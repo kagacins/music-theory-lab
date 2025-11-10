@@ -20,7 +20,9 @@ import { getNoteKeyId } from '../utils/noteUtils.js';
  */
 export let g_KeyboardKeys = [];
 export let isPointerDown = false;
-export let activeKeyNoteName = null;
+export let activeKeyNoteName = null; // Kept for backward compatibility with mouse events
+export let activeKeyNoteNames = new Set(); // Multitouch support: Set of currently pressed keys
+export let activeTouches = new Map(); // Map of touchId -> noteName for multitouch tracking
 export let lastTouchTime = 0;
 
 /**
@@ -33,22 +35,49 @@ export function clearHighlights() {
 }
 
 /**
- * Release the currently active key (stop sound and remove visual feedback)
- * Depends on: global piano, audioIsReady, activeKeyNoteName
+ * Release a specific key or all keys (stop sound and remove visual feedback)
+ * @param {string|null} noteName - The note name to release, or null to release all keys
+ * Depends on: global piano, audioIsReady, activeKeyNoteNames
  */
-export function releaseActiveKey() {
+export function releaseActiveKey(noteName = null) {
     // Access global variables - should be passed as parameters in refactored version
-    const piano = window.getPiano ? window.getPiano() : null;
+    const instrument = window.getInstrument ? window.getInstrument() : (window.getPiano ? window.getPiano() : null);
     const audioIsReady = window.getAudioIsReady ? window.getAudioIsReady() : false;
 
-    if (activeKeyNoteName && piano && audioIsReady) {
-        piano.triggerRelease(activeKeyNoteName, Tone.now());
-        const keyId = getNoteKeyId(activeKeyNoteName);
-        const keyEl = document.getElementById(keyId);
-        if (keyEl) {
-            // Remove all playback highlighting classes
-            keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
+    if (!instrument || !audioIsReady) return;
+
+    if (noteName) {
+        // Release a specific key
+        try {
+            instrument.triggerRelease(noteName, Tone.now());
+            const keyId = getNoteKeyId(noteName);
+            const keyEl = document.getElementById(keyId);
+            if (keyEl) {
+                // Remove all playback highlighting classes
+                keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
+            }
+            activeKeyNoteNames.delete(noteName);
+            if (activeKeyNoteName === noteName) {
+                activeKeyNoteName = null;
+            }
+        } catch (e) {
+            // Ignore errors for individual note release
         }
+    } else {
+        // Release all active keys (for mouse/backward compatibility)
+        activeKeyNoteNames.forEach(note => {
+            try {
+                instrument.triggerRelease(note, Tone.now());
+                const keyId = getNoteKeyId(note);
+                const keyEl = document.getElementById(keyId);
+                if (keyEl) {
+                    keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
+                }
+            } catch (e) {
+                // Ignore errors for individual note release
+            }
+        });
+        activeKeyNoteNames.clear();
         activeKeyNoteName = null;
     }
 }
@@ -150,6 +179,12 @@ export function renderKeyboard() {
     keyboardEl.innerHTML = '';
     g_KeyboardKeys = [];
     
+    // Clear multitouch state when re-rendering keyboard
+    activeKeyNoteNames.clear();
+    activeTouches.clear();
+    activeKeyNoteName = null;
+    isPointerDown = false;
+    
     // Apply modern keyboard class by default (unless classic is enabled)
     const isClassicKeyboardOn = window.isClassicKeyboardOn || false;
     if (!isClassicKeyboardOn) {
@@ -187,6 +222,132 @@ export function renderKeyboard() {
     const whiteKeyWidth = 100 / totalWhiteKeys;
     const blackKeyWidth = whiteKeyWidth * 0.5;
 
+    // Helper function to press a key (supports both mouse and multitouch)
+    const pressKeyByName = (noteName, touchId = null) => {
+        const keyEl = document.getElementById(getNoteKeyId(noteName));
+        if (!keyEl) return;
+        
+        // Get current tab fresh each time
+        const currentTab = window.currentTab || 'builder';
+        
+        // For mouse events (touchId === null), maintain single-key behavior for backward compatibility
+        // For touch events (touchId !== null), allow multitouch
+        const isMouseEvent = touchId === null;
+        
+        if (isMouseEvent && forceStopAllPlayback) {
+            forceStopAllPlayback();
+        }
+        
+        // For mouse: if clicking the same key that's already active, toggle it
+        if (isMouseEvent && noteName === activeKeyNoteName) {
+            releaseActiveKey(noteName);
+            // Small delay to ensure release completes, then press again
+            setTimeout(() => {
+                if (initAudio) initAudio();
+                const instrument = window.getInstrument ? window.getInstrument() : (window.getPiano ? window.getPiano() : null);
+                const audioIsReady = window.getAudioIsReady ? window.getAudioIsReady() : false;
+                if (!audioIsReady || !instrument) return;
+                instrument.triggerAttack(noteName, Tone.now());
+                activeKeyNoteName = noteName;
+                activeKeyNoteNames.add(noteName);
+                
+                // Get current tab fresh
+                const currentTabNow = window.currentTab || 'builder';
+                
+                // Add consistent playback highlighting based on current tab
+                keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
+                if (currentTabNow === 'builder') {
+                    keyEl.classList.add('active-builder-playback');
+                } else if (currentTabNow === 'scales') {
+                    keyEl.classList.add('active-scale-playback');
+                } else if (currentTabNow === 'trainer') {
+                    keyEl.classList.add('active-progression');
+                } else if (currentTabNow === 'melody') {
+                    keyEl.classList.add('active-melody-playback');
+                }
+
+                // If recording melody on the melody tab, add note to interactive melody
+                if (currentTabNow === 'melody' && window.isInteractiveMode && window.addNoteToInteractiveMelody) {
+                    window.addNoteToInteractiveMelody(noteName, true); // true = skip playback
+                }
+            }, 10);
+            return;
+        }
+        
+        // For mouse: release previous key if different (single-key mode)
+        if (isMouseEvent && activeKeyNoteName && activeKeyNoteName !== noteName) {
+            releaseActiveKey(activeKeyNoteName);
+        }
+        
+        // For touch: if this key is already being played by this touch, don't press again
+        if (!isMouseEvent && activeTouches.has(touchId) && activeTouches.get(touchId) === noteName) {
+            return;
+        }
+        
+        // For touch: if this touch was on a different key, release that key first
+        if (!isMouseEvent && activeTouches.has(touchId)) {
+            const previousNote = activeTouches.get(touchId);
+            if (previousNote !== noteName) {
+                releaseActiveKey(previousNote);
+                activeTouches.delete(touchId);
+            }
+        }
+        
+        // Don't press if the key is already active (for multitouch, allow same key from different touches)
+        if (activeKeyNoteNames.has(noteName) && isMouseEvent) {
+            return;
+        }
+        
+        if (initAudio) initAudio();
+        const instrument = window.getInstrument ? window.getInstrument() : (window.getPiano ? window.getPiano() : null);
+        const audioIsReady = window.getAudioIsReady ? window.getAudioIsReady() : false;
+        if (!audioIsReady || !instrument) return;
+        
+        try {
+            instrument.triggerAttack(noteName, Tone.now());
+            
+            // Track the active key
+            if (isMouseEvent) {
+                activeKeyNoteName = noteName;
+            }
+            activeKeyNoteNames.add(noteName);
+            if (!isMouseEvent && touchId !== null) {
+                activeTouches.set(touchId, noteName);
+            }
+            
+            // Add consistent playback highlighting based on current tab
+            keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
+            if (currentTab === 'builder') {
+                keyEl.classList.add('active-builder-playback');
+            } else if (currentTab === 'scales') {
+                keyEl.classList.add('active-scale-playback');
+            } else if (currentTab === 'trainer') {
+                keyEl.classList.add('active-progression');
+            } else if (currentTab === 'melody') {
+                keyEl.classList.add('active-melody-playback');
+            }
+
+            // If recording on the trainer tab, capture chord (all active keys)
+            const trainerStateNow = window.trainerState;
+            if (trainerStateNow && trainerStateNow.isRecording && currentTab === 'trainer' && capturePlayedChord) {
+                // For multitouch, capture all currently active keys as a chord
+                if (activeKeyNoteNames.size > 0) {
+                    capturePlayedChord(Array.from(activeKeyNoteNames));
+                } else {
+                    capturePlayedChord([noteName]);
+                }
+            }
+
+            // If recording melody on the melody tab, add note to interactive melody
+            if (currentTab === 'melody' && window.isInteractiveMode && window.addNoteToInteractiveMelody) {
+                window.addNoteToInteractiveMelody(noteName, true); // true = skip playback
+            }
+        } catch (e) {
+            // Ignore errors (e.g., if audio context is not ready)
+            console.warn('Error triggering attack:', e);
+        }
+    };
+
     g_KeyboardKeys.forEach(keyData => {
         const keyEl = document.createElement('div');
         keyEl.id = getNoteKeyId(keyData.name);
@@ -216,86 +377,7 @@ export function renderKeyboard() {
         const pressThisKey = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            
-            // Get current tab fresh each time (not captured at render time)
-            const currentTab = window.currentTab || 'builder';
-            
-            if (forceStopAllPlayback) forceStopAllPlayback();
-            
-            // Always release any previously active key first (if it's a different key)
-            if (activeKeyNoteName && activeKeyNoteName !== keyData.name) {
-                releaseActiveKey();
-            }
-            
-            // If clicking the same key that's already active, release it and then immediately press it again
-            if (keyData.name === activeKeyNoteName) {
-                releaseActiveKey();
-                // Small delay to ensure release completes, then press again
-                setTimeout(() => {
-                    if (initAudio) initAudio();
-                    const piano = window.getPiano ? window.getPiano() : null;
-                    const audioIsReady = window.getAudioIsReady ? window.getAudioIsReady() : false;
-                    if (!audioIsReady || !piano) return;
-                    piano.triggerAttack(keyData.name, Tone.now());
-                    activeKeyNoteName = keyData.name;
-                    
-                    // Get current tab fresh
-                    const currentTabNow = window.currentTab || 'builder';
-                    
-                    // Add consistent playback highlighting based on current tab
-                    keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
-                    if (currentTabNow === 'builder') {
-                        keyEl.classList.add('active-builder-playback');
-                    } else if (currentTabNow === 'scales') {
-                        keyEl.classList.add('active-scale-playback');
-                    } else if (currentTabNow === 'trainer') {
-                        keyEl.classList.add('active-progression');
-                    } else if (currentTabNow === 'melody') {
-                        keyEl.classList.add('active-melody-playback');
-                    }
-
-                    // If recording melody on the melody tab, add note to interactive melody
-                    if (currentTabNow === 'melody' && window.isInteractiveMode && window.addNoteToInteractiveMelody) {
-                        // Add note to melody (but don't play it again - keyboard already plays it)
-                        window.addNoteToInteractiveMelody(keyData.name, true); // true = skip playback
-                    }
-                }, 10);
-                return;
-            }
-            
-            if (initAudio) initAudio();
-            const instrument = window.getInstrument ? window.getInstrument() : (window.getPiano ? window.getPiano() : null);
-            const audioIsReady = window.getAudioIsReady ? window.getAudioIsReady() : false;
-            if (!audioIsReady || !instrument) return;
-            instrument.triggerAttack(keyData.name, Tone.now());
-            activeKeyNoteName = keyData.name;
-            
-            // Add consistent playback highlighting based on current tab
-            // Remove all playback classes first, then add the appropriate one
-            keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
-            if (currentTab === 'builder') {
-                keyEl.classList.add('active-builder-playback');
-            } else if (currentTab === 'scales') {
-                keyEl.classList.add('active-scale-playback');
-            } else if (currentTab === 'trainer') {
-                keyEl.classList.add('active-progression');
-            } else if (currentTab === 'melody') {
-                keyEl.classList.add('active-melody-playback');
-            }
-
-            // If recording on the trainer tab, treat single note as a simple chord root
-            const trainerStateNow = window.trainerState;
-            if (trainerStateNow && trainerStateNow.isRecording && currentTab === 'trainer' && capturePlayedChord) {
-                // We can capture single notes as the root of a default chord
-                capturePlayedChord([keyData.name]);
-            }
-
-            // If recording melody on the melody tab, add note to interactive melody
-            if (currentTab === 'melody' && window.isInteractiveMode && window.addNoteToInteractiveMelody) {
-                // Add note to melody (but don't play it again - keyboard already played it)
-                // We'll pass a flag to skip playback in addNoteToInteractiveMelody
-                window.addNoteToInteractiveMelody(keyData.name, true); // true = skip playback
-            }
+            pressKeyByName(keyData.name, null); // null = mouse event
         };
 
         keyEl.addEventListener('mousedown', (e) => {
@@ -303,14 +385,16 @@ export function renderKeyboard() {
             isPointerDown = true;
             pressThisKey(e);
         });
-        keyEl.addEventListener('touchstart', (e) => {
-            lastTouchTime = Date.now();
-            isPointerDown = true;
-            pressThisKey(e);
-        }, { passive: false });
+        
+        // Touch events are handled at the keyboard level for multitouch support
+        // Individual key touchstart is not needed - we'll handle all touches at the keyboard container level
 
         keyEl.addEventListener('mouseenter', (e) => {
-            if (isPointerDown) pressThisKey(e);
+            if (isPointerDown) {
+                e.preventDefault();
+                e.stopPropagation();
+                pressKeyByName(keyData.name, null); // null = mouse event
+            }
         });
 
         keysMap[keyData.name] = keyEl;
@@ -319,19 +403,68 @@ export function renderKeyboard() {
     document.addEventListener('mouseup', (e) => {
         if (Date.now() - lastTouchTime < 500) { e.preventDefault(); return; }
         isPointerDown = false;
-        releaseActiveKey();
+        releaseActiveKey(); // Release all keys for mouse (backward compatibility)
     });
+
+    // Multitouch support: Handle all touches at the keyboard container level
+    keyboardEl.addEventListener('touchstart', (e) => {
+        lastTouchTime = Date.now();
+        e.preventDefault();
+        
+        // Process all touches in the event
+        Array.from(e.changedTouches).forEach(touch => {
+            const touchId = touch.identifier;
+            const touchX = touch.clientX;
+            const touchY = touch.clientY;
+            
+            // Find the key element at this touch point
+            const keyElement = document.elementFromPoint(touchX, touchY);
+            if (keyElement && keyElement.classList.contains('key')) {
+                const noteName = g_KeyboardKeys.find(k => getNoteKeyId(k.name) === keyElement.id)?.name;
+                if (noteName) {
+                    pressKeyByName(noteName, touchId);
+                }
+            }
+        });
+    }, { passive: false });
 
     keyboardEl.addEventListener('touchend', (e) => {
         e.preventDefault();
-        isPointerDown = false;
-        releaseActiveKey();
-    });
+        
+        // Release keys for all ended touches
+        Array.from(e.changedTouches).forEach(touch => {
+            const touchId = touch.identifier;
+            const noteName = activeTouches.get(touchId);
+            if (noteName) {
+                releaseActiveKey(noteName);
+                activeTouches.delete(touchId);
+            }
+        });
+        
+        // Update isPointerDown flag (true if any touches remain)
+        if (activeTouches.size === 0) {
+            isPointerDown = false;
+        }
+    }, { passive: false });
+    
     keyboardEl.addEventListener('touchcancel', (e) => {
         e.preventDefault();
-        isPointerDown = false;
-        releaseActiveKey();
-    });
+        
+        // Release keys for all cancelled touches
+        Array.from(e.changedTouches).forEach(touch => {
+            const touchId = touch.identifier;
+            const noteName = activeTouches.get(touchId);
+            if (noteName) {
+                releaseActiveKey(noteName);
+                activeTouches.delete(touchId);
+            }
+        });
+        
+        // Update isPointerDown flag
+        if (activeTouches.size === 0) {
+            isPointerDown = false;
+        }
+    }, { passive: false });
 
     let currentWhiteKeyIndex = 0;
     g_KeyboardKeys.forEach(keyData => {
@@ -347,16 +480,39 @@ export function renderKeyboard() {
     });
 
     keyboardEl.addEventListener('touchmove', (e) => {
-        if (!isPointerDown) return;
         e.preventDefault();
-        const touch = e.touches[0];
-        const newKeyElement = document.elementFromPoint(touch.clientX, touch.clientY);
-        if (newKeyElement && newKeyElement.classList.contains('key')) {
-            const newNoteName = g_KeyboardKeys.find(k => getNoteKeyId(k.name) === newKeyElement.id)?.name;
-            if (newNoteName && newNoteName !== activeKeyNoteName) {
-                newKeyElement.dispatchEvent(new MouseEvent('mousedown'));
+        
+        // Handle all active touches
+        Array.from(e.touches).forEach(touch => {
+            const touchId = touch.identifier;
+            const touchX = touch.clientX;
+            const touchY = touch.clientY;
+            
+            // Find the key element at this touch point
+            const keyElement = document.elementFromPoint(touchX, touchY);
+            if (keyElement && keyElement.classList.contains('key')) {
+                const newNoteName = g_KeyboardKeys.find(k => getNoteKeyId(k.name) === keyElement.id)?.name;
+                if (newNoteName) {
+                    const currentNoteForTouch = activeTouches.get(touchId);
+                    // If touch moved to a different key, release old key and press new one
+                    if (currentNoteForTouch !== newNoteName) {
+                        if (currentNoteForTouch) {
+                            releaseActiveKey(currentNoteForTouch);
+                            activeTouches.delete(touchId);
+                        }
+                        // Press the new key
+                        pressKeyByName(newNoteName, touchId);
+                    }
+                }
+            } else {
+                // Touch moved off keyboard, release the key for this touch
+                const currentNoteForTouch = activeTouches.get(touchId);
+                if (currentNoteForTouch) {
+                    releaseActiveKey(currentNoteForTouch);
+                    activeTouches.delete(touchId);
+                }
             }
-        }
+        });
     }, { passive: false });
 
     keyboardEl.addEventListener('mouseleave', () => {
