@@ -1,0 +1,12 @@
+{
+  "name": "music-theory-lab",
+  "version": "1.0.0",
+  "description": "Interactive Music Theory Lab",
+  "scripts": {
+    "build-css": "tailwindcss -i ./src/input.css -o ./dist/output.css --minify",
+    "watch-css": "tailwindcss -i ./src/input.css -o ./dist/output.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
+  }
+}

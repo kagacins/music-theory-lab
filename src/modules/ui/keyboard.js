@@ -1,0 +1,644 @@
+/**
+ * Keyboard UI Module
+ * Handles piano keyboard rendering, highlighting, and interaction
+ *
+ * State Dependencies:
+ * - Requires global state: piano, audioIsReady, g_KeyboardKeys, isPointerDown,
+ *   activeKeyNoteName, lastTouchTime, currentTab, trainerState, enharmonicPreference,
+ *   builderRootIndex, isRomanNumeralEngineOn
+ * - Depends on: initAudio, forceStopAllPlayback, releaseActiveKey, capturePlayedChord,
+ *   getNoteKeyId from noteUtils
+ */
+
+import { getNoteKeyId } from '../utils/noteUtils.js';
+
+// NOTE: This module accesses and modifies global state variables that should be
+// refactored into proper state management modules in the future.
+
+/**
+ * Global keyboard state - should be moved to a state module
+ */
+export let g_KeyboardKeys = [];
+export let isPointerDown = false;
+export let activeKeyNoteName = null;
+export let lastTouchTime = 0;
+
+/**
+ * Clear all highlight classes from keyboard keys
+ */
+export function clearHighlights() {
+    document.querySelectorAll('.key').forEach(key => {
+        key.classList.remove('active-scale', 'active-progression', 'active-builder', 'active-scale-explorer', 'active-scale-playback', 'active-builder-playback', 'active-melody-playback');
+    });
+}
+
+/**
+ * Release the currently active key (stop sound and remove visual feedback)
+ * Depends on: global piano, audioIsReady, activeKeyNoteName
+ */
+export function releaseActiveKey() {
+    // Access global variables - should be passed as parameters in refactored version
+    const piano = window.getPiano ? window.getPiano() : null;
+    const audioIsReady = window.getAudioIsReady ? window.getAudioIsReady() : false;
+
+    if (activeKeyNoteName && piano && audioIsReady) {
+        piano.triggerRelease(activeKeyNoteName, Tone.now());
+        const keyId = getNoteKeyId(activeKeyNoteName);
+        const keyEl = document.getElementById(keyId);
+        if (keyEl) {
+            // Remove all playback highlighting classes
+            keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
+        }
+        activeKeyNoteName = null;
+    }
+}
+
+/**
+ * Press a key (placeholder for touchmove logic)
+ * @param {string} noteName - The note name to press
+ * @param {HTMLElement} keyElement - The key element
+ */
+export function pressKey(noteName, keyElement) {
+    // This function is a placeholder for the logic inside pressThisKey, adapted for touchmove
+}
+
+/**
+ * Highlight builder notes on the keyboard
+ * @param {Array<string>} specificNotes - Array of note names to highlight
+ * Depends on: global currentTab, builderRootIndex, enharmonicPreference, builderOmittedNotes, builderLHOmittedNotes
+ */
+export function highlightBuilderNotes(specificNotes) {
+    // Access global variables
+    const currentTab = window.currentTab;
+    const builderRootIndex = window.builderRootIndex;
+    const enharmonicPreference = window.enharmonicPreference;
+    const builderOmittedNotes = window.builderOmittedNotes;
+    const builderLHOmittedNotes = window.builderLHOmittedNotes;
+    const builderSelectionMode = window.builderSelectionMode;
+    const SHARP_NOTES = window.SHARP_NOTES;
+    const FLAT_NOTES = window.FLAT_NOTES;
+    const getLHNotes = window.getLHNotes;
+
+    clearHighlights();
+    if (!specificNotes || currentTab !== 'builder') return;
+
+    let allNotes = [...specificNotes];
+
+    const rootNote = (enharmonicPreference === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[builderRootIndex];
+    const lhType = document.getElementById('builder-lh-type-select').value;
+    const lhOctaveShift = parseInt(document.getElementById('builder-lh-octave-select').value, 10);
+    const lhInversion = parseInt(document.getElementById('builder-lh-inversion-select').value, 10) || 0;
+
+    // Filter out any omitted notes from the right-hand part before highlighting
+    allNotes = allNotes.filter(note => !builderOmittedNotes.includes(note));
+
+    if (builderSelectionMode === 'chord' || builderSelectionMode === 'interval') {
+        const allLhNotes = getLHNotes(rootNote, lhType, lhInversion, rootNote, lhOctaveShift);
+        const voicedLhNotes = allLhNotes.filter(note => !builderLHOmittedNotes.includes(note));
+        allNotes = allNotes.concat(voicedLhNotes);
+    }
+
+    allNotes.forEach(note => {
+        const keyId = getNoteKeyId(note);
+        const keyElement = document.getElementById(keyId);
+        if (keyElement) keyElement.classList.add('active-builder');
+    });
+}
+
+/**
+ * Highlight trainer scale and chord notes
+ * @param {Array<string>} scaleNotes - Scale notes to highlight
+ * @param {Array<string>} chordNotes - Chord notes to highlight (optional)
+ * Depends on: global currentTab
+ */
+export function highlightTrainer(scaleNotes, chordNotes) {
+    const currentTab = window.currentTab;
+
+    clearHighlights();
+    if (currentTab !== 'trainer' || !scaleNotes) return;
+
+    scaleNotes.forEach(note => {
+        const keyId = getNoteKeyId(note);
+        const keyElement = document.getElementById(keyId);
+        if (keyElement) keyElement.classList.add('active-scale');
+    });
+
+    if (chordNotes) {
+         chordNotes.forEach(note => {
+            const keyId = getNoteKeyId(note);
+            const keyElement = document.getElementById(keyId);
+            if (keyElement) keyElement.classList.add('active-progression');
+        });
+    }
+}
+
+/**
+ * Render the piano keyboard
+ * Depends on: global g_NumOctaves, piano, audioIsReady, currentTab, trainerState
+ */
+export function renderKeyboard() {
+    // Access global variables
+    const g_NumOctaves = window.g_NumOctaves;
+    const initAudio = window.initAudio;
+    const forceStopAllPlayback = window.forceStopAllPlayback;
+    const capturePlayedChord = window.capturePlayedChord;
+    const trainerState = window.trainerState;
+    const currentTab = window.currentTab;
+
+    const numOctaves = g_NumOctaves;
+    const keyboardEl = document.getElementById('piano-keyboard');
+    keyboardEl.innerHTML = '';
+    g_KeyboardKeys = [];
+    
+    // Apply modern keyboard class by default (unless classic is enabled)
+    const isClassicKeyboardOn = window.isClassicKeyboardOn || false;
+    if (!isClassicKeyboardOn) {
+        // Classic keyboard is OFF - show modern style (default)
+        keyboardEl.classList.add('modern-keyboard');
+    } else {
+        // Classic keyboard is ON - show classic style
+        keyboardEl.classList.remove('modern-keyboard');
+    }
+
+    const centerMidi = 60; // C4
+    const totalKeys = numOctaves * 12 + 1;
+    const halfRange = Math.floor(totalKeys / 2);
+
+    let idealStartMidi = centerMidi - halfRange;
+    let idealEndMidi = centerMidi + (totalKeys - halfRange - 1);
+
+    const actualStartMidi = Math.max(21, idealStartMidi);
+    const actualEndMidi = Math.min(108, idealEndMidi);
+
+    for (let midi = actualStartMidi; midi <= actualEndMidi; midi++) {
+        const noteName = Tone.Midi(midi).toNote();
+        const baseName = noteName.replace(/[0-9]/g, '');
+        g_KeyboardKeys.push({
+            name: noteName,
+            type: baseName.includes('#') ? 'black' : 'white',
+            baseName: baseName
+        });
+    }
+
+    let keysMap = {};
+    const totalWhiteKeys = g_KeyboardKeys.filter(k => k.type === 'white').length;
+    if (totalWhiteKeys === 0) return;
+
+    const whiteKeyWidth = 100 / totalWhiteKeys;
+    const blackKeyWidth = whiteKeyWidth * 0.5;
+
+    g_KeyboardKeys.forEach(keyData => {
+        const keyEl = document.createElement('div');
+        keyEl.id = getNoteKeyId(keyData.name);
+
+        if (keyData.type === 'white') {
+            keyEl.className = 'key white-key';
+            keyEl.style.width = `${whiteKeyWidth}%`;
+            const noteNameLabel = document.createElement('span');
+            noteNameLabel.className = 'key-label-note text-gray-500 text-xs absolute bottom-1';
+            if (keyData.name.includes('C')) {
+                 noteNameLabel.textContent = keyData.name;
+            }
+            keyEl.appendChild(noteNameLabel);
+        } else {
+            keyEl.className = 'key black-key';
+            keyEl.style.width = `${blackKeyWidth}%`;
+        }
+
+        const romanLabel = document.createElement('span');
+        romanLabel.className = 'key-label-roman text-indigo-700 text-xs font-bold absolute top-1 left-1/2 -translate-x-1/2 pointer-events-none';
+        keyEl.appendChild(romanLabel);
+
+        const keyNameLabel = document.createElement('span');
+        keyNameLabel.className = 'key-label-keyname text-gray-600 text-xs font-medium absolute bottom-1 left-1/2 -translate-x-1/2 pointer-events-none';
+        keyEl.appendChild(keyNameLabel);
+
+        const pressThisKey = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Get current tab fresh each time (not captured at render time)
+            const currentTab = window.currentTab || 'builder';
+            
+            if (forceStopAllPlayback) forceStopAllPlayback();
+            
+            // Always release any previously active key first (if it's a different key)
+            if (activeKeyNoteName && activeKeyNoteName !== keyData.name) {
+                releaseActiveKey();
+            }
+            
+            // If clicking the same key that's already active, release it and then immediately press it again
+            if (keyData.name === activeKeyNoteName) {
+                releaseActiveKey();
+                // Small delay to ensure release completes, then press again
+                setTimeout(() => {
+                    if (initAudio) initAudio();
+                    const piano = window.getPiano ? window.getPiano() : null;
+                    const audioIsReady = window.getAudioIsReady ? window.getAudioIsReady() : false;
+                    if (!audioIsReady || !piano) return;
+                    piano.triggerAttack(keyData.name, Tone.now());
+                    activeKeyNoteName = keyData.name;
+                    
+                    // Get current tab fresh
+                    const currentTabNow = window.currentTab || 'builder';
+                    
+                    // Add consistent playback highlighting based on current tab
+                    keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
+                    if (currentTabNow === 'builder') {
+                        keyEl.classList.add('active-builder-playback');
+                    } else if (currentTabNow === 'scales') {
+                        keyEl.classList.add('active-scale-playback');
+                    } else if (currentTabNow === 'trainer') {
+                        keyEl.classList.add('active-progression');
+                    } else if (currentTabNow === 'melody') {
+                        keyEl.classList.add('active-melody-playback');
+                    }
+
+                    // If recording melody on the melody tab, add note to interactive melody
+                    if (currentTabNow === 'melody' && window.isInteractiveMode && window.addNoteToInteractiveMelody) {
+                        // Add note to melody (but don't play it again - keyboard already plays it)
+                        window.addNoteToInteractiveMelody(keyData.name, true); // true = skip playback
+                    }
+                }, 10);
+                return;
+            }
+            
+            if (initAudio) initAudio();
+            const instrument = window.getInstrument ? window.getInstrument() : (window.getPiano ? window.getPiano() : null);
+            const audioIsReady = window.getAudioIsReady ? window.getAudioIsReady() : false;
+            if (!audioIsReady || !instrument) return;
+            instrument.triggerAttack(keyData.name, Tone.now());
+            activeKeyNoteName = keyData.name;
+            
+            // Add consistent playback highlighting based on current tab
+            // Remove all playback classes first, then add the appropriate one
+            keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
+            if (currentTab === 'builder') {
+                keyEl.classList.add('active-builder-playback');
+            } else if (currentTab === 'scales') {
+                keyEl.classList.add('active-scale-playback');
+            } else if (currentTab === 'trainer') {
+                keyEl.classList.add('active-progression');
+            } else if (currentTab === 'melody') {
+                keyEl.classList.add('active-melody-playback');
+            }
+
+            // If recording on the trainer tab, treat single note as a simple chord root
+            const trainerStateNow = window.trainerState;
+            if (trainerStateNow && trainerStateNow.isRecording && currentTab === 'trainer' && capturePlayedChord) {
+                // We can capture single notes as the root of a default chord
+                capturePlayedChord([keyData.name]);
+            }
+
+            // If recording melody on the melody tab, add note to interactive melody
+            if (currentTab === 'melody' && window.isInteractiveMode && window.addNoteToInteractiveMelody) {
+                // Add note to melody (but don't play it again - keyboard already played it)
+                // We'll pass a flag to skip playback in addNoteToInteractiveMelody
+                window.addNoteToInteractiveMelody(keyData.name, true); // true = skip playback
+            }
+        };
+
+        keyEl.addEventListener('mousedown', (e) => {
+            if (Date.now() - lastTouchTime < 500) { e.preventDefault(); return; }
+            isPointerDown = true;
+            pressThisKey(e);
+        });
+        keyEl.addEventListener('touchstart', (e) => {
+            lastTouchTime = Date.now();
+            isPointerDown = true;
+            pressThisKey(e);
+        }, { passive: false });
+
+        keyEl.addEventListener('mouseenter', (e) => {
+            if (isPointerDown) pressThisKey(e);
+        });
+
+        keysMap[keyData.name] = keyEl;
+    });
+
+    document.addEventListener('mouseup', (e) => {
+        if (Date.now() - lastTouchTime < 500) { e.preventDefault(); return; }
+        isPointerDown = false;
+        releaseActiveKey();
+    });
+
+    keyboardEl.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        isPointerDown = false;
+        releaseActiveKey();
+    });
+    keyboardEl.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        isPointerDown = false;
+        releaseActiveKey();
+    });
+
+    let currentWhiteKeyIndex = 0;
+    g_KeyboardKeys.forEach(keyData => {
+        const keyEl = keysMap[keyData.name];
+        if (keyData.type === 'white') {
+            keyboardEl.appendChild(keyEl);
+            currentWhiteKeyIndex++;
+        } else {
+            let whiteKeyStart = whiteKeyWidth * currentWhiteKeyIndex;
+            keyEl.style.left = `${whiteKeyStart - (blackKeyWidth / 2)}%`;
+            keyboardEl.appendChild(keyEl);
+        }
+    });
+
+    keyboardEl.addEventListener('touchmove', (e) => {
+        if (!isPointerDown) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        const newKeyElement = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (newKeyElement && newKeyElement.classList.contains('key')) {
+            const newNoteName = g_KeyboardKeys.find(k => getNoteKeyId(k.name) === newKeyElement.id)?.name;
+            if (newNoteName && newNoteName !== activeKeyNoteName) {
+                newKeyElement.dispatchEvent(new MouseEvent('mousedown'));
+            }
+        }
+    }, { passive: false });
+
+    keyboardEl.addEventListener('mouseleave', () => {
+         if(isPointerDown) {
+            releaseActiveKey();
+            isPointerDown = false;
+         }
+    });
+}
+
+/**
+ * Update keyboard labels with Roman numerals
+ * Depends on: global isRomanNumeralEngineOn, currentTab, trainerState, builderRootIndex, enharmonicPreference
+ */
+/**
+ * Convert Roman numeral to minor case (for minor keys)
+ * @param {string} roman - Roman numeral (e.g., "I", "ii", "V")
+ * @returns {string} Roman numeral in minor case (e.g., "i", "ii°", "v")
+ */
+function convertRomanToMinor(roman) {
+    // Map major Roman numerals to minor equivalents
+    const minorMap = {
+        'I': 'i',
+        'ii': 'ii°',
+        'iii': 'III',
+        'IV': 'iv',
+        'V': 'v',
+        'vi': 'VI',
+        'vii°': 'VII'
+    };
+    return minorMap[roman] || roman;
+}
+
+export function updateKeyboardLabels() {
+    // Access global variables
+    const isRomanNumeralEngineOn = window.isRomanNumeralEngineOn || false;
+    const currentTab = window.currentTab || 'builder';
+    
+    // Import trainerState getter if window.trainerState is not available
+    let trainerState;
+    if (window.trainerState) {
+        trainerState = window.trainerState;
+    } else if (window.getTrainerState) {
+        trainerState = window.getTrainerState();
+    } else {
+        trainerState = { isReady: false, currentKey: 'C' };
+    }
+    
+    // Don't read builderRootIndex here - read it fresh in each tab branch when needed
+    const enharmonicPreference = window.enharmonicPreference || 'sharp';
+    const SHARP_NOTES = window.SHARP_NOTES;
+    const FLAT_NOTES = window.FLAT_NOTES;
+    const ALL_NOTES = window.ALL_NOTES;
+    const MAJOR_SCALE_STEPS = window.MAJOR_SCALE_STEPS;
+
+    // Access key names state
+    const isKeyNamesOn = window.isKeyNamesOn || false;
+
+    // Clear all existing labels first - force clear all
+    document.querySelectorAll('.key-label-roman').forEach(label => {
+        label.textContent = '';
+        label.classList.remove('text-white', 'text-indigo-700');
+        label.style.display = '';
+    });
+
+    // Clear key name labels
+    document.querySelectorAll('.key-label-keyname').forEach(label => {
+        label.textContent = '';
+        label.style.display = '';
+    });
+
+    // Update key names if enabled
+    if (isKeyNamesOn) {
+        updateKeyNames();
+    }
+
+    if (!isRomanNumeralEngineOn) {
+        return; // Exit if the feature is turned off
+    }
+
+    // Get root note name based on current tab
+    let rootNoteName;
+    let isMinorKey = false;
+    if (currentTab === 'trainer') {
+        // For trainer tab, always try to get the current key
+        // Even if isReady is false, we should still show Roman numerals if a key is selected
+        if (trainerState && trainerState.currentKey) {
+            rootNoteName = trainerState.currentKey;
+        } else {
+            // Try to get it from the selector directly
+            const keySelect = document.getElementById('trainer-key-select');
+            if (keySelect && keySelect.value) {
+                rootNoteName = keySelect.value;
+            } else {
+                rootNoteName = 'C'; // Default fallback
+            }
+        }
+        // Check if key is minor (ends with 'm')
+        isMinorKey = rootNoteName.endsWith('m');
+        // Remove 'm' suffix for root note calculation
+        if (isMinorKey) {
+            rootNoteName = rootNoteName.replace(/m$/, '');
+        }
+    } else if (currentTab === 'builder') {
+        // Always read builderRootIndex fresh from window
+        const currentBuilderRootIndex = window.builderRootIndex !== undefined ? window.builderRootIndex : 0;
+        if (!SHARP_NOTES || !FLAT_NOTES || currentBuilderRootIndex < 0 || currentBuilderRootIndex >= (enharmonicPreference === 'sharp' ? SHARP_NOTES.length : FLAT_NOTES.length)) {
+            return; // Invalid state
+        }
+        rootNoteName = (enharmonicPreference === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[currentBuilderRootIndex];
+    } else if (currentTab === 'scales') {
+        // Get scale root index from window or state module
+        const scaleRootIndex = window.scaleRootIndex !== undefined ? window.scaleRootIndex : 
+            (window.getScaleRootIndex ? window.getScaleRootIndex() : 0);
+        if (!SHARP_NOTES || !FLAT_NOTES || scaleRootIndex < 0 || scaleRootIndex >= (enharmonicPreference === 'sharp' ? SHARP_NOTES.length : FLAT_NOTES.length)) {
+            return; // Invalid state
+        }
+        rootNoteName = (enharmonicPreference === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[scaleRootIndex];
+    } else {
+        return; // Don't show labels on other tabs
+    }
+
+    if (!rootNoteName || !ALL_NOTES || !MAJOR_SCALE_STEPS) {
+        return; // Required data not available
+    }
+
+    // Find the root note in ALL_NOTES (normalize enharmonics)
+    // Handle both sharp and flat notation
+    let keyRootIndex = ALL_NOTES.indexOf(rootNoteName);
+    if (keyRootIndex === -1) {
+        // Try to find enharmonic equivalent
+        // For example, if rootNoteName is "Db", try "C#"
+        const enharmonicMap = {
+            'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#', 'Cb': 'B'
+        };
+        const equivalent = enharmonicMap[rootNoteName] || rootNoteName;
+        keyRootIndex = ALL_NOTES.indexOf(equivalent);
+        if (keyRootIndex === -1) {
+            console.warn(`Could not find root note ${rootNoteName} in ALL_NOTES`);
+            return;
+        }
+    }
+
+    // Use g_KeyboardKeys from the module scope - it should always be available after renderKeyboard()
+    // If not available, try window fallback
+    let keyboardKeys = g_KeyboardKeys;
+    if (!keyboardKeys || keyboardKeys.length === 0) {
+        keyboardKeys = window.g_KeyboardKeys || [];
+    }
+    
+    if (!keyboardKeys || keyboardKeys.length === 0) {
+        // Keyboard might not be rendered yet, try again after a short delay
+        setTimeout(() => {
+            updateKeyboardLabels();
+        }, 100);
+        return;
+    }
+
+    // Update Roman numeral labels for each key
+    keyboardKeys.forEach(keyData => {
+        const keyEl = document.getElementById(getNoteKeyId(keyData.name));
+        if (!keyEl) return;
+
+        // Find the note index in ALL_NOTES
+        // Handle both sharp and flat notation for baseName
+        let noteIndex = ALL_NOTES.indexOf(keyData.baseName);
+        if (noteIndex === -1) {
+            // Try enharmonic equivalent
+            const enharmonicMap = {
+                'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#', 'Cb': 'B'
+            };
+            const equivalent = enharmonicMap[keyData.baseName] || keyData.baseName;
+            noteIndex = ALL_NOTES.indexOf(equivalent);
+            if (noteIndex === -1) return;
+        }
+
+        // Calculate interval from root note
+        // Use modulo 12 to handle octave wrapping
+        const interval = (noteIndex - keyRootIndex + 12) % 12;
+        const scaleDegreeIndex = MAJOR_SCALE_STEPS.indexOf(interval);
+
+        // Get the label element once
+        const label = keyEl.querySelector('.key-label-roman');
+        if (!label) return;
+
+        // Update label if this note is part of the scale
+        if (scaleDegreeIndex !== -1) {
+            // Use major Roman numerals for major keys, minor for minor keys
+            const majorDiatonicNumerals = ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°'];
+            let romanNumeral = majorDiatonicNumerals[scaleDegreeIndex];
+            
+            // Convert to minor case if key is minor
+            if (isMinorKey && romanNumeral) {
+                romanNumeral = convertRomanToMinor(romanNumeral);
+            }
+            
+            if (romanNumeral && scaleDegreeIndex < majorDiatonicNumerals.length) {
+                label.textContent = romanNumeral;
+                if (keyData.type === 'black') {
+                    label.classList.add('text-white');
+                    label.classList.remove('text-indigo-700');
+                } else {
+                    label.classList.add('text-indigo-700');
+                    label.classList.remove('text-white');
+                }
+            }
+        } else {
+            // Clear label if note is not in the scale
+            label.textContent = '';
+        }
+    });
+}
+
+/**
+ * Update keyboard labels with key names
+ */
+export function updateKeyNames() {
+    const enharmonicPreference = window.enharmonicPreference || 'sharp';
+    
+    // Use g_KeyboardKeys from the module scope
+    let keyboardKeys = g_KeyboardKeys;
+    if (!keyboardKeys || keyboardKeys.length === 0) {
+        keyboardKeys = window.g_KeyboardKeys || [];
+    }
+    
+    if (!keyboardKeys || keyboardKeys.length === 0) {
+        // Keyboard might not be rendered yet, try again after a short delay
+        setTimeout(() => {
+            updateKeyNames();
+        }, 100);
+        return;
+    }
+
+    // Update key name labels for each key
+    keyboardKeys.forEach(keyData => {
+        const keyEl = document.getElementById(getNoteKeyId(keyData.name));
+        if (!keyEl) return;
+
+        const keyNameLabel = keyEl.querySelector('.key-label-keyname');
+        if (!keyNameLabel) return;
+
+        // Skip C keys as they already have octave labels (C4, C5, etc.)
+        if (keyData.baseName === 'C') {
+            keyNameLabel.textContent = '';
+            keyNameLabel.style.display = 'none';
+            return;
+        }
+
+        // Get the note name based on enharmonic preference
+        const baseName = keyData.baseName;
+        let displayName = baseName;
+        
+        // If enharmonic preference is flat, convert sharps to flats where applicable
+        if (enharmonicPreference === 'flat') {
+            const sharpToFlatMap = {
+                'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb'
+            };
+            if (sharpToFlatMap[baseName]) {
+                displayName = sharpToFlatMap[baseName];
+            }
+        } else {
+            // If enharmonic preference is sharp, convert flats to sharps where applicable
+            const flatToSharpMap = {
+                'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#'
+            };
+            if (flatToSharpMap[baseName]) {
+                displayName = flatToSharpMap[baseName];
+            }
+        }
+
+        // Display the note name
+        keyNameLabel.textContent = displayName;
+        keyNameLabel.style.display = 'block';
+        
+        // Style based on key type
+        if (keyData.type === 'black') {
+            keyNameLabel.classList.remove('text-gray-600');
+            keyNameLabel.classList.add('text-white');
+        } else {
+            keyNameLabel.classList.remove('text-white');
+            keyNameLabel.classList.add('text-gray-600');
+        }
+    });
+}
+

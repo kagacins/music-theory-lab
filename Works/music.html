@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Music Theory Lab</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- NEW: Load SortableJS for drag-and-drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <!-- Load Tone.js for audio synthesis -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    
+    <!-- Link to external CSS file -->
+    <link rel="stylesheet" href="music.css">
+</head>
+<body class="bg-gray-50 min-h-screen p-4 sm:p-8 font-sans antialiased">
+    <!-- NEW: Sidebar Navigation -->
+    <div id="sidebar" class="fixed top-0 left-0 h-full bg-gray-800 text-white w-64 transform -translate-x-full transition-transform duration-300 ease-in-out z-30 shadow-2xl">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-indigo-300">Navigation</h2>
+                <button onclick="toggleSidebar()" class="p-2 rounded-full hover:bg-gray-700 transition" title="Close Sidebar">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                </button>
+            </div>
+            <nav class="flex flex-col gap-3">
+                <div class="flex items-center gap-2">
+                    <button id="sidebar-btn-builder" onclick="switchTab('builder')" class="sidebar-btn text-left p-3 rounded-lg font-semibold bg-indigo-500 flex-grow">1. Chord Builder</button>
+                    <button onclick="showModal('Build custom chords, intervals, and voicings from scratch. This is your creative canvas.', true)" class="p-2 text-gray-400 hover:text-white transition"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="sidebar-btn-trainer" onclick="switchTab('trainer')" class="sidebar-btn text-left p-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">2. Progression Builder</button>
+                    <button onclick="showModal('Practice pre-made chord progressions or create your own. Use the record button to capture ideas from the keyboard.', true)" class="p-2 text-gray-400 hover:text-white transition"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="sidebar-btn-scales" onclick="switchTab('scales')" class="sidebar-btn text-left p-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">3. Scale Explorer</button>
+                    <button onclick="showModal('Explore a wide variety of musical scales and modes. Hear how they sound and see their notes on the keyboard.', true)" class="p-2 text-gray-400 hover:text-white transition"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
+                </div>
+            </nav>
+
+            <!-- NEW: Settings Section in Sidebar -->
+            <div class="mt-8 border-t border-gray-700 pt-6">
+                <h2 class="text-xl font-bold text-indigo-300 mb-4">Settings</h2>
+                <div class="flex flex-col gap-4">
+                    <!-- Displayed Octaves -->
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="font-medium text-gray-300">Displayed Octaves</span>
+                        <div class="flex items-center gap-2">
+                            <button onclick="showModal('Changes the number of octaves visible on the main keyboard.', true)" class="p-1 text-gray-400 hover:text-white transition"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
+                            <select id="octave-range-select" onchange="handleOctaveRangeChange(this.value)" class="p-1 text-sm border border-gray-600 rounded bg-gray-700 text-white focus:ring-2 focus:ring-indigo-400">
+                                <option value="2">2 Octaves</option>
+                                <option value="3">3 Octaves</option>
+                                <option value="4" selected>4 Octaves</option>
+                                <option value="5">5 Octaves</option>
+                                <option value="6">6 Octaves</option>
+                                <option value="7">7 Octaves</option>
+                                <option value="8">8 Octaves (Std)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- Notation Toggle -->
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="font-medium text-gray-300">Notation Style</span>
+                        <div class="flex items-center gap-2">
+                            <button onclick="showModal('Switch between displaying full chord names (e.g., C Major) or shorthand symbols (e.g., C).', true)" class="p-1 text-gray-400 hover:text-white transition"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
+                            <label for="notation-toggle" class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="notation-toggle" class="sr-only" onchange="toggleNotationStyle()"><div class="toggle-bg w-10 h-6 bg-gray-600 rounded-full border border-gray-500"></div></label>
+                        </div>
+                    </div>
+                    <!-- Enharmonic Toggle -->
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="font-medium text-gray-300">Accidentals</span>
+                        <div class="flex items-center gap-2">
+                            <button onclick="showModal('Switch between displaying sharp (♯) or flat (♭) notation for accidental notes.', true)" class="p-1 text-gray-400 hover:text-white transition -mr-1"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
+                            <span id="flat-indicator" class="text-lg font-semibold text-gray-500">♭</span>
+                            <label for="enharmonic-toggle" class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="enharmonic-toggle" class="sr-only" onchange="toggleEnharmonic()"><div class="toggle-bg w-10 h-6 bg-gray-600 rounded-full border border-gray-500"></div></label>
+                            <span id="sharp-indicator" class="text-lg font-semibold text-indigo-300">♯</span>
+                        </div>
+                    </div>
+                    <!-- Suggestion Toggle -->
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="font-medium text-gray-300">Chord Suggestions</span>
+                        <div class="flex items-center gap-2">
+                            <button onclick="showModal('Highlights suggested next chords in the builder for smooth voice leading.', true)" class="p-1 text-gray-400 hover:text-white transition"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
+                            <label for="suggestion-toggle" class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="suggestion-toggle" class="sr-only" onchange="toggleSuggestionEngine()"><div class="toggle-bg w-10 h-6 bg-gray-600 rounded-full border border-gray-500"></div></label>
+                        </div>
+                    </div>
+                    <!-- Roman Numeral Toggle -->
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="font-medium text-gray-300">Roman Numerals</span>
+                        <div class="flex items-center gap-2">
+                            <button onclick="showModal('Toggles the display of Roman numeral analysis on the keyboard, relative to the selected key.', true)" class="p-1 text-gray-400 hover:text-white transition"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
+                            <label for="roman-numeral-toggle" class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="roman-numeral-toggle" class="sr-only" onchange="toggleRomanNumeralEngine()"><div class="toggle-bg w-10 h-6 bg-gray-600 rounded-full border border-gray-500"></div></label>
+                        </div>
+                    </div>
+                    <!-- Compact Controls Toggle -->
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="font-medium text-gray-300">Compact Controls</span>
+                        <div class="flex items-center gap-2">
+                            <button onclick="showModal('Hides secondary controls on the floating panels and shrinks buttons for a more minimal UI.', true)" class="p-1 text-gray-400 hover:text-white transition"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
+                            <label for="compact-controls-toggle" class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="compact-controls-toggle" class="sr-only" onchange="toggleCompactControls()"><div class="toggle-bg w-10 h-6 bg-gray-600 rounded-full border border-gray-500"></div></label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden" onclick="toggleSidebar()"></div>
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Main Header -->
+        <div class="grid items-center bg-white/80 backdrop-blur-sm p-2 rounded-xl shadow-md mb-4 sticky top-4 z-20 border border-gray-200" style="grid-template-columns: auto 1fr auto;">
+            <!-- Left side: Sidebar Toggle and Title -->
+            <div class="flex items-center gap-4 justify-start">
+                <button id="sidebar-toggle" onclick="toggleSidebar()" class="p-2 rounded-md hover:bg-gray-200 transition" title="Open Menu & Settings">
+                    <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
+                <div>
+                    <h1 id="main-title" class="text-base sm:text-lg font-bold text-gray-800 tracking-tight">Interactive Music Theory Lab</h1>
+                    <p class="hidden sm:block text-gray-500 text-xs">Explore chords, scales, and progressions.</p>
+                </div>
+            </div>
+            
+            <!-- Center: Displays -->
+            <div class="hidden lg:flex justify-center items-center gap-2">
+                <div id="header-display-panels" class="flex items-center gap-2">
+                    <div id="shared-key-signature-display" class="bg-gray-100 p-2 rounded-md shadow-inner h-full flex items-center justify-center gap-2 w-auto">
+                        <div class="relative">
+                            <img id="treble-clef-img" src="public/key_signatures/treble_0.svg" alt="Treble Clef Key Signature" class="h-10">
+                            <span id="enharmonic-key-label" class="absolute -bottom-0.5 -right-0.5 text-[10px] leading-none font-bold bg-black/50 text-white px-1 rounded hidden"></span>
+                        </div>
+                        <span id="key-signature-text" class="text-gray-700 text-xs font-medium text-center w-28 border-l-2 border-gray-300 pl-2">Key: C Major (No Sharps or Flats)</span>
+                        <div class="flex flex-col items-center justify-center text-center w-24 border-l-2 border-gray-300 pl-2">
+                            <span class="text-xs text-gray-500 -mb-1">Rel. Minor</span>
+                            <span id="relative-minor-display" class="text-gray-700 text-sm font-semibold">A minor</span>
+                        </div>
+                    </div>
+                    <div id="shared-chord-display" class="w-56">
+                        <div id="builder-info-display" class="text-center p-1 bg-amber-50 rounded-lg shadow-inner"><p id="builder-chord-name" class="text-sm font-bold text-gray-900 truncate px-2">C Major (Root)</p><p id="builder-chord-notes" class="text-xs text-amber-700 font-medium h-4 truncate px-2">C4 - E4 - G4</p></div>
+                        <div id="progression-chord-display" class="text-center p-1 bg-teal-50 rounded-lg shadow-inner hidden"><p class="text-sm font-bold text-gray-900 truncate px-2">Progression Player</p><p id="progression-chord-notes-display" class="text-xs text-teal-700 font-medium h-4 truncate px-2">Ready to Play</p></div>
+                        <div id="scale-info-display" class="text-center p-1 bg-lime-50 rounded-lg shadow-inner hidden"><p id="scale-name" class="text-sm font-bold text-gray-900 truncate px-2">C Major Scale</p><p id="scale-notes-display" class="text-xs text-lime-700 font-medium h-4 truncate px-2">C4 - D4 - E4 - F4 - G4 - A4 - B4 - C5</p></div>
+                    </div>
+                </div>
+                <button onclick="toggleDisplayPanel('header-display-panels')" class="p-1 text-gray-400 hover:text-gray-600" title="Toggle Header Displays"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"></path></svg></button>
+            </div>
+
+            <!-- Right side: Header Tabs -->
+            <div class="flex justify-end">
+                <!-- Header Tab buttons -->
+                <div class="hidden md:flex flex-col items-end">
+                    <button id="header-tab-btn-builder" onclick="switchTab('builder')" class="px-3 py-1 text-sm font-semibold rounded-t-lg">Chord Builder</button>
+                    <button id="header-tab-btn-trainer" onclick="switchTab('trainer')" class="px-3 py-1 text-sm font-semibold">Progression Builder</button>
+                    <button id="header-tab-btn-scales" onclick="switchTab('scales')" class="px-3 py-1 text-sm font-semibold rounded-b-lg">Scale Explorer</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Visual Piano Keyboard (Shared) -->
+        <section class="mb-4 sticky top-24 z-10">
+            <div id="piano-keyboard" class="keyboard rounded-md shadow-inner bg-gray-200">
+                <!-- Keys injected here by JS -->
+            </div>
+        </section>
+
+        <!-- TAB CONTENT: CHORD BUILDER -->
+        <div id="tab-builder" class="tab-content">
+            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-2xl border border-amber-100 mb-8">
+                <!-- NEW: Compact control grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-6">
+                    <!-- 1. Root Note Selector -->
+                    <div class="bg-gray-50/50 p-3 rounded-lg border border-gray-200">
+                        <section class="lg:col-span-1">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-2">1. Select Root Note</h3>
+                            <div id="builder-note-selector" class="grid grid-cols-6 gap-2">
+                                <!-- Buttons will be generated by JS -->
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- 2. Inversion & Octave -->
+                    <div class="bg-gray-50/50 p-3 rounded-lg border border-gray-200">
+                        <section class="lg:col-span-1">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-2">3. Chord Voicing</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <h3 class="text-sm font-medium text-gray-600 mb-2">Inversion</h3>
+                                    <div id="builder-inversion-selector" class="flex flex-wrap gap-2">
+                                        <!-- Buttons will be generated by JS -->
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-medium text-gray-600 mb-2">RH Note Selection</h3>
+                                    <!-- NEW: Voicing Editor will be placed here -->
+                                    <div id="voicing-editor-container" class="hidden">
+                                        <div id="voicing-editor" class="flex flex-wrap gap-x-3 gap-y-1 items-center p-2 rounded-lg bg-gray-50 border h-full"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                    
+                    <!-- 3. NEW: Left Hand -->
+                    <div class="bg-gray-50/50 p-3 rounded-lg border border-gray-200">
+                        <section class="lg:col-span-1">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-2">4. Left Hand</h3>
+                             <div class="flex flex-col gap-2">
+                                <div class="flex gap-2 w-full">
+                                    <div class="flex-1">
+                                        <label for="builder-lh-type-select" class="block text-xs font-medium text-gray-600 mb-1">LH Type</label>
+                                        <select id="builder-lh-type-select" title="Left-Hand Chord Type" onchange="document.getElementById('builder-lh-inversion-select').value = '0'; updateBuilderDisplay();" class="w-full p-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-800 focus:ring-amber-500 focus:border-amber-500 transition duration-150 text-sm">
+                                            <option value="off" title="No left hand notes will be played.">Off</option>
+                                            <option value="rootOnly" title="Plays only the root note of the chord.">Root Only</option>
+                                            <option value="rootAnd5th" title="Plays the root and the 5th of the chord.">Root + 5th</option>
+                                            <option value="powerChord" title="Plays the root, 5th, and the root again one octave higher.">Power Chord</option>
+                                            <option value="Major" title="Plays a full Major triad (Root, 3rd, 5th).">Major Triad</option>
+                                            <option value="Minor" title="Plays a full Minor triad (Root, b3rd, 5th).">Minor Triad</option>
+                                            <option value="shell_maj7" title="Plays the Root, 3rd, and Major 7th. A common jazz voicing.">Shell (R-3-7)</option>
+                                            <option value="shell_min7" title="Plays the Root, Minor 3rd, and Minor 7th. A common jazz voicing.">Minor 7th Shell (R-b3-b7)</option>
+                                            <option value="shell_dom7" title="Plays the Root, Major 3rd, and Minor 7th. The most common jazz/blues shell.">Dominant 7th Shell (R-3-b7)</option>
+                                            <option value="spread" title="Plays the Root, 5th, and the 3rd an octave higher (10th). A common open piano voicing.">Spread Triad (R-5-10)</option>
+                                            <option value="quartal" title="Plays notes stacked in 4ths (Root, 4th, 7th). A modern, open sound.">Quartal (R-4-7)</option>
+                                            <option value="Dominant 7th" title="Plays a full Dominant 7th chord (Root, 3rd, 5th, b7th).">Dominant 7th</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex-1">
+                                        <label for="builder-lh-inversion-select" class="block text-xs font-medium text-gray-600 mb-1">LH Inversion</label>
+                                        <select id="builder-lh-inversion-select" title="Left-Hand Inversion" onchange="updateBuilderDisplay()" class="w-full p-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-800 focus:ring-amber-500 focus:border-amber-500 transition duration-150 text-sm">
+                                            <!-- Options generated by JS -->
+                                        </select>
+                                    </div>
+                                    <div class="flex-1">
+                                        <label for="builder-lh-octave-select" class="block text-xs font-medium text-gray-600 mb-1">LH Octave</label>
+                                        <select id="builder-lh-octave-select" title="Left-Hand Octave" onchange="updateBuilderDisplay()" class="w-full p-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-800 focus:ring-amber-500 focus:border-amber-500 transition duration-150 text-sm">
+                                            <option value="-12" selected>Octave Below</option>
+                                            <option value="-24">2 Octaves Below</option>
+                                            <option value="-36">3 Octaves Below</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                 <div class="col-span-2">
+                                    <label class="block text-sm font-medium text-gray-600 mb-2">LH Note Selection</label>
+                                    <!-- NEW: Voicing Editor for the Left Hand -->
+                                    <div id="lh-voicing-editor-container" class="hidden">
+                                        <div id="lh-voicing-editor" class="flex flex-wrap gap-x-3 gap-y-1 items-center p-2 rounded-lg bg-gray-50 border h-full"></div>
+                                    </div>
+                                 </div>
+                             </div>
+                        </section>
+                    </div>
+                </div>
+
+                <!-- 2. Chord Type Selector -->
+                <section class="mt-2">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">2. Select Chord or Interval Type</h3>
+                    <div id="builder-chord-type-selector" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <!-- Chord groups will be generated by JS -->
+                    </div>
+                </section>
+                <!-- 3. Interval Selector -->
+                <section class="mt-6">
+                    <div id="builder-interval-selector" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        <!-- Interval groups will be generated by JS -->
+                    </div>
+                </section>
+
+                <p class="mt-4 text-sm text-gray-500 text-center">
+                    <span class="text-amber-700 font-bold">Amber</span> keys show the selected chord. (Tip: Hold click on any selection button to play it)
+                </p>
+            </div>
+        </div>
+
+
+        <!-- TAB CONTENT: PROGRESSION TRAINER -->
+        <div id="tab-trainer" class="tab-content hidden">
+             <div class="bg-white p-6 sm:p-8 rounded-xl shadow-2xl border border-indigo-100 mb-8">
+                <!-- NEW: Control Grid (5 cols) -->
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
+                    <!-- Key Selection -->
+                    <div>
+                        <label for="trainer-key-select" class="block text-sm font-medium text-gray-600 mb-2">1. Choose a Key</label>
+                        <select id="trainer-key-select" class="w-full p-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-800 focus:ring-teal-500 focus:border-teal-500 transition duration-150">
+                            <!-- Keys populated by JS -->
+                        </select>
+                    </div>
+
+                    <!-- Progression Selection -->
+                    <div>
+                        <label for="trainer-progression-select" class="block text-sm font-medium text-gray-600 mb-2">2. Choose a Progression</label>
+                        <select id="trainer-progression-select" class="w-full p-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-800 focus:ring-teal-500 focus:border-teal-500 transition duration-150">
+                            <!-- Progressions populated by JS -->
+                        </select>
+                    </div>
+                    
+                    <!-- Octave Shift Section -->
+                    <!-- This space is now empty as octave controls have been moved -->
+                    
+                    <!-- This area is now intentionally left blank as the default LH controls have been removed -->
+                    <div class="col-span-3"></div>
+                </div>
+                
+                <!-- Progression Visualization (Clickable) -->
+                <div id="progression-visualization" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200 mb-6">
+                    <!-- Clickable Roman Numerals will be injected here -->
+                </div>
+
+
+                <!-- This container is now empty as the controls are in the floating panel -->
+                
+                <p class="mt-4 text-sm text-gray-500">
+                    <span class="text-cyan-500 font-bold">Cyan</span> keys show the selected Major Scale. <span class="text-teal-600 font-bold">Teal</span> keys show the current chord during playback. Click any Roman numeral above to play and analyze that chord.
+                </p>
+            </div>
+        </div>
+        
+        <!-- NEW: TAB CONTENT: SCALE EXPLORER -->
+        <div id="tab-scales" class="tab-content hidden">
+            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-2xl border border-lime-200 mb-8">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-8">
+                    <!-- 1. Root Note Selector -->
+                    <section>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-3">1. Select Root Note</h3>
+                        <div id="scale-note-selector" class="grid grid-cols-6 gap-2">
+                            <!-- Buttons will be generated by JS -->
+                        </div>
+                    </section>
+
+                    <!-- 2. Octave -->
+                    <!-- This space is now empty as octave controls have been moved -->
+                </div>
+
+                <!-- 3. Scale Type Selector -->
+                <section class="mb-8">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-3">3. Select Scale Type</h3>
+                    <div id="scale-type-selector" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                        <!-- Buttons will be generated by JS -->
+                    </div>
+                </section>
+                
+                <p class="mt-4 text-sm text-gray-500 text-center">
+                    <span class="text-lime-700 font-bold">Lime</span> keys show the selected scale.
+                </p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- NEW: Floating Controls Container -->
+    <div class="fixed bottom-6 right-4 z-20 flex flex-col items-end gap-4">
+
+        <!-- Builder Floating Controls -->
+        <div id="floating-builder-controls" class="flex flex-col items-stretch gap-2 p-3 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border w-max" title="Chord Builder Controls">
+            <div class="flex flex-col gap-2">
+                <button onmousedown="startBuilderChord()" onmouseup="stopBuilderChord()" onmouseleave="stopBuilderChord()" class="px-2 py-1 bg-amber-500 text-white font-bold rounded-xl shadow-lg hover:bg-amber-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-1 whitespace-nowrap text-sm" title="Play Chord">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg> 
+                    <span class="compact-hide">Play Chord</span><span class="compact-show">Play</span>
+                </button>
+                <button onclick="addChordToProgression(false)" class="px-2 py-1 bg-indigo-500 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-1 whitespace-nowrap text-sm" title="Add Chord to Progression">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"></path></svg> 
+                    <span class="compact-hide">Add Chord</span><span class="compact-show">Add</span>
+                </button>
+                <button onclick="addChordToProgression(true)" class="px-2 py-1 bg-teal-500 text-white font-bold rounded-xl shadow-lg hover:bg-teal-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-1 whitespace-nowrap text-sm" title="Add Chord and Switch to Progression Builder">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"></path></svg> 
+                    <span class="compact-hide">Add & Go</span><span class="compact-show">Add/Go</span>
+                </button>
+            </div>
+            <div class="border-t border-gray-200 my-1"></div>
+            <div class="flex flex-col gap-2">
+                <div class="flex items-center justify-between gap-1 compact-target" title="Arpeggio Speed">
+                    <span class="text-xs font-medium text-gray-600">Arp Speed:</span>
+                    <button id="arp-speed-down" onclick="changeArpeggioSpeed('slower')" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Slower Arpeggio">-</button>
+                    <span id="arp-speed-display" class="text-sm font-semibold text-gray-700 w-12 text-center" title="Current Arpeggio Speed">Medium</span>
+                    <button id="arp-speed-up" onclick="changeArpeggioSpeed('faster')" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Faster Arpeggio">+</button>
+                </div>
+                <div class="flex items-center justify-between gap-1 compact-target" title="Right-Hand Octave Shift">
+                    <span class="text-xs font-medium text-gray-600">RH Octave:</span>
+                    <button id="builder-octave-down" onmousedown="changeBuilderOctave(-1)" onmouseup="stopBuilderChord()" onmouseleave="stopBuilderChord()" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Decrease Octave">-</button>
+                    <span id="builder-octave-display" class="text-sm font-semibold text-gray-700 w-12 text-center" title="Current Octave Shift">Oct: 0</span>
+                    <button id="builder-octave-up" onmousedown="changeBuilderOctave(1)" onmouseup="stopBuilderChord()" onmouseleave="stopBuilderChord()" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Increase Octave">+</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trainer Floating Controls -->
+        <div id="floating-trainer-controls" class="hidden flex-col items-stretch gap-2 p-3 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border w-max" title="Progression Builder Controls">
+            <div class="flex flex-col gap-2 w-full">
+                <button id="play-progression-btn" onclick="handleAutoPlayback()" class="px-2 py-1 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 flex items-center justify-center whitespace-nowrap text-sm" title="Toggle Auto Play"><span id="play-text" class="compact-hide">Auto Play</span><span id="play-text-compact" class="compact-show">Play</span></button>
+                <button id="step-chord-btn" onmousedown="stepChord()" onmouseup="stopTrainerChord()" onmouseleave="stopTrainerChord()" disabled class="px-2 py-1 bg-indigo-500 hover:bg-indigo-600 active:scale-95 transition text-white font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap text-sm" title="Step to Next Chord">Step ►</button>
+                
+                <div>
+                    <label for="trainer-speed-select" class="block text-xs font-medium text-gray-600 mb-1" title="Auto-Play Speed">Auto-Play Speed</label>
+                    <select id="trainer-speed-select" class="w-full p-2 text-sm bg-gray-100 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500" title="Select Auto-Play Speed">
+                        <option value="1.5">Slow</option>
+                        <option value="1" selected>Medium</option>
+                        <option value="0.6">Fast</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-col gap-2 w-full" >
+                    <button id="record-progression-btn" onclick="toggleRecording()" class="flex-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg transition duration-300 transform hover:scale-105 flex items-center justify-center gap-2 text-sm" title="Start/Stop Recording">
+                        <svg id="record-icon" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"></circle></svg>
+                        <span id="record-text">Record</span>
+                    </button>
+                    <button id="save-recording-btn" onclick="saveRecording()" disabled class="px-2 py-1 bg-blue-500 hover:bg-blue-600 transition text-white font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm" title="Save Recorded Progression">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scale Floating Controls -->
+        <div id="floating-scale-controls" class="hidden flex-col items-stretch gap-2 p-3 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border w-max" title="Scale Explorer Controls">
+            <div class="flex flex-col items-stretch gap-2">
+                <button onclick="playScale('asc')" class="px-2 py-1 bg-lime-600 text-white font-bold rounded-xl shadow-lg hover:bg-lime-700 active:scale-95 transition duration-150 transform flex items-center justify-center gap-2 whitespace-nowrap text-sm" title="Play Scale Ascending">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                    <span class="compact-hide">Play Asc</span><span class="compact-show">Asc</span>
+                </button>
+                <button onclick="playScale('desc')" class="px-2 py-1 bg-lime-500 text-white font-bold rounded-xl shadow-lg hover:bg-lime-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-2 whitespace-nowrap text-sm" title="Play Scale Descending">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" transform="rotate(180)"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                    <span class="compact-hide">Play Desc</span><span class="compact-show">Desc</span>
+                </button>
+            </div>
+            <div class="border-t border-gray-200 my-1"></div>
+            <div class="flex flex-col gap-2 compact-target">
+                <div class="flex items-center justify-between gap-1" title="Scale Playback Speed">
+                    <span class="text-xs font-medium text-gray-600">Speed:</span>
+                    <button id="scale-speed-down" onclick="changeScaleSpeed('slower')" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Slower Scale">-</button>
+                    <span id="scale-speed-display" class="text-sm font-semibold text-gray-700 w-12 text-center" title="Current Scale Speed">Medium</span>
+                    <button id="scale-speed-up" onclick="changeScaleSpeed('faster')" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Faster Scale">+</button>
+                </div>
+                <div class="flex items-center justify-between gap-1" title="Scale Octave Shift">
+                    <span class="text-xs font-medium text-gray-600">Octave:</span>
+                    <button id="scale-octave-down" onclick="changeScaleOctave(-1)" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Decrease Octave">-</button>
+                    <span id="scale-octave-display" class="text-sm font-semibold text-gray-700 w-12 text-center" title="Current Octave Shift">Oct: 0</span>
+                    <button id="scale-octave-up" onclick="changeScaleOctave(1)" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Increase Octave">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NEW: Expand Floating Controls Button -->
+    <button id="expand-controls-btn" onclick="toggleFloatingControls()" class="fixed bottom-6 right-4 z-10 p-2 bg-gray-700 text-white rounded-full shadow-lg hover:bg-gray-600 transition" title="Show/Hide Floating Controls">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+        </svg>
+    </button>
+
+
+    <!-- Message Modal -->
+    <div id="message-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full text-center">
+            <p id="modal-text" class="text-lg font-medium text-gray-800 mb-4"></p>
+            <button id="modal-close-btn" onclick="hideModal()" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition">
+                Got It
+            </button>
+        </div>
+    </div>
+
+    <!-- Link to external JS file. 'defer' ensures it runs after the HTML is parsed. -->
+    <script>let isFloatingControlsVisible = true;</script>
+    <script src="music-data.js" defer></script>
+    <script src="music.js" defer></script>
+</body>
+</html>
