@@ -276,3 +276,50 @@ export function setAudioIsLoading(value) {
 export function setAudioIsReady(value) {
     audioIsReady = value;
 }
+
+// ============================================================================
+// Audio Context Keep-Alive
+// ============================================================================
+
+/**
+ * Proactively resume audio context to reduce playback delay
+ * Called when page becomes visible or window regains focus
+ */
+export function resumeAudioContextIfNeeded() {
+    if (typeof Tone !== 'undefined' && Tone.context) {
+        if (Tone.context.state !== 'running') {
+            Tone.context.resume().catch(err => {
+                console.warn("Could not resume audio context:", err);
+            });
+        }
+    }
+}
+
+/**
+ * Initialize audio context keep-alive listeners
+ * Resumes audio context when user returns to the page
+ */
+export function initAudioContextKeepAlive() {
+    // Resume audio context when page becomes visible (user returns to tab)
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            // Page is now visible - resume audio context proactively
+            resumeAudioContextIfNeeded();
+        }
+    });
+
+    // Resume audio context when window regains focus
+    window.addEventListener('focus', () => {
+        resumeAudioContextIfNeeded();
+    });
+
+    // Also resume on mouse/touch events (user interaction)
+    // This ensures audio is ready even if visibility/focus events don't fire
+    // Using { once: true } means these listeners will automatically be removed after first call
+    const resumeOnInteraction = () => {
+        resumeAudioContextIfNeeded();
+    };
+    
+    document.addEventListener('mousedown', resumeOnInteraction, { once: true });
+    document.addEventListener('touchstart', resumeOnInteraction, { once: true, passive: true });
+}

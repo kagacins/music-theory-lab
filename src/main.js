@@ -99,7 +99,7 @@ import {
     changeScaleSpeed,
     updateScaleSpeedUI
 } from './modules/features/scaleExplorer.js';
-import { initAudio, getPiano, getGuitar, getInstrument, getAudioIsReady, forceStopAllPlayback } from './modules/audio/audioEngine.js';
+import { initAudio, getPiano, getGuitar, getInstrument, getAudioIsReady, forceStopAllPlayback, initAudioContextKeepAlive } from './modules/audio/audioEngine.js';
 import { updateUndoRedoButtons } from './modules/utils/undoRedo.js';
 import {
     getCurrentTab,
@@ -1981,6 +1981,9 @@ window.onload = () => {
     // Initialize audio
     initAudio();
 
+    // Initialize audio context keep-alive (resumes audio when user returns to page)
+    initAudioContextKeepAlive();
+
     // Initialize preset system
     initPresetUI();
 
@@ -2155,38 +2158,7 @@ document.addEventListener('keydown', (event) => {
 // MELODY COMPOSER UI FUNCTIONS
 // ===========================
 
-/**
- * Set the melody composition mode (with-progression or free-melody)
- * @param {string} mode - Either 'with-progression' or 'free-melody'
- */
-window.setMelodyMode = function(mode) {
-    const withProgressionBtn = document.getElementById('mode-with-progression');
-    const freeMelodyBtn = document.getElementById('mode-free-melody');
-    const freeMelodyControls = document.getElementById('free-melody-controls');
-    const melodyProgressionDisplay = document.getElementById('melody-progression-display');
-
-    if (mode === 'with-progression') {
-        // Update button styles
-        withProgressionBtn.classList.remove('bg-gray-200', 'text-gray-700');
-        withProgressionBtn.classList.add('bg-violet-600', 'text-white');
-        freeMelodyBtn.classList.remove('bg-violet-600', 'text-white');
-        freeMelodyBtn.classList.add('bg-gray-200', 'text-gray-700');
-
-        // Show progression display, hide free melody controls
-        if (melodyProgressionDisplay) melodyProgressionDisplay.classList.remove('hidden');
-        if (freeMelodyControls) freeMelodyControls.classList.add('hidden');
-    } else if (mode === 'free-melody') {
-        // Update button styles
-        freeMelodyBtn.classList.remove('bg-gray-200', 'text-gray-700');
-        freeMelodyBtn.classList.add('bg-violet-600', 'text-white');
-        withProgressionBtn.classList.remove('bg-violet-600', 'text-white');
-        withProgressionBtn.classList.add('bg-gray-200', 'text-gray-700');
-
-        // Hide progression display, show free melody controls
-        if (melodyProgressionDisplay) melodyProgressionDisplay.classList.add('hidden');
-        if (freeMelodyControls) freeMelodyControls.classList.remove('hidden');
-    }
-};
+// Removed setMelodyMode function - Composition Mode and Free Melody Settings UI have been removed
 
 /**
  * Toggle the melody controls panel visibility

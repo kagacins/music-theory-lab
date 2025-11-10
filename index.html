@@ -1200,32 +1200,9 @@
                         </div>
                         <div>
                             <h2 class="text-2xl font-bold text-gray-800">Melody Composer</h2>
-                            <p class="text-sm text-gray-600">Build melodies over progressions or create standalone melodic ideas</p>
+                            <p class="text-sm text-gray-600">Build melodies over your chord progressions</p>
                         </div>
                     </div>
-                </div>
-
-                <!-- Mode Toggle -->
-                <div class="mb-4 p-3 bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg border border-violet-200">
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">Composition Mode:</label>
-                    <div class="flex gap-2">
-                        <button id="mode-with-progression" onclick="setMelodyMode('with-progression')" class="flex-1 px-4 py-2 bg-violet-600 text-white font-semibold rounded-lg shadow transition hover:bg-violet-700">
-                            <div class="flex items-center justify-center gap-2">
-                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"></path></svg>
-                                With Progression
-                            </div>
-                        </button>
-                        <button id="mode-free-melody" onclick="setMelodyMode('free-melody')" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg shadow transition hover:bg-gray-300">
-                            <div class="flex items-center justify-center gap-2">
-                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path></svg>
-                                Free Melody
-                            </div>
-                        </button>
-                    </div>
-                    <p class="text-xs text-gray-600 mt-2">
-                        <strong>With Progression:</strong> Create melodies over your chord progression from the Progression Builder.
-                        <strong>Free Melody:</strong> Compose standalone melodic ideas without chord constraints.
-                    </p>
                 </div>
 
                 <div id="melody-sections-container" class="space-y-3">
@@ -1379,62 +1356,6 @@
                         <div id="melody-progression-visualization" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-3 bg-white rounded-lg border border-gray-200">
                             <div class="text-sm text-gray-500 italic p-4 col-span-full">No progression loaded. Switch to Progression Builder to create one.</div>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Free Melody Mode Controls (Hidden by default) -->
-                <div id="free-melody-controls" class="hidden mb-4 p-4 bg-gradient-to-br from-amber-50 to-yellow-50 rounded-lg border-2 border-amber-200">
-                    <h3 class="text-sm font-semibold text-amber-800 mb-3 flex items-center gap-2">
-                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path></svg>
-                        Free Melody Settings
-                    </h3>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <!-- Scale Selector -->
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-1">Scale Constraint</label>
-                            <select id="free-melody-scale" class="w-full p-2 text-sm border border-amber-300 rounded-lg focus:ring-amber-500 focus:border-amber-500 bg-white">
-                                <option value="chromatic">Chromatic (All Notes)</option>
-                                <option value="C-major" selected>C Major</option>
-                                <option value="C-minor">C Minor</option>
-                                <option value="D-major">D Major</option>
-                                <option value="D-minor">D Minor</option>
-                                <option value="E-major">E Major</option>
-                                <option value="E-minor">E Minor</option>
-                                <option value="F-major">F Major</option>
-                                <option value="F-minor">F Minor</option>
-                                <option value="G-major">G Major</option>
-                                <option value="G-minor">G Minor</option>
-                                <option value="A-major">A Major</option>
-                                <option value="A-minor">A Minor</option>
-                                <option value="B-major">B Major</option>
-                                <option value="B-minor">B Minor</option>
-                            </select>
-                            <p class="text-xs text-gray-500 mt-1">Constrain notes to a specific scale</p>
-                        </div>
-
-                        <!-- Rhythmic Pattern Templates -->
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-1">Rhythmic Template</label>
-                            <select id="free-melody-rhythm-template" class="w-full p-2 text-sm border border-amber-300 rounded-lg focus:ring-amber-500 focus:border-amber-500 bg-white">
-                                <option value="custom">Custom (Manual Entry)</option>
-                                <option value="whole-notes">Whole Notes</option>
-                                <option value="half-notes">Half Notes</option>
-                                <option value="quarter-notes" selected>Quarter Notes</option>
-                                <option value="eighth-notes">Eighth Notes</option>
-                                <option value="sixteenth-notes">Sixteenth Notes</option>
-                                <option value="dotted-quarter">Dotted Quarter Pattern</option>
-                                <option value="swing-eighths">Swing Eighths</option>
-                            </select>
-                            <p class="text-xs text-gray-500 mt-1">Apply rhythmic template to melody</p>
-                        </div>
-                    </div>
-
-                    <!-- Manual Note Entry (Future feature) -->
-                    <div class="mt-3 p-2 bg-white rounded border border-amber-200">
-                        <p class="text-xs text-amber-700 italic">
-                            💡 Manual note entry coming soon! Use the editor below to modify generated melodies.
-                        </p>
                     </div>
                 </div>
 
