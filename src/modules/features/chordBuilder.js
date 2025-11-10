@@ -330,13 +330,45 @@ function playBuilderChordOnce(notes) {
         instrument.triggerAttackRelease(notes, '0.5s');
     }
 
-    // Highlight the notes on the keyboard
-    const rootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[getBuilderRootIndex()];
-    highlightBuilderNotes(notes);
-    Tone.Draw.schedule(() => {
-        if (window.clearHighlights) {
-            window.clearHighlights();
+    // Add playback highlighting on top of existing builder highlights
+    notes.forEach(note => {
+        const keyId = getNoteKeyId(note);
+        const keyElement = document.getElementById(keyId);
+        if (keyElement) {
+            keyElement.classList.add('active-builder-playback');
         }
+    });
+
+    // After playback ends, remove only playback highlighting and restore builder highlights
+    Tone.Draw.schedule(() => {
+        // Remove only playback highlighting
+        document.querySelectorAll('.active-builder-playback').forEach(key => {
+            key.classList.remove('active-builder-playback');
+        });
+        
+        // Re-apply builder highlights to ensure they're correct
+        // Get the current RH notes for highlighting (highlightBuilderNotes will add LH notes)
+        const rootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[getBuilderRootIndex()];
+        let rhNotes = [];
+        
+        if (getBuilderSelectionMode() === 'chord') {
+            const chordResult = getInvertedChordNotes(
+                rootNote,
+                getBuilderChordType(),
+                getBuilderInversion(),
+                rootNote,
+                getBuilderOctaveShift(),
+                getEnharmonicPreference(),
+                getNotationPreference()
+            );
+            rhNotes = chordResult.specificNotes;
+        } else {
+            const intervalResult = getIntervalNotes(rootNote, getBuilderIntervalType(), getBuilderOctaveShift(), getEnharmonicPreference());
+            rhNotes = intervalResult.specificNotes;
+        }
+        
+        // Re-highlight with current settings (this will include current LH notes)
+        highlightBuilderNotes(rhNotes);
     }, Tone.now() + 0.5);
 }
 
