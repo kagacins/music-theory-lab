@@ -2071,6 +2071,21 @@ window.onload = () => {
     //     });
     // }
 
+    // Ensure song search toggle button works (fallback for GitHub Pages module loading issues)
+    const songSearchToggle = document.getElementById('song-search-toggle');
+    if (songSearchToggle) {
+        // Remove existing onclick and use addEventListener for better reliability
+        songSearchToggle.removeAttribute('onclick');
+        songSearchToggle.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (window.toggleSongSearchPanel) {
+                window.toggleSongSearchPanel();
+            } else {
+                console.error('toggleSongSearchPanel not available');
+            }
+        });
+    }
+
     // Audio context will be resumed automatically by Tone.js when user interacts
 };
 
