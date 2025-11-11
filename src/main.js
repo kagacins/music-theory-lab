@@ -129,7 +129,7 @@ import {
     getNumOctaves,
     setNumOctaves
 } from './modules/state/globalState.js';
-import { getTrainerState, setProgressionData } from './modules/state/trainerState.js';
+import { getTrainerState, setProgressionData, setIsReady } from './modules/state/trainerState.js';
 import {
     getBuilderRootIndex,
     getBuilderChordType,
@@ -195,7 +195,8 @@ import {
     tieLastNote,
     getEditorState,
     setAccidental,
-    setDynamic
+    setDynamic,
+    setMelodyTempo
 } from './modules/audio/melodyGenerator.js';
 import {
     ENHARMONIC_MAP,
@@ -1086,6 +1087,7 @@ window.getEnharmonicPreference = getEnharmonicPreference;
 window.getNotationPreference = getNotationPreference;
 window.getNumOctaves = getNumOctaves;
 window.getTrainerState = getTrainerState;
+window.setIsReady = setIsReady;
 window.clearHighlights = clearHighlights;
 window.getScaleRootIndex = getScaleRootIndex;
 window.updateKeyboardLabels = updateKeyboardLabels;
@@ -1547,6 +1549,7 @@ window.tieLastNote = tieLastNote;
 window.getEditorState = getEditorState;
 window.setAccidental = setAccidental;
 window.setDynamic = setDynamic;
+window.setMelodyTempo = setMelodyTempo;
 window.playAllMelody = playAllMelody;
 window.stopPlayAllMelody = stopPlayAllMelody;
 window.playMeasure = playMeasure;

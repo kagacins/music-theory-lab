@@ -225,6 +225,23 @@ export function importSongProgression(songIndex) {
         addParsedChordToProgression(chordSymbol, song.key);
     });
     
+    // Mark progression as ready so Step button and Auto Play work
+    // Use setIsReady from trainerState if available, or set it via window
+    if (window.setIsReady) {
+        window.setIsReady(true);
+    } else if (window.trainerState) {
+        // Fallback: set directly if available
+        window.trainerState.isReady = true;
+    }
+    
+    // Update UI - render display and update controls
+    if (window.renderProgressionDisplay) {
+        window.renderProgressionDisplay();
+    }
+    if (window.updateProgressionControlsUI) {
+        window.updateProgressionControlsUI();
+    }
+    
     // Update UI
     alert(`Successfully imported "${song.title}" by ${song.artist}!\n\n${song.chords.length} chords added to your progression.`);
     

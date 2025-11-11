@@ -1077,9 +1077,29 @@ export function setAccidental(accidental) {
 }
 
 /**
- * Set dynamic for next note
- * @param {string|null} dynamic - ppp, pp, p, mp, mf, f, ff, fff, or null
+ * Set the tempo (BPM) for melody playback
+ * @param {number} bpm - Beats per minute (40-200)
  */
+export function setMelodyTempo(bpm) {
+    if (typeof bpm !== 'number' || bpm < 40 || bpm > 200) {
+        console.warn('Invalid BPM value:', bpm);
+        return;
+    }
+    interactiveMelody.tempo = bpm;
+    
+    // Update slider value if it exists
+    const slider = document.getElementById('melody-bpm-slider');
+    if (slider) {
+        slider.value = bpm;
+    }
+    
+    // Update display value if it exists
+    const display = document.getElementById('melody-bpm-value');
+    if (display) {
+        display.textContent = bpm;
+    }
+}
+
 export function setDynamic(dynamic) {
     currentDynamic = dynamic;
     
@@ -4355,9 +4375,10 @@ export function playInteractiveMelodyWithChords() {
     Tone.Transport.cancel();
     Tone.Transport.position = 0;
 
-    // Calculate timing (4/4 time, 120 BPM = 2 seconds per measure)
-    const measureDuration = 2.0; // seconds
-    const beatDuration = 0.5; // seconds (quarter note)
+    // Calculate timing based on tempo
+    const tempo = interactiveMelody.tempo || 120;
+    const beatDuration = 60.0 / tempo; // seconds per beat (based on tempo)
+    const measureDuration = beatDuration * 4; // seconds per measure (4/4 time)
 
     // Schedule melody notes
     const melodyPart = new Tone.Part((time, note) => {

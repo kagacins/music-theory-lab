@@ -2996,13 +2996,22 @@ export function handleAutoPlayback() {
     
 
     // We're starting playback - ensure progression is loaded
+    // Only load from dropdown if there's no progression data (e.g., after import, we have data but isReady might be false)
     if (!trainerState.isReady) {
-        loadProgression();
-        // Get fresh state after loading
-        trainerState = getTrainerState();
-        if (!trainerState.isReady || !trainerState.progressionData || trainerState.progressionData.length === 0) {
-            // If still not ready after loading, return
-            return;
+        // Check if we already have progression data (e.g., from import)
+        if (trainerState.progressionData && trainerState.progressionData.length > 0) {
+            // We have progression data, just mark as ready
+            setIsReady(true);
+            trainerState = getTrainerState(); // Refresh state
+        } else {
+            // No progression data, load from dropdown
+            loadProgression();
+            // Get fresh state after loading
+            trainerState = getTrainerState();
+            if (!trainerState.isReady || !trainerState.progressionData || trainerState.progressionData.length === 0) {
+                // If still not ready after loading, return
+                return;
+            }
         }
     }
 
