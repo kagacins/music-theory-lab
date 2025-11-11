@@ -2834,8 +2834,8 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                         if (!window.dynamicsToDraw) window.dynamicsToDraw = [];
                         window.dynamicsToDraw.push({
                             dynamic: note.dynamic,
-                            measure: noteMeasure,
-                            beat: noteBeat,
+                            measure: note.measure,
+                            beat: note.beat,
                             vexNote: vexNote
                         });
                     }
