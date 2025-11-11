@@ -905,18 +905,25 @@ export function renderChordMelodyTimeline(melody, progressionData) {
 
 /**
  * Interactive melody data structure
- * Users click keyboard to add notes, which are rendered as quarter notes in 4/4 time
+ * Full notation editor with support for notes, rests, ties, and multiple clefs
  */
 let interactiveMelody = {
-    notes: [], // Array of { pitch, duration, measure, beat, chordIndex }
+    // Melody staff (treble by default)
+    melodyNotes: [], // Array of { type: 'note'|'rest', pitch, duration, measure, beat, dotted, tied, tiedFrom }
+    // Chord staff (can be treble or bass)
+    chordNotes: [], // Array of { type: 'note'|'rest', pitches: [], duration, measure, beat, dotted }
     timeSignature: '4/4',
+    beatsPerMeasure: 4,
+    beatDuration: '4n', // '4n' = quarter note gets the beat
     tempo: 120,
     key: 'C'
 };
 
 let isInteractiveMode = false;
 let currentMeasure = 0; // Track which measure user is currently adding notes to
-let currentBeat = 0; // Track which beat within measure (0-3 for 4/4)
+let currentBeat = 0; // Track which beat within measure (in quarter note units, 0-3 for 4/4)
+let currentNoteDuration = '4n'; // Current selected note duration (default: quarter note)
+let currentNoteDotted = false; // Whether current note should be dotted
 
 /**
  * Initialize interactive melody mode
@@ -930,16 +937,21 @@ export function initInteractiveMelody() {
         return false;
     }
 
-    // Reset interactive melody
+    // Reset interactive melody with expanded structure
     interactiveMelody = {
-        notes: [],
+        melodyNotes: [],
+        chordNotes: [],
         timeSignature: '4/4',
+        beatsPerMeasure: 4,
+        beatDuration: '4n',
         tempo: 120,
         key: currentKey
     };
 
     currentMeasure = 0;
     currentBeat = 0;
+    currentNoteDuration = '4n'; // Reset to default quarter note
+    currentNoteDotted = false; // Reset dot
     isInteractiveMode = true;
 
     // Render chord progression as whole notes
@@ -955,10 +967,140 @@ export function initInteractiveMelody() {
 }
 
 /**
- * Add note to interactive melody when user clicks keyboard
- * @param {string} noteName - The note to add (e.g., 'C4', 'D5')
- * @param {boolean} skipPlayback - If true, skip playing the note (keyboard already plays it)
+ * Add rest to melody
+ * @param {string} duration - Tone.js duration string (e.g., '4n', '8n', '2n')
+ * @param {boolean} dotted - Whether the rest is dotted
  */
+export function addRestToMelody(duration = '4n', dotted = false) {
+    if (!isInteractiveMode) return;
+
+    const toneDuration = getToneDurationString(duration, dotted);
+    
+    const newRest = {
+        type: 'rest',
+        duration: toneDuration,
+        measure: currentMeasure,
+        beat: currentBeat,
+        dotted: dotted
+    };
+
+    interactiveMelody.melodyNotes.push(newRest);
+
+    // Advance beat position
+    const durationInQuarters = getDurationInQuarterNotes(duration, dotted);
+    currentBeat += durationInQuarters;
+    
+    // Handle measure overflow
+    while (currentBeat >= interactiveMelody.beatsPerMeasure) {
+        currentBeat -= interactiveMelody.beatsPerMeasure;
+        currentMeasure++;
+    }
+
+    // Re-render
+    const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
+    if (interactiveCanvas) {
+        renderInteractiveMelodyStaff(interactiveCanvas);
+    }
+}
+
+/**
+ * Set time signature
+ * @param {string} timeSignature - e.g. '4/4', '3/4', '6/8', '2/2'
+ */
+export function setTimeSignature(timeSignature) {
+    const parts = timeSignature.split('/');
+    if (parts.length !== 2) return false;
+
+    const beats = parseInt(parts[0]);
+    const noteValue = parseInt(parts[1]);
+
+    interactiveMelody.timeSignature = timeSignature;
+    interactiveMelody.beatsPerMeasure = beats;
+    interactiveMelody.beatDuration = noteValue === 4 ? '4n' : noteValue === 8 ? '8n' : '4n';
+
+    // Re-render with new time signature
+    const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
+    if (interactiveCanvas) {
+        renderInteractiveMelodyStaff(interactiveCanvas);
+    }
+
+    return true;
+}
+
+/**
+ * Create a tie from the last note
+ * Adds a flag to the last note indicating it's tied to the next note
+ */
+export function tieLastNote() {
+    if (!isInteractiveMode || interactiveMelody.melodyNotes.length === 0) return false;
+
+    const lastNote = interactiveMelody.melodyNotes[interactiveMelody.melodyNotes.length - 1];
+    if (lastNote.type !== 'note') return false;
+
+    lastNote.tied = true; // Flag for VexFlow to draw tie
+
+    // Re-render
+    const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
+    if (interactiveCanvas) {
+        renderInteractiveMelodyStaff(interactiveCanvas);
+    }
+
+    return true;
+}
+
+/**
+ * Get current editing state
+ */
+export function getEditorState() {
+    return {
+        measure: currentMeasure,
+        beat: currentBeat,
+        noteDuration: currentNoteDuration,
+        isDotted: currentNoteDotted,
+        timeSignature: interactiveMelody.timeSignature,
+        tempo: interactiveMelody.tempo,
+        key: interactiveMelody.key,
+        totalNotes: interactiveMelody.melodyNotes.length + interactiveMelody.chordNotes.length
+    };
+}
+
+/**
+ * Get the duration value for a note duration string
+ * Returns the duration in quarter note units (e.g., '4n' = 1, '8n' = 0.5, '2n' = 2)
+ * @param {string} duration - Tone.js duration string (e.g., '4n', '8n', '2n')
+ * @param {boolean} dotted - Whether the note is dotted
+ * @returns {number} Duration in quarter note units
+ */
+function getDurationInQuarterNotes(duration, dotted = false) {
+    const durationMap = {
+        '1n': 4,   // Whole note = 4 quarter notes
+        '2n': 2,   // Half note = 2 quarter notes
+        '4n': 1,   // Quarter note = 1 quarter note
+        '8n': 0.5, // Eighth note = 0.5 quarter notes
+        '16n': 0.25, // 16th note = 0.25 quarter notes
+        '32n': 0.125 // 32nd note = 0.125 quarter notes
+    };
+    
+    let durationValue = durationMap[duration] || 1; // Default to quarter note
+    
+    // Apply dot (increase by 50%)
+    if (dotted) {
+        durationValue *= 1.5;
+    }
+    
+    return durationValue;
+}
+
+/**
+ * Get Tone.js duration string with dot if needed
+ * @param {string} duration - Base duration (e.g., '4n')
+ * @param {boolean} dotted - Whether the note is dotted
+ * @returns {string} Duration string (e.g., '4n' or '4n.')
+ */
+function getToneDurationString(duration, dotted = false) {
+    return dotted ? duration + '.' : duration;
+}
+
 export function addNoteToInteractiveMelody(noteName, skipPlayback = false) {
     if (!isInteractiveMode) return;
 
@@ -968,21 +1110,32 @@ export function addNoteToInteractiveMelody(noteName, skipPlayback = false) {
     // Determine which chord/measure this note belongs to
     const chordIndex = currentMeasure % progressionData.length;
 
-    // Add note with quarter note duration
+    // Get current duration settings
+    const duration = currentNoteDuration;
+    const dotted = currentNoteDotted;
+    const toneDuration = getToneDurationString(duration, dotted);
+
+    // Add note with selected duration using new structure
     const newNote = {
+        type: 'note',
         pitch: noteName,
-        duration: '4n', // Quarter note
+        duration: toneDuration,
         measure: currentMeasure,
         beat: currentBeat,
-        chordIndex: chordIndex
+        chordIndex: chordIndex,
+        dotted: dotted,
+        tied: false // Initialize tie flag
     };
 
-    interactiveMelody.notes.push(newNote);
+    interactiveMelody.melodyNotes.push(newNote);
 
-    // Advance beat position
-    currentBeat++;
-    if (currentBeat >= 4) {
-        currentBeat = 0;
+    // Advance beat position based on note duration
+    const durationInQuarters = getDurationInQuarterNotes(duration, dotted);
+    currentBeat += durationInQuarters;
+    
+    // Handle measure overflow (respects current time signature)
+    while (currentBeat >= interactiveMelody.beatsPerMeasure) {
+        currentBeat -= interactiveMelody.beatsPerMeasure;
         currentMeasure++;
     }
 
@@ -996,28 +1149,90 @@ export function addNoteToInteractiveMelody(noteName, skipPlayback = false) {
     if (!skipPlayback) {
         const instrument = getInstrument();
         if (instrument && getAudioIsReady()) {
-            instrument.triggerAttackRelease(noteName, '4n');
+            instrument.triggerAttackRelease(noteName, toneDuration);
         }
     }
+}
+
+/**
+ * Set the duration for the next note to be recorded
+ * @param {string} duration - Tone.js duration string (e.g., '1n', '2n', '4n', '8n', '16n', '32n')
+ */
+export function setNoteDuration(duration) {
+    currentNoteDuration = duration;
+    
+    // Update UI button states
+    const durations = ['1n', '2n', '4n', '8n', '16n', '32n'];
+    durations.forEach(d => {
+        const btn = document.getElementById(`duration-${d}`);
+        if (btn) {
+            if (d === duration) {
+                btn.classList.remove('bg-amber-200', 'text-amber-900');
+                btn.classList.add('bg-amber-600', 'text-white');
+            } else {
+                btn.classList.remove('bg-amber-600', 'text-white');
+                btn.classList.add('bg-amber-200', 'text-amber-900');
+            }
+        }
+    });
+}
+
+/**
+ * Set whether the next note should be dotted
+ * @param {boolean} dotted - Whether the note should be dotted
+ */
+export function setNoteDotted(dotted) {
+    currentNoteDotted = dotted;
+}
+
+/**
+ * Get the current note duration
+ * @returns {string} Current duration string
+ */
+export function getCurrentNoteDuration() {
+    return currentNoteDuration;
+}
+
+/**
+ * Get whether the current note is dotted
+ * @returns {boolean} Whether current note is dotted
+ */
+export function getCurrentNoteDotted() {
+    return currentNoteDotted;
 }
 
 /**
  * Delete last added note from interactive melody
  */
 export function deleteLastNote() {
-    if (interactiveMelody.notes.length === 0) return;
+    if (interactiveMelody.melodyNotes.length === 0) return;
 
-    interactiveMelody.notes.pop();
+    // Get the last note to calculate its duration
+    const lastNote = interactiveMelody.melodyNotes[interactiveMelody.melodyNotes.length - 1];
+    const durationStr = lastNote.duration || '4n';
+    const dotted = lastNote.dotted || false;
+    
+    // Extract base duration from string (e.g., '4n.' -> '4n')
+    const baseDuration = durationStr.replace('.', '');
+    const durationInQuarters = getDurationInQuarterNotes(baseDuration, dotted);
+    
+    // Remove the note
+    interactiveMelody.melodyNotes.pop();
 
-    // Update beat/measure position
-    if (currentBeat === 0) {
+    // Update beat/measure position by subtracting the note's duration
+    currentBeat -= durationInQuarters;
+    
+    // Handle measure underflow
+    while (currentBeat < 0) {
         if (currentMeasure > 0) {
             currentMeasure--;
-            currentBeat = 3;
+            currentBeat += interactiveMelody.beatsPerMeasure;
+        } else {
+            currentBeat = 0; // Can't go below measure 0
+            break;
         }
-    } else {
-        currentBeat--;
     }
+    
     const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
     if (interactiveCanvas) {
         renderInteractiveMelodyStaff(interactiveCanvas);
@@ -1028,9 +1243,13 @@ export function deleteLastNote() {
  * Clear all notes from interactive melody
  */
 export function clearInteractiveMelody() {
-    interactiveMelody.notes = [];
+    interactiveMelody.melodyNotes = [];
+    interactiveMelody.chordNotes = [];
     currentMeasure = 0;
     currentBeat = 0;
+    // Reset duration to default
+    currentNoteDuration = '4n';
+    currentNoteDotted = false;
     const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
     if (interactiveCanvas) {
         renderInteractiveMelodyStaff(interactiveCanvas);
@@ -1653,7 +1872,7 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         return;
     }
 
-    const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental, Beam, TextBracket } = VexFlow;
+    const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental, Beam, TextBracket, Rest } = VexFlow;
 
     try {
         // Clear canvas
@@ -1667,8 +1886,8 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         // Calculate dimensions dynamically - ensure all chords are visible
         // Use FIXED measure width to prevent shrinking when more chords are added
         // Auto-add measures: use the maximum of progression length and highest measure in melody notes
-        const maxMeasureFromMelody = interactiveMelody.notes.length > 0 
-            ? Math.max(...interactiveMelody.notes.map(n => n.measure)) + 1
+        const maxMeasureFromMelody = interactiveMelody.melodyNotes.length > 0 
+            ? Math.max(...interactiveMelody.melodyNotes.map(n => n.measure)) + 1
             : 0;
         const numMeasures = Math.max(progressionData.length, maxMeasureFromMelody); // Render ALL chords and any additional measures from melody
         const desiredMeasureWidth = 220; // Fixed pixels per measure - DO NOT shrink
@@ -2195,36 +2414,24 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 // CRITICAL: Sort by beat first, then by insertion order if beats are equal
                 const allNotesInMeasure = notesByMeasure[measureIndex];
                 
-                // Filter out any notes with invalid beat values (should be 0-3 for 4/4 time)
-                // This prevents rendering issues with malformed note data
+                // Filter out any notes with invalid beat values
+                // With variable durations, beats can be fractional (e.g., 0, 0.5, 1, 1.5, etc.)
+                // But they should still be within [0, 4) for a 4/4 measure
                 const validNotes = allNotesInMeasure.filter(note => 
                     typeof note.beat === 'number' && note.beat >= 0 && note.beat < 4
                 );
                 
-                // Sort by beat (0-3 for 4/4 time) - this is the primary sort
-                const notes = validNotes.sort((a, b) => {
-                    // First sort by beat (0-3 for 4/4 time)
+                // Sort by beat (supports fractional beats for variable durations)
+                const notesToProcess = validNotes.sort((a, b) => {
+                    // Primary sort: by beat position (allows fractional beats for shorter notes)
                     if (a.beat !== b.beat) {
                         return a.beat - b.beat;
                     }
-                    // If beats are equal (shouldn't happen in normal 4/4, but handle it),
-                    // sort by the original index in the interactiveMelody.notes array to maintain insertion order
+                    // Secondary sort: by insertion order if beats are equal (shouldn't happen, but handle it)
                     const aIndex = interactiveMelody.notes.findIndex(n => n === a);
                     const bIndex = interactiveMelody.notes.findIndex(n => n === b);
                     return aIndex - bIndex;
                 });
-
-                // Limit to exactly 4 notes per measure (4/4 time = 4 quarter notes max)
-                // If there are more than 4 notes, only render the first 4 in beat order
-                // This prevents rendering issues with extra notes that might have incorrect beat values
-                // CRITICAL: Only take the first 4 notes after sorting by beat to ensure correct sequence
-                const notesToProcess = notes.slice(0, 4);
-                
-                // Debug logging to verify order (can be removed later)
-                if (notes.length > 4) {
-                    console.warn(`Measure ${measureNum} has ${notes.length} notes, but only rendering first 4. Extra notes:`, 
-                        notes.slice(4).map(n => ({ pitch: n.pitch, beat: n.beat })));
-                }
 
                 // Process notes with octave shift detection (similar to chord notes)
                 // Strategy:
@@ -2366,12 +2573,28 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                     const noteName = displayMatch[1];
                     const octave = parseInt(displayMatch[2]);
 
+                    // Parse duration from note (e.g., '4n', '4n.', '8n', '2n')
+                    let durationStr = note.duration || '4n';
+                    const isDotted = durationStr.includes('.') || (note.dotted === true);
+                    
+                    // Extract base duration (remove 'n' suffix and dot)
+                    let baseDuration = durationStr.replace('n', '').replace('.', '');
+                    
+                    // Convert to VexFlow duration format (just the number, no 'n')
+                    // VexFlow uses: '1' (whole), '2' (half), '4' (quarter), '8' (eighth), '16' (16th), '32' (32nd)
+                    const vexDuration = baseDuration;
+
                     const vexNote = new StaveNote({
                         clef: melodyClef, // Use selected melody clef
                         keys: [`${noteName}/${octave}`],
-                        duration: '4', // Quarter note (remove 'n' suffix for VexFlow)
+                        duration: vexDuration,
                         auto_stem: true
                     });
+                    
+                    // Add dot if needed
+                    if (isDotted) {
+                        vexNote.addDot(0); // Add dot to the first (and only) note in the StaveNote
+                    }
 
                     if (noteName.includes('#')) {
                         vexNote.addModifier(new Accidental('#'), 0);
@@ -2410,26 +2633,99 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                     })
                     .filter(note => note !== null && note !== undefined);
                 
-                // Fill measure with rests if needed (only if we have fewer than 4 notes)
-                // In VexFlow, we don't need to add explicit rests - the formatter will handle spacing
-                // But if you want to ensure exactly 4 beats, we can pad with invisible notes or skip this
-                // For now, we'll just render whatever notes we have
+                // Calculate total duration of notes in this measure to ensure they fit
+                let totalDurationInQuarters = 0;
+                notesToProcess.forEach(note => {
+                    const durationStr = note.duration || '4n';
+                    const isDotted = durationStr.includes('.') || (note.dotted === true);
+                    const baseDuration = durationStr.replace('n', '').replace('.', '');
+                    totalDurationInQuarters += getDurationInQuarterNotes(baseDuration, isDotted);
+                });
+                
+                // If notes don't fill the measure, we need to add rests to fill it
+                // This ensures VexFlow formats the measure correctly and notes stay within bounds
+                const MEASURE_DURATION = 4; // 4 quarter notes per measure in 4/4 time
+                const remainingDuration = MEASURE_DURATION - totalDurationInQuarters;
+                
+                // Handle cases where notes exceed or don't fill the measure
+                // When using strict mode, VexFlow requires exactly 4 beats per measure
+                if (remainingDuration > 0 && remainingDuration < MEASURE_DURATION) {
+                    // Add rests to fill the remaining space
+                    // Calculate the best rest duration(s) to use
+                    let durationToFill = remainingDuration;
+                    
+                    // Add rests until the measure is filled
+                    while (durationToFill > 0) {
+                        let restDuration = '4n'; // Default to quarter rest
+                        if (durationToFill >= 2) {
+                            restDuration = '2n'; // Half rest
+                            durationToFill -= 2;
+                        } else if (durationToFill >= 1) {
+                            restDuration = '4n'; // Quarter rest
+                            durationToFill -= 1;
+                        } else if (durationToFill >= 0.5) {
+                            restDuration = '8n'; // Eighth rest
+                            durationToFill -= 0.5;
+                        } else if (durationToFill >= 0.25) {
+                            restDuration = '16n'; // 16th rest
+                            durationToFill -= 0.25;
+                        } else {
+                            restDuration = '32n'; // 32nd rest
+                            durationToFill -= 0.125;
+                        }
+                        
+                        try {
+                            const rest = new Rest({ duration: restDuration });
+                            vexNoteObjects.push(rest);
+                        } catch (e) {
+                            console.warn('Could not create rest:', e);
+                            break; // Stop trying to add rests if there's an error
+                        }
+                        
+                        // Safety check to prevent infinite loop
+                        if (durationToFill < 0.01) {
+                            break;
+                        }
+                    }
+                } else if (remainingDuration < 0) {
+                    // Notes exceed the measure - this shouldn't happen with proper beat tracking
+                    // But if it does, we'll use non-strict mode for this measure
+                    console.warn(`Measure ${measureNum} has ${totalDurationInQuarters} beats, exceeding 4 beats. Using non-strict mode.`);
+                }
 
                 const voice = new Voice({ num_beats: 4, beat_value: 4 });
-                voice.setStrict(false);
+                // Use strict mode to ensure notes fit within the measure width
+                // Strict mode requires exactly 4 beats, so we must add rests if needed
+                // Recalculate total duration after adding rests
+                let finalDuration = totalDurationInQuarters;
+                if (remainingDuration > 0 && remainingDuration < MEASURE_DURATION) {
+                    finalDuration = MEASURE_DURATION; // Rests were added to fill the measure
+                }
+                
+                // Only use strict mode if the measure is properly filled (4 beats)
+                if (Math.abs(finalDuration - MEASURE_DURATION) < 0.01) {
+                    voice.setStrict(true);
+                } else {
+                    // If measure isn't exactly 4 beats, use non-strict but with tight formatting
+                    voice.setStrict(false);
+                }
                 voice.addTickables(vexNoteObjects);
 
-                // Format and draw
+                // Format and draw - use the exact available width in the measure
                 // First measure has key/time signatures, so needs more padding
                 // Subsequent measures don't have signatures, so can use less padding
                 let formatWidth;
                 if (measureNum === 0) {
                     // First measure: account for key/time signatures (typically 60-80px)
-                    formatWidth = Math.max(measureWidth - 100, 100); // Reduced padding for first measure (was 120)
+                    // Use tighter format width to ensure notes fit within measure boundaries
+                    formatWidth = Math.max(measureWidth - 100, 80); // Tighter constraint for first measure
                 } else {
                     // Subsequent measures: standard padding (no signatures)
-                    formatWidth = Math.max(measureWidth - 40, 100); // Less padding for subsequent measures
+                    // Use tighter format width to ensure notes don't overflow
+                    formatWidth = Math.max(measureWidth - 40, 80); // Tighter constraint for subsequent measures
                 }
+                
+                // Format with strict width constraint
                 new Formatter()
                     .joinVoices([voice])
                     .format([voice], formatWidth);

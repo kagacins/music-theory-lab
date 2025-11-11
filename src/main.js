@@ -161,6 +161,10 @@ import {
     addNoteToInteractiveMelody,
     deleteLastNote,
     clearInteractiveMelody,
+    setNoteDuration,
+    setNoteDotted,
+    getCurrentNoteDuration,
+    getCurrentNoteDotted,
     renderChordProgressionStaff,
     renderInteractiveMelodyStaff,
     getInteractiveMelody,
@@ -1506,11 +1510,20 @@ window.initInteractiveMelody = initInteractiveMelody;
 window.addNoteToInteractiveMelody = addNoteToInteractiveMelody;
 window.deleteLastNote = deleteLastNote;
 window.clearInteractiveMelody = clearInteractiveMelody;
+window.setNoteDuration = setNoteDuration;
+window.setNoteDotted = setNoteDotted;
+window.getCurrentNoteDuration = getCurrentNoteDuration;
+window.getCurrentNoteDotted = getCurrentNoteDotted;
 window.renderChordProgressionStaff = renderChordProgressionStaff;
 window.renderInteractiveMelodyStaff = renderInteractiveMelodyStaff;
 window.getInteractiveMelody = getInteractiveMelody;
 window.toggleInteractiveMode = toggleInteractiveMode;
 window.playInteractiveMelodyWithChords = playInteractiveMelodyWithChords;
+// New notation editor functions
+window.addRestToMelody = addRestToMelody;
+window.setTimeSignature = setTimeSignature;
+window.tieLastNote = tieLastNote;
+window.getEditorState = getEditorState;
 window.playAllMelody = playAllMelody;
 window.stopPlayAllMelody = stopPlayAllMelody;
 window.playMeasure = playMeasure;
@@ -1548,7 +1561,28 @@ window.toggleMelodyRecording = function(isRecording) {
         }
     }
     
+    // Show/hide note duration selector based on recording state
+    const durationSelector = document.getElementById('note-duration-selector-container');
+    if (durationSelector) {
+        if (isRecording) {
+            durationSelector.classList.remove('hidden');
+        } else {
+            durationSelector.classList.add('hidden');
+        }
+    }
+    
     if (isRecording) {
+        // Reset duration to default (quarter note) when starting recording
+        if (window.setNoteDuration) {
+            window.setNoteDuration('4n');
+        }
+        if (window.setNoteDotted) {
+            window.setNoteDotted(false);
+            const dotCheckbox = document.getElementById('note-duration-dot');
+            if (dotCheckbox) {
+                dotCheckbox.checked = false;
+            }
+        }
         // Start recording - enable interactive mode
         try {
             if (!window.isInteractiveMode) {

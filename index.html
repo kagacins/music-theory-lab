@@ -1505,10 +1505,36 @@
 
                         <!-- Free Mode Controls (shown by default) -->
                         <div id="free-mode-controls">
+                            <!-- Note Duration Selector (only visible when recording) -->
+                            <div id="note-duration-selector-container" class="hidden mb-3 p-3 bg-amber-50 rounded-lg border-2 border-amber-200">
+                                <label class="block text-sm font-semibold text-amber-800 mb-2">Note Duration:</label>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <!-- Duration Buttons -->
+                                    <div class="flex gap-1 flex-wrap">
+                                        <button onclick="window.setNoteDuration && window.setNoteDuration('1n')" id="duration-1n" class="px-3 py-1.5 text-xs font-semibold bg-amber-200 text-amber-900 rounded-md hover:bg-amber-300 transition duration-150" title="Whole Note">𝅝</button>
+                                        <button onclick="window.setNoteDuration && window.setNoteDuration('2n')" id="duration-2n" class="px-3 py-1.5 text-xs font-semibold bg-amber-200 text-amber-900 rounded-md hover:bg-amber-300 transition duration-150" title="Half Note">𝅗𝅥</button>
+                                        <button onclick="window.setNoteDuration && window.setNoteDuration('4n')" id="duration-4n" class="px-3 py-1.5 text-xs font-semibold bg-amber-600 text-white rounded-md hover:bg-amber-700 transition duration-150" title="Quarter Note">𝅘𝅥</button>
+                                        <button onclick="window.setNoteDuration && window.setNoteDuration('8n')" id="duration-8n" class="px-3 py-1.5 text-xs font-semibold bg-amber-200 text-amber-900 rounded-md hover:bg-amber-300 transition duration-150" title="Eighth Note">♫</button>
+                                        <button onclick="window.setNoteDuration && window.setNoteDuration('16n')" id="duration-16n" class="px-3 py-1.5 text-xs font-semibold bg-amber-200 text-amber-900 rounded-md hover:bg-amber-300 transition duration-150" title="16th Note">𝅘𝅥𝅮</button>
+                                        <button onclick="window.setNoteDuration && window.setNoteDuration('32n')" id="duration-32n" class="px-3 py-1.5 text-xs font-semibold bg-amber-200 text-amber-900 rounded-md hover:bg-amber-300 transition duration-150" title="32nd Note">𝅘𝅥𝅯</button>
+                                    </div>
+                                    <!-- Dot Toggle -->
+                                    <div class="flex items-center gap-2 ml-2">
+                                        <label class="flex items-center gap-2 cursor-pointer">
+                                            <input type="checkbox" id="note-duration-dot" onchange="window.setNoteDotted && window.setNoteDotted(this.checked)" class="w-4 h-4 text-amber-600 border-amber-300 rounded focus:ring-amber-500">
+                                            <span class="text-sm font-semibold text-amber-800">Dotted (.)</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-amber-700 mt-2">
+                                    Select the duration for the next note you record. Dotted notes last 50% longer.
+                                </p>
+                            </div>
+
                             <!-- Free Mode Explanation -->
                             <div class="mb-3 p-2 bg-violet-100 rounded-lg border border-violet-300">
                                 <p class="text-xs text-violet-900">
-                                    <strong>Interactive Mode -</strong> Each chord in the progression is shown on the staff as a whole note in 4/4 time. When recording, each melody note is added as a quarter note. Click notes on the keyboard to add them, or use buttons below to delete/clear.
+                                    <strong>Interactive Mode -</strong> Each chord in the progression is shown on the staff as a whole note in 4/4 time. When recording, select a note duration above and click notes on the keyboard to add them, or use buttons below to delete/clear.
                                 </p>
                             </div>
 
