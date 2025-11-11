@@ -4,7 +4,7 @@
  */
 
 import { getProgressionData, getCurrentKey } from '../state/trainerState.js';
-import { getInstrument, getAudioIsReady, initAudio, getPiano } from './audioEngine.js';
+import { getInstrument, getAudioIsReady, initAudio, getPiano, getPianoReverb } from './audioEngine.js';
 import { getEnharmonicPreference, getNotationPreference } from '../state/globalState.js';
 import { getNoteKeyId, noteToMidi, getLHNotes } from '../utils/noteUtils.js';
 import { CHORD_DEFINITIONS, ALL_NOTES, MAJOR_SCALE_STEPS } from '../../data/music-data.js';
@@ -4459,6 +4459,7 @@ export function stopPlayAllMelody() {
     // Immediately stop all currently playing notes
     const piano = getPiano();
     const synth = getInstrument();
+    const reverb = getPianoReverb();
     
     if (piano) {
         try {
@@ -4475,6 +4476,24 @@ export function stopPlayAllMelody() {
             // Ignore errors if synth is not ready
         }
     }
+    
+    // Stop reverb immediately by muting it
+    if (reverb) {
+        try {
+            reverb.wet.value = 0; // Mute reverb output immediately
+            // Reset reverb wet level after a short delay to allow it to fade out
+            setTimeout(() => {
+                if (reverb) {
+                    reverb.wet.value = 0.3; // Restore reverb for next playback
+                }
+            }, 100);
+        } catch (e) {
+            // Ignore errors
+        }
+    }
+    
+    // Clear tracked chord notes
+    currentlyPlayingChordNotes = [];
     
     // Stop transport
     Tone.Transport.stop();

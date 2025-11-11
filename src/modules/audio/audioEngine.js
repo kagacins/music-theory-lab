@@ -221,6 +221,14 @@ export function getPiano() {
 }
 
 /**
+ * Get the piano reverb instance
+ * @returns {Tone.Reverb|null} The piano reverb or null if not initialized
+ */
+export function getPianoReverb() {
+    return pianoReverb;
+}
+
+/**
  * Get the guitar synthesizer instance (creates lazily if needed)
  * @returns {Tone.PluckSynth|Tone.Sampler|null} The guitar synth/sampler or null if not initialized
  */
