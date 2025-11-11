@@ -181,7 +181,14 @@ import {
     setMelodyClef,
     setChordClef,
     setHighlightEnabled,
-    getHighlightEnabled
+    getHighlightEnabled,
+    // New notation editor functions
+    addRestToMelody,
+    setTimeSignature,
+    tieLastNote,
+    getEditorState,
+    setAccidental,
+    setDynamic
 } from './modules/audio/melodyGenerator.js';
 import {
     ENHARMONIC_MAP,
@@ -1524,6 +1531,8 @@ window.addRestToMelody = addRestToMelody;
 window.setTimeSignature = setTimeSignature;
 window.tieLastNote = tieLastNote;
 window.getEditorState = getEditorState;
+window.setAccidental = setAccidental;
+window.setDynamic = setDynamic;
 window.playAllMelody = playAllMelody;
 window.stopPlayAllMelody = stopPlayAllMelody;
 window.playMeasure = playMeasure;
@@ -1561,28 +1570,27 @@ window.toggleMelodyRecording = function(isRecording) {
         }
     }
     
-    // Show/hide note duration selector based on recording state
-    const durationSelector = document.getElementById('note-duration-selector-container');
-    if (durationSelector) {
-        if (isRecording) {
-            durationSelector.classList.remove('hidden');
-        } else {
-            durationSelector.classList.add('hidden');
-        }
-    }
-    
-    if (isRecording) {
-        // Reset duration to default (quarter note) when starting recording
-        if (window.setNoteDuration) {
-            window.setNoteDuration('4n');
-        }
-        if (window.setNoteDotted) {
-            window.setNoteDotted(false);
-            const dotCheckbox = document.getElementById('note-duration-dot');
-            if (dotCheckbox) {
-                dotCheckbox.checked = false;
+            // Sync time signature selector with current state
+            const timeSigSelect = document.getElementById('time-signature-select');
+            if (timeSigSelect && window.getEditorState) {
+                const state = window.getEditorState();
+                if (state && state.timeSignature) {
+                    timeSigSelect.value = state.timeSignature;
+                }
             }
-        }
+            
+            if (isRecording) {
+                // Reset duration to default (quarter note) when starting recording
+                if (window.setNoteDuration) {
+                    window.setNoteDuration('4n');
+                }
+                if (window.setNoteDotted) {
+                    window.setNoteDotted(false);
+                    const dotCheckbox = document.getElementById('note-duration-dot');
+                    if (dotCheckbox) {
+                        dotCheckbox.checked = false;
+                    }
+                }
         // Start recording - enable interactive mode
         try {
             if (!window.isInteractiveMode) {
