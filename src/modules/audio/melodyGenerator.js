@@ -2818,14 +2818,17 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 
                 // Debug: Log measure state with detailed note info for troubleshooting
                 if (notesToProcess.length > 0) {
-                    console.log(`Measure ${measureNum}: ${notesToProcess.length} notes total, ${totalDurationInQuarters.toFixed(2)} beats, ${vexNoteObjects.length} VexFlow objects, duration=${notesToProcess.length > 0 ? notesToProcess[0].duration : 'N/A'}`);
+                    const restCount = notesToProcess.filter(n => n.type === 'rest').length;
+                    const noteCount = notesToProcess.length - restCount;
+                    console.log(`Measure ${measureNum}: ${noteCount} notes + ${restCount} rests = ${notesToProcess.length} total, ${totalDurationInQuarters.toFixed(2)} beats, ${vexNoteObjects.length} VexFlow objects`);
                     // For full measures or many notes, log each note's details
                     if (totalDurationInQuarters >= 3.9 && totalDurationInQuarters <= 4.1 && notesToProcess.length >= 6) {
                         notesToProcess.forEach((note, idx) => {
                             const durationStr = note.duration || '4n';
                             // Pass the full duration string, not just the base number
                             const duration = getDurationInQuarterNotes(durationStr, note.dotted || false);
-                            console.log(`  Note ${idx + 1}: pitch=${note.pitch}, beat=${note.beat}, duration=${durationStr}, beatsValue=${duration.toFixed(3)}`);
+                            const noteType = note.type === 'rest' ? 'REST' : note.pitch;
+                            console.log(`  ${idx + 1}: ${noteType}, beat=${note.beat}, duration=${durationStr}, beatsValue=${duration.toFixed(3)}`);
                         });
                     }
                 }
