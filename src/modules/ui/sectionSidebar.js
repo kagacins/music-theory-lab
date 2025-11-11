@@ -539,26 +539,44 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     
     // Create tooltip that appears immediately on hover (no delay)
     const tooltipText = toggle.textContent.trim() || sectionId;
-    tab.setAttribute('title', tooltipText);
+    // Remove title attribute to prevent browser default tooltip delay
+    tab.removeAttribute('title');
     tab.style.position = 'relative';
     
     // Add custom tooltip for immediate display (no transition for instant appearance)
     const tooltip = document.createElement('div');
     tooltip.className = 'sidebar-tooltip absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 pointer-events-none whitespace-nowrap z-50';
-    tooltip.style.opacity = '0';
-    tooltip.style.transition = 'none'; // No transition for instant display
     tooltip.textContent = tooltipText;
+    // Pre-configure for instant display
+    tooltip.style.opacity = '0';
+    tooltip.style.visibility = 'hidden';
+    tooltip.style.transition = 'none';
+    tooltip.style.transitionDelay = '0s';
+    tooltip.style.transitionDuration = '0s';
+    tooltip.style.willChange = 'opacity, visibility';
     tab.appendChild(tooltip);
     
-    // Show tooltip immediately on hover (no delay)
+    // Show tooltip immediately on hover (absolutely no delay)
     tab.addEventListener('mouseenter', () => {
+        // Force immediate display with multiple methods
+        tooltip.style.transition = 'none';
+        tooltip.style.transitionDelay = '0s';
+        tooltip.style.transitionDuration = '0s';
+        tooltip.style.visibility = 'visible';
         tooltip.style.opacity = '1';
-        tooltip.style.transition = 'none';
-    });
+        tooltip.style.display = 'block';
+        // Force reflow to ensure immediate rendering
+        void tooltip.offsetHeight;
+    }, { passive: true });
+    
     tab.addEventListener('mouseleave', () => {
-        tooltip.style.opacity = '0';
+        // Hide immediately
         tooltip.style.transition = 'none';
-    });
+        tooltip.style.transitionDelay = '0s';
+        tooltip.style.transitionDuration = '0s';
+        tooltip.style.opacity = '0';
+        tooltip.style.visibility = 'hidden';
+    }, { passive: true });
     
     // Get icon from toggle button
     const icon = toggle.querySelector('svg:not(.drag-handle):not([id$="-chevron"])');
