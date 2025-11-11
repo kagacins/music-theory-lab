@@ -2180,29 +2180,50 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         invLabelContainer.appendChild(suggestionBtn);
         invContainer.appendChild(invLabelContainer);
         
-        const invSelect = document.createElement('select');
-        invSelect.className = 'w-full p-1 text-xs border border-gray-300 rounded';
-        INVERSION_NAMES.forEach((name, invIndex) => {
-            const def = CHORD_DEFINITIONS[chordData.type];
-            const maxInversion = def ? def.intervals.length - 1 : 0;
-            if (invIndex <= maxInversion) {
-                const option = document.createElement('option');
-                option.value = invIndex;
-                option.textContent = name;
-                if (invIndex === chordData.inversion) option.selected = true;
-                invSelect.appendChild(option);
-            }
-        });
-        invSelect.onchange = (e) => {
-            const wrapper = e.target.closest(`#${containerId} > div`);
-            const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
-            updateProgressionChord(currentIndex, 'inversion', parseInt(e.target.value));
-            // Update suggestion button color after inversion changes
-            setTimeout(() => checkSuggestion(), 50);
-        };
-        invSelect.onmousedown = (e) => e.stopPropagation();
-        invSelect.style.cursor = 'default';
-        invContainer.appendChild(invSelect);
+        // Inversion button switches
+        const invButtonContainer = document.createElement('div');
+        invButtonContainer.className = 'flex gap-1';
+        
+        const def = CHORD_DEFINITIONS[chordData.type];
+        const maxInversion = def ? def.intervals.length - 1 : 0;
+        const currentInversion = chordData.inversion || 0;
+        
+        // Create buttons for R, 1, 2, 3 (up to maxInversion)
+        const invButtons = [];
+        for (let invIndex = 0; invIndex <= Math.min(maxInversion, 3); invIndex++) {
+            const invButton = document.createElement('button');
+            invButton.type = 'button';
+            invButton.textContent = invIndex === 0 ? 'R' : invIndex.toString();
+            invButton.setAttribute('data-inversion', invIndex);
+            invButton.className = `flex-1 px-2 py-1 text-xs font-semibold rounded transition-colors ${
+                invIndex === currentInversion
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`;
+            invButton.onclick = (e) => {
+                e.stopPropagation();
+                const wrapper = e.target.closest(`#${containerId} > div`);
+                const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+                const selectedInversion = parseInt(e.target.getAttribute('data-inversion'));
+                updateProgressionChord(currentIndex, 'inversion', selectedInversion);
+                // Update button states
+                invButtonContainer.querySelectorAll('button').forEach((btn) => {
+                    const btnInversion = parseInt(btn.getAttribute('data-inversion'));
+                    if (btnInversion === selectedInversion) {
+                        btn.className = 'flex-1 px-2 py-1 text-xs font-semibold rounded transition-colors bg-indigo-600 text-white';
+                    } else {
+                        btn.className = 'flex-1 px-2 py-1 text-xs font-semibold rounded transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300';
+                    }
+                });
+                // Update suggestion button color after inversion changes
+                setTimeout(() => checkSuggestion(), 50);
+            };
+            invButton.onmousedown = (e) => e.stopPropagation();
+            invButtonContainer.appendChild(invButton);
+            invButtons.push(invButton);
+        }
+        
+        invContainer.appendChild(invButtonContainer);
         
         editor.appendChild(invContainer);
 
