@@ -3822,9 +3822,44 @@ function renderMelodyNotationIfNeeded() {
 }
 
 /**
- * Remove a chord from the progression
- * @param {number} index - Index of chord to remove
+ * Clear all chords from the progression
  */
+export function clearProgression() {
+    const trainerState = getTrainerState();
+    
+    // Stop any active playback
+    if (trainerState.isPlaying && window.handleAutoPlayback) {
+        window.handleAutoPlayback();
+    }
+    
+    // Stop any step chord playback
+    if (window.stopStepChord) {
+        window.stopStepChord();
+    }
+    
+    // Clear progression data
+    setProgressionData([]);
+    setProgressionRomans([]);
+    setCurrentIndex(0);
+    setIsReady(false);
+    
+    // Clear highlights
+    if (window.clearHighlights) {
+        window.clearHighlights();
+    }
+    
+    // Clear card highlights
+    document.querySelectorAll('.active-progression-card').forEach(card => {
+        card.classList.remove('active-progression-card');
+    });
+    
+    // Re-render the display
+    renderProgressionDisplay();
+    
+    // Update UI
+    updateProgressionControlsUI();
+}
+
 export function removeChordFromProgression(index) {
     const trainerState = getTrainerState();
 

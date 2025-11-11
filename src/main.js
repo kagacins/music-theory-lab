@@ -92,7 +92,8 @@ import {
     toggleStyleMoodInsightsPanel,
     toggleProgressionControlsPanel,
     toggleProgressionCardsPanel,
-    toggleAllStaffNotation
+    toggleAllStaffNotation,
+    clearProgression
 } from './modules/features/progressionBuilder.js';
 import {
     renderScaleSelectors,
@@ -903,6 +904,7 @@ window.renderProgressionControls = renderProgressionControls;
 window.toggleRecording = toggleRecording;
 window.saveRecording = saveRecording;
 window.removeChordFromProgression = removeChordFromProgression;
+window.clearProgression = clearProgression;
 window.toggleProgressionNote = toggleProgressionNote;
 window.toggleProgressionLHNote = toggleProgressionLHNote;
 window.handleUndo = handleUndo;
