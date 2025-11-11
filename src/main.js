@@ -6,6 +6,7 @@
 // Import all necessary modules
 import { switchTab, refreshAllTabs } from './modules/ui/tabs.js';
 import { initAllSectionDragDrop } from './modules/ui/sectionDragDrop.js';
+import { initAllSectionSidebars } from './modules/ui/sectionSidebar.js';
 import { showModal, hideModal } from './modules/ui/modals.js';
 import { renderKeyboard, updateKeyboardLabels, updateKeyNames, clearHighlights, g_KeyboardKeys } from './modules/ui/keyboard.js';
 import { updateKeySignatureDisplay, setupResponsiveTitle } from './modules/ui/header.js';
@@ -2055,6 +2056,9 @@ window.onload = () => {
 
     // Initialize section drag-and-drop
     initAllSectionDragDrop();
+    
+    // Initialize section sidebar system (collapsed sections appear as tabs)
+    initAllSectionSidebars();
 
     // Setup responsive title abbreviation
     setupResponsiveTitle();
