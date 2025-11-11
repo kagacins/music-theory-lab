@@ -4738,11 +4738,9 @@ export function playAllMelody() {
                 chordNoteIds.push({ noteId, note });
             });
             
-            // Play the chord with extended release to allow reverb to decay
-            // Use triggerAttackRelease but extend the duration slightly for reverb tail
-            const noteDuration = Tone.Time('1n').toSeconds();
-            const reverbTail = 2.0; // Additional seconds for reverb decay
-            piano.triggerAttackRelease(chordNotes, noteDuration + reverbTail, time);
+            // Play the chord for the full measure duration
+            // The reverb will decay naturally after the note is released
+            piano.triggerAttackRelease(chordNotes, '1n', time);
             
             // Update active measure index for measure highlighting
             activeMeasureIndex = measureIndex;
