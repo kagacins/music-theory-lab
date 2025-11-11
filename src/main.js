@@ -1,6 +1,14 @@
 /**
  * Main Entry Point
  * Initializes the application and exposes necessary functions to the global scope for HTML event handlers
+ * 
+ * GOOGLE CUSTOM SEARCH API CONFIGURATION:
+ * To enable internet search in "Search Song Chords", uncomment and set these values:
+ * 
+ * window.GOOGLE_SEARCH_API_KEY = 'YOUR_API_KEY_HERE';
+ * window.GOOGLE_SEARCH_ENGINE_ID = 'YOUR_SEARCH_ENGINE_ID_HERE';
+ * 
+ * See GOOGLE_SEARCH_API_SETUP.md for detailed setup instructions.
  */
 
 // Import all necessary modules
