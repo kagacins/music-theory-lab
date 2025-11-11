@@ -952,6 +952,7 @@ window.toggleCurrentMelodyPanel = function() {
 // Expand/Collapse All functions for tabs
 window.expandAllTrainerSections = function() {
     const sections = [
+        { panelId: 'song-search-panel', chevronId: 'song-search-chevron' },
         { panelId: 'progression-controls-panel', chevronId: 'progression-controls-chevron' },
         { panelId: 'style-mood-insights-panel', chevronId: 'style-mood-insights-chevron' },
         { panelId: 'progression-visualization-panel', chevronId: 'progression-visualization-chevron' },
@@ -970,6 +971,7 @@ window.expandAllTrainerSections = function() {
 
 window.collapseAllTrainerSections = function() {
     const sections = [
+        { panelId: 'song-search-panel', chevronId: 'song-search-chevron' },
         { panelId: 'progression-controls-panel', chevronId: 'progression-controls-chevron' },
         { panelId: 'style-mood-insights-panel', chevronId: 'style-mood-insights-chevron' },
         { panelId: 'progression-visualization-panel', chevronId: 'progression-visualization-chevron' },
