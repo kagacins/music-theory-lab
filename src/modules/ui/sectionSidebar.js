@@ -89,7 +89,7 @@ export function initSectionSidebar(tabId, containerId, sectionClass) {
 function createSidebar(tabId) {
     const sidebar = document.createElement('div');
     sidebar.id = `${tabId}-section-sidebar`;
-    sidebar.className = 'section-sidebar absolute left-0 top-0 w-16 bg-gray-800/90 backdrop-blur-sm text-white z-30 flex flex-col items-center py-4 gap-2 transition-all duration-300 border-r border-gray-700';
+    sidebar.className = 'section-sidebar absolute left-0 top-0 w-16 bg-gray-800/90 backdrop-blur-sm text-white z-5 flex flex-col items-center py-4 gap-2 transition-all duration-300 border-r border-gray-700';
     sidebar.style.display = 'none'; // Hidden by default, shown when sections are collapsed
     sidebar.style.minHeight = '100%'; // Start with full height
     sidebar.style.height = 'auto'; // Allow height to grow with content
@@ -178,7 +178,25 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
         tab.className = 'section-sidebar-tab w-12 h-12 rounded-lg bg-gray-700 hover:bg-gray-600 transition-all flex items-center justify-center text-xs font-semibold p-2 text-center';
     }
     tab.setAttribute('data-section-id', sectionId);
-    tab.title = toggle.textContent.trim() || sectionId;
+    
+    // Create tooltip that appears immediately on hover (no delay)
+    const tooltipText = toggle.textContent.trim() || sectionId;
+    tab.setAttribute('title', tooltipText);
+    tab.style.position = 'relative';
+    
+    // Add custom tooltip for immediate display
+    const tooltip = document.createElement('div');
+    tooltip.className = 'sidebar-tooltip absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 pointer-events-none whitespace-nowrap opacity-0 transition-opacity duration-0 z-50';
+    tooltip.textContent = tooltipText;
+    tab.appendChild(tooltip);
+    
+    // Show tooltip immediately on hover
+    tab.addEventListener('mouseenter', () => {
+        tooltip.style.opacity = '1';
+    });
+    tab.addEventListener('mouseleave', () => {
+        tooltip.style.opacity = '0';
+    });
     
     // Get icon from toggle button
     const icon = toggle.querySelector('svg:not(.drag-handle):not([id$="-chevron"])');
@@ -272,6 +290,77 @@ function syncSidebarOrder(sidebar, container) {
             sidebar.appendChild(tab);
         }
     });
+}
+
+/**
+ * Reorder sections in container based on sidebar tab order
+ * @param {HTMLElement} sidebar - The sidebar element
+ * @param {HTMLElement} container - The container element
+ * @param {string} sectionClass - The section class name
+ */
+function reorderSectionsFromSidebar(sidebar, container, sectionClass) {
+    // Get sidebar tab order
+    const tabs = Array.from(sidebar.querySelectorAll('[data-section-id]'));
+    const sidebarOrder = tabs.map(tab => tab.getAttribute('data-section-id'));
+    
+    // Get all sections (including hidden ones)
+    const sections = Array.from(container.querySelectorAll(`.${sectionClass}`));
+    const sectionMap = new Map();
+    
+    sections.forEach(section => {
+        const toggle = section.querySelector('button[id$="-toggle"]');
+        if (toggle) {
+            const sectionId = toggle.id.replace('-toggle', '');
+            sectionMap.set(sectionId, section);
+        }
+    });
+    
+    // Get all section IDs in current container order
+    const currentOrder = Array.from(container.children).map(section => {
+        const toggle = section.querySelector('button[id$="-toggle"]');
+        return toggle ? toggle.id.replace('-toggle', '') : null;
+    }).filter(id => id !== null);
+    
+    // Create new order: sidebar order first (collapsed), then remaining sections
+    const newOrder = [];
+    const remainingSections = new Set(currentOrder);
+    
+    // Add collapsed sections in sidebar order
+    sidebarOrder.forEach(sectionId => {
+        if (sectionMap.has(sectionId)) {
+            newOrder.push(sectionId);
+            remainingSections.delete(sectionId);
+        }
+    });
+    
+    // Add remaining sections (expanded) in their current order
+    currentOrder.forEach(sectionId => {
+        if (remainingSections.has(sectionId)) {
+            newOrder.push(sectionId);
+        }
+    });
+    
+    // Reorder sections in container
+    newOrder.forEach(sectionId => {
+        const section = sectionMap.get(sectionId);
+        if (section) {
+            container.appendChild(section);
+        }
+    });
+    
+    // Save the new order to localStorage (if sectionDragDrop module is available)
+    const tabId = container.closest('.tab-content')?.id.replace('tab-', '');
+    if (tabId && typeof localStorage !== 'undefined') {
+        try {
+            const finalOrder = Array.from(container.children).map(section => {
+                const toggle = section.querySelector('button[id$="-toggle"]');
+                return toggle ? toggle.id.replace('-toggle', '') : null;
+            }).filter(id => id !== null);
+            localStorage.setItem(`sectionOrder_${tabId}`, JSON.stringify(finalOrder));
+        } catch (e) {
+            console.warn('Error saving section order:', e);
+        }
+    }
 }
 
 /**
