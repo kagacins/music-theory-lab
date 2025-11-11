@@ -1956,7 +1956,9 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         return;
     }
 
-    const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental, Beam, TextBracket, Rest } = VexFlow;
+    const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental, Beam, TextBracket } = VexFlow;
+    // Rest might not be directly exported in VexFlow, try to get it or use GhostNote as fallback
+    const Rest = VexFlow.Rest || VexFlow.GhostNote;
 
     try {
         // Clear canvas
