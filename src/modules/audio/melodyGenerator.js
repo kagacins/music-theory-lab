@@ -4730,24 +4730,29 @@ export function playAllMelody() {
         const chordNotes = [...rhNotes, ...lhNotes];
         
         if (chordNotes.length > 0) {
-            piano.triggerAttackRelease(chordNotes, '1n', time);
-            
-            // Add chord notes to activeNotes for highlighting
+            // Add chord notes to activeNotes for highlighting BEFORE scheduling
             // Format: "measure-0-pitch" (chords use beat 0)
             const chordNoteIds = [];
             chordNotes.forEach(note => {
                 const noteId = `${measureIndex}-0-${note}`;
-                activeNotes.add(noteId);
                 chordNoteIds.push({ noteId, note });
             });
+            
+            // Play the chord with extended release to allow reverb to decay
+            // Use triggerAttackRelease but extend the duration slightly for reverb tail
+            const noteDuration = Tone.Time('1n').toSeconds();
+            const reverbTail = 2.0; // Additional seconds for reverb decay
+            piano.triggerAttackRelease(chordNotes, noteDuration + reverbTail, time);
             
             // Update active measure index for measure highlighting
             activeMeasureIndex = measureIndex;
             
             // Update canvas to show highlights when chord starts
             Tone.Draw.schedule(() => {
-                // Visual feedback on keyboard - add highlight when chord starts
-                chordNoteIds.forEach(({ note }) => {
+                // Add all chord notes to activeNotes when chord actually starts playing
+                chordNoteIds.forEach(({ noteId, note }) => {
+                    activeNotes.add(noteId);
+                    // Visual feedback on keyboard - add highlight when chord starts
                     const keyEl = document.getElementById(getNoteKeyId(note));
                     if (keyEl) keyEl.classList.add('active-progression');
                 });
@@ -4819,8 +4824,10 @@ export function playAllMelody() {
         const maxMelodyMeasure = Math.max(...interactiveMelody.melodyNotes.map(n => n.measure));
         maxMeasure = Math.max(maxMeasure, maxMelodyMeasure);
     }
-    // Add a small buffer to ensure the last chord/melody note finishes playing
-    const totalDuration = (maxMeasure + 1) * measureDuration + 0.5;
+    // Add buffer for note duration + reverb decay (2 seconds for reverb tail)
+    // This ensures reverb can fully decay before Transport stops
+    const reverbTail = 2.0;
+    const totalDuration = (maxMeasure + 1) * measureDuration + reverbTail;
     
     // Stop after all notes have played
     Tone.Transport.scheduleOnce(() => {
