@@ -1991,6 +1991,9 @@ export function renderInteractiveMelodyStaff(canvasElement) {
             : 0;
         const numMeasures = Math.max(progressionData.length, maxMeasureFromMelody); // Render ALL chords and any additional measures from melody
         
+        // Initialize dynamics array for manual drawing
+        window.dynamicsToDraw = [];
+        
         // Calculate dynamic measure width based on melody density
         // Group notes by measure to find the densest measure
         let maxNotesInMeasure = 0;
@@ -2814,29 +2817,27 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                         vexNote.addModifier(new Accidental('b'), 0);
                     }
                     
-                    // Handle dynamics: inherit from previous note if not specified, or use new value if changed
-                    let dynamicToRender = null;
+                    // Handle dynamics: only track when dynamic changes (we'll draw them manually between staves)
+                    // Update tracking for inheritance, but don't attach to note
                     if (note.dynamic) {
-                        // This note has a dynamic change - use it and update tracking
-                        dynamicToRender = note.dynamic;
+                        // This note has a dynamic change - update tracking
                         currentRenderingDynamic = note.dynamic;
                     } else if (currentRenderingDynamic) {
-                        // No dynamic on this note, but we have one from previous - inherit it
-                        dynamicToRender = currentRenderingDynamic;
+                        // No dynamic on this note, but we have one from previous - inherit it (don't render, just track)
+                        // The dynamic persists but we don't render it on every note
                     }
                     
-                    // Add dynamics if we have one to render (either from this note or inherited)
-                    if (dynamicToRender && typeof dynamicToRender === 'string') {
-                        try {
-                            const { Annotation } = VexFlow;
-                            const dynamicAnnotation = new Annotation(dynamicToRender);
-                            dynamicAnnotation.setFont('Times', 12, 'italic');
-                            // Position ABOVE the note to avoid overlap with chord staff
-                            dynamicAnnotation.setVerticalJustification(VexFlow.Annotation.VerticalJustify.TOP);
-                            vexNote.addModifier(dynamicAnnotation, 0);
-                        } catch (e) {
-                            console.warn('Could not add dynamic annotation:', e);
-                        }
+                    // Store dynamic info for manual drawing later (only when it changes)
+                    if (note.dynamic) {
+                        // Store the note's bounding box info for positioning the dynamic
+                        // We'll draw it manually after all notes are rendered
+                        if (!window.dynamicsToDraw) window.dynamicsToDraw = [];
+                        window.dynamicsToDraw.push({
+                            dynamic: note.dynamic,
+                            measure: noteMeasure,
+                            beat: noteBeat,
+                            vexNote: vexNote
+                        });
                     }
 
                     return { vexNote, noteIdx, isRest: false, shouldApplyOttava, ottavaType };
@@ -3229,6 +3230,35 @@ export function renderInteractiveMelodyStaff(canvasElement) {
             
             // Clear the brackets array for next render
             window._ottavaBracketsChords = [];
+        }
+
+        // Draw dynamics manually between the staves (only when they change)
+        // Melody stave is at Y=30, chord stave is at Y=140, so middle is around Y=85
+        if (window.dynamicsToDraw && window.dynamicsToDraw.length > 0) {
+            const dynamicY = 85; // Position between the two staves
+            
+            window.dynamicsToDraw.forEach(dynamicInfo => {
+                try {
+                    const boundingBox = dynamicInfo.vexNote.getBoundingBox();
+                    if (boundingBox) {
+                        const dynamicX = boundingBox.getX() - 5; // Slightly to the left of the note
+                        
+                        // Draw dynamic text manually
+                        ctx.save();
+                        ctx.font = 'italic 12px Times';
+                        ctx.fillStyle = '#111827';
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(dynamicInfo.dynamic, dynamicX, dynamicY);
+                        ctx.restore();
+                    }
+                } catch (e) {
+                    console.warn('Error drawing dynamic:', e);
+                }
+            });
+            
+            // Clear the dynamics array for next render
+            window.dynamicsToDraw = [];
         }
 
         // Chord names removed - user requested no text notes in Melody Notation area
@@ -4356,6 +4386,17 @@ export function stopPlayAllMelody() {
         playAllParts.chordPart = null;
     }
     
+    // Clear all keyboard highlights
+    document.querySelectorAll('.active-melody-playback').forEach(key => {
+        key.classList.remove('active-melody-playback');
+    });
+    document.querySelectorAll('.active-progression').forEach(key => {
+        key.classList.remove('active-progression');
+    });
+    
+    // Clear active notes and measure index
+    activeNotes.clear();
+    
     // Also stop any hold-to-play measures
     const canvas = document.getElementById('interactive-melody-notation-canvas');
     if (canvas) {
@@ -4369,9 +4410,6 @@ export function stopPlayAllMelody() {
     isPlayAllActive = false;
     activeMeasureIndex = -1;
     selectedMeasureIndex = 0;
-    
-    // Clear all active notes to prevent lingering highlights
-    activeNotes.clear();
     
     // Update button text - ensure both buttons are updated
     updatePlayAllButton();
@@ -4540,25 +4578,28 @@ export function playAllMelody() {
         const noteId = `${measureNum}-${beatNum}-${pitchStr}`;
         
         // Add note to active set when it starts playing
-            activeNotes.add(noteId);
+        activeNotes.add(noteId);
         updateCanvas();
-            
-            // Visual feedback on keyboard
+        
+        // Visual feedback on keyboard - add highlight when note starts
+        Tone.Draw.schedule(() => {
             const keyEl = document.getElementById(getNoteKeyId(noteData.pitch));
             if (keyEl) keyEl.classList.add('active-melody-playback');
+        }, time);
         
         // Calculate note duration and schedule removal
         const noteDuration = Tone.Time(noteData.duration).toSeconds();
         const removeTime = time + noteDuration;
         
         if (removeTime >= 0) {
-            Tone.Transport.scheduleOnce(() => {
-            activeNotes.delete(noteId);
+            // Remove from active set and keyboard highlight when note ends
+            Tone.Draw.schedule(() => {
+                activeNotes.delete(noteId);
                 updateCanvas();
-            
-            // Remove visual feedback from keyboard
-            const keyEl = document.getElementById(getNoteKeyId(noteData.pitch));
-            if (keyEl) keyEl.classList.remove('active-melody-playback');
+                
+                // Remove visual feedback from keyboard
+                const keyEl = document.getElementById(getNoteKeyId(noteData.pitch));
+                if (keyEl) keyEl.classList.remove('active-melody-playback');
             }, removeTime);
         }
     }, interactiveMelody.melodyNotes
@@ -4599,40 +4640,37 @@ export function playAllMelody() {
             
             // Add chord notes to activeNotes for highlighting
             // Format: "measure-0-pitch" (chords use beat 0)
+            const chordNoteIds = [];
             chordNotes.forEach(note => {
                 const noteId = `${measureIndex}-0-${note}`;
                 activeNotes.add(noteId);
+                chordNoteIds.push({ noteId, note });
             });
             
             // Update active measure index for measure highlighting
             activeMeasureIndex = measureIndex;
             
-            // Update canvas to show highlights
-            updateCanvas();
-            
-            // Visual feedback on keyboard
-                chordNotes.forEach(note => {
+            // Visual feedback on keyboard - add highlight when chord starts
+            Tone.Draw.schedule(() => {
+                chordNoteIds.forEach(({ note }) => {
                     const keyEl = document.getElementById(getNoteKeyId(note));
                     if (keyEl) keyEl.classList.add('active-progression');
                 });
+            }, time);
             
-            // Remove chord notes from activeNotes after measure duration
-            const removeTime = time + measureDuration - 0.1;
-            if (removeTime >= 0) {
-                Tone.Transport.scheduleOnce(() => {
-                    chordNotes.forEach(note => {
-                        const noteId = `${measureIndex}-0-${note}`;
-                        activeNotes.delete(noteId);
-                    });
-                    updateCanvas();
-                    
-                    // Remove visual feedback from keyboard
-                chordNotes.forEach(note => {
+            // Remove chord highlights after chord duration (whole note = 1 measure)
+            const chordDuration = measureDuration;
+            Tone.Draw.schedule(() => {
+                chordNoteIds.forEach(({ noteId, note }) => {
+                    activeNotes.delete(noteId);
                     const keyEl = document.getElementById(getNoteKeyId(note));
                     if (keyEl) keyEl.classList.remove('active-progression');
                 });
-                }, removeTime);
-            }
+                updateCanvas();
+            }, time + chordDuration);
+            
+            // Update canvas to show highlights
+            updateCanvas();
         }
     }, progressionData.map((chord, index) => {
         const chordTime = index * measureDuration;
