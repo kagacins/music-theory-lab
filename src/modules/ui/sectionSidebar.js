@@ -77,6 +77,28 @@ export function initSectionSidebar(tabId, containerId, sectionClass) {
     // Observe child list changes for drag-and-drop reordering
     orderObserver.observe(container, { childList: true });
 
+    // Initialize Sortable for sidebar tabs (drag-and-drop reordering)
+    if (typeof Sortable !== 'undefined') {
+        new Sortable(sidebar, {
+            animation: 200,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            dragClass: 'sortable-drag',
+            draggable: '[data-section-id]', // Only tabs are draggable
+            forceFallback: false,
+            fallbackOnBody: true,
+            scrollSensitivity: 40,
+            scrollSpeed: 10,
+            direction: 'vertical',
+            onEnd: function(evt) {
+                if (evt.oldIndex !== evt.newIndex && evt.oldIndex !== undefined && evt.newIndex !== undefined) {
+                    // Reorder the actual sections in the container to match sidebar order
+                    reorderSectionsFromSidebar(sidebar, container, sectionClass);
+                }
+            }
+        });
+    }
+
     // Store instance
     sectionSidebarInstances.set(tabId, { sidebar, container, sectionClass, collapsedSections, observer, orderObserver });
 }
