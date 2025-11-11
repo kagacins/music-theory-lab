@@ -4757,6 +4757,17 @@ export function playAllMelody() {
         const chord = chordData.chord;
         const measureIndex = chordData.measureIndex;
         
+        // Release previous chord notes before playing new chord
+        // This ensures reverb from previous chord stops when next chord starts
+        if (currentlyPlayingChordNotes.length > 0) {
+            try {
+                piano.triggerRelease(currentlyPlayingChordNotes, time);
+            } catch (e) {
+                // Ignore errors
+            }
+            currentlyPlayingChordNotes = [];
+        }
+        
         const rhNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
         const lhNotes = getLHNotes(
             chord.root,
@@ -4779,13 +4790,16 @@ export function playAllMelody() {
             });
             
             // Calculate actual note duration based on current tempo
-            // Use the actual duration in seconds instead of '1n' to ensure correct timing
+            // Use the actual duration in seconds - exactly the measure duration (no extra time)
+            // The note should last exactly as long as its beat count according to BPM
             const noteDurationSeconds = measureDuration;
-            // Add extra time for release and reverb decay (1 second for release + 1 second for reverb tail)
-            const totalDurationSeconds = noteDurationSeconds + 2.0;
             
-            // Play the chord for the full measure duration with extended release for reverb
-            piano.triggerAttackRelease(chordNotes, totalDurationSeconds, time);
+            // Track these notes so we can release them when next chord starts
+            currentlyPlayingChordNotes = [...chordNotes];
+            
+            // Play the chord for exactly the measure duration
+            // The reverb will naturally decay after the note is released
+            piano.triggerAttackRelease(chordNotes, noteDurationSeconds, time);
             
             // Update active measure index for measure highlighting
             activeMeasureIndex = measureIndex;
