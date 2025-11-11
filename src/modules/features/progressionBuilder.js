@@ -2308,8 +2308,8 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         lhInvLabel.textContent = 'LH Inversion';
         const lhInversionSelect = document.createElement('select');
         lhInversionSelect.className = 'w-full p-1 text-xs border border-gray-300 rounded';
-        const maxInversion = getMaxInversionForLhType(chordData.lhType);
-        for (let i = 0; i <= maxInversion; i++) {
+        const maxLhInversion = getMaxInversionForLhType(chordData.lhType);
+        for (let i = 0; i <= maxLhInversion; i++) {
             lhInversionSelect.add(new Option(INVERSION_NAMES[i], i));
         }
         lhInversionSelect.value = chordData.lhInversion || 0;
