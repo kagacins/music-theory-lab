@@ -1200,6 +1200,21 @@ export function addNoteToInteractiveMelody(noteName, skipPlayback = false) {
         }
     }
 
+    // Only store dynamic if it's different from the previous note (dynamics persist until changed)
+    // Check the last note to see if dynamic changed
+    let dynamicToStore = null;
+    if (interactiveMelody.melodyNotes.length > 0) {
+        const lastNote = interactiveMelody.melodyNotes[interactiveMelody.melodyNotes.length - 1];
+        if (lastNote.dynamic !== currentDynamic) {
+            // Dynamic changed - store it
+            dynamicToStore = currentDynamic;
+        }
+        // If dynamic hasn't changed, don't store it (it will be inherited during rendering)
+    } else {
+        // First note - store dynamic if one is set
+        dynamicToStore = currentDynamic;
+    }
+    
     // Add note with selected duration using new structure
     const newNote = {
         type: 'note',
@@ -1211,7 +1226,7 @@ export function addNoteToInteractiveMelody(noteName, skipPlayback = false) {
         dotted: dotted,
         tied: false, // Initialize tie flag
         accidental: currentAccidental, // Store accidental (null, '#', 'b', 'n')
-        dynamic: currentDynamic // Store dynamic marker (ppp-fff)
+        dynamic: dynamicToStore // Only store when dynamic changes
     };
 
     interactiveMelody.melodyNotes.push(newNote);
@@ -2037,12 +2052,12 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         });
 
         // Set canvas height - two staves (melody and chords) with padding
-        // Melody stave starts at Y=20, chord stave at Y=110 (20+90)
-        // Each stave is ~80px tall, so chord stave ends at ~190
-        // Need padding at bottom for low notes in bass clef, so increase height
-        let canvasHeight = 250; // Increased height for two staves (melody + chords) with extra padding for low notes
+        // Melody stave starts at Y=30, chord stave at Y=140 (30+110)
+        // Each stave is ~80px tall, so chord stave ends at ~220
+        // Need padding at bottom for low notes in bass clef, plus space for dynamics above melody
+        let canvasHeight = 270; // Increased height for two staves with dynamics spacing
         if (needsExtraHeight) {
-            canvasHeight = 270; // Extra height for ottava brackets
+            canvasHeight = 290; // Extra height for ottava brackets
         }
 
         // Set canvas dimensions explicitly BEFORE clearing or creating renderer
@@ -2062,8 +2077,9 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         const measureWidth = fixedMeasureWidth;
 
         // Vertical positions for staves - single stave positions
-        const melodyStaveY = 20; // Melody stave position
-        const chordStaveY = melodyStaveY + 90; // Chord stave position (below melody)
+        // Increased spacing to accommodate dynamics above melody notes
+        const melodyStaveY = 30; // Melody stave position (moved down to make room for dynamics above)
+        const chordStaveY = melodyStaveY + 110; // Chord stave position (increased from 90 to 110 for more space)
 
         // Create staves for melody (upper staff) - ensure we create one for EVERY chord
         // Position staves contiguously with no gaps
@@ -2097,8 +2113,8 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         if (highlightEnabled && activeMeasureIndex >= 0 && activeMeasureIndex < numMeasures) {
             const highlightX = 20 + (activeMeasureIndex * measureWidth);
             const highlightWidth = measureWidth;
-            const highlightY = 10;
-            const highlightHeight = canvas.height - 20;
+            const highlightY = 5; // Start from top of canvas (moved up slightly for dynamics space)
+            const highlightHeight = canvas.height - 10;
             
             // Draw background highlight using raw canvas context (ctx already declared at start of function)
             ctx.save();
@@ -2694,6 +2710,33 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                     }
                 }
                 
+                // Track current dynamic as we iterate (dynamics persist until changed)
+                // Find the last dynamic from previous notes in the melody
+                let currentRenderingDynamic = null;
+                if (measureNum > 0) {
+                    // Look backwards through previous measures to find the last dynamic
+                    for (let m = measureNum - 1; m >= 0; m--) {
+                        const prevMeasureNotes = interactiveMelody.melodyNotes.filter(n => n.measure === m);
+                        for (let i = prevMeasureNotes.length - 1; i >= 0; i--) {
+                            if (prevMeasureNotes[i].dynamic) {
+                                currentRenderingDynamic = prevMeasureNotes[i].dynamic;
+                                break;
+                            }
+                        }
+                        if (currentRenderingDynamic) break;
+                    }
+                }
+                // Also check notes in current measure before this batch
+                const currentMeasureNotesBefore = interactiveMelody.melodyNotes.filter(n => 
+                    n.measure === measureNum && n.beat < (notesToProcess[0]?.beat || 0)
+                );
+                for (let i = currentMeasureNotesBefore.length - 1; i >= 0; i--) {
+                    if (currentMeasureNotesBefore[i].dynamic) {
+                        currentRenderingDynamic = currentMeasureNotesBefore[i].dynamic;
+                        break;
+                    }
+                }
+                
                 // Create VexFlow notes with ottava transposition if needed
                 // CRITICAL: Use notesToProcess (which is already sorted by beat and limited to beatsPerMeasure)
                 // This ensures notes are created in the exact order by beat position
@@ -2771,13 +2814,25 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                         vexNote.addModifier(new Accidental('b'), 0);
                     }
                     
-                    // Add dynamics if specified
-                    if (note.dynamic && typeof note.dynamic === 'string') {
+                    // Handle dynamics: inherit from previous note if not specified, or use new value if changed
+                    let dynamicToRender = null;
+                    if (note.dynamic) {
+                        // This note has a dynamic change - use it and update tracking
+                        dynamicToRender = note.dynamic;
+                        currentRenderingDynamic = note.dynamic;
+                    } else if (currentRenderingDynamic) {
+                        // No dynamic on this note, but we have one from previous - inherit it
+                        dynamicToRender = currentRenderingDynamic;
+                    }
+                    
+                    // Add dynamics if we have one to render (either from this note or inherited)
+                    if (dynamicToRender && typeof dynamicToRender === 'string') {
                         try {
                             const { Annotation } = VexFlow;
-                            const dynamicAnnotation = new Annotation(note.dynamic);
+                            const dynamicAnnotation = new Annotation(dynamicToRender);
                             dynamicAnnotation.setFont('Times', 12, 'italic');
-                            dynamicAnnotation.setVerticalJustification(VexFlow.Annotation.VerticalJustify.BOTTOM);
+                            // Position ABOVE the note to avoid overlap with chord staff
+                            dynamicAnnotation.setVerticalJustification(VexFlow.Annotation.VerticalJustify.TOP);
                             vexNote.addModifier(dynamicAnnotation, 0);
                         } catch (e) {
                             console.warn('Could not add dynamic annotation:', e);
