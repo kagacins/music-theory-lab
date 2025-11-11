@@ -229,10 +229,13 @@ export function importSongProgression(songIndex) {
         window.clearProgression();
     }
     
-    // Add each chord to the progression synchronously
-    // Each chord should be fully processed before moving to the next
+    // Add each chord to the progression
+    // Use a small delay between additions to ensure each chord is fully processed
+    // This prevents state conflicts when adding multiple chords quickly
     song.chords.forEach((chordSymbol, index) => {
-        addParsedChordToProgression(chordSymbol, song.key);
+        setTimeout(() => {
+            addParsedChordToProgression(chordSymbol, song.key);
+        }, index * 10); // 10ms delay between each chord to ensure proper processing
     });
     
     // Mark progression as ready so Step button and Auto Play work
@@ -245,7 +248,8 @@ export function importSongProgression(songIndex) {
     }
     
     // Update UI - render display and update controls after all chords are added
-    // Use setTimeout to ensure all chord additions are complete before updating UI
+    // Calculate delay based on number of chords (10ms per chord + 100ms buffer)
+    const updateDelay = (song.chords.length * 10) + 100;
     setTimeout(() => {
         if (window.renderProgressionDisplay) {
             window.renderProgressionDisplay();
@@ -256,7 +260,7 @@ export function importSongProgression(songIndex) {
         
         // Update UI
         alert(`Successfully imported "${song.title}" by ${song.artist}!\n\n${song.chords.length} chords added to your progression.`);
-    }, 100);
+    }, updateDelay);
     
     // Collapse the search panel
     const panel = document.getElementById('song-search-panel');
