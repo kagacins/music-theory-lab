@@ -38,6 +38,11 @@ export function toggleTheoryPanel() {
             panel.classList.add('hidden');
             chevron.classList.remove('rotate-180');
         }
+        
+        // Save panel state
+        if (window.savePanelState) {
+            window.savePanelState('theory-tools-panel', !isHidden);
+        }
     }
 }
 

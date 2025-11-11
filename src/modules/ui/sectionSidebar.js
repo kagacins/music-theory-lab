@@ -234,6 +234,12 @@ function updateSectionState(section, sidebar, collapsedSections, container) {
 
     const isCollapsed = panel.classList.contains('hidden');
     
+    // Save panel state to localStorage
+    const panelId = panel.id;
+    if (panelId && window.savePanelState) {
+        window.savePanelState(panelId, !isCollapsed);
+    }
+    
     if (isCollapsed && !collapsedSections.has(sectionId)) {
         // Section just collapsed - animate to sidebar
         animateToSidebar(section, toggle, sidebar, sectionId, collapsedSections, container);

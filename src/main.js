@@ -123,6 +123,7 @@ import {
 } from './modules/features/scaleExplorer.js';
 import { initAudio, getPiano, getGuitar, getInstrument, getAudioIsReady, getCameraShutter, forceStopAllPlayback, initAudioContextKeepAlive } from './modules/audio/audioEngine.js';
 import { updateUndoRedoButtons } from './modules/utils/undoRedo.js';
+import { savePanelState, restoreAllPanelStates, restoreTabPanelStates } from './modules/storage/panelState.js';
 import {
     getCurrentTab,
     getEnharmonicPreference,
@@ -946,6 +947,11 @@ window.toggleMelodyProgressionPanel = function() {
         panel.classList.add('hidden');
         chevron.classList.remove('rotate-180');
     }
+    
+    // Save panel state
+    if (window.savePanelState) {
+        window.savePanelState('melody-progression-panel', !isHidden);
+    }
 };
 
 window.toggleCurrentMelodyPanel = function() {
@@ -960,6 +966,11 @@ window.toggleCurrentMelodyPanel = function() {
     } else {
         panel.classList.add('hidden');
         chevron.classList.remove('rotate-180');
+    }
+    
+    // Save panel state
+    if (window.savePanelState) {
+        window.savePanelState('current-melody-panel', !isHidden);
     }
 };
 
@@ -979,6 +990,10 @@ window.expandAllTrainerSections = function() {
         if (panelEl && chevronEl) {
             panelEl.classList.remove('hidden');
             chevronEl.classList.add('rotate-180');
+            // Save panel state
+            if (window.savePanelState) {
+                window.savePanelState(panelId, true);
+            }
         }
     });
 };
@@ -998,6 +1013,10 @@ window.collapseAllTrainerSections = function() {
         if (panelEl && chevronEl) {
             panelEl.classList.add('hidden');
             chevronEl.classList.remove('rotate-180');
+            // Save panel state
+            if (window.savePanelState) {
+                window.savePanelState(panelId, false);
+            }
         }
     });
 };
@@ -1014,6 +1033,10 @@ window.expandAllBuilderSections = function() {
         if (panelEl && chevronEl) {
             panelEl.classList.remove('hidden');
             chevronEl.classList.add('rotate-180');
+            // Save panel state
+            if (window.savePanelState) {
+                window.savePanelState(panelId, true);
+            }
         }
     });
 };
@@ -1030,6 +1053,10 @@ window.collapseAllBuilderSections = function() {
         if (panelEl && chevronEl) {
             panelEl.classList.add('hidden');
             chevronEl.classList.remove('rotate-180');
+            // Save panel state
+            if (window.savePanelState) {
+                window.savePanelState(panelId, false);
+            }
         }
     });
 };
@@ -1046,6 +1073,10 @@ window.expandAllMelodySections = function() {
         if (panelEl && chevronEl) {
             panelEl.classList.remove('hidden');
             chevronEl.classList.add('rotate-180');
+            // Save panel state
+            if (window.savePanelState) {
+                window.savePanelState(panelId, true);
+            }
         }
     });
 };
@@ -1062,6 +1093,10 @@ window.collapseAllMelodySections = function() {
         if (panelEl && chevronEl) {
             panelEl.classList.add('hidden');
             chevronEl.classList.remove('rotate-180');
+            // Save panel state
+            if (window.savePanelState) {
+                window.savePanelState(panelId, false);
+            }
         }
     });
 };
@@ -1110,6 +1145,11 @@ window.getScaleRootIndex = getScaleRootIndex;
 window.updateKeyboardLabels = updateKeyboardLabels;
 window.getIsFretboardModeOn = getIsFretboardModeOn;
 window.setIsFretboardModeOn = setIsFretboardModeOn;
+
+// Panel state persistence functions
+window.savePanelState = savePanelState;
+window.restoreAllPanelStates = restoreAllPanelStates;
+window.restoreTabPanelStates = restoreTabPanelStates;
 
 // Audio functions already imported above, just expose to window
 window.getPiano = getPiano;
@@ -2073,7 +2113,7 @@ window.onload = () => {
     // Initialize Theory Tools
     initTheoryTools();
 
-    // Initialize section drag-and-drop
+    // Initialize section drag-and-drop (this also restores section ordering)
     initAllSectionDragDrop();
     
     // Initialize section sidebar system (collapsed sections appear as tabs)
@@ -2108,6 +2148,13 @@ window.onload = () => {
             }
         });
     }
+
+    // Restore panel states (expanded/collapsed) from localStorage
+    // Do this after everything is initialized, including tab switch
+    // The switchTab function will also restore states for the active tab
+    setTimeout(() => {
+        restoreAllPanelStates();
+    }, 150);
 
     // Audio context will be resumed automatically by Tone.js when user interacts
 };
@@ -2266,6 +2313,11 @@ window.toggleMelodyControlsPanel = function() {
         const isHidden = panel.classList.contains('hidden');
         panel.classList.toggle('hidden');
         chevron.classList.toggle('rotate-180');
+        
+        // Save panel state
+        if (window.savePanelState) {
+            window.savePanelState('melody-controls-panel', !isHidden);
+        }
         
         // When panel is opened, render chord progression if in Free mode
         if (isHidden) {

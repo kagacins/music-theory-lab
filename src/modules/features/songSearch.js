@@ -181,7 +181,8 @@ export function toggleSongSearchPanel() {
     const chevron = document.getElementById('song-search-chevron');
     
     if (panel && chevron) {
-        if (panel.classList.contains('hidden')) {
+        const isHidden = panel.classList.contains('hidden');
+        if (isHidden) {
             panel.classList.remove('hidden');
             chevron.classList.add('rotate-180');
             // Update search count display when panel opens
@@ -189,6 +190,11 @@ export function toggleSongSearchPanel() {
         } else {
             panel.classList.add('hidden');
             chevron.classList.remove('rotate-180');
+        }
+        
+        // Save panel state
+        if (window.savePanelState) {
+            window.savePanelState('song-search-panel', !isHidden);
         }
     }
 }

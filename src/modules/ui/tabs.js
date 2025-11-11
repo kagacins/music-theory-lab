@@ -68,6 +68,14 @@ export function switchTab(tabId) {
     if (typeof window !== 'undefined') {
         window.currentTab = tabId;
     }
+    
+    // Restore panel states for the tab being switched to
+    // Use a small delay to ensure DOM is ready
+    if (window.restoreTabPanelStates && (tabId === 'builder' || tabId === 'trainer' || tabId === 'melody')) {
+        setTimeout(() => {
+            window.restoreTabPanelStates(tabId);
+        }, 10);
+    }
 
     // Show/hide expand/collapse header buttons based on active tab
     const headerExpandCollapse = document.getElementById('header-expand-collapse-group');

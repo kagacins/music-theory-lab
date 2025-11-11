@@ -474,6 +474,11 @@ export function toggleStyleMoodInsightsPanel() {
         panel.classList.add('hidden');
         chevron.classList.remove('rotate-180');
     }
+    
+    // Save panel state
+    if (window.savePanelState) {
+        window.savePanelState('style-mood-insights-panel', !isHidden);
+    }
 }
 
 export function toggleProgressionControlsPanel() {
@@ -489,6 +494,11 @@ export function toggleProgressionControlsPanel() {
         panel.classList.add('hidden');
         chevron.classList.remove('rotate-180');
     }
+    
+    // Save panel state
+    if (window.savePanelState) {
+        window.savePanelState('progression-controls-panel', !isHidden);
+    }
 }
 
 export function toggleProgressionCardsPanel() {
@@ -503,6 +513,11 @@ export function toggleProgressionCardsPanel() {
     } else {
         panel.classList.add('hidden');
         chevron.classList.remove('rotate-180');
+    }
+    
+    // Save panel state
+    if (window.savePanelState) {
+        window.savePanelState('progression-visualization-panel', !isHidden);
     }
 }
 

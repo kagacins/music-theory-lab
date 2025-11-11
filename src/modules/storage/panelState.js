@@ -1,0 +1,171 @@
+/**
+ * Panel State Persistence Module
+ * Saves and restores the expanded/collapsed state of all collapsible panels
+ */
+
+/**
+ * Save panel state to localStorage
+ * @param {string} panelId - The panel ID (e.g., 'song-search-panel')
+ * @param {boolean} isExpanded - Whether the panel is expanded (true) or collapsed (false)
+ */
+export function savePanelState(panelId, isExpanded) {
+    try {
+        const states = loadAllPanelStates();
+        states[panelId] = isExpanded;
+        localStorage.setItem('panelStates', JSON.stringify(states));
+    } catch (e) {
+        console.warn('Error saving panel state:', e);
+    }
+}
+
+/**
+ * Load panel state from localStorage
+ * @param {string} panelId - The panel ID
+ * @param {boolean} defaultValue - Default value if not found (default: true for expanded)
+ * @returns {boolean} Whether the panel should be expanded
+ */
+export function loadPanelState(panelId, defaultValue = true) {
+    try {
+        const states = loadAllPanelStates();
+        return states.hasOwnProperty(panelId) ? states[panelId] : defaultValue;
+    } catch (e) {
+        console.warn('Error loading panel state:', e);
+        return defaultValue;
+    }
+}
+
+/**
+ * Load all panel states from localStorage
+ * @returns {Object} Object mapping panel IDs to their expanded state
+ */
+function loadAllPanelStates() {
+    try {
+        const saved = localStorage.getItem('panelStates');
+        return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+        console.warn('Error loading panel states:', e);
+        return {};
+    }
+}
+
+/**
+ * Get panel ID from toggle button ID
+ * @param {string} toggleId - The toggle button ID (e.g., 'song-search-toggle')
+ * @returns {string} The panel ID (e.g., 'song-search-panel')
+ */
+function getPanelIdFromToggle(toggleId) {
+    return toggleId.replace('-toggle', '-panel');
+}
+
+/**
+ * Get toggle ID from panel ID
+ * @param {string} panelId - The panel ID (e.g., 'song-search-panel')
+ * @returns {string} The toggle button ID (e.g., 'song-search-toggle')
+ */
+function getToggleIdFromPanel(panelId) {
+    return panelId.replace('-panel', '-toggle');
+}
+
+/**
+ * Restore panel state from localStorage
+ * @param {string} panelId - The panel ID
+ */
+export function restorePanelState(panelId) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    
+    const toggleId = getToggleIdFromPanel(panelId);
+    const chevron = document.getElementById(toggleId.replace('-toggle', '-chevron'));
+    
+    const isExpanded = loadPanelState(panelId, true);
+    
+    if (isExpanded) {
+        panel.classList.remove('hidden');
+        if (chevron) {
+            chevron.classList.add('rotate-180');
+        }
+    } else {
+        panel.classList.add('hidden');
+        if (chevron) {
+            chevron.classList.remove('rotate-180');
+        }
+    }
+}
+
+/**
+ * Restore all panel states for a specific tab
+ * @param {string} tabId - The tab ID ('builder', 'trainer', 'melody')
+ */
+export function restoreTabPanelStates(tabId) {
+    const panelConfigs = getTabPanelConfigs(tabId);
+    
+    panelConfigs.forEach(({ panelId }) => {
+        restorePanelState(panelId);
+    });
+}
+
+/**
+ * Get panel configurations for a specific tab
+ * @param {string} tabId - The tab ID
+ * @returns {Array<Object>} Array of panel configurations
+ */
+function getTabPanelConfigs(tabId) {
+    const configs = {
+        builder: [
+            { panelId: 'chord-setup-panel', toggleId: 'chord-setup-toggle', chevronId: 'chord-setup-chevron' },
+            { panelId: 'chord-library-panel', toggleId: 'chord-library-toggle', chevronId: 'chord-library-chevron' },
+            { panelId: 'chord-intervals-panel', toggleId: 'chord-intervals-toggle', chevronId: 'chord-intervals-chevron' }
+        ],
+        trainer: [
+            { panelId: 'song-search-panel', toggleId: 'song-search-toggle', chevronId: 'song-search-chevron' },
+            { panelId: 'progression-controls-panel', toggleId: 'progression-controls-toggle', chevronId: 'progression-controls-chevron' },
+            { panelId: 'style-mood-insights-panel', toggleId: 'style-mood-insights-toggle', chevronId: 'style-mood-insights-chevron' },
+            { panelId: 'progression-visualization-panel', toggleId: 'progression-visualization-toggle', chevronId: 'progression-visualization-chevron' },
+            { panelId: 'theory-tools-panel', toggleId: 'theory-tools-toggle', chevronId: 'theory-tools-chevron' },
+            { panelId: 'melody-generator-panel', toggleId: 'melody-generator-toggle', chevronId: 'melody-generator-chevron' }
+        ],
+        melody: [
+            { panelId: 'melody-progression-panel', toggleId: 'melody-progression-toggle', chevronId: 'melody-progression-chevron' },
+            { panelId: 'melody-controls-panel', toggleId: 'melody-controls-toggle', chevronId: 'melody-controls-chevron' },
+            { panelId: 'current-melody-panel', toggleId: 'current-melody-toggle', chevronId: 'current-melody-chevron' }
+        ]
+    };
+    
+    return configs[tabId] || [];
+}
+
+/**
+ * Initialize panel state persistence for a toggle function
+ * Wraps a toggle function to save state when called
+ * @param {Function} originalToggle - The original toggle function
+ * @param {string} panelId - The panel ID
+ * @returns {Function} Wrapped toggle function that saves state
+ */
+export function wrapToggleFunction(originalToggle, panelId) {
+    return function(...args) {
+        // Call the original toggle function
+        const result = originalToggle.apply(this, args);
+        
+        // Save the new state after a short delay to ensure DOM has updated
+        setTimeout(() => {
+            const panel = document.getElementById(panelId);
+            if (panel) {
+                const isExpanded = !panel.classList.contains('hidden');
+                savePanelState(panelId, isExpanded);
+            }
+        }, 10);
+        
+        return result;
+    };
+}
+
+/**
+ * Restore all panel states on page load
+ */
+export function restoreAllPanelStates() {
+    // Restore states for all tabs
+    ['builder', 'trainer', 'melody'].forEach(tabId => {
+        restoreTabPanelStates(tabId);
+    });
+}
+

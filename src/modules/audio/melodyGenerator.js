@@ -526,6 +526,11 @@ export function toggleMelodyGeneratorPanel() {
             panel.classList.add('hidden');
             chevron.classList.remove('rotate-180');
         }
+        
+        // Save panel state
+        if (window.savePanelState) {
+            window.savePanelState('melody-generator-panel', !isHidden);
+        }
     }
 }
 
