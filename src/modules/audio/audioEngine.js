@@ -17,6 +17,7 @@ import { showModal, hideModal } from '../ui/modals.js';
 // ============================================================================
 
 let piano = null;
+let pianoReverb = null;
 let guitar = null;
 let audioIsLoading = false;
 let audioIsReady = false;
@@ -65,7 +66,19 @@ export function initAudio() {
             audioIsLoading = false;
             showModal("Error loading audio. Please refresh.", true);
         }
-    }).toDestination();
+    });
+    
+    // Add reverb with long decay to match slow tempos (up to 10 seconds for very slow BPM)
+    // Reverb decay will be dynamically adjusted based on note duration in playback functions
+    pianoReverb = new Tone.Reverb({
+        decay: 10, // Maximum decay for very slow tempos (e.g., 40 BPM whole note = 6 seconds)
+        preDelay: 0.01,
+        wet: 0.3  // Moderate reverb for natural sound
+    });
+    
+    piano.connect(pianoReverb);
+    pianoReverb.toDestination();
+    pianoReverb.generate();
 
     cameraShutter = new Tone.Player({
         url: "public/camera-shutter.mp3",

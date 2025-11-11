@@ -4744,12 +4744,15 @@ export function playAllMelody() {
             // Update active measure index for measure highlighting
             activeMeasureIndex = measureIndex;
             
-            // Visual feedback on keyboard - add highlight when chord starts
+            // Update canvas to show highlights when chord starts
             Tone.Draw.schedule(() => {
+                // Visual feedback on keyboard - add highlight when chord starts
                 chordNoteIds.forEach(({ note }) => {
                     const keyEl = document.getElementById(getNoteKeyId(note));
                     if (keyEl) keyEl.classList.add('active-progression');
                 });
+                // Update canvas to show chord note highlighting
+                updateCanvas();
             }, time);
             
             // Remove chord highlights after chord duration (whole note = 1 measure)
@@ -4762,9 +4765,6 @@ export function playAllMelody() {
                 });
                 updateCanvas();
             }, time + chordDuration);
-            
-            // Update canvas to show highlights
-            updateCanvas();
         }
     }, progressionData.map((chord, index) => {
         const chordTime = index * measureDuration;
