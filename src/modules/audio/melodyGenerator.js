@@ -3806,7 +3806,8 @@ function startMeasurePlayback(canvas, measureIndex) {
     
     // Start playing melody notes sequentially (quarter notes)
     if (measureMelodyNotes.length > 0) {
-        const beatDuration = 0.5; // seconds (quarter note at 120 BPM)
+        const tempo = interactiveMelody.tempo || 120;
+        const beatDuration = 60.0 / tempo; // seconds per beat (based on tempo)
         
         measureMelodyNotes.forEach((note, index) => {
             const delay = index * beatDuration;
@@ -4293,7 +4294,8 @@ export function playMeasure(measureIndex) {
     
     // Play melody notes sequentially (quarter notes)
     if (measureMelodyNotes.length > 0) {
-        const beatDuration = 0.5; // seconds (quarter note at 120 BPM)
+        const tempo = interactiveMelody.tempo || 120;
+        const beatDuration = 60.0 / tempo; // seconds per beat (based on tempo)
         
         measureMelodyNotes.forEach((note, index) => {
             const delay = index * beatDuration;
