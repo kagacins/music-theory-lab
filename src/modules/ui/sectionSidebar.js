@@ -761,12 +761,86 @@ function reorderSectionsFromSidebar(sidebar, container, sectionClass) {
 }
 
 /**
+ * Create instant tooltips for all elements with title attributes
+ * Replaces browser default tooltips which have delay with custom instant ones
+ */
+export function initInstantTooltips() {
+    // Find all elements with title attributes
+    document.querySelectorAll('[title]').forEach(element => {
+        // Skip if already has a tooltip child
+        if (element.querySelector('.instant-tooltip')) return;
+        
+        const titleText = element.getAttribute('title');
+        if (!titleText) return;
+        
+        // Create tooltip element
+        const tooltip = document.createElement('div');
+        tooltip.className = 'instant-tooltip absolute bottom-full mb-2 bg-gray-900 text-white text-xs rounded py-1 px-2 pointer-events-none whitespace-nowrap';
+        tooltip.textContent = titleText;
+        
+        // Style it for instant display
+        tooltip.style.position = 'absolute';
+        tooltip.style.bottom = '100%';
+        tooltip.style.left = '50%';
+        tooltip.style.transform = 'translateX(-50%)';
+        tooltip.style.marginBottom = '8px';
+        tooltip.style.backgroundColor = '#111827';
+        tooltip.style.color = 'white';
+        tooltip.style.fontSize = '12px';
+        tooltip.style.borderRadius = '4px';
+        tooltip.style.padding = '4px 8px';
+        tooltip.style.pointerEvents = 'none';
+        tooltip.style.whiteSpace = 'nowrap';
+        tooltip.style.zIndex = '9999';
+        tooltip.style.opacity = '0';
+        tooltip.style.visibility = 'hidden';
+        tooltip.style.display = 'block';
+        tooltip.style.transition = 'none';
+        tooltip.style.transitionDelay = '0s';
+        tooltip.style.transitionDuration = '0s';
+        tooltip.style.willChange = 'opacity, visibility';
+        
+        // Set element position to relative so tooltip positions from it
+        if (getComputedStyle(element).position === 'static') {
+            element.style.position = 'relative';
+        }
+        
+        // Append tooltip to element
+        element.appendChild(tooltip);
+        
+        // Remove title attribute to prevent browser default tooltip
+        element.removeAttribute('title');
+        
+        // Add event listeners for instant display
+        element.addEventListener('mouseenter', () => {
+            tooltip.style.transition = 'none';
+            tooltip.style.transitionDelay = '0s';
+            tooltip.style.transitionDuration = '0s';
+            tooltip.style.visibility = 'visible';
+            tooltip.style.opacity = '1';
+            void tooltip.offsetHeight; // Force reflow
+        }, { passive: true });
+        
+        element.addEventListener('mouseleave', () => {
+            tooltip.style.transition = 'none';
+            tooltip.style.transitionDelay = '0s';
+            tooltip.style.transitionDuration = '0s';
+            tooltip.style.opacity = '0';
+            tooltip.style.visibility = 'hidden';
+        }, { passive: true });
+    });
+}
+
+/**
  * Initialize sidebar for all tabs
  */
 export function initAllSectionSidebars() {
     initSectionSidebar('builder', 'builder-sections-container', 'builder-section-item');
     initSectionSidebar('trainer', 'trainer-sections-container', 'trainer-section-item');
     initSectionSidebar('melody', 'melody-sections-container', 'melody-section-item');
+    
+    // Initialize instant tooltips for all floating controls and other buttons
+    initInstantTooltips();
 }
 
 /**
