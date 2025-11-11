@@ -187,7 +187,16 @@ function addParsedChordToProgression(chordSymbol, key) {
     // Build chord manually by calling the chord functions
     // This approach simulates selecting the chord in the builder and adding it
     if (window.selectBuilderChordBySymbol) {
-        window.selectBuilderChordBySymbol(root, chordType);
+        try {
+            window.selectBuilderChordBySymbol(root, chordType);
+            // Verify the chord was added by checking progression length
+            const trainerState = window.getTrainerState ? window.getTrainerState() : null;
+            if (trainerState && trainerState.progressionData) {
+                console.log(`Added chord ${chordSymbol} (${root} ${chordType}). Progression now has ${trainerState.progressionData.length} chords.`);
+            }
+        } catch (error) {
+            console.error(`Error adding chord ${chordSymbol}:`, error);
+        }
     } else {
         console.warn(`Chord building functions not available for: ${chordSymbol}`);
     }
@@ -220,8 +229,9 @@ export function importSongProgression(songIndex) {
         window.clearProgression();
     }
     
-    // Add each chord to the progression
-    song.chords.forEach(chordSymbol => {
+    // Add each chord to the progression synchronously
+    // Each chord should be fully processed before moving to the next
+    song.chords.forEach((chordSymbol, index) => {
         addParsedChordToProgression(chordSymbol, song.key);
     });
     
@@ -234,16 +244,19 @@ export function importSongProgression(songIndex) {
         window.trainerState.isReady = true;
     }
     
-    // Update UI - render display and update controls
-    if (window.renderProgressionDisplay) {
-        window.renderProgressionDisplay();
-    }
-    if (window.updateProgressionControlsUI) {
-        window.updateProgressionControlsUI();
-    }
-    
-    // Update UI
-    alert(`Successfully imported "${song.title}" by ${song.artist}!\n\n${song.chords.length} chords added to your progression.`);
+    // Update UI - render display and update controls after all chords are added
+    // Use setTimeout to ensure all chord additions are complete before updating UI
+    setTimeout(() => {
+        if (window.renderProgressionDisplay) {
+            window.renderProgressionDisplay();
+        }
+        if (window.updateProgressionControlsUI) {
+            window.updateProgressionControlsUI();
+        }
+        
+        // Update UI
+        alert(`Successfully imported "${song.title}" by ${song.artist}!\n\n${song.chords.length} chords added to your progression.`);
+    }, 100);
     
     // Collapse the search panel
     const panel = document.getElementById('song-search-panel');
