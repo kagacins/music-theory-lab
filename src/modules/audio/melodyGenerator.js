@@ -1396,6 +1396,14 @@ export function deleteLastNote() {
  * Clear all notes from interactive melody
  */
 export function clearInteractiveMelody() {
+    // Stop any active playback immediately
+    if (window.stopPlayAllMelody) {
+        window.stopPlayAllMelody();
+    }
+    
+    // Also stop any other melody playback
+    stopMelody();
+    
     interactiveMelody.melodyNotes = [];
     interactiveMelody.chordNotes = [];
     currentMeasure = 0;
