@@ -1248,17 +1248,17 @@ export function addNoteToInteractiveMelody(noteName, skipPlayback = false) {
 export function setNoteDuration(duration) {
     currentNoteDuration = duration;
     
-    // Update UI button states
+    // Update UI button states - use emerald colors to match other notation panel buttons
     const durations = ['1n', '2n', '4n', '8n', '16n', '32n'];
     durations.forEach(d => {
         const btn = document.getElementById(`duration-${d}`);
         if (btn) {
             if (d === duration) {
-                btn.classList.remove('bg-amber-200', 'text-amber-900');
-                btn.classList.add('bg-amber-600', 'text-white');
+                btn.classList.remove('bg-emerald-200', 'text-emerald-900');
+                btn.classList.add('bg-emerald-600', 'text-white');
             } else {
-                btn.classList.remove('bg-amber-600', 'text-white');
-                btn.classList.add('bg-amber-200', 'text-amber-900');
+                btn.classList.remove('bg-emerald-600', 'text-white');
+                btn.classList.add('bg-emerald-200', 'text-emerald-900');
             }
         }
     });
