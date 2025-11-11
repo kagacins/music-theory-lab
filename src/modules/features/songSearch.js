@@ -77,6 +77,85 @@ const DEMO_SONG_DATABASE = [
     }
 ];
 
+// Rate limiting configuration
+const DAILY_SEARCH_LIMIT = 100; // Free tier limit
+const SEARCH_COUNT_KEY = 'google_search_count';
+const SEARCH_DATE_KEY = 'google_search_date';
+
+/**
+ * Get today's date as a string (YYYY-MM-DD)
+ * @returns {string} Today's date
+ */
+function getTodayDateString() {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Get the current daily search count
+ * @returns {number} Current search count for today
+ */
+function getDailySearchCount() {
+    const storedDate = localStorage.getItem(SEARCH_DATE_KEY);
+    const today = getTodayDateString();
+    
+    // If it's a new day, reset the count
+    if (storedDate !== today) {
+        localStorage.setItem(SEARCH_DATE_KEY, today);
+        localStorage.setItem(SEARCH_COUNT_KEY, '0');
+        return 0;
+    }
+    
+    // Return stored count
+    const count = parseInt(localStorage.getItem(SEARCH_COUNT_KEY) || '0', 10);
+    return isNaN(count) ? 0 : count;
+}
+
+/**
+ * Increment the daily search count
+ * @returns {number} New count after incrementing
+ */
+function incrementDailySearchCount() {
+    const count = getDailySearchCount() + 1;
+    localStorage.setItem(SEARCH_COUNT_KEY, count.toString());
+    return count;
+}
+
+/**
+ * Check if daily search limit has been reached
+ * @returns {boolean} True if limit reached, false otherwise
+ */
+function isDailyLimitReached() {
+    return getDailySearchCount() >= DAILY_SEARCH_LIMIT;
+}
+
+/**
+ * Get remaining searches for today
+ * @returns {number} Remaining searches
+ */
+function getRemainingSearches() {
+    return Math.max(0, DAILY_SEARCH_LIMIT - getDailySearchCount());
+}
+
+/**
+ * Update the search count display in the UI
+ */
+function updateSearchCountDisplay() {
+    const display = document.getElementById('search-count-display');
+    if (!display) return;
+    
+    const count = getDailySearchCount();
+    const remaining = getRemainingSearches();
+    
+    if (count >= DAILY_SEARCH_LIMIT) {
+        display.innerHTML = `<strong class="text-yellow-800">Daily limit reached:</strong> ${count}/${DAILY_SEARCH_LIMIT} searches used today. Limit resets at midnight.`;
+    } else if (remaining <= 10) {
+        display.innerHTML = `<strong class="text-orange-800">${remaining} searches remaining today</strong> (${count}/${DAILY_SEARCH_LIMIT} used)`;
+    } else {
+        display.innerHTML = `${count}/${DAILY_SEARCH_LIMIT} internet searches used today (${remaining} remaining)`;
+    }
+}
+
 /**
  * Toggle the song search panel visibility
  */
@@ -88,6 +167,8 @@ export function toggleSongSearchPanel() {
         if (panel.classList.contains('hidden')) {
             panel.classList.remove('hidden');
             chevron.classList.add('rotate-180');
+            // Update search count display when panel opens
+            updateSearchCountDisplay();
         } else {
             panel.classList.add('hidden');
             chevron.classList.remove('rotate-180');
@@ -126,12 +207,31 @@ export async function searchSongChords() {
         return songText.includes(queryLower);
     });
     
-    // Then search the internet
+    // Then search the internet (only if under daily limit)
     let internetResults = [];
-    try {
-        internetResults = await searchInternetForChords(query);
-    } catch (error) {
-        console.warn('Internet search failed:', error);
+    let rateLimitReached = false;
+    
+    if (isDailyLimitReached()) {
+        rateLimitReached = true;
+        console.log('Daily search limit reached. Skipping internet search.');
+    } else {
+        // Check if we have API credentials before attempting search
+        const hasApiCredentials = window.GOOGLE_SEARCH_API_KEY && window.GOOGLE_SEARCH_ENGINE_ID;
+        
+        if (hasApiCredentials) {
+            try {
+                internetResults = await searchInternetForChords(query);
+                // Increment count after successful API call attempt
+                incrementDailySearchCount();
+            } catch (error) {
+                console.warn('Internet search failed:', error);
+                // Still increment on error to prevent retry loops
+                // (API call was attempted, even if it failed)
+                incrementDailySearchCount();
+            }
+            // Update display after incrementing
+            updateSearchCountDisplay();
+        }
     }
     
     // Combine results (local first, then internet)
@@ -139,21 +239,49 @@ export async function searchSongChords() {
     
     // Display results
     if (allResults.length === 0) {
-        resultsContainer.innerHTML = `
-            <div class="space-y-3">
-                <p class="text-sm text-gray-500 italic">No songs found in local database.</p>
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p class="text-sm text-blue-800 mb-2">Try searching on Ultimate Guitar:</p>
-                    <button onclick="window.openUltimateGuitarSearch && window.openUltimateGuitarSearch('${escapeHtml(query)}')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow transition">
-                        Search Ultimate Guitar
-                    </button>
+        let message = '<p class="text-sm text-gray-500 italic">No songs found in local database.</p>';
+        
+        if (rateLimitReached) {
+            const remaining = getRemainingSearches();
+            message += `
+                <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p class="text-sm text-yellow-800"><strong>Daily search limit reached:</strong> You've used all ${DAILY_SEARCH_LIMIT} free searches for today. Internet search is disabled until tomorrow.</p>
+                    <p class="text-xs text-yellow-700 mt-1">Local database searches are still available.</p>
                 </div>
+            `;
+        }
+        
+        message += `
+            <div class="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p class="text-sm text-blue-800 mb-2">Try searching on Ultimate Guitar:</p>
+                <button onclick="window.openUltimateGuitarSearch && window.openUltimateGuitarSearch('${escapeHtml(query)}')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow transition">
+                    Search Ultimate Guitar
+                </button>
             </div>
         `;
+        
+        resultsContainer.innerHTML = `<div class="space-y-3">${message}</div>`;
         return;
     }
     
-    resultsContainer.innerHTML = allResults.map((song) => {
+    // Show rate limit warning if approaching limit
+    const remaining = getRemainingSearches();
+    let rateLimitWarning = '';
+    if (rateLimitReached) {
+        rateLimitWarning = `
+            <div class="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p class="text-sm text-yellow-800"><strong>Daily search limit reached:</strong> You've used all ${DAILY_SEARCH_LIMIT} free searches for today. Internet search results are not available until tomorrow.</p>
+            </div>
+        `;
+    } else if (remaining <= 10 && remaining > 0) {
+        rateLimitWarning = `
+            <div class="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                <p class="text-sm text-orange-800"><strong>Search limit warning:</strong> You have ${remaining} internet search${remaining === 1 ? '' : 'es'} remaining today (out of ${DAILY_SEARCH_LIMIT} free searches).</p>
+            </div>
+        `;
+    }
+    
+    resultsContainer.innerHTML = rateLimitWarning + allResults.map((song) => {
         if (song.source === 'local') {
             // Local database result with import button
             return `
