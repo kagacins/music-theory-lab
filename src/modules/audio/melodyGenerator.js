@@ -1130,14 +1130,20 @@ function getDurationInQuarterNotes(duration, dotted = false) {
         '16n': 0.25, // 16th note = 0.25 quarter notes
         '32n': 0.125 // 32nd note = 0.125 quarter notes
     };
-    
-    let durationValue = durationMap[duration] || 1; // Default to quarter note
-    
+
+    if (!duration || typeof duration !== 'string') {
+        duration = '4n';
+    }
+
+    // Normalize duration by removing dots and trimming whitespace
+    const normalizedDuration = duration.replace('.', '').trim().toLowerCase();
+    let durationValue = durationMap[normalizedDuration] || 1; // Default to quarter note
+
     // Apply dot (increase by 50%)
-    if (dotted) {
+    if (dotted || duration.includes('.')) {
         durationValue *= 1.5;
     }
-    
+
     return durationValue;
 }
 
