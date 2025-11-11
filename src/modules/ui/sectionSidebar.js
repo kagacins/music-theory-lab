@@ -605,6 +605,36 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     // Track if tooltip should be visible
     let isTooltipVisible = false;
     let tooltipTimeout = null;
+    let mouseMoveHandler = null;
+    
+    // Global mouse move handler to check if mouse is still over tab or tooltip
+    const checkMousePosition = (e) => {
+        if (!isTooltipVisible) return;
+        
+        const tabRect = tab.getBoundingClientRect();
+        const tooltipRect = tooltip.getBoundingClientRect();
+        const mouseX = e.clientX;
+        const mouseY = e.clientY;
+        
+        const isOverTab = mouseX >= tabRect.left && 
+                         mouseX <= tabRect.right &&
+                         mouseY >= tabRect.top && 
+                         mouseY <= tabRect.bottom;
+        
+        const isOverTooltip = mouseX >= tooltipRect.left && 
+                             mouseX <= tooltipRect.right &&
+                             mouseY >= tooltipRect.top && 
+                             mouseY <= tooltipRect.bottom;
+        
+        if (!isOverTab && !isOverTooltip) {
+            // Mouse is not over either tab or tooltip, hide it
+            if (tooltipTimeout) {
+                clearTimeout(tooltipTimeout);
+                tooltipTimeout = null;
+            }
+            hideTooltip();
+        }
+    };
     
     // Show tooltip immediately on hover (absolutely no delay)
     const showTooltip = () => {
@@ -630,6 +660,12 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
         tooltip.style.opacity = '1';
         // Force reflow to ensure immediate rendering
         void tooltip.offsetHeight;
+        
+        // Add global mouse move handler to track mouse position
+        if (!mouseMoveHandler) {
+            mouseMoveHandler = checkMousePosition;
+            document.addEventListener('mousemove', mouseMoveHandler, { passive: true });
+        }
     };
     
     const hideTooltip = () => {
@@ -646,10 +682,20 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
         tooltip.style.transitionDuration = '0s';
         tooltip.style.opacity = '0';
         tooltip.style.visibility = 'hidden';
+        
+        // Remove global mouse move handler
+        if (mouseMoveHandler) {
+            document.removeEventListener('mousemove', mouseMoveHandler);
+            mouseMoveHandler = null;
+        }
     };
     
+    // Track mouse position relative to tab
+    let isMouseOverTab = false;
+    
     // Use mouseenter/mouseleave which don't bubble and are more reliable
-    tab.addEventListener('mouseenter', () => {
+    tab.addEventListener('mouseenter', (e) => {
+        isMouseOverTab = true;
         // Clear any pending hide
         if (tooltipTimeout) {
             clearTimeout(tooltipTimeout);
@@ -658,14 +704,13 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
         showTooltip();
     }, { passive: true });
     
-    tab.addEventListener('mouseleave', () => {
-        // Small delay to prevent flickering when mouse briefly leaves during child element transitions
-        tooltipTimeout = setTimeout(() => {
-            hideTooltip();
-        }, 100);
+    tab.addEventListener('mouseleave', (e) => {
+        isMouseOverTab = false;
+        // The global mousemove handler will check if mouse is over tooltip or tab
+        // and hide the tooltip if mouse is not over either
+        // No timeout needed here since mousemove will fire immediately as mouse moves
     }, { passive: true });
     
-    // Remove mouseout - it fires too frequently when moving over child elements
     
     // Get icon from toggle button
     const icon = toggle.querySelector('svg:not(.drag-handle):not([id$="-chevron"])');
