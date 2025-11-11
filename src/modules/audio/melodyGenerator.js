@@ -4810,6 +4810,9 @@ export function playAllMelody() {
         updatePlayAllButton();
     });
     
+    // Set Transport BPM to match the melody tempo
+    Tone.Transport.bpm.value = tempo;
+    
     // Add parts to transport and start
     if (melodyPart) {
         melodyPart.start(0);
