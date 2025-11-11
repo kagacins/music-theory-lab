@@ -542,18 +542,13 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     const tooltipText = toggle.textContent.trim() || sectionId;
     // Remove title attribute to prevent browser default tooltip delay
     tab.removeAttribute('title');
-    tab.style.position = 'relative';
     
-    // Add custom tooltip for immediate display (no transition for instant appearance)
+    // Add custom tooltip for immediate display (fixed positioning to avoid clipping)
     const tooltip = document.createElement('div');
-    tooltip.className = 'sidebar-tooltip absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 pointer-events-none whitespace-nowrap';
+    tooltip.className = 'sidebar-section-tooltip bg-gray-900 text-white text-xs rounded py-1 px-2 pointer-events-none whitespace-nowrap';
     tooltip.textContent = tooltipText;
-    // Pre-configure for instant display - keep it in DOM but hidden
-    tooltip.style.position = 'absolute';
-    tooltip.style.left = '100%';
-    tooltip.style.marginLeft = '8px';
-    tooltip.style.top = '50%';
-    tooltip.style.transform = 'translateY(-50%)';
+    // Pre-configure for instant display with fixed positioning
+    tooltip.style.position = 'fixed';
     tooltip.style.backgroundColor = '#111827';
     tooltip.style.color = 'white';
     tooltip.style.fontSize = '12px';
@@ -569,11 +564,17 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     tooltip.style.transitionDelay = '0s';
     tooltip.style.transitionDuration = '0s';
     tooltip.style.willChange = 'opacity, visibility';
-    tab.appendChild(tooltip);
+    document.body.appendChild(tooltip);
     
     // Show tooltip immediately on hover (absolutely no delay)
     tab.addEventListener('mouseenter', () => {
-        // Force immediate display with multiple methods
+        // Get current position of tab
+        const tabRect = tab.getBoundingClientRect();
+        // Position tooltip to the right of the tab, vertically centered
+        tooltip.style.left = `${tabRect.right + 8}px`;
+        tooltip.style.top = `${tabRect.top + tabRect.height / 2}px`;
+        tooltip.style.transform = 'translateY(-50%)';
+        // Show it
         tooltip.style.transition = 'none';
         tooltip.style.transitionDelay = '0s';
         tooltip.style.transitionDuration = '0s';
@@ -591,8 +592,6 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
         tooltip.style.transitionDuration = '0s';
         tooltip.style.opacity = '0';
         tooltip.style.visibility = 'hidden';
-        // Keep display as block so element stays in layout
-        tooltip.style.display = 'block';
     }, { passive: true });
     
     // Get icon from toggle button
