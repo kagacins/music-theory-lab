@@ -15,6 +15,7 @@ let melodySequence = null;
 let isPlaying = false;
 let isPlayAllActive = false; // Track if "Play All" is currently active
 let playAllParts = { melodyPart: null, chordPart: null }; // Store parts for stopping
+let currentlyPlayingChordNotes = []; // Track currently playing chord notes to release when next chord starts
 
 // Clef preferences for melody and chords
 let melodyClef = 'treble'; // 'treble' or 'bass'
@@ -4851,6 +4852,19 @@ export function playAllMelody() {
     
     // Set Transport BPM to match the melody tempo
     Tone.Transport.bpm.value = tempo;
+    
+    // Reset reverb wet level to ensure it's active for playback
+    const reverb = getPianoReverb();
+    if (reverb) {
+        try {
+            reverb.wet.value = 0.3; // Ensure reverb is active
+        } catch (e) {
+            // Ignore errors
+        }
+    }
+    
+    // Clear any previously tracked chord notes
+    currentlyPlayingChordNotes = [];
     
     // Add parts to transport and start
     if (melodyPart) {
