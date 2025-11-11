@@ -3,6 +3,10 @@
  * Saves and restores the expanded/collapsed state of all collapsible panels
  */
 
+import { loadFromStorage, saveToStorage } from './storageUtils.js';
+
+const STORAGE_KEY = 'panelStates';
+
 /**
  * Save panel state to localStorage
  * @param {string} panelId - The panel ID (e.g., 'song-search-panel')
@@ -12,7 +16,7 @@ export function savePanelState(panelId, isExpanded) {
     try {
         const states = loadAllPanelStates();
         states[panelId] = isExpanded;
-        localStorage.setItem('panelStates', JSON.stringify(states));
+        saveToStorage(STORAGE_KEY, states);
     } catch (e) {
         console.warn('Error saving panel state:', e);
     }
@@ -39,13 +43,7 @@ export function loadPanelState(panelId, defaultValue = true) {
  * @returns {Object} Object mapping panel IDs to their expanded state
  */
 function loadAllPanelStates() {
-    try {
-        const saved = localStorage.getItem('panelStates');
-        return saved ? JSON.parse(saved) : {};
-    } catch (e) {
-        console.warn('Error loading panel states:', e);
-        return {};
-    }
+    return loadFromStorage(STORAGE_KEY, {});
 }
 
 /**
@@ -72,23 +70,43 @@ function getToggleIdFromPanel(panelId) {
  */
 export function restorePanelState(panelId) {
     const panel = document.getElementById(panelId);
-    if (!panel) return;
+    if (!panel) {
+        // Panel not found - might not be in current tab or DOM not ready
+        // This is normal for panels in hidden tabs, so we don't log a warning
+        return;
+    }
     
     const toggleId = getToggleIdFromPanel(panelId);
     const chevron = document.getElementById(toggleId.replace('-toggle', '-chevron'));
     
-    const isExpanded = loadPanelState(panelId, true);
+    // Check if there's a saved state for this panel
+    const allStates = loadAllPanelStates();
+    const hasSavedState = allStates.hasOwnProperty(panelId);
     
-    if (isExpanded) {
-        panel.classList.remove('hidden');
-        if (chevron) {
-            chevron.classList.add('rotate-180');
+    // If there's no saved state, don't change anything (preserve HTML defaults)
+    if (!hasSavedState) {
+        return;
+    }
+    
+    // There is a saved state - use it
+    const isExpanded = allStates[panelId];
+    const isCurrentlyExpanded = !panel.classList.contains('hidden');
+    
+    // Apply the saved state if it's different from current state
+    if (isExpanded !== isCurrentlyExpanded) {
+        if (isExpanded) {
+            panel.classList.remove('hidden');
+            if (chevron) {
+                chevron.classList.add('rotate-180');
+            }
+        } else {
+            panel.classList.add('hidden');
+            if (chevron) {
+                chevron.classList.remove('rotate-180');
+            }
         }
-    } else {
-        panel.classList.add('hidden');
-        if (chevron) {
-            chevron.classList.remove('rotate-180');
-        }
+        // Debug log (can be removed later)
+        // console.log(`Restored panel ${panelId} to ${isExpanded ? 'expanded' : 'collapsed'}`);
     }
 }
 
@@ -161,11 +179,30 @@ export function wrapToggleFunction(originalToggle, panelId) {
 
 /**
  * Restore all panel states on page load
+ * Only restores states for panels that exist in the DOM
  */
 export function restoreAllPanelStates() {
-    // Restore states for all tabs
+    // Get the current tab to restore its states first
+    const currentTab = window.getCurrentTab ? window.getCurrentTab() : 'trainer';
+    
+    // Restore states for all tabs (panels exist in DOM even if tab is hidden)
+    // But prioritize the current tab
     ['builder', 'trainer', 'melody'].forEach(tabId => {
-        restoreTabPanelStates(tabId);
+        // Restore current tab first, then others
+        if (tabId === currentTab) {
+            restoreTabPanelStates(tabId);
+        }
     });
+    
+    // Then restore other tabs
+    ['builder', 'trainer', 'melody'].forEach(tabId => {
+        if (tabId !== currentTab) {
+            restoreTabPanelStates(tabId);
+        }
+    });
+    
+    // Debug log (can be removed later)
+    // const allStates = loadAllPanelStates();
+    // console.log('Restored panel states:', allStates);
 }
 

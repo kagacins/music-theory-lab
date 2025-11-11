@@ -64,8 +64,9 @@ export function initSectionSidebar(tabId, containerId, sectionClass) {
         if (panel) {
             // Observe the panel for class changes
             observer.observe(panel, { attributes: true, attributeFilter: ['class'] });
-            // Check initial state
-            updateSectionState(section, sidebar, collapsedSections, container);
+            // Check initial state (but don't save - states should already be restored)
+            // Pass false to skip saving during initialization
+            updateSectionState(section, sidebar, collapsedSections, container, false);
         }
     });
 
@@ -222,8 +223,9 @@ function createSidebar(tabId) {
  * @param {HTMLElement} sidebar - The sidebar element
  * @param {Set} collapsedSections - Set of collapsed section IDs
  * @param {HTMLElement} container - The container element
+ * @param {boolean} saveState - Whether to save state to localStorage (default: true)
  */
-function updateSectionState(section, sidebar, collapsedSections, container) {
+function updateSectionState(section, sidebar, collapsedSections, container, saveState = true) {
     const toggle = section.querySelector('button[id$="-toggle"]');
     if (!toggle) return;
 
@@ -234,10 +236,12 @@ function updateSectionState(section, sidebar, collapsedSections, container) {
 
     const isCollapsed = panel.classList.contains('hidden');
     
-    // Save panel state to localStorage
-    const panelId = panel.id;
-    if (panelId && window.savePanelState) {
-        window.savePanelState(panelId, !isCollapsed);
+    // Save panel state to localStorage (skip during initialization to preserve restored states)
+    if (saveState) {
+        const panelId = panel.id;
+        if (panelId && window.savePanelState) {
+            window.savePanelState(panelId, !isCollapsed);
+        }
     }
     
     if (isCollapsed && !collapsedSections.has(sectionId)) {

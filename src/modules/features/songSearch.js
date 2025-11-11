@@ -857,7 +857,7 @@ function convertToEnharmonicPreference(note) {
  * @param {string} key - The key of the song
  * @param {boolean} playShutterSound - Whether to play the shutter sound (default: false)
  */
-function addParsedChordToProgression(chordSymbol, key, playShutterSound = false) {
+function addParsedChordToProgression(chordSymbol, key, playShutterSound = false, inversion = 0) {
     // Parse the chord symbol
     // Format: [Root][Accidental?][Type][Extensions?]
     // Examples: C, Am, F#m7, Gsus4, Cmaj7, Dm7b5, Ab, Bbm
@@ -905,8 +905,8 @@ function addParsedChordToProgression(chordSymbol, key, playShutterSound = false)
             const trainerStateBefore = window.getTrainerState ? window.getTrainerState() : null;
             const lengthBefore = trainerStateBefore && trainerStateBefore.progressionData ? trainerStateBefore.progressionData.length : 0;
             
-            // Call the function to select and add the chord (pass playShutterSound parameter)
-            window.selectBuilderChordBySymbol(root, chordType, playShutterSound);
+            // Call the function to select and add the chord (pass playShutterSound and inversion parameters)
+            window.selectBuilderChordBySymbol(root, chordType, playShutterSound, inversion);
             
             // Verify the chord was added by checking progression length after a short delay
             setTimeout(() => {
@@ -914,7 +914,8 @@ function addParsedChordToProgression(chordSymbol, key, playShutterSound = false)
                 if (trainerStateAfter && trainerStateAfter.progressionData) {
                     const lengthAfter = trainerStateAfter.progressionData.length;
                     if (lengthAfter > lengthBefore) {
-                        console.log(`✓ Added chord ${chordSymbol} (${root} ${chordType}). Progression: ${lengthBefore} → ${lengthAfter} chords.`);
+                        const inversionText = inversion > 0 ? ` (inv. ${inversion})` : '';
+                        console.log(`✓ Added chord ${chordSymbol} (${root} ${chordType}${inversionText}). Progression: ${lengthBefore} → ${lengthAfter} chords.`);
                     } else {
                         console.warn(`⚠ Chord ${chordSymbol} (${root} ${chordType}) was not added. Progression length unchanged: ${lengthBefore}`);
                     }
@@ -987,9 +988,19 @@ export async function importSongProgression(songIndex) {
     // Add each chord to the progression (skip shutter sound for all chords)
     // Use a small delay between additions to ensure each chord is fully processed
     // This prevents state conflicts when adding multiple chords quickly
+    // Support inversions if provided in the song data
     song.chords.forEach((chordSymbol, index) => {
         setTimeout(() => {
-            addParsedChordToProgression(chordSymbol, song.key, false);
+            // Check if inversions array exists and has an inversion for this chord
+            let inversion = 0; // Default to root position
+            if (song.inversions && Array.isArray(song.inversions) && index < song.inversions.length) {
+                const inversionValue = song.inversions[index];
+                // Ensure inversion is a valid number (0, 1, 2, etc.)
+                if (typeof inversionValue === 'number' && inversionValue >= 0) {
+                    inversion = inversionValue;
+                }
+            }
+            addParsedChordToProgression(chordSymbol, song.key, false, inversion);
         }, index * 100); // Increased delay for consistency
     });
     

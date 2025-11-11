@@ -148,13 +148,20 @@ export function playArpeggio(selectionType, type, direction) {
     }
 
     const speedValue = ARPEGGIO_SPEEDS[arpeggioSpeed];
-    const noteDurationSeconds = Tone.Time(speedValue).toSeconds();
+    const intervalSeconds = Tone.Time(speedValue).toSeconds();
+    // Make note duration slightly shorter than interval to ensure clean separation
+    // Use 85% of interval to allow for clean note separation and prevent overlap
+    const noteDurationSeconds = intervalSeconds * 0.85;
+    // Convert back to Tone.js time format for triggerAttackRelease
+    const noteDuration = noteDurationSeconds;
+    
     // Use getInstrument() instead of getPiano() to respect fretboard mode
     const getInstrument = window.getInstrument || getPiano;
     const instrument = getInstrument();
-
+    
     g_arpeggioSequence = new Tone.Sequence((time, note) => {
-        instrument.triggerAttackRelease(note, speedValue, time);
+        // Use consistent note duration for all notes (85% of interval)
+        instrument.triggerAttackRelease(note, noteDuration, time);
         // NEW: Schedule visual highlighting for each note in the arpeggio
         Tone.Draw.schedule(() => {
             const keyEl = document.getElementById(window.getNoteKeyId(note));
@@ -171,7 +178,8 @@ export function playArpeggio(selectionType, type, direction) {
     Tone.Transport.start();
 
     // Schedule cleanup after the sequence finishes
-    const totalDuration = notesToPlay.length * noteDurationSeconds;
+    // Use interval-based calculation to ensure cleanup happens after all notes
+    const totalDuration = notesToPlay.length * intervalSeconds;
     Tone.Transport.scheduleOnce((time) => {
         Tone.Draw.schedule(() => {
             stopArpeggio();

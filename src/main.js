@@ -2113,11 +2113,21 @@ window.onload = () => {
     // Initialize Theory Tools
     initTheoryTools();
 
+    // Restore panel states FIRST, before initializing sidebar system
+    // This prevents the sidebar from overwriting saved states with HTML defaults
+    // Use a small delay to ensure DOM is ready
+    setTimeout(() => {
+        restoreAllPanelStates();
+    }, 100);
+
     // Initialize section drag-and-drop (this also restores section ordering)
     initAllSectionDragDrop();
     
-    // Initialize section sidebar system (collapsed sections appear as tabs)
-    initAllSectionSidebars();
+    // Initialize section sidebar system AFTER restoring panel states
+    // This ensures the sidebar sees the restored states, not HTML defaults
+    setTimeout(() => {
+        initAllSectionSidebars();
+    }, 200);
 
     // Setup responsive title abbreviation
     setupResponsiveTitle();
@@ -2148,13 +2158,6 @@ window.onload = () => {
             }
         });
     }
-
-    // Restore panel states (expanded/collapsed) from localStorage
-    // Do this after everything is initialized, including tab switch
-    // The switchTab function will also restore states for the active tab
-    setTimeout(() => {
-        restoreAllPanelStates();
-    }, 150);
 
     // Audio context will be resumed automatically by Tone.js when user interacts
 };

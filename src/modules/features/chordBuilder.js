@@ -1347,7 +1347,7 @@ export function capturePlayedChord(notes, type = 'Major', inversion = 0) {
  * @param {string} root - Root note (e.g., "C", "F#", "Bb")
  * @param {string} type - Chord type (e.g., "major", "minor", "dominant7")
  */
-export function selectBuilderChordBySymbol(root, type, playShutterSound = true) {
+export function selectBuilderChordBySymbol(root, type, playShutterSound = true, inversion = 0) {
     // Map common chord type names to internal type names (matching CHORD_DEFINITIONS keys exactly)
     const typeMap = {
         'major': 'Major',
@@ -1379,6 +1379,11 @@ export function selectBuilderChordBySymbol(root, type, playShutterSound = true) 
     // Set the builder state
     setBuilderRootIndex(rootIndex);
     setBuilderChordType(mappedType);
+    
+    // Set inversion if provided (0 = root position, 1 = first inversion, 2 = second inversion, etc.)
+    if (inversion !== undefined && inversion !== null) {
+        setBuilderInversion(inversion);
+    }
     
     // Update displays
     updateBuilderDisplay();

@@ -3,7 +3,8 @@
     "title": "Like a Rolling Stone",
     "artist": "Bob Dylan",
     "key": "C",
-    "chords": ["C", "Am", "F", "G", "C", "Am", "F", "G"]
+    "chords": ["C", "Am", "F", "G", "C", "Am", "F", "G"],
+    "inversions": [0, 0, 1, 0, 0, 0, 1, 0]
   },
   {
     "title": "Satisfaction",
