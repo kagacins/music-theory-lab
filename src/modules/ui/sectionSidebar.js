@@ -70,7 +70,7 @@ export function initSectionSidebar(tabId, containerId, sectionClass) {
     });
 
     // Store instance
-    sectionSidebarInstances.set(tabId, { sidebar, container, sectionClass, collapsedSections, observer });
+    sectionSidebarInstances.set(tabId, { sidebar, container, sectionClass, collapsedSections, observer, orderObserver });
 }
 
 /**
@@ -106,10 +106,13 @@ function updateSectionState(section, sidebar, collapsedSections, container) {
     const isCollapsed = panel.classList.contains('hidden');
     
     if (isCollapsed && !collapsedSections.has(sectionId)) {
-        // Section just collapsed - add to sidebar
+        // Section just collapsed - hide the entire section and add to sidebar
+        section.style.display = 'none';
         addToSidebar(section, sidebar, sectionId, collapsedSections, container);
+        syncSidebarOrder(sidebar, container);
     } else if (!isCollapsed && collapsedSections.has(sectionId)) {
-        // Section just expanded - remove from sidebar
+        // Section just expanded - show the section and remove from sidebar
+        section.style.display = '';
         removeFromSidebar(section, sidebar, sectionId, collapsedSections);
     }
 
@@ -142,9 +145,26 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     const toggle = section.querySelector('button[id$="-toggle"]');
     if (!toggle) return;
 
-    // Create sidebar tab
+    // Extract gradient colors from toggle button
+    const toggleClasses = toggle.className;
+    let gradientClasses = '';
+    const gradientMatch = toggleClasses.match(/bg-gradient-to-r\s+from-[\w-]+\s+to-[\w-]+/);
+    if (gradientMatch) {
+        gradientClasses = gradientMatch[0];
+    }
+    
+    // Extract hover gradient if available
+    const hoverMatch = toggleClasses.match(/hover:from-[\w-]+\s+hover:to-[\w-]+/);
+    const hoverClasses = hoverMatch ? hoverMatch[0] : '';
+
+    // Create sidebar tab with matching colors
     const tab = document.createElement('button');
-    tab.className = 'section-sidebar-tab w-12 h-12 rounded-lg bg-gray-700 hover:bg-gray-600 transition-all flex items-center justify-center text-xs font-semibold p-2 text-center';
+    if (gradientClasses) {
+        tab.className = `section-sidebar-tab w-12 h-12 rounded-lg ${gradientClasses} ${hoverClasses} text-white transition-all flex items-center justify-center text-xs font-semibold p-2 text-center shadow-md`;
+    } else {
+        // Fallback to gray if no gradient found
+        tab.className = 'section-sidebar-tab w-12 h-12 rounded-lg bg-gray-700 hover:bg-gray-600 transition-all flex items-center justify-center text-xs font-semibold p-2 text-center';
+    }
     tab.setAttribute('data-section-id', sectionId);
     tab.title = toggle.textContent.trim() || sectionId;
     
@@ -188,6 +208,31 @@ function removeFromSidebar(section, sidebar, sectionId, collapsedSections) {
 }
 
 /**
+ * Sync sidebar tab order with the container's section order
+ * @param {HTMLElement} sidebar - The sidebar element
+ * @param {HTMLElement} container - The container element
+ */
+function syncSidebarOrder(sidebar, container) {
+    // Get all sections in their current order (including hidden ones)
+    const sections = Array.from(container.children);
+    const sectionOrder = sections.map(section => {
+        const toggle = section.querySelector('button[id$="-toggle"]');
+        return toggle ? toggle.id.replace('-toggle', '') : null;
+    }).filter(id => id !== null);
+
+    // Get all sidebar tabs
+    const tabs = Array.from(sidebar.querySelectorAll('[data-section-id]'));
+    
+    // Reorder tabs to match section order (only include collapsed sections)
+    sectionOrder.forEach(sectionId => {
+        const tab = tabs.find(t => t.getAttribute('data-section-id') === sectionId);
+        if (tab) {
+            sidebar.appendChild(tab);
+        }
+    });
+}
+
+/**
  * Initialize sidebar for all tabs
  */
 export function initAllSectionSidebars() {
@@ -203,6 +248,9 @@ export function cleanupSectionSidebars() {
     sectionSidebarInstances.forEach((instance, tabId) => {
         if (instance.observer) {
             instance.observer.disconnect();
+        }
+        if (instance.orderObserver) {
+            instance.orderObserver.disconnect();
         }
     });
     sectionSidebarInstances.clear();
