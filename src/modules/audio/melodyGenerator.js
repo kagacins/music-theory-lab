@@ -1113,6 +1113,49 @@ export function getEditorState() {
 }
 
 /**
+ * Get volume level from dynamic marking
+ * @param {string|null} dynamic - Dynamic marking (ppp, pp, p, mp, mf, f, ff, fff, or null)
+ * @returns {number} - Volume level between 0 and 1
+ */
+function getVolumeFromDynamic(dynamic) {
+    if (!dynamic) return 0.7; // Default volume (mf)
+    
+    const volumeMap = {
+        'ppp': 0.2,  // Pianississimo - very very quiet
+        'pp': 0.35,  // Pianissimo - very quiet
+        'p': 0.5,    // Piano - quiet
+        'mp': 0.6,   // Mezzo-piano - moderately quiet
+        'mf': 0.7,   // Mezzo-forte - moderately loud (default)
+        'f': 0.8,    // Forte - loud
+        'ff': 0.9,   // Fortissimo - very loud
+        'fff': 1.0   // Fortississimo - very very loud
+    };
+    
+    return volumeMap[dynamic.toLowerCase()] || 0.7;
+}
+
+/**
+ * Get the effective dynamic for a note (either stored or inherited)
+ * @param {number} noteIndex - Index of the note in interactiveMelody.melodyNotes
+ * @returns {string|null} - The effective dynamic marking
+ */
+function getEffectiveDynamicForNote(noteIndex) {
+    if (noteIndex < 0 || noteIndex >= interactiveMelody.melodyNotes.length) {
+        return null;
+    }
+    
+    // Look backwards from this note to find the last stored dynamic
+    for (let i = noteIndex; i >= 0; i--) {
+        if (interactiveMelody.melodyNotes[i].dynamic) {
+            return interactiveMelody.melodyNotes[i].dynamic;
+        }
+    }
+    
+    // If no dynamic found, return null (will use default volume)
+    return null;
+}
+
+/**
  * Get the duration value for a note duration string
  * Returns the duration in quarter note units (e.g., '4n' = 1, '8n' = 0.5, '2n' = 2)
  * @param {string} duration - Tone.js duration string (e.g., '4n', '8n', '2n')
@@ -1200,20 +1243,30 @@ export function addNoteToInteractiveMelody(noteName, skipPlayback = false) {
         }
     }
 
-    // Only store dynamic if it's different from the previous note (dynamics persist until changed)
-    // Check the last note to see if dynamic changed
-    let dynamicToStore = null;
+    // Only store dynamic if it's different from the effective dynamic of the previous note
+    // We need to find the effective dynamic (either stored or inherited from earlier)
+    let effectiveLastDynamic = null;
     if (interactiveMelody.melodyNotes.length > 0) {
-        const lastNote = interactiveMelody.melodyNotes[interactiveMelody.melodyNotes.length - 1];
-        if (lastNote.dynamic !== currentDynamic) {
-            // Dynamic changed - store it
-            dynamicToStore = currentDynamic;
+        // Find the last effective dynamic by looking backwards through all notes
+        for (let i = interactiveMelody.melodyNotes.length - 1; i >= 0; i--) {
+            if (interactiveMelody.melodyNotes[i].dynamic) {
+                effectiveLastDynamic = interactiveMelody.melodyNotes[i].dynamic;
+                break;
+            }
         }
-        // If dynamic hasn't changed, don't store it (it will be inherited during rendering)
-    } else {
-        // First note - store dynamic if one is set
+        // If no stored dynamic found, use currentDynamic as the effective (it persists)
+        if (!effectiveLastDynamic) {
+            effectiveLastDynamic = currentDynamic;
+        }
+    }
+    
+    // Only store dynamic if it's different from the effective last dynamic
+    let dynamicToStore = null;
+    if (currentDynamic !== effectiveLastDynamic) {
+        // Dynamic changed - store it
         dynamicToStore = currentDynamic;
     }
+    // If dynamic hasn't changed, don't store it (it will be inherited during rendering)
     
     // Add note with selected duration using new structure
     const newNote = {
@@ -3235,19 +3288,20 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         // Draw dynamics manually between the staves (only when they change)
         // Melody stave is at Y=30, chord stave is at Y=140, so middle is around Y=85
         if (window.dynamicsToDraw && window.dynamicsToDraw.length > 0) {
-            const dynamicY = 85; // Position between the two staves
+            const dynamicY = 85; // Position between the two staves (centered between melody and chord staves)
             
             window.dynamicsToDraw.forEach(dynamicInfo => {
                 try {
                     const boundingBox = dynamicInfo.vexNote.getBoundingBox();
                     if (boundingBox) {
-                        const dynamicX = boundingBox.getX() - 5; // Slightly to the left of the note
+                        // Position dynamics centered horizontally with the note, but between the staves vertically
+                        const dynamicX = boundingBox.getX() + (boundingBox.getW() / 2) - 8; // Center on note, slight offset for text width
                         
                         // Draw dynamic text manually
                         ctx.save();
-                        ctx.font = 'italic 12px Times';
+                        ctx.font = 'italic 14px Times';
                         ctx.fillStyle = '#111827';
-                        ctx.textAlign = 'left';
+                        ctx.textAlign = 'center'; // Center the text
                         ctx.textBaseline = 'middle';
                         ctx.fillText(dynamicInfo.dynamic, dynamicX, dynamicY);
                         ctx.restore();
@@ -4568,6 +4622,13 @@ export function playAllMelody() {
     
     // Schedule melody notes
     const melodyPart = new Tone.Part((time, noteData) => {
+        // Get effective dynamic for this note (either stored or inherited)
+        const effectiveDynamic = noteData.dynamic || getEffectiveDynamicForNote(noteData.noteIndex);
+        const volume = getVolumeFromDynamic(effectiveDynamic);
+        
+        // Set volume before playing (convert linear volume 0-1 to decibels)
+        synth.volume.value = Tone.gainToDb(volume);
+        
         // Use the passed-in time parameter directly (Tone.js handles timing)
         synth.triggerAttackRelease(noteData.pitch, noteData.duration, time);
         
@@ -4604,7 +4665,7 @@ export function playAllMelody() {
         }
     }, interactiveMelody.melodyNotes
         .filter(note => note.type === 'note' && note.pitch) // Skip rests
-        .map(note => {
+        .map((note, index) => {
             const noteTime = (note.measure * measureDuration) + (note.beat * beatDuration);
             // Ensure time is non-negative
             const safeTime = Math.max(0, noteTime);
@@ -4613,7 +4674,9 @@ export function playAllMelody() {
                 pitch: note.pitch,
                 duration: note.duration,
                 measure: note.measure,
-                beat: note.beat
+                beat: note.beat,
+                dynamic: note.dynamic, // Include stored dynamic (may be null if inherited)
+                noteIndex: index // Include index for finding effective dynamic
             };
         }));
     
