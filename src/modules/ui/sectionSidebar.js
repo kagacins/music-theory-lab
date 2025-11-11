@@ -84,12 +84,13 @@ export function initSectionSidebar(tabId, containerId, sectionClass) {
             ghostClass: 'sortable-ghost',
             chosenClass: 'sortable-chosen',
             dragClass: 'sortable-drag',
-            draggable: '[data-section-id]', // Only tabs are draggable
+            draggable: '[data-section-id]', // Only section tabs are draggable, not the toggle all button
             forceFallback: false,
             fallbackOnBody: true,
             scrollSensitivity: 40,
             scrollSpeed: 10,
             direction: 'vertical',
+            filter: '[data-toggle-all]', // Prevent dragging the toggle all button
             onEnd: function(evt) {
                 if (evt.oldIndex !== evt.newIndex && evt.oldIndex !== undefined && evt.newIndex !== undefined) {
                     // Reorder the actual sections in the container to match sidebar order
@@ -101,6 +102,11 @@ export function initSectionSidebar(tabId, containerId, sectionClass) {
 
     // Store instance
     sectionSidebarInstances.set(tabId, { sidebar, container, sectionClass, collapsedSections, observer, orderObserver });
+    
+    // Initialize toggle all button state
+    if (sidebar._updateToggleAllButton) {
+        setTimeout(() => sidebar._updateToggleAllButton(), 100);
+    }
 }
 
 /**
@@ -111,10 +117,82 @@ export function initSectionSidebar(tabId, containerId, sectionClass) {
 function createSidebar(tabId) {
     const sidebar = document.createElement('div');
     sidebar.id = `${tabId}-section-sidebar`;
-    sidebar.className = 'section-sidebar absolute left-0 top-0 w-16 bg-gray-800/90 backdrop-blur-sm text-white z-[1] flex flex-col items-center py-4 gap-2 transition-all duration-300 border-r border-gray-700';
+    sidebar.className = 'section-sidebar absolute left-0 top-0 w-16 bg-gray-800/90 backdrop-blur-sm text-white z-[1] flex flex-col items-center py-2 gap-2 transition-all duration-300 border-r border-gray-700';
     sidebar.style.display = 'none'; // Hidden by default, shown when sections are collapsed
     sidebar.style.minHeight = '100%'; // Start with full height
     sidebar.style.height = 'auto'; // Allow height to grow with content
+    
+    // Add collapse/expand all button at the top
+    const toggleAllBtn = document.createElement('button');
+    toggleAllBtn.className = 'w-12 h-8 rounded-md bg-gray-700 hover:bg-gray-600 text-white text-[10px] font-semibold transition-colors flex items-center justify-center mb-1 shadow-sm';
+    toggleAllBtn.setAttribute('data-toggle-all', 'true');
+    toggleAllBtn.setAttribute('data-state', 'expand'); // 'expand' means clicking will expand all, 'collapse' means clicking will collapse all
+    toggleAllBtn.textContent = 'All';
+    toggleAllBtn.title = 'Collapse All';
+    
+    // Update button state and text based on current sections
+    const updateToggleAllButton = () => {
+        const tabContent = sidebar.closest('.tab-content');
+        if (!tabContent) return;
+        
+        // Get all sections in this tab
+        const container = tabContent.querySelector('[id$="-sections-container"]');
+        if (!container) return;
+        
+        const sections = container.querySelectorAll('[id$="-panel"]');
+        let allCollapsed = true;
+        let allExpanded = true;
+        
+        sections.forEach(panel => {
+            if (panel.classList.contains('hidden')) {
+                allExpanded = false;
+            } else {
+                allCollapsed = false;
+            }
+        });
+        
+        if (sections.length === 0) {
+            toggleAllBtn.style.display = 'none';
+            return;
+        }
+        
+        toggleAllBtn.style.display = 'flex';
+        
+        if (allCollapsed) {
+            toggleAllBtn.setAttribute('data-state', 'expand');
+            toggleAllBtn.textContent = 'All';
+            toggleAllBtn.title = 'Expand All';
+        } else if (allExpanded) {
+            toggleAllBtn.setAttribute('data-state', 'collapse');
+            toggleAllBtn.textContent = 'All';
+            toggleAllBtn.title = 'Collapse All';
+        } else {
+            // Mixed state - default to collapse all
+            toggleAllBtn.setAttribute('data-state', 'collapse');
+            toggleAllBtn.textContent = 'All';
+            toggleAllBtn.title = 'Collapse All';
+        }
+    };
+    
+    toggleAllBtn.addEventListener('click', () => {
+        const state = toggleAllBtn.getAttribute('data-state');
+        if (state === 'expand') {
+            if (window.expandAllCurrentTab) {
+                window.expandAllCurrentTab();
+            }
+        } else {
+            if (window.collapseAllCurrentTab) {
+                window.collapseAllCurrentTab();
+            }
+        }
+        // Update button state after a short delay to allow DOM updates
+        setTimeout(updateToggleAllButton, 100);
+    });
+    
+    sidebar.appendChild(toggleAllBtn);
+    
+    // Store update function on sidebar for later use
+    sidebar._updateToggleAllButton = updateToggleAllButton;
     
     return sidebar;
 }
@@ -145,6 +223,10 @@ function updateSectionState(section, sidebar, collapsedSections, container) {
         if (container) {
             container.style.marginLeft = '4rem'; // 64px = w-16
         }
+        // Update toggle all button state
+        if (sidebar._updateToggleAllButton) {
+            setTimeout(() => sidebar._updateToggleAllButton(), 50);
+        }
     } else if (!isCollapsed && collapsedSections.has(sectionId)) {
         // Section just expanded - animate from sidebar
         // Note: We'll update sidebar visibility after animation completes
@@ -174,6 +256,11 @@ function updateSidebarVisibility(sidebar, collapsedSections, container) {
         if (container) {
             container.style.marginLeft = '0';
         }
+    }
+    
+    // Update toggle all button state
+    if (sidebar._updateToggleAllButton) {
+        setTimeout(() => sidebar._updateToggleAllButton(), 50);
     }
 }
 
@@ -443,18 +530,22 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     tab.setAttribute('title', tooltipText);
     tab.style.position = 'relative';
     
-    // Add custom tooltip for immediate display
+    // Add custom tooltip for immediate display (no transition for instant appearance)
     const tooltip = document.createElement('div');
-    tooltip.className = 'sidebar-tooltip absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 pointer-events-none whitespace-nowrap opacity-0 transition-opacity duration-0 z-50';
+    tooltip.className = 'sidebar-tooltip absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 pointer-events-none whitespace-nowrap z-50';
+    tooltip.style.opacity = '0';
+    tooltip.style.transition = 'none'; // No transition for instant display
     tooltip.textContent = tooltipText;
     tab.appendChild(tooltip);
     
-    // Show tooltip immediately on hover
+    // Show tooltip immediately on hover (no delay)
     tab.addEventListener('mouseenter', () => {
         tooltip.style.opacity = '1';
+        tooltip.style.transition = 'none';
     });
     tab.addEventListener('mouseleave', () => {
         tooltip.style.opacity = '0';
+        tooltip.style.transition = 'none';
     });
     
     // Get icon from toggle button
