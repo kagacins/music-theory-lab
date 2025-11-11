@@ -1580,15 +1580,13 @@ window.toggleMelodyRecording = function(isRecording) {
             }
             
             if (isRecording) {
-                // Reset duration to default (quarter note) when starting recording
-                if (window.setNoteDuration) {
-                    window.setNoteDuration('4n');
-                }
+                // NOTE: Don't reset duration here - preserve user's selected duration
+                // The duration is already initialized in initInteractiveMelody and clearInteractiveMelody
                 if (window.setNoteDotted) {
-                    window.setNoteDotted(false);
+                    // Only reset dotted if user hasn't selected it, but don't force it
                     const dotCheckbox = document.getElementById('note-duration-dot');
                     if (dotCheckbox) {
-                        dotCheckbox.checked = false;
+                        // Keep the current state, don't reset
                     }
                 }
         // Start recording - enable interactive mode

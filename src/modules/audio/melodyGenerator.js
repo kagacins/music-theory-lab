@@ -2769,7 +2769,7 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 
                 // Debug: Log measure state with detailed note info for troubleshooting
                 if (notesToProcess.length > 0) {
-                    console.log(`Measure ${measureNum}: ${notesToProcess.length} notes total, ${totalDurationInQuarters.toFixed(2)} beats, ${vexNoteObjects.length} VexFlow objects`);
+                    console.log(`Measure ${measureNum}: ${notesToProcess.length} notes total, ${totalDurationInQuarters.toFixed(2)} beats, ${vexNoteObjects.length} VexFlow objects, duration=${notesToProcess.length > 0 ? notesToProcess[0].duration : 'N/A'}`);
                     // For full measures or many notes, log each note's details
                     if (totalDurationInQuarters >= 3.9 && totalDurationInQuarters <= 4.1 && notesToProcess.length >= 6) {
                         notesToProcess.forEach((note, idx) => {
@@ -2815,22 +2815,26 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 const isFullMeasure = measureFillRatio >= 0.95;
                 
                 // Calculate base format width with different padding for first vs subsequent measures
+                // IMPORTANT: The first measure's clef and time signatures take up significant space (~70-90px)
+                // We need to give notes much more room in the first measure
                 let baseFormatWidth;
                 if (measureNum === 0) {
-                    // First measure: account for key/time signatures (typically 60-80px)
-                    // For full measures, be more generous to fit all notes
+                    // First measure: account for key/time signatures (typically 70-90px in VexFlow)
+                    // For full measures, use most of the remaining width after signatures
                     if (isFullMeasure) {
-                        // Full measure: use most of the width, leaving minimal padding for signatures
-                        baseFormatWidth = Math.max(measureWidth - 60, 140); // More generous for full measures
+                        // Full measure: use as much width as possible, minimal padding
+                        // measureWidth is 220px, signatures take ~80px, so ~140px for notes
+                        // But we need more space for many notes, so be very generous
+                        baseFormatWidth = Math.max(measureWidth - 30, 180); // Very generous for full measures in first measure
                     } else {
                         // Partial measure: standard padding
                         baseFormatWidth = Math.max(measureWidth - 100, 80);
                     }
                 } else {
-                    // Subsequent measures: standard padding (no signatures)
-                    // For full measures, use almost the entire width
+                    // Subsequent measures: no signatures, so use almost entire width
+                    // For full measures, use very generous width
                     if (isFullMeasure) {
-                        baseFormatWidth = Math.max(measureWidth - 20, 180); // Very generous for full measures
+                        baseFormatWidth = Math.max(measureWidth - 10, 200); // Almost entire width for full measures
                     } else {
                         baseFormatWidth = Math.max(measureWidth - 40, 80);
                     }
@@ -2849,13 +2853,11 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                     // For full measures, prioritize fitting all notes over strict width constraints
                     formatWidth = Math.max(baseFormatWidth, minWidthForNotes);
                     
-                    // If we still don't have enough width, use the full measure width minus minimal padding
+                    // If we still don't have enough width, use maximum available width
                     // This is a fallback to ensure all notes are visible
-                    if (formatWidth < minWidthForNotes && measureNum === 0) {
-                        // First measure: use almost full width, leaving just enough for signatures
-                        formatWidth = Math.max(measureWidth - 50, minWidthForNotes);
-                    } else if (formatWidth < minWidthForNotes) {
-                        // Subsequent measures: use almost full width
+                    if (formatWidth < minWidthForNotes) {
+                        // Use maximum available width regardless of measure position
+                        // For first measure with 16+ notes, might need very wide format
                         formatWidth = Math.max(measureWidth - 10, minWidthForNotes);
                     }
                 } else {
