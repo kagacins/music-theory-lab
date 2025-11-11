@@ -212,31 +212,36 @@ export async function searchSongChords() {
         return songText.includes(queryLower);
     });
     
-    // Then search the internet (only if under daily limit)
+    // Only search the internet if no local results found (to save API calls)
     let internetResults = [];
     let rateLimitReached = false;
     
-    if (isDailyLimitReached()) {
-        rateLimitReached = true;
-        console.log('Daily search limit reached. Skipping internet search.');
-    } else {
-        // Check if we have API credentials before attempting search
-        const hasApiCredentials = window.GOOGLE_SEARCH_API_KEY && window.GOOGLE_SEARCH_ENGINE_ID;
-        
-        if (hasApiCredentials) {
-            try {
-                internetResults = await searchInternetForChords(query);
-                // Increment count after successful API call attempt
-                incrementDailySearchCount();
-            } catch (error) {
-                console.warn('Internet search failed:', error);
-                // Still increment on error to prevent retry loops
-                // (API call was attempted, even if it failed)
-                incrementDailySearchCount();
+    if (localResults.length === 0) {
+        // No local results, search the internet (only if under daily limit)
+        if (isDailyLimitReached()) {
+            rateLimitReached = true;
+            console.log('Daily search limit reached. Skipping internet search.');
+        } else {
+            // Check if we have API credentials before attempting search
+            const hasApiCredentials = window.GOOGLE_SEARCH_API_KEY && window.GOOGLE_SEARCH_ENGINE_ID;
+            
+            if (hasApiCredentials) {
+                try {
+                    internetResults = await searchInternetForChords(query);
+                    // Increment count after successful API call attempt
+                    incrementDailySearchCount();
+                } catch (error) {
+                    console.warn('Internet search failed:', error);
+                    // Still increment on error to prevent retry loops
+                    // (API call was attempted, even if it failed)
+                    incrementDailySearchCount();
+                }
+                // Update display after incrementing
+                updateSearchCountDisplay();
             }
-            // Update display after incrementing
-            updateSearchCountDisplay();
         }
+    } else {
+        console.log(`Found ${localResults.length} local result(s), skipping internet search to save API calls.`);
     }
     
     // Combine results (local first, then internet)
@@ -290,13 +295,13 @@ export async function searchSongChords() {
         if (song.source === 'local') {
             // Local database result with import button
             return `
-                <div class="bg-white p-3 rounded-lg border border-purple-200 hover:border-purple-400 transition">
-                    <div class="flex items-start justify-between gap-3">
-                        <div class="flex-1">
+        <div class="bg-white p-3 rounded-lg border border-purple-200 hover:border-purple-400 transition">
+            <div class="flex items-start justify-between gap-3">
+                <div class="flex-1">
                             <h4 class="font-bold text-gray-800 text-sm">${escapeHtml(song.title)}</h4>
                             <p class="text-xs text-gray-600">${escapeHtml(song.artist)}</p>
                             <p class="text-xs text-gray-500 mt-1"><strong>Key:</strong> ${escapeHtml(song.key)}</p>
-                            <div class="flex flex-wrap gap-1 mt-2">
+                    <div class="flex flex-wrap gap-1 mt-2">
                                 ${song.chords.map(chord => `<span class="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs font-semibold rounded">${escapeHtml(chord)}</span>`).join('')}
                             </div>
                         </div>
@@ -327,8 +332,8 @@ export async function searchSongChords() {
                         <div class="flex flex-col gap-2">
                             ${song.chords && song.chords.length > 0 ? `
                                 <button onclick="const songData = JSON.parse(decodeURIComponent('${songData}')); window.importInternetSongProgression && window.importInternetSongProgression(songData);" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-lg shadow transition whitespace-nowrap">
-                                    Import
-                                </button>
+                    Import
+                </button>
                             ` : ''}
                             ${song.url ? `
                                 <a href="${escapeHtml(song.url)}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow transition whitespace-nowrap text-center">
@@ -336,8 +341,8 @@ export async function searchSongChords() {
                                 </a>
                             ` : ''}
                         </div>
-                    </div>
-                </div>
+            </div>
+        </div>
             `;
         }
     }).join('');
@@ -571,15 +576,56 @@ export async function importInternetSongProgression(song) {
             window.updateProgressionControlsUI();
         }
         
+        // Expand and scroll to Current Chord Progression section
+        expandAndScrollToProgressionSection();
+        
         alert(`Successfully imported "${song.title}"!\n\n${song.chords.length} chords added to your progression.`);
     }, updateDelay);
+}
+
+/**
+ * Expand the Current Chord Progression section and scroll to it
+ */
+function expandAndScrollToProgressionSection() {
+    // Determine which tab we're on
+    const currentTab = window.currentTab || 'trainer';
     
-    // Collapse the search panel
-    const panel = document.getElementById('song-search-panel');
-    const chevron = document.getElementById('song-search-chevron');
-    if (panel && chevron) {
-        panel.classList.add('hidden');
-        chevron.classList.remove('rotate-180');
+    let panelId, toggleId, chevronId;
+    if (currentTab === 'trainer') {
+        panelId = 'progression-visualization-panel';
+        toggleId = 'progression-visualization-toggle';
+        chevronId = 'progression-visualization-chevron';
+    } else if (currentTab === 'melody') {
+        panelId = 'melody-progression-panel';
+        toggleId = 'melody-progression-toggle';
+        chevronId = 'melody-progression-chevron';
+    } else {
+        // If not on trainer or melody tab, switch to trainer tab first
+        if (window.switchTab) {
+            window.switchTab('trainer');
+        }
+        panelId = 'progression-visualization-panel';
+        toggleId = 'progression-visualization-toggle';
+        chevronId = 'progression-visualization-chevron';
+    }
+    
+    const panel = document.getElementById(panelId);
+    const toggle = document.getElementById(toggleId);
+    const chevron = document.getElementById(chevronId);
+    
+    if (panel && toggle) {
+        // Expand the panel if it's collapsed
+        if (panel.classList.contains('hidden')) {
+            panel.classList.remove('hidden');
+            if (chevron) {
+                chevron.classList.add('rotate-180');
+            }
+        }
+        
+        // Scroll to the section with smooth behavior
+        setTimeout(() => {
+            toggle.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
     }
 }
 
@@ -873,8 +919,8 @@ export async function importSongProgression(songIndex) {
     }
     
     // Update UI - render display and update controls after all chords are added
-    // Calculate delay based on number of chords (10ms per chord + 100ms buffer)
-    const updateDelay = (song.chords.length * 10) + 100;
+    // Calculate delay based on number of chords (100ms per chord + 200ms buffer for consistency)
+    const updateDelay = (song.chords.length * 100) + 200;
     setTimeout(() => {
         if (window.renderProgressionDisplay) {
             window.renderProgressionDisplay();
@@ -883,17 +929,12 @@ export async function importSongProgression(songIndex) {
             window.updateProgressionControlsUI();
         }
         
-        // Update UI
+        // Expand and scroll to Current Chord Progression section
+        expandAndScrollToProgressionSection();
+        
+        // Show success message
         alert(`Successfully imported "${song.title}" by ${song.artist}!\n\n${song.chords.length} chords added to your progression.`);
     }, updateDelay);
-    
-    // Collapse the search panel
-    const panel = document.getElementById('song-search-panel');
-    const chevron = document.getElementById('song-search-chevron');
-    if (panel && chevron) {
-        panel.classList.add('hidden');
-        chevron.classList.remove('rotate-180');
-    }
 }
 
 /**
