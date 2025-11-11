@@ -551,11 +551,23 @@ export async function importInternetSongProgression(song) {
         window.clearProgression();
     }
     
-    // Add each chord to the progression
+    // Play shutter sound only once at the beginning of import
+    // Use a flag to ensure it only plays once even if function is called multiple times
+    let shutterSoundPlayed = false;
+    if (!shutterSoundPlayed && window.getAudioIsReady && window.getCameraShutter) {
+        const audioIsReady = window.getAudioIsReady();
+        const cameraShutter = window.getCameraShutter();
+        if (audioIsReady && cameraShutter) {
+            cameraShutter.start();
+            shutterSoundPlayed = true;
+        }
+    }
+    
+    // Add each chord to the progression (skip shutter sound for all chords)
     // Use longer delay to ensure each chord is fully processed before adding the next
     song.chords.forEach((chordSymbol, index) => {
         setTimeout(() => {
-            addParsedChordToProgression(chordSymbol, detectedKey || 'C');
+            addParsedChordToProgression(chordSymbol, detectedKey || 'C', false);
         }, index * 100); // Increased from 10ms to 100ms for better reliability
     });
     
@@ -622,9 +634,44 @@ function expandAndScrollToProgressionSection() {
             }
         }
         
-        // Scroll to the section with smooth behavior
+        // Scroll to the section with smooth behavior, accounting for keyboard height
         setTimeout(() => {
-            toggle.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Get keyboard height to ensure section is visible above keyboard
+            const keyboardSection = document.getElementById('keyboard-section');
+            const keyboardHeight = keyboardSection ? keyboardSection.offsetHeight : 0;
+            const headerHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--header-height')) || 80;
+            
+            // Get the toggle button's position (this is the section header)
+            const toggleRect = toggle.getBoundingClientRect();
+            const currentScrollY = window.scrollY || window.pageYOffset;
+            
+            // Calculate the desired position: we want the toggle button to be visible
+            // just above the keyboard, with enough space to see the panel content below it
+            // Use a smaller offset to prevent scrolling too far
+            const viewportHeight = window.innerHeight;
+            const spaceAboveKeyboard = viewportHeight - keyboardHeight - headerHeight;
+            
+            // We want the toggle to be positioned in the upper portion of the visible area above the keyboard
+            // This ensures the panel content below the toggle is also visible
+            const desiredTogglePosition = headerHeight + 60; // Position toggle 60px below header
+            
+            // Calculate how much we need to scroll
+            const toggleCurrentPosition = currentScrollY + toggleRect.top;
+            const scrollAmount = toggleCurrentPosition - desiredTogglePosition;
+            
+            // Calculate target scroll position
+            let targetY = currentScrollY - scrollAmount;
+            
+            // Ensure we don't scroll too far (don't scroll past the top of the page)
+            if (targetY < 0) {
+                targetY = 0;
+            }
+            
+            // Scroll to position that shows the section above the keyboard
+            window.scrollTo({
+                top: targetY,
+                behavior: 'smooth'
+            });
         }, 100);
     }
 }
@@ -787,8 +834,9 @@ function convertToEnharmonicPreference(note) {
  * Parse a chord symbol and add it to the progression
  * @param {string} chordSymbol - Chord symbol like "C", "Am", "F#m7", "Gsus4", "Ab", "Bbm"
  * @param {string} key - The key of the song
+ * @param {boolean} playShutterSound - Whether to play the shutter sound (default: false)
  */
-function addParsedChordToProgression(chordSymbol, key) {
+function addParsedChordToProgression(chordSymbol, key, playShutterSound = false) {
     // Parse the chord symbol
     // Format: [Root][Accidental?][Type][Extensions?]
     // Examples: C, Am, F#m7, Gsus4, Cmaj7, Dm7b5, Ab, Bbm
@@ -836,8 +884,8 @@ function addParsedChordToProgression(chordSymbol, key) {
             const trainerStateBefore = window.getTrainerState ? window.getTrainerState() : null;
             const lengthBefore = trainerStateBefore && trainerStateBefore.progressionData ? trainerStateBefore.progressionData.length : 0;
             
-            // Call the function to select and add the chord
-            window.selectBuilderChordBySymbol(root, chordType);
+            // Call the function to select and add the chord (pass playShutterSound parameter)
+            window.selectBuilderChordBySymbol(root, chordType, playShutterSound);
             
             // Verify the chord was added by checking progression length after a short delay
             setTimeout(() => {
@@ -900,12 +948,24 @@ export async function importSongProgression(songIndex) {
         window.clearProgression();
     }
     
-    // Add each chord to the progression
+    // Play shutter sound only once at the beginning of import
+    // Use a flag to ensure it only plays once even if function is called multiple times
+    let shutterSoundPlayed = false;
+    if (!shutterSoundPlayed && window.getAudioIsReady && window.getCameraShutter) {
+        const audioIsReady = window.getAudioIsReady();
+        const cameraShutter = window.getCameraShutter();
+        if (audioIsReady && cameraShutter) {
+            cameraShutter.start();
+            shutterSoundPlayed = true;
+        }
+    }
+    
+    // Add each chord to the progression (skip shutter sound for all chords)
     // Use a small delay between additions to ensure each chord is fully processed
     // This prevents state conflicts when adding multiple chords quickly
     song.chords.forEach((chordSymbol, index) => {
         setTimeout(() => {
-            addParsedChordToProgression(chordSymbol, song.key);
+            addParsedChordToProgression(chordSymbol, song.key, false);
         }, index * 100); // Increased delay for consistency
     });
     

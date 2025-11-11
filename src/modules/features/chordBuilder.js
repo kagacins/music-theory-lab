@@ -1151,12 +1151,13 @@ export function renderVoicingEditor(notes, editorId, containerId, omittedNotes, 
 /**
  * Add the current builder chord to the progression
  * @param {boolean} switchToTrainer - Whether to switch to trainer tab after adding
+ * @param {boolean} playShutterSound - Whether to play the camera shutter sound (default: true)
  */
-export function addChordToProgression(switchToTrainer = false) {
+export function addChordToProgression(switchToTrainer = false, playShutterSound = true) {
     const rootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[getBuilderRootIndex()];
 
-    // Play camera shutter sound effect
-    if (getAudioIsReady() && getCameraShutter()) {
+    // Play camera shutter sound effect (only if requested)
+    if (playShutterSound && getAudioIsReady() && getCameraShutter()) {
         getCameraShutter().start();
     }
 
@@ -1331,7 +1332,7 @@ export function capturePlayedChord(notes, type = 'Major', inversion = 0) {
  * @param {string} root - Root note (e.g., "C", "F#", "Bb")
  * @param {string} type - Chord type (e.g., "major", "minor", "dominant7")
  */
-export function selectBuilderChordBySymbol(root, type) {
+export function selectBuilderChordBySymbol(root, type, playShutterSound = true) {
     // Map common chord type names to internal type names (matching CHORD_DEFINITIONS keys exactly)
     const typeMap = {
         'major': 'Major',
@@ -1367,8 +1368,8 @@ export function selectBuilderChordBySymbol(root, type) {
     // Update displays
     updateBuilderDisplay();
     
-    // Add to progression
-    addChordToProgression(false);
+    // Add to progression (pass through playShutterSound parameter)
+    addChordToProgression(false, playShutterSound);
 }
 
 // ============================================================================

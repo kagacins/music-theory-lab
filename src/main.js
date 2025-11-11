@@ -121,7 +121,7 @@ import {
     changeScaleSpeed,
     updateScaleSpeedUI
 } from './modules/features/scaleExplorer.js';
-import { initAudio, getPiano, getGuitar, getInstrument, getAudioIsReady, forceStopAllPlayback, initAudioContextKeepAlive } from './modules/audio/audioEngine.js';
+import { initAudio, getPiano, getGuitar, getInstrument, getAudioIsReady, getCameraShutter, forceStopAllPlayback, initAudioContextKeepAlive } from './modules/audio/audioEngine.js';
 import { updateUndoRedoButtons } from './modules/utils/undoRedo.js';
 import {
     getCurrentTab,
@@ -1116,6 +1116,7 @@ window.getPiano = getPiano;
 window.getGuitar = getGuitar;
 window.getInstrument = getInstrument;
 window.getAudioIsReady = getAudioIsReady;
+window.getCameraShutter = getCameraShutter;
 window.initAudio = initAudio;
 window.forceStopAllPlayback = forceStopAllPlayback;
 
