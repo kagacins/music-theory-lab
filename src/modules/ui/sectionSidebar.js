@@ -15,7 +15,10 @@ let sectionSidebarInstances = new Map(); // Track sidebar instances per tab
  */
 export function initSectionSidebar(tabId, containerId, sectionClass) {
     const container = document.getElementById(containerId);
-    if (!container) return;
+    if (!container) {
+        console.warn(`Section sidebar: Container ${containerId} not found`);
+        return;
+    }
 
     // Create sidebar if it doesn't exist
     let sidebar = document.getElementById(`${tabId}-section-sidebar`);
@@ -32,29 +35,38 @@ export function initSectionSidebar(tabId, containerId, sectionClass) {
             // Adjust container margin to make room for sidebar when visible
             container.style.marginLeft = '0';
             container.style.transition = 'margin-left 0.3s ease';
+        } else {
+            console.warn(`Section sidebar: Tab content not found for ${tabId}`);
         }
     }
 
     // Track which sections are collapsed
     const collapsedSections = new Set();
     
-    // Observe section visibility changes
+    // Observe panel visibility changes
     const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
             if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                const section = mutation.target;
-                if (section.classList.contains(sectionClass)) {
+                const panel = mutation.target;
+                // Find the parent section
+                const section = panel.closest(`.${sectionClass}`);
+                if (section) {
                     updateSectionState(section, sidebar, collapsedSections, container);
                 }
             }
         });
     });
 
-    // Observe all sections
+    // Observe all sections and their panels
     const sections = container.querySelectorAll(`.${sectionClass}`);
     sections.forEach(section => {
-        observer.observe(section, { attributes: true, attributeFilter: ['class'] });
-        updateSectionState(section, sidebar, collapsedSections, container);
+        const panel = section.querySelector('[id$="-panel"]');
+        if (panel) {
+            // Observe the panel for class changes
+            observer.observe(panel, { attributes: true, attributeFilter: ['class'] });
+            // Check initial state
+            updateSectionState(section, sidebar, collapsedSections, container);
+        }
     });
 
     // Store instance
