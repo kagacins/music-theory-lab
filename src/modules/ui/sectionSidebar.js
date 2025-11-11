@@ -539,7 +539,23 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     tab.setAttribute('data-section-id', sectionId);
     
     // Create tooltip that appears immediately on hover (no delay)
-    const sectionName = toggle.textContent.trim() || sectionId;
+    // Extract section name more carefully - get text from span or direct text nodes, excluding drag handles
+    let sectionName = sectionId;
+    const textSpan = toggle.querySelector('span:not(.drag-handle)');
+    if (textSpan) {
+        sectionName = textSpan.textContent.trim();
+    } else {
+        // Fallback: get all text nodes, excluding drag handle
+        const textNodes = Array.from(toggle.childNodes)
+            .filter(node => node.nodeType === Node.TEXT_NODE)
+            .map(node => node.textContent.trim())
+            .filter(text => text && !text.toLowerCase().includes('drag to reorder'));
+        if (textNodes.length > 0) {
+            sectionName = textNodes.join(' ').trim();
+        }
+    }
+    // Clean up any "Drag to reorder" text that might have been included
+    sectionName = sectionName.replace(/\s*[Dd]rag\s+to\s+reorder\s*/g, '').trim();
     const tooltipText = `${sectionName} - drag to reorder`;
     // Remove title attribute to prevent browser default tooltip delay
     tab.removeAttribute('title');
@@ -567,8 +583,13 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     tooltip.style.willChange = 'opacity, visibility';
     document.body.appendChild(tooltip);
     
+    // Track if tooltip should be visible
+    let isTooltipVisible = false;
+    
     // Show tooltip immediately on hover (absolutely no delay)
-    tab.addEventListener('mouseenter', () => {
+    const showTooltip = () => {
+        if (isTooltipVisible) return; // Prevent duplicate calls
+        isTooltipVisible = true;
         // Get current position of tab
         const tabRect = tab.getBoundingClientRect();
         // Position tooltip to the right of the tab, vertically centered
@@ -584,15 +605,27 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
         tooltip.style.opacity = '1';
         // Force reflow to ensure immediate rendering
         void tooltip.offsetHeight;
-    }, { passive: true });
+    };
     
-    tab.addEventListener('mouseleave', () => {
+    const hideTooltip = () => {
+        if (!isTooltipVisible) return; // Prevent duplicate calls
+        isTooltipVisible = false;
         // Hide immediately
         tooltip.style.transition = 'none';
         tooltip.style.transitionDelay = '0s';
         tooltip.style.transitionDuration = '0s';
         tooltip.style.opacity = '0';
         tooltip.style.visibility = 'hidden';
+    };
+    
+    tab.addEventListener('mouseenter', showTooltip, { passive: true });
+    tab.addEventListener('mouseleave', hideTooltip, { passive: true });
+    tab.addEventListener('mouseout', hideTooltip, { passive: true });
+    
+    // Also hide tooltip if mouse leaves the tooltip itself (edge case)
+    tooltip.addEventListener('mouseenter', () => {
+        // If mouse somehow enters tooltip, hide it since it's pointer-events-none anyway
+        hideTooltip();
     }, { passive: true });
     
     // Get icon from toggle button
