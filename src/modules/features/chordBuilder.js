@@ -1332,7 +1332,7 @@ export function capturePlayedChord(notes, type = 'Major', inversion = 0) {
  * @param {string} type - Chord type (e.g., "major", "minor", "dominant7")
  */
 export function selectBuilderChordBySymbol(root, type) {
-    // Map common chord type names to internal type names
+    // Map common chord type names to internal type names (matching CHORD_DEFINITIONS keys exactly)
     const typeMap = {
         'major': 'Major',
         'minor': 'Minor',
@@ -1340,12 +1340,12 @@ export function selectBuilderChordBySymbol(root, type) {
         'augmented': 'Augmented',
         'sus2': 'Sus2',
         'sus4': 'Sus4',
-        'major7': 'Major7',
-        'minor7': 'Minor7',
-        'dominant7': 'Dominant7',
-        'dominant9': 'Dominant9',
-        'minor9': 'Minor9',
-        'major9': 'Major9'
+        'major7': 'Major 7th',  // Note: CHORD_DEFINITIONS uses 'Major 7th' with space
+        'minor7': 'Minor 7th',  // Note: CHORD_DEFINITIONS uses 'Minor 7th' with space
+        'dominant7': 'Dominant 7th',  // Note: CHORD_DEFINITIONS uses 'Dominant 7th' with space
+        'dominant9': 'Dominant 9th',  // Note: CHORD_DEFINITIONS uses 'Dominant 9th' with space
+        'minor9': 'Minor 9th',  // Note: CHORD_DEFINITIONS uses 'Minor 9th' with space
+        'major9': 'Major 9th'   // Note: CHORD_DEFINITIONS uses 'Major 9th' with space
     };
     
     const mappedType = typeMap[type.toLowerCase()] || 'Major';
