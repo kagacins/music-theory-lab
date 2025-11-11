@@ -4456,6 +4456,26 @@ export function playInteractiveMelodyWithChords() {
  * Stop "Play All" playback
  */
 export function stopPlayAllMelody() {
+    // Immediately stop all currently playing notes
+    const piano = getPiano();
+    const synth = getInstrument();
+    
+    if (piano) {
+        try {
+            piano.releaseAll(); // Stop all currently playing piano notes immediately
+        } catch (e) {
+            // Ignore errors if piano is not ready
+        }
+    }
+    
+    if (synth) {
+        try {
+            synth.releaseAll(); // Stop all currently playing synth notes immediately
+        } catch (e) {
+            // Ignore errors if synth is not ready
+        }
+    }
+    
     // Stop transport
     Tone.Transport.stop();
     Tone.Transport.cancel();
