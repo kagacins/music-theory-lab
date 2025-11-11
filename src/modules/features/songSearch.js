@@ -509,7 +509,7 @@ export function openUltimateGuitarSearch(query) {
  * Import a song progression from internet search results
  * @param {Object} song - Song object from internet search
  */
-export function importInternetSongProgression(song) {
+export async function importInternetSongProgression(song) {
     if (!song.chords || song.chords.length === 0) {
         alert('No chord progression available for this song. Please click "View" to see the full chord chart.');
         return;
@@ -520,12 +520,24 @@ export function importInternetSongProgression(song) {
     
     if (!confirmed) return;
     
+    // Detect which enharmonic preference the progression uses
+    const progressionPreference = detectEnharmonicPreference(song.chords);
+    
+    // Switch enharmonic preference to match the progression
+    const currentPreference = window.getEnharmonicPreference ? window.getEnharmonicPreference() : 'sharp';
+    if (progressionPreference !== currentPreference) {
+        console.log(`Switching enharmonic preference from ${currentPreference} to ${progressionPreference} to match chord progression`);
+        switchEnharmonicPreference(progressionPreference);
+        // Wait a bit for the preference change to take effect
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
     // Use key from song object if available, otherwise detect from chords
     const detectedKey = song.key || detectKeyFromChords(song.chords);
     
     // Import the progression
     if (window.setProgressionKey && detectedKey) {
-        // Convert key to match enharmonic preference
+        // Convert key to match enharmonic preference (after switching)
         const convertedKey = convertToEnharmonicPreference(detectedKey);
         window.setProgressionKey(convertedKey);
     }
@@ -609,7 +621,90 @@ function detectKeyFromChords(chords) {
 }
 
 /**
+ * Detect which enharmonic preference a chord progression uses
+ * Counts how many flats vs sharps are in the progression
+ * @param {Array<string>} chords - Array of chord symbols
+ * @returns {string} 'flat' or 'sharp'
+ */
+function detectEnharmonicPreference(chords) {
+    if (!chords || chords.length === 0) return 'sharp'; // Default
+    
+    let flatCount = 0;
+    let sharpCount = 0;
+    
+    chords.forEach(chord => {
+        const root = chord.match(/^([A-G][#b]?)/)?.[1];
+        if (root) {
+            if (root.includes('b')) {
+                flatCount++;
+            } else if (root.includes('#')) {
+                sharpCount++;
+            }
+        }
+    });
+    
+    // If more flats than sharps, prefer flats; otherwise prefer sharps
+    // If equal, prefer sharps (default)
+    return flatCount > sharpCount ? 'flat' : 'sharp';
+}
+
+/**
+ * Switch the enharmonic preference to match the chord progression
+ * @param {string} preference - 'flat' or 'sharp'
+ */
+function switchEnharmonicPreference(preference) {
+    if (!window.setEnharmonicPreference) {
+        console.warn('setEnharmonicPreference not available');
+        return;
+    }
+    
+    // Set the preference
+    window.setEnharmonicPreference(preference);
+    
+    // Update window.enharmonicPreference for modules that access it
+    if (window.getEnharmonicPreference) {
+        window.enharmonicPreference = window.getEnharmonicPreference();
+    }
+    
+    // Update the toggle checkbox
+    const toggle = document.getElementById('enharmonic-toggle');
+    if (toggle) {
+        toggle.checked = preference === 'flat';
+        
+        // Update indicator colors
+        const sharpIndicator = document.getElementById('sharp-indicator');
+        const flatIndicator = document.getElementById('flat-indicator');
+        
+        if (preference === 'sharp') {
+            if (sharpIndicator) {
+                sharpIndicator.classList.remove('text-gray-500');
+                sharpIndicator.classList.add('text-indigo-300');
+            }
+            if (flatIndicator) {
+                flatIndicator.classList.remove('text-indigo-300');
+                flatIndicator.classList.add('text-gray-500');
+            }
+        } else {
+            if (flatIndicator) {
+                flatIndicator.classList.remove('text-gray-500');
+                flatIndicator.classList.add('text-indigo-300');
+            }
+            if (sharpIndicator) {
+                sharpIndicator.classList.remove('text-indigo-300');
+                sharpIndicator.classList.add('text-gray-500');
+            }
+        }
+    }
+    
+    // Refresh all tabs to reflect the change
+    if (window.refreshAllTabs) {
+        window.refreshAllTabs();
+    }
+}
+
+/**
  * Convert a note to match the current enharmonic preference
+ * Only converts if the note doesn't match the current preference
  * @param {string} note - Note name (e.g., "Ab", "G#")
  * @returns {string} Note name matching current enharmonic preference
  */
@@ -618,7 +713,7 @@ function convertToEnharmonicPreference(note) {
     const enharmonicPreference = window.getEnharmonicPreference ? window.getEnharmonicPreference() : 'sharp';
     const targetArray = enharmonicPreference === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
     
-    // If note is already in target array, return it
+    // If note is already in target array, return it (no conversion needed)
     if (targetArray.includes(note)) {
         return note;
     }
@@ -661,7 +756,8 @@ function addParsedChordToProgression(chordSymbol, key) {
     let root = match[1] + match[2]; // e.g., "C", "F#", "Bb", "Ab"
     const typeAndExtensions = match[3]; // e.g., "m", "m7", "maj7", "sus4", "7b5", ""
     
-    // Convert root to match enharmonic preference
+    // Only convert root if it doesn't match the current enharmonic preference
+    // (We already switched the preference to match the progression, so this should rarely be needed)
     root = convertToEnharmonicPreference(root);
     
     // Determine chord type from the suffix
@@ -721,7 +817,7 @@ function addParsedChordToProgression(chordSymbol, key) {
  * Import a song's chord progression into the current progression
  * @param {number} songIndex - Index in the DEMO_SONG_DATABASE
  */
-export function importSongProgression(songIndex) {
+export async function importSongProgression(songIndex) {
     if (songIndex < 0 || songIndex >= DEMO_SONG_DATABASE.length) {
         alert('Invalid song selection.');
         return;
@@ -734,10 +830,24 @@ export function importSongProgression(songIndex) {
     
     if (!confirmed) return;
     
+    // Detect which enharmonic preference the progression uses
+    const progressionPreference = detectEnharmonicPreference(song.chords);
+    
+    // Switch enharmonic preference to match the progression
+    const currentPreference = window.getEnharmonicPreference ? window.getEnharmonicPreference() : 'sharp';
+    if (progressionPreference !== currentPreference) {
+        console.log(`Switching enharmonic preference from ${currentPreference} to ${progressionPreference} to match chord progression`);
+        switchEnharmonicPreference(progressionPreference);
+        // Wait a bit for the preference change to take effect
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
     // Import the progression
     // We need to access the progression management functions
-    if (window.setProgressionKey) {
-        window.setProgressionKey(song.key);
+    if (window.setProgressionKey && song.key) {
+        // Convert key to match enharmonic preference (after switching)
+        const convertedKey = convertToEnharmonicPreference(song.key);
+        window.setProgressionKey(convertedKey);
     }
     
     if (window.clearProgression) {
@@ -750,7 +860,7 @@ export function importSongProgression(songIndex) {
     song.chords.forEach((chordSymbol, index) => {
         setTimeout(() => {
             addParsedChordToProgression(chordSymbol, song.key);
-        }, index * 10); // 10ms delay between each chord to ensure proper processing
+        }, index * 100); // Increased delay for consistency
     });
     
     // Mark progression as ready so Step button and Auto Play work
