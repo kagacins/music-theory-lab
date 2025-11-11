@@ -13,6 +13,8 @@
  * 3. Set window.GOOGLE_SEARCH_API_KEY and window.GOOGLE_SEARCH_ENGINE_ID in your code
  */
 
+import { SHARP_NOTES, FLAT_NOTES, ALL_NOTES, ENHARMONIC_MAP } from '../../data/music-data.js';
+
 // Demo database of popular songs with chord progressions
 const DEMO_SONG_DATABASE = [
     {
@@ -431,10 +433,22 @@ function parseGoogleSearchResults(data) {
             // Try to extract chords from snippet (basic parsing)
             const chords = extractChordsFromText(item.snippet || '');
             
+            // Try to extract key from snippet (look for "Key:", "in [key]", etc.)
+            let detectedKey = null;
+            const snippet = item.snippet || '';
+            const keyMatch = snippet.match(/\b(?:key|in)\s*:?\s*([A-G][#b]?)\b/i);
+            if (keyMatch) {
+                detectedKey = keyMatch[1];
+            } else if (chords.length > 0) {
+                // Fall back to detecting from chords
+                detectedKey = detectKeyFromChords(chords);
+            }
+            
             results.push({
                 title: title || item.title,
                 artist: artist || 'Unknown',
                 chords: chords,
+                key: detectedKey,
                 url: item.link,
                 source: 'internet',
                 sourceName: getSourceName(item.link)
@@ -506,12 +520,14 @@ export function importInternetSongProgression(song) {
     
     if (!confirmed) return;
     
-    // Try to detect key from chords (simple heuristic)
-    const detectedKey = detectKeyFromChords(song.chords);
+    // Use key from song object if available, otherwise detect from chords
+    const detectedKey = song.key || detectKeyFromChords(song.chords);
     
     // Import the progression
     if (window.setProgressionKey && detectedKey) {
-        window.setProgressionKey(detectedKey);
+        // Convert key to match enharmonic preference
+        const convertedKey = convertToEnharmonicPreference(detectedKey);
+        window.setProgressionKey(convertedKey);
     }
     
     if (window.clearProgression) {
@@ -519,10 +535,11 @@ export function importInternetSongProgression(song) {
     }
     
     // Add each chord to the progression
+    // Use longer delay to ensure each chord is fully processed before adding the next
     song.chords.forEach((chordSymbol, index) => {
         setTimeout(() => {
             addParsedChordToProgression(chordSymbol, detectedKey || 'C');
-        }, index * 10);
+        }, index * 100); // Increased from 10ms to 100ms for better reliability
     });
     
     // Mark progression as ready
@@ -533,7 +550,7 @@ export function importInternetSongProgression(song) {
     }
     
     // Update UI
-    const updateDelay = (song.chords.length * 10) + 100;
+    const updateDelay = (song.chords.length * 100) + 200; // Increased delay to match new chord addition timing
     setTimeout(() => {
         if (window.renderProgressionDisplay) {
             window.renderProgressionDisplay();
@@ -555,11 +572,13 @@ export function importInternetSongProgression(song) {
 }
 
 /**
- * Detect key from chord progression (simple heuristic)
+ * Detect key from chord progression (improved heuristic)
  * @param {Array<string>} chords - Array of chord symbols
  * @returns {string|null} Detected key or null
  */
 function detectKeyFromChords(chords) {
+    if (!chords || chords.length === 0) return 'C';
+    
     // Count occurrences of each root note
     const rootCounts = {};
     chords.forEach(chord => {
@@ -579,18 +598,59 @@ function detectKeyFromChords(chords) {
         }
     }
     
+    // If we have a tie or want better detection, check for common progressions
+    // For now, use the most common root as a simple heuristic
+    // Convert to match enharmonic preference
+    if (likelyKey) {
+        likelyKey = convertToEnharmonicPreference(likelyKey);
+    }
+    
     return likelyKey || 'C'; // Default to C if can't detect
 }
 
 /**
+ * Convert a note to match the current enharmonic preference
+ * @param {string} note - Note name (e.g., "Ab", "G#")
+ * @returns {string} Note name matching current enharmonic preference
+ */
+function convertToEnharmonicPreference(note) {
+    // Get current enharmonic preference
+    const enharmonicPreference = window.getEnharmonicPreference ? window.getEnharmonicPreference() : 'sharp';
+    const targetArray = enharmonicPreference === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+    
+    // If note is already in target array, return it
+    if (targetArray.includes(note)) {
+        return note;
+    }
+    
+    // Find the note in ALL_NOTES to get its index
+    let noteIndex = ALL_NOTES.indexOf(note);
+    if (noteIndex === -1) {
+        // Try to find via enharmonic map (e.g., "Ab" -> "G#")
+        const mappedNote = ENHARMONIC_MAP && ENHARMONIC_MAP[note];
+        if (mappedNote) {
+            noteIndex = ALL_NOTES.indexOf(mappedNote);
+        }
+    }
+    
+    if (noteIndex === -1) {
+        console.warn(`Could not find note ${note} in note arrays`);
+        return note; // Return original if can't convert
+    }
+    
+    // Return the note from the target array
+    return targetArray[noteIndex];
+}
+
+/**
  * Parse a chord symbol and add it to the progression
- * @param {string} chordSymbol - Chord symbol like "C", "Am", "F#m7", "Gsus4"
+ * @param {string} chordSymbol - Chord symbol like "C", "Am", "F#m7", "Gsus4", "Ab", "Bbm"
  * @param {string} key - The key of the song
  */
 function addParsedChordToProgression(chordSymbol, key) {
     // Parse the chord symbol
     // Format: [Root][Accidental?][Type][Extensions?]
-    // Examples: C, Am, F#m7, Gsus4, Cmaj7, Dm7b5
+    // Examples: C, Am, F#m7, Gsus4, Cmaj7, Dm7b5, Ab, Bbm
     
     const match = chordSymbol.match(/^([A-G])([#b]?)(.*)$/);
     if (!match) {
@@ -598,8 +658,11 @@ function addParsedChordToProgression(chordSymbol, key) {
         return;
     }
     
-    const root = match[1] + match[2]; // e.g., "C", "F#", "Bb"
-    const typeAndExtensions = match[3]; // e.g., "m", "m7", "maj7", "sus4", "7b5"
+    let root = match[1] + match[2]; // e.g., "C", "F#", "Bb", "Ab"
+    const typeAndExtensions = match[3]; // e.g., "m", "m7", "maj7", "sus4", "7b5", ""
+    
+    // Convert root to match enharmonic preference
+    root = convertToEnharmonicPreference(root);
     
     // Determine chord type from the suffix
     let chordType = 'major'; // default
@@ -627,14 +690,27 @@ function addParsedChordToProgression(chordSymbol, key) {
     // This approach simulates selecting the chord in the builder and adding it
     if (window.selectBuilderChordBySymbol) {
         try {
+            // Get progression length before adding
+            const trainerStateBefore = window.getTrainerState ? window.getTrainerState() : null;
+            const lengthBefore = trainerStateBefore && trainerStateBefore.progressionData ? trainerStateBefore.progressionData.length : 0;
+            
+            // Call the function to select and add the chord
             window.selectBuilderChordBySymbol(root, chordType);
-            // Verify the chord was added by checking progression length
-            const trainerState = window.getTrainerState ? window.getTrainerState() : null;
-            if (trainerState && trainerState.progressionData) {
-                console.log(`Added chord ${chordSymbol} (${root} ${chordType}). Progression now has ${trainerState.progressionData.length} chords.`);
-            }
+            
+            // Verify the chord was added by checking progression length after a short delay
+            setTimeout(() => {
+                const trainerStateAfter = window.getTrainerState ? window.getTrainerState() : null;
+                if (trainerStateAfter && trainerStateAfter.progressionData) {
+                    const lengthAfter = trainerStateAfter.progressionData.length;
+                    if (lengthAfter > lengthBefore) {
+                        console.log(`✓ Added chord ${chordSymbol} (${root} ${chordType}). Progression: ${lengthBefore} → ${lengthAfter} chords.`);
+                    } else {
+                        console.warn(`⚠ Chord ${chordSymbol} (${root} ${chordType}) was not added. Progression length unchanged: ${lengthBefore}`);
+                    }
+                }
+            }, 50);
         } catch (error) {
-            console.error(`Error adding chord ${chordSymbol}:`, error);
+            console.error(`Error adding chord ${chordSymbol} (${root} ${chordType}):`, error);
         }
     } else {
         console.warn(`Chord building functions not available for: ${chordSymbol}`);
