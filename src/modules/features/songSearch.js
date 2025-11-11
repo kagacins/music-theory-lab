@@ -109,9 +109,12 @@ export function searchSongChords() {
         return;
     }
     
-    // Search the demo database
-    const results = DEMO_SONG_DATABASE.filter(song => {
-        const songText = `${song.title} ${song.artist}`.toLowerCase();
+    // Search the demo database and preserve original indices
+    const results = DEMO_SONG_DATABASE.map((song, originalIndex) => ({
+        ...song,
+        originalIndex
+    })).filter(songWithIndex => {
+        const songText = `${songWithIndex.title} ${songWithIndex.artist}`.toLowerCase();
         return songText.includes(query);
     });
     
@@ -121,18 +124,18 @@ export function searchSongChords() {
         return;
     }
     
-    resultsContainer.innerHTML = results.map((song, index) => `
+    resultsContainer.innerHTML = results.map((songWithIndex) => `
         <div class="bg-white p-3 rounded-lg border border-purple-200 hover:border-purple-400 transition">
             <div class="flex items-start justify-between gap-3">
                 <div class="flex-1">
-                    <h4 class="font-bold text-gray-800 text-sm">${escapeHtml(song.title)}</h4>
-                    <p class="text-xs text-gray-600">${escapeHtml(song.artist)}</p>
-                    <p class="text-xs text-gray-500 mt-1"><strong>Key:</strong> ${escapeHtml(song.key)}</p>
+                    <h4 class="font-bold text-gray-800 text-sm">${escapeHtml(songWithIndex.title)}</h4>
+                    <p class="text-xs text-gray-600">${escapeHtml(songWithIndex.artist)}</p>
+                    <p class="text-xs text-gray-500 mt-1"><strong>Key:</strong> ${escapeHtml(songWithIndex.key)}</p>
                     <div class="flex flex-wrap gap-1 mt-2">
-                        ${song.chords.map(chord => `<span class="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs font-semibold rounded">${escapeHtml(chord)}</span>`).join('')}
+                        ${songWithIndex.chords.map(chord => `<span class="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs font-semibold rounded">${escapeHtml(chord)}</span>`).join('')}
                     </div>
                 </div>
-                <button onclick="window.importSongProgression && window.importSongProgression(${index})" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-lg shadow transition whitespace-nowrap">
+                <button onclick="window.importSongProgression && window.importSongProgression(${songWithIndex.originalIndex})" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-lg shadow transition whitespace-nowrap">
                     Import
                 </button>
             </div>
