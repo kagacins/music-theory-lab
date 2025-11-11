@@ -218,14 +218,12 @@ export async function searchSongChords() {
 async function searchInternetForChords(query) {
     const results = [];
     
-    // Try Google Custom Search if API key is configured
-    if (window.GOOGLE_SEARCH_API_KEY && window.GOOGLE_SEARCH_ENGINE_ID) {
-        try {
-            const googleResults = await searchGoogleForChords(query);
-            results.push(...googleResults);
-        } catch (error) {
-            console.warn('Google Custom Search failed:', error);
-        }
+    // Try Google Custom Search (uses Netlify function if available, or direct API if keys are in window)
+    try {
+        const googleResults = await searchGoogleForChords(query);
+        results.push(...googleResults);
+    } catch (error) {
+        console.warn('Internet search failed:', error);
     }
     
     return results;
@@ -233,12 +231,38 @@ async function searchInternetForChords(query) {
 
 /**
  * Search Google Custom Search for chord progressions
+ * Uses Netlify function if available, falls back to direct API call if API keys are in window
  * @param {string} query - Search query
  * @returns {Promise<Array>} Array of song results
  */
 async function searchGoogleForChords(query) {
+    // Try Netlify function first (most secure - API key hidden on server)
+    const netlifyFunctionUrl = '/.netlify/functions/searchChords';
+    
+    try {
+        const response = await fetch(`${netlifyFunctionUrl}?query=${encodeURIComponent(query)}`);
+        
+        if (response.ok) {
+            const data = await response.json();
+            return parseGoogleSearchResults(data);
+        } else if (response.status === 404) {
+            // Netlify function not available, fall back to direct API call
+            console.log('Netlify function not found, using direct API call');
+        } else {
+            throw new Error(`Function error: ${response.status}`);
+        }
+    } catch (error) {
+        // If Netlify function fails, try direct API call (for local dev or non-Netlify deployments)
+        console.log('Netlify function unavailable, trying direct API call:', error.message);
+    }
+    
+    // Fallback: Direct API call (requires API keys in window object)
     const apiKey = window.GOOGLE_SEARCH_API_KEY;
     const engineId = window.GOOGLE_SEARCH_ENGINE_ID;
+    
+    if (!apiKey || !engineId) {
+        throw new Error('API credentials not available. Use Netlify function or set window.GOOGLE_SEARCH_API_KEY and window.GOOGLE_SEARCH_ENGINE_ID');
+    }
     
     // Search for chord progressions on popular sites
     const searchQuery = `${query} chords site:ultimate-guitar.com OR site:chordify.net OR site:hooktheory.com`;
@@ -251,34 +275,43 @@ async function searchGoogleForChords(query) {
         }
         
         const data = await response.json();
-        const results = [];
-        
-        if (data.items && data.items.length > 0) {
-            data.items.forEach((item, index) => {
-                // Extract song title and artist from the search result
-                const titleMatch = item.title.match(/^(.+?)\s*[-–—]\s*(.+?)\s*[-–—]?\s*Chords?/i);
-                const title = titleMatch ? titleMatch[1].trim() : item.title.split(' - ')[0].trim();
-                const artist = titleMatch ? titleMatch[2].trim() : (item.title.split(' - ')[1] || '').replace(/Chords?/i, '').trim();
-                
-                // Try to extract chords from snippet (basic parsing)
-                const chords = extractChordsFromText(item.snippet || '');
-                
-                results.push({
-                    title: title || item.title,
-                    artist: artist || 'Unknown',
-                    chords: chords,
-                    url: item.link,
-                    source: 'internet',
-                    sourceName: getSourceName(item.link)
-                });
-            });
-        }
-        
-        return results;
+        return parseGoogleSearchResults(data);
     } catch (error) {
         console.error('Google Custom Search error:', error);
         throw error;
     }
+}
+
+/**
+ * Parse Google Search API results into song objects
+ * @param {Object} data - Google Search API response
+ * @returns {Array} Array of song result objects
+ */
+function parseGoogleSearchResults(data) {
+    const results = [];
+    
+    if (data.items && data.items.length > 0) {
+        data.items.forEach((item) => {
+            // Extract song title and artist from the search result
+            const titleMatch = item.title.match(/^(.+?)\s*[-–—]\s*(.+?)\s*[-–—]?\s*Chords?/i);
+            const title = titleMatch ? titleMatch[1].trim() : item.title.split(' - ')[0].trim();
+            const artist = titleMatch ? titleMatch[2].trim() : (item.title.split(' - ')[1] || '').replace(/Chords?/i, '').trim();
+            
+            // Try to extract chords from snippet (basic parsing)
+            const chords = extractChordsFromText(item.snippet || '');
+            
+            results.push({
+                title: title || item.title,
+                artist: artist || 'Unknown',
+                chords: chords,
+                url: item.link,
+                source: 'internet',
+                sourceName: getSourceName(item.link)
+            });
+        });
+    }
+    
+    return results;
 }
 
 /**

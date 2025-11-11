@@ -1,0 +1,17 @@
+# Netlify Configuration File
+
+[build]
+  # No build command needed for static site
+  publish = "."
+
+[functions]
+  # Node.js version for serverless functions
+  node_bundler = "esbuild"
+
+[[redirects]]
+  # Redirect all requests to index.html for SPA routing (if needed)
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
+
