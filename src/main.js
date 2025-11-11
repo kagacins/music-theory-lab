@@ -3,13 +3,17 @@
  * Initializes the application and exposes necessary functions to the global scope for HTML event handlers
  * 
  * GOOGLE CUSTOM SEARCH API CONFIGURATION:
- * To enable internet search in "Search Song Chords", uncomment and set these values:
+ * Internet search for "Search Song Chords" feature is enabled.
  * 
- * window.GOOGLE_SEARCH_API_KEY = 'YOUR_API_KEY_HERE';
- * window.GOOGLE_SEARCH_ENGINE_ID = 'YOUR_SEARCH_ENGINE_ID_HERE';
+ * SECURITY WARNING: API keys in client-side code are visible to anyone.
+ * Consider using a backend proxy for production deployments.
  * 
  * See GOOGLE_SEARCH_API_SETUP.md for detailed setup instructions.
  */
+
+// Google Custom Search API Configuration
+window.GOOGLE_SEARCH_API_KEY = 'AIzaSyCKMAccLd1yCc9tuTWmCBItpnB7QxtZiWo';
+window.GOOGLE_SEARCH_ENGINE_ID = '6233b4a886ca64ede';
 
 // Import all necessary modules
 import { switchTab, refreshAllTabs } from './modules/ui/tabs.js';
