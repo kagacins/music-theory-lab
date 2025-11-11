@@ -68,10 +68,11 @@ export function initAudio() {
         }
     });
     
-    // Add reverb with long decay to match slow tempos (up to 10 seconds for very slow BPM)
-    // Reverb decay will be dynamically adjusted based on note duration in playback functions
+    // Add reverb with moderate decay for natural sound
+    // For interactive keyboard use, shorter decay is better
+    // For playback, we can extend note durations to allow reverb to decay naturally
     pianoReverb = new Tone.Reverb({
-        decay: 10, // Maximum decay for very slow tempos (e.g., 40 BPM whole note = 6 seconds)
+        decay: 2.0, // Moderate decay (2 seconds) - good for interactive use
         preDelay: 0.01,
         wet: 0.3  // Moderate reverb for natural sound
     });
