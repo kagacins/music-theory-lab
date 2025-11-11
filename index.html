@@ -490,7 +490,7 @@
                         
                         <!-- Info Message -->
                         <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                            <p class="text-xs text-blue-800"><strong>Note:</strong> This feature uses a demo database with a limited selection of popular songs. For production use, integrate with a chord progression API like Ultimate Guitar, Hooktheory, or Chordify.</p>
+                            <p class="text-xs text-blue-800"><strong>Note:</strong> This feature searches a local demo database first, then searches the internet via Google Custom Search (if configured). To enable internet search, set <code class="text-xs bg-blue-100 px-1 rounded">window.GOOGLE_SEARCH_API_KEY</code> and <code class="text-xs bg-blue-100 px-1 rounded">window.GOOGLE_SEARCH_ENGINE_ID</code> in your code. If no results are found, you can search Ultimate Guitar directly.</p>
                         </div>
                     </div>
                 </div>

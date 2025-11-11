@@ -2,12 +2,15 @@
  * Song Search Module
  * Provides functionality to search for songs and import their chord progressions
  * 
- * NOTE: This currently uses a demo database with limited songs.
- * For production use, integrate with a real chord progression API such as:
- * - Ultimate Guitar API (requires API key)
- * - Hooktheory API (requires API key)
- * - Chordify API (requires API key)
- * - Or implement custom web scraping (check legal/ethical implications)
+ * Features:
+ * - Local demo database search (fast, limited songs)
+ * - Internet search via Google Custom Search API (requires API key)
+ * - Fallback to Ultimate Guitar search (opens in new tab)
+ * 
+ * To enable Google Custom Search:
+ * 1. Get a Google Custom Search API key from https://console.cloud.google.com/
+ * 2. Create a Custom Search Engine at https://cse.google.com/
+ * 3. Set window.GOOGLE_SEARCH_API_KEY and window.GOOGLE_SEARCH_ENGINE_ID in your code
  */
 
 // Demo database of popular songs with chord progressions
@@ -93,54 +96,326 @@ export function toggleSongSearchPanel() {
 }
 
 /**
- * Search for song chords in the database
- * In production, this would call a real API
+ * Search for song chords - searches local database first, then internet
  */
-export function searchSongChords() {
+export async function searchSongChords() {
     const searchInput = document.getElementById('song-search-input');
     const resultsContainer = document.getElementById('song-search-results');
     
     if (!searchInput || !resultsContainer) return;
     
-    const query = searchInput.value.trim().toLowerCase();
+    const query = searchInput.value.trim();
     
     if (query.length < 2) {
         resultsContainer.innerHTML = '<p class="text-sm text-gray-500 italic">Enter at least 2 characters to search...</p>';
         return;
     }
     
-    // Search the demo database and preserve original indices
-    const results = DEMO_SONG_DATABASE.map((song, originalIndex) => ({
+    // Show loading state
+    resultsContainer.innerHTML = '<div class="flex items-center gap-2 text-sm text-gray-600"><div class="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div> Searching...</div>';
+    
+    const queryLower = query.toLowerCase();
+    
+    // First, search the local demo database
+    const localResults = DEMO_SONG_DATABASE.map((song, originalIndex) => ({
         ...song,
-        originalIndex
+        originalIndex,
+        source: 'local'
     })).filter(songWithIndex => {
         const songText = `${songWithIndex.title} ${songWithIndex.artist}`.toLowerCase();
-        return songText.includes(query);
+        return songText.includes(queryLower);
     });
     
+    // Then search the internet
+    let internetResults = [];
+    try {
+        internetResults = await searchInternetForChords(query);
+    } catch (error) {
+        console.warn('Internet search failed:', error);
+    }
+    
+    // Combine results (local first, then internet)
+    const allResults = [...localResults, ...internetResults];
+    
     // Display results
-    if (results.length === 0) {
-        resultsContainer.innerHTML = '<p class="text-sm text-gray-500 italic">No songs found. Try searching for "Let It Be", "Stand By Me", or "Wonderwall".</p>';
+    if (allResults.length === 0) {
+        resultsContainer.innerHTML = `
+            <div class="space-y-3">
+                <p class="text-sm text-gray-500 italic">No songs found in local database.</p>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p class="text-sm text-blue-800 mb-2">Try searching on Ultimate Guitar:</p>
+                    <button onclick="window.openUltimateGuitarSearch && window.openUltimateGuitarSearch('${escapeHtml(query)}')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow transition">
+                        Search Ultimate Guitar
+                    </button>
+                </div>
+            </div>
+        `;
         return;
     }
     
-    resultsContainer.innerHTML = results.map((songWithIndex) => `
-        <div class="bg-white p-3 rounded-lg border border-purple-200 hover:border-purple-400 transition">
-            <div class="flex items-start justify-between gap-3">
-                <div class="flex-1">
-                    <h4 class="font-bold text-gray-800 text-sm">${escapeHtml(songWithIndex.title)}</h4>
-                    <p class="text-xs text-gray-600">${escapeHtml(songWithIndex.artist)}</p>
-                    <p class="text-xs text-gray-500 mt-1"><strong>Key:</strong> ${escapeHtml(songWithIndex.key)}</p>
-                    <div class="flex flex-wrap gap-1 mt-2">
-                        ${songWithIndex.chords.map(chord => `<span class="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs font-semibold rounded">${escapeHtml(chord)}</span>`).join('')}
+    resultsContainer.innerHTML = allResults.map((song) => {
+        if (song.source === 'local') {
+            // Local database result with import button
+            return `
+                <div class="bg-white p-3 rounded-lg border border-purple-200 hover:border-purple-400 transition">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex-1">
+                            <h4 class="font-bold text-gray-800 text-sm">${escapeHtml(song.title)}</h4>
+                            <p class="text-xs text-gray-600">${escapeHtml(song.artist)}</p>
+                            <p class="text-xs text-gray-500 mt-1"><strong>Key:</strong> ${escapeHtml(song.key)}</p>
+                            <div class="flex flex-wrap gap-1 mt-2">
+                                ${song.chords.map(chord => `<span class="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs font-semibold rounded">${escapeHtml(chord)}</span>`).join('')}
+                            </div>
+                        </div>
+                        <button onclick="window.importSongProgression && window.importSongProgression(${song.originalIndex})" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-lg shadow transition whitespace-nowrap">
+                            Import
+                        </button>
                     </div>
                 </div>
-                <button onclick="window.importSongProgression && window.importSongProgression(${songWithIndex.originalIndex})" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-lg shadow transition whitespace-nowrap">
-                    Import
-                </button>
-            </div>
-        </div>
-    `).join('');
+            `;
+        } else {
+            // Internet search result with link
+            // Store song data in data attribute to avoid JSON escaping issues
+            const songData = encodeURIComponent(JSON.stringify(song));
+            return `
+                <div class="bg-white p-3 rounded-lg border border-blue-200 hover:border-blue-400 transition">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex-1">
+                            <h4 class="font-bold text-gray-800 text-sm">${escapeHtml(song.title)}</h4>
+                            <p class="text-xs text-gray-600">${escapeHtml(song.artist || 'Unknown Artist')}</p>
+                            ${song.key ? `<p class="text-xs text-gray-500 mt-1"><strong>Key:</strong> ${escapeHtml(song.key)}</p>` : ''}
+                            ${song.chords && song.chords.length > 0 ? `
+                                <div class="flex flex-wrap gap-1 mt-2">
+                                    ${song.chords.map(chord => `<span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded">${escapeHtml(chord)}</span>`).join('')}
+                                </div>
+                            ` : ''}
+                            <p class="text-xs text-gray-500 mt-2">Source: ${escapeHtml(song.sourceName || 'Internet')}</p>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            ${song.chords && song.chords.length > 0 ? `
+                                <button onclick="const songData = JSON.parse(decodeURIComponent('${songData}')); window.importInternetSongProgression && window.importInternetSongProgression(songData);" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-lg shadow transition whitespace-nowrap">
+                                    Import
+                                </button>
+                            ` : ''}
+                            ${song.url ? `
+                                <a href="${escapeHtml(song.url)}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow transition whitespace-nowrap text-center">
+                                    View
+                                </a>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    }).join('');
+}
+
+/**
+ * Search the internet for chord progressions
+ * @param {string} query - Search query
+ * @returns {Promise<Array>} Array of song results
+ */
+async function searchInternetForChords(query) {
+    const results = [];
+    
+    // Try Google Custom Search if API key is configured
+    if (window.GOOGLE_SEARCH_API_KEY && window.GOOGLE_SEARCH_ENGINE_ID) {
+        try {
+            const googleResults = await searchGoogleForChords(query);
+            results.push(...googleResults);
+        } catch (error) {
+            console.warn('Google Custom Search failed:', error);
+        }
+    }
+    
+    return results;
+}
+
+/**
+ * Search Google Custom Search for chord progressions
+ * @param {string} query - Search query
+ * @returns {Promise<Array>} Array of song results
+ */
+async function searchGoogleForChords(query) {
+    const apiKey = window.GOOGLE_SEARCH_API_KEY;
+    const engineId = window.GOOGLE_SEARCH_ENGINE_ID;
+    
+    // Search for chord progressions on popular sites
+    const searchQuery = `${query} chords site:ultimate-guitar.com OR site:chordify.net OR site:hooktheory.com`;
+    const url = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${engineId}&q=${encodeURIComponent(searchQuery)}&num=10`;
+    
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Google Search API error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const results = [];
+        
+        if (data.items && data.items.length > 0) {
+            data.items.forEach((item, index) => {
+                // Extract song title and artist from the search result
+                const titleMatch = item.title.match(/^(.+?)\s*[-–—]\s*(.+?)\s*[-–—]?\s*Chords?/i);
+                const title = titleMatch ? titleMatch[1].trim() : item.title.split(' - ')[0].trim();
+                const artist = titleMatch ? titleMatch[2].trim() : (item.title.split(' - ')[1] || '').replace(/Chords?/i, '').trim();
+                
+                // Try to extract chords from snippet (basic parsing)
+                const chords = extractChordsFromText(item.snippet || '');
+                
+                results.push({
+                    title: title || item.title,
+                    artist: artist || 'Unknown',
+                    chords: chords,
+                    url: item.link,
+                    source: 'internet',
+                    sourceName: getSourceName(item.link)
+                });
+            });
+        }
+        
+        return results;
+    } catch (error) {
+        console.error('Google Custom Search error:', error);
+        throw error;
+    }
+}
+
+/**
+ * Extract chord names from text
+ * @param {string} text - Text to extract chords from
+ * @returns {Array<string>} Array of chord names
+ */
+function extractChordsFromText(text) {
+    // Common chord pattern: letter, optional sharp/flat, optional minor/maj/7/etc.
+    const chordPattern = /\b([A-G][#b]?(?:m|maj|dim|aug|sus|add)?(?:[0-9]|b[0-9]|#[0-9])*(?:\/[A-G][#b]?)?)\b/gi;
+    const matches = text.match(chordPattern);
+    
+    if (!matches) return [];
+    
+    // Remove duplicates and filter out common false positives
+    const uniqueChords = [...new Set(matches.map(m => m.trim()))];
+    const filtered = uniqueChords.filter(chord => {
+        // Filter out common false positives
+        const lower = chord.toLowerCase();
+        return !['am', 'pm', 'cm', 'mm', 'dm'].includes(lower) || 
+               ['Am', 'Cm', 'Dm', 'Em', 'Fm', 'Gm'].includes(chord);
+    });
+    
+    return filtered.slice(0, 20); // Limit to 20 chords
+}
+
+/**
+ * Get source name from URL
+ * @param {string} url - URL
+ * @returns {string} Source name
+ */
+function getSourceName(url) {
+    if (url.includes('ultimate-guitar.com')) return 'Ultimate Guitar';
+    if (url.includes('chordify.net')) return 'Chordify';
+    if (url.includes('hooktheory.com')) return 'Hooktheory';
+    if (url.includes('songsterr.com')) return 'Songsterr';
+    return 'Internet';
+}
+
+/**
+ * Open Ultimate Guitar search in a new tab
+ * @param {string} query - Search query
+ */
+export function openUltimateGuitarSearch(query) {
+    const searchUrl = `https://www.ultimate-guitar.com/search.php?search_type=title&value=${encodeURIComponent(query)}`;
+    window.open(searchUrl, '_blank', 'noopener,noreferrer');
+}
+
+/**
+ * Import a song progression from internet search results
+ * @param {Object} song - Song object from internet search
+ */
+export function importInternetSongProgression(song) {
+    if (!song.chords || song.chords.length === 0) {
+        alert('No chord progression available for this song. Please click "View" to see the full chord chart.');
+        return;
+    }
+    
+    // Confirm with user
+    const confirmed = confirm(`Import "${song.title}" by ${song.artist || 'Unknown'}?\n\nThis will replace your current chord progression.\n\nChords: ${song.chords.join(' → ')}`);
+    
+    if (!confirmed) return;
+    
+    // Try to detect key from chords (simple heuristic)
+    const detectedKey = detectKeyFromChords(song.chords);
+    
+    // Import the progression
+    if (window.setProgressionKey && detectedKey) {
+        window.setProgressionKey(detectedKey);
+    }
+    
+    if (window.clearProgression) {
+        window.clearProgression();
+    }
+    
+    // Add each chord to the progression
+    song.chords.forEach((chordSymbol, index) => {
+        setTimeout(() => {
+            addParsedChordToProgression(chordSymbol, detectedKey || 'C');
+        }, index * 10);
+    });
+    
+    // Mark progression as ready
+    if (window.setIsReady) {
+        window.setIsReady(true);
+    } else if (window.trainerState) {
+        window.trainerState.isReady = true;
+    }
+    
+    // Update UI
+    const updateDelay = (song.chords.length * 10) + 100;
+    setTimeout(() => {
+        if (window.renderProgressionDisplay) {
+            window.renderProgressionDisplay();
+        }
+        if (window.updateProgressionControlsUI) {
+            window.updateProgressionControlsUI();
+        }
+        
+        alert(`Successfully imported "${song.title}"!\n\n${song.chords.length} chords added to your progression.`);
+    }, updateDelay);
+    
+    // Collapse the search panel
+    const panel = document.getElementById('song-search-panel');
+    const chevron = document.getElementById('song-search-chevron');
+    if (panel && chevron) {
+        panel.classList.add('hidden');
+        chevron.classList.remove('rotate-180');
+    }
+}
+
+/**
+ * Detect key from chord progression (simple heuristic)
+ * @param {Array<string>} chords - Array of chord symbols
+ * @returns {string|null} Detected key or null
+ */
+function detectKeyFromChords(chords) {
+    // Count occurrences of each root note
+    const rootCounts = {};
+    chords.forEach(chord => {
+        const root = chord.match(/^([A-G][#b]?)/)?.[1];
+        if (root) {
+            rootCounts[root] = (rootCounts[root] || 0) + 1;
+        }
+    });
+    
+    // Find the most common root (likely the key)
+    let maxCount = 0;
+    let likelyKey = null;
+    for (const [root, count] of Object.entries(rootCounts)) {
+        if (count > maxCount) {
+            maxCount = count;
+            likelyKey = root;
+        }
+    }
+    
+    return likelyKey || 'C'; // Default to C if can't detect
 }
 
 /**

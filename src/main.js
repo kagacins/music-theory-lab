@@ -41,7 +41,9 @@ import {
 import {
     toggleSongSearchPanel,
     searchSongChords,
-    importSongProgression
+    importSongProgression,
+    openUltimateGuitarSearch,
+    importInternetSongProgression
 } from './modules/features/songSearch.js';
 import {
     renderBuilderSelectors,
@@ -1136,6 +1138,8 @@ window.updateGuitarFretboard = updateGuitarFretboard;
 window.toggleSongSearchPanel = toggleSongSearchPanel;
 window.searchSongChords = searchSongChords;
 window.importSongProgression = importSongProgression;
+window.openUltimateGuitarSearch = openUltimateGuitarSearch;
+window.importInternetSongProgression = importInternetSongProgression;
 
 // Theory Tools functions
 window.toggleTheoryPanel = toggleTheoryPanel;
