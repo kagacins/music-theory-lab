@@ -111,7 +111,7 @@ export function initSectionSidebar(tabId, containerId, sectionClass) {
 function createSidebar(tabId) {
     const sidebar = document.createElement('div');
     sidebar.id = `${tabId}-section-sidebar`;
-    sidebar.className = 'section-sidebar absolute left-0 top-0 w-16 bg-gray-800/90 backdrop-blur-sm text-white z-5 flex flex-col items-center py-4 gap-2 transition-all duration-300 border-r border-gray-700';
+    sidebar.className = 'section-sidebar absolute left-0 top-0 w-16 bg-gray-800/90 backdrop-blur-sm text-white z-[1] flex flex-col items-center py-4 gap-2 transition-all duration-300 border-r border-gray-700';
     sidebar.style.display = 'none'; // Hidden by default, shown when sections are collapsed
     sidebar.style.minHeight = '100%'; // Start with full height
     sidebar.style.height = 'auto'; // Allow height to grow with content
