@@ -956,8 +956,6 @@ export function initInteractiveMelody() {
 
     currentMeasure = 0;
     currentBeat = 0;
-    currentNoteDuration = '4n'; // Reset to default quarter note
-    currentNoteDotted = false; // Reset dot
     isInteractiveMode = true;
 
     // Render chord progression as whole notes
@@ -1280,9 +1278,7 @@ export function deleteLastNote() {
     const durationStr = lastNote.duration || '4n';
     const dotted = lastNote.dotted || false;
     
-    // Extract base duration from string (e.g., '4n.' -> '4n')
-    const baseDuration = durationStr.replace('.', '');
-    const durationInQuarters = getDurationInQuarterNotes(baseDuration, dotted);
+    const durationInQuarters = getDurationInQuarterNotes(durationStr, dotted);
     
     // Remove the note
     interactiveMelody.melodyNotes.pop();
@@ -1315,9 +1311,6 @@ export function clearInteractiveMelody() {
     interactiveMelody.chordNotes = [];
     currentMeasure = 0;
     currentBeat = 0;
-    // Reset duration to default
-    currentNoteDuration = '4n';
-    currentNoteDotted = false;
     const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
     if (interactiveCanvas) {
         renderInteractiveMelodyStaff(interactiveCanvas);
@@ -2498,8 +2491,7 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                     // Check if note's duration would exceed the measure
                     const durationStr = note.duration || '4n';
                     const isDotted = durationStr.includes('.') || (note.dotted === true);
-                    const baseDuration = durationStr.replace('n', '').replace('.', '');
-                    const noteDuration = getDurationInQuarterNotes(baseDuration, isDotted);
+                    const noteDuration = getDurationInQuarterNotes(durationStr, isDotted);
                     // Note is valid if it starts within the measure and ends at or before the measure boundary
                     // Use a small epsilon to handle floating point precision issues
                     const noteEndBeat = note.beat + noteDuration;
