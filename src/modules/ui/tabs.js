@@ -14,6 +14,7 @@ import { updateKeySignatureDisplay } from './header.js';
 import { loadProgression, renderProgressionDisplay, renderProgressionControls } from '../features/progressionBuilder.js';
 import { updateScaleDisplay, renderScaleSelectors } from '../features/scaleExplorer.js';
 import { updateButtonVisibility } from './presetUI.js';
+import { updateTabSidebarHeight } from './sectionSidebar.js';
 
 /**
  * Switches between tabs and manages their visibility and state
@@ -212,6 +213,12 @@ export function switchTab(tabId) {
 
     // Update preset button visibility based on current tab
     updateButtonVisibility();
+
+    // Update sidebar height for the active tab to ensure it meets dimension requirements
+    // This ensures the sidebar height matches the taller of: white container OR sidebar content
+    if (tabId === 'builder' || tabId === 'trainer' || tabId === 'melody') {
+        updateTabSidebarHeight(tabId);
+    }
 
     // Sidebar stays open - user may want to make other selections
 }

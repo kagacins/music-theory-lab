@@ -107,6 +107,12 @@ export function initSectionSidebar(tabId, containerId, sectionClass) {
     if (sidebar._updateToggleAllButton) {
         setTimeout(() => sidebar._updateToggleAllButton(), 100);
     }
+    
+    // Update sidebar height on initial load to ensure it meets dimension requirements
+    // Use a delay to ensure DOM has fully rendered
+    setTimeout(() => {
+        updateSidebarHeight(sidebar);
+    }, 150);
 }
 
 /**
@@ -939,6 +945,20 @@ export function initAllSectionSidebars() {
     
     // Initialize instant tooltips for all floating controls and other buttons
     initInstantTooltips();
+}
+
+/**
+ * Update sidebar height for a specific tab
+ * @param {string} tabId - The tab ID ('builder', 'trainer', 'melody')
+ */
+export function updateTabSidebarHeight(tabId) {
+    const sidebar = document.getElementById(`${tabId}-section-sidebar`);
+    if (sidebar) {
+        // Use a small delay to ensure DOM has updated after tab switch
+        setTimeout(() => {
+            updateSidebarHeight(sidebar);
+        }, 50);
+    }
 }
 
 /**
