@@ -539,7 +539,8 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     tab.setAttribute('data-section-id', sectionId);
     
     // Create tooltip that appears immediately on hover (no delay)
-    const tooltipText = toggle.textContent.trim() || sectionId;
+    const sectionName = toggle.textContent.trim() || sectionId;
+    const tooltipText = `${sectionName} - drag to reorder`;
     // Remove title attribute to prevent browser default tooltip delay
     tab.removeAttribute('title');
     
