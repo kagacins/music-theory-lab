@@ -1,0 +1,698 @@
+[
+  {
+    "title": "Like a Rolling Stone",
+    "artist": "Bob Dylan",
+    "key": "C",
+    "chords": ["C", "Am", "F", "G", "C", "Am", "F", "G"]
+  },
+  {
+    "title": "Satisfaction",
+    "artist": "The Rolling Stones",
+    "key": "E",
+    "chords": ["E", "A", "E", "A", "E", "A", "E", "A"]
+  },
+  {
+    "title": "Imagine",
+    "artist": "John Lennon",
+    "key": "C",
+    "chords": ["C", "Cmaj7", "F", "C", "Cmaj7", "F", "Am", "Dm"]
+  },
+  {
+    "title": "What's Going On",
+    "artist": "Marvin Gaye",
+    "key": "F",
+    "chords": ["F", "Dm", "Bb", "C", "F", "Dm", "Bb", "C"]
+  },
+  {
+    "title": "Respect",
+    "artist": "Aretha Franklin",
+    "key": "C",
+    "chords": ["C", "F", "C", "F", "C", "F", "C", "G"]
+  },
+  {
+    "title": "Good Vibrations",
+    "artist": "The Beach Boys",
+    "key": "G",
+    "chords": ["G", "Em", "Am", "D", "G", "Em", "Am", "D"]
+  },
+  {
+    "title": "Johnny B. Goode",
+    "artist": "Chuck Berry",
+    "key": "B",
+    "chords": ["B", "B", "E", "E", "B", "B", "E", "E"]
+  },
+  {
+    "title": "Hey Jude",
+    "artist": "The Beatles",
+    "key": "F",
+    "chords": ["F", "C", "F", "C", "F", "C", "F", "C"]
+  },
+  {
+    "title": "Smells Like Teen Spirit",
+    "artist": "Nirvana",
+    "key": "F",
+    "chords": ["F", "Bb", "Ab", "Db", "F", "Bb", "Ab", "Db"]
+  },
+  {
+    "title": "What'd I Say",
+    "artist": "Ray Charles",
+    "key": "C",
+    "chords": ["C", "C", "F", "F", "C", "C", "G", "G"]
+  },
+  {
+    "title": "My Generation",
+    "artist": "The Who",
+    "key": "G",
+    "chords": ["G", "C", "G", "C", "G", "C", "G", "C"]
+  },
+  {
+    "title": "A Change Is Gonna Come",
+    "artist": "Sam Cooke",
+    "key": "Ab",
+    "chords": ["Ab", "Eb", "Ab", "Eb", "Ab", "Db", "Eb", "Ab"]
+  },
+  {
+    "title": "Yesterday",
+    "artist": "The Beatles",
+    "key": "F",
+    "chords": ["F", "Em", "Am", "Dm", "Bb", "C", "F", "F"]
+  },
+  {
+    "title": "Blowin' in the Wind",
+    "artist": "Bob Dylan",
+    "key": "G",
+    "chords": ["G", "C", "G", "C", "G", "C", "G", "C"]
+  },
+  {
+    "title": "London Calling",
+    "artist": "The Clash",
+    "key": "E",
+    "chords": ["E", "G", "A", "E", "E", "G", "A", "E"]
+  },
+  {
+    "title": "I Want to Hold Your Hand",
+    "artist": "The Beatles",
+    "key": "G",
+    "chords": ["G", "Em", "C", "D", "G", "Em", "C", "D"]
+  },
+  {
+    "title": "Purple Haze",
+    "artist": "Jimi Hendrix",
+    "key": "E",
+    "chords": ["E", "G", "A", "E", "E", "G", "A", "E"]
+  },
+  {
+    "title": "Maybellene",
+    "artist": "Chuck Berry",
+    "key": "C",
+    "chords": ["C", "F", "C", "F", "C", "G", "C", "C"]
+  },
+  {
+    "title": "Hound Dog",
+    "artist": "Elvis Presley",
+    "key": "C",
+    "chords": ["C", "F", "C", "F", "C", "F", "C", "G"]
+  },
+  {
+    "title": "Let It Be",
+    "artist": "The Beatles",
+    "key": "C",
+    "chords": ["C", "G", "Am", "F", "C", "G", "F", "C"]
+  },
+  {
+    "title": "Born to Run",
+    "artist": "Bruce Springsteen",
+    "key": "E",
+    "chords": ["E", "B", "A", "E", "E", "B", "A", "E"]
+  },
+  {
+    "title": "Be My Baby",
+    "artist": "The Ronettes",
+    "key": "A",
+    "chords": ["A", "E", "F#m", "D", "A", "E", "F#m", "D"]
+  },
+  {
+    "title": "In My Life",
+    "artist": "The Beatles",
+    "key": "A",
+    "chords": ["A", "E", "F#m", "D", "A", "E", "F#m", "D"]
+  },
+  {
+    "title": "People Get Ready",
+    "artist": "The Impressions",
+    "key": "C",
+    "chords": ["C", "Am", "F", "G", "C", "Am", "F", "G"]
+  },
+  {
+    "title": "God Only Knows",
+    "artist": "The Beach Boys",
+    "key": "A",
+    "chords": ["A", "E", "F#m", "D", "A", "E", "F#m", "D"]
+  },
+  {
+    "title": "A Day in the Life",
+    "artist": "The Beatles",
+    "key": "G",
+    "chords": ["G", "Bm", "C", "G", "G", "Bm", "C", "G"]
+  },
+  {
+    "title": "Layla",
+    "artist": "Derek and the Dominos",
+    "key": "Dm",
+    "chords": ["Dm", "Bb", "C", "F", "Dm", "Bb", "C", "F"]
+  },
+  {
+    "title": "A Whiter Shade of Pale",
+    "artist": "Procol Harum",
+    "key": "C",
+    "chords": ["C", "Am", "F", "G", "C", "Am", "F", "G"]
+  },
+  {
+    "title": "Thunder Road",
+    "artist": "Bruce Springsteen",
+    "key": "G",
+    "chords": ["G", "C", "G", "C", "G", "C", "G", "D"]
+  },
+  {
+    "title": "Ring of Fire",
+    "artist": "Johnny Cash",
+    "key": "G",
+    "chords": ["G", "C", "G", "C", "G", "C", "G", "D"]
+  },
+  {
+    "title": "That's All Right",
+    "artist": "Elvis Presley",
+    "key": "A",
+    "chords": ["A", "D", "A", "D", "A", "D", "A", "E"]
+  },
+  {
+    "title": "Mystery Train",
+    "artist": "Elvis Presley",
+    "key": "A",
+    "chords": ["A", "A", "D", "D", "A", "A", "E", "E"]
+  },
+  {
+    "title": "I Got You (I Feel Good)",
+    "artist": "James Brown",
+    "key": "F",
+    "chords": ["F", "Bb", "F", "Bb", "F", "Bb", "F", "C"]
+  },
+  {
+    "title": "Mr. Tambourine Man",
+    "artist": "Bob Dylan",
+    "key": "G",
+    "chords": ["G", "C", "G", "C", "G", "C", "G", "D"]
+  },
+  {
+    "title": "I Heard It Through the Grapevine",
+    "artist": "Marvin Gaye",
+    "key": "Am",
+    "chords": ["Am", "Dm", "Am", "Dm", "Am", "Dm", "Am", "E"]
+  },
+  {
+    "title": "You Really Got Me",
+    "artist": "The Kinks",
+    "key": "G",
+    "chords": ["G", "C", "G", "C", "G", "C", "G", "C"]
+  },
+  {
+    "title": "Help!",
+    "artist": "The Beatles",
+    "key": "G",
+    "chords": ["G", "Em", "C", "D", "G", "Em", "C", "D"]
+  },
+  {
+    "title": "I Walk the Line",
+    "artist": "Johnny Cash",
+    "key": "F",
+    "chords": ["F", "C", "F", "C", "F", "C", "F", "C"]
+  },
+  {
+    "title": "Stairway to Heaven",
+    "artist": "Led Zeppelin",
+    "key": "Am",
+    "chords": ["Am", "C", "D", "F", "Am", "C", "D", "F"]
+  },
+  {
+    "title": "Sympathy for the Devil",
+    "artist": "The Rolling Stones",
+    "key": "E",
+    "chords": ["E", "D", "A", "E", "E", "D", "A", "E"]
+  },
+  {
+    "title": "River Deep - Mountain High",
+    "artist": "Ike & Tina Turner",
+    "key": "C",
+    "chords": ["C", "F", "C", "F", "C", "F", "C", "G"]
+  },
+  {
+    "title": "You Can't Always Get What You Want",
+    "artist": "The Rolling Stones",
+    "key": "C",
+    "chords": ["C", "Am", "F", "G", "C", "Am", "F", "G"]
+  },
+  {
+    "title": "Adventure of a Lifetime",
+    "artist": "Coldplay",
+    "key": "F#m",
+    "chords": ["F#m", "A", "E", "D", "F#m", "A", "E", "D"]
+  },
+  {
+    "title": "Gimme Shelter",
+    "artist": "The Rolling Stones",
+    "key": "Am",
+    "chords": ["Am", "C", "D", "F", "Am", "C", "D", "F"]
+  },
+  {
+    "title": "A Hard Day's Night",
+    "artist": "The Beatles",
+    "key": "G",
+    "chords": ["G", "C", "G", "C", "G", "C", "G", "D"]
+  },
+  {
+    "title": "When Doves Cry",
+    "artist": "Prince",
+    "key": "Am",
+    "chords": ["Am", "Am", "G", "G", "Am", "Am", "G", "G"]
+  },
+  {
+    "title": "All Along the Watchtower",
+    "artist": "Jimi Hendrix",
+    "key": "C#m",
+    "chords": ["C#m", "B", "A", "C#m", "C#m", "B", "A", "C#m"]
+  },
+  {
+    "title": "Good Times",
+    "artist": "Chic",
+    "key": "Dm",
+    "chords": ["Dm", "Bb", "C", "F", "Dm", "Bb", "C", "F"]
+  },
+  {
+    "title": "Voodoo Child (Slight Return)",
+    "artist": "Jimi Hendrix",
+    "key": "E",
+    "chords": ["E", "G", "A", "E", "E", "G", "A", "E"]
+  },
+  {
+    "title": "The Weight",
+    "artist": "The Band",
+    "key": "G",
+    "chords": ["G", "C", "G", "C", "G", "C", "G", "D"]
+  },
+  {
+    "title": "Light My Fire",
+    "artist": "The Doors",
+    "key": "Am",
+    "chords": ["Am", "F", "C", "G", "Am", "F", "C", "G"]
+  },
+  {
+    "title": "One",
+    "artist": "U2",
+    "key": "D",
+    "chords": ["D", "A", "Bm", "G", "D", "A", "Bm", "G"]
+  },
+  {
+    "title": "No Woman No Cry",
+    "artist": "Bob Marley",
+    "key": "C",
+    "chords": ["C", "G/B", "Am", "F", "C", "F", "C", "G"]
+  },
+  {
+    "title": "Crazy",
+    "artist": "Patsy Cline",
+    "key": "C",
+    "chords": ["C", "Am", "F", "G", "C", "Am", "F", "G"]
+  },
+  {
+    "title": "Every Breath You Take",
+    "artist": "The Police",
+    "key": "G",
+    "chords": ["G", "Em", "C", "D", "G", "Em", "C", "D"]
+  },
+  {
+    "title": "I Still Haven't Found What I'm Looking For",
+    "artist": "U2",
+    "key": "D",
+    "chords": ["D", "A", "Bm", "G", "D", "A", "Bm", "G"]
+  },
+  {
+    "title": "For What It's Worth",
+    "artist": "Buffalo Springfield",
+    "key": "E",
+    "chords": ["E", "A", "E", "A", "E", "A", "E", "A"]
+  },
+  {
+    "title": "Fire and Rain",
+    "artist": "James Taylor",
+    "key": "A",
+    "chords": ["A", "D", "A", "D", "A", "D", "A", "E"]
+  },
+  {
+    "title": "I Put a Spell on You",
+    "artist": "Screamin' Jay Hawkins",
+    "key": "Am",
+    "chords": ["Am", "Am", "Dm", "Dm", "Am", "Am", "E", "E"]
+  },
+  {
+    "title": "That's Entertainment",
+    "artist": "The Jam",
+    "key": "G",
+    "chords": ["G", "C", "G", "C", "G", "C", "G", "D"]
+  },
+  {
+    "title": "Family Affair",
+    "artist": "Sly and the Family Stone",
+    "key": "F",
+    "chords": ["F", "Bb", "F", "Bb", "F", "Bb", "F", "C"]
+  },
+  {
+    "title": "I Can See for Miles",
+    "artist": "The Who",
+    "key": "E",
+    "chords": ["E", "A", "E", "A", "E", "A", "E", "A"]
+  },
+  {
+    "title": "Gimme Some Lovin'",
+    "artist": "The Spencer Davis Group",
+    "key": "C",
+    "chords": ["C", "F", "C", "F", "C", "F", "C", "G"]
+  },
+  {
+    "title": "The Tracks of My Tears",
+    "artist": "Smokey Robinson & The Miracles",
+    "key": "G",
+    "chords": ["G", "Em", "C", "D", "G", "Em", "C", "D"]
+  },
+  {
+    "title": "The Message",
+    "artist": "Grandmaster Flash & The Furious Five",
+    "key": "F#m",
+    "chords": ["F#m", "A", "E", "D", "F#m", "A", "E", "D"]
+  },
+  {
+    "title": "When a Man Loves a Woman",
+    "artist": "Percy Sledge",
+    "key": "C",
+    "chords": ["C", "Am", "F", "G", "C", "Am", "F", "G"]
+  },
+  {
+    "title": "Louie Louie",
+    "artist": "The Kingsmen",
+    "key": "A",
+    "chords": ["A", "D", "A", "D", "A", "D", "A", "E"]
+  },
+  {
+    "title": "Long Tall Sally",
+    "artist": "Little Richard",
+    "key": "C",
+    "chords": ["C", "F", "C", "F", "C", "F", "C", "G"]
+  },
+  {
+    "title": "A Whiter Shade of Pale",
+    "artist": "Procol Harum",
+    "key": "C",
+    "chords": ["C", "Am", "F", "G", "C", "Am", "F", "G"]
+  },
+  {
+    "title": "The House of the Rising Sun",
+    "artist": "The Animals",
+    "key": "Am",
+    "chords": ["Am", "C", "D", "F", "Am", "C", "D", "F"]
+  },
+  {
+    "title": "Bohemian Rhapsody",
+    "artist": "Queen",
+    "key": "Bb",
+    "chords": ["Bb", "F", "Gm", "Eb", "Bb", "F", "Gm", "Eb"]
+  },
+  {
+    "title": "Sweet Child O' Mine",
+    "artist": "Guns N' Roses",
+    "key": "D",
+    "chords": ["D", "A", "Bm", "G", "D", "A", "Bm", "G"]
+  },
+  {
+    "title": "Superstition",
+    "artist": "Stevie Wonder",
+    "key": "Eb",
+    "chords": ["Eb", "Bb", "Ab", "Eb", "Eb", "Bb", "Ab", "Eb"]
+  },
+  {
+    "title": "Whole Lotta Love",
+    "artist": "Led Zeppelin",
+    "key": "E",
+    "chords": ["E", "A", "E", "A", "E", "A", "E", "A"]
+  },
+  {
+    "title": "Strawberry Fields Forever",
+    "artist": "The Beatles",
+    "key": "A",
+    "chords": ["A", "E", "F#m", "D", "A", "E", "F#m", "D"]
+  },
+  {
+    "title": "Mystery Train",
+    "artist": "Elvis Presley",
+    "key": "A",
+    "chords": ["A", "A", "D", "D", "A", "A", "E", "E"]
+  },
+  {
+    "title": "I Got You (I Feel Good)",
+    "artist": "James Brown",
+    "key": "F",
+    "chords": ["F", "Bb", "F", "Bb", "F", "Bb", "F", "C"]
+  },
+  {
+    "title": "Moondance",
+    "artist": "Van Morrison",
+    "key": "Am",
+    "chords": ["Am", "Dm", "Am", "Dm", "Am", "Dm", "Am", "E"]
+  },
+  {
+    "title": "Not Fade Away",
+    "artist": "Buddy Holly",
+    "key": "A",
+    "chords": ["A", "D", "A", "D", "A", "D", "A", "E"]
+  },
+  {
+    "title": "Little Red Corvette",
+    "artist": "Prince",
+    "key": "Am",
+    "chords": ["Am", "Am", "G", "G", "Am", "Am", "G", "G"]
+  },
+  {
+    "title": "Brown Sugar",
+    "artist": "The Rolling Stones",
+    "key": "C",
+    "chords": ["C", "F", "C", "F", "C", "F", "C", "G"]
+  },
+  {
+    "title": "My Girl",
+    "artist": "The Temptations",
+    "key": "C",
+    "chords": ["C", "Am", "F", "G", "C", "Am", "F", "G"]
+  },
+  {
+    "title": "Ain't No Mountain High Enough",
+    "artist": "Marvin Gaye & Tammi Terrell",
+    "key": "F",
+    "chords": ["F", "Dm", "Bb", "C", "F", "Dm", "Bb", "C"]
+  },
+  {
+    "title": "Bridge Over Troubled Water",
+    "artist": "Simon & Garfunkel",
+    "key": "G",
+    "chords": ["G", "Em", "C", "D", "G", "Em", "C", "D"]
+  },
+  {
+    "title": "All Shook Up",
+    "artist": "Elvis Presley",
+    "key": "C",
+    "chords": ["C", "F", "C", "F", "C", "F", "C", "G"]
+  },
+  {
+    "title": "Good Golly Miss Molly",
+    "artist": "Little Richard",
+    "key": "C",
+    "chords": ["C", "F", "C", "F", "C", "F", "C", "G"]
+  },
+  {
+    "title": "Hound Dog",
+    "artist": "Elvis Presley",
+    "key": "C",
+    "chords": ["C", "F", "C", "F", "C", "F", "C", "G"]
+  },
+  {
+    "title": "Stand By Me",
+    "artist": "Ben E. King",
+    "key": "A",
+    "chords": ["A", "F#m", "D", "E", "A", "F#m", "D", "E"]
+  },
+  {
+    "title": "Heartbreak Hotel",
+    "artist": "Elvis Presley",
+    "key": "E",
+    "chords": ["E", "A", "E", "A", "E", "A", "E", "A"]
+  },
+  {
+    "title": "Heroes",
+    "artist": "David Bowie",
+    "key": "D",
+    "chords": ["D", "A", "Bm", "G", "D", "A", "Bm", "G"]
+  },
+  {
+    "title": "Beast of Burden",
+    "artist": "The Rolling Stones",
+    "key": "E",
+    "chords": ["E", "A", "E", "A", "E", "A", "E", "A"]
+  },
+  {
+    "title": "Hotel California",
+    "artist": "Eagles",
+    "key": "Bm",
+    "chords": ["Bm", "F#", "A", "E", "G", "D", "Em", "F#"]
+  },
+  {
+    "title": "The Sounds of Silence",
+    "artist": "Simon & Garfunkel",
+    "key": "Am",
+    "chords": ["Am", "C", "D", "F", "Am", "C", "D", "F"]
+  },
+  {
+    "title": "I Can't Help Myself",
+    "artist": "Four Tops",
+    "key": "C",
+    "chords": ["C", "Am", "F", "G", "C", "Am", "F", "G"]
+  },
+  {
+    "title": "You Send Me",
+    "artist": "Sam Cooke",
+    "key": "C",
+    "chords": ["C", "Am", "F", "G", "C", "Am", "F", "G"]
+  },
+  {
+    "title": "The Dock of the Bay",
+    "artist": "Otis Redding",
+    "key": "G",
+    "chords": ["G", "C", "G", "C", "G", "C", "G", "D"]
+  },
+  {
+    "title": "California Dreamin'",
+    "artist": "The Mamas & The Papas",
+    "key": "Am",
+    "chords": ["Am", "F", "C", "G", "Am", "F", "C", "G"]
+  },
+  {
+    "title": "In the Midnight Hour",
+    "artist": "Wilson Pickett",
+    "key": "C",
+    "chords": ["C", "F", "C", "F", "C", "F", "C", "G"]
+  },
+  {
+    "title": "I'm a Believer",
+    "artist": "The Monkees",
+    "key": "C",
+    "chords": ["C", "Am", "F", "G", "C", "Am", "F", "G"]
+  },
+  {
+    "title": "Good Lovin'",
+    "artist": "The Young Rascals",
+    "key": "C",
+    "chords": ["C", "F", "C", "F", "C", "F", "C", "G"]
+  },
+  {
+    "title": "Eight Miles High",
+    "artist": "The Byrds",
+    "key": "E",
+    "chords": ["E", "A", "E", "A", "E", "A", "E", "A"]
+  },
+  {
+    "title": "Crazy",
+    "artist": "Gnarls Barkley",
+    "key": "Am",
+    "chords": ["Am", "F", "C", "G", "Am", "F", "C", "G"]
+  },
+  {
+    "title": "Love Shack",
+    "artist": "The B-52's",
+    "key": "C",
+    "chords": ["C", "F", "C", "F", "C", "F", "C", "G"]
+  },
+  {
+    "title": "Thank You (Falettinme Be Mice Elf Agin)",
+    "artist": "Sly and the Family Stone",
+    "key": "F",
+    "chords": ["F", "Bb", "F", "Bb", "F", "Bb", "F", "C"]
+  },
+  {
+    "title": "Tears in Heaven",
+    "artist": "Eric Clapton",
+    "key": "A",
+    "chords": ["A", "E", "F#m", "D", "A", "E", "F#m", "D"]
+  },
+  {
+    "title": "Walk on the Wild Side",
+    "artist": "Lou Reed",
+    "key": "C",
+    "chords": ["C", "Am", "F", "G", "C", "Am", "F", "G"]
+  },
+  {
+    "title": "Rock Around the Clock",
+    "artist": "Bill Haley & His Comets",
+    "key": "C",
+    "chords": ["C", "F", "C", "F", "C", "F", "C", "G"]
+  },
+  {
+    "title": "Shout",
+    "artist": "The Isley Brothers",
+    "key": "C",
+    "chords": ["C", "F", "C", "F", "C", "F", "C", "G"]
+  },
+  {
+    "title": "I Will Survive",
+    "artist": "Gloria Gaynor",
+    "key": "Am",
+    "chords": ["Am", "Dm", "Am", "Dm", "Am", "Dm", "Am", "E"]
+  },
+  {
+    "title": "Le Freak",
+    "artist": "Chic",
+    "key": "Dm",
+    "chords": ["Dm", "Bb", "C", "F", "Dm", "Bb", "C", "F"]
+  },
+  {
+    "title": "I Will Always Love You",
+    "artist": "Whitney Houston",
+    "key": "A",
+    "chords": ["A", "E", "F#m", "D", "A", "E", "F#m", "D"]
+  },
+  {
+    "title": "Life on Mars?",
+    "artist": "David Bowie",
+    "key": "F",
+    "chords": ["F", "Dm", "Bb", "C", "F", "Dm", "Bb", "C"]
+  },
+  {
+    "title": "Hallelujah",
+    "artist": "Leonard Cohen",
+    "key": "C",
+    "chords": ["C", "Am", "C", "Am", "F", "G", "C", "G"]
+  },
+  {
+    "title": "Creep",
+    "artist": "Radiohead",
+    "key": "G",
+    "chords": ["G", "B", "C", "Cm", "G", "B", "C", "Cm"]
+  },
+  {
+    "title": "Wonderwall",
+    "artist": "Oasis",
+    "key": "Gb",
+    "chords": ["F#m7", "A", "Esus4", "Bm7", "F#m7", "A", "Esus4", "Bm7"]
+  },
+  {
+    "title": "Somewhere Over the Rainbow",
+    "artist": "Israel Kamakawiwo'ole",
+    "key": "C",
+    "chords": ["C", "Em", "F", "C", "F", "E7", "Am", "F"]
+  }
+]

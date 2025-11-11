@@ -15,8 +15,11 @@
 
 import { SHARP_NOTES, FLAT_NOTES, ALL_NOTES, ENHARMONIC_MAP } from '../../data/music-data.js';
 
-// Demo database of popular songs with chord progressions
-const DEMO_SONG_DATABASE = [
+// Song database - loaded from JSON file
+let DEMO_SONG_DATABASE = [];
+
+// Fallback database in case JSON fails to load
+const FALLBACK_SONG_DATABASE = [
     {
         title: "Let It Be",
         artist: "The Beatles",
@@ -28,56 +31,65 @@ const DEMO_SONG_DATABASE = [
         artist: "Ben E. King",
         key: "A",
         chords: ["A", "F#m", "D", "E", "A", "F#m", "D", "E"]
-    },
-    {
-        title: "No Woman No Cry",
-        artist: "Bob Marley",
-        key: "C",
-        chords: ["C", "G/B", "Am", "F", "C", "F", "C", "G"]
-    },
-    {
-        title: "Every Breath You Take",
-        artist: "The Police",
-        key: "G",
-        chords: ["G", "Em", "C", "D", "G", "Em", "C", "D"]
-    },
-    {
-        title: "Wonderwall",
-        artist: "Oasis",
-        key: "Gb",
-        chords: ["F#m7", "A", "Esus4", "Bm7", "F#m7", "A", "Esus4", "Bm7"]
-    },
-    {
-        title: "Hallelujah",
-        artist: "Leonard Cohen",
-        key: "C",
-        chords: ["C", "Am", "C", "Am", "F", "G", "C", "G"]
-    },
-    {
-        title: "Hotel California",
-        artist: "Eagles",
-        key: "Bm",
-        chords: ["Bm", "F#", "A", "E", "G", "D", "Em", "F#"]
-    },
-    {
-        title: "Imagine",
-        artist: "John Lennon",
-        key: "C",
-        chords: ["C", "Cmaj7", "F", "C", "Cmaj7", "F", "Am", "Dm"]
-    },
-    {
-        title: "Somewhere Over the Rainbow",
-        artist: "Israel Kamakawiwo'ole",
-        key: "C",
-        chords: ["C", "Em", "F", "C", "F", "E7", "Am", "F"]
-    },
-    {
-        title: "Creep",
-        artist: "Radiohead",
-        key: "G",
-        chords: ["G", "B", "C", "Cm", "G", "B", "C", "Cm"]
     }
 ];
+
+// Load song database from JSON file
+let databaseLoadPromise = null;
+
+/**
+ * Load the song database from JSON file
+ * @returns {Promise<Array>} Promise that resolves to the song database array
+ */
+async function loadSongDatabase() {
+    if (databaseLoadPromise) {
+        return databaseLoadPromise;
+    }
+    
+    databaseLoadPromise = (async () => {
+        try {
+            // Try multiple possible paths for the JSON file
+            const possiblePaths = [
+                '/src/data/song-database.json',
+                './src/data/song-database.json',
+                'src/data/song-database.json'
+            ];
+            
+            let response = null;
+            for (const path of possiblePaths) {
+                try {
+                    response = await fetch(path);
+                    if (response.ok) {
+                        break;
+                    }
+                } catch (e) {
+                    // Try next path
+                    continue;
+                }
+            }
+            
+            if (response && response.ok) {
+                const data = await response.json();
+                if (Array.isArray(data) && data.length > 0) {
+                    DEMO_SONG_DATABASE = data;
+                    console.log(`Loaded ${DEMO_SONG_DATABASE.length} songs from database`);
+                    return DEMO_SONG_DATABASE;
+                }
+            }
+            throw new Error('Invalid or empty database');
+        } catch (error) {
+            console.warn('Failed to load song database from JSON, using fallback:', error);
+            // Use fallback database if JSON load fails
+            DEMO_SONG_DATABASE = FALLBACK_SONG_DATABASE;
+            return DEMO_SONG_DATABASE;
+        }
+    })();
+    
+    return databaseLoadPromise;
+}
+
+// Initialize database loading immediately
+loadSongDatabase();
 
 // Rate limiting configuration
 // Note: This is a client-side limit for user experience.
@@ -199,6 +211,9 @@ export async function searchSongChords() {
     
     // Show loading state
     resultsContainer.innerHTML = '<div class="flex items-center gap-2 text-sm text-gray-600"><div class="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div> Searching...</div>';
+    
+    // Ensure database is loaded before searching
+    await loadSongDatabase();
     
     const queryLower = query.toLowerCase();
     
@@ -912,6 +927,9 @@ function addParsedChordToProgression(chordSymbol, key, playShutterSound = false)
  * @param {number} songIndex - Index in the DEMO_SONG_DATABASE
  */
 export async function importSongProgression(songIndex) {
+    // Ensure database is loaded
+    await loadSongDatabase();
+    
     if (songIndex < 0 || songIndex >= DEMO_SONG_DATABASE.length) {
         alert('Invalid song selection.');
         return;
@@ -1010,9 +1028,10 @@ function escapeHtml(text) {
 
 /**
  * Get the song database (for testing or external use)
- * @returns {Array} - Array of song objects
+ * @returns {Promise<Array>} - Promise that resolves to array of song objects
  */
-export function getSongDatabase() {
+export async function getSongDatabase() {
+    await loadSongDatabase();
     return DEMO_SONG_DATABASE;
 }
 
