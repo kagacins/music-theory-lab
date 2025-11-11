@@ -547,9 +547,10 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     const tooltip = document.createElement('div');
     tooltip.className = 'sidebar-tooltip absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 pointer-events-none whitespace-nowrap z-50';
     tooltip.textContent = tooltipText;
-    // Pre-configure for instant display
+    // Pre-configure for instant display - keep it in DOM but hidden
     tooltip.style.opacity = '0';
     tooltip.style.visibility = 'hidden';
+    tooltip.style.display = 'block'; // Keep display as block so it takes up space
     tooltip.style.transition = 'none';
     tooltip.style.transitionDelay = '0s';
     tooltip.style.transitionDuration = '0s';
@@ -562,9 +563,9 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
         tooltip.style.transition = 'none';
         tooltip.style.transitionDelay = '0s';
         tooltip.style.transitionDuration = '0s';
+        tooltip.style.display = 'block';
         tooltip.style.visibility = 'visible';
         tooltip.style.opacity = '1';
-        tooltip.style.display = 'block';
         // Force reflow to ensure immediate rendering
         void tooltip.offsetHeight;
     }, { passive: true });
@@ -576,6 +577,8 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
         tooltip.style.transitionDuration = '0s';
         tooltip.style.opacity = '0';
         tooltip.style.visibility = 'hidden';
+        // Keep display as block so element stays in layout
+        tooltip.style.display = 'block';
     }, { passive: true });
     
     // Get icon from toggle button
