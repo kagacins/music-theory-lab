@@ -2763,8 +2763,9 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 notesToProcess.forEach((note, idx) => {
                     const durationStr = note.duration || '4n';
                     const isDotted = durationStr.includes('.') || (note.dotted === true);
-                    const baseDuration = durationStr.replace('n', '').replace('.', '');
-                    totalDurationInQuarters += getDurationInQuarterNotes(baseDuration, isDotted);
+                    // Pass the full duration string to getDurationInQuarterNotes, not just the base number
+                    // The function expects format like '8n' or '16n', not just '8' or '16'
+                    totalDurationInQuarters += getDurationInQuarterNotes(durationStr, isDotted);
                 });
                 
                 // Debug: Log measure state with detailed note info for troubleshooting
@@ -2774,7 +2775,8 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                     if (totalDurationInQuarters >= 3.9 && totalDurationInQuarters <= 4.1 && notesToProcess.length >= 6) {
                         notesToProcess.forEach((note, idx) => {
                             const durationStr = note.duration || '4n';
-                            const duration = getDurationInQuarterNotes(durationStr.replace('n', '').replace('.', ''), note.dotted || false);
+                            // Pass the full duration string, not just the base number
+                            const duration = getDurationInQuarterNotes(durationStr, note.dotted || false);
                             console.log(`  Note ${idx + 1}: pitch=${note.pitch}, beat=${note.beat}, duration=${durationStr}, beatsValue=${duration.toFixed(3)}`);
                         });
                     }
