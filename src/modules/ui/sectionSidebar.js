@@ -121,6 +121,7 @@ function createSidebar(tabId) {
     sidebar.style.display = 'none'; // Hidden by default, shown when sections are collapsed
     sidebar.style.minHeight = '100%'; // Start with full height
     sidebar.style.height = 'auto'; // Allow height to grow with content
+    sidebar.style.overflow = 'visible'; // Ensure tooltips are not clipped
     
     // Add separate collapse/expand all buttons at the top
     const collapseAllBtn = document.createElement('button');
@@ -545,12 +546,25 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     
     // Add custom tooltip for immediate display (no transition for instant appearance)
     const tooltip = document.createElement('div');
-    tooltip.className = 'sidebar-tooltip absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 pointer-events-none whitespace-nowrap z-50';
+    tooltip.className = 'sidebar-tooltip absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 pointer-events-none whitespace-nowrap';
     tooltip.textContent = tooltipText;
     // Pre-configure for instant display - keep it in DOM but hidden
+    tooltip.style.position = 'absolute';
+    tooltip.style.left = '100%';
+    tooltip.style.marginLeft = '8px';
+    tooltip.style.top = '50%';
+    tooltip.style.transform = 'translateY(-50%)';
+    tooltip.style.backgroundColor = '#111827';
+    tooltip.style.color = 'white';
+    tooltip.style.fontSize = '12px';
+    tooltip.style.borderRadius = '4px';
+    tooltip.style.padding = '4px 8px';
+    tooltip.style.pointerEvents = 'none';
+    tooltip.style.whiteSpace = 'nowrap';
+    tooltip.style.zIndex = '9999';
     tooltip.style.opacity = '0';
     tooltip.style.visibility = 'hidden';
-    tooltip.style.display = 'block'; // Keep display as block so it takes up space
+    tooltip.style.display = 'block';
     tooltip.style.transition = 'none';
     tooltip.style.transitionDelay = '0s';
     tooltip.style.transitionDuration = '0s';
