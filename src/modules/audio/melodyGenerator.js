@@ -2862,6 +2862,13 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 
                 // Add tickables to voice
                 voice.addTickables(vexNoteObjects);
+                
+                // Set context for all objects (especially important for Rest objects)
+                vexNoteObjects.forEach(obj => {
+                    if (obj && typeof obj.setContext === 'function') {
+                        obj.setContext(context);
+                    }
+                });
 
                 // Format and draw - keep formatting within the actual measure width
                 // First measure has key/time signatures, so usable space is reduced
