@@ -69,6 +69,14 @@ export function initSectionSidebar(tabId, containerId, sectionClass) {
         }
     });
 
+    // Observe container for child order changes (drag-and-drop)
+    const orderObserver = new MutationObserver(() => {
+        syncSidebarOrder(sidebar, container);
+    });
+    
+    // Observe child list changes for drag-and-drop reordering
+    orderObserver.observe(container, { childList: true });
+
     // Store instance
     sectionSidebarInstances.set(tabId, { sidebar, container, sectionClass, collapsedSections, observer, orderObserver });
 }
