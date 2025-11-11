@@ -536,6 +536,11 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
         // Fallback to gray if no gradient found
         tab.className = 'section-sidebar-tab w-12 h-12 rounded-lg bg-gray-700 hover:bg-gray-600 transition-all flex items-center justify-center text-xs font-semibold p-2 text-center';
     }
+    // Ensure fixed height to prevent layout issues
+    tab.style.width = '48px';
+    tab.style.height = '48px';
+    tab.style.minHeight = '48px';
+    tab.style.minWidth = '48px';
     tab.setAttribute('data-section-id', sectionId);
     
     // Create tooltip that appears immediately on hover (no delay)
@@ -585,9 +590,15 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     
     // Track if tooltip should be visible
     let isTooltipVisible = false;
+    let tooltipTimeout = null;
     
     // Show tooltip immediately on hover (absolutely no delay)
     const showTooltip = () => {
+        // Clear any pending hide timeout
+        if (tooltipTimeout) {
+            clearTimeout(tooltipTimeout);
+            tooltipTimeout = null;
+        }
         if (isTooltipVisible) return; // Prevent duplicate calls
         isTooltipVisible = true;
         // Get current position of tab
@@ -608,6 +619,11 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     };
     
     const hideTooltip = () => {
+        // Clear any pending show timeout
+        if (tooltipTimeout) {
+            clearTimeout(tooltipTimeout);
+            tooltipTimeout = null;
+        }
         if (!isTooltipVisible) return; // Prevent duplicate calls
         isTooltipVisible = false;
         // Hide immediately
@@ -618,15 +634,24 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
         tooltip.style.visibility = 'hidden';
     };
     
-    tab.addEventListener('mouseenter', showTooltip, { passive: true });
-    tab.addEventListener('mouseleave', hideTooltip, { passive: true });
-    tab.addEventListener('mouseout', hideTooltip, { passive: true });
-    
-    // Also hide tooltip if mouse leaves the tooltip itself (edge case)
-    tooltip.addEventListener('mouseenter', () => {
-        // If mouse somehow enters tooltip, hide it since it's pointer-events-none anyway
-        hideTooltip();
+    // Use mouseenter/mouseleave which don't bubble and are more reliable
+    tab.addEventListener('mouseenter', () => {
+        // Clear any pending hide
+        if (tooltipTimeout) {
+            clearTimeout(tooltipTimeout);
+            tooltipTimeout = null;
+        }
+        showTooltip();
     }, { passive: true });
+    
+    tab.addEventListener('mouseleave', () => {
+        // Small delay to prevent flickering when mouse briefly leaves during child element transitions
+        tooltipTimeout = setTimeout(() => {
+            hideTooltip();
+        }, 100);
+    }, { passive: true });
+    
+    // Remove mouseout - it fires too frequently when moving over child elements
     
     // Get icon from toggle button
     const icon = toggle.querySelector('svg:not(.drag-handle):not([id$="-chevron"])');
