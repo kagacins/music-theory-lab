@@ -2837,20 +2837,39 @@ export function renderInteractiveMelodyStaff(canvasElement) {
 
                 // Format and draw - keep formatting within the actual measure width
                 // First measure has key/time signatures, so usable space is reduced
+                // We need to be very aggressive to prevent notes from spilling into the next measure
                 const measureFillRatio = Math.min(totalDurationInQuarters / MEASURE_DURATION, 1.0);
                 const isFullMeasure = measureFillRatio >= 0.95;
-                const FIRST_MEASURE_PADDING = 90;
-                const OTHER_MEASURE_PADDING = 40;
                 
-                const availableWidth = Math.max(
-                    measureWidth - (measureNum === 0 ? FIRST_MEASURE_PADDING : OTHER_MEASURE_PADDING),
-                    60
-                );
+                // Calculate min space needed for this many notes
+                // 8 eighth notes need ~160px, 16 sixteenth notes need ~200px
+                // Plan ahead to ensure notes don't spill
+                const minSpacePerNote = 20; // Conservative: pixels per note
+                const minSpaceNeeded = vexNoteObjects.length * minSpacePerNote;
+                
+                // For first measure, be very aggressive with padding to leave room for clef/signature
+                // The clef and time signature can take 80-100px
+                let availableWidth;
+                if (measureNum === 0) {
+                    // First measure: reserve 100px for clef and signature, use rest for notes
+                    availableWidth = Math.max(measureWidth - 100, 80);
+                } else {
+                    // Other measures: only need 10-20px padding for barline and margins
+                    availableWidth = Math.max(measureWidth - 20, 180);
+                }
                 
                 let formatWidth;
                 if (isFullMeasure) {
-                    // A full measure should use the entire available width
-                    formatWidth = availableWidth;
+                    // Full measure: ensure we have enough space for all notes
+                    // Use max of available width or minimum space needed
+                    formatWidth = Math.max(availableWidth, minSpaceNeeded);
+                    
+                    // Safety: if min space needed exceeds available width, spread notes more
+                    if (minSpaceNeeded > availableWidth) {
+                        // We need more space than available - increase format width aggressively
+                        formatWidth = minSpaceNeeded;
+                        console.warn(`Measure ${measureNum}: ${vexNoteObjects.length} notes need ${minSpaceNeeded}px but only ${availableWidth}px available. Using ${formatWidth}px.`);
+                    }
                 } else {
                     // For incomplete measures, shrink width proportionally but never below 60px
                     const proportionalWidth = availableWidth * Math.max(measureFillRatio, 0.5);
@@ -2858,7 +2877,7 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 }
                 
                 if (vexNoteObjects.length >= 7 || isFullMeasure) {
-                    console.log(`Measure ${measureNum}: ${vexNoteObjects.length} notes, ${totalDurationInQuarters.toFixed(2)}/${MEASURE_DURATION} beats, formatWidth=${formatWidth.toFixed(0)}px, availableWidth=${availableWidth.toFixed(0)}px, measureWidth=${measureWidth}px`);
+                    console.log(`Measure ${measureNum}: ${vexNoteObjects.length} notes, ${totalDurationInQuarters.toFixed(2)}/${MEASURE_DURATION} beats, formatWidth=${formatWidth.toFixed(0)}px, availableWidth=${availableWidth.toFixed(0)}px, minSpaceNeeded=${minSpaceNeeded}px, measureWidth=${measureWidth}px`);
                 }
                 
                 // Format and draw - always use strict width constraints to prevent overflow
