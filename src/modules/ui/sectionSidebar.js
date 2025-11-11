@@ -152,7 +152,8 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     const icon = toggle.querySelector('svg:not(.drag-handle):not([id$="-chevron"])');
     if (icon) {
         const iconClone = icon.cloneNode(true);
-        iconClone.className = 'w-6 h-6';
+        // Use setAttribute for SVG elements instead of className
+        iconClone.setAttribute('class', 'w-6 h-6');
         tab.appendChild(iconClone);
     } else {
         tab.textContent = sectionId.charAt(0).toUpperCase();
