@@ -138,17 +138,30 @@ function updateSectionState(section, sidebar, collapsedSections, container) {
     const isCollapsed = panel.classList.contains('hidden');
     
     if (isCollapsed && !collapsedSections.has(sectionId)) {
-        // Section just collapsed - hide the entire section and add to sidebar
-        section.style.display = 'none';
-        addToSidebar(section, sidebar, sectionId, collapsedSections, container);
-        syncSidebarOrder(sidebar, container);
+        // Section just collapsed - animate to sidebar
+        animateToSidebar(section, toggle, sidebar, sectionId, collapsedSections, container);
+        // Update sidebar visibility immediately since we're adding a section
+        sidebar.style.display = 'flex';
+        if (container) {
+            container.style.marginLeft = '4rem'; // 64px = w-16
+        }
     } else if (!isCollapsed && collapsedSections.has(sectionId)) {
-        // Section just expanded - show the section and remove from sidebar
-        section.style.display = '';
-        removeFromSidebar(section, sidebar, sectionId, collapsedSections);
+        // Section just expanded - animate from sidebar
+        // Note: We'll update sidebar visibility after animation completes
+        animateFromSidebar(section, sidebar, sectionId, collapsedSections, container);
+    } else {
+        // No state change, just update sidebar visibility
+        updateSidebarVisibility(sidebar, collapsedSections, container);
     }
+}
 
-    // Show/hide sidebar based on whether any sections are collapsed
+/**
+ * Update sidebar visibility based on collapsed sections
+ * @param {HTMLElement} sidebar - The sidebar element
+ * @param {Set} collapsedSections - Set of collapsed section IDs
+ * @param {HTMLElement} container - The container element
+ */
+function updateSidebarVisibility(sidebar, collapsedSections, container) {
     if (collapsedSections.size > 0) {
         sidebar.style.display = 'flex';
         if (container) {
@@ -162,6 +175,202 @@ function updateSectionState(section, sidebar, collapsedSections, container) {
             container.style.marginLeft = '0';
         }
     }
+}
+
+/**
+ * Animate section collapsing to sidebar
+ * @param {HTMLElement} section - The section element
+ * @param {HTMLElement} toggle - The toggle button
+ * @param {HTMLElement} sidebar - The sidebar element
+ * @param {string} sectionId - The section ID
+ * @param {Set} collapsedSections - Set of collapsed section IDs
+ * @param {HTMLElement} container - The container element
+ */
+function animateToSidebar(section, toggle, sidebar, sectionId, collapsedSections, container) {
+    // Get the icon from the toggle button
+    const icon = toggle.querySelector('svg:not(.drag-handle):not([id$="-chevron"])');
+    if (!icon) {
+        // Fallback to non-animated version
+        section.style.display = 'none';
+        addToSidebar(section, sidebar, sectionId, collapsedSections, container);
+        syncSidebarOrder(sidebar, container);
+        return;
+    }
+
+    // Get positions
+    const toggleRect = toggle.getBoundingClientRect();
+    const tabContent = sidebar.closest('.tab-content');
+    if (!tabContent) {
+        section.style.display = 'none';
+        addToSidebar(section, sidebar, sectionId, collapsedSections, container);
+        syncSidebarOrder(sidebar, container);
+        return;
+    }
+
+    // Create animated clone
+    const clone = icon.cloneNode(true);
+    clone.style.position = 'fixed';
+    clone.style.left = `${toggleRect.left + toggleRect.width / 2 - 12}px`;
+    clone.style.top = `${toggleRect.top + toggleRect.height / 2 - 12}px`;
+    clone.style.width = '24px';
+    clone.style.height = '24px';
+    clone.style.zIndex = '9999';
+    clone.style.pointerEvents = 'none';
+    clone.style.color = getComputedStyle(icon).color;
+    document.body.appendChild(clone);
+
+    // Hide the section immediately
+    section.style.display = 'none';
+
+    // Ensure sidebar is visible for positioning
+    const wasSidebarVisible = sidebar.style.display !== 'none';
+    if (!wasSidebarVisible) {
+        sidebar.style.display = 'flex';
+        if (container) {
+            container.style.marginLeft = '4rem';
+        }
+    }
+
+    // Add the tab to sidebar (but make it invisible initially)
+    addToSidebar(section, sidebar, sectionId, collapsedSections, container);
+    const tab = sidebar.querySelector(`[data-section-id="${sectionId}"]`);
+    if (tab) {
+        tab.style.opacity = '0';
+    }
+
+    // Calculate target position (center of sidebar tab)
+    requestAnimationFrame(() => {
+        if (!tab) {
+            document.body.removeChild(clone);
+            return;
+        }
+        const tabRect = tab.getBoundingClientRect();
+        const targetX = tabRect.left + tabRect.width / 2 - 12;
+        const targetY = tabRect.top + tabRect.height / 2 - 12;
+
+        // Animate
+        clone.animate([
+            {
+                left: `${toggleRect.left + toggleRect.width / 2 - 12}px`,
+                top: `${toggleRect.top + toggleRect.height / 2 - 12}px`,
+                transform: 'scale(1)',
+                opacity: 1
+            },
+            {
+                left: `${targetX}px`,
+                top: `${targetY}px`,
+                transform: 'scale(0.75)',
+                opacity: 0.8
+            }
+        ], {
+            duration: 400,
+            easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+            fill: 'forwards'
+        }).onfinish = () => {
+            document.body.removeChild(clone);
+            if (tab) {
+                tab.style.opacity = '1';
+                tab.style.transition = 'opacity 0.2s';
+            }
+            syncSidebarOrder(sidebar, container);
+            updateSidebarHeight(sidebar);
+        };
+    });
+}
+
+/**
+ * Animate section expanding from sidebar
+ * @param {HTMLElement} section - The section element
+ * @param {HTMLElement} sidebar - The sidebar element
+ * @param {string} sectionId - The section ID
+ * @param {Set} collapsedSections - Set of collapsed section IDs
+ * @param {HTMLElement} container - The container element
+ */
+function animateFromSidebar(section, sidebar, sectionId, collapsedSections, container) {
+    const tab = sidebar.querySelector(`[data-section-id="${sectionId}"]`);
+    if (!tab) {
+        section.style.display = '';
+        removeFromSidebar(section, sidebar, sectionId, collapsedSections);
+        updateSidebarVisibility(sidebar, collapsedSections, container);
+        return;
+    }
+
+    // Get the icon from the tab
+    const tabIcon = tab.querySelector('svg');
+    if (!tabIcon) {
+        section.style.display = '';
+        removeFromSidebar(section, sidebar, sectionId, collapsedSections);
+        updateSidebarVisibility(sidebar, collapsedSections, container);
+        return;
+    }
+
+    // Get positions
+    const tabRect = tab.getBoundingClientRect();
+    const toggle = section.querySelector('button[id$="-toggle"]');
+    if (!toggle) {
+        section.style.display = '';
+        removeFromSidebar(section, sidebar, sectionId, collapsedSections);
+        updateSidebarVisibility(sidebar, collapsedSections, container);
+        return;
+    }
+
+    // Create animated clone
+    const clone = tabIcon.cloneNode(true);
+    clone.style.position = 'fixed';
+    clone.style.left = `${tabRect.left + tabRect.width / 2 - 12}px`;
+    clone.style.top = `${tabRect.top + tabRect.height / 2 - 12}px`;
+    clone.style.width = '24px';
+    clone.style.height = '24px';
+    clone.style.zIndex = '9999';
+    clone.style.pointerEvents = 'none';
+    clone.style.color = getComputedStyle(tabIcon).color;
+    document.body.appendChild(clone);
+
+    // Hide the tab immediately
+    tab.style.opacity = '0';
+
+    // Show the section (but make toggle invisible initially)
+    section.style.display = '';
+    const sectionIcon = toggle.querySelector('svg:not(.drag-handle):not([id$="-chevron"])');
+    if (sectionIcon) {
+        sectionIcon.style.opacity = '0';
+    }
+
+    // Calculate target position (center of toggle button)
+    requestAnimationFrame(() => {
+        const toggleRect = toggle.getBoundingClientRect();
+        const targetX = toggleRect.left + toggleRect.width / 2 - 12;
+        const targetY = toggleRect.top + toggleRect.height / 2 - 12;
+
+        // Animate
+        clone.animate([
+            {
+                left: `${tabRect.left + tabRect.width / 2 - 12}px`,
+                top: `${tabRect.top + tabRect.height / 2 - 12}px`,
+                transform: 'scale(0.75)',
+                opacity: 0.8
+            },
+            {
+                left: `${targetX}px`,
+                top: `${targetY}px`,
+                transform: 'scale(1)',
+                opacity: 1
+            }
+        ], {
+            duration: 400,
+            easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+            fill: 'forwards'
+        }).onfinish = () => {
+            document.body.removeChild(clone);
+            if (sectionIcon) {
+                sectionIcon.style.opacity = '1';
+                sectionIcon.style.transition = 'opacity 0.2s';
+            }
+            removeFromSidebar(section, sidebar, sectionId, collapsedSections);
+            // Update sidebar visibility after removing section
+            updateSidebarVisibility(sidebar, collapsedSections, container);
+        };
+    });
 }
 
 /**
