@@ -248,6 +248,14 @@ function updateSectionState(section, sidebar, collapsedSections, container) {
         // No state change, just update sidebar visibility
         updateSidebarVisibility(sidebar, collapsedSections, container);
     }
+    
+    // Recalculate sidebar height after a short delay to account for white container height changes
+    // This ensures the sidebar height matches the taller of: white container OR sidebar content
+    if (sidebar.style.display !== 'none') {
+        setTimeout(() => {
+            updateSidebarHeight(sidebar);
+        }, 100);
+    }
 }
 
 /**
@@ -705,7 +713,17 @@ function removeFromSidebar(section, sidebar, sectionId, collapsedSections) {
 function updateSidebarHeight(sidebar) {
     if (!sidebar || sidebar.style.display === 'none') return;
     
-    // Temporarily remove height constraint to measure actual content
+    // Get the tab content container (parent of sidebar)
+    const tabContent = sidebar.closest('.tab-content');
+    if (!tabContent) return;
+    
+    // Find the white container element with the specific classes
+    // This is the main content container that should match the sidebar height
+    // Try to find the container with the exact classes first, then fall back to a more general selector
+    const whiteContainer = tabContent.querySelector('.bg-white.p-4.rounded-xl.shadow-2xl.border.mb-4');
+    const whiteContainerHeight = whiteContainer ? whiteContainer.offsetHeight : 0;
+    
+    // Temporarily remove height constraint to measure actual sidebar content
     const originalHeight = sidebar.style.height;
     const originalMinHeight = sidebar.style.minHeight;
     sidebar.style.height = 'auto';
@@ -714,10 +732,10 @@ function updateSidebarHeight(sidebar) {
     // Force a reflow to get accurate measurements
     void sidebar.offsetHeight;
     
-    // Get the actual content height
+    // Get the actual sidebar content height
     const actualContentHeight = sidebar.scrollHeight;
     
-    // Calculate expected height for verification
+    // Calculate expected sidebar height for verification
     const tabs = sidebar.querySelectorAll('[data-section-id]');
     const tabHeight = 48; // w-12 h-12 = 48px
     const gap = 8; // gap-2 = 8px
@@ -730,10 +748,14 @@ function updateSidebarHeight(sidebar) {
     
     // Calculate: padding + toggle buttons + gap + (tab height + gap) * number of tabs - last gap
     const tabsHeight = tabs.length > 0 ? (tabs.length * (tabHeight + gap)) - gap : 0;
-    const calculatedHeight = padding + toggleAllHeight + toggleAllMargin + tabsHeight;
+    const calculatedSidebarHeight = padding + toggleAllHeight + toggleAllMargin + tabsHeight;
     
-    // Use the larger of actual content height or calculated height to ensure all buttons fit
-    const finalHeight = Math.max(actualContentHeight, calculatedHeight);
+    // Use the larger of actual sidebar content height or calculated sidebar height
+    const sidebarContentHeight = Math.max(actualContentHeight, calculatedSidebarHeight);
+    
+    // Final height is the maximum of: white container height OR sidebar content height
+    // This ensures the sidebar is always at least as tall as the taller of the two
+    const finalHeight = Math.max(whiteContainerHeight, sidebarContentHeight);
     
     // Set sidebar height to fit all content
     sidebar.style.height = `${finalHeight}px`;
