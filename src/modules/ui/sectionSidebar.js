@@ -705,21 +705,39 @@ function removeFromSidebar(section, sidebar, sectionId, collapsedSections) {
 function updateSidebarHeight(sidebar) {
     if (!sidebar || sidebar.style.display === 'none') return;
     
-    // Get the tab content container (parent of sidebar)
-    const tabContent = sidebar.closest('.tab-content');
-    if (!tabContent) return;
+    // Temporarily remove height constraint to measure actual content
+    const originalHeight = sidebar.style.height;
+    const originalMinHeight = sidebar.style.minHeight;
+    sidebar.style.height = 'auto';
+    sidebar.style.minHeight = 'auto';
     
-    // Calculate total height needed: padding + (tab height + gap) * number of tabs
+    // Force a reflow to get accurate measurements
+    void sidebar.offsetHeight;
+    
+    // Get the actual content height
+    const actualContentHeight = sidebar.scrollHeight;
+    
+    // Calculate expected height for verification
     const tabs = sidebar.querySelectorAll('[data-section-id]');
     const tabHeight = 48; // w-12 h-12 = 48px
     const gap = 8; // gap-2 = 8px
-    const padding = 32; // py-4 = 16px top + 16px bottom = 32px
-    const totalHeight = padding + (tabs.length * (tabHeight + gap)) - gap; // Subtract last gap
+    const padding = 16; // py-2 = 8px top + 8px bottom = 16px
     
-    // Set sidebar height to fit content, but at least match tab content height
-    const tabContentHeight = tabContent.offsetHeight;
-    sidebar.style.height = `${Math.max(totalHeight, tabContentHeight)}px`;
-    sidebar.style.minHeight = `${Math.max(totalHeight, tabContentHeight)}px`;
+    // Include the toggle all buttons container at the top
+    const toggleAllContainer = sidebar.querySelector('[data-toggle-all]')?.parentElement;
+    const toggleAllHeight = toggleAllContainer ? toggleAllContainer.offsetHeight : 0;
+    const toggleAllMargin = toggleAllContainer ? 4 : 0; // mb-1 = 4px
+    
+    // Calculate: padding + toggle buttons + gap + (tab height + gap) * number of tabs - last gap
+    const tabsHeight = tabs.length > 0 ? (tabs.length * (tabHeight + gap)) - gap : 0;
+    const calculatedHeight = padding + toggleAllHeight + toggleAllMargin + tabsHeight;
+    
+    // Use the larger of actual content height or calculated height to ensure all buttons fit
+    const finalHeight = Math.max(actualContentHeight, calculatedHeight);
+    
+    // Set sidebar height to fit all content
+    sidebar.style.height = `${finalHeight}px`;
+    sidebar.style.minHeight = `${finalHeight}px`;
 }
 
 /**
