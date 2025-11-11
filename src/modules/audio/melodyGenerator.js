@@ -1179,10 +1179,31 @@ export function addNoteToInteractiveMelody(noteName, skipPlayback = false) {
 
     const toneDuration = getToneDurationString(duration, dotted);
 
+    // Apply selected accidental to the note if requested
+    let adjustedPitch = noteName;
+    const pitchMatch = noteName.match(/^([A-G])([#b]?)(\d+)$/);
+    if (pitchMatch) {
+        const baseNote = pitchMatch[1];
+        const existingAccidental = pitchMatch[2];
+        const octave = pitchMatch[3];
+
+        if (currentAccidental === 'n') {
+            // Natural removes existing accidental
+            adjustedPitch = `${baseNote}${octave}`;
+        } else if (currentAccidental === '#' || currentAccidental === 'b') {
+            adjustedPitch = `${baseNote}${currentAccidental}${octave}`;
+        } else if (existingAccidental) {
+            // Preserve the accidental from the note if user hasn't selected one
+            adjustedPitch = `${baseNote}${existingAccidental}${octave}`;
+        } else {
+            adjustedPitch = `${baseNote}${octave}`;
+        }
+    }
+
     // Add note with selected duration using new structure
     const newNote = {
         type: 'note',
-        pitch: noteName,
+        pitch: adjustedPitch,
         duration: toneDuration,
         measure: currentMeasure,
         beat: currentBeat,
@@ -1215,7 +1236,7 @@ export function addNoteToInteractiveMelody(noteName, skipPlayback = false) {
     if (!skipPlayback) {
         const instrument = getInstrument();
         if (instrument && getAudioIsReady()) {
-            instrument.triggerAttackRelease(noteName, toneDuration);
+        instrument.triggerAttackRelease(adjustedPitch, toneDuration);
         }
     }
 }
@@ -1706,80 +1727,82 @@ export function renderChordProgressionStaff(canvasElement) {
             const clickRegions = noteClickRegions.get(canvas);
             
             // Highlight currently playing chord notes in red and store click regions
+            const chordDefaultColor = '#111827';
+            const chordActiveFill = '#EF4444';
+            const chordActiveStroke = '#DC2626';
+            let chordIsActive = false;
+
+            allNotes.forEach(note => {
+                const noteId = `${index}-0-${note}`;
+                if (highlightEnabled && activeNotes.has(noteId)) {
+                    chordIsActive = true;
+                }
+            });
+
+            if (typeof staveNote.setStyle === 'function') {
+                staveNote.setStyle({
+                    fillStyle: chordIsActive ? chordActiveFill : chordDefaultColor,
+                    strokeStyle: chordIsActive ? chordActiveStroke : chordDefaultColor
+                });
+            }
+            if (typeof staveNote.setStemStyle === 'function') {
+                staveNote.setStemStyle({ strokeStyle: chordIsActive ? chordActiveStroke : chordDefaultColor });
+            }
+
             try {
                 const boundingBox = staveNote.getBoundingBox();
-                if (boundingBox) {
-                    // Store clickable region for each chord note
-                    allNotes.forEach((note, noteIdx) => {
-                        // Create noteId: "measure-0-pitch" (chords use beat 0)
-                        const noteId = `${index}-0-${note}`;
-                        
-                        // Try to get individual note head positions for more precise clicking
-                        let noteX, noteY, noteWidth = 15, noteHeight = 15;
-                        try {
-                            const glyphs = staveNote.getGlyphs();
-                            if (glyphs && glyphs.length > noteIdx) {
-                                const glyph = glyphs[noteIdx];
-                                if (glyph && glyph.getBoundingBox) {
-                                    const glyphBounds = glyph.getBoundingBox();
-                                    if (glyphBounds) {
-                                        noteX = glyphBounds.getX();
-                                        noteY = glyphBounds.getY();
-                                        noteWidth = glyphBounds.getW();
-                                        noteHeight = glyphBounds.getH();
-                                    }
+                if (!boundingBox) {
+                    return;
+                }
+
+                const glyphs = staveNote.getGlyphs ? staveNote.getGlyphs() : null;
+
+                allNotes.forEach((note, noteIdx) => {
+                    const noteId = `${index}-0-${note}`;
+
+                    let noteX;
+                    let noteY;
+                    let noteWidth = 15;
+                    let noteHeight = 15;
+
+                    try {
+                        if (glyphs && glyphs.length > noteIdx) {
+                            const glyph = glyphs[noteIdx];
+                            if (glyph && glyph.getBoundingBox) {
+                                const glyphBounds = glyph.getBoundingBox();
+                                if (glyphBounds) {
+                                    noteX = glyphBounds.getX();
+                                    noteY = glyphBounds.getY();
+                                    noteWidth = glyphBounds.getW();
+                                    noteHeight = glyphBounds.getH();
                                 }
                             }
-                        } catch (e) {
-                            // Fallback to bounding box
                         }
-                        
-                        // If we couldn't get individual position, use bounding box
-                        if (!noteX || !noteY) {
-                            // Distribute chord notes across the bounding box width
-                            const noteSpacing = boundingBox.getW() / allNotes.length;
-                            noteX = boundingBox.getX() + (noteIdx * noteSpacing);
-                            noteY = boundingBox.getY();
-                            noteWidth = noteSpacing;
-                            noteHeight = boundingBox.getH();
-                        }
-                        
-                        // Store clickable region (expand slightly for easier clicking)
-                        clickRegions.push({
-                            type: 'chord',
-                            measure: index,
-                            beat: 0, // Chords use beat 0 (whole measure)
-                            pitch: note,
-                            x: noteX - 10,
-                            y: noteY - 10,
-                            width: noteWidth + 20,
-                            height: noteHeight + 20
-                        });
-                        
-                        // Check if this specific chord note is currently playing
-                        if (highlightEnabled && activeNotes.size > 0 && activeNotes.has(noteId)) {
-                            context.save();
-                            
-                            // Draw red note head
-                            context.fillStyle = '#EF4444'; // Red-500
-                            context.strokeStyle = '#DC2626'; // Red-600
-                            context.lineWidth = 1.5;
-                            
-                            const centerX = noteX + (noteWidth / 2);
-                            const centerY = noteY + (noteHeight / 2);
-                            
-                            // Draw red note head (whole notes are slightly larger)
-                            context.beginPath();
-                            context.ellipse(centerX, centerY, 10, 7, 0, 0, 2 * Math.PI);
-                            context.fill();
-                            context.stroke();
-                            
-                            context.restore();
-                        }
+                    } catch (glyphErr) {
+                        // Ignore glyph errors, fall back to bounding box distribution
+                    }
+
+                    if (typeof noteX !== 'number' || typeof noteY !== 'number') {
+                        const noteSpacing = boundingBox.getW() / allNotes.length;
+                        noteX = boundingBox.getX() + (noteIdx * noteSpacing);
+                        noteY = boundingBox.getY();
+                        noteWidth = noteSpacing;
+                        noteHeight = boundingBox.getH();
+                    }
+
+                    clickRegions.push({
+                        type: 'chord',
+                        measure: index,
+                        beat: 0,
+                        pitch: note,
+                        x: noteX - 10,
+                        y: noteY - 10,
+                        width: noteWidth + 20,
+                        height: noteHeight + 20
                     });
-                }
+                });
             } catch (e) {
-                // Silently fail if bounding box not available
+                // Ignore highlight errors
             }
 
             // Store stave note for ottava bracket tracking (only if all notes agree)
@@ -2710,7 +2733,11 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                         vexNote.addDot(0); // Add dot to the first (and only) note in the StaveNote
                     }
 
-                    if (noteName.includes('#')) {
+                    if (note.accidental === 'n') {
+                        vexNote.addModifier(new Accidental('n'), 0);
+                    } else if (note.accidental === '#' || note.accidental === 'b') {
+                        vexNote.addModifier(new Accidental(note.accidental), 0);
+                    } else if (noteName.includes('#')) {
                         vexNote.addModifier(new Accidental('#'), 0);
                     } else if (noteName.includes('b')) {
                         vexNote.addModifier(new Accidental('b'), 0);
@@ -2808,70 +2835,30 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 // Add tickables to voice
                 voice.addTickables(vexNoteObjects);
 
-                // Format and draw - calculate format width based on note density
-                // First measure has key/time signatures, so needs more padding
-                // Subsequent measures don't have signatures, so can use less padding
+                // Format and draw - keep formatting within the actual measure width
+                // First measure has key/time signatures, so usable space is reduced
                 const measureFillRatio = Math.min(totalDurationInQuarters / MEASURE_DURATION, 1.0);
                 const isFullMeasure = measureFillRatio >= 0.95;
+                const FIRST_MEASURE_PADDING = 90;
+                const OTHER_MEASURE_PADDING = 40;
                 
-                // Calculate base format width with different padding for first vs subsequent measures
-                // IMPORTANT: The first measure's clef and time signatures take up significant space (~70-90px)
-                // We need to give notes much more room in the first measure
-                let baseFormatWidth;
-                if (measureNum === 0) {
-                    // First measure: account for key/time signatures (typically 70-90px in VexFlow)
-                    // For full measures, use most of the remaining width after signatures
-                    if (isFullMeasure) {
-                        // Full measure: use as much width as possible, minimal padding
-                        // measureWidth is 220px, signatures take ~80px, so ~140px for notes
-                        // But we need more space for many notes, so be very generous
-                        baseFormatWidth = Math.max(measureWidth - 30, 180); // Very generous for full measures in first measure
-                    } else {
-                        // Partial measure: standard padding
-                        baseFormatWidth = Math.max(measureWidth - 100, 80);
-                    }
-                } else {
-                    // Subsequent measures: no signatures, so use almost entire width
-                    // For full measures, use very generous width
-                    if (isFullMeasure) {
-                        baseFormatWidth = Math.max(measureWidth - 10, 200); // Almost entire width for full measures
-                    } else {
-                        baseFormatWidth = Math.max(measureWidth - 40, 80);
-                    }
-                }
-                
-                // Calculate minimum space needed based on note count
-                // Eighth notes need ~20-25px, sixteenth notes need ~15-20px, quarter notes need ~30-35px
-                // Use a conservative estimate to ensure all notes fit
-                const minSpacePerNote = 20; // Minimum pixels per note (conservative for eighth/sixteenth notes)
-                const minWidthForNotes = vexNoteObjects.length * minSpacePerNote;
+                const availableWidth = Math.max(
+                    measureWidth - (measureNum === 0 ? FIRST_MEASURE_PADDING : OTHER_MEASURE_PADDING),
+                    60
+                );
                 
                 let formatWidth;
                 if (isFullMeasure) {
-                    // Measure is full or nearly full - use the full calculated base width
-                    // This ensures all notes (like 8 eighth notes or 16 sixteenth notes) fit
-                    // For full measures, prioritize fitting all notes over strict width constraints
-                    formatWidth = Math.max(baseFormatWidth, minWidthForNotes);
-                    
-                    // If we still don't have enough width, use maximum available width
-                    // This is a fallback to ensure all notes are visible
-                    if (formatWidth < minWidthForNotes) {
-                        // Use maximum available width regardless of measure position
-                        // For first measure with 16+ notes, might need very wide format
-                        formatWidth = Math.max(measureWidth - 10, minWidthForNotes);
-                    }
+                    // A full measure should use the entire available width
+                    formatWidth = availableWidth;
                 } else {
-                    // Partial measure - use proportional width but ensure minimum space
-                    const proportionalWidth = baseFormatWidth * Math.max(measureFillRatio, 0.5); // At least 50% of width
-                    formatWidth = Math.min(
-                        Math.max(proportionalWidth, minWidthForNotes),
-                        baseFormatWidth
-                    );
+                    // For incomplete measures, shrink width proportionally but never below 60px
+                    const proportionalWidth = availableWidth * Math.max(measureFillRatio, 0.5);
+                    formatWidth = Math.max(Math.min(proportionalWidth, availableWidth), 60);
                 }
                 
-                // Debug logging for troubleshooting
                 if (vexNoteObjects.length >= 7 || isFullMeasure) {
-                    console.log(`Measure ${measureNum}: ${vexNoteObjects.length} notes, ${totalDurationInQuarters.toFixed(2)}/${MEASURE_DURATION} beats, fillRatio: ${measureFillRatio.toFixed(2)}, formatWidth: ${formatWidth.toFixed(0)}px, baseFormatWidth: ${baseFormatWidth.toFixed(0)}px, minWidthForNotes: ${minWidthForNotes.toFixed(0)}px, measureWidth: ${measureWidth}px`);
+                    console.log(`Measure ${measureNum}: ${vexNoteObjects.length} notes, ${totalDurationInQuarters.toFixed(2)}/${MEASURE_DURATION} beats, formatWidth=${formatWidth.toFixed(0)}px, availableWidth=${availableWidth.toFixed(0)}px, measureWidth=${measureWidth}px`);
                 }
                 
                 // Format and draw - always use strict width constraints to prevent overflow
@@ -2935,104 +2922,57 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 }
                 const clickRegions = noteClickRegions.get(canvas);
                 
-                // Highlight currently playing melody notes in red and store click regions
-                if (highlightEnabled && activeNotes.size > 0) {
-                    vexNoteObjects.forEach((vexNote, noteIdx) => {
-                        if (noteIdx < notesToProcess.length) {
-                            const note = notesToProcess[noteIdx];
-                            
-                            // Create noteId: "measure-beat-pitch"
-                            // Ensure consistent types: measure and beat as numbers, pitch as string
-                            const noteMeasure = typeof note.measure === 'number' ? note.measure : parseInt(note.measure, 10);
-                            const noteBeat = typeof note.beat === 'number' ? note.beat : parseInt(note.beat, 10);
-                            const notePitch = String(note.pitch);
-                            const noteId = `${noteMeasure}-${noteBeat}-${notePitch}`;
-                            
-                            // Store clickable region for this note
-                            try {
-                                const boundingBox = vexNote.getBoundingBox();
-                                if (boundingBox) {
-                                    // Store clickable region (expand slightly for easier clicking)
-                                    clickRegions.push({
-                                        type: 'melody',
-                                        measure: noteMeasure,
-                                        beat: noteBeat,
-                                        pitch: notePitch,
-                                        x: boundingBox.getX() - 10,
-                                        y: boundingBox.getY() - 10,
-                                        width: boundingBox.getW() + 20,
-                                        height: boundingBox.getH() + 20
-                                    });
-                                    
-                                    // Check if this note is currently playing
-                                    // Only check notes in the current measure to avoid false matches
-                                    if (noteMeasure === measureNum && activeNotes.has(noteId)) {
-                                        context.save();
-                                        
-                                        // Draw red note head
-                                        context.fillStyle = '#EF4444'; // Red-500
-                                        context.strokeStyle = '#DC2626'; // Red-600
-                                        context.lineWidth = 1.5;
-                                        
-                                        const noteX = vexNote.getAbsoluteX();
-                                        const noteY = boundingBox.getY() + (boundingBox.getH() / 2);
-                                        
-                                        context.beginPath();
-                                        context.ellipse(noteX, noteY, 8, 6, 0, 0, 2 * Math.PI);
-                                        context.fill();
-                                        context.stroke();
-                                        
-                                        // Draw red stem if it exists
-                                        const stem = vexNote.getStem();
-                                        if (stem) {
-                                            const stemBounds = stem.getBoundingBox();
-                                            if (stemBounds) {
-                                                context.strokeStyle = '#DC2626';
-                                                context.lineWidth = 2;
-                                                context.beginPath();
-                                                context.moveTo(stemBounds.getX(), stemBounds.getY());
-                                                context.lineTo(stemBounds.getX(), stemBounds.getY() + stemBounds.getH());
-                                                context.stroke();
-                                            }
-                                        }
-                                        
-                                        context.restore();
-                                    }
-                                }
-                            } catch (e) {
-                                // Silently fail if bounding box not available
-                            }
+                // Determine note highlighting and store clickable regions
+                vexNoteObjects.forEach((vexNote, noteIdx) => {
+                    if (noteIdx >= notesToProcess.length) {
+                        return;
+                    }
+
+                    const note = notesToProcess[noteIdx];
+                    const noteMeasure = typeof note.measure === 'number' ? note.measure : parseInt(note.measure, 10);
+                    const noteBeat = typeof note.beat === 'number' ? note.beat : parseInt(note.beat, 10);
+                    const notePitch = String(note.pitch);
+                    const noteId = `${noteMeasure}-${noteBeat}-${notePitch}`;
+
+                    const isActive = highlightEnabled && noteMeasure === measureNum && activeNotes.has(noteId);
+
+                    if (vexNote && typeof vexNote.setStyle === 'function') {
+                        const defaultFill = '#111827';
+                        const defaultStroke = '#111827';
+                        const activeFill = '#EF4444';
+                        const activeStroke = '#DC2626';
+
+                        vexNote.setStyle({
+                            fillStyle: isActive ? activeFill : defaultFill,
+                            strokeStyle: isActive ? activeStroke : defaultStroke
+                        });
+
+                        if (typeof vexNote.setStemStyle === 'function') {
+                            vexNote.setStemStyle({
+                                strokeStyle: isActive ? activeStroke : defaultStroke
+                            });
                         }
-                    });
-                } else {
-                    // Store clickable regions even when not highlighting
-                    vexNoteObjects.forEach((vexNote, noteIdx) => {
-                        if (noteIdx < notesToProcess.length) {
-                            const note = notesToProcess[noteIdx];
-                            const noteMeasure = typeof note.measure === 'number' ? note.measure : parseInt(note.measure, 10);
-                            const noteBeat = typeof note.beat === 'number' ? note.beat : parseInt(note.beat, 10);
-                            const notePitch = String(note.pitch);
-                            
-                            try {
-                                const boundingBox = vexNote.getBoundingBox();
-                                if (boundingBox) {
-                                    clickRegions.push({
-                                        type: 'melody',
-                                        measure: noteMeasure,
-                                        beat: noteBeat,
-                                        pitch: notePitch,
-                                        x: boundingBox.getX() - 10,
-                                        y: boundingBox.getY() - 10,
-                                        width: boundingBox.getW() + 20,
-                                        height: boundingBox.getH() + 20
-                                    });
-                                }
-                            } catch (e) {
-                                // Silently fail
-                            }
+                    }
+
+                    // Store clickable region for this note
+                    try {
+                        const boundingBox = vexNote.getBoundingBox();
+                        if (boundingBox) {
+                            clickRegions.push({
+                                type: 'melody',
+                                measure: noteMeasure,
+                                beat: noteBeat,
+                                pitch: notePitch,
+                                x: boundingBox.getX() - 10,
+                                y: boundingBox.getY() - 10,
+                                width: boundingBox.getW() + 20,
+                                height: boundingBox.getH() + 20
+                            });
                         }
-                    });
-                }
+                    } catch (e) {
+                        // Ignore bounding box errors
+                    }
+                });
             });
         }
 
