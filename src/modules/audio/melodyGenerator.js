@@ -2842,9 +2842,10 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 const isFullMeasure = measureFillRatio >= 0.95;
                 
                 // Calculate min space needed for this many notes
-                // 8 eighth notes need ~160px, 16 sixteenth notes need ~200px
-                // Plan ahead to ensure notes don't spill
-                const minSpacePerNote = 20; // Conservative: pixels per note
+                // 8 eighth notes in first measure: 120px available / 8 notes = 15px per note
+                // We use 12px to be conservative and ensure notes fit
+                // In subsequent measures: 200px available / 16 notes = 12.5px per note
+                const minSpacePerNote = measureNum === 0 ? 12 : 13; // Tighter packing to stay within measure
                 const minSpaceNeeded = vexNoteObjects.length * minSpacePerNote;
                 
                 // For first measure, be very aggressive with padding to leave room for clef/signature
@@ -2942,6 +2943,7 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 const clickRegions = noteClickRegions.get(canvas);
                 
                 // Determine note highlighting and store clickable regions
+                // Only highlight notes that are CURRENTLY playing (in activeNotes AND in this measure)
                 vexNoteObjects.forEach((vexNote, noteIdx) => {
                     if (noteIdx >= notesToProcess.length) {
                         return;
@@ -2953,7 +2955,11 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                     const notePitch = String(note.pitch);
                     const noteId = `${noteMeasure}-${noteBeat}-${notePitch}`;
 
-                    const isActive = highlightEnabled && noteMeasure === measureNum && activeNotes.has(noteId);
+                    // A note is only active if:
+                    // 1. Highlighting is enabled
+                    // 2. It's in the current measure we're rendering
+                    // 3. It's in the activeNotes set (currently playing)
+                    const isActive = highlightEnabled && noteMeasure === measureNum && activeNotes.size > 0 && activeNotes.has(noteId);
 
                     if (vexNote && typeof vexNote.setStyle === 'function') {
                         const defaultFill = '#111827';
