@@ -207,17 +207,31 @@ function animateToSidebar(section, toggle, sidebar, sectionId, collapsedSections
         return;
     }
 
-    // Create animated clone
+    // Create animated clone with darker, more visible styling
     const clone = icon.cloneNode(true);
-    clone.style.position = 'fixed';
-    clone.style.left = `${toggleRect.left + toggleRect.width / 2 - 12}px`;
-    clone.style.top = `${toggleRect.top + toggleRect.height / 2 - 12}px`;
     clone.style.width = '24px';
     clone.style.height = '24px';
-    clone.style.zIndex = '9999';
-    clone.style.pointerEvents = 'none';
-    clone.style.color = getComputedStyle(icon).color;
-    document.body.appendChild(clone);
+    clone.style.color = '#1f2937'; // Dark gray for better visibility
+    clone.style.filter = 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 3px rgba(255, 255, 255, 0.9))';
+    
+    // Wrap in container for background
+    const animContainer = document.createElement('div');
+    animContainer.style.position = 'fixed';
+    animContainer.style.left = `${toggleRect.left + toggleRect.width / 2 - 14}px`;
+    animContainer.style.top = `${toggleRect.top + toggleRect.height / 2 - 14}px`;
+    animContainer.style.width = '28px';
+    animContainer.style.height = '28px';
+    animContainer.style.zIndex = '9999';
+    animContainer.style.pointerEvents = 'none';
+    animContainer.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+    animContainer.style.borderRadius = '6px';
+    animContainer.style.padding = '2px';
+    animContainer.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.4), 0 0 4px rgba(0, 0, 0, 0.2)';
+    animContainer.style.display = 'flex';
+    animContainer.style.alignItems = 'center';
+    animContainer.style.justifyContent = 'center';
+    animContainer.appendChild(clone);
+    document.body.appendChild(animContainer);
 
     // Hide the section immediately
     section.style.display = 'none';
@@ -241,7 +255,7 @@ function animateToSidebar(section, toggle, sidebar, sectionId, collapsedSections
     // Calculate target position (center of sidebar tab)
     requestAnimationFrame(() => {
         if (!tab) {
-            document.body.removeChild(clone);
+            document.body.removeChild(animContainer);
             return;
         }
         const tabRect = tab.getBoundingClientRect();
@@ -249,25 +263,25 @@ function animateToSidebar(section, toggle, sidebar, sectionId, collapsedSections
         const targetY = tabRect.top + tabRect.height / 2 - 12;
 
         // Animate
-        clone.animate([
+        animContainer.animate([
             {
-                left: `${toggleRect.left + toggleRect.width / 2 - 12}px`,
-                top: `${toggleRect.top + toggleRect.height / 2 - 12}px`,
+                left: `${toggleRect.left + toggleRect.width / 2 - 14}px`,
+                top: `${toggleRect.top + toggleRect.height / 2 - 14}px`,
                 transform: 'scale(1)',
                 opacity: 1
             },
             {
-                left: `${targetX}px`,
-                top: `${targetY}px`,
+                left: `${targetX - 2}px`,
+                top: `${targetY - 2}px`,
                 transform: 'scale(0.75)',
-                opacity: 0.8
+                opacity: 0.9
             }
         ], {
             duration: 400,
             easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
             fill: 'forwards'
         }).onfinish = () => {
-            document.body.removeChild(clone);
+            document.body.removeChild(animContainer);
             if (tab) {
                 tab.style.opacity = '1';
                 tab.style.transition = 'opacity 0.2s';
@@ -314,17 +328,31 @@ function animateFromSidebar(section, sidebar, sectionId, collapsedSections, cont
         return;
     }
 
-    // Create animated clone
+    // Create animated clone with darker, more visible styling
     const clone = tabIcon.cloneNode(true);
-    clone.style.position = 'fixed';
-    clone.style.left = `${tabRect.left + tabRect.width / 2 - 12}px`;
-    clone.style.top = `${tabRect.top + tabRect.height / 2 - 12}px`;
     clone.style.width = '24px';
     clone.style.height = '24px';
-    clone.style.zIndex = '9999';
-    clone.style.pointerEvents = 'none';
-    clone.style.color = getComputedStyle(tabIcon).color;
-    document.body.appendChild(clone);
+    clone.style.color = '#1f2937'; // Dark gray for better visibility
+    clone.style.filter = 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 3px rgba(255, 255, 255, 0.9))';
+    
+    // Wrap in container for background
+    const animContainer = document.createElement('div');
+    animContainer.style.position = 'fixed';
+    animContainer.style.left = `${tabRect.left + tabRect.width / 2 - 14}px`;
+    animContainer.style.top = `${tabRect.top + tabRect.height / 2 - 14}px`;
+    animContainer.style.width = '28px';
+    animContainer.style.height = '28px';
+    animContainer.style.zIndex = '9999';
+    animContainer.style.pointerEvents = 'none';
+    animContainer.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+    animContainer.style.borderRadius = '6px';
+    animContainer.style.padding = '2px';
+    animContainer.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.4), 0 0 4px rgba(0, 0, 0, 0.2)';
+    animContainer.style.display = 'flex';
+    animContainer.style.alignItems = 'center';
+    animContainer.style.justifyContent = 'center';
+    animContainer.appendChild(clone);
+    document.body.appendChild(animContainer);
 
     // Hide the tab immediately
     tab.style.opacity = '0';
@@ -343,16 +371,16 @@ function animateFromSidebar(section, sidebar, sectionId, collapsedSections, cont
         const targetY = toggleRect.top + toggleRect.height / 2 - 12;
 
         // Animate
-        clone.animate([
+        animContainer.animate([
             {
-                left: `${tabRect.left + tabRect.width / 2 - 12}px`,
-                top: `${tabRect.top + tabRect.height / 2 - 12}px`,
+                left: `${tabRect.left + tabRect.width / 2 - 14}px`,
+                top: `${tabRect.top + tabRect.height / 2 - 14}px`,
                 transform: 'scale(0.75)',
-                opacity: 0.8
+                opacity: 0.9
             },
             {
-                left: `${targetX}px`,
-                top: `${targetY}px`,
+                left: `${targetX - 2}px`,
+                top: `${targetY - 2}px`,
                 transform: 'scale(1)',
                 opacity: 1
             }
@@ -361,7 +389,7 @@ function animateFromSidebar(section, sidebar, sectionId, collapsedSections, cont
             easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
             fill: 'forwards'
         }).onfinish = () => {
-            document.body.removeChild(clone);
+            document.body.removeChild(animContainer);
             if (sectionIcon) {
                 sectionIcon.style.opacity = '1';
                 sectionIcon.style.transition = 'opacity 0.2s';
