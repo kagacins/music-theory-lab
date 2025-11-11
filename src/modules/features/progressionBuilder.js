@@ -1738,8 +1738,8 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
     
     // IMPORTANT: Destroy Sortable BEFORE clearing innerHTML
     // because innerHTML = '' destroys all DOM elements Sortable is tracking
-    // Only destroy Sortable for the main progression builder (not melody tab)
-    if (containerId === 'progression-visualization' && container.sortableInstance) {
+    // Destroy Sortable for both progression builder and melody tab
+    if ((containerId === 'progression-visualization' || containerId === 'melody-progression-visualization') && container.sortableInstance) {
         try {
             container.sortableInstance.destroy();
             container.sortableInstance = null;
@@ -2474,9 +2474,9 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
     });
     
     // Initialize Sortable for drag-and-drop after rendering
-    // Only for the main progression builder (not melody tab)
+    // For both the main progression builder and melody tab
     // Always create a fresh instance since we rebuilt the DOM with innerHTML = ''
-    if (containerId === 'progression-visualization' && typeof Sortable !== 'undefined') {
+    if ((containerId === 'progression-visualization' || containerId === 'melody-progression-visualization') && typeof Sortable !== 'undefined') {
         container.sortableInstance = new Sortable(container, {
             animation: 200,
             ghostClass: 'sortable-ghost',
@@ -2547,6 +2547,15 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
                             orderAfter: Array.from(container.children).map(w => w.getAttribute('data-index'))
                         };
                     }
+                    
+                    // Re-render the other tab to keep them in sync
+                    const otherContainerId = containerId === 'progression-visualization' 
+                        ? 'melody-progression-visualization' 
+                        : 'progression-visualization';
+                    renderProgressionDisplay(otherContainerId, false);
+                    
+                    // Re-render melody notation if needed (chord order affects melody rendering)
+                    renderMelodyNotationIfNeeded();
                 }
             }
         });
