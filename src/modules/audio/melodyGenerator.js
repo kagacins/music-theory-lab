@@ -1967,17 +1967,40 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         const renderer = new Renderer(canvas, Renderer.Backends.CANVAS);
         const context = renderer.getContext();
 
-        // Calculate dimensions dynamically - ensure all chords are visible
-        // Use FIXED measure width to prevent shrinking when more chords are added
+        // Calculate dimensions dynamically - ensure all chords are visible and dense melodies fit
         // Auto-add measures: use the maximum of progression length and highest measure in melody notes
         const maxMeasureFromMelody = interactiveMelody.melodyNotes.length > 0 
             ? Math.max(...interactiveMelody.melodyNotes.map(n => n.measure)) + 1
             : 0;
         const numMeasures = Math.max(progressionData.length, maxMeasureFromMelody); // Render ALL chords and any additional measures from melody
-        const desiredMeasureWidth = 220; // Fixed pixels per measure - DO NOT shrink
+        
+        // Calculate dynamic measure width based on melody density
+        // Group notes by measure to find the densest measure
+        let maxNotesInMeasure = 0;
+        if (interactiveMelody.melodyNotes.length > 0) {
+            const notesByMeasure = {};
+            interactiveMelody.melodyNotes.forEach(note => {
+                if (!notesByMeasure[note.measure]) {
+                    notesByMeasure[note.measure] = [];
+                }
+                notesByMeasure[note.measure].push(note);
+            });
+            maxNotesInMeasure = Math.max(...Object.values(notesByMeasure).map(notes => notes.length));
+        }
+        
+        // Base width: 220px; add 15px per note beyond 4 notes to accommodate density
+        // 4 quarter notes (typical): 220px
+        // 8 eighth notes (dense): 220 + (8-4)*15 = 280px
+        // 16 sixteenth notes (very dense): 220 + (16-4)*15 = 400px
+        const desiredMeasureWidth = Math.max(220, 220 + Math.max(0, maxNotesInMeasure - 4) * 15);
+        
         const padding = 40; // Left and right padding
         // Always use calculated width based on number of measures - enables horizontal scrolling
         const calculatedCanvasWidth = (numMeasures * desiredMeasureWidth) + padding;
+        
+        if (maxNotesInMeasure > 4) {
+            console.log(`Dense melody detected: ${maxNotesInMeasure} notes in a measure. Measure width: ${desiredMeasureWidth}px`);
+        }
 
         // Determine if we need extra height for ottava brackets
         // We'll use treble clef for all notes and apply 8va/8vb when needed
