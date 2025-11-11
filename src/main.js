@@ -38,6 +38,11 @@ import {
     showJazzVoicingsInfo
 } from './modules/features/theoryTools.js';
 import {
+    toggleSongSearchPanel,
+    searchSongChords,
+    importSongProgression
+} from './modules/features/songSearch.js';
+import {
     renderBuilderSelectors,
     updateBuilderDisplay,
     selectBuilderRootNote,
@@ -48,6 +53,7 @@ import {
     stopBuilderChord,
     playBuilderChordWithDuration,
     changeBuilderOctave,
+    selectBuilderChordBySymbol,
     updateBuilderOctaveUI,
     updateLHInversionSelector,
     addChordToProgression,
@@ -858,6 +864,7 @@ window.selectBuilderRootNote = selectBuilderRootNote;
 window.selectBuilderChordType = selectBuilderChordType;
 window.selectBuilderInterval = selectBuilderInterval;
 window.selectBuilderInversion = selectBuilderInversion;
+window.selectBuilderChordBySymbol = selectBuilderChordBySymbol;
 window.playArpeggio = playArpeggio;
 window.stopArpeggio = stopArpeggio;
 window.getNoteKeyId = getNoteKeyId;
@@ -1117,6 +1124,11 @@ window.toggleGuitarFretboardPanel = toggleGuitarFretboardPanel;
 window.openGuitarFretboardPanel = openGuitarFretboardPanel;
 window.closeGuitarFretboardPanel = closeGuitarFretboardPanel;
 window.updateGuitarFretboard = updateGuitarFretboard;
+
+// Song Search functions
+window.toggleSongSearchPanel = toggleSongSearchPanel;
+window.searchSongChords = searchSongChords;
+window.importSongProgression = importSongProgression;
 
 // Theory Tools functions
 window.toggleTheoryPanel = toggleTheoryPanel;

@@ -1990,11 +1990,11 @@ export function renderInteractiveMelodyStaff(canvasElement) {
             maxNotesInMeasure = Math.max(...Object.values(notesByMeasure).map(notes => notes.length));
         }
         
-        // Base width: 220px; add 15px per note beyond 4 notes to accommodate density
+        // Base width: 220px; add 30px per note beyond 4 notes to accommodate density
         // 4 quarter notes (typical): 220px
-        // 8 eighth notes (dense): 220 + (8-4)*15 = 280px
-        // 16 sixteenth notes (very dense): 220 + (16-4)*15 = 400px
-        const desiredMeasureWidth = Math.max(220, 220 + Math.max(0, maxNotesInMeasure - 4) * 15);
+        // 8 eighth notes (dense): 220 + (8-4)*30 = 340px
+        // 16 sixteenth notes (very dense): 220 + (16-4)*30 = 580px
+        const desiredMeasureWidth = Math.max(220, 220 + Math.max(0, maxNotesInMeasure - 4) * 30);
         
         const padding = 40; // Left and right padding
         // Always use calculated width based on number of measures - enables horizontal scrolling
@@ -2083,7 +2083,8 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 } catch (e) {
                     console.warn('Key signature error:', e);
                 }
-                stave.addTimeSignature('4/4'); // Add time signature to match bass clef
+                // Use the selected time signature from interactiveMelody
+                stave.addTimeSignature(interactiveMelody.timeSignature || '4/4');
             }
 
             stave.setContext(context).draw();
@@ -2124,7 +2125,8 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 } catch (e) {
                     console.warn('Key signature error:', e);
                 }
-                stave.addTimeSignature('4/4');
+                // Use the selected time signature from interactiveMelody
+                stave.addTimeSignature(interactiveMelody.timeSignature || '4/4');
             }
 
             stave.setContext(context).draw();
@@ -2709,10 +2711,11 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                         const vexDuration = baseDuration;
                         
                         try {
-                            const rest = new Rest({ duration: vexDuration });
-                            if (isDotted) {
-                                rest.addDot(0);
-                            }
+                            // Rest constructor is different from StaveNote - it's a StaveNote with rest: true
+                            const rest = new StaveNote({
+                                keys: ['b/4'], // Standard position for rests
+                                duration: vexDuration + (isDotted ? 'd' : '') + 'r' // Add 'r' suffix for rest, 'd' for dotted
+                            });
                             return { vexNote: rest, noteIdx, isRest: true, shouldApplyOttava: false, ottavaType: null };
                         } catch (e) {
                             console.warn('Could not create rest:', e);
@@ -2766,6 +2769,19 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                         vexNote.addModifier(new Accidental('#'), 0);
                     } else if (noteName.includes('b')) {
                         vexNote.addModifier(new Accidental('b'), 0);
+                    }
+                    
+                    // Add dynamics if specified
+                    if (note.dynamic && typeof note.dynamic === 'string') {
+                        try {
+                            const { Annotation } = VexFlow;
+                            const dynamicAnnotation = new Annotation(note.dynamic);
+                            dynamicAnnotation.setFont('Times', 12, 'italic');
+                            dynamicAnnotation.setVerticalJustification(VexFlow.Annotation.VerticalJustify.BOTTOM);
+                            vexNote.addModifier(dynamicAnnotation, 0);
+                        } catch (e) {
+                            console.warn('Could not add dynamic annotation:', e);
+                        }
                     }
 
                     return { vexNote, noteIdx, isRest: false, shouldApplyOttava, ottavaType };
@@ -2993,9 +3009,18 @@ export function renderInteractiveMelodyStaff(canvasElement) {
 
                     // A note is only active if:
                     // 1. Highlighting is enabled
-                    // 2. It's in the current measure we're rendering
-                    // 3. It's in the activeNotes set (currently playing)
-                    const isActive = highlightEnabled && noteMeasure === measureNum && activeNotes.size > 0 && activeNotes.has(noteId);
+                    // 2. It's in the activeNotes set (currently playing)
+                    // We check the exact noteId to ensure only currently playing notes are highlighted
+                    const isActive = highlightEnabled && activeNotes.has(noteId);
+                    
+                    // Debug: log active notes (can be removed later)
+                    if (activeNotes.size > 0 && measureNum === 0) {
+                        // Only log for first measure to reduce console spam
+                        const activeList = Array.from(activeNotes);
+                        if (activeList.some(id => id.startsWith(`${measureNum}-`))) {
+                            console.log(`Rendering measure ${measureNum}: noteId="${noteId}", isActive=${isActive}, activeNotes=[${activeList.join(', ')}]`);
+                        }
+                    }
 
                     // Only apply styling to actual notes (StaveNote), not rests
                     // Rest objects don't support setStyle

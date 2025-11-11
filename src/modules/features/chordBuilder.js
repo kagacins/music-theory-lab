@@ -1325,6 +1325,52 @@ export function capturePlayedChord(notes, type = 'Major', inversion = 0) {
     }
 }
 
+/**
+ * Programmatically select a chord by root and type, then add it to the progression
+ * Used for importing chords from external sources like song search
+ * @param {string} root - Root note (e.g., "C", "F#", "Bb")
+ * @param {string} type - Chord type (e.g., "major", "minor", "dominant7")
+ */
+export function selectBuilderChordBySymbol(root, type) {
+    // Map common chord type names to internal type names
+    const typeMap = {
+        'major': 'Major',
+        'minor': 'Minor',
+        'diminished': 'Diminished',
+        'augmented': 'Augmented',
+        'sus2': 'Sus2',
+        'sus4': 'Sus4',
+        'major7': 'Major7',
+        'minor7': 'Minor7',
+        'dominant7': 'Dominant7',
+        'dominant9': 'Dominant9',
+        'minor9': 'Minor9',
+        'major9': 'Major9'
+    };
+    
+    const mappedType = typeMap[type.toLowerCase()] || 'Major';
+    
+    // Get note arrays based on enharmonic preference
+    const noteArray = getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+    
+    // Find the root note index
+    const rootIndex = noteArray.indexOf(root);
+    if (rootIndex === -1) {
+        console.warn(`Root note not found: ${root}`);
+        return;
+    }
+    
+    // Set the builder state
+    setBuilderRootIndex(rootIndex);
+    setBuilderChordType(mappedType);
+    
+    // Update displays
+    updateBuilderDisplay();
+    
+    // Add to progression
+    addChordToProgression(false);
+}
+
 // ============================================================================
 // Suggestion Engine
 // ============================================================================
