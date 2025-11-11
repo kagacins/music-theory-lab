@@ -90,7 +90,7 @@ export function initSectionSidebar(tabId, containerId, sectionClass) {
             scrollSensitivity: 40,
             scrollSpeed: 10,
             direction: 'vertical',
-            filter: '[data-toggle-all]', // Prevent dragging the toggle all button
+            filter: '[data-toggle-all]', // Prevent dragging the collapse/expand all buttons
             onEnd: function(evt) {
                 if (evt.oldIndex !== evt.newIndex && evt.oldIndex !== undefined && evt.newIndex !== undefined) {
                     // Reorder the actual sections in the container to match sidebar order
@@ -122,16 +122,31 @@ function createSidebar(tabId) {
     sidebar.style.minHeight = '100%'; // Start with full height
     sidebar.style.height = 'auto'; // Allow height to grow with content
     
-    // Add collapse/expand all button at the top
-    const toggleAllBtn = document.createElement('button');
-    toggleAllBtn.className = 'w-12 h-8 rounded-md bg-gray-700 hover:bg-gray-600 text-white text-[10px] font-semibold transition-colors flex items-center justify-center mb-1 shadow-sm';
-    toggleAllBtn.setAttribute('data-toggle-all', 'true');
-    toggleAllBtn.setAttribute('data-state', 'expand'); // 'expand' means clicking will expand all, 'collapse' means clicking will collapse all
-    toggleAllBtn.textContent = 'All';
-    toggleAllBtn.title = 'Collapse All';
+    // Add separate collapse/expand all buttons at the top
+    const collapseAllBtn = document.createElement('button');
+    collapseAllBtn.className = 'w-12 bg-gray-700 hover:bg-gray-600 text-white text-[9px] font-semibold transition-colors flex items-center justify-center shadow-sm';
+    collapseAllBtn.setAttribute('data-toggle-all', 'true');
+    collapseAllBtn.setAttribute('data-action', 'collapse');
+    collapseAllBtn.textContent = '−';
+    collapseAllBtn.title = 'Collapse All';
+    collapseAllBtn.style.height = '20px';
+    collapseAllBtn.style.padding = '0';
+    collapseAllBtn.style.lineHeight = '1';
+    collapseAllBtn.style.minHeight = '20px';
     
-    // Update button state and text based on current sections
-    const updateToggleAllButton = () => {
+    const expandAllBtn = document.createElement('button');
+    expandAllBtn.className = 'w-12 bg-gray-700 hover:bg-gray-600 text-white text-[9px] font-semibold transition-colors flex items-center justify-center shadow-sm';
+    expandAllBtn.setAttribute('data-toggle-all', 'true');
+    expandAllBtn.setAttribute('data-action', 'expand');
+    expandAllBtn.textContent = '+';
+    expandAllBtn.title = 'Expand All';
+    expandAllBtn.style.height = '20px';
+    expandAllBtn.style.padding = '0';
+    expandAllBtn.style.lineHeight = '1';
+    expandAllBtn.style.minHeight = '20px';
+    
+    // Update button visibility based on current sections
+    const updateToggleAllButtons = () => {
         const tabContent = sidebar.closest('.tab-content');
         if (!tabContent) return;
         
@@ -152,47 +167,44 @@ function createSidebar(tabId) {
         });
         
         if (sections.length === 0) {
-            toggleAllBtn.style.display = 'none';
+            collapseAllBtn.style.display = 'none';
+            expandAllBtn.style.display = 'none';
             return;
         }
         
-        toggleAllBtn.style.display = 'flex';
-        
-        if (allCollapsed) {
-            toggleAllBtn.setAttribute('data-state', 'expand');
-            toggleAllBtn.textContent = 'All';
-            toggleAllBtn.title = 'Expand All';
-        } else if (allExpanded) {
-            toggleAllBtn.setAttribute('data-state', 'collapse');
-            toggleAllBtn.textContent = 'All';
-            toggleAllBtn.title = 'Collapse All';
-        } else {
-            // Mixed state - default to collapse all
-            toggleAllBtn.setAttribute('data-state', 'collapse');
-            toggleAllBtn.textContent = 'All';
-            toggleAllBtn.title = 'Collapse All';
-        }
+        // Show collapse button when at least one section is expanded
+        collapseAllBtn.style.display = allCollapsed ? 'none' : 'flex';
+        // Show expand button when at least one section is collapsed
+        expandAllBtn.style.display = allExpanded ? 'none' : 'flex';
     };
     
-    toggleAllBtn.addEventListener('click', () => {
-        const state = toggleAllBtn.getAttribute('data-state');
-        if (state === 'expand') {
-            if (window.expandAllCurrentTab) {
-                window.expandAllCurrentTab();
-            }
-        } else {
-            if (window.collapseAllCurrentTab) {
-                window.collapseAllCurrentTab();
-            }
+    collapseAllBtn.addEventListener('click', () => {
+        if (window.collapseAllCurrentTab) {
+            window.collapseAllCurrentTab();
         }
-        // Update button state after a short delay to allow DOM updates
-        setTimeout(updateToggleAllButton, 100);
+        // Update button visibility after a short delay to allow DOM updates
+        setTimeout(updateToggleAllButtons, 100);
     });
     
-    sidebar.appendChild(toggleAllBtn);
+    expandAllBtn.addEventListener('click', () => {
+        if (window.expandAllCurrentTab) {
+            window.expandAllCurrentTab();
+        }
+        // Update button visibility after a short delay to allow DOM updates
+        setTimeout(updateToggleAllButtons, 100);
+    });
+    
+    // Create container for the buttons
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'flex flex-col gap-0.5 mb-1';
+    buttonContainer.style.padding = '0';
+    buttonContainer.appendChild(collapseAllBtn);
+    buttonContainer.appendChild(expandAllBtn);
+    
+    sidebar.appendChild(buttonContainer);
     
     // Store update function on sidebar for later use
-    sidebar._updateToggleAllButton = updateToggleAllButton;
+    sidebar._updateToggleAllButton = updateToggleAllButtons;
     
     return sidebar;
 }
