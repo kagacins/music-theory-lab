@@ -78,7 +78,10 @@ const DEMO_SONG_DATABASE = [
 ];
 
 // Rate limiting configuration
-const DAILY_SEARCH_LIMIT = 100; // Free tier limit
+// Note: This is a client-side limit for user experience.
+// You should ALSO set a quota in Google Cloud Console (hard limit enforced by Google).
+// See GOOGLE_API_QUOTA_SETUP.md for instructions.
+const DAILY_SEARCH_LIMIT = 100; // Free tier limit (should match Google Cloud quota)
 const SEARCH_COUNT_KEY = 'google_search_count';
 const SEARCH_DATE_KEY = 'google_search_date';
 
