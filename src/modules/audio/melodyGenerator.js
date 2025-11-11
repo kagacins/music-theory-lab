@@ -4897,10 +4897,9 @@ export function playAllMelody() {
         const maxMelodyMeasure = Math.max(...interactiveMelody.melodyNotes.map(n => n.measure));
         maxMeasure = Math.max(maxMeasure, maxMelodyMeasure);
     }
-    // Add buffer for note duration + reverb decay (2 seconds for reverb tail)
-    // This ensures reverb can fully decay before Transport stops
-    const reverbTail = 2.0;
-    const totalDuration = (maxMeasure + 1) * measureDuration + reverbTail;
+    // Add small buffer to ensure last chord finishes (reverb will decay naturally)
+    // No need for large buffer since we're releasing notes at exact measure boundaries
+    const totalDuration = (maxMeasure + 1) * measureDuration + 0.5;
     
     // Stop after all notes have played
     Tone.Transport.scheduleOnce(() => {
