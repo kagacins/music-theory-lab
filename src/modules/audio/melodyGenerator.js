@@ -2980,7 +2980,8 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                     const note = notesToProcess[noteIdx];
                     const noteMeasure = typeof note.measure === 'number' ? note.measure : parseInt(note.measure, 10);
                     const noteBeat = typeof note.beat === 'number' ? note.beat : parseInt(note.beat, 10);
-                    const notePitch = String(note.pitch);
+                    const isRest = note.type === 'rest';
+                    const notePitch = isRest ? 'rest' : String(note.pitch);
                     const noteId = `${noteMeasure}-${noteBeat}-${notePitch}`;
 
                     // A note is only active if:
@@ -2989,7 +2990,9 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                     // 3. It's in the activeNotes set (currently playing)
                     const isActive = highlightEnabled && noteMeasure === measureNum && activeNotes.size > 0 && activeNotes.has(noteId);
 
-                    if (vexNote && typeof vexNote.setStyle === 'function') {
+                    // Only apply styling to actual notes (StaveNote), not rests
+                    // Rest objects don't support setStyle
+                    if (!isRest && vexNote && typeof vexNote.setStyle === 'function') {
                         const defaultFill = '#111827';
                         const defaultStroke = '#111827';
                         const activeFill = '#EF4444';
@@ -3007,7 +3010,7 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                         }
                     }
 
-                    // Store clickable region for this note
+                    // Store clickable region for this note/rest
                     try {
                         const boundingBox = vexNote.getBoundingBox();
                         if (boundingBox) {
