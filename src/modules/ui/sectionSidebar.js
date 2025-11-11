@@ -916,6 +916,9 @@ function reorderSectionsFromSidebar(sidebar, container, sectionClass) {
 export function initInstantTooltips() {
     // Find all elements with title attributes
     document.querySelectorAll('[title]').forEach(element => {
+        // Skip option elements - they need native title tooltips in dropdowns
+        if (element.tagName === 'OPTION') return;
+        
         // Skip if already has a tooltip child
         if (element.querySelector('.instant-tooltip')) return;
         

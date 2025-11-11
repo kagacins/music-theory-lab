@@ -2253,7 +2253,21 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         lhTypeLabel.textContent = 'LH Type';
         const lhTypeSelect = document.createElement('select');
         lhTypeSelect.className = 'w-full p-1 text-xs border border-gray-300 rounded';
-        lhTypeSelect.innerHTML = document.getElementById('builder-lh-type-select').innerHTML;
+        
+        // Copy options from source select, preserving text and title attributes
+        const sourceSelect = document.getElementById('builder-lh-type-select');
+        if (sourceSelect) {
+            Array.from(sourceSelect.options).forEach(sourceOption => {
+                const newOption = document.createElement('option');
+                newOption.value = sourceOption.value;
+                newOption.textContent = sourceOption.textContent; // Only copy text content, not innerHTML
+                if (sourceOption.title) {
+                    newOption.title = sourceOption.title; // Copy title attribute for tooltip
+                }
+                lhTypeSelect.appendChild(newOption);
+            });
+        }
+        
         lhTypeSelect.value = chordData.lhType || 'off';
         lhTypeSelect.onchange = (e) => {
             const wrapper = e.target.closest(`#${containerId} > div`);
