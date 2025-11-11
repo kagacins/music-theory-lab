@@ -89,8 +89,10 @@ export function initSectionSidebar(tabId, containerId, sectionClass) {
 function createSidebar(tabId) {
     const sidebar = document.createElement('div');
     sidebar.id = `${tabId}-section-sidebar`;
-    sidebar.className = 'section-sidebar absolute left-0 top-0 h-full w-16 bg-gray-800/90 backdrop-blur-sm text-white z-30 flex flex-col items-center py-4 gap-2 overflow-y-auto transition-all duration-300 border-r border-gray-700';
+    sidebar.className = 'section-sidebar absolute left-0 top-0 w-16 bg-gray-800/90 backdrop-blur-sm text-white z-30 flex flex-col items-center py-4 gap-2 transition-all duration-300 border-r border-gray-700';
     sidebar.style.display = 'none'; // Hidden by default, shown when sections are collapsed
+    sidebar.style.minHeight = '100%'; // Start with full height
+    sidebar.style.height = 'auto'; // Allow height to grow with content
     
     return sidebar;
 }
@@ -130,6 +132,8 @@ function updateSectionState(section, sidebar, collapsedSections, container) {
         if (container) {
             container.style.marginLeft = '4rem'; // 64px = w-16
         }
+        // Update height when showing sidebar
+        updateSidebarHeight(sidebar);
     } else {
         sidebar.style.display = 'none';
         if (container) {
@@ -198,6 +202,9 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
 
     sidebar.appendChild(tab);
     collapsedSections.add(sectionId);
+    
+    // Update sidebar height to fit all tabs without scrolling
+    updateSidebarHeight(sidebar);
 }
 
 /**
@@ -213,6 +220,33 @@ function removeFromSidebar(section, sidebar, sectionId, collapsedSections) {
         tab.remove();
     }
     collapsedSections.delete(sectionId);
+    
+    // Update sidebar height after removing tab
+    updateSidebarHeight(sidebar);
+}
+
+/**
+ * Update sidebar height to fit all tabs without scrolling
+ * @param {HTMLElement} sidebar - The sidebar element
+ */
+function updateSidebarHeight(sidebar) {
+    if (!sidebar || sidebar.style.display === 'none') return;
+    
+    // Get the tab content container (parent of sidebar)
+    const tabContent = sidebar.closest('.tab-content');
+    if (!tabContent) return;
+    
+    // Calculate total height needed: padding + (tab height + gap) * number of tabs
+    const tabs = sidebar.querySelectorAll('[data-section-id]');
+    const tabHeight = 48; // w-12 h-12 = 48px
+    const gap = 8; // gap-2 = 8px
+    const padding = 32; // py-4 = 16px top + 16px bottom = 32px
+    const totalHeight = padding + (tabs.length * (tabHeight + gap)) - gap; // Subtract last gap
+    
+    // Set sidebar height to fit content, but at least match tab content height
+    const tabContentHeight = tabContent.offsetHeight;
+    sidebar.style.height = `${Math.max(totalHeight, tabContentHeight)}px`;
+    sidebar.style.minHeight = `${Math.max(totalHeight, tabContentHeight)}px`;
 }
 
 /**
