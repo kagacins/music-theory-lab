@@ -108,7 +108,8 @@ import {
     toggleProgressionControlsPanel,
     toggleProgressionCardsPanel,
     toggleAllStaffNotation,
-    clearProgression
+    clearProgression,
+    importChordList
 } from './modules/features/progressionBuilder.js';
 import {
     renderScaleSelectors,
@@ -932,6 +933,14 @@ window.toggleStyleMoodInsightsPanel = toggleStyleMoodInsightsPanel;
 window.toggleProgressionControlsPanel = toggleProgressionControlsPanel;
 window.toggleProgressionCardsPanel = toggleProgressionCardsPanel;
 window.toggleAllStaffNotation = toggleAllStaffNotation;
+window.importChordList = importChordList;
+
+// Debug: Verify function is available
+if (typeof window.importChordList !== 'function') {
+    console.error('importChordList is not a function!', typeof importChordList, importChordList);
+} else {
+    console.log('importChordList successfully exposed to window');
+}
 
 // Melody Composer toggle functions
 window.toggleMelodyProgressionPanel = function() {
@@ -1857,7 +1866,7 @@ window.onSelectNoteToEdit = function() {
 // Initialize application when DOM is ready
 window.onload = () => {
     // Calculate and set keyboard sticky position based on header height
-    const header = document.querySelector('.grid.items-center.bg-white\\/80');
+    const header = document.getElementById('main-header');
     if (header) {
         const headerHeight = header.offsetHeight;
         const headerTop = parseInt(getComputedStyle(header).top) || 16; // top-4 = 1rem = 16px

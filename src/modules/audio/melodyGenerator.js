@@ -2039,6 +2039,9 @@ export function renderChordProgressionStaff(canvasElement) {
 export function renderInteractiveMelodyStaff(canvasElement) {
     const canvas = canvasElement;
 
+    // Debug: Log render call with activeNotes state
+    console.log(`[RENDER START] activeNotes.size=${activeNotes.size}, activeNotes=[${Array.from(activeNotes).join(', ')}], highlightEnabled=${highlightEnabled}`);
+
     // Clear note click regions before rendering
     noteClickRegions.set(canvas, []);
 
@@ -2430,6 +2433,32 @@ export function renderInteractiveMelodyStaff(canvasElement) {
             }
             });
 
+            // Check if ANY note in this chord is currently playing
+            let chordIsActive = false;
+            allNotes.forEach(note => {
+                const noteId = `${index}-0-${note}`;
+                if (highlightEnabled && activeNotes.has(noteId)) {
+                    chordIsActive = true;
+                }
+            });
+
+            // Debug logging for first chord
+            if (index === 0 && activeNotes.size > 0) {
+                console.log(`[CHORD] Measure ${index}: chordIsActive=${chordIsActive}, activeNotes=[${Array.from(activeNotes).join(', ')}]`);
+            }
+
+            // Apply styling BEFORE drawing
+            const chordDefaultColor = '#111827';   // Black/dark gray
+            const chordActiveFill = '#EF4444';     // Red
+            const chordActiveStroke = '#DC2626';   // Dark red
+
+            if (typeof staveNote.setStyle === 'function') {
+                staveNote.setStyle({
+                    fillStyle: chordIsActive ? chordActiveFill : chordDefaultColor,
+                    strokeStyle: chordIsActive ? chordActiveStroke : chordDefaultColor
+                });
+            }
+
             const voice = new Voice({ num_beats: 4, beat_value: 4 });
             voice.setStrict(false);
             voice.addTickables([staveNote]);
@@ -2447,22 +2476,21 @@ export function renderInteractiveMelodyStaff(canvasElement) {
             }
             new Formatter().joinVoices([voice]).format([voice], chordFormatWidth);
             voice.draw(context, chordStaves[index]);
-            
-            // Store note clickable regions for chord notes
+
+            // Store note clickable regions for chord notes (AFTER drawing)
             if (!noteClickRegions.has(canvas)) {
                 noteClickRegions.set(canvas, []);
             }
             const clickRegions = noteClickRegions.get(canvas);
-            
-            // Highlight currently playing chord notes in red and store click regions
+
+            // Store clickable regions for each chord note
             try {
                 const boundingBox = staveNote.getBoundingBox();
                 if (boundingBox) {
-                    // Store clickable region for each chord note
                     allNotes.forEach((note, noteIdx) => {
                         // Create noteId: "measure-0-pitch" (chords use beat 0)
                         const noteId = `${index}-0-${note}`;
-                        
+
                         // Try to get individual note head positions for more precise clicking
                         let noteX, noteY, noteWidth = 15, noteHeight = 15;
                         try {
@@ -2482,7 +2510,7 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                         } catch (e) {
                             // Fallback to bounding box
                         }
-                        
+
                         // If we couldn't get individual position, use bounding box
                         if (!noteX || !noteY) {
                             // Distribute chord notes across the bounding box width
@@ -2492,7 +2520,7 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                             noteWidth = noteSpacing;
                             noteHeight = boundingBox.getH();
                         }
-                        
+
                         // Store clickable region (expand slightly for easier clicking)
                         clickRegions.push({
                             type: 'chord',
@@ -2504,27 +2532,6 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                             width: noteWidth + 20,
                             height: noteHeight + 20
                         });
-                        
-                        // Check if this specific chord note is currently playing
-                        if (highlightEnabled && activeNotes.size > 0 && activeNotes.has(noteId)) {
-                            context.save();
-                            
-                            // Draw red note head
-                            context.fillStyle = '#EF4444'; // Red-500
-                            context.strokeStyle = '#DC2626'; // Red-600
-                            context.lineWidth = 1.5;
-                            
-                            const centerX = noteX + (noteWidth / 2);
-                            const centerY = noteY + (noteHeight / 2);
-                            
-                            // Draw red note head (whole notes are slightly larger)
-                            context.beginPath();
-                            context.ellipse(centerX, centerY, 10, 7, 0, 0, 2 * Math.PI);
-                            context.fill();
-                            context.stroke();
-                            
-                            context.restore();
-                        }
                     });
                 }
             } catch (e) {
@@ -3075,11 +3082,62 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                     console.log(`Measure ${measureNum}: ${vexNoteObjects.length} notes, ${totalDurationInQuarters.toFixed(2)}/${MEASURE_DURATION} beats, formatWidth=${formatWidth.toFixed(0)}px, availableWidth=${availableWidth.toFixed(0)}px, minSpaceNeeded=${minSpaceNeeded}px, measureWidth=${measureWidth}px`);
                 }
                 
+                // Apply note styling BEFORE drawing
+                // Determine which notes should be highlighted based on activeNotes
+                vexNoteObjects.forEach((vexNote, noteIdx) => {
+                    if (noteIdx >= notesToProcess.length) {
+                        return;
+                    }
+
+                    const note = notesToProcess[noteIdx];
+                    const noteMeasure = typeof note.measure === 'number' ? note.measure : parseInt(note.measure, 10);
+                    const noteBeat = typeof note.beat === 'number' ? note.beat : parseInt(note.beat, 10);
+                    const isRest = note.type === 'rest';
+                    const notePitch = isRest ? 'rest' : String(note.pitch);
+                    const noteId = `${noteMeasure}-${noteBeat}-${notePitch}`;
+
+                    // A note is only active if:
+                    // 1. Highlighting is enabled
+                    // 2. It's in the activeNotes set (currently playing)
+                    const isActive = highlightEnabled && activeNotes.has(noteId);
+
+                    // Debug logging - log ALL notes in first 2 measures when activeNotes is not empty
+                    if (activeNotes.size > 0 && measureNum <= 1) {
+                        console.log(`[MELODY NOTE] Measure ${measureNum}, Note ${noteIdx}: noteId="${noteId}", isActive=${isActive}, highlightEnabled=${highlightEnabled}, inActiveNotes=${activeNotes.has(noteId)}`);
+                    }
+
+                    // Only apply styling to actual notes (StaveNote), not rests
+                    // Rest objects don't support setStyle
+                    if (!isRest && vexNote && typeof vexNote.setStyle === 'function') {
+                        const defaultFill = '#111827';   // Black/dark gray
+                        const defaultStroke = '#111827';
+                        const activeFill = '#EF4444';    // Red
+                        const activeStroke = '#DC2626';  // Dark red
+
+                        // CRITICAL: Apply the style - red if active, black if not
+                        vexNote.setStyle({
+                            fillStyle: isActive ? activeFill : defaultFill,
+                            strokeStyle: isActive ? activeStroke : defaultStroke
+                        });
+
+                        if (typeof vexNote.setStemStyle === 'function') {
+                            vexNote.setStemStyle({
+                                strokeStyle: isActive ? activeStroke : defaultStroke
+                            });
+                        }
+
+                        // Extra logging to verify style was set
+                        if (measureNum === 0 && noteIdx < 3 && activeNotes.size > 0) {
+                            console.log(`[STYLE SET] Note ${noteIdx} style: ${isActive ? 'RED (active)' : 'BLACK (inactive)'}`);
+                        }
+                    }
+                });
+
                 // Format and draw - always use strict width constraints to prevent overflow
                 try {
                     // Join voices first
                     new Formatter().joinVoices([voice]);
-                    
+
                     // Use the calculated formatWidth to fit all notes within the measure
                     // This ensures notes stay within the measure boundaries while allowing
                     // enough space for all notes to be visible
@@ -3091,7 +3149,7 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                     try {
                         // VexFlow's Beam.generateBeams automatically groups consecutive beamable notes
                         beams = Beam.generateBeams(vexNoteObjects);
-                        
+
                         // Debug: log beaming info for measures with many notes
                         if (vexNoteObjects.length >= 7) {
                             console.log(`Measure ${measureNum}: Generated ${beams.length} beam groups for ${vexNoteObjects.length} notes`);
@@ -3102,7 +3160,7 @@ export function renderInteractiveMelodyStaff(canvasElement) {
 
                     // Always draw the voice, even for incomplete measures
                     voice.draw(context, melodyStaves[measureNum]);
-                    
+
                     // Draw beams on top of the voice
                     // This must be done after drawing the voice so beams overlay the stems
                     beams.forEach(beam => {
@@ -3129,61 +3187,23 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                         }
                     }
                 }
-                
-                // Store note clickable regions for note click-to-play
+
+                // Store note clickable regions for note click-to-play (AFTER drawing to get bounding boxes)
                 if (!noteClickRegions.has(canvas)) {
                     noteClickRegions.set(canvas, []);
                 }
                 const clickRegions = noteClickRegions.get(canvas);
-                
-                // Determine note highlighting and store clickable regions
-                // Only highlight notes that are CURRENTLY playing (in activeNotes AND in this measure)
-                vexNoteObjects.forEach((vexNote, noteIdx) => {
-                    if (noteIdx >= notesToProcess.length) {
+
+                notesToProcess.forEach((note, noteIdx) => {
+                    if (noteIdx >= vexNoteObjects.length) {
                         return;
                     }
 
-                    const note = notesToProcess[noteIdx];
+                    const vexNote = vexNoteObjects[noteIdx];
                     const noteMeasure = typeof note.measure === 'number' ? note.measure : parseInt(note.measure, 10);
                     const noteBeat = typeof note.beat === 'number' ? note.beat : parseInt(note.beat, 10);
                     const isRest = note.type === 'rest';
                     const notePitch = isRest ? 'rest' : String(note.pitch);
-                    const noteId = `${noteMeasure}-${noteBeat}-${notePitch}`;
-
-                    // A note is only active if:
-                    // 1. Highlighting is enabled
-                    // 2. It's in the activeNotes set (currently playing)
-                    // We check the exact noteId to ensure only currently playing notes are highlighted
-                    const isActive = highlightEnabled && activeNotes.has(noteId);
-                    
-                    // Debug: log active notes (can be removed later)
-                    if (activeNotes.size > 0 && measureNum === 0) {
-                        // Only log for first measure to reduce console spam
-                        const activeList = Array.from(activeNotes);
-                        if (activeList.some(id => id.startsWith(`${measureNum}-`))) {
-                            console.log(`Rendering measure ${measureNum}: noteId="${noteId}", isActive=${isActive}, activeNotes=[${activeList.join(', ')}]`);
-                        }
-                    }
-
-                    // Only apply styling to actual notes (StaveNote), not rests
-                    // Rest objects don't support setStyle
-                    if (!isRest && vexNote && typeof vexNote.setStyle === 'function') {
-                        const defaultFill = '#111827';
-                        const defaultStroke = '#111827';
-                        const activeFill = '#EF4444';
-                        const activeStroke = '#DC2626';
-
-                        vexNote.setStyle({
-                            fillStyle: isActive ? activeFill : defaultFill,
-                            strokeStyle: isActive ? activeStroke : defaultStroke
-                        });
-
-                        if (typeof vexNote.setStemStyle === 'function') {
-                            vexNote.setStemStyle({
-                                strokeStyle: isActive ? activeStroke : defaultStroke
-                            });
-                        }
-                    }
 
                     // Store clickable region for this note/rest
                     try {
@@ -3859,56 +3879,66 @@ function startMeasurePlayback(canvas, measureIndex) {
 function stopMeasurePlayback(canvas) {
     const state = activePlaybackState.get(canvas);
     if (!state || !state.isPlaying) return;
-    
+
     const piano = getPiano();
     const synth = getInstrument();
-    
+
     // Get the measure index before clearing state
     const previousMeasureIndex = state.activeMeasureIndex >= 0 ? state.activeMeasureIndex : activeMeasureIndex;
-    
+
     // Stop all active chord notes and remove from activeNotes
     state.activeChordNotes.forEach(note => {
         piano.triggerRelease(note, Tone.now());
-        
+
         // Remove from activeNotes for highlighting (format: "measure-0-pitch")
         if (previousMeasureIndex >= 0) {
             const noteId = `${previousMeasureIndex}-0-${note}`;
             activeNotes.delete(noteId);
         }
-        
+
         // Remove visual feedback
         const keyEl = document.getElementById(getNoteKeyId(note));
         if (keyEl) {
             keyEl.classList.remove('active-progression');
         }
     });
-    
-    // Stop all active melody notes
+
+    // Stop all active melody notes and remove from activeNotes
+    // Get melody notes for this measure to properly remove them from activeNotes
+    if (previousMeasureIndex >= 0) {
+        const measureMelodyNotes = interactiveMelody.melodyNotes.filter(note => note.measure === previousMeasureIndex);
+        measureMelodyNotes.forEach(note => {
+            const noteBeat = typeof note.beat === 'number' ? note.beat : 0;
+            const noteId = `${previousMeasureIndex}-${noteBeat}-${note.pitch}`;
+            activeNotes.delete(noteId);
+        });
+    }
+
     state.activeMelodyNotes.forEach(note => {
         synth.triggerRelease(note, Tone.now());
-        
+
         // Remove visual feedback
         const keyEl = document.getElementById(getNoteKeyId(note));
         if (keyEl) {
             keyEl.classList.remove('active-melody-playback');
         }
     });
-    
+
     // Clear any scheduled melody notes
     state.melodyTimeouts.forEach(timeoutId => {
         clearTimeout(timeoutId);
     });
-    
+
     // Reset state
     state.activeChordNotes = [];
     state.activeMelodyNotes = [];
     state.melodyTimeouts = [];
     state.isPlaying = false;
-    
+
     // Clear active measure highlighting
     activeMeasureIndex = -1;
     state.activeMeasureIndex = -1;
-    
+
     // Re-render canvas to remove highlighting if enabled
     // Use setTimeout to avoid blocking audio release
     if (highlightEnabled && previousMeasureIndex !== -1) {
@@ -4001,7 +4031,7 @@ export function stopStepMeasureMelody() {
     // Stop any currently playing measure
     Tone.Transport.stop();
     Tone.Transport.cancel();
-    
+
     const piano = getPiano();
     const synth = getInstrument();
     if (piano) {
@@ -4014,19 +4044,28 @@ export function stopStepMeasureMelody() {
             synth.releaseAll(Tone.now());
         } catch (e) {}
     }
-    
-    // Clear highlights
-    if (window.clearHighlights) {
-        window.clearHighlights();
-    }
-    
+
+    // Clear keyboard highlights
+    document.querySelectorAll('.active-melody-playback').forEach(key => {
+        key.classList.remove('active-melody-playback');
+    });
+    document.querySelectorAll('.active-progression').forEach(key => {
+        key.classList.remove('active-progression');
+    });
+
+    // Clear active notes for highlighting
+    activeNotes.clear();
+
+    // Clear active measure highlighting
+    activeMeasureIndex = -1;
+
     // Advance to next measure
     const progressionData = getProgressionData();
     if (progressionData && progressionData.length > 0 && currentStepMeasureIndex >= 0) {
         const nextIndex = (currentStepMeasureIndex + 1) % progressionData.length;
         selectedMeasureIndex = nextIndex;
         currentStepMeasureIndex = nextIndex;
-        
+
         // Re-render canvas to show new selection
         const canvas = document.getElementById('interactive-melody-notation-canvas');
         if (canvas) {
@@ -4246,24 +4285,34 @@ export function playFromSelectedMeasure() {
 export function playMeasure(measureIndex) {
     const progressionData = getProgressionData();
     if (!progressionData || progressionData.length === 0) return;
-    
+
     // Calculate numMeasures to allow melody notes beyond chord progression
-    const maxMeasureFromMelody = interactiveMelody.melodyNotes.length > 0 
+    const maxMeasureFromMelody = interactiveMelody.melodyNotes.length > 0
         ? Math.max(...interactiveMelody.melodyNotes.map(n => n.measure)) + 1
         : 0;
     const numMeasures = Math.max(progressionData.length, maxMeasureFromMelody);
-    
+
     if (measureIndex < 0 || measureIndex >= numMeasures) return;
-    
+
     initAudio();
     if (!getAudioIsReady()) {
         alert('Audio not ready. Please wait...');
         return;
     }
-    
+
     const piano = getPiano();
     const synth = getInstrument();
-    
+
+    // Helper function to update canvas rendering
+    const updateCanvas = () => {
+        requestAnimationFrame(() => {
+            const canvas = document.getElementById('interactive-melody-notation-canvas');
+            if (canvas && window.renderInteractiveMelodyStaff) {
+                window.renderInteractiveMelodyStaff(canvas);
+            }
+        });
+    };
+
     // Get chord for this measure - use the last chord if measure is beyond progression length
     const chordIndex = measureIndex < progressionData.length ? measureIndex : progressionData.length - 1;
     const chord = progressionData[chordIndex];
@@ -4278,45 +4327,87 @@ export function playMeasure(measureIndex) {
         getEnharmonicPreference()
     ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
     const chordNotes = [...rhNotes, ...lhNotes];
-    
+
+    // Set active measure for highlighting
+    activeMeasureIndex = measureIndex;
+
     // Play chord
     if (chordNotes.length > 0) {
+        // Calculate chord duration in seconds
+        const chordDurationSeconds = Tone.Time('1n').toSeconds();
+
         piano.triggerAttackRelease(chordNotes, '1n');
-        
-        // Visual feedback
+
+        // Add to activeNotes for highlighting (format: "measure-0-pitch")
         chordNotes.forEach(note => {
+            const noteId = `${measureIndex}-0-${note}`;
+            activeNotes.add(noteId);
+
+            // Visual feedback on keyboard
             const keyEl = document.getElementById(getNoteKeyId(note));
             if (keyEl) {
                 keyEl.classList.add('active-progression');
-                setTimeout(() => {
-                    keyEl.classList.remove('active-progression');
-                }, 2000);
             }
         });
+
+        // Update canvas to show chord highlighting
+        updateCanvas();
+
+        // Remove chord highlights after duration
+        setTimeout(() => {
+            chordNotes.forEach(note => {
+                const noteId = `${measureIndex}-0-${note}`;
+                activeNotes.delete(noteId);
+
+                const keyEl = document.getElementById(getNoteKeyId(note));
+                if (keyEl) {
+                    keyEl.classList.remove('active-progression');
+                }
+            });
+            updateCanvas();
+        }, chordDurationSeconds * 1000);
     }
-    
+
     // Get melody notes for this measure
     const measureMelodyNotes = interactiveMelody.melodyNotes.filter(note => note.measure === measureIndex);
-    
-    // Play melody notes sequentially (quarter notes)
+
+    // Play melody notes sequentially
     if (measureMelodyNotes.length > 0) {
         const tempo = interactiveMelody.tempo || 120;
         const beatDuration = 60.0 / tempo; // seconds per beat (based on tempo)
-        
+
         measureMelodyNotes.forEach((note, index) => {
-            const delay = index * beatDuration;
-            
+            if (note.type === 'rest') return; // Skip rests
+
+            const delay = note.beat * beatDuration; // Use actual beat position for timing
+
             setTimeout(() => {
-                synth.triggerAttackRelease(note.pitch, '4n');
-                
-                // Visual feedback
+                const noteDuration = note.duration ? Tone.Time(note.duration).toSeconds() : 0.5;
+                synth.triggerAttackRelease(note.pitch, noteDuration);
+
+                // Add to activeNotes for highlighting (format: "measure-beat-pitch")
+                const noteBeat = typeof note.beat === 'number' ? note.beat : index;
+                const noteId = `${measureIndex}-${noteBeat}-${note.pitch}`;
+                activeNotes.add(noteId);
+
+                // Update canvas to show note highlighting
+                updateCanvas();
+
+                // Visual feedback on keyboard
                 const keyEl = document.getElementById(getNoteKeyId(note.pitch));
                 if (keyEl) {
                     keyEl.classList.add('active-melody-playback');
-                    setTimeout(() => {
-                        keyEl.classList.remove('active-melody-playback');
-                    }, 400);
                 }
+
+                // Remove highlights after note duration
+                setTimeout(() => {
+                    activeNotes.delete(noteId);
+                    updateCanvas();
+
+                    if (keyEl) {
+                        keyEl.classList.remove('active-melody-playback');
+                    }
+                }, noteDuration * 1000);
             }, delay * 1000);
         });
     }

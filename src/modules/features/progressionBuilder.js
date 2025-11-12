@@ -1313,9 +1313,11 @@ function renderStaffNotation(chordIndex, canvas) {
             });
         }
 
-        // Reset canvas dimensions to prevent squishing
-        // The canvas width should stay at 350px
-        canvas.width = 350;
+        // Reset canvas dimensions using device pixel ratio and actual container width
+        // This avoids browser CSS downscaling that can make glyphs look compressed
+        const parentWidth = (canvas.parentElement && canvas.parentElement.clientWidth) ? canvas.parentElement.clientWidth : 170;
+        // Clamp display width to the card's inner width range (prevents overflow and squish)
+        const displayWidth = Math.max(160, Math.min(parentWidth, 170));
 
         // Set canvas height BEFORE clearing or rendering (changing height clears canvas)
         // Check if we need extra height for ottava brackets
@@ -1323,11 +1325,17 @@ function renderStaffNotation(chordIndex, canvas) {
         const bassNeedsOttava = bassNotes.length > 0 && bassNotes[0].ottavaType;
         const needsExtraHeight = trebleNeedsOttava || bassNeedsOttava;
         
-        if (trebleNotes.length > 0 && bassNotes.length > 0) {
-            canvas.height = needsExtraHeight ? 220 : 200;
-        } else {
-            canvas.height = needsExtraHeight ? 140 : 120;
-        }
+        // Use a shorter height to avoid a tall, stretched appearance on narrow cards
+        const displayHeight = (trebleNotes.length > 0 && bassNotes.length > 0)
+            ? (needsExtraHeight ? 195 : 175)
+            : (needsExtraHeight ? 125 : 110);
+        
+        // Render at exact CSS size to avoid aspect distortion
+        canvas.width = displayWidth;
+        canvas.height = displayHeight;
+        // Match CSS size to display size (no additional CSS scaling)
+        canvas.style.width = `${displayWidth}px`;
+        canvas.style.height = `${displayHeight}px`;
 
         // Clear canvas completely
         const context = canvas.getContext('2d');
@@ -1340,10 +1348,11 @@ function renderStaffNotation(chordIndex, canvas) {
 
         let yOffset = 10;
 
-        // Calculate stave width to fit within card (accommodate key signatures with many sharps/flats)
-        // Canvas is 350px wide - use 165px width as requested
-        const staveWidth = 165; // Set to 165px to accommodate key signatures with many accidentals
-        const staveX = 0; // Left margin set to 0px as requested
+        // Calculate stave width based on actual display width (minimize unused margins)
+        // Leave small margins to avoid clipping clef/key signatures
+        const horizontalMargin = 6;
+        const staveWidth = Math.max(120, displayWidth - (horizontalMargin * 2));
+        const staveX = Math.max(2, horizontalMargin - 1);
 
         // Render treble clef if there are treble notes
         if (trebleNotes.length > 0) {
@@ -1360,11 +1369,28 @@ function renderStaffNotation(chordIndex, canvas) {
                 // Continue without key signature - accidentals will still be shown per-note
             }
 
+            // Try to move the starting X for notes to the right (more space after clef/key signature)
+            try {
+                if (typeof stave.setNoteStartX === 'function') {
+                    // Slightly reduce offset to nudge notes left a bit
+                    stave.setNoteStartX(stave.getX() + 40);
+                }
+            } catch (e) {
+                // Ignore if API not available
+            }
+
             stave.setContext(ctx).draw();
 
             // Create a single chord (all notes stacked)
             const keys = trebleNotes.map(n => n.note);
             const staveNote = new StaveNote({ clef: 'treble', keys: keys, duration: 'w' });
+            // Push notes to the right of the clef for better centering
+            try {
+                // Positive x-shift moves the glyphs to the right
+                staveNote.setXShift(18);
+            } catch (e) {
+                // Ignore if API differs
+            }
 
             // Add accidentals only for notes NOT in the key signature
             trebleNotes.forEach((n, idx) => {
@@ -1425,7 +1451,8 @@ function renderStaffNotation(chordIndex, canvas) {
                 }
             }
 
-            yOffset += 80;
+            // Inter-staff spacing tuned to avoid overlap/clipping at this height
+            yOffset += 70;
         }
 
         // Render bass clef if there are bass notes
@@ -1443,11 +1470,26 @@ function renderStaffNotation(chordIndex, canvas) {
                 // Continue without key signature - accidentals will still be shown per-note
             }
 
+            // Try to move the starting X for notes to the right (more space after clef/key signature)
+            try {
+                if (typeof stave.setNoteStartX === 'function') {
+                    stave.setNoteStartX(stave.getX() + 40);
+                }
+            } catch (e) {
+                // Ignore if API not available
+            }
+
             stave.setContext(ctx).draw();
 
             // Create a single chord (all notes stacked)
             const keys = bassNotes.map(n => n.note);
             const staveNote = new StaveNote({ clef: 'bass', keys: keys, duration: 'w' });
+            // Push notes to the right of the clef for better centering
+            try {
+                staveNote.setXShift(18);
+            } catch (e) {
+                // Ignore if API differs
+            }
 
             // Add accidentals only for notes NOT in the key signature
             bassNotes.forEach((n, idx) => {
@@ -1771,18 +1813,18 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
     trainerState.progressionData.forEach((chordData, index) => {
         // Create wrapper container for controls above and card below
         const wrapper = document.createElement('div');
-        wrapper.className = 'flex flex-col items-center w-full max-w-[200px] relative';
+        wrapper.className = 'flex flex-col items-center w-full max-w-[170px] relative';
         // Make wrapper draggable for Sortable
         wrapper.setAttribute('data-index', index);
         
         // Controls container above the card (centered)
         // Position relative with z-index to appear on top of expanded cards
         const topControls = document.createElement('div');
-        topControls.className = 'flex items-center justify-center gap-2 mb-1 relative z-10';
+        topControls.className = 'flex items-center justify-center gap-1 mb-0.5 relative z-10';
         
         const playBtn = document.createElement('button');
-        playBtn.innerHTML = '<svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.841z"></path></svg>Play';
-        playBtn.className = 'px-2 py-1 text-xs font-semibold bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 active:bg-indigo-300 transition no-drag';
+        playBtn.innerHTML = '<svg class="w-2.5 h-2.5 inline mr-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.841z"></path></svg>Play';
+        playBtn.className = 'px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 active:bg-indigo-300 transition no-drag';
         playBtn.setAttribute('data-chord-index', index);
         playBtn.onmousedown = (e) => {
             e.stopPropagation();
@@ -1804,8 +1846,8 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
 
         // Add Staff Notation Toggle button (icon only, next to Play)
         const staffToggleBtn = document.createElement('button');
-        staffToggleBtn.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>';
-        staffToggleBtn.className = 'p-1 text-teal-600 rounded-full hover:bg-teal-100 transition';
+        staffToggleBtn.innerHTML = '<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>';
+        staffToggleBtn.className = 'p-0.5 text-teal-600 rounded-full hover:bg-teal-100 transition';
         staffToggleBtn.title = 'Toggle staff notation view';
         staffToggleBtn.setAttribute('data-chord-index', index);
         staffToggleBtn.onclick = (e) => {
@@ -1822,7 +1864,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         
         // Create the card itself
         const card = document.createElement('div');
-        card.className = 'p-1.5 bg-indigo-50 rounded-lg shadow border border-indigo-200 flex flex-col gap-1 progression-chord-item w-full';
+        card.className = 'p-1 bg-indigo-50 rounded-lg shadow border border-indigo-200 flex flex-col gap-0.5 progression-chord-item w-full';
         // Prevent text selection during drag
         card.style.userSelect = 'none';
         card.style.webkitUserSelect = 'none';
@@ -1846,12 +1888,12 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         nameContainer.className = 'flex flex-col text-left';
 
         const romanEl = document.createElement('span');
-        romanEl.className = 'font-mono font-bold text-base text-indigo-700 leading-none';
+        romanEl.className = 'font-mono font-bold text-sm text-indigo-700 leading-tight';
         romanEl.textContent = chordData.roman;
         nameContainer.appendChild(romanEl);
 
         const simpleNameEl = document.createElement('span');
-        simpleNameEl.className = 'px-1 font-sans text-xs text-gray-500 leading-none';
+        simpleNameEl.className = 'px-0.5 font-sans text-[10px] text-gray-500 leading-tight';
         simpleNameEl.textContent = chordData.simpleName || '';
         nameContainer.appendChild(simpleNameEl);
 
@@ -1859,14 +1901,14 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         const functionLabel = getChordFunction(chordData.roman);
         if (functionLabel) {
             const functionEl = document.createElement('span');
-            functionEl.className = 'px-1 font-sans text-xs text-indigo-500 font-medium leading-none';
+            functionEl.className = 'px-0.5 font-sans text-[10px] text-indigo-500 font-medium leading-tight';
             functionEl.textContent = functionLabel;
             nameContainer.appendChild(functionEl);
         }
         
         // Add scale notes indicator (shows which scale notes work over this chord)
         const scaleNotesEl = document.createElement('span');
-        scaleNotesEl.className = 'px-1 font-sans text-xs text-purple-500 leading-none cursor-help whitespace-nowrap overflow-hidden text-ellipsis block';
+        scaleNotesEl.className = 'px-0.5 font-sans text-[9px] text-purple-500 leading-tight cursor-help whitespace-nowrap overflow-hidden text-ellipsis block';
         const trainerState = getTrainerState();
         const scaleNotes = trainerState.scaleNotes || [];
         const chordNotes = chordData.notes || [];
@@ -1885,7 +1927,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
 
         // Delete button in header (right side)
         const deleteBtn = document.createElement('button');
-        deleteBtn.innerHTML = '<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>';
+        deleteBtn.innerHTML = '<svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>';
         deleteBtn.className = 'p-0.5 text-gray-400 rounded-full hover:bg-gray-200 hover:text-gray-600 transition flex-shrink-0';
         deleteBtn.title = 'Remove Chord';
         deleteBtn.onmousedown = (e) => {
@@ -1910,23 +1952,26 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         // This will be shown when toggled, replacing all other card content
         const staffContainer = document.createElement('div');
         staffContainer.id = `staff-notation-${index}`;
-        staffContainer.className = 'hidden p-2 bg-white rounded w-full';
+        staffContainer.className = 'hidden p-1 bg-white rounded w-full overflow-hidden';
         const staffCanvas = document.createElement('canvas');
         staffCanvas.id = `staff-canvas-${index}`;
-        staffCanvas.width = 350;
-        staffCanvas.height = 200;
+        // Render at 220px to give VexFlow room to space notes far from clef
+        staffCanvas.width = 220;
+        staffCanvas.height = 150;
+        // Display at 100% of card width
         staffCanvas.style.width = '100%';
-        staffCanvas.style.maxWidth = '350px';
+        staffCanvas.style.maxWidth = '100%';
         staffCanvas.style.height = 'auto';
+        staffCanvas.style.display = 'block';
         staffContainer.appendChild(staffCanvas);
         card.appendChild(staffContainer);
 
         // Chord Type Selector with Quality Indicator
         const typeSelectContainer = document.createElement('div');
-        typeSelectContainer.className = 'relative mt-0.5';
+        typeSelectContainer.className = 'relative mt-0';
         
         const typeSelect = document.createElement('select');
-        typeSelect.className = 'w-full p-1 pr-6 text-xs border border-gray-300 rounded';
+        typeSelect.className = 'w-full p-0.5 pr-5 text-[10px] border border-gray-300 rounded';
         Object.keys(CHORD_DEFINITIONS).forEach(type => {
             const option = document.createElement('option');
             option.value = type;
@@ -1946,23 +1991,23 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
 
         // Voicing editor for RH chord
         const editor = document.createElement('div');
-        editor.className = 'flex flex-wrap gap-x-2 gap-y-0.5 items-center p-1 mt-1 rounded bg-gray-50 border';
+        editor.className = 'flex flex-wrap gap-x-1 gap-y-0.5 items-center p-0.5 mt-0.5 rounded bg-gray-50 border';
 
         const voicingLabelContainer = document.createElement('div');
-        voicingLabelContainer.className = 'w-full flex items-center justify-between mb-0.5';
+        voicingLabelContainer.className = 'w-full flex items-center justify-between mb-0';
         
         const voicingLabel = document.createElement('h4');
-        voicingLabel.className = 'text-xs font-semibold text-indigo-600';
+        voicingLabel.className = 'text-[10px] font-semibold text-indigo-600';
         voicingLabel.textContent = 'Voicing';
         voicingLabelContainer.appendChild(voicingLabel);
 
         // Add "All" and "None" buttons for RH voicing
         const buttonContainer = document.createElement('div');
-        buttonContainer.className = 'flex gap-1';
+        buttonContainer.className = 'flex gap-0.5';
         
         const allButton = document.createElement('button');
         allButton.textContent = 'All';
-        allButton.className = 'px-2 py-0.5 text-xs font-semibold bg-indigo-500 hover:bg-indigo-600 text-white rounded transition-colors';
+        allButton.className = 'px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-500 hover:bg-indigo-600 text-white rounded transition-colors';
         allButton.onmousedown = (e) => e.stopPropagation();
         allButton.onclick = (e) => {
             const wrapper = e.target.closest('#progression-visualization > div');
@@ -2013,7 +2058,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         
         const noneButton = document.createElement('button');
         noneButton.textContent = 'None';
-        noneButton.className = 'px-2 py-0.5 text-xs font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded transition-colors';
+        noneButton.className = 'px-1.5 py-0.5 text-[10px] font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded transition-colors';
         noneButton.onmousedown = (e) => e.stopPropagation();
         noneButton.onclick = (e) => {
             const wrapper = e.target.closest('#progression-visualization > div');
@@ -2068,17 +2113,17 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         editor.appendChild(voicingLabelContainer);
 
         const checkboxContainer = document.createElement('div');
-        checkboxContainer.className = 'w-full flex flex-wrap gap-x-3 gap-y-1 mb-2';
+        checkboxContainer.className = 'w-full flex flex-wrap gap-x-2 gap-y-0.5 mb-1';
 
         const notesForVoicing = chordData.notes || [];
         notesForVoicing.forEach(note => {
             const wrapper = document.createElement('label');
-            wrapper.className = 'flex items-center gap-1 cursor-pointer text-gray-700 text-xs';
+            wrapper.className = 'flex items-center gap-0.5 cursor-pointer text-gray-700 text-[10px]';
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.value = note;
             checkbox.checked = !(chordData.omittedNotes || []).includes(note);
-            checkbox.className = 'w-3 h-3 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500';
+            checkbox.className = 'w-2.5 h-2.5 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500';
         checkbox.onmousedown = (e) => e.stopPropagation();
             checkbox.onchange = (e) => {
                 const cardWrapper = e.target.closest(`#${containerId} > div`);
@@ -2093,20 +2138,20 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
 
         // Inversion Selector with Suggestions
         const invContainer = document.createElement('div');
-        invContainer.className = 'mt-2';
+        invContainer.className = 'mt-0.5';
         
         const invLabelContainer = document.createElement('div');
-        invLabelContainer.className = 'flex items-center justify-between mb-1';
+        invLabelContainer.className = 'flex items-center justify-between mb-0.5';
         
         const invLabel = document.createElement('label');
-        invLabel.className = 'block text-xs font-medium text-gray-600';
+        invLabel.className = 'block text-[10px] font-medium text-gray-600';
         invLabel.textContent = 'Inversion:';
         invLabelContainer.appendChild(invLabel);
         
         // Add suggestion button with tooltip
         const suggestionBtn = document.createElement('button');
         suggestionBtn.type = 'button';
-        suggestionBtn.textContent = '💡 Suggest';
+        suggestionBtn.textContent = '💡';
         suggestionBtn.title = 'Hover to see inversion suggestion';
         suggestionBtn.onmousedown = (e) => e.stopPropagation();
         
@@ -2115,10 +2160,10 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             const suggestion = suggestInversion(index);
             if (suggestion) {
                 // Green-tinted when there is a suggestion
-                suggestionBtn.className = 'px-1.5 py-0.5 text-xs bg-green-100 hover:bg-green-200 text-green-700 rounded transition-colors relative';
+                suggestionBtn.className = 'px-1 py-0.5 text-[10px] bg-green-100 hover:bg-green-200 text-green-700 rounded transition-colors relative';
             } else {
                 // Red-tinted when there is no suggestion
-                suggestionBtn.className = 'px-1.5 py-0.5 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors relative';
+                suggestionBtn.className = 'px-1 py-0.5 text-[10px] bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors relative';
             }
         };
         
@@ -2128,9 +2173,9 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         // Create tooltip container - append to body to avoid z-index issues
         const tooltipContainer = document.createElement('div');
         tooltipContainer.id = `inversion-tooltip-${index}`;
-        tooltipContainer.className = 'fixed bg-white border border-gray-300 rounded-lg shadow-xl z-[9999] p-3';
+        tooltipContainer.className = 'fixed bg-white border border-gray-300 rounded-lg shadow-xl z-[9999] p-2';
         tooltipContainer.style.display = 'none';
-        tooltipContainer.style.width = '280px';
+        tooltipContainer.style.width = '240px';
         document.body.appendChild(tooltipContainer);
         
         // Show tooltip on hover
@@ -2149,9 +2194,9 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             
             if (suggestion) {
                 tooltipContainer.innerHTML = `
-                    <div class="text-xs font-semibold text-indigo-700 mb-1">Suggested: ${suggestion.inversionName}</div>
-                    <div class="text-xs text-gray-600 mb-2">${suggestion.reason}</div>
-                    <button class="w-full px-2 py-1 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded transition-colors">
+                    <div class="text-[10px] font-semibold text-indigo-700 mb-0.5">Suggested: ${suggestion.inversionName}</div>
+                    <div class="text-[10px] text-gray-600 mb-1.5">${suggestion.reason}</div>
+                    <button class="w-full px-2 py-0.5 text-[10px] font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded transition-colors">
                         Accept
                     </button>
                 `;
@@ -2172,7 +2217,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
                 tooltipContainer.style.display = 'block';
             } else {
                 tooltipContainer.innerHTML = `
-                    <div class="text-xs text-gray-600">No suggestion available. Current inversion is already optimal or no previous chord to compare.</div>
+                    <div class="text-[10px] text-gray-600">No suggestion available. Current inversion is already optimal or no previous chord to compare.</div>
                 `;
                 tooltipContainer.style.display = 'block';
             }
@@ -2197,7 +2242,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         
         // Inversion button switches
         const invButtonContainer = document.createElement('div');
-        invButtonContainer.className = 'flex gap-1';
+        invButtonContainer.className = 'flex gap-0.5';
         
         const def = CHORD_DEFINITIONS[chordData.type];
         const maxInversion = def ? def.intervals.length - 1 : 0;
@@ -2210,7 +2255,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             invButton.type = 'button';
             invButton.textContent = invIndex === 0 ? 'R' : invIndex.toString();
             invButton.setAttribute('data-inversion', invIndex);
-            invButton.className = `flex-1 px-2 py-1 text-xs font-semibold rounded transition-colors ${
+            invButton.className = `flex-1 px-1 py-0.5 text-[10px] font-semibold rounded transition-colors ${
                 invIndex === currentInversion
                     ? 'bg-indigo-600 text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -2225,9 +2270,9 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
                 invButtonContainer.querySelectorAll('button').forEach((btn) => {
                     const btnInversion = parseInt(btn.getAttribute('data-inversion'));
                     if (btnInversion === selectedInversion) {
-                        btn.className = 'flex-1 px-2 py-1 text-xs font-semibold rounded transition-colors bg-indigo-600 text-white';
+                        btn.className = 'flex-1 px-1 py-0.5 text-[10px] font-semibold rounded transition-colors bg-indigo-600 text-white';
                     } else {
-                        btn.className = 'flex-1 px-2 py-1 text-xs font-semibold rounded transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300';
+                        btn.className = 'flex-1 px-1 py-0.5 text-[10px] font-semibold rounded transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300';
                     }
                 });
                 // Update suggestion button color after inversion changes
@@ -2243,13 +2288,16 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         editor.appendChild(invContainer);
 
         // Octave Shift Selector
+        const octContainer = document.createElement('div');
+        octContainer.className = 'mt-0.5';
+        
         const octLabel = document.createElement('label');
-        octLabel.className = 'block text-xs font-medium text-gray-600 mt-2';
-        octLabel.textContent = 'Octave Shift:';
-        editor.appendChild(octLabel);
+        octLabel.className = 'block text-[10px] font-medium text-gray-600 mb-0.5';
+        octLabel.textContent = 'Octave Adj.:';
+        octContainer.appendChild(octLabel);
 
         const octSelect = document.createElement('select');
-        octSelect.className = 'w-full p-1 text-xs border border-gray-300 rounded';
+        octSelect.className = 'w-full p-0.5 text-[10px] border border-gray-300 rounded';
         // Reverse order: +3 at top, -3 at bottom
         for (let i = 3; i >= -3; i--) {
             const option = document.createElement('option');
@@ -2265,30 +2313,31 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         };
         octSelect.onmousedown = (e) => e.stopPropagation();
         octSelect.style.cursor = 'default';
-        editor.appendChild(octSelect);
+        octContainer.appendChild(octSelect);
+        editor.appendChild(octContainer);
 
         card.appendChild(editor);
 
         // Left Hand Controls
         const lhLabel = document.createElement('div');
-        lhLabel.className = 'text-xs text-gray-500 font-medium mt-1';
-        lhLabel.textContent = 'LH Accomp.';
+        lhLabel.className = 'text-[10px] text-gray-500 font-medium mt-0.5';
+        lhLabel.textContent = 'Left Hand:';
         card.appendChild(lhLabel);
 
         const lhContainer = document.createElement('div');
-        lhContainer.className = 'p-1 mt-0.5 rounded bg-gray-50 border';
+        lhContainer.className = 'p-0.5 mt-0 rounded bg-gray-50 border';
 
         const lhControlGrid = document.createElement('div');
-        lhControlGrid.className = 'grid grid-cols-2 gap-x-1 gap-y-0.5 items-end';
+        lhControlGrid.className = 'grid grid-cols-2 gap-x-0.5 gap-y-0.5 items-end';
 
         // LH Type Dropdown
         const lhTypeWrapper = document.createElement('div');
         lhTypeWrapper.className = 'col-span-2';
         const lhTypeLabel = document.createElement('label');
-        lhTypeLabel.className = 'block text-xs font-medium text-gray-600';
-        lhTypeLabel.textContent = 'LH Type';
+        lhTypeLabel.className = 'block text-[10px] font-medium text-gray-600';
+        lhTypeLabel.textContent = 'Type';
         const lhTypeSelect = document.createElement('select');
-        lhTypeSelect.className = 'w-full p-1 text-xs border border-gray-300 rounded';
+        lhTypeSelect.className = 'w-full p-0.5 text-[10px] border border-gray-300 rounded';
         
         // Copy options from source select, preserving text and title attributes
         const sourceSelect = document.getElementById('builder-lh-type-select');
@@ -2315,37 +2364,71 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         lhTypeWrapper.appendChild(lhTypeSelect);
         lhControlGrid.appendChild(lhTypeWrapper);
 
-        // LH Inversion Dropdown
+        // LH Inversion Buttons (similar to RH inversion buttons)
         const lhInvWrapper = document.createElement('div');
         lhInvWrapper.className = 'col-span-2';
         const lhInvLabel = document.createElement('label');
-        lhInvLabel.className = 'block text-xs font-medium text-gray-600';
-        lhInvLabel.textContent = 'LH Inversion';
-        const lhInversionSelect = document.createElement('select');
-        lhInversionSelect.className = 'w-full p-1 text-xs border border-gray-300 rounded';
-        const maxLhInversion = getMaxInversionForLhType(chordData.lhType);
-        for (let i = 0; i <= maxLhInversion; i++) {
-            lhInversionSelect.add(new Option(INVERSION_NAMES[i], i));
-        }
-        lhInversionSelect.value = chordData.lhInversion || 0;
-        lhInversionSelect.onchange = (e) => {
-            const wrapper = e.target.closest(`#${containerId} > div`);
-            const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
-            updateProgressionChordLH(currentIndex, 'lhInversion', e.target.value);
-        };
-        lhInversionSelect.onmousedown = (e) => e.stopPropagation();
+        lhInvLabel.className = 'block text-[10px] font-medium text-gray-600 mb-0.5';
+        lhInvLabel.textContent = 'Inversion:';
         lhInvWrapper.appendChild(lhInvLabel);
-        lhInvWrapper.appendChild(lhInversionSelect);
+        
+        const lhInvButtonContainer = document.createElement('div');
+        lhInvButtonContainer.className = 'flex gap-0.5';
+        
+        const maxLhInversion = getMaxInversionForLhType(chordData.lhType);
+        const currentLhInversion = chordData.lhInversion || 0;
+        
+        // Only show inversion buttons if LH type is not 'off' and has inversions available
+        if (chordData.lhType && chordData.lhType !== 'off' && maxLhInversion > 0) {
+            // Create buttons for R, 1, 2, 3 (up to maxLhInversion)
+            for (let invIndex = 0; invIndex <= Math.min(maxLhInversion, 3); invIndex++) {
+                const lhInvButton = document.createElement('button');
+                lhInvButton.type = 'button';
+                lhInvButton.textContent = invIndex === 0 ? 'R' : invIndex.toString();
+                lhInvButton.setAttribute('data-lh-inversion', invIndex);
+                lhInvButton.className = `flex-1 px-1 py-0.5 text-[10px] font-semibold rounded transition-colors ${
+                    invIndex === currentLhInversion
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`;
+                lhInvButton.onclick = (e) => {
+                    e.stopPropagation();
+                    const wrapper = e.target.closest(`#${containerId} > div`);
+                    const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+                    const selectedLhInversion = parseInt(e.target.getAttribute('data-lh-inversion'));
+                    updateProgressionChordLH(currentIndex, 'lhInversion', selectedLhInversion);
+                    // Update button states
+                    lhInvButtonContainer.querySelectorAll('button').forEach((btn) => {
+                        const btnInversion = parseInt(btn.getAttribute('data-lh-inversion'));
+                        if (btnInversion === selectedLhInversion) {
+                            btn.className = 'flex-1 px-1 py-0.5 text-[10px] font-semibold rounded transition-colors bg-indigo-600 text-white';
+                        } else {
+                            btn.className = 'flex-1 px-1 py-0.5 text-[10px] font-semibold rounded transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300';
+                        }
+                    });
+                };
+                lhInvButton.onmousedown = (e) => e.stopPropagation();
+                lhInvButtonContainer.appendChild(lhInvButton);
+            }
+        } else {
+            // Show disabled state when LH is off or no inversions available
+            const disabledText = document.createElement('div');
+            disabledText.className = 'text-[10px] text-gray-400 italic py-0.5';
+            disabledText.textContent = chordData.lhType === 'off' ? 'Off' : 'N/A';
+            lhInvButtonContainer.appendChild(disabledText);
+        }
+        
+        lhInvWrapper.appendChild(lhInvButtonContainer);
         lhControlGrid.appendChild(lhInvWrapper);
 
         // LH Octave Dropdown
         const lhOctWrapper = document.createElement('div');
         lhOctWrapper.className = 'col-span-2';
         const lhOctLabel = document.createElement('label');
-        lhOctLabel.className = 'block text-xs font-medium text-gray-600';
-        lhOctLabel.textContent = 'LH Octave';
+        lhOctLabel.className = 'block text-[10px] font-medium text-gray-600 mb-0.5';
+        lhOctLabel.textContent = 'Octave Adj.:';
         const lhOctaveSelect = document.createElement('select');
-        lhOctaveSelect.className = 'w-full p-1 text-xs border border-gray-300 rounded';
+        lhOctaveSelect.className = 'w-full p-0.5 text-[10px] border border-gray-300 rounded';
         lhOctaveSelect.innerHTML = document.getElementById('builder-lh-octave-select').innerHTML;
         lhOctaveSelect.value = chordData.lhOctaveShift || '-12';
         lhOctaveSelect.onchange = (e) => {
@@ -2362,14 +2445,14 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
 
         // LH Voicing Editor
         const lhVoicingEditor = document.createElement('div');
-        lhVoicingEditor.className = 'p-1 mt-1 rounded bg-gray-100 border-t';
+        lhVoicingEditor.className = 'p-0.5 mt-0.5 rounded bg-gray-100 border-t';
         
         const lhVoicingLabelContainer = document.createElement('div');
-        lhVoicingLabelContainer.className = 'w-full flex items-center justify-between mb-0.5';
+        lhVoicingLabelContainer.className = 'w-full flex items-center justify-between mb-0';
         
         const lhVoicingLabel = document.createElement('h4');
-        lhVoicingLabel.className = 'text-xs font-semibold text-indigo-600';
-        lhVoicingLabel.textContent = 'LH Voicing';
+        lhVoicingLabel.className = 'text-[10px] font-semibold text-indigo-600';
+        lhVoicingLabel.textContent = 'Voicing';
         lhVoicingLabelContainer.appendChild(lhVoicingLabel);
 
         const allLhNotes = getLHNotes(
@@ -2385,11 +2468,11 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         if (allLhNotes.length > 0) {
             // Add "All" and "None" buttons for LH voicing
             const lhButtonContainer = document.createElement('div');
-            lhButtonContainer.className = 'flex gap-1';
+            lhButtonContainer.className = 'flex gap-0.5';
             
             const lhAllButton = document.createElement('button');
             lhAllButton.textContent = 'All';
-            lhAllButton.className = 'px-2 py-0.5 text-xs font-semibold bg-indigo-500 hover:bg-indigo-600 text-white rounded transition-colors';
+            lhAllButton.className = 'px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-500 hover:bg-indigo-600 text-white rounded transition-colors';
             lhAllButton.onmousedown = (e) => e.stopPropagation();
             lhAllButton.onclick = (e) => {
                 const wrapper = e.target.closest(`#${containerId} > div`);
@@ -2438,7 +2521,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             
             const lhNoneButton = document.createElement('button');
             lhNoneButton.textContent = 'None';
-            lhNoneButton.className = 'px-2 py-0.5 text-xs font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded transition-colors';
+            lhNoneButton.className = 'px-1.5 py-0.5 text-[10px] font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded transition-colors';
             lhNoneButton.onmousedown = (e) => e.stopPropagation();
             lhNoneButton.onclick = (e) => {
                 const wrapper = e.target.closest(`#${containerId} > div`);
@@ -2490,16 +2573,16 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             lhVoicingEditor.appendChild(lhVoicingLabelContainer);
 
             const lhCheckboxContainer = document.createElement('div');
-            lhCheckboxContainer.className = 'flex flex-wrap gap-x-3 gap-y-1';
+            lhCheckboxContainer.className = 'flex flex-wrap gap-x-2 gap-y-0.5';
             
             allLhNotes.forEach(note => {
                 const wrapper = document.createElement('label');
-                wrapper.className = 'flex items-center gap-1 cursor-pointer text-gray-700 text-xs';
+                wrapper.className = 'flex items-center gap-0.5 cursor-pointer text-gray-700 text-[10px]';
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.value = note;
                 checkbox.checked = !(chordData.lhOmittedNotes || []).includes(note);
-                checkbox.className = 'w-3 h-3 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 lh-voicing-checkbox';
+                checkbox.className = 'w-2.5 h-2.5 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 lh-voicing-checkbox';
         checkbox.onmousedown = (e) => e.stopPropagation();
                 checkbox.onchange = (e) => {
                     const cardWrapper = e.target.closest(`#${containerId} > div`);
@@ -4679,4 +4762,345 @@ export function handleRedo() {
 function saveStateBeforeChange() {
     const currentState = captureProgressionState();
     saveState(currentState);
+}
+
+/**
+ * Parse a delimited chord list string into an array of chord symbols
+ * Supports various delimiters: spaces, commas, dashes, pipes, etc.
+ * @param {string} chordListString - The chord list string (e.g., "C - F - Am - G" or "C, F, Am, G")
+ * @returns {Array<string>} Array of chord symbols
+ */
+function parseChordList(chordListString) {
+    if (!chordListString || typeof chordListString !== 'string') {
+        return [];
+    }
+    
+    // Trim the string
+    let trimmed = chordListString.trim();
+    if (!trimmed) {
+        return [];
+    }
+    
+    // Split by common delimiters: comma, dash, pipe, or multiple spaces
+    // Use regex to split on one or more of: comma, dash, pipe, or whitespace
+    const chords = trimmed
+        .split(/[,|\-–—]|\s+/)
+        .map(chord => chord.trim())
+        .filter(chord => chord.length > 0);
+    
+    return chords;
+}
+
+/**
+ * Parse a chord symbol and determine its root and type
+ * @param {string} chordSymbol - Chord symbol (e.g., "C", "Am", "F#m7", "Gsus4")
+ * @returns {Object|null} Object with root and type, or null if invalid
+ */
+function parseChordSymbol(chordSymbol) {
+    if (!chordSymbol || typeof chordSymbol !== 'string') {
+        return null;
+    }
+    
+    // Match pattern: [A-G][#b]?[type/extensions]
+    const match = chordSymbol.match(/^([A-G])([#b]?)(.*)$/);
+    if (!match) {
+        return null;
+    }
+    
+    const root = match[1] + match[2]; // e.g., "C", "F#", "Bb"
+    const typeAndExtensions = match[3]; // e.g., "m", "m7", "maj7", "sus4", ""
+    
+    // Determine chord type from the suffix
+    let chordType = 'Major'; // default
+    if (typeAndExtensions.startsWith('m') && !typeAndExtensions.startsWith('maj')) {
+        chordType = 'Minor';
+    } else if (typeAndExtensions.includes('dim')) {
+        chordType = 'Diminished';
+    } else if (typeAndExtensions.includes('aug')) {
+        chordType = 'Augmented';
+    } else if (typeAndExtensions.includes('sus')) {
+        chordType = typeAndExtensions.includes('sus2') ? 'Sus2' : 'Sus4';
+    } else if (typeAndExtensions.includes('7')) {
+        if (typeAndExtensions.includes('maj7') || typeAndExtensions.includes('M7')) {
+            chordType = 'Major 7th';
+        } else if (typeAndExtensions.startsWith('m7')) {
+            chordType = 'Minor 7th';
+        } else {
+            chordType = 'Dominant 7th';
+        }
+    } else if (typeAndExtensions.includes('9')) {
+        if (typeAndExtensions.includes('maj9') || typeAndExtensions.includes('M9')) {
+            chordType = 'Major 9th';
+        } else if (typeAndExtensions.startsWith('m9')) {
+            chordType = 'Minor 9th';
+        } else {
+            chordType = 'Dominant 9th';
+        }
+    }
+    
+    return { root, type: chordType };
+}
+
+/**
+ * Import a chord list string into the progression
+ * @param {string} mode - Either 'replace' or 'append'
+ */
+export function importChordList(mode = 'replace') {
+    const input = document.getElementById('chord-list-input');
+    if (!input) {
+        console.error('Chord list input not found');
+        return;
+    }
+    
+    const chordListString = input.value.trim();
+    if (!chordListString) {
+        if (window.showModal) {
+            window.showModal('Please enter a chord list to import.', true);
+        }
+        return;
+    }
+    
+    // Parse the chord list
+    const chordSymbols = parseChordList(chordListString);
+    console.log('Parsed chord symbols:', chordSymbols);
+    if (chordSymbols.length === 0) {
+        if (window.showModal) {
+            window.showModal('No valid chords found in the input. Please check the format.', true);
+        }
+        return;
+    }
+    
+    // Get trainer state BEFORE clearing (if replacing)
+    let trainerState = getTrainerState();
+    const currentKey = trainerState.currentKey || 'C';
+    const keyForCalculation = currentKey.endsWith('m') ? currentKey.replace(/m$/, '') : currentKey;
+    const octaveShift = trainerState.octaveShift || 0;
+    const enharmonicPreference = getEnharmonicPreference();
+    const notationPreference = getNotationPreference();
+    
+    console.log('Import settings:', { mode, currentKey, keyForCalculation, octaveShift, enharmonicPreference });
+    
+    // Clear progression if replacing
+    if (mode === 'replace') {
+        clearProgression();
+        // Get fresh state after clearing
+        trainerState = getTrainerState();
+    }
+    
+    // Convert enharmonic preference to match the key if needed
+    const notes = enharmonicPreference === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+    
+    // Play shutter sound only once at the beginning
+    let shutterSoundPlayed = false;
+    if (window.getAudioIsReady && window.getCameraShutter) {
+        const audioIsReady = window.getAudioIsReady();
+        const cameraShutter = window.getCameraShutter();
+        if (audioIsReady && cameraShutter) {
+            cameraShutter.start();
+            shutterSoundPlayed = true;
+        }
+    }
+    
+    // Process each chord
+    const newChords = [];
+    let successCount = 0;
+    let errorCount = 0;
+    
+    chordSymbols.forEach((chordSymbol, index) => {
+        const parsed = parseChordSymbol(chordSymbol);
+        console.log(`Processing chord ${index + 1}/${chordSymbols.length}: "${chordSymbol}" ->`, parsed);
+        if (!parsed) {
+            console.warn(`Could not parse chord: ${chordSymbol}`);
+            errorCount++;
+            return;
+        }
+        
+        // Convert root to match enharmonic preference
+        let root = parsed.root;
+        // Check if root needs conversion
+        if (enharmonicPreference === 'sharp' && FLAT_NOTES.includes(root)) {
+            // Convert flat to sharp
+            const flatIndex = FLAT_NOTES.indexOf(root);
+            root = SHARP_NOTES[flatIndex];
+        } else if (enharmonicPreference === 'flat' && SHARP_NOTES.includes(root)) {
+            // Convert sharp to flat
+            const sharpIndex = SHARP_NOTES.indexOf(root);
+            root = FLAT_NOTES[sharpIndex];
+        }
+        
+        console.log(`  Root: ${parsed.root} -> ${root}, Type: ${parsed.type}`);
+        
+        // Get chord notes
+        const chordResult = getInvertedChordNotes(
+            root,
+            parsed.type,
+            0, // Default to root position (no inversion)
+            keyForCalculation,
+            octaveShift,
+            enharmonicPreference,
+            notationPreference
+        );
+        
+        console.log(`  Chord result:`, chordResult);
+        
+        if (!chordResult || !chordResult.specificNotes || chordResult.specificNotes.length === 0) {
+            console.warn(`Could not generate notes for chord: ${chordSymbol} (root: ${root}, type: ${parsed.type})`);
+            errorCount++;
+            return;
+        }
+        
+        // Calculate Roman numeral
+        const trainerKeyRootIndex = ALL_NOTES.indexOf(keyForCalculation);
+        let addedChordRootIndex = ALL_NOTES.indexOf(root);
+        if (addedChordRootIndex === -1) {
+            addedChordRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[root] || root);
+        }
+        if (addedChordRootIndex === -1) {
+            console.warn(`Could not find root note index for: ${root}`);
+            errorCount++;
+            return;
+        }
+        
+        const interval = (addedChordRootIndex - trainerKeyRootIndex + 12) % 12;
+        const scaleDegreeIndex = MAJOR_SCALE_STEPS.indexOf(interval);
+        
+        let romanNumeral = '?';
+        if (scaleDegreeIndex !== -1) {
+            const romanKeys = Object.keys(ROMAN_MAP_BASE);
+            // First try to find exact match (for basic triads)
+            let foundKey = romanKeys.find(key =>
+                ROMAN_MAP_BASE[key].index === scaleDegreeIndex &&
+                ROMAN_MAP_BASE[key].quality === parsed.type
+            );
+            
+            // If no exact match, find by scale degree index only (for extended chords)
+            if (!foundKey) {
+                foundKey = romanKeys.find(key => ROMAN_MAP_BASE[key].index === scaleDegreeIndex);
+            }
+            
+            romanNumeral = foundKey || '?';
+            
+            // For extended chords, append the extension to the Roman numeral
+            if (foundKey && parsed.type !== 'Major' && parsed.type !== 'Minor') {
+                // Add extension suffix (e.g., "I7" for "I Dominant 7th")
+                if (parsed.type.includes('7th')) {
+                    romanNumeral = romanNumeral + '7';
+                } else if (parsed.type.includes('9th')) {
+                    romanNumeral = romanNumeral + '9';
+                }
+            }
+        } else {
+            // Non-diatonic chord - use root note as identifier
+            romanNumeral = root;
+        }
+        
+        // Convert Roman numeral to minor case if the key is minor
+        const isMinorKey = currentKey && currentKey.endsWith('m');
+        if (isMinorKey && romanNumeral && romanNumeral !== '?') {
+            const minorMap = {
+                'I': 'i',
+                'ii': 'ii°',
+                'iii': 'III',
+                'IV': 'iv',
+                'V': 'v',
+                'vi': 'VI',
+                'vii°': 'VII'
+            };
+            romanNumeral = minorMap[romanNumeral] || romanNumeral;
+        }
+        
+        // Create chord data object
+        const chordData = {
+            roman: romanNumeral,
+            name: chordResult.name,
+            simpleName: chordResult.simpleName || chordResult.name,
+            notes: chordResult.specificNotes,
+            root: root,
+            type: parsed.type,
+            inversion: 0,
+            selectionMode: 'chord',
+            omittedNotes: [],
+            octaveShift: octaveShift,
+            lhType: 'off',
+            lhInversion: 0,
+            lhOctaveShift: -12,
+            lhOmittedNotes: [],
+            rhythmPattern: 'block',
+            isVoicingExpanded: true
+        };
+        
+        newChords.push(chordData);
+        successCount++;
+    });
+    
+    // Add all chords to progression
+    console.log(`Total chords to add: ${newChords.length}, Success: ${successCount}, Errors: ${errorCount}`);
+    if (newChords.length > 0) {
+        // Save state before adding
+        saveStateBeforeChange();
+        
+        // Get fresh state reference
+        trainerState = getTrainerState();
+        
+        // Ensure progressionData array exists
+        if (!trainerState.progressionData) {
+            trainerState.progressionData = [];
+        }
+        if (!trainerState.progressionRomans) {
+            trainerState.progressionRomans = [];
+        }
+        
+        console.log(`Before adding: progression has ${trainerState.progressionData.length} chords`);
+        
+        // Add chords to progression
+        newChords.forEach((chordData, idx) => {
+            console.log(`Adding chord ${idx + 1}:`, chordData);
+            trainerState.progressionData.push(chordData);
+            if (chordData.roman && !trainerState.progressionRomans.includes(chordData.roman)) {
+                trainerState.progressionRomans.push(chordData.roman);
+            }
+        });
+        
+        console.log(`After adding: progression has ${trainerState.progressionData.length} chords`);
+        
+        // Update state using setters
+        setProgressionData(trainerState.progressionData);
+        setProgressionRomans(trainerState.progressionRomans);
+        setIsReady(true);
+        
+        // Get fresh state after updating
+        trainerState = getTrainerState();
+        console.log(`State after setProgressionData: ${trainerState.progressionData.length} chords`);
+        
+        // Render progression display
+        console.log('Rendering progression display...');
+        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', false);
+        
+        // Update UI
+        updateProgressionControlsUI();
+        
+        // Clear the input
+        input.value = '';
+        
+        // Show success message
+        const message = mode === 'replace' 
+            ? `Replaced progression with ${successCount} chord${successCount !== 1 ? 's' : ''}.`
+            : `Appended ${successCount} chord${successCount !== 1 ? 's' : ''} to progression.`;
+        
+        if (errorCount > 0) {
+            if (window.showModal) {
+                window.showModal(`${message}\n\n${errorCount} chord${errorCount !== 1 ? 's' : ''} could not be parsed.`, false);
+            }
+        } else {
+            if (window.showModal) {
+                window.showModal(message, false);
+            }
+        }
+    } else {
+        console.error('No chords were successfully parsed!');
+        if (window.showModal) {
+            window.showModal('No valid chords could be imported. Please check the format.', true);
+        }
+    }
 }
