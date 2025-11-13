@@ -43,6 +43,9 @@ import {
 
 import { getTrainerState } from '../state/trainerState.js';
 
+// Import unified chord suggestion helpers for enhanced voice leading
+import { generateUnifiedChordSuggestions } from './unifiedChordSuggestions.js';
+
 // =========================================================================
 // Helper Function: Create Tooltip for Button
 // =========================================================================
@@ -344,176 +347,31 @@ function createChordButtonTooltip(button, chordName, chordDescription, chordType
 // =========================================================================
 
 /**
- * Generate chord suggestions based on music theory voice leading.
- * Picks next chord inversions that minimize bass motion from current inversion.
- * @param {string} currentChordType
- * @param {number} currentInversion
- * @param {string} rootNote
- * @param {string} enhPref
- * @param {string} notationPref
- * @param {string} mood - 'bright', 'dark', 'jazzy', or 'tense'
- * @returns {Array<{nextChord:string,nextInversion:number,reason:string}>}
+ * Generate chord suggestions using comprehensive voice leading analysis.
+ * Now uses the unified suggestion system with enhanced scoring that considers:
+ * - Bass movement (stepwise motion preferred)
+ * - Common tones between chords
+ * - Total voice movement minimization
+ * - Voice range positioning
+ * - Contrary motion between outer voices
+ *
+ * Returns 8-10 suggestions including multiple inversions per chord type.
+ *
+ * @param {string} currentChordType - Current chord type
+ * @param {number} currentInversion - Current inversion
+ * @param {string} rootNote - Root note (same root for all suggestions)
+ * @param {string} enhPref - Enharmonic preference (not used, kept for compatibility)
+ * @param {string} notationPref - Notation preference (not used, kept for compatibility)
+ * @param {string} style - Musical style ('balanced', 'pop', 'jazz', 'classical', 'rock', 'indie')
+ * @param {string} mood - Intended mood ('bright', 'dark', 'jazzy', 'tense', 'calm', 'energetic')
+ * @returns {Array<{nextChord:string, nextInversion:number, reason:string, confidence:number}>}
  */
-function generateChordSuggestions(currentChordType, currentInversion, rootNote, enhPref, notationPref, mood = 'bright') {
-    // Helper: get bass MIDI of a chord type/inversion at current root
-    const getBassMidi = (chordType, inversion) => {
-        const res = getInvertedChordNotes(
-            rootNote,
-            chordType,
-            inversion,
-            rootNote,
-            getBuilderOctaveShift ? getBuilderOctaveShift() : 0,
-            enhPref,
-            notationPref
-        );
-        const lowest = res.specificNotes && res.specificNotes.length ? res.specificNotes[0] : null;
-        return lowest ? noteToMidi(lowest) : null;
-    };
-    const currentBassMidi = getBassMidi(currentChordType, currentInversion);
-    // Helper: choose inversion for nextChord minimizing bass motion
-    const chooseOptimalInversion = (nextChordType) => {
-        const def = CHORD_DEFINITIONS[nextChordType];
-        if (!def) return 0;
-        let bestInv = 0;
-        let bestDiff = Infinity;
-        for (let i = 0; i < def.intervals.length; i++) {
-            const midi = getBassMidi(nextChordType, i);
-            if (midi === null || currentBassMidi === null) continue;
-            const diff = Math.abs(midi - currentBassMidi);
-            if (diff < bestDiff) {
-                bestDiff = diff;
-                bestInv = i;
-            }
-        }
-        return bestInv;
-    };
+function generateChordSuggestions(currentChordType, currentInversion, rootNote, enhPref, notationPref, style = 'balanced', mood = 'bright') {
+    // Use the comprehensive unified suggestion system
+    const suggestions = generateUnifiedChordSuggestions(currentChordType, rootNote, style, mood, currentInversion);
 
-    // Core suggestions per chord quality and mood
-    const raw = [];
-    
-    // Mood-based suggestions
-    if (mood === 'bright') {
-        switch (currentChordType) {
-            case 'Major':
-                raw.push({ nextChord: 'Major 7th', reason: 'Jazzy and bright extension of the major triad.' });
-                raw.push({ nextChord: 'Dominant 7th', reason: 'Creates uplifting forward motion.' });
-                raw.push({ nextChord: 'Add9', reason: 'Modern, open sound that adds color.' });
-                raw.push({ nextChord: 'Major 6th', reason: 'Sweet, retro feel with stable resolution.' });
-                break;
-            case 'Minor':
-                raw.push({ nextChord: 'Major', reason: 'Brightens the mood with major quality.' });
-                raw.push({ nextChord: 'Major 7th', reason: 'Lifts into major with jazz color.' });
-                raw.push({ nextChord: 'Add9', reason: 'Opens up the sound while maintaining major tonality.' });
-                break;
-            case 'Dominant 7th':
-                raw.push({ nextChord: 'Major 7th', reason: 'Resolves tension with a bright, stable sound.' });
-                raw.push({ nextChord: 'Major 6th', reason: 'Sweet resolution without the 7th.' });
-                raw.push({ nextChord: 'Sus2', reason: 'Open, airy sound that feels hopeful.' });
-                break;
-            default:
-                raw.push({ nextChord: 'Major 7th', reason: 'Bright, jazzy color.' });
-                raw.push({ nextChord: 'Major', reason: 'Clear, stable major tonality.' });
-                raw.push({ nextChord: 'Add9', reason: 'Modern, open sound.' });
-                break;
-        }
-    } else if (mood === 'dark') {
-        switch (currentChordType) {
-            case 'Major':
-                raw.push({ nextChord: 'Minor', reason: 'Shifts to melancholic minor quality.' });
-                raw.push({ nextChord: 'Diminished', reason: 'Unstable, tense leading tone.' });
-                raw.push({ nextChord: 'Minor 7th', reason: 'Soulful, darker color with 7th.' });
-                raw.push({ nextChord: 'Half-Diminished 7th', reason: 'Jazz tension with minor quality.' });
-                break;
-            case 'Minor':
-                raw.push({ nextChord: 'Diminished', reason: 'Increases tension and instability.' });
-                raw.push({ nextChord: 'Minor 7th', reason: 'Deepens the minor color.' });
-                raw.push({ nextChord: 'Minor-Major 7th', reason: 'Mysterious, film-score quality.' });
-                raw.push({ nextChord: 'Half-Diminished 7th', reason: 'Jazzy, darker harmonic color.' });
-                break;
-            case 'Dominant 7th':
-                raw.push({ nextChord: 'Minor', reason: 'Resolves to minor for darker effect.' });
-                raw.push({ nextChord: 'Diminished', reason: 'Maintains tension with unstable quality.' });
-                raw.push({ nextChord: 'Minor 7th', reason: 'Soulful resolution to minor.' });
-                break;
-            default:
-                raw.push({ nextChord: 'Minor 7th', reason: 'Soulful, darker quality.' });
-                raw.push({ nextChord: 'Diminished', reason: 'Tense, unstable harmony.' });
-                raw.push({ nextChord: 'Minor', reason: 'Melancholic minor tonality.' });
-                break;
-        }
-    } else if (mood === 'jazzy') {
-        switch (currentChordType) {
-            case 'Major':
-                raw.push({ nextChord: 'Major 9th', reason: 'Lush, rich jazz color.' });
-                raw.push({ nextChord: 'Dominant 9th', reason: 'Blues/funk dominant with 9th.' });
-                raw.push({ nextChord: '6/9', reason: 'Static jazz chord with rich harmony.' });
-                raw.push({ nextChord: 'Dominant 11th', reason: 'Complex, suspended quality.' });
-                break;
-            case 'Minor':
-                raw.push({ nextChord: 'Minor 9th', reason: 'Smooth, soulful jazz extension.' });
-                raw.push({ nextChord: 'Minor 11th', reason: 'Rich, complex minor color.' });
-                raw.push({ nextChord: 'Half-Diminished 7th', reason: 'Common jazz ii chord.' });
-                raw.push({ nextChord: 'Dominant 9th', reason: 'Sets up jazz resolution.' });
-                break;
-            case 'Dominant 7th':
-                raw.push({ nextChord: 'Major 9th', reason: 'Resolves to lush major 9th.' });
-                raw.push({ nextChord: 'Minor 9th', reason: 'Smooth resolution to minor 9th.' });
-                raw.push({ nextChord: '7#9', reason: 'Altered dominant "Hendrix chord".' });
-                raw.push({ nextChord: '7b9', reason: 'Tense altered dominant.' });
-                break;
-            default:
-                raw.push({ nextChord: 'Major 9th', reason: 'Lush jazz harmony.' });
-                raw.push({ nextChord: 'Dominant 9th', reason: 'Blues/jazz dominant.' });
-                raw.push({ nextChord: 'Minor 9th', reason: 'Smooth, soulful.' });
-                break;
-        }
-    } else if (mood === 'tense') {
-        switch (currentChordType) {
-            case 'Major':
-                raw.push({ nextChord: 'Dominant 7th', reason: 'Creates tension seeking resolution.' });
-                raw.push({ nextChord: 'Augmented', reason: 'Dissonant, dramatic quality.' });
-                raw.push({ nextChord: '7b5', reason: 'Altered dominant with tension.' });
-                raw.push({ nextChord: 'Diminished 7th', reason: 'Extremely tense and dissonant.' });
-                break;
-            case 'Minor':
-                raw.push({ nextChord: 'Diminished 7th', reason: 'Maximum tension and dissonance.' });
-                raw.push({ nextChord: 'Half-Diminished 7th', reason: 'Tense but less harsh.' });
-                raw.push({ nextChord: 'Augmented 7th', reason: 'Dissonant dominant.' });
-                raw.push({ nextChord: '7#5', reason: 'Altered dominant with sharp 5th.' });
-                break;
-            case 'Dominant 7th':
-                raw.push({ nextChord: '7b9', reason: 'Very tense altered dominant.' });
-                raw.push({ nextChord: '7#9', reason: 'Hendrix chord with sharp 9th.' });
-                raw.push({ nextChord: 'Augmented 7th', reason: 'Dissonant altered dominant.' });
-                raw.push({ nextChord: 'Diminished 7th', reason: 'Extremely tense.' });
-                break;
-            default:
-                raw.push({ nextChord: 'Dominant 7th', reason: 'Creates forward tension.' });
-                raw.push({ nextChord: 'Diminished 7th', reason: 'Extremely tense.' });
-                raw.push({ nextChord: 'Augmented', reason: 'Dissonant and dramatic.' });
-                break;
-        }
-    }
-
-    // Compute optimal inversions
-    const suggestions = raw.map(s => ({
-        nextChord: s.nextChord,
-        nextInversion: chooseOptimalInversion(s.nextChord),
-        reason: s.reason
-    }));
-
-    // De-duplicate by chord+inversion
-    const seen = new Set();
-    const unique = [];
-    for (const s of suggestions) {
-        const key = `${s.nextChord}|${s.nextInversion}`;
-        if (!seen.has(key)) {
-            seen.add(key);
-            unique.push(s);
-        }
-    }
-    // Filter out default I suggestion (Major Root) from the main list
-    return unique.filter(s => !(s.nextChord === 'Major' && s.nextInversion === 0));
+    // Filter out default Major Root suggestion (if it exists)
+    return suggestions.filter(s => !(s.nextChord === 'Major' && s.nextInversion === 0));
 }
 
 /**
@@ -552,14 +410,54 @@ function showChordSuggestionsModal(chordType, inversion) {
     
     const inversionName = INVERSION_NAMES[inversion] || `Inversion ${inversion}`;
     
+    // Title container with close button
+    const titleContainer = document.createElement('div');
+    titleContainer.style.display = 'flex';
+    titleContainer.style.justifyContent = 'space-between';
+    titleContainer.style.alignItems = 'flex-start';
+    titleContainer.style.marginBottom = '16px';
+    
     // Title
     const title = document.createElement('h2');
     title.textContent = `Suggested Next Chords After ${chordType} (${inversionName})`;
-    title.style.marginBottom = '16px';
+    title.style.margin = '0';
     title.style.fontSize = '18px';
     title.style.fontWeight = '600';
     title.style.color = '#111827';
-    modal.appendChild(title);
+    title.style.flex = '1';
+    titleContainer.appendChild(title);
+    
+    // Close button
+    const closeXBtn = document.createElement('button');
+    closeXBtn.innerHTML = '×';
+    closeXBtn.style.background = 'none';
+    closeXBtn.style.border = 'none';
+    closeXBtn.style.fontSize = '28px';
+    closeXBtn.style.color = '#6b7280';
+    closeXBtn.style.cursor = 'pointer';
+    closeXBtn.style.padding = '0';
+    closeXBtn.style.width = '32px';
+    closeXBtn.style.height = '32px';
+    closeXBtn.style.display = 'flex';
+    closeXBtn.style.alignItems = 'center';
+    closeXBtn.style.justifyContent = 'center';
+    closeXBtn.style.borderRadius = '4px';
+    closeXBtn.style.lineHeight = '1';
+    closeXBtn.title = 'Close';
+    closeXBtn.addEventListener('mouseenter', () => {
+        closeXBtn.style.backgroundColor = '#f3f4f6';
+        closeXBtn.style.color = '#111827';
+    });
+    closeXBtn.addEventListener('mouseleave', () => {
+        closeXBtn.style.backgroundColor = 'transparent';
+        closeXBtn.style.color = '#6b7280';
+    });
+    closeXBtn.addEventListener('click', () => {
+        overlay.remove();
+    });
+    titleContainer.appendChild(closeXBtn);
+    
+    modal.appendChild(titleContainer);
     
     // Resolve current root and preferences
     const currentNotesArray = getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
@@ -567,10 +465,69 @@ function showChordSuggestionsModal(chordType, inversion) {
     const enhPref = getEnharmonicPreference();
     const notationPref = getNotationPreference();
     
+    // Style & Mood selectors in a grid (sticky at top)
+    const controlsRow = document.createElement('div');
+    controlsRow.style.display = 'grid';
+    controlsRow.style.gridTemplateColumns = '1fr 1fr';
+    controlsRow.style.gap = '12px';
+    controlsRow.style.marginBottom = '16px';
+    controlsRow.style.position = 'sticky';
+    controlsRow.style.top = '-24px'; // Offset modal padding to stick to very top
+    controlsRow.style.marginLeft = '-24px'; // Offset modal padding
+    controlsRow.style.marginRight = '-24px'; // Offset modal padding
+    controlsRow.style.paddingLeft = '24px'; // Restore padding for content
+    controlsRow.style.paddingRight = '24px'; // Restore padding for content
+    controlsRow.style.paddingTop = '8px';
+    controlsRow.style.paddingBottom = '8px';
+    controlsRow.style.backgroundColor = 'white';
+    controlsRow.style.zIndex = '10';
+    controlsRow.style.borderBottom = '1px solid #e5e7eb';
+
+    // Style selector
+    const styleContainer = document.createElement('div');
+    const styleLabel = document.createElement('label');
+    styleLabel.textContent = 'Musical Style:';
+    styleLabel.style.fontSize = '12px';
+    styleLabel.style.fontWeight = '600';
+    styleLabel.style.color = '#374151';
+    styleLabel.style.display = 'block';
+    styleLabel.style.marginBottom = '4px';
+    styleContainer.appendChild(styleLabel);
+
+    const styleSelect = document.createElement('select');
+    styleSelect.style.width = '100%';
+    styleSelect.style.padding = '6px 8px';
+    styleSelect.style.border = '1px solid #d1d5db';
+    styleSelect.style.borderRadius = '4px';
+    styleSelect.style.fontSize = '12px';
+    styleSelect.style.backgroundColor = 'white';
+
+    // Get saved preferences or defaults
+    let currentStyle = localStorage.getItem('chord-suggestion-style') || 'balanced';
+    let currentMood = localStorage.getItem('chord-suggestion-mood') || 'bright';
+
+    const styles = [
+        { value: 'balanced', label: 'Balanced Blend' },
+        { value: 'pop', label: 'Top 40 / Pop' },
+        { value: 'jazz', label: 'Jazz / Complex' },
+        { value: 'classical', label: 'Classical / Traditional' },
+        { value: 'rock', label: 'Rock / Power' },
+        { value: 'indie', label: 'Indie / Alternative' }
+    ];
+
+    styles.forEach(s => {
+        const option = document.createElement('option');
+        option.value = s.value;
+        option.textContent = s.label;
+        if (s.value === currentStyle) option.selected = true;
+        styleSelect.appendChild(option);
+    });
+
+    styleContainer.appendChild(styleSelect);
+    controlsRow.appendChild(styleContainer);
+
     // Mood selector
     const moodContainer = document.createElement('div');
-    moodContainer.style.marginBottom = '16px';
-    
     const moodLabel = document.createElement('label');
     moodLabel.textContent = 'Intended Mood:';
     moodLabel.style.fontSize = '12px';
@@ -579,7 +536,7 @@ function showChordSuggestionsModal(chordType, inversion) {
     moodLabel.style.display = 'block';
     moodLabel.style.marginBottom = '4px';
     moodContainer.appendChild(moodLabel);
-    
+
     const moodSelect = document.createElement('select');
     moodSelect.style.width = '100%';
     moodSelect.style.padding = '6px 8px';
@@ -587,31 +544,40 @@ function showChordSuggestionsModal(chordType, inversion) {
     moodSelect.style.borderRadius = '4px';
     moodSelect.style.fontSize = '12px';
     moodSelect.style.backgroundColor = 'white';
-    
+
     const moods = [
         { value: 'bright', label: '😊 Happy / Bright' },
         { value: 'dark', label: '😔 Melancholic / Dark' },
         { value: 'jazzy', label: '🎷 Jazzy / Complex' },
-        { value: 'tense', label: '⚡ Tense / Dramatic' }
+        { value: 'tense', label: '⚡ Tense / Dramatic' },
+        { value: 'calm', label: '😌 Calm / Peaceful' },
+        { value: 'energetic', label: '⚡ Energetic / Driving' }
     ];
-    
+
     moods.forEach(m => {
         const option = document.createElement('option');
         option.value = m.value;
         option.textContent = m.label;
+        if (m.value === currentMood) option.selected = true;
         moodSelect.appendChild(option);
     });
-    
+
     moodContainer.appendChild(moodSelect);
-    modal.appendChild(moodContainer);
-    
-    // Container for suggestions that will be regenerated on mood change
+    controlsRow.appendChild(moodContainer);
+
+    modal.appendChild(controlsRow);
+
+    // Container for suggestions that will be regenerated on style/mood change
     const suggestionsContainer = document.createElement('div');
     modal.appendChild(suggestionsContainer);
-    
-    // Function to render suggestions based on mood
-    const renderSuggestions = (mood) => {
+
+    // Function to render suggestions based on style and mood
+    const renderSuggestions = (style, mood) => {
         suggestionsContainer.innerHTML = '';
+        
+        // Save preferences to localStorage
+        localStorage.setItem('chord-suggestion-style', style);
+        localStorage.setItem('chord-suggestion-mood', mood);
         
         // Default baseline suggestion (small text)
         const defaultNote = document.createElement('div');
@@ -621,8 +587,8 @@ function showChordSuggestionsModal(chordType, inversion) {
         defaultNote.textContent = 'Default: Major (Root) is a common, stable resolution.';
         suggestionsContainer.appendChild(defaultNote);
         
-        // Get suggestions for current mood
-        const suggestions = generateChordSuggestions(chordType, inversion, rootNote, enhPref, notationPref, mood);
+        // Get suggestions for current style and mood
+        const suggestions = generateChordSuggestions(chordType, inversion, rootNote, enhPref, notationPref, style, mood);
         
         // Helper to create hold-to-play buttons
         const createHoldPlayButton = (label, cType, inv) => {
@@ -708,9 +674,18 @@ function showChordSuggestionsModal(chordType, inversion) {
             chordHeader.style.fontWeight = '600';
             chordHeader.style.marginBottom = '4px';
             chordHeader.style.color = '#1f2937';
-            
+            chordHeader.style.display = 'flex';
+            chordHeader.style.alignItems = 'center';
+            chordHeader.style.gap = '6px';
+
             const invName = INVERSION_NAMES[suggestion.nextInversion] || `Inversion ${suggestion.nextInversion}`;
-            chordHeader.textContent = `→ ${suggestion.nextChord} (${invName})`;
+            const confidence = suggestion.confidence || 75;
+            const stars = confidence >= 90 ? '⭐⭐⭐' : confidence >= 75 ? '⭐⭐' : '⭐';
+
+            chordHeader.innerHTML = `
+                <span>→ ${suggestion.nextChord} (${invName})</span>
+                <span style="font-size: 10px;">${stars}</span>
+            `;
             suggestionCard.appendChild(chordHeader);
             
             // Playback row (current vs next)
@@ -783,12 +758,16 @@ function showChordSuggestionsModal(chordType, inversion) {
         });
     };
     
-    // Initial render with bright mood
-    renderSuggestions('bright');
-    
-    // Listen for mood changes
-    moodSelect.addEventListener('change', (e) => {
-        renderSuggestions(e.target.value);
+    // Initial render with saved preferences
+    renderSuggestions(currentStyle, currentMood);
+
+    // Listen for style and mood changes
+    styleSelect.addEventListener('change', () => {
+        renderSuggestions(styleSelect.value, moodSelect.value);
+    });
+
+    moodSelect.addEventListener('change', () => {
+        renderSuggestions(styleSelect.value, moodSelect.value);
     });
     
     // Close button

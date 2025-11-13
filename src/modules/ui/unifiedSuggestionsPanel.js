@@ -3,8 +3,10 @@
  * Combines theory-based AI recommendations with style/mood preferences
  */
 
-import { generateChordRecommendations, analyzeProgression } from '../features/chordRecommendations.js';
-import { getProgressionData, getCurrentKey, getSuggestionStyle, getSuggestionMood } from '../state/trainerState.js';
+import { generateUnifiedChordSuggestions, SUGGESTION_STYLES, SUGGESTION_MOODS } from '../features/unifiedChordSuggestions.js';
+import { analyzeProgression, generateChordRecommendations } from '../features/chordRecommendations.js';
+import { CHORD_DEFINITIONS } from '../../data/music-data.js';
+import { getProgressionData, getCurrentKey, getSuggestionStyle, getSuggestionMood, setSuggestionStyle, setSuggestionMood } from '../state/trainerState.js';
 
 /**
  * Replace both panels with a unified suggestions panel
@@ -141,43 +143,51 @@ function createUnifiedPanelHTML() {
             </button>
 
             <!-- Content -->
-            <div id="unified-suggestions-panel" class="mt-2 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 rounded-lg p-4 border border-purple-200 space-y-3">
+            <div id="unified-suggestions-panel" class="mt-2 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 rounded-lg p-2.5 border border-purple-200 space-y-2">
 
                 <!-- Quick Analysis Bar -->
-                <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-purple-300 shadow-sm">
-                    <div class="flex items-center gap-4 flex-wrap">
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs text-gray-600">Analysis:</span>
-                            <span id="quick-roman-numerals" class="font-bold text-purple-700 text-sm">—</span>
+                <div class="flex items-center justify-between p-2 bg-white rounded-lg border border-purple-200 shadow-sm">
+                    <div class="flex items-center gap-3 flex-wrap text-xs">
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-600">Analysis:</span>
+                            <span id="quick-roman-numerals" class="font-bold text-purple-700">—</span>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs text-gray-600">Mood:</span>
-                            <span id="quick-mood" class="font-semibold text-sm">—</span>
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-600">Mood:</span>
+                            <span id="quick-mood" class="font-semibold">—</span>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs text-gray-600">Tension:</span>
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-600">Tension:</span>
                             <button onclick="window.showTensionMapModal && window.showTensionMapModal()"
-                                    class="px-2 py-0.5 bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs font-semibold rounded transition flex items-center gap-1"
-                                    title="Click to view detailed tension map">
+                                    class="px-1.5 py-0.5 bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs font-semibold rounded transition"
+                                    title="View tension map">
                                 <span id="quick-tension">—</span>
-                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path>
-                                    <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"></path>
-                                </svg>
                             </button>
                         </div>
                     </div>
                     <button onclick="window.showFullAnalysisModal && window.showFullAnalysisModal()"
-                            class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded transition">
-                        Details →
+                            class="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded transition">
+                        Details
                     </button>
                 </div>
 
+                <!-- Style & Mood Controls -->
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="p-2 bg-white border border-indigo-200 rounded-lg">
+                        <label for="unified-style-select" class="text-xs font-semibold text-indigo-800 block mb-1">Musical Style</label>
+                        <select id="unified-style-select" class="w-full p-1.5 text-xs bg-white border border-indigo-200 rounded text-gray-800 focus:ring-indigo-500 focus:border-indigo-500"></select>
+                    </div>
+                    <div class="p-2 bg-white border border-purple-200 rounded-lg">
+                        <label for="unified-mood-select" class="text-xs font-semibold text-purple-800 block mb-1">Intended Mood</label>
+                        <select id="unified-mood-select" class="w-full p-1.5 text-xs bg-white border border-purple-200 rounded text-gray-800 focus:ring-purple-500 focus:border-purple-500"></select>
+                    </div>
+                </div>
+
                 <!-- Suggested Next Chords -->
-                <div class="bg-white rounded-lg p-3 border border-indigo-300 shadow-sm">
-                    <div class="flex items-center justify-between mb-3">
-                        <h4 class="text-sm font-bold text-indigo-800 flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <div class="bg-white rounded-lg p-2 border border-indigo-300 shadow-sm">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="text-xs font-bold text-indigo-800 flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clip-rule="evenodd"></path>
                             </svg>
                             What's Next?
@@ -187,8 +197,8 @@ function createUnifiedPanelHTML() {
                             Refresh
                         </button>
                     </div>
-                    <div id="unified-suggestions-list" class="space-y-2">
-                        <p class="text-sm text-gray-500 italic">Add chords to get intelligent suggestions...</p>
+                    <div id="unified-suggestions-list" class="space-y-1.5">
+                        <p class="text-xs text-gray-500 italic">Add chords to get intelligent suggestions...</p>
                     </div>
                 </div>
 
@@ -293,12 +303,12 @@ function attachEventListeners() {
             panel.classList.add('hidden');
             chevron.classList.remove('rotate-180');
         }
-        
+
         // Save panel state
         if (window.savePanelState) {
             window.savePanelState('unified-suggestions-panel', !isHidden);
         }
-        
+
         // Manually trigger sidebar update with a small delay to ensure DOM is updated
         if (window.triggerSectionSidebarUpdate) {
             setTimeout(() => {
@@ -306,6 +316,38 @@ function attachEventListeners() {
             }, 50);
         }
     };
+
+    // Initialize Style dropdown
+    const styleSelect = document.getElementById('unified-style-select');
+    if (styleSelect) {
+        SUGGESTION_STYLES.forEach(style => {
+            const option = document.createElement('option');
+            option.value = style.id;
+            option.textContent = style.label;
+            styleSelect.appendChild(option);
+        });
+        styleSelect.value = getSuggestionStyle() || 'balanced';
+        styleSelect.onchange = () => {
+            setSuggestionStyle(styleSelect.value);
+            updateUnifiedSuggestions();
+        };
+    }
+
+    // Initialize Mood dropdown
+    const moodSelect = document.getElementById('unified-mood-select');
+    if (moodSelect) {
+        SUGGESTION_MOODS.forEach(mood => {
+            const option = document.createElement('option');
+            option.value = mood.id;
+            option.textContent = mood.label;
+            moodSelect.appendChild(option);
+        });
+        moodSelect.value = getSuggestionMood() || 'bright';
+        moodSelect.onchange = () => {
+            setSuggestionMood(moodSelect.value);
+            updateUnifiedSuggestions();
+        };
+    }
 
     // Modal controls
     window.showTensionMapModal = () => {
@@ -351,10 +393,19 @@ export function updateUnifiedSuggestions() {
  * Update quick analysis bar
  */
 function updateQuickAnalysis(progression, key) {
+    const romanNumeralsEl = document.getElementById('quick-roman-numerals');
+    const moodEl = document.getElementById('quick-mood');
+    const tensionEl = document.getElementById('quick-tension');
+    
+    // Return early if elements don't exist yet
+    if (!romanNumeralsEl || !moodEl || !tensionEl) {
+        return;
+    }
+    
     if (progression.length === 0) {
-        document.getElementById('quick-roman-numerals').textContent = '—';
-        document.getElementById('quick-mood').textContent = '—';
-        document.getElementById('quick-tension').textContent = '—';
+        romanNumeralsEl.textContent = '—';
+        moodEl.textContent = '—';
+        tensionEl.textContent = '—';
         return;
     }
 
@@ -362,67 +413,67 @@ function updateQuickAnalysis(progression, key) {
 
     // Roman numerals (show last 4)
     const romans = analysis.romanNumerals.slice(-4).join(' - ');
-    document.getElementById('quick-roman-numerals').textContent = romans;
+    romanNumeralsEl.textContent = romans;
 
     // Mood with emoji
     const moodEmoji = getMoodEmoji(analysis.mood);
-    document.getElementById('quick-mood').textContent = `${moodEmoji} ${analysis.mood}`;
+    moodEl.textContent = `${moodEmoji} ${analysis.mood}`;
 
     // Calculate average tension (simplified - would integrate with existing tension calculation)
     const avgTension = Math.round(analysis.voiceLeadingQuality / 2); // Placeholder
-    document.getElementById('quick-tension').textContent = `${avgTension}%`;
+    tensionEl.textContent = `${avgTension}%`;
 }
 
 /**
- * Update suggestions list (combines theory + style/mood)
+ * Update suggestions list (uses progression-aware recommendations with different roots)
  */
 function updateSuggestionsList(progression, key) {
     const suggestionsList = document.getElementById('unified-suggestions-list');
     if (!suggestionsList) return;
 
-    // Get style and mood preferences
-    const style = getSuggestionStyle();
-    const mood = getSuggestionMood();
-
-    const recommendations = generateChordRecommendations(progression, key, style, mood);
-
-    if (recommendations.length === 0) {
-        suggestionsList.innerHTML = '<p class="text-sm text-gray-500 italic">Add chords to get suggestions...</p>';
+    if (progression.length === 0) {
+        suggestionsList.innerHTML = '<p class="text-sm text-gray-500 italic">Add chords to get intelligent suggestions...</p>';
         return;
     }
 
-    const html = recommendations.map((rec, index) => {
+    // Get style and mood preferences
+    const style = getSuggestionStyle() || 'balanced';
+    const mood = getSuggestionMood() || 'bright';
+
+    // Use the old recommendation system which understands keys and harmonic function
+    const recommendations = generateChordRecommendations(progression, key, style, mood);
+
+    if (recommendations.length === 0) {
+        suggestionsList.innerHTML = '<p class="text-sm text-gray-500 italic">No suggestions available</p>';
+        return;
+    }
+
+    const html = recommendations.map((rec) => {
         const confidence = rec.confidence;
         const stars = confidence >= 90 ? '⭐⭐⭐' : confidence >= 75 ? '⭐⭐' : '⭐';
 
+        // Get chord symbol
+        const chordSymbol = CHORD_DEFINITIONS[rec.type]?.symbol || '';
+        const chordLabel = `${rec.chord}${chordSymbol}`;
+
         return `
-            <div class="p-3 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg border border-indigo-200 hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer group"
-                 onclick="window.addChordFromRecommendation && window.addChordFromRecommendation('${rec.chord}', '${rec.type}', ${rec.inversion})">
-                <div class="flex items-start justify-between gap-3">
+            <div class="p-2 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg border border-indigo-200 hover:border-indigo-400 hover:shadow-sm transition-all cursor-pointer group"
+                 onclick="window.addChordFromUnifiedSuggestion && window.addChordFromUnifiedSuggestion('${rec.type}', '${rec.chord}', ${rec.inversion || 0})">
+                <div class="flex items-start justify-between gap-2">
                     <div class="flex-1">
                         <div class="flex items-center gap-2 mb-1">
-                            <span class="text-lg font-bold text-indigo-800">${rec.chord}${rec.type === 'minor' ? 'm' : ''}</span>
+                            <span class="text-base font-bold text-indigo-800">${chordLabel}</span>
                             <span class="text-xs text-indigo-600">${stars}</span>
-                            <span class="text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full font-semibold">${confidence}%</span>
+                            <span class="text-xs bg-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded-full font-semibold">${confidence}%</span>
                         </div>
                         ${rec.reasons && rec.reasons.length > 0 ? `
-                        <div class="space-y-0.5 text-xs">
-                            ${rec.reasons.slice(0, 2).map(reason => `
-                                <div class="text-gray-700">
-                                    <span class="font-medium text-indigo-700">•</span>
-                                    ${reason.commonTalk}
-                                </div>
-                            `).join('')}
-                        </div>
-                        ` : ''}
-                        ${rec.songExamples && rec.songExamples.length > 0 ? `
-                        <div class="mt-1 text-xs text-gray-600">
-                            <span class="font-medium">Examples:</span> ${rec.songExamples.slice(0, 2).join(', ')}
+                        <div class="text-xs text-gray-600 leading-tight">
+                            ${rec.reasons[0].commonTalk}
                         </div>
                         ` : ''}
                     </div>
-                    <button class="px-3 py-1.5 bg-indigo-600 group-hover:bg-indigo-700 text-white text-xs font-semibold rounded shadow-sm transition">
-                        Add →
+                    <button class="px-2 py-1 bg-indigo-600 group-hover:bg-indigo-700 text-white text-xs font-semibold rounded shadow-sm transition">
+                        Add
                     </button>
                 </div>
             </div>
@@ -430,7 +481,15 @@ function updateSuggestionsList(progression, key) {
     }).join('');
 
     suggestionsList.innerHTML = html;
+
+    // Set up add chord callback
+    window.addChordFromUnifiedSuggestion = (chordType, root, inversion) => {
+        if (window.addChordToProgression) {
+            window.addChordToProgression(chordType, root, inversion);
+        }
+    };
 }
+
 
 /**
  * Update tension map in modal

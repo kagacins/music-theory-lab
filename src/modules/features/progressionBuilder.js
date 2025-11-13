@@ -88,6 +88,9 @@ import {
     COMMON_PROGRESSIONS
 } from '../../data/music-data.js';
 
+// Import chord suggestion modal
+import { showChordSuggestionModal } from '../ui/chordSuggestionModal.js';
+
 // Import undo/redo utilities
 import {
     saveState,
@@ -1877,7 +1880,24 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             toggleStaffNotation(currentIndex, containerId);
         };
         topControls.appendChild(staffToggleBtn);
-        
+
+        // Add Chord Suggestion button (lightbulb icon, next to staff toggle)
+        const suggestionBtn = document.createElement('button');
+        suggestionBtn.innerHTML = '💡';
+        suggestionBtn.className = 'text-sm p-0.5 text-yellow-600 rounded-full hover:bg-yellow-100 transition';
+        suggestionBtn.title = 'Get chord suggestions';
+        suggestionBtn.setAttribute('data-chord-index', index);
+        suggestionBtn.onclick = (e) => {
+            e.stopPropagation();
+            // Get current index from wrapper's data attribute (handles drag-and-drop)
+            const wrapper = e.target.closest(`#${containerId} > div`);
+            const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+            if (window.showProgressionChordSuggestions) {
+                window.showProgressionChordSuggestions(currentIndex);
+            }
+        };
+        topControls.appendChild(suggestionBtn);
+
         wrapper.appendChild(topControls);
         
         // Create the card itself
@@ -2167,21 +2187,21 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         invLabelContainer.appendChild(invLabel);
         
         // Add suggestion button with tooltip
-        const suggestionBtn = document.createElement('button');
-        suggestionBtn.type = 'button';
-        suggestionBtn.textContent = '💡';
-        suggestionBtn.title = 'Hover to see inversion suggestion';
-        suggestionBtn.onmousedown = (e) => e.stopPropagation();
+        const inversionSuggestionBtn = document.createElement('button');
+        inversionSuggestionBtn.type = 'button';
+        inversionSuggestionBtn.textContent = '💡';
+        inversionSuggestionBtn.title = 'Hover to see inversion suggestion';
+        inversionSuggestionBtn.onmousedown = (e) => e.stopPropagation();
         
         // Check if there's a suggestion and set button color accordingly
         const checkSuggestion = () => {
             const suggestion = suggestInversion(index);
             if (suggestion) {
                 // Green-tinted when there is a suggestion
-                suggestionBtn.className = 'px-1 py-0.5 text-[10px] bg-green-100 hover:bg-green-200 text-green-700 rounded transition-colors relative';
+                inversionSuggestionBtn.className = 'px-1 py-0.5 text-[10px] bg-green-100 hover:bg-green-200 text-green-700 rounded transition-colors relative';
             } else {
                 // Red-tinted when there is no suggestion
-                suggestionBtn.className = 'px-1 py-0.5 text-[10px] bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors relative';
+                inversionSuggestionBtn.className = 'px-1 py-0.5 text-[10px] bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors relative';
             }
         };
         
@@ -2198,14 +2218,14 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         
         // Show tooltip on hover
         let tooltipTimeout;
-        suggestionBtn.addEventListener('mouseenter', () => {
+        inversionSuggestionBtn.addEventListener('mouseenter', () => {
             clearTimeout(tooltipTimeout);
             // Update button color on hover (in case suggestion status changed)
             checkSuggestion();
             const suggestion = suggestInversion(index);
             
             // Position tooltip near the button
-            const rect = suggestionBtn.getBoundingClientRect();
+            const rect = inversionSuggestionBtn.getBoundingClientRect();
             tooltipContainer.style.left = `${rect.left + (rect.width / 2)}px`;
             tooltipContainer.style.top = `${rect.top - 10}px`;
             tooltipContainer.style.transform = 'translate(-50%, -100%)';
@@ -2224,7 +2244,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
                 acceptBtn.onclick = (e) => {
                     e.stopPropagation();
                     // Get current index from wrapper's data attribute (handles drag-and-drop)
-                    const wrapper = suggestionBtn.closest(`#${containerId} > div`);
+                    const wrapper = inversionSuggestionBtn.closest(`#${containerId} > div`);
                     const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
                     updateProgressionChord(currentIndex, 'inversion', suggestion.inversion);
                     tooltipContainer.style.display = 'none';
@@ -2241,7 +2261,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             }
         });
         
-        suggestionBtn.addEventListener('mouseleave', () => {
+        inversionSuggestionBtn.addEventListener('mouseleave', () => {
             tooltipTimeout = setTimeout(() => {
                 tooltipContainer.style.display = 'none';
             }, 100); // Small delay to allow moving to tooltip
@@ -2255,7 +2275,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         tooltipContainer.addEventListener('mouseleave', () => {
             tooltipContainer.style.display = 'none';
         });
-        invLabelContainer.appendChild(suggestionBtn);
+        invLabelContainer.appendChild(inversionSuggestionBtn);
         invContainer.appendChild(invLabelContainer);
         
         // Inversion button switches
@@ -2749,8 +2769,10 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
     // Restore staff notation states after rendering is complete
     restoreStaffNotationStates();
 
-    // Update style/mood suggestions and tension analysis
-    refreshStyleMoodInsights();
+    // Update unified suggestions panel
+    if (window.updateUnifiedSuggestions) {
+        window.updateUnifiedSuggestions();
+    }
 }
 
 // ============================================================================
@@ -3930,6 +3952,191 @@ export function stopTrainerChord() {
 }
 
 /**
+ * Show chord suggestions modal for a specific chord in the progression
+ * @param {number} chordIndex - Index of the chord in the progression
+ */
+export function showProgressionChordSuggestions(chordIndex) {
+    const trainerState = getTrainerState();
+    const progression = trainerState.progressionData;
+
+    if (!progression || chordIndex < 0 || chordIndex >= progression.length) {
+        console.warn('Invalid chord index for suggestions:', chordIndex);
+        return;
+    }
+
+    const currentChord = progression[chordIndex];
+    const currentRoot = currentChord.root;
+    const currentType = currentChord.type || 'Major';
+    const currentInversion = currentChord.inversion || 0;
+
+    // Callback to add suggested chord to progression
+    const onAddChord = (nextChordType, nextRoot, nextInversion) => {
+        const nextChordData = {
+            root: nextRoot,
+            type: nextChordType,
+            inversion: nextInversion,
+            duration: currentChord.duration || '1n',
+            notes: [], // Will be populated
+            lhNotes: [], // Will be populated
+            roman: '', // Will be calculated
+            name: '' // Will be calculated
+        };
+
+        // Get the notes for this chord
+        const key = trainerState.currentKey;
+        const chordResult = getProgressionChordNotes(
+            key,
+            nextChordData.roman, // Not needed for calculation
+            nextChordType,
+            nextInversion,
+            0 // octaveShift
+        );
+
+        if (chordResult) {
+            nextChordData.notes = chordResult.notes || [];
+            nextChordData.lhNotes = chordResult.lhNotes || [];
+            nextChordData.roman = chordResult.roman || '';
+            nextChordData.name = chordResult.name || `${nextRoot} ${nextChordType}`;
+        }
+
+        // Insert after current chord
+        progression.splice(chordIndex + 1, 0, nextChordData);
+
+        // Update state
+        setProgressionData(progression);
+
+        // Re-render
+        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', false);
+        updateProgressionControlsUI();
+
+        // Save state for undo
+        saveState();
+    };
+
+    // Track currently playing notes for release
+    let currentlyPlayingNotes = [];
+
+    // Callback to preview a chord (starts playing)
+    const onPlayChord = (chordType, root, inversion) => {
+        try {
+            // Get chord notes using the same method as Chord Builder
+            const res = getInvertedChordNotes(
+                root,
+                chordType,
+                inversion,
+                root, // key (same as root for now)
+                0, // octaveShift
+                'sharp', // enharmonicPreference
+                'full' // notationPreference
+            );
+
+            const heldNotes = res.specificNotes || [];
+            if (heldNotes.length === 0) {
+                console.warn('No notes generated for chord:', chordType, root, inversion);
+                return;
+            }
+
+            const instrument = getInstrument();
+            if (!instrument) {
+                console.warn('Instrument not ready');
+                return;
+            }
+
+            // Release any currently playing notes first
+            if (currentlyPlayingNotes.length > 0) {
+                const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                if (isGuitar) {
+                    currentlyPlayingNotes.forEach(n => {
+                        try { instrument.triggerRelease(n, Tone.now()); } catch (_) {}
+                    });
+                } else {
+                    instrument.triggerRelease(currentlyPlayingNotes, Tone.now());
+                }
+            }
+
+            // Trigger new notes
+            const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+            const baseTime = Tone.now() + 0.01;
+
+            if (isGuitar) {
+                heldNotes.forEach((n, idx) => instrument.triggerAttack(n, baseTime + idx * 0.0001));
+            } else {
+                instrument.triggerAttack(heldNotes, Tone.now());
+            }
+
+            currentlyPlayingNotes = heldNotes;
+            setTrainerChordNotes(heldNotes);
+        } catch (error) {
+            console.error('Error playing chord:', error);
+        }
+    };
+
+    // Callback to stop playing chord (releases notes)
+    const onStopChord = () => {
+        if (currentlyPlayingNotes.length > 0) {
+            const instrument = getInstrument();
+            if (instrument && getAudioIsReady()) {
+                const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                if (isGuitar) {
+                    currentlyPlayingNotes.forEach(n => {
+                        try { instrument.triggerRelease(n, Tone.now()); } catch (_) {}
+                    });
+                } else {
+                    instrument.triggerRelease(currentlyPlayingNotes, Tone.now());
+                }
+                currentlyPlayingNotes = [];
+                setTrainerChordNotes([]);
+            }
+        }
+    };
+
+    // Show the modal
+    showChordSuggestionModal(currentType, currentRoot, currentInversion, onAddChord, onPlayChord, onStopChord);
+}
+
+// Make it available globally for onclick handlers
+window.showProgressionChordSuggestions = showProgressionChordSuggestions;
+
+/**
+ * Add a chord to the progression from Smart Suggestions panel
+ * @param {string} chordType - The chord type
+ * @param {string} root - The root note
+ * @param {number} inversion - The inversion
+ */
+export function addChordToProgression(chordType, root, inversion = 0) {
+    const trainerState = getTrainerState();
+
+    // Create chord data
+    const newChordData = {
+        type: chordType,
+        root: root,
+        inversion: inversion || 0,
+        octaveShift: 0
+    };
+
+    // Add to the end of the progression
+    const updatedProgression = [...trainerState.progressionData, newChordData];
+
+    // Save for undo
+    saveForUndo();
+
+    // Update state
+    setProgressionData(updatedProgression);
+
+    // Re-render
+    renderProgression();
+
+    // Update unified suggestions
+    if (window.updateUnifiedSuggestions) {
+        window.updateUnifiedSuggestions();
+    }
+}
+
+// Make it available globally
+window.addChordToProgression = addChordToProgression;
+
+/**
  * Highlight trainer scale and chord notes on keyboard
  * @param {Array<string>} scaleNotes - Scale notes to highlight
  * @param {Array<string>} chordNotes - Chord notes to highlight
@@ -4612,10 +4819,10 @@ export function renderProgressionControls() {
         };
     }
 
-    // Initialize style & mood controls
-    initializeStyleMoodControls();
-    refreshStyleMoodInsights(true);
-    
+    // Style & mood controls are now initialized in the Smart Chord Suggestions panel
+    // initializeStyleMoodControls();
+    // refreshStyleMoodInsights(true);
+
     // If progression data is empty, load default progression
     const trainerState = getTrainerState();
     if (trainerState.progressionData.length === 0) {

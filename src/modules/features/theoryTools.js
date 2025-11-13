@@ -942,6 +942,11 @@ export function setSelectedChordIndex(index) {
             showChordSubstitutions();
         }, 100); // Small delay to ensure DOM is ready
     }
+
+    // Update Smart Suggestions panel to reflect the selected chord
+    if (window.updateUnifiedSuggestions) {
+        window.updateUnifiedSuggestions();
+    }
 }
 
 /**
