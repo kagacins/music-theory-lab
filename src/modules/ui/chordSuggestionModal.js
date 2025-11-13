@@ -2,10 +2,14 @@
  * Chord Suggestion Modal UI Component
  * Reusable modal for displaying chord suggestions with style/mood controls
  * Styled to match the Chord Builder modal
+ * Now uses the comprehensive 3D recommendation engine
  */
 
-import { generateUnifiedChordSuggestions, SUGGESTION_STYLES, SUGGESTION_MOODS } from '../features/unifiedChordSuggestions.js';
+import { generateComprehensiveRecommendations } from '../features/comprehensiveChordRecommendations.js';
+import { SUGGESTION_STYLES, SUGGESTION_MOODS } from '../features/unifiedChordSuggestions.js';
 import { CHORD_DEFINITIONS, INVERSION_NAMES } from '../../data/music-data.js';
+import { getCurrentKey } from '../state/trainerState.js';
+import { showChordExplorerModal } from './chordExplorerModal.js';
 
 /**
  * Show chord suggestion modal
@@ -246,8 +250,36 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
         localStorage.setItem('chord-suggestion-style', style);
         localStorage.setItem('chord-suggestion-mood', mood);
 
-        // Generate suggestions
-        const suggestions = generateUnifiedChordSuggestions(currentChordType, currentRoot, style, mood, currentInversion);
+        // Get musical key context
+        const key = getCurrentKey() || 'C';
+
+        // Determine tension direction based on mood
+        let tensionDirection = 'maintain';
+        if (mood === 'bright' || mood === 'calm') {
+            tensionDirection = 'resolve';
+        } else if (mood === 'tense' || mood === 'energetic') {
+            tensionDirection = 'build';
+        }
+
+        // Generate comprehensive suggestions using 3D scoring system
+        const recommendations = generateComprehensiveRecommendations(
+            currentRoot,
+            currentChordType,
+            currentInversion,
+            key,
+            style,
+            mood,
+            tensionDirection
+        );
+
+        // Transform to expected format
+        const suggestions = recommendations.map(rec => ({
+            nextRoot: rec.root,
+            nextChord: rec.type,
+            nextInversion: rec.inversion,
+            reason: rec.reason,
+            confidence: rec.confidence
+        }));
 
         // Display each suggestion
         suggestions.forEach((suggestion) => {
@@ -367,6 +399,51 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     moodSelect.onchange = () => {
         renderSuggestions(styleSelect.value, moodSelect.value);
     };
+    
+    // Show All Details button (opens 3D explorer)
+    const showAllBtn = document.createElement('button');
+    showAllBtn.textContent = '🔬 Show All Details (3D Explorer)';
+    showAllBtn.style.marginTop = '16px';
+    showAllBtn.style.padding = '10px 16px';
+    showAllBtn.style.backgroundColor = '#667eea';
+    showAllBtn.style.border = 'none';
+    showAllBtn.style.borderRadius = '4px';
+    showAllBtn.style.cursor = 'pointer';
+    showAllBtn.style.fontWeight = '600';
+    showAllBtn.style.width = '100%';
+    showAllBtn.style.color = 'white';
+    showAllBtn.style.fontSize = '14px';
+    showAllBtn.addEventListener('mouseenter', () => {
+        showAllBtn.style.backgroundColor = '#5568d3';
+    });
+    showAllBtn.addEventListener('mouseleave', () => {
+        showAllBtn.style.backgroundColor = '#667eea';
+    });
+    showAllBtn.addEventListener('click', () => {
+        const key = getCurrentKey() || 'C';
+        // Use current values from dropdowns (user may have changed them)
+        const selectedStyle = styleSelect.value;
+        const selectedMood = moodSelect.value;
+        let tensionDirection = 'maintain';
+        if (selectedMood === 'bright' || selectedMood === 'calm') {
+            tensionDirection = 'resolve';
+        } else if (selectedMood === 'tense' || selectedMood === 'energetic') {
+            tensionDirection = 'build';
+        }
+
+        showChordExplorerModal(
+            currentRoot,
+            currentChordType,
+            currentInversion,
+            key,
+            selectedStyle,
+            selectedMood,
+            onAddChord, // Use the provided callback
+            onPlayChord, // Use the provided callback
+            onStopChord  // Use the provided callback
+        );
+    });
+    modal.appendChild(showAllBtn);
     
     // Close button at bottom
     const closeBottomBtn = document.createElement('button');

@@ -41,10 +41,13 @@ import {
     getIsSuggestionEngineOn
 } from '../state/globalState.js';
 
-import { getTrainerState } from '../state/trainerState.js';
+import { getTrainerState, getCurrentKey } from '../state/trainerState.js';
 
-// Import unified chord suggestion helpers for enhanced voice leading
-import { generateUnifiedChordSuggestions } from './unifiedChordSuggestions.js';
+// Import comprehensive chord recommendation engine (evaluates all roots, types, inversions)
+import { generateComprehensiveRecommendations } from './comprehensiveChordRecommendations.js';
+
+// Import chord explorer for detailed 3D visualization
+import { showChordExplorerModal } from '../ui/chordExplorerModal.js';
 
 // =========================================================================
 // Helper Function: Create Tooltip for Button
@@ -347,31 +350,66 @@ function createChordButtonTooltip(button, chordName, chordDescription, chordType
 // =========================================================================
 
 /**
- * Generate chord suggestions using comprehensive voice leading analysis.
- * Now uses the unified suggestion system with enhanced scoring that considers:
- * - Bass movement (stepwise motion preferred)
- * - Common tones between chords
- * - Total voice movement minimization
- * - Voice range positioning
- * - Contrary motion between outer voices
+ * Generate chord suggestions using comprehensive 3D scoring system.
  *
- * Returns 8-10 suggestions including multiple inversions per chord type.
+ * Evaluates ALL possible next chords across three dimensions:
+ * 1. Root Note (12 chromatic possibilities)
+ * 2. Chord Type (Major, Minor, 7th variants, etc.)
+ * 3. Inversion (Root, 1st, 2nd, etc.)
  *
- * @param {string} currentChordType - Current chord type
- * @param {number} currentInversion - Current inversion
- * @param {string} rootNote - Root note (same root for all suggestions)
+ * Plus a 4th dimension: Tension Direction (resolve, maintain, build)
+ *
+ * Each (root, type, inversion) combination is scored based on:
+ * - Voice leading quality (30%): bass movement, common tones, total movement, range, contrary motion
+ * - Harmonic function (35%): tonic → subdominant → dominant relationships
+ * - Style fit (20%): pop, jazz, classical, rock, indie preferences
+ * - Mood fit (15%): bright, dark, jazzy, tense, calm, energetic
+ *
+ * Returns top 10 recommendations with different roots (not just variations on the same root).
+ *
+ * @param {string} currentChordType - Current chord type (e.g., 'Major', 'Minor 7th')
+ * @param {number} currentInversion - Current inversion (0, 1, 2, etc.)
+ * @param {string} rootNote - Current root note (e.g., 'C', 'D', 'F#')
  * @param {string} enhPref - Enharmonic preference (not used, kept for compatibility)
  * @param {string} notationPref - Notation preference (not used, kept for compatibility)
  * @param {string} style - Musical style ('balanced', 'pop', 'jazz', 'classical', 'rock', 'indie')
  * @param {string} mood - Intended mood ('bright', 'dark', 'jazzy', 'tense', 'calm', 'energetic')
- * @returns {Array<{nextChord:string, nextInversion:number, reason:string, confidence:number}>}
+ * @returns {Array<{root:string, type:string, inversion:number, reason:string, confidence:number}>}
  */
 function generateChordSuggestions(currentChordType, currentInversion, rootNote, enhPref, notationPref, style = 'balanced', mood = 'bright') {
-    // Use the comprehensive unified suggestion system
-    const suggestions = generateUnifiedChordSuggestions(currentChordType, rootNote, style, mood, currentInversion);
+    // Get current musical key (defaults to C if not set)
+    const key = getCurrentKey() || 'C';
 
-    // Filter out default Major Root suggestion (if it exists)
-    return suggestions.filter(s => !(s.nextChord === 'Major' && s.nextInversion === 0));
+    // Determine tension direction based on mood
+    // - 'bright', 'calm' moods favor resolution
+    // - 'tense', 'energetic' moods favor building tension
+    // - Other moods maintain tension
+    let tensionDirection = 'maintain';
+    if (mood === 'bright' || mood === 'calm') {
+        tensionDirection = 'resolve';
+    } else if (mood === 'tense' || mood === 'energetic') {
+        tensionDirection = 'build';
+    }
+
+    // Use comprehensive recommendation engine
+    const recommendations = generateComprehensiveRecommendations(
+        rootNote,
+        currentChordType,
+        currentInversion,
+        key,
+        style,
+        mood,
+        tensionDirection
+    );
+
+    // Transform to expected format (rename 'root' and 'type' to match existing code)
+    return recommendations.map(rec => ({
+        nextRoot: rec.root,        // NEW: Now includes different root notes!
+        nextChord: rec.type,       // Chord type (was 'nextChord')
+        nextInversion: rec.inversion,
+        reason: rec.reason,
+        confidence: rec.confidence
+    }));
 }
 
 /**
@@ -591,7 +629,7 @@ function showChordSuggestionsModal(chordType, inversion) {
         const suggestions = generateChordSuggestions(chordType, inversion, rootNote, enhPref, notationPref, style, mood);
         
         // Helper to create hold-to-play buttons
-        const createHoldPlayButton = (label, cType, inv) => {
+        const createHoldPlayButton = (label, cType, inv, chordRoot = rootNote) => {
             const btn = document.createElement('button');
             btn.textContent = label;
             btn.style.padding = '6px 8px';
@@ -608,10 +646,10 @@ function showChordSuggestionsModal(chordType, inversion) {
             btn.addEventListener('mousedown', (e) => {
                 e.stopPropagation();
                 const res = getInvertedChordNotes(
-                    rootNote,
+                    chordRoot,
                     cType,
                     inv,
-                    rootNote,
+                    chordRoot,
                     getBuilderOctaveShift ? getBuilderOctaveShift() : 0,
                     enhPref,
                     notationPref
@@ -682,12 +720,16 @@ function showChordSuggestionsModal(chordType, inversion) {
             const confidence = suggestion.confidence || 75;
             const stars = confidence >= 90 ? '⭐⭐⭐' : confidence >= 75 ? '⭐⭐' : '⭐';
 
+            // NEW: Get next root note and chord symbol
+            const nextRoot = suggestion.nextRoot || rootNote; // Fallback to current root if not specified
+            const nextSymbol = (CHORD_DEFINITIONS[suggestion.nextChord]?.symbol || '');
+
             chordHeader.innerHTML = `
-                <span>→ ${suggestion.nextChord} (${invName})</span>
+                <span>→ ${nextRoot}${nextSymbol} (${invName})</span>
                 <span style="font-size: 10px;">${stars}</span>
             `;
             suggestionCard.appendChild(chordHeader);
-            
+
             // Playback row (current vs next)
             const playbackRow = document.createElement('div');
             playbackRow.style.display = 'flex';
@@ -700,11 +742,10 @@ function showChordSuggestionsModal(chordType, inversion) {
             playbackRow.addEventListener('mousedown', (e) => e.stopPropagation());
             playbackRow.addEventListener('mouseup', (e) => e.stopPropagation());
             const currentSymbol = (CHORD_DEFINITIONS[chordType]?.symbol || '');
-            const nextSymbol = (CHORD_DEFINITIONS[suggestion.nextChord]?.symbol || '');
             const currentLabel = `Current: ${rootNote}${currentSymbol} (${INVERSION_NAMES[inversion] || inversion})`;
-            const nextLabel = `Next: ${rootNote}${nextSymbol} (${INVERSION_NAMES[suggestion.nextInversion] || suggestion.nextInversion})`;
-            playbackRow.appendChild(createHoldPlayButton(currentLabel, chordType, inversion));
-            playbackRow.appendChild(createHoldPlayButton(nextLabel, suggestion.nextChord, suggestion.nextInversion));
+            const nextLabel = `Next: ${nextRoot}${nextSymbol} (${INVERSION_NAMES[suggestion.nextInversion] || suggestion.nextInversion})`;
+            playbackRow.appendChild(createHoldPlayButton(currentLabel, chordType, inversion, rootNote));
+            playbackRow.appendChild(createHoldPlayButton(nextLabel, suggestion.nextChord, suggestion.nextInversion, nextRoot));
             
             // Add to Progression button
             const addToProgBtn = document.createElement('button');
@@ -728,12 +769,20 @@ function showChordSuggestionsModal(chordType, inversion) {
             });
             addToProgBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
+
+                // First, select the new root note (if different from current)
+                const nextRootIndex = ALL_NOTES.indexOf(nextRoot);
+                if (nextRootIndex !== -1 && nextRootIndex !== getBuilderRootIndex()) {
+                    selectBuilderRootNote(nextRootIndex, false); // Don't play audio during selection
+                }
+
+                // Then add to progression with the selected chord type and inversion
                 if (window.addSpecificChordToProgression) {
                     window.addSpecificChordToProgression(suggestion.nextChord, suggestion.nextInversion, true);
                 }
             });
             playbackRow.appendChild(addToProgBtn);
-            
+
             suggestionCard.appendChild(playbackRow);
 
             // Reason
@@ -743,13 +792,19 @@ function showChordSuggestionsModal(chordType, inversion) {
             reason.style.lineHeight = '1.4';
             reason.textContent = suggestion.reason;
             suggestionCard.appendChild(reason);
-            
-            // Click to select
+
+            // Click to select chord (updates Chord Builder to show this chord)
             suggestionCard.addEventListener('click', () => {
-                // Find the root note index (assume it stays the same, or we navigate up by interval)
-                // For now, just select the suggested chord
+                // Select the new root note
+                const nextRootIndex = ALL_NOTES.indexOf(nextRoot);
+                if (nextRootIndex !== -1) {
+                    selectBuilderRootNote(nextRootIndex, false);
+                }
+
+                // Select the chord type and inversion
                 selectBuilderChordType(suggestion.nextChord, false);
                 selectBuilderInversion(suggestion.nextInversion, true);
+
                 // Close modal
                 overlay.remove();
             });
@@ -769,11 +824,58 @@ function showChordSuggestionsModal(chordType, inversion) {
     moodSelect.addEventListener('change', () => {
         renderSuggestions(styleSelect.value, moodSelect.value);
     });
-    
+
+    // Show All Details button (opens 3D explorer)
+    const showAllBtn = document.createElement('button');
+    showAllBtn.textContent = '🔬 Show All Details (3D Explorer)';
+    showAllBtn.style.marginTop = '16px';
+    showAllBtn.style.padding = '10px 16px';
+    showAllBtn.style.backgroundColor = '#667eea';
+    showAllBtn.style.border = 'none';
+    showAllBtn.style.borderRadius = '4px';
+    showAllBtn.style.cursor = 'pointer';
+    showAllBtn.style.fontWeight = '600';
+    showAllBtn.style.width = '100%';
+    showAllBtn.style.color = 'white';
+    showAllBtn.style.fontSize = '14px';
+    showAllBtn.addEventListener('click', () => {
+        const key = getCurrentKey() || 'C';
+        let tensionDirection = 'maintain';
+        if (currentMood === 'bright' || currentMood === 'calm') {
+            tensionDirection = 'resolve';
+        } else if (currentMood === 'tense' || currentMood === 'energetic') {
+            tensionDirection = 'build';
+        }
+
+        showChordExplorerModal(
+            rootNote,
+            chordType,
+            inversion,
+            key,
+            currentStyle,
+            currentMood,
+            (type, root, inv) => {
+                // Add chord callback
+                if (window.addSpecificChordToProgression) {
+                    const nextRootIndex = ALL_NOTES.indexOf(root);
+                    if (nextRootIndex !== -1 && nextRootIndex !== getBuilderRootIndex()) {
+                        selectBuilderRootNote(nextRootIndex, false);
+                    }
+                    window.addSpecificChordToProgression(type, inv, true);
+                }
+            },
+            null, // play chord - TODO: implement
+            null  // stop chord - TODO: implement
+        );
+    });
+    showAllBtn.addEventListener('mouseenter', () => showAllBtn.style.backgroundColor = '#5a67d8');
+    showAllBtn.addEventListener('mouseleave', () => showAllBtn.style.backgroundColor = '#667eea');
+    modal.appendChild(showAllBtn);
+
     // Close button
     const closeBtn = document.createElement('button');
     closeBtn.textContent = 'Close';
-    closeBtn.style.marginTop = '16px';
+    closeBtn.style.marginTop = '8px';
     closeBtn.style.padding = '8px 16px';
     closeBtn.style.backgroundColor = '#e5e7eb';
     closeBtn.style.border = '1px solid #d1d5db';
