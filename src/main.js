@@ -18,12 +18,13 @@ window.GOOGLE_SEARCH_ENGINE_ID = '6233b4a886ca64ede';
 // Import all necessary modules
 import { switchTab, refreshAllTabs } from './modules/ui/tabs.js';
 import { initAllSectionDragDrop } from './modules/ui/sectionDragDrop.js';
-import { initAllSectionSidebars } from './modules/ui/sectionSidebar.js';
+import { initAllSectionSidebars, triggerSectionSidebarUpdate } from './modules/ui/sectionSidebar.js';
 import { showModal, hideModal } from './modules/ui/modals.js';
 import { renderKeyboard, updateKeyboardLabels, updateKeyNames, clearHighlights, g_KeyboardKeys } from './modules/ui/keyboard.js';
 import { updateKeySignatureDisplay, setupResponsiveTitle } from './modules/ui/header.js';
 import { toggleSidebar } from './modules/ui/sidebar.js';
 import { initPresetUI, togglePresetPanel, openPresetPanel, closePresetPanel } from './modules/ui/presetUI.js';
+import { initUnifiedSuggestionsPanel, updateUnifiedSuggestions } from './modules/ui/unifiedSuggestionsPanel.js';
 import { initCircleOfFifths, toggleCircleOfFifthsPanel, openCircleOfFifthsPanel, closeCircleOfFifthsPanel } from './modules/features/circleOfFifths.js';
 import { initGuitarFretboard, toggleGuitarFretboardPanel, openGuitarFretboardPanel, closeGuitarFretboardPanel, updateGuitarFretboard } from './modules/features/guitarFretboard.js';
 import {
@@ -72,6 +73,7 @@ import {
     updateBuilderOctaveUI,
     updateLHInversionSelector,
     addChordToProgression,
+    addSpecificChordToProgression,
     updateChordTypeButtonCaptions,
     updateIntervalButtonCaptions,
     capturePlayedChord,
@@ -823,6 +825,8 @@ window.toggleFretboard = toggleFretboard;
 window.toggleFloatingControls = toggleFloatingControls;
 window.toggleDisplayPanel = toggleDisplayPanel;
 window.handleOctaveRangeChange = handleOctaveRangeChange;
+window.updateRecommendations = updateUnifiedSuggestions;
+window.updateUnifiedSuggestions = updateUnifiedSuggestions;
 
 // Drag & Drop helpers (shock/refresh)
 function refreshDragDrop() {
@@ -876,6 +880,7 @@ window.startBuilderChord = startBuilderChord;
 window.stopBuilderChord = stopBuilderChord;
 window.playBuilderChordWithDuration = playBuilderChordWithDuration;
 window.addChordToProgression = addChordToProgression;
+window.addSpecificChordToProgression = addSpecificChordToProgression;
 window.changeArpeggioSpeed = changeArpeggioSpeed;
 window.changeBuilderOctave = changeBuilderOctave;
 window.updateBuilderDisplay = updateBuilderDisplay;
@@ -932,6 +937,7 @@ window.updateUndoRedoButtons = updateUndoRedoButtons;
 window.toggleStyleMoodInsightsPanel = toggleStyleMoodInsightsPanel;
 window.toggleProgressionControlsPanel = toggleProgressionControlsPanel;
 window.toggleProgressionCardsPanel = toggleProgressionCardsPanel;
+window.triggerSectionSidebarUpdate = triggerSectionSidebarUpdate;
 window.toggleAllStaffNotation = toggleAllStaffNotation;
 window.importChordList = importChordList;
 
@@ -941,6 +947,37 @@ if (typeof window.importChordList !== 'function') {
 } else {
     console.log('importChordList successfully exposed to window');
 }
+
+// Add chord from recommendation (used by Smart Suggestions panel)
+window.addChordFromRecommendation = function(root, type, inversion) {
+    // Import the necessary functions
+    import('./modules/state/chordBuilderState.js').then(module => {
+        const { setBuilderRootIndex, setBuilderChordType, setBuilderInversion } = module;
+        import('./data/music-data.js').then(dataModule => {
+            const { ALL_NOTES } = dataModule;
+            import('./modules/state/trainerState.js').then(stateModule => {
+                const { getEnharmonicPreference } = stateModule;
+
+                // Set up builder state to match the recommendation
+                const SHARP_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+                const FLAT_NOTES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+                const notes = getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+                const rootIndex = notes.indexOf(root);
+
+                if (rootIndex !== -1) {
+                    setBuilderRootIndex(rootIndex);
+                    setBuilderChordType(type);
+                    setBuilderInversion(inversion);
+
+                    // Import and call addChordToProgression
+                    import('./modules/features/chordBuilder.js').then(builderModule => {
+                        builderModule.addChordToProgression(false, true);
+                    });
+                }
+            });
+        });
+    });
+};
 
 // Melody Composer toggle functions
 window.toggleMelodyProgressionPanel = function() {
@@ -986,6 +1023,7 @@ window.toggleCurrentMelodyPanel = function() {
 // Expand/Collapse All functions for tabs
 window.expandAllTrainerSections = function() {
     const sections = [
+        { panelId: 'unified-suggestions-panel', chevronId: 'unified-suggestions-chevron' },
         { panelId: 'song-search-panel', chevronId: 'song-search-chevron' },
         { panelId: 'progression-controls-panel', chevronId: 'progression-controls-chevron' },
         { panelId: 'style-mood-insights-panel', chevronId: 'style-mood-insights-chevron' },
@@ -1009,6 +1047,7 @@ window.expandAllTrainerSections = function() {
 
 window.collapseAllTrainerSections = function() {
     const sections = [
+        { panelId: 'unified-suggestions-panel', chevronId: 'unified-suggestions-chevron' },
         { panelId: 'song-search-panel', chevronId: 'song-search-chevron' },
         { panelId: 'progression-controls-panel', chevronId: 'progression-controls-chevron' },
         { panelId: 'style-mood-insights-panel', chevronId: 'style-mood-insights-chevron' },
@@ -1619,6 +1658,35 @@ window.getEditorState = getEditorState;
 window.setAccidental = setAccidental;
 window.setDynamic = setDynamic;
 window.setMelodyTempo = setMelodyTempo;
+
+// Notation Control Panel Tab Switching
+window.showNotationTab = function(tabName) {
+    // Hide all tab contents
+    const allContents = document.querySelectorAll('.notation-tab-content');
+    allContents.forEach(content => {
+        content.classList.add('hidden');
+    });
+    
+    // Remove active state from all tab buttons
+    const allTabs = document.querySelectorAll('[id^="notation-tab-"]');
+    allTabs.forEach(tab => {
+        tab.classList.remove('bg-blue-600', 'text-white');
+        tab.classList.add('bg-gray-200', 'text-gray-700');
+    });
+    
+    // Show selected tab content
+    const selectedContent = document.getElementById(`notation-content-${tabName}`);
+    if (selectedContent) {
+        selectedContent.classList.remove('hidden');
+    }
+    
+    // Activate selected tab button
+    const selectedTab = document.getElementById(`notation-tab-${tabName}`);
+    if (selectedTab) {
+        selectedTab.classList.remove('bg-gray-200', 'text-gray-700');
+        selectedTab.classList.add('bg-blue-600', 'text-white');
+    }
+};
 window.playAllMelody = playAllMelody;
 window.stopPlayAllMelody = stopPlayAllMelody;
 window.playMeasure = playMeasure;
@@ -2121,6 +2189,11 @@ window.onload = () => {
 
     // Initialize Theory Tools
     initTheoryTools();
+
+    // Initialize Unified Smart Suggestions Panel (replaces old recommendations + style/mood)
+    setTimeout(() => {
+        initUnifiedSuggestionsPanel();
+    }, 200);
 
     // Restore panel states FIRST, before initializing sidebar system
     // This prevents the sidebar from overwriting saved states with HTML defaults

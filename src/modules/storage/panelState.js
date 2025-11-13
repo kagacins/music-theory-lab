@@ -135,6 +135,7 @@ function getTabPanelConfigs(tabId) {
             { panelId: 'chord-intervals-panel', toggleId: 'chord-intervals-toggle', chevronId: 'chord-intervals-chevron' }
         ],
         trainer: [
+            { panelId: 'unified-suggestions-panel', toggleId: 'unified-suggestions-toggle', chevronId: 'unified-suggestions-chevron' },
             { panelId: 'song-search-panel', toggleId: 'song-search-toggle', chevronId: 'song-search-chevron' },
             { panelId: 'progression-controls-panel', toggleId: 'progression-controls-toggle', chevronId: 'progression-controls-chevron' },
             { panelId: 'style-mood-insights-panel', toggleId: 'style-mood-insights-toggle', chevronId: 'style-mood-insights-chevron' },

@@ -185,6 +185,10 @@ function initializeStyleMoodControls() {
             setSuggestionStyle(event.target.value);
             updateStyleMoodDescriptions();
             refreshStyleMoodInsights();
+            // Update unified suggestions panel if available
+            if (window.updateUnifiedSuggestions) {
+                window.updateUnifiedSuggestions();
+            }
         };
     }
     if (styleSelect) {
@@ -203,6 +207,10 @@ function initializeStyleMoodControls() {
             setSuggestionMood(event.target.value);
             updateStyleMoodDescriptions();
             refreshStyleMoodInsights();
+            // Update unified suggestions panel if available
+            if (window.updateUnifiedSuggestions) {
+                window.updateUnifiedSuggestions();
+            }
         };
     }
     if (moodSelect) {
@@ -463,14 +471,17 @@ function refreshStyleMoodInsights(force = false) {
 
 export function toggleStyleMoodInsightsPanel() {
     const panel = document.getElementById('style-mood-insights-panel');
+    const section = panel?.closest('.trainer-section-item');
     const chevron = document.getElementById('style-mood-insights-chevron');
-    if (!panel || !chevron) return;
+    if (!panel || !chevron || !section) return;
 
     const isHidden = panel.classList.contains('hidden');
     if (isHidden) {
+        // Expanding
         panel.classList.remove('hidden');
         chevron.classList.add('rotate-180');
     } else {
+        // Collapsing - hide panel which will trigger MutationObserver
         panel.classList.add('hidden');
         chevron.classList.remove('rotate-180');
     }
@@ -478,6 +489,13 @@ export function toggleStyleMoodInsightsPanel() {
     // Save panel state
     if (window.savePanelState) {
         window.savePanelState('style-mood-insights-panel', !isHidden);
+    }
+    
+    // Manually trigger sidebar update with a small delay to ensure DOM is updated
+    if (window.triggerSectionSidebarUpdate) {
+        setTimeout(() => {
+            window.triggerSectionSidebarUpdate('trainer', 'style-mood-insights');
+        }, 50);
     }
 }
 
@@ -2248,12 +2266,14 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         const maxInversion = def ? def.intervals.length - 1 : 0;
         const currentInversion = chordData.inversion || 0;
         
-        // Create buttons for R, 1, 2, 3 (up to maxInversion)
+        // Create buttons for all available inversions (up to maxInversion)
         const invButtons = [];
-        for (let invIndex = 0; invIndex <= Math.min(maxInversion, 3); invIndex++) {
+        for (let invIndex = 0; invIndex <= maxInversion; invIndex++) {
             const invButton = document.createElement('button');
             invButton.type = 'button';
-            invButton.textContent = invIndex === 0 ? 'R' : invIndex.toString();
+            // Use INVERSION_NAMES for display, or fallback to 'R' for root, number for others
+            const invName = INVERSION_NAMES[invIndex] || (invIndex === 0 ? 'R' : invIndex.toString());
+            invButton.textContent = invIndex === 0 ? 'R' : invName.replace('st', '').replace('nd', '').replace('rd', '').replace('th', '');
             invButton.setAttribute('data-inversion', invIndex);
             invButton.className = `flex-1 px-1 py-0.5 text-[10px] font-semibold rounded transition-colors ${
                 invIndex === currentInversion

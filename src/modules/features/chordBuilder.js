@@ -44,6 +44,779 @@ import {
 import { getTrainerState } from '../state/trainerState.js';
 
 // =========================================================================
+// Helper Function: Create Tooltip for Button
+// =========================================================================
+
+/**
+ * Creates a custom tooltip for a button that appears on hover
+ * Uses fixed positioning to avoid overflow clipping issues
+ * @param {HTMLElement} button - The button element to attach tooltip to
+ * @param {string} tooltipText - The text to display in the tooltip
+ * @param {string} chordType - (Optional) The chord type, used to show inversion options
+ */
+function createButtonTooltip(button, tooltipText, chordType = null) {
+    if (!tooltipText || tooltipText.length === 0) return;
+    
+    const tooltip = document.createElement('div');
+    tooltip.className = 'chord-button-tooltip';
+    
+    // Style it for fixed positioning (to avoid overflow clipping)
+    tooltip.style.position = 'fixed';
+    tooltip.style.backgroundColor = '#111827';
+    tooltip.style.color = 'white';
+    tooltip.style.fontSize = '12px';
+    tooltip.style.fontWeight = '500';
+    tooltip.style.borderRadius = '6px';
+    tooltip.style.padding = '8px 12px';
+    tooltip.style.pointerEvents = 'auto';
+    tooltip.style.whiteSpace = 'normal';
+    tooltip.style.wordWrap = 'break-word';
+    tooltip.style.maxWidth = '320px';
+    tooltip.style.textAlign = 'left';
+    tooltip.style.lineHeight = '1.5';
+    tooltip.style.zIndex = '99999';
+    tooltip.style.opacity = '0';
+    tooltip.style.visibility = 'hidden';
+    tooltip.style.transition = 'opacity 0.15s ease-in-out, visibility 0.15s ease-in-out';
+    tooltip.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+    tooltip.style.border = '1px solid #374151';
+    
+    // Style the first line (name) to be bold and slightly larger
+    const lines = tooltipText.split('\n');
+    if (lines.length > 1) {
+        const nameLine = lines[0];
+        const descriptionLines = lines.slice(1).join('\n').trim();
+        let tooltipHTML = `<div style="font-weight: 600; font-size: 13px; margin-bottom: 4px; color: #fbbf24;">${nameLine}</div><div style="font-weight: 400; font-size: 12px;">${descriptionLines}</div>`;
+        
+        // Add inversion buttons if this is a chord
+        if (chordType && CHORD_DEFINITIONS[chordType]) {
+            const chordDef = CHORD_DEFINITIONS[chordType];
+            const maxInversion = chordDef.intervals.length - 1;
+            tooltipHTML += `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #4b5563;">
+                <div style="font-size: 11px; font-weight: 600; margin-bottom: 4px; color: #60a5fa;">Inversions:</div>
+                <div style="display: flex; gap: 4px; flex-wrap: wrap;" class="inversion-buttons-container">`;
+            
+            for (let i = 0; i <= maxInversion; i++) {
+                const invName = INVERSION_NAMES[i] || `${i}`;
+                tooltipHTML += `<button data-inversion="${i}" class="tooltip-inversion-btn" style="
+                    padding: 4px 8px;
+                    font-size: 11px;
+                    background-color: #374151;
+                    color: white;
+                    border: 1px solid #4b5563;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    font-weight: 500;
+                " onmouseover="if(!this.classList.contains('selected')) this.style.backgroundColor='#4b5563'" onmouseout="if(!this.classList.contains('selected')) this.style.backgroundColor='#374151'">${invName}</button>`;
+            }
+            
+            tooltipHTML += `</div></div>`;
+        }
+        
+        tooltip.innerHTML = tooltipHTML;
+    } else {
+        tooltip.textContent = tooltipText;
+    }
+    
+    document.body.appendChild(tooltip);
+    
+    // Add event listeners to inversion buttons
+    if (chordType) {
+        const inversionButtons = tooltip.querySelectorAll('[data-inversion]');
+        
+        // Function to update button highlighting
+        const updateButtonHighlight = (selectedIndex) => {
+            inversionButtons.forEach(btn => {
+                const btnIndex = parseInt(btn.dataset.inversion, 10);
+                if (btnIndex === selectedIndex) {
+                    btn.classList.add('selected');
+                    btn.style.backgroundColor = '#fbbf24'; // Amber/gold for selected
+                    btn.style.borderColor = '#f59e0b';
+                    btn.style.color = '#111827';
+                    btn.style.fontWeight = '600';
+                } else {
+                    btn.classList.remove('selected');
+                    btn.style.backgroundColor = '#374151';
+                    btn.style.borderColor = '#4b5563';
+                    btn.style.color = 'white';
+                    btn.style.fontWeight = '500';
+                }
+            });
+        };
+        
+        inversionButtons.forEach(btn => {
+            // Play while button is pressed/held
+            btn.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                const inversionIndex = parseInt(btn.dataset.inversion, 10);
+                // First ensure the correct chord type is selected (without playing)
+                selectBuilderChordType(chordType, false);
+                // Then select the inversion and start playing
+                selectBuilderInversion(inversionIndex, false);
+                startBuilderChord();
+                // Store the selected chord+inversion for suggestion generation
+                window.lastTooltipChordSelection = { chordType, inversion: inversionIndex };
+                // Update button highlighting
+                updateButtonHighlight(inversionIndex);
+                // Keep tooltip open for trying other inversions
+            });
+            
+            // Stop playing when button is released
+            btn.addEventListener('mouseup', (e) => {
+                e.stopPropagation();
+                stopBuilderChord();
+            });
+            
+            // Stop playing if mouse leaves button while pressed
+            btn.addEventListener('mouseleave', (e) => {
+                e.stopPropagation();
+                stopBuilderChord();
+            });
+        });
+        
+        // Initialize highlighting if there's a stored selection for this chord
+        if (window.lastTooltipChordSelection && window.lastTooltipChordSelection.chordType === chordType) {
+            updateButtonHighlight(window.lastTooltipChordSelection.inversion);
+        }
+    }
+    
+    // Add "Suggested Next Chords" button if this is a chord tooltip
+    if (chordType && lines.length > 1) {
+        const suggestionsBtn = document.createElement('button');
+        suggestionsBtn.textContent = '💡 Suggested Next';
+        suggestionsBtn.style.marginTop = '8px';
+        suggestionsBtn.style.padding = '4px 8px';
+        suggestionsBtn.style.fontSize = '10px';
+        suggestionsBtn.style.backgroundColor = '#60a5fa';
+        suggestionsBtn.style.color = 'white';
+        suggestionsBtn.style.border = '1px solid #3b82f6';
+        suggestionsBtn.style.borderRadius = '3px';
+        suggestionsBtn.style.cursor = 'pointer';
+        suggestionsBtn.style.width = '100%';
+        suggestionsBtn.style.fontWeight = '600';
+        suggestionsBtn.style.transition = 'all 0.2s';
+        suggestionsBtn.onmouseover = () => suggestionsBtn.style.backgroundColor = '#3b82f6';
+        suggestionsBtn.onmouseout = () => suggestionsBtn.style.backgroundColor = '#60a5fa';
+        suggestionsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const selectedInversion = window.lastTooltipChordSelection?.inversion || 0;
+            showChordSuggestionsModal(chordType, selectedInversion);
+        });
+        tooltip.appendChild(suggestionsBtn);
+    }
+    
+    // Mouse enter: show tooltip above button
+    button.addEventListener('mouseenter', () => {
+        const rect = button.getBoundingClientRect();
+        // More space above the button: 200px for chord tooltips with inversions + button, 80px for interval tooltips
+        const tooltipHeight = chordType ? 200 : 80;
+        
+        tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+        tooltip.style.top = (rect.top - tooltipHeight - 12) + 'px';
+        tooltip.style.transform = 'translateX(-50%)';
+        
+        tooltip.style.opacity = '1';
+        tooltip.style.visibility = 'visible';
+    });
+    
+    // Mouse leave: hide tooltip
+    button.addEventListener('mouseleave', () => {
+        tooltip.style.opacity = '0';
+        tooltip.style.visibility = 'hidden';
+    });
+    
+    // Keep tooltip visible when hovering over it
+    tooltip.addEventListener('mouseenter', () => {
+        tooltip.style.opacity = '1';
+        tooltip.style.visibility = 'visible';
+    });
+    
+    tooltip.addEventListener('mouseleave', () => {
+        tooltip.style.opacity = '0';
+        tooltip.style.visibility = 'hidden';
+    });
+}
+
+/**
+ * Creates a chord tooltip with inversion selection buttons
+ * @param {HTMLElement} button - The button element to attach tooltip to
+ * @param {string} chordName - Name of the chord
+ * @param {string} chordDescription - Description of the chord
+ * @param {string} chordType - Type of chord (for inversion lookup)
+ */
+function createChordButtonTooltip(button, chordName, chordDescription, chordType) {
+    if (!chordName || !chordDescription) return;
+    
+    const tooltip = document.createElement('div');
+    tooltip.className = 'chord-button-tooltip-interactive';
+    
+    // Get number of inversions available for this chord
+    const chordDef = CHORD_DEFINITIONS[chordType];
+    const maxInversion = chordDef ? chordDef.intervals.length - 1 : 0;
+    
+    // Build HTML content with name, description, and inversion buttons
+    let html = `<div style="font-weight: 600; font-size: 13px; margin-bottom: 4px; color: #fbbf24;">${chordName}</div>`;
+    html += `<div style="font-weight: 400; font-size: 12px; margin-bottom: 8px;">${chordDescription}</div>`;
+    html += `<div style="font-weight: 500; font-size: 11px; margin-bottom: 4px; color: #d1d5db;">Inversions:</div>`;
+    html += `<div style="display: flex; gap: 4px; flex-wrap: wrap;">`;
+    
+    for (let inv = 0; inv <= maxInversion; inv++) {
+        const invName = INVERSION_NAMES[inv] || `Inv${inv}`;
+        html += `<button class="inversion-button" data-inversion="${inv}" style="padding: 3px 8px; background-color: #374151; color: #d1d5db; border: 1px solid #4b5563; border-radius: 3px; font-size: 11px; cursor: pointer; transition: all 0.15s; white-space: nowrap;" onmouseover="this.style.backgroundColor='#4b5563'; this.style.color='#f3f4f6';" onmouseout="this.style.backgroundColor='#374151'; this.style.color='#d1d5db';">${invName}</button>`;
+    }
+    
+    html += `</div>`;
+    tooltip.innerHTML = html;
+    
+    // Style the container
+    tooltip.style.position = 'fixed';
+    tooltip.style.backgroundColor = '#111827';
+    tooltip.style.color = 'white';
+    tooltip.style.borderRadius = '6px';
+    tooltip.style.padding = '8px 12px';
+    tooltip.style.pointerEvents = 'auto'; // Allow interaction with buttons
+    tooltip.style.maxWidth = '340px';
+    tooltip.style.textAlign = 'left';
+    tooltip.style.zIndex = '99999';
+    tooltip.style.opacity = '0';
+    tooltip.style.visibility = 'hidden';
+    tooltip.style.transition = 'opacity 0.15s ease-in-out, visibility 0.15s ease-in-out';
+    tooltip.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+    tooltip.style.border = '1px solid #374151';
+    
+    document.body.appendChild(tooltip);
+    
+    // Add click handlers to inversion buttons
+    tooltip.querySelectorAll('.inversion-button').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const inversion = parseInt(btn.dataset.inversion, 10);
+            selectBuilderInversion(inversion, true); // true = play audio
+            
+            // Update the display (which updates Chord Voicing section and inversions)
+            updateBuilderDisplay();
+            
+            // Hide tooltip after selection
+            tooltip.style.opacity = '0';
+            tooltip.style.visibility = 'hidden';
+        });
+    });
+    
+    // Mouse enter: show tooltip above button
+    button.addEventListener('mouseenter', () => {
+        const rect = button.getBoundingClientRect();
+        const tooltipHeight = 140; // Larger for inversion buttons
+        
+        tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+        tooltip.style.top = (rect.top - tooltipHeight - 12) + 'px';
+        tooltip.style.transform = 'translateX(-50%)';
+        
+        tooltip.style.opacity = '1';
+        tooltip.style.visibility = 'visible';
+    });
+    
+    // Mouse leave: hide tooltip
+    button.addEventListener('mouseleave', () => {
+        setTimeout(() => {
+            // Only hide if mouse is not over tooltip
+            if (!tooltip.matches(':hover')) {
+                tooltip.style.opacity = '0';
+                tooltip.style.visibility = 'hidden';
+            }
+        }, 50);
+    });
+    
+    // Keep tooltip visible when hovering over it
+    tooltip.addEventListener('mouseenter', () => {
+        tooltip.style.opacity = '1';
+        tooltip.style.visibility = 'visible';
+    });
+    
+    tooltip.addEventListener('mouseleave', () => {
+        tooltip.style.opacity = '0';
+        tooltip.style.visibility = 'hidden';
+    });
+}
+
+// =========================================================================
+// Chord Suggestion Generation and Modal
+// =========================================================================
+
+/**
+ * Generate chord suggestions based on music theory voice leading.
+ * Picks next chord inversions that minimize bass motion from current inversion.
+ * @param {string} currentChordType
+ * @param {number} currentInversion
+ * @param {string} rootNote
+ * @param {string} enhPref
+ * @param {string} notationPref
+ * @param {string} mood - 'bright', 'dark', 'jazzy', or 'tense'
+ * @returns {Array<{nextChord:string,nextInversion:number,reason:string}>}
+ */
+function generateChordSuggestions(currentChordType, currentInversion, rootNote, enhPref, notationPref, mood = 'bright') {
+    // Helper: get bass MIDI of a chord type/inversion at current root
+    const getBassMidi = (chordType, inversion) => {
+        const res = getInvertedChordNotes(
+            rootNote,
+            chordType,
+            inversion,
+            rootNote,
+            getBuilderOctaveShift ? getBuilderOctaveShift() : 0,
+            enhPref,
+            notationPref
+        );
+        const lowest = res.specificNotes && res.specificNotes.length ? res.specificNotes[0] : null;
+        return lowest ? noteToMidi(lowest) : null;
+    };
+    const currentBassMidi = getBassMidi(currentChordType, currentInversion);
+    // Helper: choose inversion for nextChord minimizing bass motion
+    const chooseOptimalInversion = (nextChordType) => {
+        const def = CHORD_DEFINITIONS[nextChordType];
+        if (!def) return 0;
+        let bestInv = 0;
+        let bestDiff = Infinity;
+        for (let i = 0; i < def.intervals.length; i++) {
+            const midi = getBassMidi(nextChordType, i);
+            if (midi === null || currentBassMidi === null) continue;
+            const diff = Math.abs(midi - currentBassMidi);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                bestInv = i;
+            }
+        }
+        return bestInv;
+    };
+
+    // Core suggestions per chord quality and mood
+    const raw = [];
+    
+    // Mood-based suggestions
+    if (mood === 'bright') {
+        switch (currentChordType) {
+            case 'Major':
+                raw.push({ nextChord: 'Major 7th', reason: 'Jazzy and bright extension of the major triad.' });
+                raw.push({ nextChord: 'Dominant 7th', reason: 'Creates uplifting forward motion.' });
+                raw.push({ nextChord: 'Add9', reason: 'Modern, open sound that adds color.' });
+                raw.push({ nextChord: 'Major 6th', reason: 'Sweet, retro feel with stable resolution.' });
+                break;
+            case 'Minor':
+                raw.push({ nextChord: 'Major', reason: 'Brightens the mood with major quality.' });
+                raw.push({ nextChord: 'Major 7th', reason: 'Lifts into major with jazz color.' });
+                raw.push({ nextChord: 'Add9', reason: 'Opens up the sound while maintaining major tonality.' });
+                break;
+            case 'Dominant 7th':
+                raw.push({ nextChord: 'Major 7th', reason: 'Resolves tension with a bright, stable sound.' });
+                raw.push({ nextChord: 'Major 6th', reason: 'Sweet resolution without the 7th.' });
+                raw.push({ nextChord: 'Sus2', reason: 'Open, airy sound that feels hopeful.' });
+                break;
+            default:
+                raw.push({ nextChord: 'Major 7th', reason: 'Bright, jazzy color.' });
+                raw.push({ nextChord: 'Major', reason: 'Clear, stable major tonality.' });
+                raw.push({ nextChord: 'Add9', reason: 'Modern, open sound.' });
+                break;
+        }
+    } else if (mood === 'dark') {
+        switch (currentChordType) {
+            case 'Major':
+                raw.push({ nextChord: 'Minor', reason: 'Shifts to melancholic minor quality.' });
+                raw.push({ nextChord: 'Diminished', reason: 'Unstable, tense leading tone.' });
+                raw.push({ nextChord: 'Minor 7th', reason: 'Soulful, darker color with 7th.' });
+                raw.push({ nextChord: 'Half-Diminished 7th', reason: 'Jazz tension with minor quality.' });
+                break;
+            case 'Minor':
+                raw.push({ nextChord: 'Diminished', reason: 'Increases tension and instability.' });
+                raw.push({ nextChord: 'Minor 7th', reason: 'Deepens the minor color.' });
+                raw.push({ nextChord: 'Minor-Major 7th', reason: 'Mysterious, film-score quality.' });
+                raw.push({ nextChord: 'Half-Diminished 7th', reason: 'Jazzy, darker harmonic color.' });
+                break;
+            case 'Dominant 7th':
+                raw.push({ nextChord: 'Minor', reason: 'Resolves to minor for darker effect.' });
+                raw.push({ nextChord: 'Diminished', reason: 'Maintains tension with unstable quality.' });
+                raw.push({ nextChord: 'Minor 7th', reason: 'Soulful resolution to minor.' });
+                break;
+            default:
+                raw.push({ nextChord: 'Minor 7th', reason: 'Soulful, darker quality.' });
+                raw.push({ nextChord: 'Diminished', reason: 'Tense, unstable harmony.' });
+                raw.push({ nextChord: 'Minor', reason: 'Melancholic minor tonality.' });
+                break;
+        }
+    } else if (mood === 'jazzy') {
+        switch (currentChordType) {
+            case 'Major':
+                raw.push({ nextChord: 'Major 9th', reason: 'Lush, rich jazz color.' });
+                raw.push({ nextChord: 'Dominant 9th', reason: 'Blues/funk dominant with 9th.' });
+                raw.push({ nextChord: '6/9', reason: 'Static jazz chord with rich harmony.' });
+                raw.push({ nextChord: 'Dominant 11th', reason: 'Complex, suspended quality.' });
+                break;
+            case 'Minor':
+                raw.push({ nextChord: 'Minor 9th', reason: 'Smooth, soulful jazz extension.' });
+                raw.push({ nextChord: 'Minor 11th', reason: 'Rich, complex minor color.' });
+                raw.push({ nextChord: 'Half-Diminished 7th', reason: 'Common jazz ii chord.' });
+                raw.push({ nextChord: 'Dominant 9th', reason: 'Sets up jazz resolution.' });
+                break;
+            case 'Dominant 7th':
+                raw.push({ nextChord: 'Major 9th', reason: 'Resolves to lush major 9th.' });
+                raw.push({ nextChord: 'Minor 9th', reason: 'Smooth resolution to minor 9th.' });
+                raw.push({ nextChord: '7#9', reason: 'Altered dominant "Hendrix chord".' });
+                raw.push({ nextChord: '7b9', reason: 'Tense altered dominant.' });
+                break;
+            default:
+                raw.push({ nextChord: 'Major 9th', reason: 'Lush jazz harmony.' });
+                raw.push({ nextChord: 'Dominant 9th', reason: 'Blues/jazz dominant.' });
+                raw.push({ nextChord: 'Minor 9th', reason: 'Smooth, soulful.' });
+                break;
+        }
+    } else if (mood === 'tense') {
+        switch (currentChordType) {
+            case 'Major':
+                raw.push({ nextChord: 'Dominant 7th', reason: 'Creates tension seeking resolution.' });
+                raw.push({ nextChord: 'Augmented', reason: 'Dissonant, dramatic quality.' });
+                raw.push({ nextChord: '7b5', reason: 'Altered dominant with tension.' });
+                raw.push({ nextChord: 'Diminished 7th', reason: 'Extremely tense and dissonant.' });
+                break;
+            case 'Minor':
+                raw.push({ nextChord: 'Diminished 7th', reason: 'Maximum tension and dissonance.' });
+                raw.push({ nextChord: 'Half-Diminished 7th', reason: 'Tense but less harsh.' });
+                raw.push({ nextChord: 'Augmented 7th', reason: 'Dissonant dominant.' });
+                raw.push({ nextChord: '7#5', reason: 'Altered dominant with sharp 5th.' });
+                break;
+            case 'Dominant 7th':
+                raw.push({ nextChord: '7b9', reason: 'Very tense altered dominant.' });
+                raw.push({ nextChord: '7#9', reason: 'Hendrix chord with sharp 9th.' });
+                raw.push({ nextChord: 'Augmented 7th', reason: 'Dissonant altered dominant.' });
+                raw.push({ nextChord: 'Diminished 7th', reason: 'Extremely tense.' });
+                break;
+            default:
+                raw.push({ nextChord: 'Dominant 7th', reason: 'Creates forward tension.' });
+                raw.push({ nextChord: 'Diminished 7th', reason: 'Extremely tense.' });
+                raw.push({ nextChord: 'Augmented', reason: 'Dissonant and dramatic.' });
+                break;
+        }
+    }
+
+    // Compute optimal inversions
+    const suggestions = raw.map(s => ({
+        nextChord: s.nextChord,
+        nextInversion: chooseOptimalInversion(s.nextChord),
+        reason: s.reason
+    }));
+
+    // De-duplicate by chord+inversion
+    const seen = new Set();
+    const unique = [];
+    for (const s of suggestions) {
+        const key = `${s.nextChord}|${s.nextInversion}`;
+        if (!seen.has(key)) {
+            seen.add(key);
+            unique.push(s);
+        }
+    }
+    // Filter out default I suggestion (Major Root) from the main list
+    return unique.filter(s => !(s.nextChord === 'Major' && s.nextInversion === 0));
+}
+
+/**
+ * Show modal with chord suggestions
+ * @param {string} chordType - The chord type to suggest from
+ * @param {number} inversion - The selected inversion
+ */
+function showChordSuggestionsModal(chordType, inversion) {
+    // Remove existing modal if any
+    const existingModal = document.getElementById('chord-suggestions-modal');
+    if (existingModal) existingModal.remove();
+    
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'chord-suggestions-modal';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.zIndex = '99999';
+    
+    // Create modal content
+    const modal = document.createElement('div');
+    modal.style.backgroundColor = 'white';
+    modal.style.borderRadius = '8px';
+    modal.style.padding = '24px';
+    modal.style.maxWidth = '500px';
+    modal.style.maxHeight = '80vh';
+    modal.style.overflowY = 'auto';
+    modal.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.1)';
+    
+    const inversionName = INVERSION_NAMES[inversion] || `Inversion ${inversion}`;
+    
+    // Title
+    const title = document.createElement('h2');
+    title.textContent = `Suggested Next Chords After ${chordType} (${inversionName})`;
+    title.style.marginBottom = '16px';
+    title.style.fontSize = '18px';
+    title.style.fontWeight = '600';
+    title.style.color = '#111827';
+    modal.appendChild(title);
+    
+    // Resolve current root and preferences
+    const currentNotesArray = getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+    const rootNote = currentNotesArray[getBuilderRootIndex()];
+    const enhPref = getEnharmonicPreference();
+    const notationPref = getNotationPreference();
+    
+    // Mood selector
+    const moodContainer = document.createElement('div');
+    moodContainer.style.marginBottom = '16px';
+    
+    const moodLabel = document.createElement('label');
+    moodLabel.textContent = 'Intended Mood:';
+    moodLabel.style.fontSize = '12px';
+    moodLabel.style.fontWeight = '600';
+    moodLabel.style.color = '#374151';
+    moodLabel.style.display = 'block';
+    moodLabel.style.marginBottom = '4px';
+    moodContainer.appendChild(moodLabel);
+    
+    const moodSelect = document.createElement('select');
+    moodSelect.style.width = '100%';
+    moodSelect.style.padding = '6px 8px';
+    moodSelect.style.border = '1px solid #d1d5db';
+    moodSelect.style.borderRadius = '4px';
+    moodSelect.style.fontSize = '12px';
+    moodSelect.style.backgroundColor = 'white';
+    
+    const moods = [
+        { value: 'bright', label: '😊 Happy / Bright' },
+        { value: 'dark', label: '😔 Melancholic / Dark' },
+        { value: 'jazzy', label: '🎷 Jazzy / Complex' },
+        { value: 'tense', label: '⚡ Tense / Dramatic' }
+    ];
+    
+    moods.forEach(m => {
+        const option = document.createElement('option');
+        option.value = m.value;
+        option.textContent = m.label;
+        moodSelect.appendChild(option);
+    });
+    
+    moodContainer.appendChild(moodSelect);
+    modal.appendChild(moodContainer);
+    
+    // Container for suggestions that will be regenerated on mood change
+    const suggestionsContainer = document.createElement('div');
+    modal.appendChild(suggestionsContainer);
+    
+    // Function to render suggestions based on mood
+    const renderSuggestions = (mood) => {
+        suggestionsContainer.innerHTML = '';
+        
+        // Default baseline suggestion (small text)
+        const defaultNote = document.createElement('div');
+        defaultNote.style.fontSize = '11px';
+        defaultNote.style.color = '#6b7280';
+        defaultNote.style.marginBottom = '12px';
+        defaultNote.textContent = 'Default: Major (Root) is a common, stable resolution.';
+        suggestionsContainer.appendChild(defaultNote);
+        
+        // Get suggestions for current mood
+        const suggestions = generateChordSuggestions(chordType, inversion, rootNote, enhPref, notationPref, mood);
+        
+        // Helper to create hold-to-play buttons
+        const createHoldPlayButton = (label, cType, inv) => {
+            const btn = document.createElement('button');
+            btn.textContent = label;
+            btn.style.padding = '6px 8px';
+            btn.style.fontSize = '11px';
+            btn.style.border = '1px solid #d1d5db';
+            btn.style.borderRadius = '4px';
+            btn.style.backgroundColor = '#f9fafb';
+            btn.style.color = '#111827';
+            btn.style.cursor = 'pointer';
+            btn.style.transition = 'all 0.15s';
+            btn.addEventListener('mouseenter', () => { btn.style.backgroundColor = '#f3f4f6'; });
+            btn.addEventListener('mouseleave', () => { btn.style.backgroundColor = '#f9fafb'; });
+            let heldNotes = null;
+            btn.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                const res = getInvertedChordNotes(
+                    rootNote,
+                    cType,
+                    inv,
+                    rootNote,
+                    getBuilderOctaveShift ? getBuilderOctaveShift() : 0,
+                    enhPref,
+                    notationPref
+                );
+                heldNotes = res.specificNotes || [];
+                const instrument = getInstrument && getInstrument();
+                if (instrument && heldNotes.length > 0) {
+                    const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                    const baseTime = Tone.now() + 0.01;
+                    if (isGuitar) {
+                        heldNotes.forEach((n, idx) => instrument.triggerAttack(n, baseTime + idx * 0.0001));
+                    } else {
+                        instrument.triggerAttack(heldNotes, Tone.now());
+                    }
+                }
+            });
+            const stopHeld = (e) => {
+                if (e) e.stopPropagation();
+                const instrument = getInstrument && getInstrument();
+                if (instrument && heldNotes && heldNotes.length > 0) {
+                    const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                    if (isGuitar) {
+                        heldNotes.forEach(n => {
+                            try { instrument.triggerRelease(n, Tone.now()); } catch (_) {}
+                        });
+                    } else {
+                        instrument.triggerRelease(heldNotes, Tone.now());
+                    }
+                }
+                heldNotes = null;
+            };
+            btn.addEventListener('mouseup', stopHeld);
+            btn.addEventListener('mouseleave', stopHeld);
+            return btn;
+        };
+
+        // Display each suggestion
+        suggestions.forEach((suggestion, index) => {
+            const suggestionCard = document.createElement('div');
+            suggestionCard.style.padding = '12px';
+            suggestionCard.style.marginBottom = '12px';
+            suggestionCard.style.backgroundColor = '#f3f4f6';
+            suggestionCard.style.borderLeft = '4px solid #60a5fa';
+            suggestionCard.style.borderRadius = '4px';
+            suggestionCard.style.cursor = 'pointer';
+            suggestionCard.style.transition = 'all 0.2s';
+            
+            suggestionCard.addEventListener('mouseenter', () => {
+                suggestionCard.style.backgroundColor = '#e5e7eb';
+                suggestionCard.style.borderLeftColor = '#3b82f6';
+            });
+            
+            suggestionCard.addEventListener('mouseleave', () => {
+                suggestionCard.style.backgroundColor = '#f3f4f6';
+                suggestionCard.style.borderLeftColor = '#60a5fa';
+            });
+            
+            // Chord header
+            const chordHeader = document.createElement('div');
+            chordHeader.style.fontWeight = '600';
+            chordHeader.style.marginBottom = '4px';
+            chordHeader.style.color = '#1f2937';
+            
+            const invName = INVERSION_NAMES[suggestion.nextInversion] || `Inversion ${suggestion.nextInversion}`;
+            chordHeader.textContent = `→ ${suggestion.nextChord} (${invName})`;
+            suggestionCard.appendChild(chordHeader);
+            
+            // Playback row (current vs next)
+            const playbackRow = document.createElement('div');
+            playbackRow.style.display = 'flex';
+            playbackRow.style.gap = '8px';
+            playbackRow.style.margin = '8px 0';
+            playbackRow.style.flexWrap = 'wrap';
+            playbackRow.style.alignItems = 'center';
+            // Stop propagation so clicking buttons doesn't trigger card click
+            playbackRow.addEventListener('click', (e) => e.stopPropagation());
+            playbackRow.addEventListener('mousedown', (e) => e.stopPropagation());
+            playbackRow.addEventListener('mouseup', (e) => e.stopPropagation());
+            const currentSymbol = (CHORD_DEFINITIONS[chordType]?.symbol || '');
+            const nextSymbol = (CHORD_DEFINITIONS[suggestion.nextChord]?.symbol || '');
+            const currentLabel = `Current: ${rootNote}${currentSymbol} (${INVERSION_NAMES[inversion] || inversion})`;
+            const nextLabel = `Next: ${rootNote}${nextSymbol} (${INVERSION_NAMES[suggestion.nextInversion] || suggestion.nextInversion})`;
+            playbackRow.appendChild(createHoldPlayButton(currentLabel, chordType, inversion));
+            playbackRow.appendChild(createHoldPlayButton(nextLabel, suggestion.nextChord, suggestion.nextInversion));
+            
+            // Add to Progression button
+            const addToProgBtn = document.createElement('button');
+            addToProgBtn.textContent = '➕ Add to Progression';
+            addToProgBtn.style.padding = '6px 12px';
+            addToProgBtn.style.fontSize = '11px';
+            addToProgBtn.style.border = '1px solid #10b981';
+            addToProgBtn.style.borderRadius = '4px';
+            addToProgBtn.style.backgroundColor = '#10b981';
+            addToProgBtn.style.color = 'white';
+            addToProgBtn.style.cursor = 'pointer';
+            addToProgBtn.style.transition = 'all 0.15s';
+            addToProgBtn.style.fontWeight = '600';
+            addToProgBtn.addEventListener('mouseenter', () => { 
+                addToProgBtn.style.backgroundColor = '#059669';
+                addToProgBtn.style.borderColor = '#059669';
+            });
+            addToProgBtn.addEventListener('mouseleave', () => { 
+                addToProgBtn.style.backgroundColor = '#10b981';
+                addToProgBtn.style.borderColor = '#10b981';
+            });
+            addToProgBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (window.addSpecificChordToProgression) {
+                    window.addSpecificChordToProgression(suggestion.nextChord, suggestion.nextInversion, true);
+                }
+            });
+            playbackRow.appendChild(addToProgBtn);
+            
+            suggestionCard.appendChild(playbackRow);
+
+            // Reason
+            const reason = document.createElement('div');
+            reason.style.fontSize = '12px';
+            reason.style.color = '#4b5563';
+            reason.style.lineHeight = '1.4';
+            reason.textContent = suggestion.reason;
+            suggestionCard.appendChild(reason);
+            
+            // Click to select
+            suggestionCard.addEventListener('click', () => {
+                // Find the root note index (assume it stays the same, or we navigate up by interval)
+                // For now, just select the suggested chord
+                selectBuilderChordType(suggestion.nextChord, false);
+                selectBuilderInversion(suggestion.nextInversion, true);
+                // Close modal
+                overlay.remove();
+            });
+            
+            suggestionsContainer.appendChild(suggestionCard);
+        });
+    };
+    
+    // Initial render with bright mood
+    renderSuggestions('bright');
+    
+    // Listen for mood changes
+    moodSelect.addEventListener('change', (e) => {
+        renderSuggestions(e.target.value);
+    });
+    
+    // Close button
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'Close';
+    closeBtn.style.marginTop = '16px';
+    closeBtn.style.padding = '8px 16px';
+    closeBtn.style.backgroundColor = '#e5e7eb';
+    closeBtn.style.border = '1px solid #d1d5db';
+    closeBtn.style.borderRadius = '4px';
+    closeBtn.style.cursor = 'pointer';
+    closeBtn.style.fontWeight = '600';
+    closeBtn.style.width = '100%';
+    closeBtn.addEventListener('click', () => overlay.remove());
+    closeBtn.addEventListener('mouseenter', () => closeBtn.style.backgroundColor = '#d1d5db');
+    closeBtn.addEventListener('mouseleave', () => closeBtn.style.backgroundColor = '#e5e7eb');
+    modal.appendChild(closeBtn);
+    
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.remove();
+    });
+}
+
+// =========================================================================
 // Collapsible Panel Toggles (Chord Builder UI)
 // =========================================================================
 
@@ -971,11 +1744,16 @@ export function renderBuilderSelectors() {
                     const mainButton = document.createElement('button');
                     mainButton.className = 'flex-grow px-1.5 py-1.5 text-center text-sm font-medium text-gray-800 hover:bg-amber-100';
                     mainButton.dataset.chordType = chordType;
-                    mainButton.title = CHORD_DEFINITIONS[chordType].description || '';
+                    const chordDescription = CHORD_DEFINITIONS[chordType].description || '';
+                    mainButton.title = chordDescription;
                     mainButton.onmousedown = () => selectBuilderChordType(chordType, true);
                     mainButton.onmouseup = () => stopBuilderChord();
                     mainButton.onmouseleave = () => stopBuilderChord();
                     buttonContainer.appendChild(mainButton);
+                    
+                    // Create tooltip for chord button with name and inversion options
+                    const tooltipText = `${chordType}\n\n${chordDescription}`;
+                    createButtonTooltip(mainButton, tooltipText, chordType);
 
                     // Container for arpeggio buttons (imported from arpeggiator module)
                     const arpContainer = document.createElement('div');
@@ -1047,11 +1825,16 @@ export function renderBuilderSelectors() {
                     const mainButton = document.createElement('button');
                     mainButton.className = 'flex-grow px-2 py-2 text-center font-medium text-gray-800 hover:bg-amber-100';
                     mainButton.dataset.intervalType = intervalType;
-                    mainButton.title = INTERVAL_DEFINITIONS[intervalType].description || '';
+                    const intervalDescription = INTERVAL_DEFINITIONS[intervalType].description || '';
+                    mainButton.title = intervalDescription;
                     mainButton.onmousedown = () => selectBuilderInterval(intervalType, true);
                     mainButton.onmouseup = () => stopBuilderChord();
                     mainButton.onmouseleave = () => stopBuilderChord();
                     buttonContainer.appendChild(mainButton);
+                    
+                    // Create tooltip for interval button with name included
+                    const tooltipText = `${intervalType}\n\n${intervalDescription}`;
+                    createButtonTooltip(mainButton, tooltipText);
 
                     // Container for arpeggio buttons
                     const arpContainer = document.createElement('div');
@@ -1300,8 +2083,131 @@ export function addChordToProgression(switchToTrainer = false, playShutterSound 
         }
     }
 
+    // Update smart recommendations panel
+    if (window.updateRecommendations) {
+        window.updateRecommendations();
+    }
+
     if (switchToTrainer && window.switchTab) {
         window.switchTab('trainer');
+    }
+}
+
+/**
+ * Add a specific chord type and inversion to the progression without changing builder state
+ * @param {string} chordType - The chord type to add
+ * @param {number} inversion - The inversion to use
+ * @param {boolean} playShutterSound - Whether to play the camera shutter sound (default: true)
+ */
+export function addSpecificChordToProgression(chordType, inversion, playShutterSound = true) {
+    const rootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[getBuilderRootIndex()];
+    
+    // Play camera shutter sound effect (only if requested)
+    if (playShutterSound && getAudioIsReady() && getCameraShutter()) {
+        getCameraShutter().start();
+    }
+    
+    const lhType = document.getElementById('builder-lh-type-select').value;
+    const lhInversion = parseInt(document.getElementById('builder-lh-inversion-select').value, 10) || 0;
+    const lhOctaveShift = parseInt(document.getElementById('builder-lh-octave-select').value, 10);
+    const omittedNotes = [...getBuilderOmittedNotes()]; // Capture current voicing
+    const lhOmittedNotes = [...getBuilderLHOmittedNotes()]; // Capture LH voicing
+    const octaveShift = getBuilderOctaveShift(); // Capture current octave shift
+    
+    const trainerState = getTrainerState();
+    const result = getInvertedChordNotes(
+        rootNote,
+        chordType,
+        inversion,
+        trainerState.currentKey,
+        octaveShift,
+        getEnharmonicPreference(),
+        getNotationPreference()
+    );
+    
+    const newChordData = {
+        name: result.name,
+        simpleName: result.simpleName,
+        notes: result.specificNotes,
+        root: rootNote,
+        type: chordType,
+        inversion: inversion,
+        selectionMode: 'chord',
+        omittedNotes: omittedNotes,
+        octaveShift: octaveShift
+    };
+    
+    // Get the key without the 'm' suffix for index calculation
+    let trainerKey = trainerState.currentKey || 'C';
+    const isMinorKey = trainerKey && trainerKey.endsWith('m');
+    if (isMinorKey) {
+        trainerKey = trainerKey.replace(/m$/, '');
+    }
+    let trainerKeyRootIndex = ALL_NOTES.indexOf(trainerKey);
+    if (trainerKeyRootIndex === -1) trainerKeyRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[trainerKey] || trainerKey);
+    
+    // Resolve the root note to its sharp equivalent
+    let addedChordRootIndex = ALL_NOTES.indexOf(rootNote);
+    if (addedChordRootIndex === -1) addedChordRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[rootNote]);
+    if (addedChordRootIndex === -1) return; // Should not happen
+    
+    const interval = (addedChordRootIndex - trainerKeyRootIndex + 12) % 12;
+    const scaleDegreeIndex = MAJOR_SCALE_STEPS.indexOf(interval);
+    
+    let romanNumeral = '?';
+    if (scaleDegreeIndex !== -1) {
+        const romanKeys = Object.keys(ROMAN_MAP_BASE);
+        const foundKey = romanKeys.find(key =>
+            ROMAN_MAP_BASE[key].index === scaleDegreeIndex &&
+            ROMAN_MAP_BASE[key].quality === chordType
+        );
+        const fallbackKey = romanKeys.find(key => ROMAN_MAP_BASE[key].index === scaleDegreeIndex);
+        romanNumeral = foundKey || fallbackKey || '?';
+    } else {
+        romanNumeral = rootNote;
+    }
+    
+    // Convert Roman numeral to minor case if the key is minor
+    if (isMinorKey && romanNumeral && romanNumeral !== '?') {
+        // Convert major Roman numerals to minor case
+        const minorMap = {
+            'I': 'i',
+            'ii': 'ii°',
+            'iii': 'III',
+            'IV': 'iv',
+            'V': 'v',
+            'vi': 'VI',
+            'vii°': 'VII'
+        };
+        romanNumeral = minorMap[romanNumeral] || romanNumeral;
+    }
+    
+    newChordData.roman = romanNumeral;
+    newChordData.lhType = lhType;
+    newChordData.lhInversion = lhInversion;
+    newChordData.lhOmittedNotes = lhOmittedNotes;
+    newChordData.rhythmPattern = 'block'; // Default rhythm pattern
+    newChordData.isVoicingExpanded = true; // Default to expanded when adding
+    newChordData.lhOctaveShift = lhOctaveShift;
+    
+    // Add to trainer state using window function
+    if (window.addToProgressionData) {
+        window.addToProgressionData(newChordData);
+    } else {
+        // Fallback: manually add to progression
+        const trainerState = getTrainerState();
+        trainerState.progressionData.push(newChordData);
+        if (newChordData.roman && !trainerState.progressionRomans.includes(newChordData.roman)) {
+            trainerState.progressionRomans.push(newChordData.roman);
+        }
+        if (window.renderProgressionDisplay) {
+            window.renderProgressionDisplay();
+        }
+    }
+    
+    // Update smart recommendations panel
+    if (window.updateRecommendations) {
+        window.updateRecommendations();
     }
 }
 

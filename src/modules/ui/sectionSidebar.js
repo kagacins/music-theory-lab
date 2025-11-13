@@ -543,13 +543,15 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     // Extract gradient colors from toggle button
     const toggleClasses = toggle.className;
     let gradientClasses = '';
-    const gradientMatch = toggleClasses.match(/bg-gradient-to-r\s+from-[\w-]+\s+to-[\w-]+/);
+    // Match gradients with or without via classes: "from-X to-Y" or "from-X via-Y to-Z"
+    // This regex matches: bg-gradient-to-r, then from-X, optionally via-Y, then to-Z
+    const gradientMatch = toggleClasses.match(/bg-gradient-to-r\s+from-[\w-]+(?:\s+via-[\w-]+)?\s+to-[\w-]+/);
     if (gradientMatch) {
         gradientClasses = gradientMatch[0];
     }
     
-    // Extract hover gradient if available
-    const hoverMatch = toggleClasses.match(/hover:from-[\w-]+\s+hover:to-[\w-]+/);
+    // Extract hover gradient if available (with or without via)
+    const hoverMatch = toggleClasses.match(/hover:from-[\w-]+(?:\s+hover:via-[\w-]+)?\s+hover:to-[\w-]+/);
     const hoverClasses = hoverMatch ? hoverMatch[0] : '';
 
     // Create sidebar tab with matching colors
@@ -937,7 +939,9 @@ export function initInstantTooltips() {
         
         // Create tooltip element
         const tooltip = document.createElement('div');
-        tooltip.className = 'instant-tooltip absolute bottom-full mb-2 bg-gray-900 text-white text-xs rounded py-1 px-2 pointer-events-none whitespace-nowrap';
+        // Use normal whitespace for longer descriptions (chord/interval tooltips)
+        const isLongDescription = titleText.length > 50;
+        tooltip.className = `instant-tooltip absolute bottom-full mb-2 bg-gray-900 text-white text-xs rounded py-1 px-2 pointer-events-none ${isLongDescription ? '' : 'whitespace-nowrap'}`;
         tooltip.textContent = titleText;
         
         // Style it for instant display
@@ -950,9 +954,12 @@ export function initInstantTooltips() {
         tooltip.style.color = 'white';
         tooltip.style.fontSize = '12px';
         tooltip.style.borderRadius = '4px';
-        tooltip.style.padding = '4px 8px';
+        tooltip.style.padding = '6px 10px';
         tooltip.style.pointerEvents = 'none';
-        tooltip.style.whiteSpace = 'nowrap';
+        tooltip.style.whiteSpace = isLongDescription ? 'normal' : 'nowrap';
+        tooltip.style.maxWidth = isLongDescription ? '300px' : 'none';
+        tooltip.style.textAlign = 'left';
+        tooltip.style.lineHeight = '1.4';
         tooltip.style.zIndex = '9999';
         tooltip.style.opacity = '0';
         tooltip.style.visibility = 'hidden';
@@ -961,6 +968,7 @@ export function initInstantTooltips() {
         tooltip.style.transitionDelay = '0s';
         tooltip.style.transitionDuration = '0s';
         tooltip.style.willChange = 'opacity, visibility';
+        tooltip.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
         
         // Set element position to relative so tooltip positions from it
         if (getComputedStyle(element).position === 'static') {
@@ -1016,6 +1024,28 @@ export function updateTabSidebarHeight(tabId) {
         setTimeout(() => {
             updateSidebarHeight(sidebar);
         }, 50);
+    }
+}
+
+/**
+ * Manually trigger sidebar update for a specific section
+ * This is useful when a panel is toggled programmatically and the MutationObserver might not catch it
+ * @param {string} tabId - The tab ID ('builder', 'trainer', 'melody')
+ * @param {string} sectionId - The section ID (e.g., 'style-mood-insights')
+ */
+export function triggerSectionSidebarUpdate(tabId, sectionId) {
+    const instance = sectionSidebarInstances.get(tabId);
+    if (!instance) return;
+    
+    const { sidebar, container, collapsedSections } = instance;
+    
+    // Find the section with the matching toggle button
+    const toggle = container.querySelector(`button[id="${sectionId}-toggle"]`);
+    if (!toggle) return;
+    
+    const sectionElement = toggle.closest(`.${instance.sectionClass}`);
+    if (sectionElement) {
+        updateSectionState(sectionElement, sidebar, collapsedSections, container, false);
     }
 }
 

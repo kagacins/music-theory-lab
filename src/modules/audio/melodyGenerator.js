@@ -1342,17 +1342,17 @@ export function addNoteToInteractiveMelody(noteName, skipPlayback = false) {
 export function setNoteDuration(duration) {
     currentNoteDuration = duration;
     
-    // Update UI button states - use emerald colors to match other notation panel buttons
+    // Update UI button states - use blue colors to match notation panel design
     const durations = ['1n', '2n', '4n', '8n', '16n', '32n'];
     durations.forEach(d => {
         const btn = document.getElementById(`duration-${d}`);
         if (btn) {
             if (d === duration) {
-                btn.classList.remove('bg-emerald-200', 'text-emerald-900');
-                btn.classList.add('bg-emerald-600', 'text-white');
+                btn.classList.remove('bg-gray-100', 'text-gray-800');
+                btn.classList.add('bg-blue-600', 'text-white');
             } else {
-                btn.classList.remove('bg-emerald-600', 'text-white');
-                btn.classList.add('bg-emerald-200', 'text-emerald-900');
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('bg-gray-100', 'text-gray-800');
             }
         }
     });
@@ -2039,9 +2039,6 @@ export function renderChordProgressionStaff(canvasElement) {
 export function renderInteractiveMelodyStaff(canvasElement) {
     const canvas = canvasElement;
 
-    // Debug: Log render call with activeNotes state
-    console.log(`[RENDER START] activeNotes.size=${activeNotes.size}, activeNotes=[${Array.from(activeNotes).join(', ')}], highlightEnabled=${highlightEnabled}`);
-
     // Clear note click regions before rendering
     noteClickRegions.set(canvas, []);
 
@@ -2442,11 +2439,6 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 }
             });
 
-            // Debug logging for first chord
-            if (index === 0 && activeNotes.size > 0) {
-                console.log(`[CHORD] Measure ${index}: chordIsActive=${chordIsActive}, activeNotes=[${Array.from(activeNotes).join(', ')}]`);
-            }
-
             // Apply styling BEFORE drawing
             const chordDefaultColor = '#111827';   // Black/dark gray
             const chordActiveFill = '#EF4444';     // Red
@@ -2844,8 +2836,9 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                         let durationStr = note.duration || '4n';
                         const isDotted = durationStr.includes('.') || (note.dotted === true);
                         
-                        // Extract base duration (remove 'n' suffix and dot)
-                        let baseDuration = durationStr.replace('n', '').replace('.', '');
+                        // Extract base duration (remove 'n' suffix and any dots)
+                        // Use regex to properly handle all cases: '4n', '4n.', '16n', '16n.', etc.
+                        let baseDuration = durationStr.replace(/n\.?$/, ''); // Remove 'n' and optional trailing dot
                         
                         // Convert to VexFlow duration format (just the number, no 'n')
                         const vexDuration = baseDuration;
@@ -2882,8 +2875,9 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                     let durationStr = note.duration || '4n';
                     const isDotted = durationStr.includes('.') || (note.dotted === true);
                     
-                    // Extract base duration (remove 'n' suffix and dot)
-                    let baseDuration = durationStr.replace('n', '').replace('.', '');
+                    // Extract base duration (remove 'n' suffix and any dots)
+                    // Use regex to properly handle all cases: '4n', '4n.', '16n', '16n.', etc.
+                    let baseDuration = durationStr.replace(/n\.?$/, ''); // Remove 'n' and optional trailing dot
                     
                     // Convert to VexFlow duration format (just the number, no 'n')
                     // VexFlow uses: '1' (whole), '2' (half), '4' (quarter), '8' (eighth), '16' (16th), '32' (32nd)
@@ -3101,11 +3095,6 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                     // 2. It's in the activeNotes set (currently playing)
                     const isActive = highlightEnabled && activeNotes.has(noteId);
 
-                    // Debug logging - log ALL notes in first 2 measures when activeNotes is not empty
-                    if (activeNotes.size > 0 && measureNum <= 1) {
-                        console.log(`[MELODY NOTE] Measure ${measureNum}, Note ${noteIdx}: noteId="${noteId}", isActive=${isActive}, highlightEnabled=${highlightEnabled}, inActiveNotes=${activeNotes.has(noteId)}`);
-                    }
-
                     // Only apply styling to actual notes (StaveNote), not rests
                     // Rest objects don't support setStyle
                     if (!isRest && vexNote && typeof vexNote.setStyle === 'function') {
@@ -3114,7 +3103,6 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                         const activeFill = '#EF4444';    // Red
                         const activeStroke = '#DC2626';  // Dark red
 
-                        // CRITICAL: Apply the style - red if active, black if not
                         vexNote.setStyle({
                             fillStyle: isActive ? activeFill : defaultFill,
                             strokeStyle: isActive ? activeStroke : defaultStroke
@@ -3124,11 +3112,6 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                             vexNote.setStemStyle({
                                 strokeStyle: isActive ? activeStroke : defaultStroke
                             });
-                        }
-
-                        // Extra logging to verify style was set
-                        if (measureNum === 0 && noteIdx < 3 && activeNotes.size > 0) {
-                            console.log(`[STYLE SET] Note ${noteIdx} style: ${isActive ? 'RED (active)' : 'BLACK (inactive)'}`);
                         }
                     }
                 });
