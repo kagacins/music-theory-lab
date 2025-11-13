@@ -61,10 +61,13 @@ import { showChordExplorerModal } from '../ui/chordExplorerModal.js';
  * @param {string} chordType - (Optional) The chord type, used to show inversion options
  */
 function createButtonTooltip(button, tooltipText, chordType = null) {
-    if (!tooltipText || tooltipText.length === 0) return;
+    if (!tooltipText || tooltipText.length === 0) return null;
     
     const tooltip = document.createElement('div');
     tooltip.className = 'chord-button-tooltip';
+    if (chordType) {
+        tooltip.setAttribute('data-chord-type', chordType);
+    }
     
     // Style it for fixed positioning (to avoid overflow clipping)
     tooltip.style.position = 'fixed';
@@ -179,6 +182,34 @@ function createButtonTooltip(button, tooltipText, chordType = null) {
                 e.stopPropagation();
                 stopBuilderChord();
             });
+            
+            // Touch events for mobile/tablet
+            btn.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                const inversionIndex = parseInt(btn.dataset.inversion, 10);
+                // First ensure the correct chord type is selected (without playing)
+                selectBuilderChordType(chordType, false);
+                // Then select the inversion and start playing
+                selectBuilderInversion(inversionIndex, false);
+                startBuilderChord();
+                // Store the selected chord+inversion for suggestion generation
+                window.lastTooltipChordSelection = { chordType, inversion: inversionIndex };
+                // Update button highlighting
+                updateButtonHighlight(inversionIndex);
+            }, { passive: false });
+            
+            btn.addEventListener('touchend', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                stopBuilderChord();
+            }, { passive: false });
+            
+            btn.addEventListener('touchcancel', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                stopBuilderChord();
+            }, { passive: false });
         });
         
         // Initialize highlighting if there's a stored selection for this chord
@@ -212,22 +243,54 @@ function createButtonTooltip(button, tooltipText, chordType = null) {
         tooltip.appendChild(suggestionsBtn);
     }
     
-    // Mouse enter: show tooltip above button
-    button.addEventListener('mouseenter', () => {
-        const rect = button.getBoundingClientRect();
-        // More space above the button: 200px for chord tooltips with inversions + button, 80px for interval tooltips
-        const tooltipHeight = chordType ? 200 : 80;
+    // Track tooltip timeout for touch devices
+    let tooltipTimeout = null;
+    
+    // Detect if device supports touch
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    // Mouse enter: show tooltip above button (with delay on touch devices)
+    button.addEventListener('mouseenter', (e) => {
+        // Check if button is being held (touch device)
+        const isHeld = button.dataset.held === 'true';
         
-        tooltip.style.left = (rect.left + rect.width / 2) + 'px';
-        tooltip.style.top = (rect.top - tooltipHeight - 12) + 'px';
-        tooltip.style.transform = 'translateX(-50%)';
+        // Don't show tooltip if button is being held
+        if (isHeld) {
+            return;
+        }
         
-        tooltip.style.opacity = '1';
-        tooltip.style.visibility = 'visible';
+        // Clear any existing timeout
+        if (tooltipTimeout) clearTimeout(tooltipTimeout);
+        
+        const showTooltip = () => {
+            // Double-check button is not being held
+            if (button.dataset.held !== 'true') {
+                const rect = button.getBoundingClientRect();
+                const tooltipHeight = chordType ? 200 : 80;
+                tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+                tooltip.style.top = (rect.top - tooltipHeight - 12) + 'px';
+                tooltip.style.transform = 'translateX(-50%)';
+                tooltip.style.opacity = '1';
+                tooltip.style.visibility = 'visible';
+            }
+        };
+        
+        // On touch devices, delay tooltip to allow playback to continue
+        if (isTouchDevice) {
+            tooltipTimeout = setTimeout(showTooltip, 500); // 500ms delay on touch devices
+        } else {
+            // Desktop: show immediately
+            showTooltip();
+        }
     });
     
     // Mouse leave: hide tooltip
     button.addEventListener('mouseleave', () => {
+        // Clear any pending tooltip timeout
+        if (tooltipTimeout) {
+            clearTimeout(tooltipTimeout);
+            tooltipTimeout = null;
+        }
         tooltip.style.opacity = '0';
         tooltip.style.visibility = 'hidden';
     });
@@ -242,6 +305,8 @@ function createButtonTooltip(button, tooltipText, chordType = null) {
         tooltip.style.opacity = '0';
         tooltip.style.visibility = 'hidden';
     });
+    
+    return tooltip;
 }
 
 /**
@@ -441,7 +506,7 @@ function showChordSuggestionsModal(chordType, inversion) {
     modal.style.backgroundColor = 'white';
     modal.style.borderRadius = '8px';
     modal.style.padding = '24px';
-    modal.style.maxWidth = '500px';
+    modal.style.maxWidth = '850px';
     modal.style.maxHeight = '80vh';
     modal.style.overflowY = 'auto';
     modal.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.1)';
@@ -490,9 +555,9 @@ function showChordSuggestionsModal(chordType, inversion) {
         closeXBtn.style.backgroundColor = 'transparent';
         closeXBtn.style.color = '#6b7280';
     });
-    closeXBtn.addEventListener('click', () => {
-        overlay.remove();
-    });
+    // Store close handler reference - will be updated after handlers are defined
+    let closeXBtnHandler = () => overlay.remove();
+    closeXBtn.addEventListener('click', closeXBtnHandler);
     titleContainer.appendChild(closeXBtn);
     
     modal.appendChild(titleContainer);
@@ -503,10 +568,11 @@ function showChordSuggestionsModal(chordType, inversion) {
     const enhPref = getEnharmonicPreference();
     const notationPref = getNotationPreference();
     
-    // Style & Mood selectors in a grid (sticky at top)
+    // Style & Mood selectors with Show All button (sticky at top)
     const controlsRow = document.createElement('div');
-    controlsRow.style.display = 'grid';
-    controlsRow.style.gridTemplateColumns = '1fr 1fr';
+    controlsRow.style.display = 'flex';
+    controlsRow.style.alignItems = 'flex-end';
+    controlsRow.style.justifyContent = 'flex-start';
     controlsRow.style.gap = '12px';
     controlsRow.style.marginBottom = '16px';
     controlsRow.style.position = 'sticky';
@@ -520,12 +586,13 @@ function showChordSuggestionsModal(chordType, inversion) {
     controlsRow.style.backgroundColor = 'white';
     controlsRow.style.zIndex = '10';
     controlsRow.style.borderBottom = '1px solid #e5e7eb';
+    controlsRow.style.flexWrap = 'wrap';
 
-    // Style selector
+    // Style selector (compact)
     const styleContainer = document.createElement('div');
     const styleLabel = document.createElement('label');
-    styleLabel.textContent = 'Musical Style:';
-    styleLabel.style.fontSize = '12px';
+    styleLabel.textContent = 'Style:';
+    styleLabel.style.fontSize = '11px';
     styleLabel.style.fontWeight = '600';
     styleLabel.style.color = '#374151';
     styleLabel.style.display = 'block';
@@ -533,16 +600,18 @@ function showChordSuggestionsModal(chordType, inversion) {
     styleContainer.appendChild(styleLabel);
 
     const styleSelect = document.createElement('select');
-    styleSelect.style.width = '100%';
-    styleSelect.style.padding = '6px 8px';
+    styleSelect.style.width = '160px';
+    styleSelect.style.padding = '4px 6px';
     styleSelect.style.border = '1px solid #d1d5db';
     styleSelect.style.borderRadius = '4px';
-    styleSelect.style.fontSize = '12px';
+    styleSelect.style.fontSize = '11px';
     styleSelect.style.backgroundColor = 'white';
 
     // Get saved preferences or defaults
     let currentStyle = localStorage.getItem('chord-suggestion-style') || 'balanced';
     let currentMood = localStorage.getItem('chord-suggestion-mood') || 'bright';
+    // Track current inversion (can be changed by user)
+    let activeInversion = inversion;
 
     const styles = [
         { value: 'balanced', label: 'Balanced Blend' },
@@ -564,11 +633,11 @@ function showChordSuggestionsModal(chordType, inversion) {
     styleContainer.appendChild(styleSelect);
     controlsRow.appendChild(styleContainer);
 
-    // Mood selector
+    // Mood selector (compact)
     const moodContainer = document.createElement('div');
     const moodLabel = document.createElement('label');
-    moodLabel.textContent = 'Intended Mood:';
-    moodLabel.style.fontSize = '12px';
+    moodLabel.textContent = 'Mood:';
+    moodLabel.style.fontSize = '11px';
     moodLabel.style.fontWeight = '600';
     moodLabel.style.color = '#374151';
     moodLabel.style.display = 'block';
@@ -576,11 +645,11 @@ function showChordSuggestionsModal(chordType, inversion) {
     moodContainer.appendChild(moodLabel);
 
     const moodSelect = document.createElement('select');
-    moodSelect.style.width = '100%';
-    moodSelect.style.padding = '6px 8px';
+    moodSelect.style.width = '160px';
+    moodSelect.style.padding = '4px 6px';
     moodSelect.style.border = '1px solid #d1d5db';
     moodSelect.style.borderRadius = '4px';
-    moodSelect.style.fontSize = '12px';
+    moodSelect.style.fontSize = '11px';
     moodSelect.style.backgroundColor = 'white';
 
     const moods = [
@@ -603,7 +672,179 @@ function showChordSuggestionsModal(chordType, inversion) {
     moodContainer.appendChild(moodSelect);
     controlsRow.appendChild(moodContainer);
 
+    // Show All Details button (compact, inline, aligned with selectors)
+    const showAllBtn = document.createElement('button');
+    showAllBtn.textContent = '🔬 Show All';
+    showAllBtn.style.padding = '4px 12px';
+    showAllBtn.style.backgroundColor = '#667eea';
+    showAllBtn.style.border = 'none';
+    showAllBtn.style.borderRadius = '4px';
+    showAllBtn.style.cursor = 'pointer';
+    showAllBtn.style.fontWeight = '600';
+    showAllBtn.style.color = 'white';
+    showAllBtn.style.fontSize = '11px';
+    showAllBtn.style.height = '28px';
+    showAllBtn.style.alignSelf = 'flex-end';
+    showAllBtn.title = 'Show All Details (3D Explorer)';
+    showAllBtn.addEventListener('click', () => {
+        const key = getCurrentKey() || 'C';
+        let tensionDirection = 'maintain';
+        if (currentMood === 'bright' || currentMood === 'calm') {
+            tensionDirection = 'resolve';
+        } else if (currentMood === 'tense' || currentMood === 'energetic') {
+            tensionDirection = 'build';
+        }
+
+        showChordExplorerModal(
+            rootNote,
+            chordType,
+            activeInversion, // Use active inversion
+            key,
+            currentStyle,
+            currentMood,
+            (type, root, inv) => {
+                // Add chord callback
+                if (window.addSpecificChordToProgression) {
+                    const nextRootIndex = ALL_NOTES.indexOf(root);
+                    if (nextRootIndex !== -1 && nextRootIndex !== getBuilderRootIndex()) {
+                        selectBuilderRootNote(nextRootIndex, false);
+                    }
+                    window.addSpecificChordToProgression(type, inv, true);
+                }
+            },
+            null, // play chord - TODO: implement
+            null  // stop chord - TODO: implement
+        );
+    });
+    showAllBtn.addEventListener('mouseenter', () => showAllBtn.style.backgroundColor = '#5568d3');
+    showAllBtn.addEventListener('mouseleave', () => showAllBtn.style.backgroundColor = '#667eea');
+    controlsRow.appendChild(showAllBtn);
+
     modal.appendChild(controlsRow);
+
+    // Inversion selector row
+    const inversionRow = document.createElement('div');
+    inversionRow.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #e5e7eb;
+    `;
+    
+    const inversionLabel = document.createElement('label');
+    inversionLabel.textContent = 'Current Chord Inversion:';
+    inversionLabel.style.cssText = 'font-size: 12px; font-weight: 600; color: #374151; white-space: nowrap;';
+    inversionRow.appendChild(inversionLabel);
+    
+    const inversionButtonsContainer = document.createElement('div');
+    inversionButtonsContainer.style.cssText = 'display: flex; gap: 4px; flex-wrap: wrap;';
+    
+    // Calculate max inversions for this chord type
+    const chordDef = CHORD_DEFINITIONS[chordType];
+    const maxInversion = chordDef ? Math.max(0, chordDef.intervals.length - 1) : 0;
+    
+    // Create inversion buttons
+    for (let inv = 0; inv <= maxInversion; inv++) {
+        const invBtn = document.createElement('button');
+        invBtn.textContent = INVERSION_NAMES[inv] || `Inversion ${inv}`;
+        invBtn.dataset.inversion = inv;
+        invBtn.style.cssText = `
+            padding: 6px 12px;
+            border: 2px solid ${inv === activeInversion ? '#667eea' : '#d1d5db'};
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: ${inv === activeInversion ? '600' : '500'};
+            background-color: ${inv === activeInversion ? '#667eea' : 'white'};
+            color: ${inv === activeInversion ? 'white' : '#374151'};
+            transition: all 0.2s;
+        `;
+        let heldNotes = null;
+        
+        // Hold-to-play functionality
+        invBtn.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            const key = getCurrentKey() || 'C';
+            const res = getInvertedChordNotes(
+                rootNote,
+                chordType,
+                inv,
+                key,
+                getBuilderOctaveShift ? getBuilderOctaveShift() : 0,
+                enhPref,
+                notationPref
+            );
+            heldNotes = res.specificNotes || [];
+            const instrument = getInstrument && getInstrument();
+            if (instrument && heldNotes.length > 0) {
+                const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                const baseTime = Tone.now() + 0.01;
+                if (isGuitar) {
+                    heldNotes.forEach((n, idx) => instrument.triggerAttack(n, baseTime + idx * 0.0001));
+                } else {
+                    instrument.triggerAttack(heldNotes, Tone.now());
+                }
+            }
+        });
+        
+        const stopHeld = (e) => {
+            if (e) e.stopPropagation();
+            const instrument = getInstrument && getInstrument();
+            if (instrument && heldNotes && heldNotes.length > 0) {
+                const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                if (isGuitar) {
+                    heldNotes.forEach(n => {
+                        try { instrument.triggerRelease(n, Tone.now()); } catch (_) {}
+                    });
+                } else {
+                    instrument.triggerRelease(heldNotes, Tone.now());
+                }
+                heldNotes = null;
+            }
+        };
+        
+        invBtn.addEventListener('mouseup', stopHeld);
+        invBtn.addEventListener('mouseleave', stopHeld);
+        
+        invBtn.addEventListener('click', () => {
+            activeInversion = inv;
+            // Update button styles
+            inversionButtonsContainer.querySelectorAll('button').forEach(btn => {
+                const btnInv = parseInt(btn.dataset.inversion);
+                btn.style.borderColor = btnInv === inv ? '#667eea' : '#d1d5db';
+                btn.style.backgroundColor = btnInv === inv ? '#667eea' : 'white';
+                btn.style.color = btnInv === inv ? 'white' : '#374151';
+                btn.style.fontWeight = btnInv === inv ? '600' : '500';
+            });
+            // Update title
+            const newInversionName = INVERSION_NAMES[inv] || `Inversion ${inv}`;
+            title.textContent = `Suggested Next Chords After ${chordType} (${newInversionName})`;
+            // Re-render suggestions with new inversion
+            renderSuggestions(currentStyle, currentMood);
+            // Dispatch event to sync with Explorer modal
+            const event = new CustomEvent('chord-suggestion-inversion-changed', {
+                detail: { inversion: inv }
+            });
+            document.dispatchEvent(event);
+        });
+        invBtn.addEventListener('mouseenter', () => {
+            if (parseInt(invBtn.dataset.inversion) !== activeInversion) {
+                invBtn.style.backgroundColor = '#f3f4f6';
+            }
+        });
+        invBtn.addEventListener('mouseleave', (e) => {
+            stopHeld(e);
+            if (parseInt(invBtn.dataset.inversion) !== activeInversion) {
+                invBtn.style.backgroundColor = 'white';
+            }
+        });
+        inversionButtonsContainer.appendChild(invBtn);
+    }
+    
+    inversionRow.appendChild(inversionButtonsContainer);
+    modal.appendChild(inversionRow);
 
     // Container for suggestions that will be regenerated on style/mood change
     const suggestionsContainer = document.createElement('div');
@@ -626,7 +867,7 @@ function showChordSuggestionsModal(chordType, inversion) {
         suggestionsContainer.appendChild(defaultNote);
         
         // Get suggestions for current style and mood
-        const suggestions = generateChordSuggestions(chordType, inversion, rootNote, enhPref, notationPref, style, mood);
+        const suggestions = generateChordSuggestions(chordType, activeInversion, rootNote, enhPref, notationPref, style, mood);
         
         // Helper to create hold-to-play buttons
         const createHoldPlayButton = (label, cType, inv, chordRoot = rootNote) => {
@@ -683,6 +924,41 @@ function showChordSuggestionsModal(chordType, inversion) {
             };
             btn.addEventListener('mouseup', stopHeld);
             btn.addEventListener('mouseleave', stopHeld);
+            // Touch events for mobile/tablet
+            btn.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                const res = getInvertedChordNotes(
+                    chordRoot,
+                    cType,
+                    inv,
+                    chordRoot,
+                    getBuilderOctaveShift ? getBuilderOctaveShift() : 0,
+                    enhPref,
+                    notationPref
+                );
+                heldNotes = res.specificNotes || [];
+                const instrument = getInstrument && getInstrument();
+                if (instrument && heldNotes.length > 0) {
+                    const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                    const baseTime = Tone.now() + 0.01;
+                    if (isGuitar) {
+                        heldNotes.forEach((n, idx) => instrument.triggerAttack(n, baseTime + idx * 0.0001));
+                    } else {
+                        instrument.triggerAttack(heldNotes, Tone.now());
+                    }
+                }
+            }, { passive: false });
+            btn.addEventListener('touchend', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                stopHeld(e);
+            }, { passive: false });
+            btn.addEventListener('touchcancel', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                stopHeld(e);
+            }, { passive: false });
             return btn;
         };
 
@@ -825,52 +1101,53 @@ function showChordSuggestionsModal(chordType, inversion) {
         renderSuggestions(styleSelect.value, moodSelect.value);
     });
 
-    // Show All Details button (opens 3D explorer)
-    const showAllBtn = document.createElement('button');
-    showAllBtn.textContent = '🔬 Show All Details (3D Explorer)';
-    showAllBtn.style.marginTop = '16px';
-    showAllBtn.style.padding = '10px 16px';
-    showAllBtn.style.backgroundColor = '#667eea';
-    showAllBtn.style.border = 'none';
-    showAllBtn.style.borderRadius = '4px';
-    showAllBtn.style.cursor = 'pointer';
-    showAllBtn.style.fontWeight = '600';
-    showAllBtn.style.width = '100%';
-    showAllBtn.style.color = 'white';
-    showAllBtn.style.fontSize = '14px';
-    showAllBtn.addEventListener('click', () => {
-        const key = getCurrentKey() || 'C';
-        let tensionDirection = 'maintain';
-        if (currentMood === 'bright' || currentMood === 'calm') {
-            tensionDirection = 'resolve';
-        } else if (currentMood === 'tense' || currentMood === 'energetic') {
-            tensionDirection = 'build';
+    // Listen for changes from the Comprehensive Chord Explorer modal
+    const preferenceChangeHandler = (e) => {
+        const { style, mood } = e.detail;
+        // Update the dropdowns to match
+        if (styleSelect.value !== style) {
+            styleSelect.value = style;
         }
-
-        showChordExplorerModal(
-            rootNote,
-            chordType,
-            inversion,
-            key,
-            currentStyle,
-            currentMood,
-            (type, root, inv) => {
-                // Add chord callback
-                if (window.addSpecificChordToProgression) {
-                    const nextRootIndex = ALL_NOTES.indexOf(root);
-                    if (nextRootIndex !== -1 && nextRootIndex !== getBuilderRootIndex()) {
-                        selectBuilderRootNote(nextRootIndex, false);
-                    }
-                    window.addSpecificChordToProgression(type, inv, true);
-                }
-            },
-            null, // play chord - TODO: implement
-            null  // stop chord - TODO: implement
-        );
-    });
-    showAllBtn.addEventListener('mouseenter', () => showAllBtn.style.backgroundColor = '#5a67d8');
-    showAllBtn.addEventListener('mouseleave', () => showAllBtn.style.backgroundColor = '#667eea');
-    modal.appendChild(showAllBtn);
+        if (moodSelect.value !== mood) {
+            moodSelect.value = mood;
+        }
+        // Update current values and re-render
+        currentStyle = style;
+        currentMood = mood;
+        renderSuggestions(style, mood);
+    };
+    document.addEventListener('chord-suggestion-preference-changed', preferenceChangeHandler);
+    
+    // Listen for inversion changes from the Comprehensive Chord Explorer modal
+    const inversionChangeHandler = (e) => {
+        const { inversion } = e.detail;
+        if (inversion !== activeInversion && inversion <= maxInversion) {
+            activeInversion = inversion;
+            // Update button styles
+            inversionButtonsContainer.querySelectorAll('button').forEach(btn => {
+                const btnInv = parseInt(btn.dataset.inversion);
+                btn.style.borderColor = btnInv === inversion ? '#667eea' : '#d1d5db';
+                btn.style.backgroundColor = btnInv === inversion ? '#667eea' : 'white';
+                btn.style.color = btnInv === inversion ? 'white' : '#374151';
+                btn.style.fontWeight = btnInv === inversion ? '600' : '500';
+            });
+            // Update title
+            const newInversionName = INVERSION_NAMES[inversion] || `Inversion ${inversion}`;
+            title.textContent = `Suggested Next Chords After ${chordType} (${newInversionName})`;
+            // Re-render suggestions
+            renderSuggestions(currentStyle, currentMood);
+        }
+    };
+    document.addEventListener('chord-suggestion-inversion-changed', inversionChangeHandler);
+    
+    // Update close X button to clean up event listeners
+    closeXBtn.removeEventListener('click', closeXBtnHandler);
+    closeXBtnHandler = () => {
+        document.removeEventListener('chord-suggestion-preference-changed', preferenceChangeHandler);
+        document.removeEventListener('chord-suggestion-inversion-changed', inversionChangeHandler);
+        overlay.remove();
+    };
+    closeXBtn.addEventListener('click', closeXBtnHandler);
 
     // Close button
     const closeBtn = document.createElement('button');
@@ -883,7 +1160,11 @@ function showChordSuggestionsModal(chordType, inversion) {
     closeBtn.style.cursor = 'pointer';
     closeBtn.style.fontWeight = '600';
     closeBtn.style.width = '100%';
-    closeBtn.addEventListener('click', () => overlay.remove());
+    closeBtn.addEventListener('click', () => {
+        document.removeEventListener('chord-suggestion-preference-changed', preferenceChangeHandler);
+        document.removeEventListener('chord-suggestion-inversion-changed', inversionChangeHandler);
+        overlay.remove();
+    });
     closeBtn.addEventListener('mouseenter', () => closeBtn.style.backgroundColor = '#d1d5db');
     closeBtn.addEventListener('mouseleave', () => closeBtn.style.backgroundColor = '#e5e7eb');
     modal.appendChild(closeBtn);
@@ -893,7 +1174,11 @@ function showChordSuggestionsModal(chordType, inversion) {
     
     // Close on overlay click
     overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) overlay.remove();
+        if (e.target === overlay) {
+            document.removeEventListener('chord-suggestion-preference-changed', preferenceChangeHandler);
+            document.removeEventListener('chord-suggestion-inversion-changed', inversionChangeHandler);
+            overlay.remove();
+        }
     });
 }
 
@@ -1800,6 +2085,19 @@ export function renderBuilderSelectors() {
         button.onmousedown = () => selectBuilderRootNote(index, true);
         button.onmouseup = () => stopBuilderChord();
         button.onmouseleave = () => stopBuilderChord();
+        // Touch events for mobile/tablet
+        button.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            selectBuilderRootNote(index, true);
+        }, { passive: false });
+        button.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            stopBuilderChord();
+        }, { passive: false });
+        button.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            stopBuilderChord();
+        }, { passive: false });
         button.className = `key-button px-1 py-2 font-semibold rounded-lg transition duration-150 transform hover:scale-105 text-xs bg-gray-200 text-gray-800 hover:bg-amber-100`;
         rootSelector.appendChild(button);
     });
@@ -1820,6 +2118,7 @@ export function renderBuilderSelectors() {
                 if (CHORD_DEFINITIONS[chordType]) {
                     const buttonContainer = document.createElement('div');
                     buttonContainer.className = 'key-button-wrapper flex items-stretch rounded-lg shadow-sm overflow-hidden bg-gray-200 transition duration-150 transform hover:scale-105';
+                    buttonContainer.style.position = 'relative'; // For absolute positioning of info icon
 
                     // Main button for block chord
                     const mainButton = document.createElement('button');
@@ -1827,14 +2126,122 @@ export function renderBuilderSelectors() {
                     mainButton.dataset.chordType = chordType;
                     const chordDescription = CHORD_DEFINITIONS[chordType].description || '';
                     mainButton.title = chordDescription;
+                    // Mouse events for desktop
                     mainButton.onmousedown = () => selectBuilderChordType(chordType, true);
                     mainButton.onmouseup = () => stopBuilderChord();
                     mainButton.onmouseleave = () => stopBuilderChord();
+                    
+                    // Touch events for mobile/tablet - prevent default to avoid tooltip interference
+                    let touchStartTime = 0;
+                    let touchHolding = false;
+                    mainButton.addEventListener('touchstart', (e) => {
+                        e.preventDefault(); // Prevent mouse events and tooltip
+                        touchStartTime = Date.now();
+                        touchHolding = true;
+                        // Mark button as held to prevent tooltip from showing
+                        mainButton.dataset.held = 'true';
+                        selectBuilderChordType(chordType, true);
+                    }, { passive: false });
+                    
+                    mainButton.addEventListener('touchend', (e) => {
+                        e.preventDefault();
+                        touchHolding = false;
+                        stopBuilderChord();
+                        // Remove held flag
+                        mainButton.dataset.held = 'false';
+                        // Only show tooltip if it was a quick tap (not a hold)
+                        if (Date.now() - touchStartTime < 300) {
+                            // Trigger tooltip after a short delay
+                            setTimeout(() => {
+                                if (!touchHolding && mainButton.dataset.held !== 'true') {
+                                    const event = new MouseEvent('mouseenter', {
+                                        bubbles: true,
+                                        cancelable: true,
+                                        view: window
+                                    });
+                                    mainButton.dispatchEvent(event);
+                                }
+                            }, 100);
+                        }
+                    }, { passive: false });
+                    
+                    mainButton.addEventListener('touchcancel', (e) => {
+                        e.preventDefault();
+                        touchHolding = false;
+                        mainButton.dataset.held = 'false';
+                        stopBuilderChord();
+                    }, { passive: false });
+                    
                     buttonContainer.appendChild(mainButton);
+                    
+                    // Create info icon button in lower left corner for mobile tooltip access
+                    const infoIcon = document.createElement('button');
+                    infoIcon.innerHTML = 'ℹ';
+                    infoIcon.className = 'chord-info-icon';
+                    infoIcon.style.position = 'absolute';
+                    infoIcon.style.bottom = '1px';
+                    infoIcon.style.left = '1px';
+                    infoIcon.style.width = '12px';
+                    infoIcon.style.height = '12px';
+                    infoIcon.style.borderRadius = '50%';
+                    infoIcon.style.backgroundColor = 'rgba(107, 114, 128, 0.5)';
+                    infoIcon.style.color = 'rgba(255, 255, 255, 0.8)';
+                    infoIcon.style.fontSize = '8px';
+                    infoIcon.style.fontWeight = '600';
+                    infoIcon.style.display = 'flex';
+                    infoIcon.style.alignItems = 'center';
+                    infoIcon.style.justifyContent = 'center';
+                    infoIcon.style.border = 'none';
+                    infoIcon.style.cursor = 'pointer';
+                    infoIcon.style.zIndex = '10';
+                    infoIcon.style.padding = '0';
+                    infoIcon.style.lineHeight = '1';
+                    infoIcon.style.transition = 'all 0.2s';
+                    infoIcon.title = 'Show chord details';
+                    infoIcon.addEventListener('mouseenter', () => {
+                        infoIcon.style.backgroundColor = 'rgba(83, 122, 187, 0.6)';
+                        infoIcon.style.color = 'white';
+                        infoIcon.style.transform = 'scale(1.15)';
+                    });
+                    infoIcon.addEventListener('mouseleave', () => {
+                        infoIcon.style.backgroundColor = 'rgba(107, 114, 128, 0.5)';
+                        infoIcon.style.color = 'rgba(255, 255, 255, 0.8)';
+                        infoIcon.style.transform = 'scale(1)';
+                    });
+                    // Prevent info icon clicks from triggering chord playback
+                    infoIcon.addEventListener('mousedown', (e) => {
+                        e.stopPropagation();
+                    });
+                    infoIcon.addEventListener('touchstart', (e) => {
+                        e.stopPropagation();
+                    }, { passive: false });
+                    buttonContainer.appendChild(infoIcon);
                     
                     // Create tooltip for chord button with name and inversion options
                     const tooltipText = `${chordType}\n\n${chordDescription}`;
-                    createButtonTooltip(mainButton, tooltipText, chordType);
+                    const tooltipElement = createButtonTooltip(mainButton, tooltipText, chordType);
+                    
+                    // Make info icon trigger tooltip on click/tap
+                    const showTooltip = () => {
+                        if (!tooltipElement) return;
+                        const rect = mainButton.getBoundingClientRect();
+                        const tooltipHeight = 200; // Same as in createButtonTooltip
+                        tooltipElement.style.left = (rect.left + rect.width / 2) + 'px';
+                        tooltipElement.style.top = (rect.top - tooltipHeight - 12) + 'px';
+                        tooltipElement.style.transform = 'translateX(-50%)';
+                        tooltipElement.style.opacity = '1';
+                        tooltipElement.style.visibility = 'visible';
+                    };
+                    infoIcon.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        showTooltip();
+                    });
+                    infoIcon.addEventListener('touchend', (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        showTooltip();
+                    }, { passive: false });
 
                     // Container for arpeggio buttons (imported from arpeggiator module)
                     const arpContainer = document.createElement('div');
@@ -1880,6 +2287,19 @@ export function renderBuilderSelectors() {
             button.onmousedown = () => selectBuilderInversion(index, true);
             button.onmouseup = () => stopBuilderChord();
             button.onmouseleave = () => stopBuilderChord();
+            // Touch events for mobile/tablet
+            button.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                selectBuilderInversion(index, true);
+            }, { passive: false });
+            button.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                stopBuilderChord();
+            }, { passive: false });
+            button.addEventListener('touchcancel', (e) => {
+                e.preventDefault();
+                stopBuilderChord();
+            }, { passive: false });
             button.className = 'key-button px-3 py-1 font-medium rounded-lg text-sm transition duration-150 transform hover:scale-105 bg-gray-200 text-gray-800 hover:bg-amber-100';
             invSelector.appendChild(button);
         });
@@ -1911,6 +2331,19 @@ export function renderBuilderSelectors() {
                     mainButton.onmousedown = () => selectBuilderInterval(intervalType, true);
                     mainButton.onmouseup = () => stopBuilderChord();
                     mainButton.onmouseleave = () => stopBuilderChord();
+                    // Touch events for mobile/tablet
+                    mainButton.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        selectBuilderInterval(intervalType, true);
+                    }, { passive: false });
+                    mainButton.addEventListener('touchend', (e) => {
+                        e.preventDefault();
+                        stopBuilderChord();
+                    }, { passive: false });
+                    mainButton.addEventListener('touchcancel', (e) => {
+                        e.preventDefault();
+                        stopBuilderChord();
+                    }, { passive: false });
                     buttonContainer.appendChild(mainButton);
                     
                     // Create tooltip for interval button with name included

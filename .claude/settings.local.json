@@ -11,7 +11,8 @@
       "Bash(python3:*)",
       "Bash(node --check:*)",
       "Bash($null)",
-      "Bash(node --version:*)"
+      "Bash(node --version:*)",
+      "Bash(node -e:*)"
     ],
     "deny": [],
     "ask": []

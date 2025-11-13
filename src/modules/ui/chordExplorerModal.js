@@ -13,6 +13,7 @@
 import { generateComprehensiveRecommendations } from '../features/comprehensiveChordRecommendations.js';
 import { CHORD_DEFINITIONS, INVERSION_NAMES, ALL_NOTES } from '../../data/music-data.js';
 import { getInvertedChordNotes } from '../utils/noteUtils.js';
+import { SUGGESTION_STYLES, SUGGESTION_MOODS } from '../features/unifiedChordSuggestions.js';
 // Tone.js is loaded via script tag in index.html, available as global 'Tone'
 
 /**
@@ -32,24 +33,39 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     const existing = document.getElementById('chord-explorer-modal');
     if (existing) existing.remove();
 
-    // Determine tension direction based on mood
-    let tensionDirection = 'maintain';
-    if (mood === 'bright' || mood === 'calm') {
-        tensionDirection = 'resolve';
-    } else if (mood === 'tense' || mood === 'energetic') {
-        tensionDirection = 'build';
+    // Track current style and mood (can be changed by user)
+    // Read from localStorage if available (to sync with preceding modal), otherwise use passed values
+    let currentStyle = localStorage.getItem('chord-suggestion-style') || style;
+    let currentMood = localStorage.getItem('chord-suggestion-mood') || mood;
+    // Track current inversion (can be changed by user)
+    let activeInversion = currentInversion;
+    
+    // Function to determine tension direction based on mood
+    function getTensionDirection(moodValue) {
+        if (moodValue === 'bright' || moodValue === 'calm') {
+            return 'resolve';
+        } else if (moodValue === 'tense' || moodValue === 'energetic') {
+            return 'build';
+        }
+        return 'maintain';
     }
 
-    // Generate ALL recommendations (not just top 10)
-    const allRecommendations = generateAllRecommendations(
-        currentRoot,
-        currentChordType,
-        currentInversion,
-        key,
-        style,
-        mood,
-        tensionDirection
-    );
+    // Function to generate ALL recommendations
+    function generateRecommendations() {
+        const tensionDirection = getTensionDirection(currentMood);
+        return generateAllRecommendations(
+            currentRoot,
+            currentChordType,
+            activeInversion, // Use active inversion
+            key,
+            currentStyle,
+            currentMood,
+            tensionDirection
+        );
+    }
+
+    // Generate initial recommendations
+    let allRecommendations = generateRecommendations();
 
     // Create modal overlay
     const overlay = document.createElement('div');
@@ -104,7 +120,8 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     title.style.cssText = 'margin: 0; font-size: 24px; font-weight: 700;';
     const subtitle = document.createElement('p');
     const chordSymbol = CHORD_DEFINITIONS[currentChordType]?.symbol || '';
-    subtitle.textContent = `Analyzing ALL possible next chords after ${currentRoot}${chordSymbol} (${INVERSION_NAMES[currentInversion] || currentInversion})`;
+    subtitle.id = 'explorer-subtitle';
+    subtitle.textContent = `Analyzing ALL possible next chords after ${currentRoot}${chordSymbol} (${INVERSION_NAMES[activeInversion] || activeInversion})`;
     subtitle.style.cssText = 'margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;';
     titleSection.appendChild(title);
     titleSection.appendChild(subtitle);
@@ -132,15 +149,43 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     header.appendChild(titleSection);
     header.appendChild(closeBtn);
 
-    // Tab navigation
+    // Function to update recommendations when style/mood changes
+    function updateRecommendations() {
+        // Save to localStorage to sync with preceding modal
+        localStorage.setItem('chord-suggestion-style', currentStyle);
+        localStorage.setItem('chord-suggestion-mood', currentMood);
+        
+        // Dispatch custom event to notify suggestion modals of the change
+        const event = new CustomEvent('chord-suggestion-preference-changed', {
+            detail: {
+                style: currentStyle,
+                mood: currentMood
+            }
+        });
+        document.dispatchEvent(event);
+        
+        // Regenerate recommendations
+        allRecommendations = generateRecommendations();
+        
+        // Re-render current tab
+        renderTabContent();
+    }
+
+    // Tab navigation with inline style/mood controls
     const tabNav = document.createElement('div');
     tabNav.style.cssText = `
         display: flex;
-        gap: 8px;
-        padding: 12px 24px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 24px;
         background-color: #f9fafb;
         border-bottom: 1px solid #e5e7eb;
     `;
+
+    // Tab buttons container
+    const tabButtonsContainer = document.createElement('div');
+    tabButtonsContainer.style.cssText = 'display: flex; gap: 8px;';
 
     const tabs = [
         { id: 'visualization', label: '🎨 3D Visualization', icon: '🎨' },
@@ -163,8 +208,213 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
             color: ${tab.id === activeTab ? 'white' : '#6b7280'};
         `;
         btn.onclick = () => switchTab(tab.id);
-        tabNav.appendChild(btn);
+        tabButtonsContainer.appendChild(btn);
     });
+
+    // Compact style/mood controls on the right
+    const controlsContainer = document.createElement('div');
+    controlsContainer.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+
+    // Style selector (compact)
+    const styleLabel = document.createElement('label');
+    styleLabel.textContent = 'Style:';
+    styleLabel.style.cssText = 'font-size: 11px; font-weight: 600; color: #6b7280; white-space: nowrap;';
+    
+    const styleSelect = document.createElement('select');
+    styleSelect.id = 'explorer-style-select';
+    styleSelect.style.cssText = 'padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 11px; background-color: white; min-width: 100px;';
+    
+    SUGGESTION_STYLES.forEach(s => {
+        const option = document.createElement('option');
+        option.value = s.id;
+        option.textContent = s.label;
+        if (s.id === currentStyle) option.selected = true;
+        styleSelect.appendChild(option);
+    });
+    
+    styleSelect.addEventListener('change', () => {
+        currentStyle = styleSelect.value;
+        updateRecommendations();
+    });
+
+    // Mood selector (compact)
+    const moodLabel = document.createElement('label');
+    moodLabel.textContent = 'Mood:';
+    moodLabel.style.cssText = 'font-size: 11px; font-weight: 600; color: #6b7280; white-space: nowrap;';
+    
+    const moodSelect = document.createElement('select');
+    moodSelect.id = 'explorer-mood-select';
+    moodSelect.style.cssText = 'padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 11px; background-color: white; min-width: 100px;';
+    
+    SUGGESTION_MOODS.forEach(m => {
+        const option = document.createElement('option');
+        option.value = m.id;
+        option.textContent = m.label;
+        if (m.id === currentMood) option.selected = true;
+        moodSelect.appendChild(option);
+    });
+    
+    moodSelect.addEventListener('change', () => {
+        currentMood = moodSelect.value;
+        updateRecommendations();
+    });
+    
+    // Listen for inversion changes from the suggestion modals
+    const inversionChangeHandler = (e) => {
+        const { inversion } = e.detail;
+        if (inversion !== activeInversion && inversion <= maxInversion) {
+            activeInversion = inversion;
+            // Update button styles
+            inversionButtonsContainer.querySelectorAll('button').forEach(btn => {
+                const btnInv = parseInt(btn.dataset.inversion);
+                btn.style.borderColor = btnInv === inversion ? '#667eea' : '#d1d5db';
+                btn.style.backgroundColor = btnInv === inversion ? '#667eea' : 'white';
+                btn.style.color = btnInv === inversion ? 'white' : '#374151';
+                btn.style.fontWeight = btnInv === inversion ? '600' : '500';
+            });
+            // Update subtitle
+            subtitle.textContent = `Analyzing ALL possible next chords after ${currentRoot}${chordSymbol} (${INVERSION_NAMES[inversion] || inversion})`;
+            // Update recommendations
+            updateRecommendations();
+        }
+    };
+    document.addEventListener('chord-suggestion-inversion-changed', inversionChangeHandler);
+    
+    // Clean up event listener when modal is closed
+    const originalCloseHandler = closeBtn.onclick;
+    closeBtn.onclick = () => {
+        document.removeEventListener('chord-suggestion-inversion-changed', inversionChangeHandler);
+        if (originalCloseHandler) originalCloseHandler();
+    };
+
+    controlsContainer.appendChild(styleLabel);
+    controlsContainer.appendChild(styleSelect);
+    controlsContainer.appendChild(moodLabel);
+    controlsContainer.appendChild(moodSelect);
+
+    tabNav.appendChild(tabButtonsContainer);
+    tabNav.appendChild(controlsContainer);
+
+    // Inversion selector row
+    const inversionRow = document.createElement('div');
+    inversionRow.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 24px;
+        background-color: #f9fafb;
+        border-bottom: 1px solid #e5e7eb;
+    `;
+    
+    const inversionLabel = document.createElement('label');
+    inversionLabel.textContent = 'Current Chord Inversion:';
+    inversionLabel.style.cssText = 'font-size: 12px; font-weight: 600; color: #374151; white-space: nowrap;';
+    inversionRow.appendChild(inversionLabel);
+    
+    const inversionButtonsContainer = document.createElement('div');
+    inversionButtonsContainer.style.cssText = 'display: flex; gap: 4px; flex-wrap: wrap;';
+    
+    // Calculate max inversions for this chord type
+    const chordDef = CHORD_DEFINITIONS[currentChordType];
+    const maxInversion = chordDef ? Math.max(0, chordDef.intervals.length - 1) : 0;
+    
+    // Create inversion buttons
+    for (let inv = 0; inv <= maxInversion; inv++) {
+        const invBtn = document.createElement('button');
+        invBtn.textContent = INVERSION_NAMES[inv] || `Inversion ${inv}`;
+        invBtn.dataset.inversion = inv;
+        invBtn.style.cssText = `
+            padding: 6px 12px;
+            border: 2px solid ${inv === activeInversion ? '#667eea' : '#d1d5db'};
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: ${inv === activeInversion ? '600' : '500'};
+            background-color: ${inv === activeInversion ? '#667eea' : 'white'};
+            color: ${inv === activeInversion ? 'white' : '#374151'};
+            transition: all 0.2s;
+        `;
+        let heldNotes = null;
+        
+        // Hold-to-play functionality
+        invBtn.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            const res = getInvertedChordNotes(
+                currentRoot,
+                currentChordType,
+                inv,
+                key,
+                0, // octave shift
+                'sharp', // enharmonic preference
+                'full' // notation preference
+            );
+            heldNotes = res.specificNotes || [];
+            const instrument = window.getInstrument && window.getInstrument();
+            if (instrument && heldNotes.length > 0) {
+                const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                const baseTime = Tone.now() + 0.01;
+                if (isGuitar) {
+                    heldNotes.forEach((n, idx) => instrument.triggerAttack(n, baseTime + idx * 0.0001));
+                } else {
+                    instrument.triggerAttack(heldNotes, Tone.now());
+                }
+            }
+        });
+        
+        const stopHeld = (e) => {
+            if (e) e.stopPropagation();
+            const instrument = window.getInstrument && window.getInstrument();
+            if (instrument && heldNotes && heldNotes.length > 0) {
+                const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                if (isGuitar) {
+                    heldNotes.forEach(n => {
+                        try { instrument.triggerRelease(n, Tone.now()); } catch (_) {}
+                    });
+                } else {
+                    instrument.triggerRelease(heldNotes, Tone.now());
+                }
+                heldNotes = null;
+            }
+        };
+        
+        invBtn.addEventListener('mouseup', stopHeld);
+        invBtn.addEventListener('mouseleave', stopHeld);
+        
+        invBtn.addEventListener('click', () => {
+            activeInversion = inv;
+            // Update button styles
+            inversionButtonsContainer.querySelectorAll('button').forEach(btn => {
+                const btnInv = parseInt(btn.dataset.inversion);
+                btn.style.borderColor = btnInv === inv ? '#667eea' : '#d1d5db';
+                btn.style.backgroundColor = btnInv === inv ? '#667eea' : 'white';
+                btn.style.color = btnInv === inv ? 'white' : '#374151';
+                btn.style.fontWeight = btnInv === inv ? '600' : '500';
+            });
+            // Update subtitle
+            subtitle.textContent = `Analyzing ALL possible next chords after ${currentRoot}${chordSymbol} (${INVERSION_NAMES[inv] || inv})`;
+            // Update recommendations
+            updateRecommendations();
+            // Dispatch event to sync with suggestion modals
+            const event = new CustomEvent('chord-suggestion-inversion-changed', {
+                detail: { inversion: inv }
+            });
+            document.dispatchEvent(event);
+        });
+        invBtn.addEventListener('mouseenter', () => {
+            if (parseInt(invBtn.dataset.inversion) !== activeInversion) {
+                invBtn.style.backgroundColor = '#f3f4f6';
+            }
+        });
+        invBtn.addEventListener('mouseleave', (e) => {
+            stopHeld(e);
+            if (parseInt(invBtn.dataset.inversion) !== activeInversion) {
+                invBtn.style.backgroundColor = 'white';
+            }
+        });
+        inversionButtonsContainer.appendChild(invBtn);
+    }
+    
+    inversionRow.appendChild(inversionButtonsContainer);
 
     // Content area
     const contentArea = document.createElement('div');
@@ -194,12 +444,13 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
         if (activeTab === 'visualization') {
             renderVisualization(contentArea, allRecommendations);
         } else if (activeTab === 'table') {
-            renderDataTable(contentArea, allRecommendations, currentRoot, currentChordType, currentInversion, onAddChord, onPlayChord, onStopChord);
+            renderDataTable(contentArea, allRecommendations, currentRoot, currentChordType, activeInversion, onAddChord, onPlayChord, onStopChord);
         }
     }
 
     // Assemble modal
     modal.appendChild(header);
+    modal.appendChild(inversionRow);
     modal.appendChild(tabNav);
     modal.appendChild(contentArea);
     overlay.appendChild(modal);
@@ -347,6 +598,12 @@ function renderDataTable(container, recommendations, currentRoot, currentChordTy
         inversion: new Set(),
         scoreMin: 0
     };
+    
+    // State for sorting
+    let sortState = {
+        column: null,
+        direction: 'asc' // 'asc' or 'desc'
+    };
 
     // Table container
     const tableContainer = document.createElement('div');
@@ -375,7 +632,10 @@ function renderDataTable(container, recommendations, currentRoot, currentChordTy
             return true;
         });
 
-        renderTable(tableContainer, filtered, currentRoot, currentChordType, currentInversion, activeFilters, recommendations, applyFilters, onAddChord, onPlayChord, onStopChord);
+        renderTable(tableContainer, filtered, currentRoot, currentChordType, currentInversion, activeFilters, recommendations, applyFilters, onAddChord, onPlayChord, onStopChord, sortState, (newSortState) => {
+            sortState = newSortState;
+            applyFilters();
+        });
     }
 
     // Initial render with all data
@@ -398,6 +658,9 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
         color: ${activeFilterSet.size > 0 ? '#3b82f6' : '#6b7280'};
     `;
     filterBtn.title = 'Filter';
+    
+    // Track if this button's menu is open
+    let currentMenu = null;
 
     filterBtn.onclick = (e) => {
         e.preventDefault();
@@ -405,12 +668,21 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
 
         console.log('Filter button clicked for column:', columnName);
 
+        // Check if this button's menu is already open - if so, close it
+        if (currentMenu && document.body.contains(currentMenu)) {
+            currentMenu.remove();
+            currentMenu = null;
+            return;
+        }
+
         // Remove any existing filter menu
         document.querySelectorAll('.column-filter-menu').forEach(m => m.remove());
+        currentMenu = null;
 
         // Create filter menu
         const menu = document.createElement('div');
         menu.className = 'column-filter-menu';
+        currentMenu = menu; // Track this menu
         menu.style.cssText = `
             position: fixed;
             background: white;
@@ -541,6 +813,7 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
                 activeFilterSet.clear();
             }
             console.log('Filter applied for', columnName, ':', Array.from(activeFilterSet));
+            currentMenu = null;
             menu.remove();
             applyFiltersCallback();
         };
@@ -563,6 +836,7 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
             e.stopPropagation();
             console.log('Clear filter button clicked');
             activeFilterSet.clear();
+            currentMenu = null;
             menu.remove();
             applyFiltersCallback();
         };
@@ -581,39 +855,47 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
             const closeHandler = (e) => {
                 if (!menu.contains(e.target) && e.target !== filterBtn) {
                     menu.remove();
+                    currentMenu = null;
                     document.removeEventListener('click', closeHandler);
                 }
             };
             document.addEventListener('click', closeHandler);
         }, 0);
+        
+        // Also clear currentMenu when menu is removed
+        const originalRemove = menu.remove;
+        menu.remove = function() {
+            currentMenu = null;
+            originalRemove.call(this);
+        };
     };
 
     return filterBtn;
 }
 
 /**
- * Render the data table with Excel-style column filters
+ * Render the data table with Excel-style column filters and sorting
  */
-function renderTable(container, recommendations, currentRoot, currentChordType, currentInversion, activeFilters, allRecommendations, applyFiltersCallback, onAddChord, onPlayChord, onStopChord) {
+function renderTable(container, recommendations, currentRoot, currentChordType, currentInversion, activeFilters, allRecommendations, applyFiltersCallback, onAddChord, onPlayChord, onStopChord, sortState, setSortState) {
     container.innerHTML = '';
 
-    // Info section showing filter status
+    // Info section showing filter status (compact)
     const infoBar = document.createElement('div');
-    infoBar.style.cssText = 'padding: 12px; background: #f0f9ff; border-radius: 6px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;';
+    infoBar.style.cssText = 'padding: 6px 10px; background: #f0f9ff; border-radius: 4px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;';
 
     const infoText = document.createElement('div');
-    infoText.style.cssText = 'font-size: 13px; color: #1e40af;';
+    infoText.style.cssText = 'font-size: 11px; color: #1e40af;';
     infoText.textContent = `Showing ${recommendations.length} of ${allRecommendations.length} chords`;
 
     const clearAllBtn = document.createElement('button');
-    clearAllBtn.textContent = '🔄 Clear All Filters';
+    clearAllBtn.textContent = '🔄 Clear All';
     clearAllBtn.style.cssText = `
-        padding: 6px 12px;
+        padding: 3px 8px;
         background: #e5e7eb;
         border: 1px solid #d1d5db;
-        border-radius: 4px;
+        border-radius: 3px;
         cursor: pointer;
-        font-size: 12px;
+        font-size: 10px;
         font-weight: 600;
         color: #374151;
     `;
@@ -648,21 +930,33 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
 
     // Define columns
     const columns = [
-        { name: 'Root', align: 'left', hasFilter: true, filterKey: 'root', allValues: allRoots },
-        { name: 'Chord Type', align: 'left', hasFilter: true, filterKey: 'type', allValues: allTypes },
-        { name: 'Inversion', align: 'left', hasFilter: true, filterKey: 'inversion', allValues: allInversions },
-        { name: 'Score', align: 'center', hasFilter: false },
-        { name: 'Harmonic', align: 'center', hasFilter: false },
-        { name: 'Voice Lead', align: 'center', hasFilter: false },
-        { name: 'Style Fit', align: 'center', hasFilter: false },
-        { name: 'Mood Fit', align: 'center', hasFilter: false },
-        { name: 'Reason', align: 'left', hasFilter: false },
-        { name: 'Actions', align: 'center', hasFilter: false }
+        { name: 'Root', align: 'left', hasFilter: true, filterKey: 'root', allValues: allRoots, sortKey: 'root', sortable: true },
+        { name: 'Chord Type', align: 'left', hasFilter: true, filterKey: 'type', allValues: allTypes, sortKey: 'type', sortable: true },
+        { name: 'Inversion', align: 'left', hasFilter: true, filterKey: 'inversion', allValues: allInversions, sortKey: 'inversion', sortable: true },
+        { name: 'Score', align: 'center', hasFilter: false, sortKey: 'score', sortable: true },
+        { name: 'Harmonic', align: 'center', hasFilter: false, sortKey: 'functionScore', sortable: true },
+        { name: 'Voice Lead', align: 'center', hasFilter: false, sortKey: 'voiceLeadingScore', sortable: true },
+        { name: 'Style Fit', align: 'center', hasFilter: false, sortKey: 'styleFit', sortable: true },
+        { name: 'Mood Fit', align: 'center', hasFilter: false, sortKey: 'moodFit', sortable: true },
+        { name: 'Reason', align: 'left', hasFilter: false, sortable: false },
+        { name: 'Actions', align: 'center', hasFilter: false, sortable: false }
     ];
 
     columns.forEach(col => {
         const th = document.createElement('th');
-        th.style.cssText = `padding: 12px 8px; text-align: ${col.align}; font-weight: 600; position: relative;`;
+        th.style.cssText = `padding: 6px 6px; text-align: ${col.align}; font-weight: 600; position: relative; font-size: 12px;`;
+        
+        // Make sortable columns clickable
+        if (col.sortable) {
+            th.style.cursor = 'pointer';
+            th.style.userSelect = 'none';
+            th.addEventListener('mouseenter', () => {
+                th.style.backgroundColor = '#e5e7eb';
+            });
+            th.addEventListener('mouseleave', () => {
+                th.style.backgroundColor = '';
+            });
+        }
 
         const headerContent = document.createElement('div');
         headerContent.style.cssText = 'display: flex; align-items: center; gap: 4px;';
@@ -670,6 +964,20 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
         const text = document.createElement('span');
         text.textContent = col.name;
         headerContent.appendChild(text);
+
+        // Add sort indicator if this column is sorted
+        if (col.sortable && sortState.column === col.sortKey) {
+            const sortIndicator = document.createElement('span');
+            sortIndicator.textContent = sortState.direction === 'asc' ? ' ▲' : ' ▼';
+            sortIndicator.style.cssText = 'color: #3b82f6; font-size: 10px;';
+            headerContent.appendChild(sortIndicator);
+        } else if (col.sortable) {
+            // Show subtle indicator for sortable columns
+            const sortIndicator = document.createElement('span');
+            sortIndicator.textContent = ' ↕';
+            sortIndicator.style.cssText = 'color: #9ca3af; font-size: 10px; opacity: 0.5;';
+            headerContent.appendChild(sortIndicator);
+        }
 
         if (col.hasFilter) {
             const filterBtn = createColumnFilter(
@@ -682,11 +990,93 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
         }
 
         th.appendChild(headerContent);
+        
+        // Add click handler for sorting
+        if (col.sortable) {
+            th.addEventListener('click', (e) => {
+                // Don't sort if clicking on filter button or its children
+                if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+                    return;
+                }
+                
+                if (sortState.column === col.sortKey) {
+                    // Toggle direction
+                    setSortState({
+                        column: col.sortKey,
+                        direction: sortState.direction === 'asc' ? 'desc' : 'asc'
+                    });
+                } else {
+                    // New column, default to ascending
+                    setSortState({
+                        column: col.sortKey,
+                        direction: 'asc'
+                    });
+                }
+            });
+        }
+        
         headerRow.appendChild(th);
     });
 
     thead.appendChild(headerRow);
     table.appendChild(thead);
+
+    // Sort recommendations if a sort column is specified
+    let sortedRecommendations = [...recommendations];
+    if (sortState.column) {
+        sortedRecommendations.sort((a, b) => {
+            let aVal, bVal;
+            
+            // Get the value to sort by
+            switch (sortState.column) {
+                case 'root':
+                    aVal = a.root;
+                    bVal = b.root;
+                    break;
+                case 'type':
+                    aVal = a.type;
+                    bVal = b.type;
+                    break;
+                case 'inversion':
+                    aVal = a.inversion;
+                    bVal = b.inversion;
+                    break;
+                case 'score':
+                    aVal = a.score || 0;
+                    bVal = b.score || 0;
+                    break;
+                case 'functionScore':
+                    aVal = a.functionScore || 0;
+                    bVal = b.functionScore || 0;
+                    break;
+                case 'voiceLeadingScore':
+                    aVal = a.voiceLeadingScore || 0;
+                    bVal = b.voiceLeadingScore || 0;
+                    break;
+                case 'styleFit':
+                    aVal = a.styleFit || 0;
+                    bVal = b.styleFit || 0;
+                    break;
+                case 'moodFit':
+                    aVal = a.moodFit || 0;
+                    bVal = b.moodFit || 0;
+                    break;
+                default:
+                    return 0;
+            }
+            
+            // Compare values
+            let comparison = 0;
+            if (typeof aVal === 'string' && typeof bVal === 'string') {
+                comparison = aVal.localeCompare(bVal);
+            } else {
+                comparison = aVal - bVal;
+            }
+            
+            // Apply sort direction
+            return sortState.direction === 'asc' ? comparison : -comparison;
+        });
+    }
 
     // Body
     const tbody = document.createElement('tbody');
@@ -801,29 +1191,29 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
         }
     }
 
-    recommendations.forEach((rec, idx) => {
+    sortedRecommendations.forEach((rec, idx) => {
         const tr = document.createElement('tr');
         tr.style.cssText = `border-bottom: 1px solid #e5e7eb; ${idx % 2 === 0 ? 'background-color: #f9fafb;' : ''}`;
 
         const invName = INVERSION_NAMES[rec.inversion] || `Inversion ${rec.inversion}`;
 
         tr.innerHTML = `
-            <td style="padding: 12px 8px; font-weight: 600;">${rec.root}</td>
-            <td style="padding: 12px 8px;">${rec.type}</td>
-            <td style="padding: 12px 8px;">${invName}</td>
-            <td style="padding: 12px 8px; text-align: center;"><span style="padding: 4px 8px; background-color: ${getScoreColor(rec.score)}; color: white; border-radius: 4px; font-weight: 600;">${rec.score}</span></td>
-            <td style="padding: 12px 8px; text-align: center;">${Math.round(rec.functionScore || 0)}</td>
-            <td style="padding: 12px 8px; text-align: center;">${Math.round(rec.voiceLeadingScore || 0)}</td>
-            <td style="padding: 12px 8px; text-align: center;">${Math.round(rec.styleFit || 0)}</td>
-            <td style="padding: 12px 8px; text-align: center;">${Math.round(rec.moodFit || 0)}</td>
-            <td style="padding: 12px 8px; font-size: 12px; color: #6b7280;">${rec.reason}</td>
-            <td style="padding: 12px 8px;">
-                <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <div style="display: flex; gap: 4px;">
-                        <button data-action="play-current" data-index="${idx}" style="padding: 4px 8px; background: #8b5cf6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 10px; flex: 1;">▶ Current</button>
-                        <button data-action="play-this" data-index="${idx}" style="padding: 4px 8px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 10px; flex: 1;">▶ This</button>
+            <td style="padding: 4px 6px; font-weight: 600; font-size: 12px;">${rec.root}</td>
+            <td style="padding: 4px 6px; font-size: 12px;">${rec.type}</td>
+            <td style="padding: 4px 6px; font-size: 12px;">${invName}</td>
+            <td style="padding: 4px 6px; text-align: center;"><span style="padding: 2px 6px; background-color: ${getScoreColor(rec.score)}; color: white; border-radius: 3px; font-weight: 600; font-size: 11px;">${rec.score}</span></td>
+            <td style="padding: 4px 6px; text-align: center; font-size: 12px;">${Math.round(rec.functionScore || 0)}</td>
+            <td style="padding: 4px 6px; text-align: center; font-size: 12px;">${Math.round(rec.voiceLeadingScore || 0)}</td>
+            <td style="padding: 4px 6px; text-align: center; font-size: 12px;">${Math.round(rec.styleFit || 0)}</td>
+            <td style="padding: 4px 6px; text-align: center; font-size: 12px;">${Math.round(rec.moodFit || 0)}</td>
+            <td style="padding: 4px 6px; font-size: 11px; color: #6b7280;">${rec.reason}</td>
+            <td style="padding: 4px 6px;">
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <div style="display: flex; gap: 2px;">
+                        <button data-action="play-current" data-index="${idx}" style="padding: 2px 4px; background: #8b5cf6; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 9px; flex: 1; line-height: 1.2;">▶ Current</button>
+                        <button data-action="play-this" data-index="${idx}" style="padding: 2px 4px; background: #3b82f6; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 9px; flex: 1; line-height: 1.2;">▶ This</button>
                     </div>
-                    <button data-action="add" data-index="${idx}" style="padding: 4px 8px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600;">➕ Add to Progression</button>
+                    <button data-action="add" data-index="${idx}" style="padding: 2px 4px; background: #10b981; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 9px; font-weight: 600; line-height: 1.2;">➕ Add</button>
                 </div>
             </td>
         `;

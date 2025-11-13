@@ -156,7 +156,7 @@ function applyStyleMoodPreferences(recommendations, style, mood) {
         // Style-based adjustments
         if (style === 'pop' || style === 'any') {
             // Pop favors major chords and common progressions
-            if (rec.type === 'major') bonus += 5;
+            if (rec.type === 'Major') bonus += 5;
         } else if (style === 'jazz') {
             // Jazz favors 7th chords and circle of fifths
             if (rec.type.includes('7')) bonus += 10;
@@ -165,19 +165,19 @@ function applyStyleMoodPreferences(recommendations, style, mood) {
             if (rec.voiceLeadingScore > 70) bonus += 10;
         } else if (style === 'rock') {
             // Rock favors power chords and simple progressions
-            if (rec.type === 'major') bonus += 5;
+            if (rec.type === 'Major') bonus += 5;
         }
 
         // Mood-based adjustments
         if (mood === 'happy' || mood === 'uplifting') {
             // Happy moods favor major chords
-            if (rec.type === 'major') bonus += 8;
+            if (rec.type === 'Major') bonus += 8;
         } else if (mood === 'sad' || mood === 'melancholic') {
             // Sad moods favor minor chords
-            if (rec.type === 'minor') bonus += 8;
+            if (rec.type === 'Minor') bonus += 8;
         } else if (mood === 'dramatic' || mood === 'tense') {
             // Dramatic moods favor dominant chords
-            if (rec.chord && rec.type === 'major') bonus += 5;
+            if (rec.chord && rec.type === 'Major') bonus += 5;
         }
 
         // Apply bonus (cap at 100)
@@ -242,7 +242,7 @@ function getInitialChordRecommendations(key) {
 
     return [{
         chord: tonicChord,
-        type: 'major',
+        type: 'Major',
         inversion: 0,
         confidence: 100,
         reasons: [
@@ -267,7 +267,7 @@ function generateFromTonic(progression, key, lastChord) {
     const IV_root = ALL_NOTES[(keyIndex + 5) % 12];
     recommendations.push({
         chord: IV_root,
-        type: 'major',
+        type: 'Major',
         inversion: 0,
         confidence: 90,
         reasons: [
@@ -290,7 +290,7 @@ function generateFromTonic(progression, key, lastChord) {
     const V_root = ALL_NOTES[(keyIndex + 7) % 12];
     recommendations.push({
         chord: V_root,
-        type: 'major',
+        type: 'Major',
         inversion: 0,
         confidence: 85,
         reasons: [
@@ -308,7 +308,7 @@ function generateFromTonic(progression, key, lastChord) {
     const vi_root = ALL_NOTES[(keyIndex + 9) % 12];
     recommendations.push({
         chord: vi_root,
-        type: 'minor',
+        type: 'Minor',
         inversion: 0,
         confidence: 80,
         reasons: [
@@ -341,7 +341,7 @@ function generateFromSubdominant(progression, key, lastChord) {
     const V_root = ALL_NOTES[(keyIndex + 7) % 12];
     recommendations.push({
         chord: V_root,
-        type: 'major',
+        type: 'Major',
         inversion: 0,
         confidence: 95,
         reasons: [
@@ -364,7 +364,7 @@ function generateFromSubdominant(progression, key, lastChord) {
     const I_root = key;
     recommendations.push({
         chord: I_root,
-        type: 'major',
+        type: 'Major',
         inversion: 0,
         confidence: 75,
         reasons: [
@@ -392,7 +392,7 @@ function generateFromDominant(progression, key, lastChord) {
     const I_root = key;
     recommendations.push({
         chord: I_root,
-        type: 'major',
+        type: 'Major',
         inversion: 0,
         confidence: 95,
         reasons: [
@@ -415,7 +415,7 @@ function generateFromDominant(progression, key, lastChord) {
     const vi_root = ALL_NOTES[(keyIndex + 9) % 12];
     recommendations.push({
         chord: vi_root,
-        type: 'minor',
+        type: 'Minor',
         inversion: 0,
         confidence: 70,
         reasons: [
@@ -460,7 +460,7 @@ export function analyzeProgression(progression, key) {
     const romanNumerals = progression.map(chord => {
         const degree = getScaleDegree(chord.root, key);
         if (!degree) return '?';
-        const isMinor = chord.type === 'minor' || chord.type === 'diminished';
+        const isMinor = chord.type === 'Minor' || chord.type === 'Diminished';
         return getRomanNumeral(degree, isMinor);
     });
 
@@ -495,8 +495,8 @@ export function analyzeProgression(progression, key) {
         : 100;
 
     // Determine mood
-    const minorCount = progression.filter(c => c.type === 'minor').length;
-    const majorCount = progression.filter(c => c.type === 'major').length;
+    const minorCount = progression.filter(c => c.type === 'Minor').length;
+    const majorCount = progression.filter(c => c.type === 'Major').length;
     let mood = 'Neutral';
     if (majorCount > minorCount * 1.5) mood = 'Uplifting';
     else if (minorCount > majorCount * 1.5) mood = 'Melancholic';

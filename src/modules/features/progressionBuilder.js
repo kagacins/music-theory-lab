@@ -75,6 +75,9 @@ import {
     getLHNotes
 } from '../utils/noteUtils.js';
 
+// Import roman numeral utilities
+import { noteToRomanNumeral } from '../utils/romanNumerals.js';
+
 // Import data definitions
 import {
     SHARP_NOTES,
@@ -1863,6 +1866,25 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             e.stopPropagation();
             stopTrainerChord();
         };
+        // Touch events for mobile/tablet
+        playBtn.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            // Get current index from wrapper's data attribute (handles drag-and-drop)
+            const wrapper = e.target.closest(`#${containerId} > div`);
+            const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+            startProgressionChord(currentIndex);
+        }, { passive: false });
+        playBtn.addEventListener('touchend', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            stopTrainerChord();
+        }, { passive: false });
+        playBtn.addEventListener('touchcancel', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            stopTrainerChord();
+        }, { passive: false });
         topControls.appendChild(playBtn);
 
         // Add Staff Notation Toggle button (icon only, next to Play)
@@ -3971,33 +3993,37 @@ export function showProgressionChordSuggestions(chordIndex) {
 
     // Callback to add suggested chord to progression
     const onAddChord = (nextChordType, nextRoot, nextInversion) => {
-        const nextChordData = {
-            root: nextRoot,
-            type: nextChordType,
-            inversion: nextInversion,
-            duration: currentChord.duration || '1n',
-            notes: [], // Will be populated
-            lhNotes: [], // Will be populated
-            roman: '', // Will be calculated
-            name: '' // Will be calculated
-        };
-
-        // Get the notes for this chord
         const key = trainerState.currentKey;
-        const chordResult = getProgressionChordNotes(
-            key,
-            nextChordData.roman, // Not needed for calculation
+
+        // Get full chord information using getInvertedChordNotes
+        const result = getInvertedChordNotes(
+            nextRoot,
             nextChordType,
             nextInversion,
-            0 // octaveShift
+            key,
+            0, // octaveShift
+            getEnharmonicPreference(),
+            getNotationPreference()
         );
 
-        if (chordResult) {
-            nextChordData.notes = chordResult.notes || [];
-            nextChordData.lhNotes = chordResult.lhNotes || [];
-            nextChordData.roman = chordResult.roman || '';
-            nextChordData.name = chordResult.name || `${nextRoot} ${nextChordType}`;
-        }
+        // Calculate roman numeral for the chord
+        const roman = noteToRomanNumeral(nextRoot, key, nextChordType) || '';
+
+        // Create complete chord data with all required properties
+        const nextChordData = {
+            name: result.name,
+            simpleName: result.simpleName,
+            notes: result.specificNotes,
+            root: nextRoot,
+            type: nextChordType,
+            inversion: nextInversion || 0,
+            selectionMode: 'chord',
+            omittedNotes: [],
+            octaveShift: 0,
+            lhOmittedNotes: [],
+            roman: roman,
+            duration: currentChord.duration || '1n'
+        };
 
         // Insert after current chord
         progression.splice(chordIndex + 1, 0, nextChordData);
@@ -4104,28 +4130,51 @@ window.showProgressionChordSuggestions = showProgressionChordSuggestions;
  * @param {string} root - The root note
  * @param {number} inversion - The inversion
  */
-export function addChordToProgression(chordType, root, inversion = 0) {
+export function addChordToProgressionByParams(chordType, root, inversion = 0) {
+    // Save current state for undo
+    const currentState = captureProgressionState();
+    pushToUndoStack(currentState);
+
     const trainerState = getTrainerState();
 
-    // Create chord data
+    // Get full chord information using getInvertedChordNotes
+    const result = getInvertedChordNotes(
+        root,
+        chordType,
+        inversion,
+        trainerState.currentKey,
+        0, // octaveShift
+        getEnharmonicPreference(),
+        getNotationPreference()
+    );
+
+    // Calculate roman numeral for the chord
+    const roman = noteToRomanNumeral(root, trainerState.currentKey, chordType) || '';
+
+    // Create complete chord data with all required properties
     const newChordData = {
-        type: chordType,
+        name: result.name,
+        simpleName: result.simpleName,
+        notes: result.specificNotes,
         root: root,
+        type: chordType,
         inversion: inversion || 0,
-        octaveShift: 0
+        selectionMode: 'chord',
+        omittedNotes: [],
+        octaveShift: 0,
+        lhOmittedNotes: [],
+        roman: roman
     };
 
     // Add to the end of the progression
     const updatedProgression = [...trainerState.progressionData, newChordData];
 
-    // Save for undo
-    saveForUndo();
-
     // Update state
     setProgressionData(updatedProgression);
 
-    // Re-render
-    renderProgression();
+    // Re-render both progression displays
+    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', false);
 
     // Update unified suggestions
     if (window.updateUnifiedSuggestions) {
@@ -4134,7 +4183,7 @@ export function addChordToProgression(chordType, root, inversion = 0) {
 }
 
 // Make it available globally
-window.addChordToProgression = addChordToProgression;
+window.addChordToProgressionByParams = addChordToProgressionByParams;
 
 /**
  * Highlight trainer scale and chord notes on keyboard

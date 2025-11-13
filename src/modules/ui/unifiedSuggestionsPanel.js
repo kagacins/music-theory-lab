@@ -3,209 +3,32 @@
  * Combines theory-based AI recommendations with style/mood preferences
  */
 
-import { generateUnifiedChordSuggestions, SUGGESTION_STYLES, SUGGESTION_MOODS } from '../features/unifiedChordSuggestions.js';
-import { analyzeProgression, generateChordRecommendations } from '../features/chordRecommendations.js';
-import { CHORD_DEFINITIONS } from '../../data/music-data.js';
-import { getProgressionData, getCurrentKey, getSuggestionStyle, getSuggestionMood, setSuggestionStyle, setSuggestionMood } from '../state/trainerState.js';
+import { analyzeProgression } from '../features/chordRecommendations.js';
+import { getProgressionData, getCurrentKey } from '../state/trainerState.js';
 
 /**
- * Replace both panels with a unified suggestions panel
+ * Initialize modals and event listeners for analysis features
+ * (Panel removed - modals still needed for Quick Analysis Bar)
  */
 export function initUnifiedSuggestionsPanel() {
-    // Find and remove the old panels
+    // Find and remove the old panels if they still exist
     const oldSmartPanel = document.querySelector('#recommendations-panel');
     const oldStyleMoodPanel = document.querySelector('#style-mood-insights-panel')?.closest('.trainer-section-item');
+    const oldUnifiedPanel = document.querySelector('#unified-suggestions-panel')?.closest('.trainer-section-item');
 
     if (oldSmartPanel) oldSmartPanel.remove();
     if (oldStyleMoodPanel) oldStyleMoodPanel.remove();
-
-    // Find the trainer sections container
-    const trainerContainer = document.querySelector('#trainer-sections-container');
-    if (!trainerContainer) {
-        console.warn('Trainer sections container not found');
-        return;
-    }
-
-    // Check for saved section order
-    let savedOrder = null;
-    try {
-        const saved = localStorage.getItem('sectionOrder_trainer');
-        savedOrder = saved ? JSON.parse(saved) : null;
-    } catch (e) {
-        console.warn('Error loading section order:', e);
-    }
-
-    // Create and insert the unified panel
-    const panelHTML = createUnifiedPanelHTML();
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = panelHTML;
-    const unifiedPanel = tempDiv.firstElementChild;
+    if (oldUnifiedPanel) oldUnifiedPanel.remove();
 
     // Create and insert modals at document body level
     insertModals();
 
-    // Check if unified-suggestions is in the saved order
-    const sectionId = 'unified-suggestions';
-    if (savedOrder && savedOrder.includes(sectionId)) {
-        // Find the position in saved order
-        const targetIndex = savedOrder.indexOf(sectionId);
-        
-        // Get all existing sections
-        const existingSections = Array.from(trainerContainer.children);
-        const sectionMap = new Map();
-        
-        existingSections.forEach(section => {
-            const toggle = section.querySelector('button[id$="-toggle"]');
-            if (toggle) {
-                const id = toggle.id.replace('-toggle', '');
-                sectionMap.set(id, section);
-            }
-        });
-
-        // Find the section that should come after unified-suggestions
-        let insertBefore = null;
-        for (let i = targetIndex + 1; i < savedOrder.length; i++) {
-            const nextSectionId = savedOrder[i];
-            const nextSection = sectionMap.get(nextSectionId);
-            if (nextSection) {
-                insertBefore = nextSection;
-                break;
-            }
-        }
-
-        // Insert at the correct position
-        if (insertBefore) {
-            trainerContainer.insertBefore(unifiedPanel, insertBefore);
-        } else {
-            // If no section comes after, append to end
-            trainerContainer.appendChild(unifiedPanel);
-        }
-    } else {
-        // If not in saved order, insert at the top (default position)
-        trainerContainer.insertBefore(unifiedPanel, trainerContainer.firstChild);
-    }
-
+    // Attach event listeners for modals
     attachEventListeners();
     
-    // If there's a saved order and the unified panel is in it, trigger a reorder
-    // to ensure it's in the correct position (in case drag-and-drop already ran)
-    if (savedOrder && savedOrder.includes(sectionId)) {
-        // Use a small delay to ensure DOM is ready, then trigger reorder
-        setTimeout(() => {
-            // Import and use the reorder function from sectionDragDrop if available
-            // For now, we'll manually reorder by calling the same logic
-            const sections = Array.from(trainerContainer.querySelectorAll('.trainer-section-item'));
-            const sectionMap = new Map();
-            
-            sections.forEach(section => {
-                const toggle = section.querySelector('button[id$="-toggle"]');
-                if (toggle) {
-                    const id = toggle.id.replace('-toggle', '');
-                    sectionMap.set(id, section);
-                }
-            });
-
-            // Reorder sections based on saved order
-            savedOrder.forEach(id => {
-                const section = sectionMap.get(id);
-                if (section) {
-                    trainerContainer.appendChild(section);
-                }
-            });
-        }, 50);
-    }
-    
-    console.log('Unified Smart Chord Suggestions panel initialized');
+    console.log('Analysis modals initialized');
 }
 
-/**
- * Create the HTML for unified panel
- */
-function createUnifiedPanelHTML() {
-    return `
-        <!-- Unified Smart Chord Suggestions Panel -->
-        <div class="mb-3 trainer-section-item">
-            <button id="unified-suggestions-toggle" onclick="window.toggleUnifiedSuggestionsPanel && window.toggleUnifiedSuggestionsPanel()"
-                    class="w-full px-4 py-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:via-indigo-700 hover:to-blue-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
-                <span class="flex items-center gap-2">
-                    <svg class="w-4 h-4 text-white/70 cursor-move drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Drag to reorder">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
-                    </svg>
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                    </svg>
-                    Smart Chord Suggestions
-                    <span class="text-xs bg-white/20 px-2 py-0.5 rounded-full">AI</span>
-                </span>
-                <svg id="unified-suggestions-chevron" class="w-5 h-5 transform transition-transform rotate-180" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                </svg>
-            </button>
-
-            <!-- Content -->
-            <div id="unified-suggestions-panel" class="mt-2 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 rounded-lg p-2.5 border border-purple-200 space-y-2">
-
-                <!-- Quick Analysis Bar -->
-                <div class="flex items-center justify-between p-2 bg-white rounded-lg border border-purple-200 shadow-sm">
-                    <div class="flex items-center gap-3 flex-wrap text-xs">
-                        <div class="flex items-center gap-1">
-                            <span class="text-gray-600">Analysis:</span>
-                            <span id="quick-roman-numerals" class="font-bold text-purple-700">—</span>
-                        </div>
-                        <div class="flex items-center gap-1">
-                            <span class="text-gray-600">Mood:</span>
-                            <span id="quick-mood" class="font-semibold">—</span>
-                        </div>
-                        <div class="flex items-center gap-1">
-                            <span class="text-gray-600">Tension:</span>
-                            <button onclick="window.showTensionMapModal && window.showTensionMapModal()"
-                                    class="px-1.5 py-0.5 bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs font-semibold rounded transition"
-                                    title="View tension map">
-                                <span id="quick-tension">—</span>
-                            </button>
-                        </div>
-                    </div>
-                    <button onclick="window.showFullAnalysisModal && window.showFullAnalysisModal()"
-                            class="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded transition">
-                        Details
-                    </button>
-                </div>
-
-                <!-- Style & Mood Controls -->
-                <div class="grid grid-cols-2 gap-2">
-                    <div class="p-2 bg-white border border-indigo-200 rounded-lg">
-                        <label for="unified-style-select" class="text-xs font-semibold text-indigo-800 block mb-1">Musical Style</label>
-                        <select id="unified-style-select" class="w-full p-1.5 text-xs bg-white border border-indigo-200 rounded text-gray-800 focus:ring-indigo-500 focus:border-indigo-500"></select>
-                    </div>
-                    <div class="p-2 bg-white border border-purple-200 rounded-lg">
-                        <label for="unified-mood-select" class="text-xs font-semibold text-purple-800 block mb-1">Intended Mood</label>
-                        <select id="unified-mood-select" class="w-full p-1.5 text-xs bg-white border border-purple-200 rounded text-gray-800 focus:ring-purple-500 focus:border-purple-500"></select>
-                    </div>
-                </div>
-
-                <!-- Suggested Next Chords -->
-                <div class="bg-white rounded-lg p-2 border border-indigo-300 shadow-sm">
-                    <div class="flex items-center justify-between mb-2">
-                        <h4 class="text-xs font-bold text-indigo-800 flex items-center gap-1">
-                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clip-rule="evenodd"></path>
-                            </svg>
-                            What's Next?
-                        </h4>
-                        <button onclick="window.refreshUnifiedSuggestions && window.refreshUnifiedSuggestions()"
-                                class="px-2 py-0.5 text-xs font-semibold text-white bg-indigo-500 hover:bg-indigo-600 rounded transition">
-                            Refresh
-                        </button>
-                    </div>
-                    <div id="unified-suggestions-list" class="space-y-1.5">
-                        <p class="text-xs text-gray-500 italic">Add chords to get intelligent suggestions...</p>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-    `;
-}
 
 /**
  * Insert modals at document body level for proper z-index
@@ -286,69 +109,6 @@ function insertModals() {
  * Attach event listeners
  */
 function attachEventListeners() {
-    // Toggle main panel
-    window.toggleUnifiedSuggestionsPanel = function() {
-        const panel = document.getElementById('unified-suggestions-panel');
-        const section = panel?.closest('.trainer-section-item');
-        const chevron = document.getElementById('unified-suggestions-chevron');
-        if (!panel || !chevron || !section) return;
-
-        const isHidden = panel.classList.contains('hidden');
-        if (isHidden) {
-            // Expanding
-            panel.classList.remove('hidden');
-            chevron.classList.add('rotate-180');
-        } else {
-            // Collapsing - hide panel which will trigger MutationObserver
-            panel.classList.add('hidden');
-            chevron.classList.remove('rotate-180');
-        }
-
-        // Save panel state
-        if (window.savePanelState) {
-            window.savePanelState('unified-suggestions-panel', !isHidden);
-        }
-
-        // Manually trigger sidebar update with a small delay to ensure DOM is updated
-        if (window.triggerSectionSidebarUpdate) {
-            setTimeout(() => {
-                window.triggerSectionSidebarUpdate('trainer', 'unified-suggestions');
-            }, 50);
-        }
-    };
-
-    // Initialize Style dropdown
-    const styleSelect = document.getElementById('unified-style-select');
-    if (styleSelect) {
-        SUGGESTION_STYLES.forEach(style => {
-            const option = document.createElement('option');
-            option.value = style.id;
-            option.textContent = style.label;
-            styleSelect.appendChild(option);
-        });
-        styleSelect.value = getSuggestionStyle() || 'balanced';
-        styleSelect.onchange = () => {
-            setSuggestionStyle(styleSelect.value);
-            updateUnifiedSuggestions();
-        };
-    }
-
-    // Initialize Mood dropdown
-    const moodSelect = document.getElementById('unified-mood-select');
-    if (moodSelect) {
-        SUGGESTION_MOODS.forEach(mood => {
-            const option = document.createElement('option');
-            option.value = mood.id;
-            option.textContent = mood.label;
-            moodSelect.appendChild(option);
-        });
-        moodSelect.value = getSuggestionMood() || 'bright';
-        moodSelect.onchange = () => {
-            setSuggestionMood(moodSelect.value);
-            updateUnifiedSuggestions();
-        };
-    }
-
     // Modal controls
     window.showTensionMapModal = () => {
         document.getElementById('tension-map-modal').classList.remove('hidden');
@@ -386,7 +146,6 @@ export function updateUnifiedSuggestions() {
     if (!progression || !key) return;
 
     updateQuickAnalysis(progression, key);
-    updateSuggestionsList(progression, key);
 }
 
 /**
@@ -411,8 +170,12 @@ function updateQuickAnalysis(progression, key) {
 
     const analysis = analyzeProgression(progression, key);
 
-    // Roman numerals (show last 4)
-    const romans = analysis.romanNumerals.slice(-4).join(' - ');
+    // Roman numerals (show all, or last 8 if too long)
+    const maxToShow = 8;
+    const romansToShow = analysis.romanNumerals.length > maxToShow
+        ? analysis.romanNumerals.slice(-maxToShow)
+        : analysis.romanNumerals;
+    const romans = romansToShow.join(' - ');
     romanNumeralsEl.textContent = romans;
 
     // Mood with emoji
@@ -423,73 +186,6 @@ function updateQuickAnalysis(progression, key) {
     const avgTension = Math.round(analysis.voiceLeadingQuality / 2); // Placeholder
     tensionEl.textContent = `${avgTension}%`;
 }
-
-/**
- * Update suggestions list (uses progression-aware recommendations with different roots)
- */
-function updateSuggestionsList(progression, key) {
-    const suggestionsList = document.getElementById('unified-suggestions-list');
-    if (!suggestionsList) return;
-
-    if (progression.length === 0) {
-        suggestionsList.innerHTML = '<p class="text-sm text-gray-500 italic">Add chords to get intelligent suggestions...</p>';
-        return;
-    }
-
-    // Get style and mood preferences
-    const style = getSuggestionStyle() || 'balanced';
-    const mood = getSuggestionMood() || 'bright';
-
-    // Use the old recommendation system which understands keys and harmonic function
-    const recommendations = generateChordRecommendations(progression, key, style, mood);
-
-    if (recommendations.length === 0) {
-        suggestionsList.innerHTML = '<p class="text-sm text-gray-500 italic">No suggestions available</p>';
-        return;
-    }
-
-    const html = recommendations.map((rec) => {
-        const confidence = rec.confidence;
-        const stars = confidence >= 90 ? '⭐⭐⭐' : confidence >= 75 ? '⭐⭐' : '⭐';
-
-        // Get chord symbol
-        const chordSymbol = CHORD_DEFINITIONS[rec.type]?.symbol || '';
-        const chordLabel = `${rec.chord}${chordSymbol}`;
-
-        return `
-            <div class="p-2 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg border border-indigo-200 hover:border-indigo-400 hover:shadow-sm transition-all cursor-pointer group"
-                 onclick="window.addChordFromUnifiedSuggestion && window.addChordFromUnifiedSuggestion('${rec.type}', '${rec.chord}', ${rec.inversion || 0})">
-                <div class="flex items-start justify-between gap-2">
-                    <div class="flex-1">
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="text-base font-bold text-indigo-800">${chordLabel}</span>
-                            <span class="text-xs text-indigo-600">${stars}</span>
-                            <span class="text-xs bg-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded-full font-semibold">${confidence}%</span>
-                        </div>
-                        ${rec.reasons && rec.reasons.length > 0 ? `
-                        <div class="text-xs text-gray-600 leading-tight">
-                            ${rec.reasons[0].commonTalk}
-                        </div>
-                        ` : ''}
-                    </div>
-                    <button class="px-2 py-1 bg-indigo-600 group-hover:bg-indigo-700 text-white text-xs font-semibold rounded shadow-sm transition">
-                        Add
-                    </button>
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    suggestionsList.innerHTML = html;
-
-    // Set up add chord callback
-    window.addChordFromUnifiedSuggestion = (chordType, root, inversion) => {
-        if (window.addChordToProgression) {
-            window.addChordToProgression(chordType, root, inversion);
-        }
-    };
-}
-
 
 /**
  * Update tension map in modal
