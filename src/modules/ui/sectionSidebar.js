@@ -208,7 +208,7 @@ function createSidebar(tabId) {
     buttonContainer.style.padding = '0';
     buttonContainer.appendChild(collapseAllBtn);
     buttonContainer.appendChild(expandAllBtn);
-    
+
     sidebar.appendChild(buttonContainer);
     
     // Store update function on sidebar for later use

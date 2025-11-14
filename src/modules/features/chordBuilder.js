@@ -90,12 +90,58 @@ function createButtonTooltip(button, tooltipText, chordType = null) {
     tooltip.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
     tooltip.style.border = '1px solid #374151';
     
+    // Add close button for touch devices
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '×';
+    closeBtn.style.position = 'absolute';
+    closeBtn.style.top = '4px';
+    closeBtn.style.right = '4px';
+    closeBtn.style.width = '20px';
+    closeBtn.style.height = '20px';
+    closeBtn.style.borderRadius = '50%';
+    closeBtn.style.backgroundColor = 'rgba(55, 65, 81, 0.8)';
+    closeBtn.style.color = 'white';
+    closeBtn.style.fontSize = '16px';
+    closeBtn.style.fontWeight = 'bold';
+    closeBtn.style.display = 'flex';
+    closeBtn.style.alignItems = 'center';
+    closeBtn.style.justifyContent = 'center';
+    closeBtn.style.border = 'none';
+    closeBtn.style.cursor = 'pointer';
+    closeBtn.style.padding = '0';
+    closeBtn.style.lineHeight = '1';
+    closeBtn.style.transition = 'all 0.2s';
+    closeBtn.title = 'Close';
+    closeBtn.addEventListener('mouseenter', () => {
+        closeBtn.style.backgroundColor = 'rgba(75, 85, 99, 1)';
+    });
+    closeBtn.addEventListener('mouseleave', () => {
+        closeBtn.style.backgroundColor = 'rgba(55, 65, 81, 0.8)';
+    });
+    let hideTooltip = () => {
+        tooltip.style.opacity = '0';
+        tooltip.style.visibility = 'hidden';
+    };
+    
+    // Store reference for close button
+    const setupCloseButton = () => {
+        closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            hideTooltip();
+        });
+        closeBtn.addEventListener('touchend', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            hideTooltip();
+        }, { passive: false });
+    };
+    
     // Style the first line (name) to be bold and slightly larger
     const lines = tooltipText.split('\n');
     if (lines.length > 1) {
         const nameLine = lines[0];
         const descriptionLines = lines.slice(1).join('\n').trim();
-        let tooltipHTML = `<div style="font-weight: 600; font-size: 13px; margin-bottom: 4px; color: #fbbf24;">${nameLine}</div><div style="font-weight: 400; font-size: 12px;">${descriptionLines}</div>`;
+        let tooltipHTML = `<div style="font-weight: 600; font-size: 13px; margin-bottom: 4px; color: #fbbf24; padding-right: 24px;">${nameLine}</div><div style="font-weight: 400; font-size: 12px;">${descriptionLines}</div>`;
         
         // Add inversion buttons if this is a chord
         if (chordType && CHORD_DEFINITIONS[chordType]) {
@@ -128,7 +174,64 @@ function createButtonTooltip(button, tooltipText, chordType = null) {
         tooltip.textContent = tooltipText;
     }
     
+    // Add close button to tooltip (positioned absolutely within the fixed tooltip)
+    tooltip.appendChild(closeBtn);
+    
     document.body.appendChild(tooltip);
+    
+    // Add tap-outside-to-close functionality for touch devices
+    const isTouchDeviceForTooltip = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (isTouchDeviceForTooltip) {
+        const handleOutsideTap = (e) => {
+            // Check if the tap is outside the tooltip
+            if (tooltip.style.visibility === 'visible' && 
+                tooltip.style.opacity === '1' &&
+                !tooltip.contains(e.target) && 
+                !button.contains(e.target)) {
+                hideTooltip();
+                document.removeEventListener('touchend', handleOutsideTap);
+                document.removeEventListener('click', handleOutsideTap);
+            }
+        };
+        
+        // Store reference to hide function for cleanup
+        const originalHide = hideTooltip;
+        tooltip.hideTooltip = () => {
+            originalHide();
+            document.removeEventListener('touchend', handleOutsideTap);
+            document.removeEventListener('click', handleOutsideTap);
+        };
+        
+        // Override hideTooltip to also remove listeners
+        hideTooltip = () => {
+            originalHide();
+            document.removeEventListener('touchend', handleOutsideTap);
+            document.removeEventListener('click', handleOutsideTap);
+        };
+        
+        // Add listeners when tooltip is shown
+        const originalShow = () => {
+            const rect = button.getBoundingClientRect();
+            const tooltipHeight = chordType ? 200 : 80;
+            tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+            tooltip.style.top = (rect.top - tooltipHeight - 12) + 'px';
+            tooltip.style.transform = 'translateX(-50%)';
+            tooltip.style.opacity = '1';
+            tooltip.style.visibility = 'visible';
+            
+            // Add outside tap listeners after a short delay to avoid immediate close
+            setTimeout(() => {
+                document.addEventListener('touchend', handleOutsideTap, { passive: true });
+                document.addEventListener('click', handleOutsideTap, { passive: true });
+            }, 100);
+        };
+        
+        // Store original show function
+        tooltip.showTooltip = originalShow;
+    }
+    
+    // Setup close button after hideTooltip is potentially overridden
+    setupCloseButton();
     
     // Add event listeners to inversion buttons
     if (chordType) {
@@ -265,13 +368,19 @@ function createButtonTooltip(button, tooltipText, chordType = null) {
         const showTooltip = () => {
             // Double-check button is not being held
             if (button.dataset.held !== 'true') {
-                const rect = button.getBoundingClientRect();
-                const tooltipHeight = chordType ? 200 : 80;
-                tooltip.style.left = (rect.left + rect.width / 2) + 'px';
-                tooltip.style.top = (rect.top - tooltipHeight - 12) + 'px';
-                tooltip.style.transform = 'translateX(-50%)';
-                tooltip.style.opacity = '1';
-                tooltip.style.visibility = 'visible';
+                // Use the stored showTooltip function if available (for touch devices with tap-outside-to-close)
+                if (tooltip.showTooltip) {
+                    tooltip.showTooltip();
+                } else {
+                    // Fallback for desktop
+                    const rect = button.getBoundingClientRect();
+                    const tooltipHeight = chordType ? 200 : 80;
+                    tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+                    tooltip.style.top = (rect.top - tooltipHeight - 12) + 'px';
+                    tooltip.style.transform = 'translateX(-50%)';
+                    tooltip.style.opacity = '1';
+                    tooltip.style.visibility = 'visible';
+                }
             }
         };
         
@@ -734,7 +843,7 @@ function showChordSuggestionsModal(chordType, inversion) {
     `;
     
     const inversionLabel = document.createElement('label');
-    inversionLabel.textContent = 'Current Chord Inversion:';
+    inversionLabel.textContent = 'Change Chord Inversion:';
     inversionLabel.style.cssText = 'font-size: 12px; font-weight: 600; color: #374151; white-space: nowrap;';
     inversionRow.appendChild(inversionLabel);
     
@@ -763,9 +872,22 @@ function showChordSuggestionsModal(chordType, inversion) {
         `;
         let heldNotes = null;
         
+        // Helper function to update button highlighting
+        const updateButtonHighlighting = () => {
+            inversionButtonsContainer.querySelectorAll('button').forEach(btn => {
+                const btnInv = parseInt(btn.dataset.inversion);
+                btn.style.borderColor = btnInv === inv ? '#667eea' : '#d1d5db';
+                btn.style.backgroundColor = btnInv === inv ? '#667eea' : 'white';
+                btn.style.color = btnInv === inv ? 'white' : '#374151';
+                btn.style.fontWeight = btnInv === inv ? '600' : '500';
+            });
+        };
+        
         // Hold-to-play functionality
         invBtn.addEventListener('mousedown', (e) => {
             e.stopPropagation();
+            // Update highlighting immediately when playback starts
+            updateButtonHighlighting();
             const key = getCurrentKey() || 'C';
             const res = getInvertedChordNotes(
                 rootNote,
@@ -789,6 +911,35 @@ function showChordSuggestionsModal(chordType, inversion) {
             }
         });
         
+        // Touch events for mobile/tablet
+        invBtn.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            // Update highlighting immediately when playback starts
+            updateButtonHighlighting();
+            const key = getCurrentKey() || 'C';
+            const res = getInvertedChordNotes(
+                rootNote,
+                chordType,
+                inv,
+                key,
+                getBuilderOctaveShift ? getBuilderOctaveShift() : 0,
+                enhPref,
+                notationPref
+            );
+            heldNotes = res.specificNotes || [];
+            const instrument = getInstrument && getInstrument();
+            if (instrument && heldNotes.length > 0) {
+                const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                const baseTime = Tone.now() + 0.01;
+                if (isGuitar) {
+                    heldNotes.forEach((n, idx) => instrument.triggerAttack(n, baseTime + idx * 0.0001));
+                } else {
+                    instrument.triggerAttack(heldNotes, Tone.now());
+                }
+            }
+        }, { passive: false });
+        
         const stopHeld = (e) => {
             if (e) e.stopPropagation();
             const instrument = getInstrument && getInstrument();
@@ -806,18 +957,21 @@ function showChordSuggestionsModal(chordType, inversion) {
         };
         
         invBtn.addEventListener('mouseup', stopHeld);
+        invBtn.addEventListener('touchend', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            stopHeld(e);
+        }, { passive: false });
+        invBtn.addEventListener('touchcancel', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            stopHeld(e);
+        }, { passive: false });
         invBtn.addEventListener('mouseleave', stopHeld);
         
         invBtn.addEventListener('click', () => {
             activeInversion = inv;
-            // Update button styles
-            inversionButtonsContainer.querySelectorAll('button').forEach(btn => {
-                const btnInv = parseInt(btn.dataset.inversion);
-                btn.style.borderColor = btnInv === inv ? '#667eea' : '#d1d5db';
-                btn.style.backgroundColor = btnInv === inv ? '#667eea' : 'white';
-                btn.style.color = btnInv === inv ? 'white' : '#374151';
-                btn.style.fontWeight = btnInv === inv ? '600' : '500';
-            });
+            // Highlighting already updated on mousedown, just update state and re-render
             // Update title
             const newInversionName = INVERSION_NAMES[inv] || `Inversion ${inv}`;
             title.textContent = `Suggested Next Chords After ${chordType} (${newInversionName})`;
@@ -2224,13 +2378,19 @@ export function renderBuilderSelectors() {
                     // Make info icon trigger tooltip on click/tap
                     const showTooltip = () => {
                         if (!tooltipElement) return;
-                        const rect = mainButton.getBoundingClientRect();
-                        const tooltipHeight = 200; // Same as in createButtonTooltip
-                        tooltipElement.style.left = (rect.left + rect.width / 2) + 'px';
-                        tooltipElement.style.top = (rect.top - tooltipHeight - 12) + 'px';
-                        tooltipElement.style.transform = 'translateX(-50%)';
-                        tooltipElement.style.opacity = '1';
-                        tooltipElement.style.visibility = 'visible';
+                        // Use the stored showTooltip function if available (for touch devices)
+                        if (tooltipElement.showTooltip) {
+                            tooltipElement.showTooltip();
+                        } else {
+                            // Fallback for desktop
+                            const rect = mainButton.getBoundingClientRect();
+                            const tooltipHeight = 200; // Same as in createButtonTooltip
+                            tooltipElement.style.left = (rect.left + rect.width / 2) + 'px';
+                            tooltipElement.style.top = (rect.top - tooltipHeight - 12) + 'px';
+                            tooltipElement.style.transform = 'translateX(-50%)';
+                            tooltipElement.style.opacity = '1';
+                            tooltipElement.style.visibility = 'visible';
+                        }
                     };
                     infoIcon.addEventListener('click', (e) => {
                         e.stopPropagation();

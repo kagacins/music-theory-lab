@@ -2322,25 +2322,131 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
                     ? 'bg-indigo-600 text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`;
-            invButton.onclick = (e) => {
-                e.stopPropagation();
-                const wrapper = e.target.closest(`#${containerId} > div`);
-                const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
-                const selectedInversion = parseInt(e.target.getAttribute('data-inversion'));
-                updateProgressionChord(currentIndex, 'inversion', selectedInversion);
-                // Update button states
+            
+            let isPlaying = false;
+            let heldNotes = null;
+            
+            // Helper function to update button highlighting
+            const updateButtonHighlighting = () => {
                 invButtonContainer.querySelectorAll('button').forEach((btn) => {
                     const btnInversion = parseInt(btn.getAttribute('data-inversion'));
-                    if (btnInversion === selectedInversion) {
+                    if (btnInversion === invIndex) {
                         btn.className = 'flex-1 px-1 py-0.5 text-[10px] font-semibold rounded transition-colors bg-indigo-600 text-white';
                     } else {
                         btn.className = 'flex-1 px-1 py-0.5 text-[10px] font-semibold rounded transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300';
                     }
                 });
-                // Update suggestion button color after inversion changes
-                setTimeout(() => checkSuggestion(), 50);
             };
-            invButton.onmousedown = (e) => e.stopPropagation();
+            
+            const startPlayback = (e) => {
+                if (e) e.stopPropagation();
+                // Update highlighting immediately
+                updateButtonHighlighting();
+                
+                if (!isPlaying) {
+                    isPlaying = true;
+                    // Get chord notes for direct playback
+                    const key = getCurrentKey ? getCurrentKey() : 'C';
+                    const res = getInvertedChordNotes(
+                        chordData.root,
+                        chordData.type,
+                        invIndex,
+                        key,
+                        0, // octave shift
+                        'sharp', // enharmonic preference
+                        'full' // notation preference
+                    );
+                    heldNotes = res.specificNotes || [];
+                    const instrument = window.getInstrument && window.getInstrument();
+                    if (instrument && heldNotes.length > 0) {
+                        const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                        const baseTime = Tone.now() + 0.01;
+                        if (isGuitar) {
+                            heldNotes.forEach((n, idx) => instrument.triggerAttack(n, baseTime + idx * 0.0001));
+                        } else {
+                            instrument.triggerAttack(heldNotes, Tone.now());
+                        }
+                    }
+                }
+            };
+            
+            const stopPlayback = (e) => {
+                if (e) e.stopPropagation();
+                if (isPlaying) {
+                    isPlaying = false;
+                    // Stop playback
+                    const instrument = window.getInstrument && window.getInstrument();
+                    if (instrument && heldNotes && heldNotes.length > 0) {
+                        const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                        if (isGuitar) {
+                            heldNotes.forEach(n => {
+                                try { instrument.triggerRelease(n, Tone.now()); } catch (_) {}
+                            });
+                        } else {
+                            instrument.triggerRelease(heldNotes, Tone.now());
+                        }
+                        heldNotes = null;
+                    }
+                }
+            };
+            
+            // Hold-to-play with immediate highlighting
+            invButton.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                startPlayback(e);
+            });
+            
+            invButton.addEventListener('mouseup', (e) => {
+                e.stopPropagation();
+                stopPlayback(e);
+                // Update state silently (without playing chord again)
+                const wrapper = e.target.closest(`#${containerId} > div`);
+                const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+                const selectedInversion = invIndex;
+                
+                const trainerState = getTrainerState();
+                if (trainerState.progressionData[currentIndex]) {
+                    trainerState.progressionData[currentIndex].inversion = selectedInversion;
+                    saveStateBeforeChange();
+                }
+                setTimeout(() => checkSuggestion(), 50);
+            });
+            
+            invButton.addEventListener('mouseleave', (e) => {
+                e.stopPropagation();
+                stopPlayback(e);
+            });
+            
+            // Touch events for mobile/tablet
+            invButton.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                startPlayback(e);
+            }, { passive: false });
+            
+            invButton.addEventListener('touchend', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                stopPlayback(e);
+                // Update state silently (without playing chord again)
+                const wrapper = e.target.closest(`#${containerId} > div`);
+                const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+                const selectedInversion = invIndex;
+                
+                const trainerState = getTrainerState();
+                if (trainerState.progressionData[currentIndex]) {
+                    trainerState.progressionData[currentIndex].inversion = selectedInversion;
+                    saveStateBeforeChange();
+                }
+                setTimeout(() => checkSuggestion(), 50);
+            }, { passive: false });
+            
+            invButton.addEventListener('touchcancel', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                stopPlayback(e);
+            }, { passive: false });
+            
             invButtonContainer.appendChild(invButton);
             invButtons.push(invButton);
         }
@@ -2453,23 +2559,129 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
                         ? 'bg-indigo-600 text-white'
                         : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`;
-                lhInvButton.onclick = (e) => {
-                    e.stopPropagation();
-                    const wrapper = e.target.closest(`#${containerId} > div`);
-                    const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
-                    const selectedLhInversion = parseInt(e.target.getAttribute('data-lh-inversion'));
-                    updateProgressionChordLH(currentIndex, 'lhInversion', selectedLhInversion);
-                    // Update button states
+                
+                let isPlaying = false;
+                let heldNotes = null;
+                
+                // Helper function to update button highlighting
+                const updateLhButtonHighlighting = () => {
                     lhInvButtonContainer.querySelectorAll('button').forEach((btn) => {
                         const btnInversion = parseInt(btn.getAttribute('data-lh-inversion'));
-                        if (btnInversion === selectedLhInversion) {
+                        if (btnInversion === invIndex) {
                             btn.className = 'flex-1 px-1 py-0.5 text-[10px] font-semibold rounded transition-colors bg-indigo-600 text-white';
                         } else {
                             btn.className = 'flex-1 px-1 py-0.5 text-[10px] font-semibold rounded transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300';
                         }
                     });
                 };
-                lhInvButton.onmousedown = (e) => e.stopPropagation();
+                
+                const startLhPlayback = (e) => {
+                    if (e) e.stopPropagation();
+                    // Update highlighting immediately
+                    updateLhButtonHighlighting();
+                    
+                    if (!isPlaying) {
+                        isPlaying = true;
+                        // Get LH chord notes for direct playback
+                        const key = getCurrentKey ? getCurrentKey() : 'C';
+                        const lhOctaveShift = chordData.lhOctaveShift || 0;
+                        heldNotes = getLHNotes(
+                            chordData.root,
+                            chordData.lhType,
+                            invIndex,
+                            key,
+                            lhOctaveShift,
+                            chordData.type,
+                            'sharp' // enharmonic preference
+                        ) || [];
+                        const instrument = window.getInstrument && window.getInstrument();
+                        if (instrument && heldNotes.length > 0) {
+                            const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                            const baseTime = Tone.now() + 0.01;
+                            if (isGuitar) {
+                                heldNotes.forEach((n, idx) => instrument.triggerAttack(n, baseTime + idx * 0.0001));
+                            } else {
+                                instrument.triggerAttack(heldNotes, Tone.now());
+                            }
+                        }
+                    }
+                };
+                
+                const stopLhPlayback = (e) => {
+                    if (e) e.stopPropagation();
+                    if (isPlaying) {
+                        isPlaying = false;
+                        // Stop playback
+                        const instrument = window.getInstrument && window.getInstrument();
+                        if (instrument && heldNotes && heldNotes.length > 0) {
+                            const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                            if (isGuitar) {
+                                heldNotes.forEach(n => {
+                                    try { instrument.triggerRelease(n, Tone.now()); } catch (_) {}
+                                });
+                            } else {
+                                instrument.triggerRelease(heldNotes, Tone.now());
+                            }
+                            heldNotes = null;
+                        }
+                    }
+                };
+                
+                // Hold-to-play with immediate highlighting
+                lhInvButton.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                    startLhPlayback(e);
+                });
+                
+                lhInvButton.addEventListener('mouseup', (e) => {
+                    e.stopPropagation();
+                    stopLhPlayback(e);
+                    // Update state silently (without playing chord again)
+                    const wrapper = e.target.closest(`#${containerId} > div`);
+                    const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+                    const selectedLhInversion = invIndex;
+                    
+                    const trainerState = getTrainerState();
+                    if (trainerState.progressionData[currentIndex]) {
+                        trainerState.progressionData[currentIndex].lhInversion = selectedLhInversion;
+                        saveStateBeforeChange();
+                    }
+                });
+                
+                lhInvButton.addEventListener('mouseleave', (e) => {
+                    e.stopPropagation();
+                    stopLhPlayback(e);
+                });
+                
+                // Touch events for mobile/tablet
+                lhInvButton.addEventListener('touchstart', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    startLhPlayback(e);
+                }, { passive: false });
+                
+                lhInvButton.addEventListener('touchend', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    stopLhPlayback(e);
+                    // Update state silently (without playing chord again)
+                    const wrapper = e.target.closest(`#${containerId} > div`);
+                    const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+                    const selectedLhInversion = invIndex;
+                    
+                    const trainerState = getTrainerState();
+                    if (trainerState.progressionData[currentIndex]) {
+                        trainerState.progressionData[currentIndex].lhInversion = selectedLhInversion;
+                        saveStateBeforeChange();
+                    }
+                }, { passive: false });
+                
+                lhInvButton.addEventListener('touchcancel', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    stopLhPlayback(e);
+                }, { passive: false });
+                
                 lhInvButtonContainer.appendChild(lhInvButton);
             }
         } else {
@@ -4025,6 +4237,10 @@ export function showProgressionChordSuggestions(chordIndex) {
             duration: currentChord.duration || '1n'
         };
 
+        // Save state for undo BEFORE making changes
+        const currentState = captureProgressionState();
+        saveState(currentState);
+
         // Insert after current chord
         progression.splice(chordIndex + 1, 0, nextChordData);
 
@@ -4035,9 +4251,6 @@ export function showProgressionChordSuggestions(chordIndex) {
         renderProgressionDisplay('progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
         updateProgressionControlsUI();
-
-        // Save state for undo
-        saveState();
     };
 
     // Track currently playing notes for release

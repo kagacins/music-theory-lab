@@ -22,7 +22,9 @@ let trainerState = {
     suggestionStyle: 'any',
     suggestionMood: 'neutral',
     styleMoodSuggestions: [],
-    tensionProfile: []
+    tensionProfile: [],
+    contextAwareMode: false, // Enable/disable context-aware chord suggestions
+    progressionLookback: 4   // Number of previous chords to analyze for context
 };
 
 // Getters and Setters for progressionData
@@ -187,6 +189,24 @@ export function setStepChordTimeoutId(value) {
     trainerState.stepChordTimeoutId = value;
 }
 
+// Getters and Setters for contextAwareMode
+export function getContextAwareMode() {
+    return trainerState.contextAwareMode;
+}
+
+export function setContextAwareMode(value) {
+    trainerState.contextAwareMode = value;
+}
+
+// Getters and Setters for progressionLookback
+export function getProgressionLookback() {
+    return trainerState.progressionLookback;
+}
+
+export function setProgressionLookback(value) {
+    trainerState.progressionLookback = value;
+}
+
 // Get complete trainer state
 export function getTrainerState() {
     return {
@@ -207,7 +227,9 @@ export function getTrainerState() {
         suggestionStyle: trainerState.suggestionStyle,
         suggestionMood: trainerState.suggestionMood,
         styleMoodSuggestions: trainerState.styleMoodSuggestions,
-        tensionProfile: trainerState.tensionProfile
+        tensionProfile: trainerState.tensionProfile,
+        contextAwareMode: trainerState.contextAwareMode,
+        progressionLookback: trainerState.progressionLookback
     };
 }
 
@@ -231,7 +253,9 @@ export function initializeTrainerState() {
         suggestionStyle: 'any',
         suggestionMood: 'neutral',
         styleMoodSuggestions: [],
-        tensionProfile: []
+        tensionProfile: [],
+        contextAwareMode: false,
+        progressionLookback: 4
     };
 }
 

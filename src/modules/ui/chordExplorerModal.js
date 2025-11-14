@@ -14,6 +14,14 @@ import { generateComprehensiveRecommendations } from '../features/comprehensiveC
 import { CHORD_DEFINITIONS, INVERSION_NAMES, ALL_NOTES } from '../../data/music-data.js';
 import { getInvertedChordNotes } from '../utils/noteUtils.js';
 import { SUGGESTION_STYLES, SUGGESTION_MOODS } from '../features/unifiedChordSuggestions.js';
+import {
+    WEIGHT_PRESETS,
+    getSavedWeights,
+    saveWeights,
+    resetWeightsToDefault,
+    applyPreset,
+    normalizeWeights
+} from '../config/weightPresets.js';
 // Tone.js is loaded via script tag in index.html, available as global 'Tone'
 
 /**
@@ -94,11 +102,12 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
         border-radius: 12px;
         width: 95%;
         max-width: 1400px;
-        height: 90vh;
+        max-height: 90vh;
         display: flex;
         flex-direction: column;
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        overflow: hidden;
+        overflow-y: auto;
+        overflow-x: hidden;
     `;
     modal.onclick = (e) => e.stopPropagation();
 
@@ -336,9 +345,22 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
         `;
         let heldNotes = null;
         
+        // Helper function to update button highlighting
+        const updateButtonHighlighting = () => {
+            inversionButtonsContainer.querySelectorAll('button').forEach(btn => {
+                const btnInv = parseInt(btn.dataset.inversion);
+                btn.style.borderColor = btnInv === inv ? '#667eea' : '#d1d5db';
+                btn.style.backgroundColor = btnInv === inv ? '#667eea' : 'white';
+                btn.style.color = btnInv === inv ? 'white' : '#374151';
+                btn.style.fontWeight = btnInv === inv ? '600' : '500';
+            });
+        };
+        
         // Hold-to-play functionality
         invBtn.addEventListener('mousedown', (e) => {
             e.stopPropagation();
+            // Update highlighting immediately when playback starts
+            updateButtonHighlighting();
             const res = getInvertedChordNotes(
                 currentRoot,
                 currentChordType,
@@ -361,6 +383,34 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
             }
         });
         
+        // Touch events for mobile/tablet
+        invBtn.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            // Update highlighting immediately when playback starts
+            updateButtonHighlighting();
+            const res = getInvertedChordNotes(
+                currentRoot,
+                currentChordType,
+                inv,
+                key,
+                0, // octave shift
+                'sharp', // enharmonic preference
+                'full' // notation preference
+            );
+            heldNotes = res.specificNotes || [];
+            const instrument = window.getInstrument && window.getInstrument();
+            if (instrument && heldNotes.length > 0) {
+                const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                const baseTime = Tone.now() + 0.01;
+                if (isGuitar) {
+                    heldNotes.forEach((n, idx) => instrument.triggerAttack(n, baseTime + idx * 0.0001));
+                } else {
+                    instrument.triggerAttack(heldNotes, Tone.now());
+                }
+            }
+        }, { passive: false });
+        
         const stopHeld = (e) => {
             if (e) e.stopPropagation();
             const instrument = window.getInstrument && window.getInstrument();
@@ -378,18 +428,21 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
         };
         
         invBtn.addEventListener('mouseup', stopHeld);
+        invBtn.addEventListener('touchend', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            stopHeld(e);
+        }, { passive: false });
+        invBtn.addEventListener('touchcancel', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            stopHeld(e);
+        }, { passive: false });
         invBtn.addEventListener('mouseleave', stopHeld);
         
         invBtn.addEventListener('click', () => {
             activeInversion = inv;
-            // Update button styles
-            inversionButtonsContainer.querySelectorAll('button').forEach(btn => {
-                const btnInv = parseInt(btn.dataset.inversion);
-                btn.style.borderColor = btnInv === inv ? '#667eea' : '#d1d5db';
-                btn.style.backgroundColor = btnInv === inv ? '#667eea' : 'white';
-                btn.style.color = btnInv === inv ? 'white' : '#374151';
-                btn.style.fontWeight = btnInv === inv ? '600' : '500';
-            });
+            // Highlighting already updated on mousedown, just update state and re-render
             // Update subtitle
             subtitle.textContent = `Analyzing ALL possible next chords after ${currentRoot}${chordSymbol} (${INVERSION_NAMES[inv] || inv})`;
             // Update recommendations
@@ -416,12 +469,330 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     
     inversionRow.appendChild(inversionButtonsContainer);
 
+    // Weight adjustment section (collapsible)
+    const weightSection = document.createElement('div');
+    weightSection.style.cssText = `
+        background-color: #fefce8;
+        border-bottom: 1px solid #e5e7eb;
+    `;
+
+    // Current weights (start with saved values)
+    let currentWeights = getSavedWeights(false); // Use standard mode weights for now
+
+    // Collapsible header
+    const weightHeader = document.createElement('div');
+    weightHeader.style.cssText = `
+        padding: 10px 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        user-select: none;
+        background-color: #fef3c7;
+        transition: background-color 0.2s;
+    `;
+
+    let isWeightSectionExpanded = false;
+
+    const weightHeaderTitle = document.createElement('div');
+    weightHeaderTitle.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+
+    const weightToggleIcon = document.createElement('span');
+    weightToggleIcon.textContent = '▶';
+    weightToggleIcon.style.cssText = 'font-size: 10px; color: #78716c; transition: transform 0.2s;';
+
+    const weightTitle = document.createElement('span');
+    weightTitle.textContent = '⚙️ Recommendation Weights';
+    weightTitle.style.cssText = 'font-weight: 600; font-size: 13px; color: #78716c;';
+
+    weightHeaderTitle.appendChild(weightToggleIcon);
+    weightHeaderTitle.appendChild(weightTitle);
+
+    const weightSubtitle = document.createElement('span');
+    weightSubtitle.textContent = 'Adjust scoring factors';
+    weightSubtitle.style.cssText = 'font-size: 11px; color: #a8a29e;';
+
+    weightHeader.appendChild(weightHeaderTitle);
+    weightHeader.appendChild(weightSubtitle);
+
+    weightHeader.onmouseenter = () => {
+        weightHeader.style.backgroundColor = '#fde68a';
+    };
+    weightHeader.onmouseleave = () => {
+        weightHeader.style.backgroundColor = '#fef3c7';
+    };
+
+    // Collapsible content
+    const weightContent = document.createElement('div');
+    weightContent.style.cssText = `
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease-in-out;
+        padding: 0 24px;
+        background-color: #fefce8;
+    `;
+
+    // Toggle function
+    const toggleWeightSection = () => {
+        isWeightSectionExpanded = !isWeightSectionExpanded;
+        if (isWeightSectionExpanded) {
+            weightToggleIcon.style.transform = 'rotate(90deg)';
+            weightContent.style.maxHeight = '600px';
+            weightContent.style.paddingTop = '16px';
+            weightContent.style.paddingBottom = '16px';
+        } else {
+            weightToggleIcon.style.transform = 'rotate(0deg)';
+            weightContent.style.maxHeight = '0';
+            weightContent.style.paddingTop = '0';
+            weightContent.style.paddingBottom = '0';
+        }
+    };
+
+    weightHeader.onclick = toggleWeightSection;
+
+    // Inner content wrapper
+    const weightInner = document.createElement('div');
+    weightInner.style.cssText = 'display: flex; flex-direction: column; gap: 16px;';
+
+    // Info notice
+    const weightNotice = document.createElement('div');
+    weightNotice.style.cssText = `
+        background-color: #fffbeb;
+        border: 1px solid #fcd34d;
+        border-radius: 6px;
+        padding: 10px 12px;
+        font-size: 11px;
+        color: #92400e;
+        line-height: 1.5;
+    `;
+    weightNotice.innerHTML = `
+        <strong>💡 Tip:</strong> Weights are automatically normalized to sum to 100%.
+        Changes apply to this modal only until you click "Save as Universal".
+    `;
+    weightInner.appendChild(weightNotice);
+
+    // Preset buttons (compact, 2 rows)
+    const presetsContainer = document.createElement('div');
+    presetsContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px;';
+
+    const presetsLabel = document.createElement('div');
+    presetsLabel.textContent = 'Quick Presets:';
+    presetsLabel.style.cssText = 'font-size: 11px; font-weight: 600; color: #78716c;';
+    presetsContainer.appendChild(presetsLabel);
+
+    const presetsGrid = document.createElement('div');
+    presetsGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px;';
+
+    Object.keys(WEIGHT_PRESETS).forEach(key => {
+        const preset = WEIGHT_PRESETS[key];
+        if (preset.requiresContext) return; // Skip context-aware preset for now
+
+        const presetBtn = document.createElement('button');
+        presetBtn.textContent = preset.name;
+        presetBtn.title = preset.tooltip;
+        presetBtn.style.cssText = `
+            padding: 6px 10px;
+            background-color: #fefce8;
+            border: 1px solid #d4d4d8;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+            font-weight: 600;
+            color: #57534e;
+            transition: all 0.2s;
+        `;
+        presetBtn.onmouseenter = () => {
+            presetBtn.style.backgroundColor = '#fde047';
+            presetBtn.style.borderColor = '#facc15';
+        };
+        presetBtn.onmouseleave = () => {
+            presetBtn.style.backgroundColor = '#fefce8';
+            presetBtn.style.borderColor = '#d4d4d8';
+        };
+        presetBtn.onclick = () => {
+            const weights = applyPreset(key, false);
+            if (weights) {
+                currentWeights = weights;
+                updateWeightSliders();
+            }
+        };
+        presetsGrid.appendChild(presetBtn);
+    });
+
+    presetsContainer.appendChild(presetsGrid);
+    weightInner.appendChild(presetsContainer);
+
+    // Weight sliders
+    const slidersContainer = document.createElement('div');
+    slidersContainer.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
+
+    const sliders = {};
+    const labels = {
+        harmonic: 'Harmonic Function',
+        voiceLeading: 'Voice Leading',
+        style: 'Style Fit',
+        mood: 'Mood Fit'
+    };
+
+    const descriptions = {
+        harmonic: 'Traditional harmonic progressions (I→IV→V)',
+        voiceLeading: 'Smooth note transitions and voice movement',
+        style: 'Match selected musical style',
+        mood: 'Match desired emotional character'
+    };
+
+    function updateWeightSliders() {
+        Object.keys(labels).forEach(key => {
+            sliders[key].slider.value = Math.round(currentWeights[key] * 100);
+            sliders[key].valueLabel.textContent = `${Math.round(currentWeights[key] * 100)}%`;
+        });
+    }
+
+    function onWeightSliderChange() {
+        const newWeights = {};
+        Object.keys(labels).forEach(key => {
+            newWeights[key] = parseFloat(sliders[key].slider.value) / 100;
+        });
+        currentWeights = normalizeWeights(newWeights);
+        updateWeightSliders();
+    }
+
+    Object.keys(labels).forEach(key => {
+        const sliderGroup = document.createElement('div');
+
+        const labelRow = document.createElement('div');
+        labelRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;';
+
+        const label = document.createElement('label');
+        label.textContent = labels[key];
+        label.style.cssText = 'font-size: 11px; font-weight: 600; color: #57534e;';
+
+        const valueLabel = document.createElement('span');
+        valueLabel.textContent = `${Math.round(currentWeights[key] * 100)}%`;
+        valueLabel.style.cssText = 'font-size: 11px; font-weight: 600; color: #ca8a04;';
+
+        labelRow.appendChild(label);
+        labelRow.appendChild(valueLabel);
+
+        const desc = document.createElement('div');
+        desc.textContent = descriptions[key];
+        desc.style.cssText = 'font-size: 10px; color: #a8a29e; margin-bottom: 4px;';
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '0';
+        slider.max = '100';
+        slider.value = Math.round(currentWeights[key] * 100);
+        slider.style.cssText = 'width: 100%; cursor: pointer;';
+        slider.oninput = onWeightSliderChange;
+
+        sliders[key] = { slider, valueLabel };
+
+        sliderGroup.appendChild(labelRow);
+        sliderGroup.appendChild(desc);
+        sliderGroup.appendChild(slider);
+        slidersContainer.appendChild(sliderGroup);
+    });
+
+    weightInner.appendChild(slidersContainer);
+
+    // Action buttons
+    const buttonRow = document.createElement('div');
+    buttonRow.style.cssText = 'display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid #e7e5e4;';
+
+    const updateBtn = document.createElement('button');
+    updateBtn.textContent = '🔄 Update Now';
+    updateBtn.style.cssText = `
+        flex: 1;
+        padding: 8px 12px;
+        background: #eab308;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 600;
+        color: white;
+        transition: background 0.2s;
+    `;
+    updateBtn.onmouseenter = () => { updateBtn.style.backgroundColor = '#ca8a04'; };
+    updateBtn.onmouseleave = () => { updateBtn.style.backgroundColor = '#eab308'; };
+    updateBtn.onclick = () => {
+        // Temporarily save current weights to localStorage (won't persist after refresh unless "Save as Universal")
+        saveWeights(currentWeights);
+        // Regenerate recommendations
+        allRecommendations = generateRecommendations();
+        renderTabContent();
+        // Show feedback
+        updateBtn.textContent = '✓ Updated!';
+        updateBtn.style.backgroundColor = '#16a34a';
+        setTimeout(() => {
+            updateBtn.textContent = '🔄 Update Now';
+            updateBtn.style.backgroundColor = '#eab308';
+        }, 1500);
+    };
+
+    const resetBtn = document.createElement('button');
+    resetBtn.textContent = 'Reset';
+    resetBtn.style.cssText = `
+        padding: 8px 12px;
+        background: #e7e5e4;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 600;
+        color: #57534e;
+        transition: background 0.2s;
+    `;
+    resetBtn.onmouseenter = () => { resetBtn.style.backgroundColor = '#d6d3d1'; };
+    resetBtn.onmouseleave = () => { resetBtn.style.backgroundColor = '#e7e5e4'; };
+    resetBtn.onclick = () => {
+        currentWeights = resetWeightsToDefault(false);
+        updateWeightSliders();
+    };
+
+    const saveUniversalBtn = document.createElement('button');
+    saveUniversalBtn.textContent = '💾 Save as Universal';
+    saveUniversalBtn.style.cssText = `
+        flex: 1;
+        padding: 8px 12px;
+        background: #3b82f6;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 600;
+        color: white;
+        transition: background 0.2s;
+    `;
+    saveUniversalBtn.onmouseenter = () => { saveUniversalBtn.style.backgroundColor = '#2563eb'; };
+    saveUniversalBtn.onmouseleave = () => { saveUniversalBtn.style.backgroundColor = '#3b82f6'; };
+    saveUniversalBtn.onclick = () => {
+        saveWeights(currentWeights);
+        saveUniversalBtn.textContent = '✓ Saved!';
+        saveUniversalBtn.style.backgroundColor = '#16a34a';
+        setTimeout(() => {
+            saveUniversalBtn.textContent = '💾 Save as Universal';
+            saveUniversalBtn.style.backgroundColor = '#3b82f6';
+        }, 1500);
+    };
+
+    buttonRow.appendChild(updateBtn);
+    buttonRow.appendChild(resetBtn);
+    buttonRow.appendChild(saveUniversalBtn);
+    weightInner.appendChild(buttonRow);
+
+    weightContent.appendChild(weightInner);
+    weightSection.appendChild(weightHeader);
+    weightSection.appendChild(weightContent);
+
     // Content area
     const contentArea = document.createElement('div');
     contentArea.style.cssText = `
         flex: 1;
         overflow-y: auto;
         padding: 24px;
+        min-height: 0;
     `;
 
     // Switch tab function
@@ -451,6 +822,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     // Assemble modal
     modal.appendChild(header);
     modal.appendChild(inversionRow);
+    modal.appendChild(weightSection);
     modal.appendChild(tabNav);
     modal.appendChild(contentArea);
     overlay.appendChild(modal);

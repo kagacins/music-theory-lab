@@ -18,6 +18,8 @@
 
 import { CHORD_DEFINITIONS, ALL_NOTES } from '../../data/music-data.js';
 import { getInvertedChordNotes, noteToMidi } from '../utils/noteUtils.js';
+import { analyzeProgressionContext, scoreContextAwareness } from './progressionContext.js';
+import { getSavedWeights } from '../config/weightPresets.js';
 
 // Harmonic function definitions
 const HARMONIC_FUNCTIONS = {
@@ -97,6 +99,9 @@ function getScaleDegree(chordRoot, key) {
  * @param {string} mood - Mood preference ('bright', 'dark', 'jazzy', 'tense', 'calm', 'energetic')
  * @param {string} tensionDirection - Tension direction ('resolve', 'maintain', 'build')
  * @param {number} limit - Maximum number of results to return (default 10, use 0 or null for all)
+ * @param {Array} progressionData - Full progression history (optional, for context-aware mode)
+ * @param {boolean} contextMode - Enable context-aware scoring (default false)
+ * @param {number} lookbackDepth - Number of previous chords to analyze (default 4)
  * @returns {Array<{root:string, type:string, inversion:number, score:number, reason:string, confidence:number}>}
  */
 export function generateComprehensiveRecommendations(
@@ -107,7 +112,10 @@ export function generateComprehensiveRecommendations(
     style = 'balanced',
     mood = 'bright',
     tensionDirection = 'resolve',
-    limit = 10
+    limit = 10,
+    progressionData = [],
+    contextMode = false,
+    lookbackDepth = 4
 ) {
     const recommendations = [];
 
@@ -120,6 +128,12 @@ export function generateComprehensiveRecommendations(
     // Get current chord's harmonic function in the key
     const currentDegree = getScaleDegree(currentRoot, key);
     const currentFunction = DEGREE_TO_FUNCTION[currentDegree] || HARMONIC_FUNCTIONS.TONIC;
+
+    // Analyze progression context if context mode is enabled
+    let context = null;
+    if (contextMode && progressionData && progressionData.length > 0) {
+        context = analyzeProgressionContext(progressionData, key, lookbackDepth);
+    }
 
     // Evaluate all possible next chords across all three dimensions
     ALL_NOTES.forEach(nextRoot => {
@@ -157,18 +171,44 @@ export function generateComprehensiveRecommendations(
                 // Calculate comprehensive voice leading score
                 const voiceLeadingScore = scoreVoiceLeading(currentMidi, nextMidi, nextInversion);
 
-                // Calculate total score (weighted combination)
-                const totalScore =
-                    (functionScore * 0.30) +      // 30% harmonic function
-                    (voiceLeadingScore * 0.35) +  // 35% voice leading quality
-                    (styleFit * 0.20) +           // 20% style fit
-                    (moodFit * 0.15);             // 15% mood fit
+                // Calculate context-aware score if enabled
+                let contextScore = 0;
+                if (context && context.hasContext) {
+                    contextScore = scoreContextAwareness(
+                        { root: nextRoot, type: nextType, inversion: nextInversion },
+                        context,
+                        key
+                    );
+                }
+
+                // Get custom weights from localStorage (or defaults)
+                const weights = getSavedWeights(contextMode);
+
+                // Calculate total score (weighted combination using custom weights)
+                let totalScore;
+                if (contextMode && context && context.hasContext) {
+                    // Context-aware mode: use context weights (includes context factor)
+                    totalScore =
+                        (functionScore * weights.harmonic) +
+                        (voiceLeadingScore * weights.voiceLeading) +
+                        (styleFit * weights.style) +
+                        (moodFit * weights.mood) +
+                        (contextScore * (weights.context || 0));
+                } else {
+                    // Standard mode: use standard weights (no context factor)
+                    totalScore =
+                        (functionScore * weights.harmonic) +
+                        (voiceLeadingScore * weights.voiceLeading) +
+                        (styleFit * weights.style) +
+                        (moodFit * weights.mood);
+                }
 
                 // Generate human-readable reason
                 const reason = generateReason(
                     currentRoot, nextRoot, nextType, nextInversion,
                     functionScore, voiceLeadingScore, styleFit, moodFit,
-                    currentFunction, nextFunction, tensionDirection
+                    currentFunction, nextFunction, tensionDirection,
+                    contextScore, context
                 );
 
                 recommendations.push({
@@ -181,7 +221,8 @@ export function generateComprehensiveRecommendations(
                     functionScore,
                     voiceLeadingScore,
                     styleFit,
-                    moodFit
+                    moodFit,
+                    contextScore
                 });
             }
         });
@@ -388,9 +429,33 @@ function scoreMoodFit(nextChordType, currentChordType, mood) {
 function generateReason(
     currentRoot, nextRoot, nextType, nextInversion,
     functionScore, voiceLeadingScore, styleFit, moodFit,
-    currentFunction, nextFunction, tensionDirection
+    currentFunction, nextFunction, tensionDirection,
+    contextScore = 0, context = null
 ) {
     const reasons = [];
+
+    // Context-aware reasons (highest priority if enabled)
+    if (context && context.hasContext) {
+        if (context.cadence.approaching && contextScore >= 70) {
+            if (context.cadence.type === 'ii-V') {
+                reasons.push('Completes ii-V-I progression');
+            } else if (context.cadence.type === 'authentic') {
+                reasons.push('Resolves V-I cadence');
+            } else if (context.cadence.type === 'plagal') {
+                reasons.push('Plagal (IV-I) resolution');
+            }
+        }
+
+        if (context.tension.trend === 'rising' && contextScore >= 65) {
+            reasons.push('continues tension arc');
+        } else if (context.tension.trend === 'falling' && contextScore >= 65) {
+            reasons.push('releases tension smoothly');
+        }
+
+        if (context.bassMovement.pattern === 'circle-of-fifths' && contextScore >= 60) {
+            reasons.push('follows circle of fifths');
+        }
+    }
 
     // Harmonic function reason
     if (functionScore >= 90) {

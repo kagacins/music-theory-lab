@@ -6,9 +6,17 @@
  */
 
 import { generateComprehensiveRecommendations } from '../features/comprehensiveChordRecommendations.js';
+import { generateChordSequences, describeSequence, generateSequenceReason } from '../features/chordSequences.js';
 import { SUGGESTION_STYLES, SUGGESTION_MOODS } from '../features/unifiedChordSuggestions.js';
 import { CHORD_DEFINITIONS, INVERSION_NAMES } from '../../data/music-data.js';
-import { getCurrentKey } from '../state/trainerState.js';
+import {
+    getCurrentKey,
+    getProgressionData,
+    getContextAwareMode,
+    setContextAwareMode,
+    getProgressionLookback,
+    setProgressionLookback
+} from '../state/trainerState.js';
 import { showChordExplorerModal } from './chordExplorerModal.js';
 import { getInvertedChordNotes } from '../utils/noteUtils.js';
 
@@ -194,6 +202,127 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     moodControl.appendChild(moodSelect);
     controlsRow.appendChild(moodControl);
 
+    // Mode Toggle (Current Chord vs Context Aware)
+    const modeControl = document.createElement('div');
+    const modeLabel = document.createElement('label');
+    modeLabel.textContent = 'Mode:';
+    modeLabel.style.fontSize = '11px';
+    modeLabel.style.fontWeight = '600';
+    modeLabel.style.color = '#374151';
+    modeLabel.style.display = 'block';
+    modeLabel.style.marginBottom = '4px';
+    modeControl.appendChild(modeLabel);
+
+    const modeToggleContainer = document.createElement('div');
+    modeToggleContainer.style.display = 'flex';
+    modeToggleContainer.style.gap = '4px';
+    modeToggleContainer.style.backgroundColor = '#f3f4f6';
+    modeToggleContainer.style.borderRadius = '4px';
+    modeToggleContainer.style.padding = '2px';
+
+    let contextMode = getContextAwareMode();
+
+    const currentChordBtn = document.createElement('button');
+    currentChordBtn.textContent = 'Current Chord';
+    currentChordBtn.style.padding = '4px 8px';
+    currentChordBtn.style.border = 'none';
+    currentChordBtn.style.borderRadius = '3px';
+    currentChordBtn.style.cursor = 'pointer';
+    currentChordBtn.style.fontSize = '10px';
+    currentChordBtn.style.fontWeight = '600';
+    currentChordBtn.style.transition = 'all 0.2s';
+
+    const contextAwareBtn = document.createElement('button');
+    contextAwareBtn.textContent = 'Context Aware';
+    contextAwareBtn.style.padding = '4px 8px';
+    contextAwareBtn.style.border = 'none';
+    contextAwareBtn.style.borderRadius = '3px';
+    contextAwareBtn.style.cursor = 'pointer';
+    contextAwareBtn.style.fontSize = '10px';
+    contextAwareBtn.style.fontWeight = '600';
+    contextAwareBtn.style.transition = 'all 0.2s';
+
+    const updateModeButtons = () => {
+        if (contextMode) {
+            currentChordBtn.style.backgroundColor = 'transparent';
+            currentChordBtn.style.color = '#6b7280';
+            contextAwareBtn.style.backgroundColor = 'white';
+            contextAwareBtn.style.color = '#2563eb';
+        } else {
+            currentChordBtn.style.backgroundColor = 'white';
+            currentChordBtn.style.color = '#2563eb';
+            contextAwareBtn.style.backgroundColor = 'transparent';
+            contextAwareBtn.style.color = '#6b7280';
+        }
+    };
+
+    updateModeButtons();
+
+    currentChordBtn.addEventListener('click', () => {
+        contextMode = false;
+        setContextAwareMode(false);
+        updateModeButtons();
+        lookbackControl.style.display = 'none';
+        renderSuggestions(styleSelect.value, moodSelect.value, contextMode);
+    });
+
+    contextAwareBtn.addEventListener('click', () => {
+        contextMode = true;
+        setContextAwareMode(true);
+        updateModeButtons();
+        lookbackControl.style.display = 'block';
+        renderSuggestions(styleSelect.value, moodSelect.value, contextMode);
+    });
+
+    modeToggleContainer.appendChild(currentChordBtn);
+    modeToggleContainer.appendChild(contextAwareBtn);
+    modeControl.appendChild(modeToggleContainer);
+    controlsRow.appendChild(modeControl);
+
+    // Lookback Depth Control (only visible in Context Aware mode) - DROPDOWN
+    const lookbackControl = document.createElement('div');
+    lookbackControl.style.display = contextMode ? 'block' : 'none';
+
+    const lookbackLabel = document.createElement('label');
+    lookbackLabel.textContent = 'Analyze:';
+    lookbackLabel.style.fontSize = '11px';
+    lookbackLabel.style.fontWeight = '600';
+    lookbackLabel.style.color = '#374151';
+    lookbackLabel.style.display = 'block';
+    lookbackLabel.style.marginBottom = '4px';
+    lookbackControl.appendChild(lookbackLabel);
+
+    const lookbackDropdown = document.createElement('select');
+    lookbackDropdown.style.width = '120px';
+    lookbackDropdown.style.padding = '4px 6px';
+    lookbackDropdown.style.border = '1px solid #d1d5db';
+    lookbackDropdown.style.borderRadius = '4px';
+    lookbackDropdown.style.fontSize = '11px';
+    lookbackDropdown.style.backgroundColor = 'white';
+    lookbackDropdown.style.cursor = 'pointer';
+
+    // Create options for 1-8 chords
+    for (let i = 1; i <= 8; i++) {
+        const option = document.createElement('option');
+        option.value = i.toString();
+        option.textContent = `Last ${i} chord${i === 1 ? '' : 's'}`;
+        if (i === getProgressionLookback()) {
+            option.selected = true;
+        }
+        lookbackDropdown.appendChild(option);
+    }
+
+    lookbackDropdown.addEventListener('change', () => {
+        const value = parseInt(lookbackDropdown.value);
+        setProgressionLookback(value);
+        if (contextMode) {
+            renderSuggestions(styleSelect.value, moodSelect.value, contextMode);
+        }
+    });
+
+    lookbackControl.appendChild(lookbackDropdown);
+    controlsRow.appendChild(lookbackControl);
+
     // Show All Details button (compact, inline, aligned with selectors)
     const showAllBtn = document.createElement('button');
     showAllBtn.textContent = '🔬 Show All';
@@ -254,7 +383,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     `;
     
     const inversionLabel = document.createElement('label');
-    inversionLabel.textContent = 'Current Chord Inversion:';
+    inversionLabel.textContent = 'Change Chord Inversion:';
     inversionLabel.style.cssText = 'font-size: 12px; font-weight: 600; color: #374151; white-space: nowrap;';
     inversionRow.appendChild(inversionLabel);
     
@@ -283,9 +412,22 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
         `;
         let heldNotes = null;
         
+        // Helper function to update button highlighting
+        const updateButtonHighlighting = () => {
+            inversionButtonsContainer.querySelectorAll('button').forEach(btn => {
+                const btnInv = parseInt(btn.dataset.inversion);
+                btn.style.borderColor = btnInv === inv ? '#667eea' : '#d1d5db';
+                btn.style.backgroundColor = btnInv === inv ? '#667eea' : 'white';
+                btn.style.color = btnInv === inv ? 'white' : '#374151';
+                btn.style.fontWeight = btnInv === inv ? '600' : '500';
+            });
+        };
+        
         // Hold-to-play functionality
         invBtn.addEventListener('mousedown', (e) => {
             e.stopPropagation();
+            // Update highlighting immediately when playback starts
+            updateButtonHighlighting();
             const key = getCurrentKey() || 'C';
             const res = getInvertedChordNotes(
                 currentRoot,
@@ -309,6 +451,35 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
             }
         });
         
+        // Touch events for mobile/tablet
+        invBtn.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            // Update highlighting immediately when playback starts
+            updateButtonHighlighting();
+            const key = getCurrentKey() || 'C';
+            const res = getInvertedChordNotes(
+                currentRoot,
+                currentChordType,
+                inv,
+                key,
+                0, // octave shift
+                'sharp', // enharmonic preference
+                'full' // notation preference
+            );
+            heldNotes = res.specificNotes || [];
+            const instrument = window.getInstrument && window.getInstrument();
+            if (instrument && heldNotes.length > 0) {
+                const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                const baseTime = Tone.now() + 0.01;
+                if (isGuitar) {
+                    heldNotes.forEach((n, idx) => instrument.triggerAttack(n, baseTime + idx * 0.0001));
+                } else {
+                    instrument.triggerAttack(heldNotes, Tone.now());
+                }
+            }
+        }, { passive: false });
+        
         const stopHeld = (e) => {
             if (e) e.stopPropagation();
             const instrument = window.getInstrument && window.getInstrument();
@@ -326,6 +497,16 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
         };
         
         invBtn.addEventListener('mouseup', stopHeld);
+        invBtn.addEventListener('touchend', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            stopHeld(e);
+        }, { passive: false });
+        invBtn.addEventListener('touchcancel', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            stopHeld(e);
+        }, { passive: false });
         invBtn.addEventListener('mouseleave', (e) => {
             stopHeld(e);
             if (parseInt(invBtn.dataset.inversion) !== activeInversion) {
@@ -335,19 +516,12 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
         
         invBtn.addEventListener('click', () => {
             activeInversion = inv;
-            // Update button styles
-            inversionButtonsContainer.querySelectorAll('button').forEach(btn => {
-                const btnInv = parseInt(btn.dataset.inversion);
-                btn.style.borderColor = btnInv === inv ? '#667eea' : '#d1d5db';
-                btn.style.backgroundColor = btnInv === inv ? '#667eea' : 'white';
-                btn.style.color = btnInv === inv ? 'white' : '#374151';
-                btn.style.fontWeight = btnInv === inv ? '600' : '500';
-            });
+            // Highlighting already updated on mousedown, just update state and re-render
             // Update title
             const newInversionName = INVERSION_NAMES[inv] || `Inversion ${inv}`;
             title.textContent = `Suggested Next Chords After ${currentRoot}${chordSymbol} (${newInversionName})`;
             // Re-render suggestions with new inversion
-            renderSuggestions(currentStyle, currentMood);
+            renderSuggestions(currentStyle, currentMood, contextMode);
             // Dispatch event to sync with Explorer modal
             const event = new CustomEvent('chord-suggestion-inversion-changed', {
                 detail: { inversion: inv }
@@ -388,40 +562,84 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
         btn.style.flex = '1';
         btn.style.minWidth = '120px';
 
-        btn.addEventListener('mouseenter', () => { btn.style.backgroundColor = '#f3f4f6'; });
-        btn.addEventListener('mouseleave', () => { btn.style.backgroundColor = '#f9fafb'; });
-
         let isPlaying = false;
-        btn.addEventListener('mousedown', (e) => {
-            e.stopPropagation();
-            if (onPlayChord && !isPlaying) {
-                isPlaying = true;
-                onPlayChord(chordType, root, inv);
-                btn.style.backgroundColor = '#e5e7eb';
-            }
-        });
+        let heldNotes = null;
 
-        const stopPlaying = (e) => {
+        const startPlaying = (e) => {
             if (e) e.stopPropagation();
-            if (isPlaying) {
-                isPlaying = false;
-                btn.style.backgroundColor = '#f9fafb';
-                if (onStopChord) onStopChord();
+            // Update highlighting immediately (before any checks)
+            btn.style.backgroundColor = '#e5e7eb';
+            
+            if (!isPlaying) {
+                isPlaying = true;
+                // Get chord notes for direct playback
+                const key = getCurrentKey() || 'C';
+                const res = getInvertedChordNotes(
+                    root,
+                    chordType,
+                    inv,
+                    key,
+                    0, // octave shift
+                    'sharp', // enharmonic preference
+                    'full' // notation preference
+                );
+                heldNotes = res.specificNotes || [];
+                const instrument = window.getInstrument && window.getInstrument();
+                if (instrument && heldNotes.length > 0) {
+                    const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                    const baseTime = Tone.now() + 0.01;
+                    if (isGuitar) {
+                        heldNotes.forEach((n, idx) => instrument.triggerAttack(n, baseTime + idx * 0.0001));
+                    } else {
+                        instrument.triggerAttack(heldNotes, Tone.now());
+                    }
+                }
             }
         };
 
-        btn.addEventListener('mouseup', stopPlaying);
-        btn.addEventListener('mouseleave', stopPlaying);
+        const stopPlaying = (e) => {
+            if (e) e.stopPropagation();
+            // Update highlighting immediately
+            if (isPlaying) {
+                isPlaying = false;
+                // Stop playback
+                const instrument = window.getInstrument && window.getInstrument();
+                if (instrument && heldNotes && heldNotes.length > 0) {
+                    const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                    if (isGuitar) {
+                        heldNotes.forEach(n => {
+                            try { instrument.triggerRelease(n, Tone.now()); } catch (_) {}
+                        });
+                    } else {
+                        instrument.triggerRelease(heldNotes, Tone.now());
+                    }
+                    heldNotes = null;
+                }
+            }
+            // Reset to default color
+            btn.style.backgroundColor = '#f9fafb';
+        };
+
+        btn.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            startPlaying(e);
+        });
+
+        btn.addEventListener('mouseup', (e) => {
+            e.stopPropagation();
+            stopPlaying(e);
+        });
+
+        btn.addEventListener('mouseleave', (e) => {
+            e.stopPropagation();
+            stopPlaying(e);
+        });
         
         // Touch events for mobile/tablet
         btn.addEventListener('touchstart', (e) => {
             e.stopPropagation();
             e.preventDefault();
-            if (onPlayChord && !isPlaying) {
-                isPlaying = true;
-                onPlayChord(chordType, root, inv);
-                btn.style.backgroundColor = '#e5e7eb';
-            }
+            startPlaying(e);
         }, { passive: false });
         
         btn.addEventListener('touchend', (e) => {
@@ -436,12 +654,431 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
             stopPlaying(e);
         }, { passive: false });
 
+        btn.addEventListener('mouseenter', () => {
+            if (!isPlaying) {
+                btn.style.backgroundColor = '#f3f4f6';
+            }
+        });
+
+        btn.addEventListener('mouseleave', (e) => {
+            // Only reset hover color if not playing (stopPlaying handles the reset when playing)
+            if (!isPlaying) {
+                btn.style.backgroundColor = '#f9fafb';
+            }
+        });
+
         return btn;
     };
 
-    // Function to render suggestions
-    const renderSuggestions = (style, mood) => {
+    // Function to play a chord sequence
+    const playChordSequence = (sequence, gap = 500) => {
+        let currentIndex = 0;
+
+        const playNext = () => {
+            if (currentIndex >= sequence.length) {
+                return; // Sequence finished
+            }
+
+            const chord = sequence[currentIndex];
+
+            // Play the current chord
+            if (onPlayChord) {
+                onPlayChord(chord.type, chord.root, chord.inversion);
+            }
+
+            // Schedule next chord or stop
+            setTimeout(() => {
+                if (onStopChord) onStopChord();
+
+                currentIndex++;
+                if (currentIndex < sequence.length) {
+                    setTimeout(playNext, gap); // Gap between chords
+                }
+            }, 800); // Play each chord for 800ms
+        };
+
+        playNext();
+    };
+
+    // Function to show loading splash screen
+    const showLoadingSplash = () => {
         suggestionsContainer.innerHTML = '';
+        const loadingDiv = document.createElement('div');
+        loadingDiv.style.display = 'flex';
+        loadingDiv.style.flexDirection = 'column';
+        loadingDiv.style.alignItems = 'center';
+        loadingDiv.style.justifyContent = 'center';
+        loadingDiv.style.padding = '40px 20px';
+        loadingDiv.style.color = '#6b7280';
+
+        const iconContainer = document.createElement('div');
+        iconContainer.style.fontSize = '48px';
+        iconContainer.style.marginBottom = '16px';
+        iconContainer.innerHTML = '🎵 🎶';
+        iconContainer.style.animation = 'pulse 1.5s ease-in-out infinite';
+
+        const loadingText = document.createElement('div');
+        loadingText.textContent = 'Updating Suggestions...';
+        loadingText.style.fontSize = '16px';
+        loadingText.style.fontWeight = '600';
+        loadingText.style.color = '#374151';
+
+        loadingDiv.appendChild(iconContainer);
+        loadingDiv.appendChild(loadingText);
+        suggestionsContainer.appendChild(loadingDiv);
+
+        // Add keyframe animation for pulse
+        if (!document.getElementById('pulse-animation-style')) {
+            const style = document.createElement('style');
+            style.id = 'pulse-animation-style';
+            style.textContent = `
+                @keyframes pulse {
+                    0%, 100% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.5; transform: scale(1.1); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    };
+
+    // Function to render chord sequence suggestions
+    const renderSequenceSuggestions = (style, mood, tensionDirection, key, progressionData, lookbackDepth) => {
+        // Show loading splash
+        showLoadingSplash();
+
+        // Use setTimeout to allow UI to update before heavy computation
+        setTimeout(() => {
+            // Generate sequences
+            const sequences = generateChordSequences(
+                currentRoot,
+                currentChordType,
+                activeInversion,
+                progressionData,
+                key,
+                style,
+                mood,
+                tensionDirection,
+                lookbackDepth,
+                3, // Generate 3-chord sequences
+                10 // Return top 10
+            );
+
+            // Clear loading screen
+            suggestionsContainer.innerHTML = '';
+
+            if (sequences.length === 0) {
+                const noResultsMsg = document.createElement('p');
+                noResultsMsg.textContent = 'No sequences found. Try adjusting the settings or add more chords to your progression.';
+                noResultsMsg.style.color = '#6b7280';
+                noResultsMsg.style.fontStyle = 'italic';
+                suggestionsContainer.appendChild(noResultsMsg);
+                return;
+            }
+
+            // Display each sequence
+            sequences.forEach((seq, index) => {
+            const card = document.createElement('div');
+            card.style.padding = '16px';
+            card.style.marginBottom = '16px';
+            card.style.backgroundColor = '#f8fafc';
+            card.style.border = '2px solid #e2e8f0';
+            card.style.borderRadius = '6px';
+            card.style.transition = 'all 0.2s';
+
+            card.addEventListener('mouseenter', () => {
+                card.style.backgroundColor = '#f1f5f9';
+                card.style.borderColor = '#cbd5e1';
+            });
+
+            card.addEventListener('mouseleave', () => {
+                card.style.backgroundColor = '#f8fafc';
+                card.style.borderColor = '#e2e8f0';
+            });
+
+            // Sequence header
+            const header = document.createElement('div');
+            header.style.display = 'flex';
+            header.style.justifyContent = 'space-between';
+            header.style.alignItems = 'center';
+            header.style.marginBottom = '12px';
+
+            const sequenceTitle = document.createElement('div');
+            sequenceTitle.style.fontWeight = '600';
+            sequenceTitle.style.color = '#1e293b';
+            sequenceTitle.style.fontSize = '14px';
+
+            const stars = seq.score >= 85 ? '⭐⭐⭐' : seq.score >= 70 ? '⭐⭐' : '⭐';
+            sequenceTitle.innerHTML = `${stars} Sequence #${index + 1} <span style="color: #64748b; font-weight: normal; font-size: 12px;">(Score: ${seq.score})</span>`;
+            header.appendChild(sequenceTitle);
+
+            card.appendChild(header);
+
+            // Sequence path visualization - Include current chord as first
+            const pathContainer = document.createElement('div');
+            pathContainer.style.marginBottom = '12px';
+            pathContainer.style.display = 'flex';
+            pathContainer.style.alignItems = 'center';
+            pathContainer.style.gap = '8px';
+            pathContainer.style.flexWrap = 'wrap';
+
+            // Create array with current chord first, then sequence chords
+            const fullSequence = [
+                { root: currentRoot, type: currentChordType, inversion: activeInversion, isCurrent: true },
+                ...seq.chords.map(c => ({ ...c, isCurrent: false }))
+            ];
+
+            fullSequence.forEach((chord, chordIndex) => {
+                const chordBox = document.createElement('button');
+                chordBox.style.display = 'inline-block';
+                chordBox.style.padding = '6px 10px';
+                chordBox.style.backgroundColor = chord.isCurrent ? '#64748b' : '#3b82f6';
+                chordBox.style.color = 'white';
+                chordBox.style.borderRadius = '4px';
+                chordBox.style.fontSize = '12px';
+                chordBox.style.fontWeight = '600';
+                chordBox.style.border = 'none';
+                chordBox.style.cursor = 'pointer';
+                chordBox.style.transition = 'all 0.2s';
+                chordBox.title = 'Hold to play';
+
+                const symbol = CHORD_DEFINITIONS[chord.type]?.symbol || '';
+                const invName = chord.inversion > 0 ? ` (${INVERSION_NAMES[chord.inversion] || 'inv' + chord.inversion})` : '';
+                chordBox.textContent = `${chord.root}${symbol}${invName}`;
+
+                // Add current chord badge
+                if (chord.isCurrent) {
+                    const badge = document.createElement('span');
+                    badge.textContent = ' (Current)';
+                    badge.style.fontSize = '9px';
+                    badge.style.opacity = '0.8';
+                    chordBox.appendChild(document.createTextNode(' '));
+                    chordBox.appendChild(badge);
+                }
+
+                // Make chord box playable (hold to play)
+                let isPlaying = false;
+                let heldNotes = null;
+
+                const startPlaying = (e) => {
+                    if (e) e.stopPropagation();
+                    // Update highlighting immediately
+                    chordBox.style.backgroundColor = chord.isCurrent ? '#475569' : '#2563eb';
+                    
+                    if (onPlayChord && !isPlaying) {
+                        isPlaying = true;
+                        // Get chord notes for direct playback
+                        const key = getCurrentKey() || 'C';
+                        const res = getInvertedChordNotes(
+                            chord.root,
+                            chord.type,
+                            chord.inversion,
+                            key,
+                            0, // octave shift
+                            'sharp', // enharmonic preference
+                            'full' // notation preference
+                        );
+                        heldNotes = res.specificNotes || [];
+                        const instrument = window.getInstrument && window.getInstrument();
+                        if (instrument && heldNotes.length > 0) {
+                            const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                            const baseTime = Tone.now() + 0.01;
+                            if (isGuitar) {
+                                heldNotes.forEach((n, idx) => instrument.triggerAttack(n, baseTime + idx * 0.0001));
+                            } else {
+                                instrument.triggerAttack(heldNotes, Tone.now());
+                            }
+                        }
+                    }
+                };
+
+                const stopPlaying = (e) => {
+                    if (e) e.stopPropagation();
+                    // Update highlighting immediately
+                    if (isPlaying) {
+                        isPlaying = false;
+                        // Stop playback
+                        const instrument = window.getInstrument && window.getInstrument();
+                        if (instrument && heldNotes && heldNotes.length > 0) {
+                            const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                            if (isGuitar) {
+                                heldNotes.forEach(n => {
+                                    try { instrument.triggerRelease(n, Tone.now()); } catch (_) {}
+                                });
+                            } else {
+                                instrument.triggerRelease(heldNotes, Tone.now());
+                            }
+                            heldNotes = null;
+                        }
+                    }
+                    // Reset to default color
+                    chordBox.style.backgroundColor = chord.isCurrent ? '#64748b' : '#3b82f6';
+                };
+
+                chordBox.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                    startPlaying(e);
+                });
+                chordBox.addEventListener('mouseup', (e) => {
+                    e.stopPropagation();
+                    stopPlaying(e);
+                });
+                chordBox.addEventListener('mouseleave', (e) => {
+                    e.stopPropagation();
+                    stopPlaying(e);
+                });
+                chordBox.addEventListener('touchstart', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    startPlaying(e);
+                }, { passive: false });
+                chordBox.addEventListener('touchend', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    stopPlaying(e);
+                }, { passive: false });
+                chordBox.addEventListener('touchcancel', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    stopPlaying(e);
+                }, { passive: false });
+
+                chordBox.addEventListener('mouseenter', () => {
+                    if (!isPlaying) {
+                        chordBox.style.backgroundColor = chord.isCurrent ? '#475569' : '#2563eb';
+                    }
+                });
+                chordBox.addEventListener('mouseleave', (e) => {
+                    // Only reset hover color if not playing (stopPlaying handles the reset when playing)
+                    if (!isPlaying) {
+                        chordBox.style.backgroundColor = chord.isCurrent ? '#64748b' : '#3b82f6';
+                    }
+                });
+
+                pathContainer.appendChild(chordBox);
+
+                if (chordIndex < fullSequence.length - 1) {
+                    const arrow = document.createElement('span');
+                    arrow.textContent = '→';
+                    arrow.style.color = '#64748b';
+                    arrow.style.fontSize = '18px';
+                    arrow.style.fontWeight = '600';
+                    pathContainer.appendChild(arrow);
+                }
+            });
+
+            card.appendChild(pathContainer);
+
+            // Reason text
+            const reason = document.createElement('div');
+            reason.style.fontSize = '12px';
+            reason.style.color = '#475569';
+            reason.style.marginBottom = '12px';
+            reason.textContent = generateSequenceReason(seq.chords, seq.score, key);
+            card.appendChild(reason);
+
+            // Action buttons
+            const buttonRow = document.createElement('div');
+            buttonRow.style.display = 'flex';
+            buttonRow.style.gap = '8px';
+            buttonRow.style.flexWrap = 'wrap';
+
+            // Play Sequence button
+            const playBtn = document.createElement('button');
+            playBtn.innerHTML = '▶️ Play Sequence';
+            playBtn.style.padding = '8px 12px';
+            playBtn.style.backgroundColor = '#10b981';
+            playBtn.style.color = 'white';
+            playBtn.style.border = 'none';
+            playBtn.style.borderRadius = '4px';
+            playBtn.style.cursor = 'pointer';
+            playBtn.style.fontSize = '12px';
+            playBtn.style.fontWeight = '600';
+            playBtn.style.transition = 'background-color 0.2s';
+
+            playBtn.addEventListener('mouseenter', () => {
+                playBtn.style.backgroundColor = '#059669';
+            });
+            playBtn.addEventListener('mouseleave', () => {
+                playBtn.style.backgroundColor = '#10b981';
+            });
+
+            playBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                playChordSequence(seq.chords);
+            });
+
+            buttonRow.appendChild(playBtn);
+
+            // Add All to Progression button
+            const addAllBtn = document.createElement('button');
+            addAllBtn.innerHTML = '➕ Add All to Progression';
+            addAllBtn.style.padding = '8px 12px';
+            addAllBtn.style.backgroundColor = '#3b82f6';
+            addAllBtn.style.color = 'white';
+            addAllBtn.style.border = 'none';
+            addAllBtn.style.borderRadius = '4px';
+            addAllBtn.style.cursor = 'pointer';
+            addAllBtn.style.fontSize = '12px';
+            addAllBtn.style.fontWeight = '600';
+            addAllBtn.style.transition = 'background-color 0.2s';
+
+            addAllBtn.addEventListener('mouseenter', () => {
+                addAllBtn.style.backgroundColor = '#2563eb';
+            });
+            addAllBtn.addEventListener('mouseleave', () => {
+                addAllBtn.style.backgroundColor = '#3b82f6';
+            });
+
+            addAllBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+
+                // Disable button during addition
+                addAllBtn.disabled = true;
+                addAllBtn.style.opacity = '0.6';
+                addAllBtn.style.cursor = 'not-allowed';
+
+                // Add all chords in sequence to progression (skipping current chord)
+                // Add them sequentially with delay to ensure state management completes
+                for (let i = 0; i < seq.chords.length; i++) {
+                    const chord = seq.chords[i];
+                    if (onAddChord) {
+                        // Wrap in try-catch to handle any errors gracefully
+                        try {
+                            onAddChord(chord.type, chord.root, chord.inversion);
+                            // Wait 100ms between additions to allow UI to update
+                            // This gives users visual feedback as each chord is added
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        } catch (error) {
+                            console.error('Error adding chord:', error);
+                        }
+                    }
+                }
+
+                // Visual feedback
+                addAllBtn.textContent = `✓ Added ${seq.chords.length} chords!`;
+                addAllBtn.style.backgroundColor = '#10b981';
+                addAllBtn.style.opacity = '1';
+
+                setTimeout(() => {
+                    addAllBtn.textContent = '➕ Add All to Progression';
+                    addAllBtn.style.backgroundColor = '#3b82f6';
+                    addAllBtn.disabled = false;
+                    addAllBtn.style.cursor = 'pointer';
+                }, 1500);
+            });
+
+            buttonRow.appendChild(addAllBtn);
+
+            card.appendChild(buttonRow);
+            suggestionsContainer.appendChild(card);
+            });
+        }, 10); // Small delay to show loading screen
+    };
+
+    // Function to render suggestions
+    const renderSuggestions = (style, mood, isContextMode = false) => {
+        // Show loading splash immediately
+        showLoadingSplash();
 
         // Save preferences
         localStorage.setItem('chord-suggestion-style', style);
@@ -458,28 +1095,48 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
             tensionDirection = 'build';
         }
 
-        // Generate comprehensive suggestions using 3D scoring system
-        const recommendations = generateComprehensiveRecommendations(
-            currentRoot,
-            currentChordType,
-            activeInversion, // Use active inversion instead of currentInversion
-            key,
-            style,
-            mood,
-            tensionDirection
-        );
+        // Get progression data for context-aware mode
+        const progressionData = getProgressionData();
+        const lookbackDepth = getProgressionLookback();
 
-        // Transform to expected format
-        const suggestions = recommendations.map(rec => ({
-            nextRoot: rec.root,
-            nextChord: rec.type,
-            nextInversion: rec.inversion,
-            reason: rec.reason,
-            confidence: rec.confidence
-        }));
+        if (isContextMode && progressionData.length > 0) {
+            // Context-Aware Mode: Generate and display chord sequences
+            renderSequenceSuggestions(style, mood, tensionDirection, key, progressionData, lookbackDepth);
+        } else {
+            // Current Chord Mode: Generate single chord suggestions
+            renderSingleChordSuggestions(style, mood, tensionDirection, key);
+        }
+    };
 
-        // Display each suggestion
-        suggestions.forEach((suggestion) => {
+    // Function to render single chord suggestions (original behavior)
+    const renderSingleChordSuggestions = (style, mood, tensionDirection, key) => {
+        // Use setTimeout to allow UI to update before heavy computation
+        setTimeout(() => {
+            // Generate comprehensive suggestions using 3D scoring system
+            const recommendations = generateComprehensiveRecommendations(
+                currentRoot,
+                currentChordType,
+                activeInversion,
+                key,
+                style,
+                mood,
+                tensionDirection
+            );
+
+            // Clear loading screen
+            suggestionsContainer.innerHTML = '';
+
+            // Transform to expected format
+            const suggestions = recommendations.map(rec => ({
+                nextRoot: rec.root,
+                nextChord: rec.type,
+                nextInversion: rec.inversion,
+                reason: rec.reason,
+                confidence: rec.confidence
+            }));
+
+            // Display each suggestion
+            suggestions.forEach((suggestion) => {
             const card = document.createElement('div');
             card.style.padding = '12px';
             card.style.marginBottom = '12px';
@@ -582,19 +1239,20 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
             card.appendChild(reason);
 
             suggestionsContainer.appendChild(card);
-        });
+            });
+        }, 10); // Small delay to show loading screen
     };
 
     // Initial render
-    renderSuggestions(currentStyle, currentMood);
+    renderSuggestions(currentStyle, currentMood, contextMode);
 
     // Add change listeners
     styleSelect.onchange = () => {
-        renderSuggestions(styleSelect.value, moodSelect.value);
+        renderSuggestions(styleSelect.value, moodSelect.value, contextMode);
     };
 
     moodSelect.onchange = () => {
-        renderSuggestions(styleSelect.value, moodSelect.value);
+        renderSuggestions(styleSelect.value, moodSelect.value, contextMode);
     };
     
     // Listen for changes from the Comprehensive Chord Explorer modal
@@ -610,10 +1268,10 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
         // Update current values and re-render
         currentStyle = style;
         currentMood = mood;
-        renderSuggestions(style, mood);
+        renderSuggestions(style, mood, contextMode);
     };
     document.addEventListener('chord-suggestion-preference-changed', preferenceChangeHandler);
-    
+
     // Listen for inversion changes from the Comprehensive Chord Explorer modal
     const inversionChangeHandler = (e) => {
         const { inversion } = e.detail;
@@ -631,7 +1289,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
             const newInversionName = INVERSION_NAMES[inversion] || `Inversion ${inversion}`;
             title.textContent = `Suggested Next Chords After ${currentRoot}${chordSymbol} (${newInversionName})`;
             // Re-render suggestions
-            renderSuggestions(currentStyle, currentMood);
+            renderSuggestions(currentStyle, currentMood, contextMode);
         }
     };
     document.addEventListener('chord-suggestion-inversion-changed', inversionChangeHandler);
