@@ -3920,7 +3920,26 @@ export function startProgressionChord(index) {
 
     document.getElementById('progression-chord-notes-display').textContent = `${chord.roman} (${chord.name})`;
 
-    const { lhType, lhInversion, lhOctaveShift, omittedNotes = [], lhOmittedNotes = [], octaveShift = 0 } = chord;
+    const { lhType, lhInversion, lhOctaveShift, omittedNotes = [], lhOmittedNotes = [], octaveShift = 0, inversion = 0 } = chord;
+
+    // Regenerate chord notes based on current inversion (in case inversion was changed)
+    // Get key without 'm' suffix for calculation
+    let keyForCalculation = trainerState.currentKey || 'C';
+    const isMinorKey = keyForCalculation && keyForCalculation.endsWith('m');
+    if (isMinorKey) {
+        keyForCalculation = keyForCalculation.replace(/m$/, '');
+    }
+    
+    const chordNotesData = getProgressionChordNotes(
+        keyForCalculation,
+        chord.roman,
+        chord.type,
+        inversion, // Use current inversion from chord data
+        octaveShift
+    );
+    
+    // Use regenerated notes if available, otherwise fall back to stored notes
+    const chordNotes = chordNotesData ? chordNotesData.notes : (chord.notes || []);
 
     const allLhNotes = getLHNotes(
         chord.root,
@@ -3944,7 +3963,7 @@ export function startProgressionChord(index) {
     });
 
     // Apply saved voicing from the chord data
-    const voicedNotes = chord.notes.filter(note => !omittedNotes.includes(note));
+    const voicedNotes = chordNotes.filter(note => !omittedNotes.includes(note));
     const lhNotes = allLhNotes.filter(note => !lhOmittedNotes.includes(note));
     const allNotes = voicedNotes.concat(lhNotes);
 
@@ -4037,7 +4056,26 @@ function playProgressionChord(index, advance = true) {
 
     document.getElementById('progression-chord-notes-display').textContent = `${chord.roman} (${chord.name})`;
 
-    const { lhType, lhInversion, lhOctaveShift, omittedNotes = [], lhOmittedNotes = [], octaveShift = 0 } = chord;
+    const { lhType, lhInversion, lhOctaveShift, omittedNotes = [], lhOmittedNotes = [], octaveShift = 0, inversion = 0 } = chord;
+
+    // Regenerate chord notes based on current inversion (in case inversion was changed)
+    // Get key without 'm' suffix for calculation
+    let keyForCalculation = trainerState.currentKey || 'C';
+    const isMinorKey = keyForCalculation && keyForCalculation.endsWith('m');
+    if (isMinorKey) {
+        keyForCalculation = keyForCalculation.replace(/m$/, '');
+    }
+    
+    const chordNotesData = getProgressionChordNotes(
+        keyForCalculation,
+        chord.roman,
+        chord.type,
+        inversion, // Use current inversion from chord data
+        octaveShift
+    );
+    
+    // Use regenerated notes if available, otherwise fall back to stored notes
+    const chordNotes = chordNotesData ? chordNotesData.notes : (chord.notes || []);
 
     const allLhNotes = getLHNotes(
         chord.root,
@@ -4061,7 +4099,7 @@ function playProgressionChord(index, advance = true) {
     });
 
     // Apply saved voicing from the chord data
-    const voicedNotes = chord.notes.filter(note => !omittedNotes.includes(note));
+    const voicedNotes = chordNotes.filter(note => !omittedNotes.includes(note));
     const lhNotes = allLhNotes.filter(note => !lhOmittedNotes.includes(note));
     const allNotes = voicedNotes.concat(lhNotes);
 

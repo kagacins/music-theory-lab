@@ -16,6 +16,8 @@ import { getInvertedChordNotes } from '../utils/noteUtils.js';
 import { SUGGESTION_STYLES, SUGGESTION_MOODS } from '../features/unifiedChordSuggestions.js';
 import {
     WEIGHT_PRESETS,
+    APPROACH_PRESETS,
+    GENRE_TEMPLATES,
     getSavedWeights,
     saveWeights,
     resetWeightsToDefault,
@@ -23,6 +25,37 @@ import {
     normalizeWeights
 } from '../config/weightPresets.js';
 // Tone.js is loaded via script tag in index.html, available as global 'Tone'
+
+/**
+ * Helper: Check if two weight objects are equal (within tolerance)
+ */
+function weightsMatch(weights1, weights2) {
+    const keys = Object.keys(weights1);
+    const tolerance = 0.01; // 1% tolerance for floating point comparison
+
+    // Check if all keys exist in both objects
+    if (!keys.every(key => key in weights2)) return false;
+
+    // Check if all values match within tolerance
+    return keys.every(key => {
+        const diff = Math.abs(weights1[key] - weights2[key]);
+        return diff < tolerance;
+    });
+}
+
+/**
+ * Find which preset (if any) matches the given weights
+ */
+function findMatchingPreset(weights) {
+    // Check all presets
+    for (const [key, preset] of Object.entries(WEIGHT_PRESETS)) {
+        if (preset.requiresContext) continue; // Skip context-aware preset
+        if (weightsMatch(weights, preset.weights)) {
+            return key;
+        }
+    }
+    return null;
+}
 
 /**
  * Show the comprehensive chord explorer modal
@@ -59,7 +92,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     }
 
     // Function to generate ALL recommendations
-    function generateRecommendations() {
+    function generateRecommendations(customWeights = null) {
         const tensionDirection = getTensionDirection(currentMood);
         return generateAllRecommendations(
             currentRoot,
@@ -68,7 +101,8 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
             key,
             currentStyle,
             currentMood,
-            tensionDirection
+            tensionDirection,
+            customWeights
         );
     }
 
@@ -158,26 +192,73 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     header.appendChild(titleSection);
     header.appendChild(closeBtn);
 
+    // Function to show loading splash screen
+    function showLoadingSplash() {
+        contentArea.innerHTML = '';
+        const loadingDiv = document.createElement('div');
+        loadingDiv.style.display = 'flex';
+        loadingDiv.style.flexDirection = 'column';
+        loadingDiv.style.alignItems = 'center';
+        loadingDiv.style.justifyContent = 'center';
+        loadingDiv.style.padding = '60px 20px';
+        loadingDiv.style.color = '#6b7280';
+
+        const iconContainer = document.createElement('div');
+        iconContainer.style.fontSize = '48px';
+        iconContainer.style.marginBottom = '16px';
+        iconContainer.innerHTML = '🎵 🎶';
+        iconContainer.style.animation = 'pulse 1.5s ease-in-out infinite';
+
+        const loadingText = document.createElement('div');
+        loadingText.textContent = 'Updating Suggestions...';
+        loadingText.style.fontSize = '18px';
+        loadingText.style.fontWeight = '600';
+        loadingText.style.color = '#374151';
+
+        loadingDiv.appendChild(iconContainer);
+        loadingDiv.appendChild(loadingText);
+        contentArea.appendChild(loadingDiv);
+
+        // Add keyframe animation for pulse
+        if (!document.getElementById('pulse-animation-style')) {
+            const style = document.createElement('style');
+            style.id = 'pulse-animation-style';
+            style.textContent = `
+                @keyframes pulse {
+                    0%, 100% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.5; transform: scale(1.1); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+
     // Function to update recommendations when style/mood changes
     function updateRecommendations() {
-        // Save to localStorage to sync with preceding modal
-        localStorage.setItem('chord-suggestion-style', currentStyle);
-        localStorage.setItem('chord-suggestion-mood', currentMood);
-        
-        // Dispatch custom event to notify suggestion modals of the change
-        const event = new CustomEvent('chord-suggestion-preference-changed', {
-            detail: {
-                style: currentStyle,
-                mood: currentMood
-            }
-        });
-        document.dispatchEvent(event);
-        
-        // Regenerate recommendations
-        allRecommendations = generateRecommendations();
-        
-        // Re-render current tab
-        renderTabContent();
+        // Show loading splash immediately
+        showLoadingSplash();
+
+        // Use setTimeout to allow UI to update before heavy computation
+        setTimeout(() => {
+            // Save to localStorage to sync with preceding modal
+            localStorage.setItem('chord-suggestion-style', currentStyle);
+            localStorage.setItem('chord-suggestion-mood', currentMood);
+
+            // Dispatch custom event to notify suggestion modals of the change
+            const event = new CustomEvent('chord-suggestion-preference-changed', {
+                detail: {
+                    style: currentStyle,
+                    mood: currentMood
+                }
+            });
+            document.dispatchEvent(event);
+
+            // Regenerate recommendations
+            allRecommendations = generateRecommendations();
+
+            // Re-render current tab
+            renderTabContent();
+        }, 10);
     }
 
     // Tab navigation with inline style/mood controls
@@ -537,9 +618,9 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
         isWeightSectionExpanded = !isWeightSectionExpanded;
         if (isWeightSectionExpanded) {
             weightToggleIcon.style.transform = 'rotate(90deg)';
-            weightContent.style.maxHeight = '600px';
-            weightContent.style.paddingTop = '16px';
-            weightContent.style.paddingBottom = '16px';
+            weightContent.style.maxHeight = '400px';
+            weightContent.style.paddingTop = '12px';
+            weightContent.style.paddingBottom = '12px';
         } else {
             weightToggleIcon.style.transform = 'rotate(0deg)';
             weightContent.style.maxHeight = '0';
@@ -571,60 +652,132 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     `;
     weightInner.appendChild(weightNotice);
 
-    // Preset buttons (compact, 2 rows)
+    // Preset buttons organized by category
     const presetsContainer = document.createElement('div');
-    presetsContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px;';
+    presetsContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px;';
 
-    const presetsLabel = document.createElement('div');
-    presetsLabel.textContent = 'Quick Presets:';
-    presetsLabel.style.cssText = 'font-size: 11px; font-weight: 600; color: #78716c;';
-    presetsContainer.appendChild(presetsLabel);
+    // Store button references for updating active states
+    const presetButtons = {};
 
-    const presetsGrid = document.createElement('div');
-    presetsGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px;';
+    // Helper function to update active states
+    function updatePresetActiveStates() {
+        const activePreset = findMatchingPreset(currentWeights);
 
-    Object.keys(WEIGHT_PRESETS).forEach(key => {
-        const preset = WEIGHT_PRESETS[key];
-        if (preset.requiresContext) return; // Skip context-aware preset for now
+        Object.keys(presetButtons).forEach(key => {
+            const btn = presetButtons[key];
+            const isActive = key === activePreset;
 
-        const presetBtn = document.createElement('button');
-        presetBtn.textContent = preset.name;
-        presetBtn.title = preset.tooltip;
-        presetBtn.style.cssText = `
-            padding: 6px 10px;
-            background-color: #fefce8;
-            border: 1px solid #d4d4d8;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 10px;
-            font-weight: 600;
-            color: #57534e;
-            transition: all 0.2s;
-        `;
-        presetBtn.onmouseenter = () => {
-            presetBtn.style.backgroundColor = '#fde047';
-            presetBtn.style.borderColor = '#facc15';
-        };
-        presetBtn.onmouseleave = () => {
-            presetBtn.style.backgroundColor = '#fefce8';
-            presetBtn.style.borderColor = '#d4d4d8';
-        };
-        presetBtn.onclick = () => {
-            const weights = applyPreset(key, false);
-            if (weights) {
-                currentWeights = weights;
-                updateWeightSliders();
+            if (isActive) {
+                btn.style.backgroundColor = '#fde68a';
+                btn.style.borderColor = '#eab308';
+                btn.style.boxShadow = '0 0 0 2px rgba(234, 179, 8, 0.2)';
+            } else {
+                btn.style.backgroundColor = '#fefce8';
+                btn.style.borderColor = '#d4d4d8';
+                btn.style.boxShadow = 'none';
             }
-        };
-        presetsGrid.appendChild(presetBtn);
-    });
+        });
+    }
 
-    presetsContainer.appendChild(presetsGrid);
+    // Helper function to create preset section
+    const createPresetSection = (title, presets, description) => {
+        const section = document.createElement('div');
+        section.style.cssText = 'display: flex; flex-direction: column; gap: 4px;';
+
+        const sectionHeader = document.createElement('div');
+        sectionHeader.style.cssText = 'display: flex; align-items: baseline; gap: 6px;';
+
+        const sectionLabel = document.createElement('div');
+        sectionLabel.textContent = title;
+        sectionLabel.style.cssText = 'font-size: 11px; font-weight: 600; color: #78716c;';
+        sectionHeader.appendChild(sectionLabel);
+
+        if (description) {
+            const sectionDesc = document.createElement('div');
+            sectionDesc.textContent = description;
+            sectionDesc.style.cssText = 'font-size: 9px; color: #a8a29e; font-style: italic;';
+            sectionHeader.appendChild(sectionDesc);
+        }
+
+        section.appendChild(sectionHeader);
+
+        const grid = document.createElement('div');
+        grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 4px;';
+
+        Object.keys(presets).forEach(key => {
+            const preset = presets[key];
+
+            const presetBtn = document.createElement('button');
+            presetBtn.textContent = preset.name;
+            presetBtn.title = preset.tooltip;
+            presetBtn.style.cssText = `
+                padding: 5px 8px;
+                background-color: #fefce8;
+                border: 1px solid #d4d4d8;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 10px;
+                font-weight: 600;
+                color: #57534e;
+                transition: all 0.2s;
+                text-align: left;
+            `;
+            presetBtn.onmouseenter = () => {
+                const isActive = findMatchingPreset(currentWeights) === key;
+                if (!isActive) {
+                    presetBtn.style.backgroundColor = '#fde047';
+                    presetBtn.style.borderColor = '#facc15';
+                }
+            };
+            presetBtn.onmouseleave = () => {
+                updatePresetActiveStates();
+            };
+            presetBtn.onclick = () => {
+                const weights = applyPreset(key, false);
+                if (weights) {
+                    currentWeights = weights;
+                    updateWeightSliders();
+                    updatePresetActiveStates();
+                }
+            };
+
+            presetButtons[key] = presetBtn;
+            grid.appendChild(presetBtn);
+        });
+
+        section.appendChild(grid);
+        return section;
+    };
+
+    // Approaches section
+    const approachesSection = createPresetSection(
+        '🎯 Approaches',
+        APPROACH_PRESETS,
+        'What to prioritize'
+    );
+    presetsContainer.appendChild(approachesSection);
+
+    // Separator
+    const separator = document.createElement('div');
+    separator.style.cssText = 'height: 1px; background-color: #e7e5e4; margin: 2px 0;';
+    presetsContainer.appendChild(separator);
+
+    // Genre templates section
+    const genreSection = createPresetSection(
+        '🎸 Genre Templates',
+        GENRE_TEMPLATES,
+        'Complete genre profiles'
+    );
+    presetsContainer.appendChild(genreSection);
+
     weightInner.appendChild(presetsContainer);
+
+    // Set initial active states
+    updatePresetActiveStates();
 
     // Weight sliders
     const slidersContainer = document.createElement('div');
-    slidersContainer.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
+    slidersContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
 
     const sliders = {};
     const labels = {
@@ -655,42 +808,51 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
         });
         currentWeights = normalizeWeights(newWeights);
         updateWeightSliders();
+        updatePresetActiveStates();
     }
 
     Object.keys(labels).forEach(key => {
         const sliderGroup = document.createElement('div');
+        sliderGroup.style.cssText = 'display: flex; align-items: center; gap: 12px;';
 
-        const labelRow = document.createElement('div');
-        labelRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;';
+        // Left side: Label and description
+        const labelColumn = document.createElement('div');
+        labelColumn.style.cssText = 'flex: 0 0 140px; display: flex; flex-direction: column;';
 
         const label = document.createElement('label');
         label.textContent = labels[key];
-        label.style.cssText = 'font-size: 11px; font-weight: 600; color: #57534e;';
-
-        const valueLabel = document.createElement('span');
-        valueLabel.textContent = `${Math.round(currentWeights[key] * 100)}%`;
-        valueLabel.style.cssText = 'font-size: 11px; font-weight: 600; color: #ca8a04;';
-
-        labelRow.appendChild(label);
-        labelRow.appendChild(valueLabel);
+        label.style.cssText = 'font-size: 11px; font-weight: 600; color: #57534e; margin-bottom: 2px;';
 
         const desc = document.createElement('div');
         desc.textContent = descriptions[key];
-        desc.style.cssText = 'font-size: 10px; color: #a8a29e; margin-bottom: 4px;';
+        desc.style.cssText = 'font-size: 9px; color: #a8a29e; line-height: 1.2;';
+
+        labelColumn.appendChild(label);
+        labelColumn.appendChild(desc);
+
+        // Right side: Slider and value
+        const sliderColumn = document.createElement('div');
+        sliderColumn.style.cssText = 'flex: 1; display: flex; align-items: center; gap: 8px;';
 
         const slider = document.createElement('input');
         slider.type = 'range';
         slider.min = '0';
         slider.max = '100';
         slider.value = Math.round(currentWeights[key] * 100);
-        slider.style.cssText = 'width: 100%; cursor: pointer;';
+        slider.style.cssText = 'flex: 1; cursor: pointer;';
         slider.oninput = onWeightSliderChange;
+
+        const valueLabel = document.createElement('span');
+        valueLabel.textContent = `${Math.round(currentWeights[key] * 100)}%`;
+        valueLabel.style.cssText = 'font-size: 11px; font-weight: 600; color: #ca8a04; min-width: 36px; text-align: right;';
+
+        sliderColumn.appendChild(slider);
+        sliderColumn.appendChild(valueLabel);
 
         sliders[key] = { slider, valueLabel };
 
-        sliderGroup.appendChild(labelRow);
-        sliderGroup.appendChild(desc);
-        sliderGroup.appendChild(slider);
+        sliderGroup.appendChild(labelColumn);
+        sliderGroup.appendChild(sliderColumn);
         slidersContainer.appendChild(sliderGroup);
     });
 
@@ -717,10 +879,8 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     updateBtn.onmouseenter = () => { updateBtn.style.backgroundColor = '#ca8a04'; };
     updateBtn.onmouseleave = () => { updateBtn.style.backgroundColor = '#eab308'; };
     updateBtn.onclick = () => {
-        // Temporarily save current weights to localStorage (won't persist after refresh unless "Save as Universal")
-        saveWeights(currentWeights);
-        // Regenerate recommendations
-        allRecommendations = generateRecommendations();
+        // Update recommendations with current weights (session only, not saved to universal settings)
+        allRecommendations = generateRecommendations(currentWeights);
         renderTabContent();
         // Show feedback
         updateBtn.textContent = '✓ Updated!';
@@ -749,6 +909,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     resetBtn.onclick = () => {
         currentWeights = resetWeightsToDefault(false);
         updateWeightSliders();
+        updatePresetActiveStates();
     };
 
     const saveUniversalBtn = document.createElement('button');
@@ -815,7 +976,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
         if (activeTab === 'visualization') {
             renderVisualization(contentArea, allRecommendations);
         } else if (activeTab === 'table') {
-            renderDataTable(contentArea, allRecommendations, currentRoot, currentChordType, activeInversion, onAddChord, onPlayChord, onStopChord);
+            renderDataTable(contentArea, allRecommendations, currentRoot, currentChordType, activeInversion, onAddChord, onPlayChord, onStopChord, currentWeights);
         }
     }
 
@@ -836,7 +997,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
  * Generate ALL recommendations (not limited to top 10)
  * This directly calls the core recommendation engine without the top-10 limit
  */
-function generateAllRecommendations(currentRoot, currentChordType, currentInversion, key, style, mood, tensionDirection) {
+function generateAllRecommendations(currentRoot, currentChordType, currentInversion, key, style, mood, tensionDirection, customWeights = null) {
     // Call the comprehensive recommendation engine with limit=0 to get ALL results
     // This returns ALL ~600+ evaluated combinations, not just the top 10
     const recommendations = generateComprehensiveRecommendations(
@@ -847,7 +1008,11 @@ function generateAllRecommendations(currentRoot, currentChordType, currentInvers
         style,
         mood,
         tensionDirection,
-        0 // limit=0 means return ALL results
+        0, // limit=0 means return ALL results
+        [], // progressionData
+        false, // contextMode
+        4, // lookbackDepth
+        customWeights // Pass custom weights if provided
     );
 
     return recommendations;
@@ -962,7 +1127,7 @@ function getScoreColor(score) {
 /**
  * Render data table tab with Excel-style filtering
  */
-function renderDataTable(container, recommendations, currentRoot, currentChordType, currentInversion, onAddChord, onPlayChord, onStopChord) {
+function renderDataTable(container, recommendations, currentRoot, currentChordType, currentInversion, onAddChord, onPlayChord, onStopChord, customWeights = null) {
     // State for active filters
     const activeFilters = {
         root: new Set(),
@@ -1007,7 +1172,7 @@ function renderDataTable(container, recommendations, currentRoot, currentChordTy
         renderTable(tableContainer, filtered, currentRoot, currentChordType, currentInversion, activeFilters, recommendations, applyFilters, onAddChord, onPlayChord, onStopChord, sortState, (newSortState) => {
             sortState = newSortState;
             applyFilters();
-        });
+        }, customWeights);
     }
 
     // Initial render with all data
@@ -1248,7 +1413,7 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
 /**
  * Render the data table with Excel-style column filters and sorting
  */
-function renderTable(container, recommendations, currentRoot, currentChordType, currentInversion, activeFilters, allRecommendations, applyFiltersCallback, onAddChord, onPlayChord, onStopChord, sortState, setSortState) {
+function renderTable(container, recommendations, currentRoot, currentChordType, currentInversion, activeFilters, allRecommendations, applyFiltersCallback, onAddChord, onPlayChord, onStopChord, sortState, setSortState, customWeights = null) {
     container.innerHTML = '';
 
     // Info section showing filter status (compact)
@@ -1537,6 +1702,19 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
             console.log('Notes array to play:', notesArray);
 
             if (notesArray && notesArray.length > 0) {
+                // Ensure the piano sampler is fully loaded before playing
+                if (!piano.loaded) {
+                    console.log('Waiting for piano samples to finish loading...');
+                    await new Promise((resolve) => {
+                        const checkLoaded = setInterval(() => {
+                            if (piano.loaded) {
+                                clearInterval(checkLoaded);
+                                resolve();
+                            }
+                        }, 100);
+                    });
+                }
+
                 currentNotes = notesArray;
                 piano.triggerAttack(notesArray);
                 console.log('Playing notes:', notesArray);
@@ -1546,8 +1724,214 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
             }
         } catch (error) {
             console.error('Error playing chord:', error);
-            alert(`Error playing chord: ${error.message}`);
+            // Provide more helpful error message for buffer issues
+            if (error.message && error.message.includes('buffer')) {
+                alert(`Audio samples are still loading. Please wait a moment and try again.`);
+            } else {
+                alert(`Error playing chord: ${error.message}`);
+            }
         }
+    }
+
+    // Helper function to show score breakdown
+    function showScoreBreakdown(rec, weights) {
+        // Create overlay
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100001;
+        `;
+        overlay.onclick = (e) => {
+            if (e.target === overlay) overlay.remove();
+        };
+
+        // Create modal
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            background-color: white;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        `;
+        modal.onclick = (e) => e.stopPropagation();
+
+        // Header
+        const header = document.createElement('div');
+        header.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        `;
+
+        const title = document.createElement('h3');
+        title.textContent = `Score Breakdown: ${rec.root} ${rec.type}`;
+        title.style.cssText = 'margin: 0; font-size: 18px; font-weight: 600; color: #111827;';
+
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '×';
+        closeBtn.style.cssText = `
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: #6b7280;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            transition: background-color 0.2s;
+        `;
+        closeBtn.onmouseenter = () => { closeBtn.style.backgroundColor = '#f3f4f6'; };
+        closeBtn.onmouseleave = () => { closeBtn.style.backgroundColor = 'transparent'; };
+        closeBtn.onclick = () => overlay.remove();
+
+        header.appendChild(title);
+        header.appendChild(closeBtn);
+        modal.appendChild(header);
+
+        // Total score
+        const totalScoreDiv = document.createElement('div');
+        totalScoreDiv.style.cssText = `
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        `;
+        totalScoreDiv.innerHTML = `
+            <div style="font-size: 14px; opacity: 0.9; margin-bottom: 4px;">Total Score</div>
+            <div style="font-size: 36px; font-weight: 700;">${rec.score}</div>
+        `;
+        modal.appendChild(totalScoreDiv);
+
+        // Formula explanation
+        const formulaDiv = document.createElement('div');
+        formulaDiv.style.cssText = `
+            background-color: #f9fafb;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            line-height: 1.6;
+        `;
+        formulaDiv.innerHTML = `
+            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">Calculation Formula:</div>
+            <div style="color: #6b7280; font-family: monospace; font-size: 12px;">
+                Total = (Harmonic × ${(weights.harmonic * 100).toFixed(0)}%) +
+                        (Voice Leading × ${(weights.voiceLeading * 100).toFixed(0)}%) +
+                        (Style × ${(weights.style * 100).toFixed(0)}%) +
+                        (Mood × ${(weights.mood * 100).toFixed(0)}%)${weights.modalInterchange ? ` +
+                        (Modal Interchange × ${(weights.modalInterchange * 100).toFixed(0)}%)` : ''}${weights.context ? ` +
+                        (Context × ${(weights.context * 100).toFixed(0)}%)` : ''}
+            </div>
+        `;
+        modal.appendChild(formulaDiv);
+
+        // Component scores
+        const components = [
+            { label: 'Harmonic Function', score: rec.functionScore || 0, weight: weights.harmonic, color: '#3b82f6', desc: 'How well the chord follows traditional harmonic progressions' },
+            { label: 'Voice Leading', score: rec.voiceLeadingScore || 0, weight: weights.voiceLeading, color: '#8b5cf6', desc: 'Smoothness of voice movement between chords' },
+            { label: 'Style Fit', score: rec.styleFit || 0, weight: weights.style, color: '#ec4899', desc: 'How well the chord fits the selected musical style' },
+            { label: 'Mood Fit', score: rec.moodFit || 0, weight: weights.mood, color: '#f59e0b', desc: 'How well the chord matches the desired mood' }
+        ];
+
+        if (rec.modalInterchangeScore !== undefined && weights.modalInterchange) {
+            components.push({
+                label: 'Modal Interchange',
+                score: rec.modalInterchangeScore || 0,
+                weight: weights.modalInterchange,
+                color: '#10b981',
+                desc: rec.borrowedFrom ? `Borrowed from ${rec.borrowedFrom}` : 'Diatonic (not borrowed)'
+            });
+        }
+
+        if (rec.contextScore !== undefined && weights.context) {
+            components.push({
+                label: 'Context Awareness',
+                score: rec.contextScore || 0,
+                weight: weights.context,
+                color: '#06b6d4',
+                desc: 'Fits progression patterns and cadences'
+            });
+        }
+
+        const componentsDiv = document.createElement('div');
+        componentsDiv.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
+
+        components.forEach(comp => {
+            const contribution = Math.round(comp.score * comp.weight * 100) / 100;
+
+            const row = document.createElement('div');
+            row.style.cssText = `
+                background-color: white;
+                border: 1px solid #e5e7eb;
+                border-radius: 8px;
+                padding: 12px;
+            `;
+
+            row.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="font-weight: 600; font-size: 14px; color: #374151;">${comp.label}</div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="padding: 2px 8px; background-color: ${comp.color}; color: white; border-radius: 4px; font-size: 12px; font-weight: 600;">${Math.round(comp.score)}</span>
+                        <span style="color: #6b7280; font-size: 13px;">× ${(comp.weight * 100).toFixed(0)}%</span>
+                        <span style="font-weight: 600; color: #111827; font-size: 14px;">= ${contribution.toFixed(1)}</span>
+                    </div>
+                </div>
+                <div style="font-size: 12px; color: #6b7280; font-style: italic;">${comp.desc}</div>
+                <div style="margin-top: 8px; background-color: #f3f4f6; height: 6px; border-radius: 3px; overflow: hidden;">
+                    <div style="height: 100%; background-color: ${comp.color}; width: ${comp.score}%; transition: width 0.3s;"></div>
+                </div>
+            `;
+
+            componentsDiv.appendChild(row);
+        });
+
+        modal.appendChild(componentsDiv);
+
+        // Calculation summary
+        const total = components.reduce((sum, comp) => sum + (comp.score * comp.weight), 0);
+        const summaryDiv = document.createElement('div');
+        summaryDiv.style.cssText = `
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 2px solid #e5e7eb;
+            font-size: 14px;
+        `;
+        summaryDiv.innerHTML = `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="color: #6b7280;">Weighted Sum:</span>
+                <span style="font-weight: 600; color: #111827;">${total.toFixed(2)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="color: #6b7280;">Rounded:</span>
+                <span style="font-weight: 600; color: #111827;">${Math.round(total)}</span>
+            </div>
+            ${rec.score !== Math.round(total) ? `
+                <div style="display: flex; justify-content: space-between; color: #f59e0b; font-size: 12px; margin-top: 4px;">
+                    <span>Note: Score adjusted by penalties/bonuses</span>
+                    <span style="font-weight: 600;">${rec.score}</span>
+                </div>
+            ` : ''}
+        `;
+        modal.appendChild(summaryDiv);
+
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
     }
 
     // Helper function to stop chord
@@ -1569,11 +1953,14 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
 
         const invName = INVERSION_NAMES[rec.inversion] || `Inversion ${rec.inversion}`;
 
+        // Create borrowed chord indicator
+        const borrowedBadge = rec.borrowedFrom ? `<span style="display: inline-block; margin-left: 6px; padding: 1px 5px; background-color: #8b5cf6; color: white; border-radius: 3px; font-size: 9px; font-weight: 600; vertical-align: middle;" title="Borrowed from ${rec.borrowedFrom}">⭐</span>` : '';
+
         tr.innerHTML = `
             <td style="padding: 4px 6px; font-weight: 600; font-size: 12px;">${rec.root}</td>
-            <td style="padding: 4px 6px; font-size: 12px;">${rec.type}</td>
+            <td style="padding: 4px 6px; font-size: 12px;">${rec.type}${borrowedBadge}</td>
             <td style="padding: 4px 6px; font-size: 12px;">${invName}</td>
-            <td style="padding: 4px 6px; text-align: center;"><span style="padding: 2px 6px; background-color: ${getScoreColor(rec.score)}; color: white; border-radius: 3px; font-weight: 600; font-size: 11px;">${rec.score}</span></td>
+            <td style="padding: 4px 6px; text-align: center;"><span data-action="show-score" data-index="${idx}" class="score-badge" style="padding: 2px 6px; background-color: ${getScoreColor(rec.score)}; color: white; border-radius: 3px; font-weight: 600; font-size: 11px; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s;" title="Click for detailed breakdown">${rec.score}</span></td>
             <td style="padding: 4px 6px; text-align: center; font-size: 12px;">${Math.round(rec.functionScore || 0)}</td>
             <td style="padding: 4px 6px; text-align: center; font-size: 12px;">${Math.round(rec.voiceLeadingScore || 0)}</td>
             <td style="padding: 4px 6px; text-align: center; font-size: 12px;">${Math.round(rec.styleFit || 0)}</td>
@@ -1589,9 +1976,50 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
                 </div>
             </td>
         `;
+
         tbody.appendChild(tr);
+
+        // Add hover effects to score badge
+        const scoreBadge = tr.querySelector('.score-badge');
+        if (scoreBadge) {
+            scoreBadge.addEventListener('mouseenter', () => {
+                scoreBadge.style.transform = 'scale(1.1)';
+                scoreBadge.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+            });
+            scoreBadge.addEventListener('mouseleave', () => {
+                scoreBadge.style.transform = 'scale(1)';
+                scoreBadge.style.boxShadow = 'none';
+            });
+        }
     });
     table.appendChild(tbody);
+
+    // Event delegation for clicks (score breakdown, add buttons)
+    table.addEventListener('click', async (e) => {
+        const target = e.target;
+
+        // Handle score badge clicks
+        if (target.dataset && target.dataset.action === 'show-score') {
+            const idx = parseInt(target.dataset.index);
+            const rec = sortedRecommendations[idx];
+            const weights = customWeights || getSavedWeights(false);
+            showScoreBreakdown(rec, weights);
+            return;
+        }
+
+        // Handle button clicks (add chord)
+        if (target.tagName === 'BUTTON') {
+            const action = target.dataset.action;
+            const idx = parseInt(target.dataset.index);
+            const rec = sortedRecommendations[idx];
+
+            if (action === 'add') {
+                console.log('Add chord:', rec);
+                addChordToProgression(rec.root, rec.type, rec.inversion);
+                overlay.remove();
+            }
+        }
+    });
 
     // Event delegation for mousedown (hold-to-play)
     table.addEventListener('mousedown', async (e) => {
@@ -1600,7 +2028,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
         if (target.tagName === 'BUTTON') {
             const action = target.dataset.action;
             const idx = parseInt(target.dataset.index);
-            const rec = recommendations[idx];
+            const rec = sortedRecommendations[idx];
 
             console.log('Button pressed:', action, 'index:', idx, 'rec:', rec);
 

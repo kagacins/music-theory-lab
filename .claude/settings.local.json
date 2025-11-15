@@ -12,7 +12,8 @@
       "Bash(node --check:*)",
       "Bash($null)",
       "Bash(node --version:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(cd:*)"
     ],
     "deny": [],
     "ask": []

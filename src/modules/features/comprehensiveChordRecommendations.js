@@ -60,6 +60,42 @@ const CHORD_TYPES_TO_EVALUATE = [
     'Diminished 7th'
 ];
 
+// Modal interchange: Define borrowed chords from parallel modes
+// Format: { mode: [[interval, chordType, commonality]] }
+const MODAL_INTERCHANGE_CHORDS = {
+    'parallel-minor': [
+        [0, 'Minor', 85],      // i - parallel minor tonic
+        [3, 'Major', 70],      // ♭III - borrowed major III
+        [5, 'Minor', 95],      // iv - minor subdominant (VERY common)
+        [8, 'Major', 85],      // ♭VI - borrowed flat VI (common)
+        [10, 'Major', 90]      // ♭VII - borrowed flat VII (rock staple)
+    ],
+    'dorian': [
+        [0, 'Minor', 60],      // i - Dorian tonic
+        [2, 'Minor', 55],      // ii - Dorian ii
+        [5, 'Major', 65],      // IV - Dorian IV
+        [7, 'Minor', 50]       // v - minor dominant
+    ],
+    'phrygian': [
+        [0, 'Minor', 45],      // i - Phrygian tonic
+        [1, 'Major', 60],      // ♭II - Phrygian flat II (exotic)
+        [5, 'Minor', 50],      // iv - Phrygian iv
+        [8, 'Diminished', 40]  // vi° - Phrygian diminished vi
+    ],
+    'lydian': [
+        [0, 'Major', 55],      // I - Lydian tonic
+        [2, 'Major', 60],      // II - Lydian II (raised 4th)
+        [4, 'Minor', 50],      // iii - Lydian iii
+        [6, 'Diminished', 45]  // #iv° - Lydian sharp 4
+    ],
+    'mixolydian': [
+        [0, 'Major', 70],      // I - Mixolydian tonic
+        [2, 'Minor', 60],      // ii - Mixolydian ii
+        [5, 'Major', 65],      // IV - Mixolydian IV
+        [10, 'Major', 85]      // ♭VII - Mixolydian flat VII (common in rock)
+    ]
+};
+
 /**
  * Helper: Get scale degree of a chord root in a key
  * @param {string} chordRoot - Root note of the chord (e.g., 'C', 'F#')
@@ -90,6 +126,239 @@ function getScaleDegree(chordRoot, key) {
 }
 
 /**
+ * Helper: Check if a chord is diatonic (naturally in the key)
+ * @param {string} chordRoot - Root note of the chord
+ * @param {string} chordType - Chord type
+ * @param {string} key - Musical key
+ * @returns {boolean} True if the chord is diatonic to the key
+ */
+function isDiatonic(chordRoot, chordType, key) {
+    const keyIndex = ALL_NOTES.indexOf(key);
+    const chordIndex = ALL_NOTES.indexOf(chordRoot);
+
+    if (keyIndex === -1 || chordIndex === -1) return false;
+
+    // Calculate interval from key root
+    const interval = (chordIndex - keyIndex + 12) % 12;
+
+    // Diatonic chords in major key (interval -> expected chord type)
+    const majorKeyDiatonic = {
+        0: ['Major', 'Major 7th', 'Major 6th', 'Major 9th'],  // I
+        2: ['Minor', 'Minor 7th', 'Minor 6th', 'Minor 9th'],  // ii
+        4: ['Minor', 'Minor 7th', 'Minor 6th', 'Minor 9th'],  // iii
+        5: ['Major', 'Major 7th', 'Major 6th', 'Major 9th'],  // IV
+        7: ['Major', 'Dominant 7th', 'Dominant 9th', 'Major'], // V (can be major or dom7)
+        9: ['Minor', 'Minor 7th', 'Minor 6th', 'Minor 9th'],  // vi
+        11: ['Diminished', 'Half Diminished 7th', 'Diminished 7th'] // vii°
+    };
+
+    // Check if this interval and chord type match a diatonic chord
+    if (majorKeyDiatonic[interval]) {
+        return majorKeyDiatonic[interval].includes(chordType);
+    }
+
+    return false;
+}
+
+/**
+ * Helper: Check if a chord is borrowed from a parallel mode
+ * @param {string} chordRoot - Root note of the chord
+ * @param {string} chordType - Chord type
+ * @param {string} key - Musical key
+ * @returns {Object|null} {mode: string, commonality: number, sourceMode: string} or null if diatonic
+ */
+function getBorrowedChordInfo(chordRoot, chordType, key) {
+    const keyIndex = ALL_NOTES.indexOf(key);
+    const chordIndex = ALL_NOTES.indexOf(chordRoot);
+
+    if (keyIndex === -1 || chordIndex === -1) return null;
+
+    // IMPORTANT: First check if this is a diatonic chord
+    // If it's naturally in the key, it's NOT borrowed!
+    if (isDiatonic(chordRoot, chordType, key)) {
+        return null; // Diatonic, not borrowed
+    }
+
+    // Calculate interval from key root
+    const interval = (chordIndex - keyIndex + 12) % 12;
+
+    // Check each mode to see if this chord exists as a borrowed chord
+    for (const [modeName, chords] of Object.entries(MODAL_INTERCHANGE_CHORDS)) {
+        for (const [chordInterval, chordTypePattern, commonality] of chords) {
+            if (interval === chordInterval && chordType === chordTypePattern) {
+                return {
+                    mode: modeName,
+                    commonality: commonality,
+                    sourceMode: modeName
+                };
+            }
+        }
+    }
+
+    return null; // Not a borrowed chord (might be chromatic/other)
+}
+
+/**
+ * Helper: Get all borrowed chords for a key across all modes
+ * @param {string} key - Musical key
+ * @returns {Array} Array of {root, type, mode, commonality}
+ */
+function getAllBorrowedChords(key) {
+    const keyIndex = ALL_NOTES.indexOf(key);
+    if (keyIndex === -1) return [];
+
+    const borrowed = [];
+
+    for (const [modeName, chords] of Object.entries(MODAL_INTERCHANGE_CHORDS)) {
+        for (const [interval, chordType, commonality] of chords) {
+            const rootIndex = (keyIndex + interval) % 12;
+            const root = ALL_NOTES[rootIndex];
+
+            borrowed.push({
+                root,
+                type: chordType,
+                mode: modeName,
+                commonality
+            });
+        }
+    }
+
+    return borrowed;
+}
+
+/**
+ * Score modal interchange appropriateness
+ * Evaluates how well a borrowed chord fits the context
+ * @param {string} chordRoot - Root note of the chord
+ * @param {string} chordType - Chord type
+ * @param {string} key - Musical key
+ * @param {string} style - Style preference
+ * @param {string} mood - Mood preference
+ * @param {Object} context - Progression context (optional)
+ * @returns {number} Modal interchange score (0-100)
+ */
+function scoreModalInterchange(chordRoot, chordType, key, style, mood, context = null) {
+    // Check if this is a borrowed chord
+    const borrowedInfo = getBorrowedChordInfo(chordRoot, chordType, key);
+
+    // If it's not a borrowed chord, return neutral score
+    if (!borrowedInfo) {
+        return 50; // Diatonic chords get neutral modal interchange score
+    }
+
+    let score = borrowedInfo.commonality; // Start with base commonality (40-95)
+
+    // 1. Context Appropriateness (adjust ±20 points)
+    if (context && context.hasContext) {
+        // Don't suggest borrowed chords on the first chord
+        if (context.progressionLength < 2) {
+            score -= 30; // Strong penalty
+        }
+
+        // Don't suggest during a resolution (would undermine the cadence)
+        if (context.cadence.approaching && context.cadence.expectsTonic) {
+            score -= 25; // Penalty for disrupting cadence
+        }
+
+        // Encourage before cadences (adds emotional weight)
+        if (context.cadence.approaching && !context.cadence.expectsTonic) {
+            score += 15; // Bonus for pre-cadence color
+        }
+
+        // Encourage when building tension
+        if (context.tension.trend === 'rising') {
+            score += 10;
+        }
+    }
+
+    // 2. Source Mode Alignment with Style (adjust ±15 points)
+    const modeStyleFit = {
+        'parallel-minor': {
+            'rock': 20,      // ♭VII is a rock staple
+            'pop': 15,       // Common in modern pop
+            'indie': 18,     // Very common in indie
+            'jazz': 10,      // Used but not defining
+            'classical': -10 // Less common in classical
+        },
+        'mixolydian': {
+            'rock': 18,      // Mixolydian ♭VII is classic rock
+            'blues': 20,     // Essential for blues
+            'pop': 10,
+            'jazz': 12,
+            'classical': -5
+        },
+        'dorian': {
+            'jazz': 20,      // Very jazzy/soulful
+            'rnbSoul': 18,
+            'pop': 8,
+            'rock': 5,
+            'classical': -5
+        },
+        'phrygian': {
+            'latinJazz': 20, // Spanish/exotic
+            'indie': 12,
+            'jazz': 10,
+            'pop': 5,
+            'classical': 5
+        },
+        'lydian': {
+            'jazz': 15,      // Dreamy, sophisticated
+            'indie': 15,
+            'pop': 10,
+            'classical': 8,
+            'rock': 5
+        }
+    };
+
+    const styleFitMap = modeStyleFit[borrowedInfo.mode];
+    if (styleFitMap && styleFitMap[style] !== undefined) {
+        score += styleFitMap[style];
+    }
+
+    // 3. Source Mode Alignment with Mood (adjust ±15 points)
+    const modeMoodFit = {
+        'parallel-minor': {
+            'dark': 20,      // Perfect for dark moods
+            'tense': 15,
+            'calm': -10,
+            'bright': -15    // Contradicts bright mood
+        },
+        'mixolydian': {
+            'energetic': 15,
+            'bright': 10,
+            'jazzy': 10,
+            'dark': -5
+        },
+        'dorian': {
+            'jazzy': 20,
+            'calm': 10,
+            'dark': 5,
+            'bright': -5
+        },
+        'phrygian': {
+            'tense': 18,
+            'dark': 15,
+            'bright': -10,
+            'calm': -10
+        },
+        'lydian': {
+            'bright': 18,
+            'calm': 15,
+            'dark': -10,
+            'tense': -5
+        }
+    };
+
+    const moodFitMap = modeMoodFit[borrowedInfo.mode];
+    if (moodFitMap && moodFitMap[mood] !== undefined) {
+        score += moodFitMap[mood];
+    }
+
+    // Clamp to 0-100
+    return Math.max(0, Math.min(100, score));
+}
+
+/**
  * Main function: Generate comprehensive chord recommendations
  * @param {string} currentRoot - Current root note (e.g., 'C')
  * @param {string} currentChordType - Current chord type (e.g., 'Major')
@@ -115,7 +384,8 @@ export function generateComprehensiveRecommendations(
     limit = 10,
     progressionData = [],
     contextMode = false,
-    lookbackDepth = 4
+    lookbackDepth = 4,
+    customWeights = null
 ) {
     const recommendations = [];
 
@@ -181,34 +451,55 @@ export function generateComprehensiveRecommendations(
                     );
                 }
 
-                // Get custom weights from localStorage (or defaults)
-                const weights = getSavedWeights(contextMode);
+                // Calculate modal interchange score
+                const modalInterchangeScore = scoreModalInterchange(
+                    nextRoot,
+                    nextType,
+                    key,
+                    style,
+                    mood,
+                    context
+                );
+
+                // Get custom weights from parameter, or from localStorage (or defaults)
+                const weights = customWeights || getSavedWeights(contextMode);
 
                 // Calculate total score (weighted combination using custom weights)
                 let totalScore;
                 if (contextMode && context && context.hasContext) {
-                    // Context-aware mode: use context weights (includes context factor)
+                    // Context-aware mode: use context weights (includes context and modal interchange factors)
                     totalScore =
                         (functionScore * weights.harmonic) +
                         (voiceLeadingScore * weights.voiceLeading) +
                         (styleFit * weights.style) +
                         (moodFit * weights.mood) +
-                        (contextScore * (weights.context || 0));
+                        (contextScore * (weights.context || 0)) +
+                        (modalInterchangeScore * (weights.modalInterchange || 0));
                 } else {
-                    // Standard mode: use standard weights (no context factor)
+                    // Standard mode: use standard weights (includes modal interchange factor)
                     totalScore =
                         (functionScore * weights.harmonic) +
                         (voiceLeadingScore * weights.voiceLeading) +
                         (styleFit * weights.style) +
-                        (moodFit * weights.mood);
+                        (moodFit * weights.mood) +
+                        (modalInterchangeScore * (weights.modalInterchange || 0));
                 }
+
+                // Apply penalty for recommending the exact same chord and inversion
+                // (Generally not musically useful to repeat the exact same chord immediately)
+                if (nextRoot === currentRoot && nextType === currentChordType && nextInversion === currentInversion) {
+                    totalScore *= 0.3; // 70% penalty for exact repetition
+                }
+
+                // Check if this is a borrowed chord
+                const borrowedInfo = getBorrowedChordInfo(nextRoot, nextType, key);
 
                 // Generate human-readable reason
                 const reason = generateReason(
                     currentRoot, nextRoot, nextType, nextInversion,
                     functionScore, voiceLeadingScore, styleFit, moodFit,
                     currentFunction, nextFunction, tensionDirection,
-                    contextScore, context
+                    contextScore, context, modalInterchangeScore, borrowedInfo
                 );
 
                 recommendations.push({
@@ -222,7 +513,9 @@ export function generateComprehensiveRecommendations(
                     voiceLeadingScore,
                     styleFit,
                     moodFit,
-                    contextScore
+                    contextScore,
+                    modalInterchangeScore,
+                    borrowedFrom: borrowedInfo ? borrowedInfo.mode : null
                 });
             }
         });
@@ -430,9 +723,22 @@ function generateReason(
     currentRoot, nextRoot, nextType, nextInversion,
     functionScore, voiceLeadingScore, styleFit, moodFit,
     currentFunction, nextFunction, tensionDirection,
-    contextScore = 0, context = null
+    contextScore = 0, context = null, modalInterchangeScore = 50, borrowedInfo = null
 ) {
     const reasons = [];
+
+    // Modal interchange reason (high priority for borrowed chords)
+    if (borrowedInfo && modalInterchangeScore >= 70) {
+        const modeLabels = {
+            'parallel-minor': 'parallel minor',
+            'mixolydian': 'Mixolydian',
+            'dorian': 'Dorian',
+            'phrygian': 'Phrygian',
+            'lydian': 'Lydian'
+        };
+        const modeLabel = modeLabels[borrowedInfo.mode] || borrowedInfo.mode;
+        reasons.push(`Borrowed from ${modeLabel}`);
+    }
 
     // Context-aware reasons (highest priority if enabled)
     if (context && context.hasContext) {

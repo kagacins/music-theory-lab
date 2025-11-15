@@ -7,12 +7,50 @@ import {
     DEFAULT_WEIGHTS,
     DEFAULT_CONTEXT_WEIGHTS,
     WEIGHT_PRESETS,
+    APPROACH_PRESETS,
+    GENRE_TEMPLATES,
     getSavedWeights,
     saveWeights,
     resetWeightsToDefault,
     applyPreset,
     normalizeWeights
 } from '../config/weightPresets.js';
+
+/**
+ * Helper: Check if two weight objects are equal (within tolerance)
+ * @param {Object} weights1 - First weight object
+ * @param {Object} weights2 - Second weight object
+ * @returns {boolean} True if weights match
+ */
+function weightsMatch(weights1, weights2) {
+    const keys = Object.keys(weights1);
+    const tolerance = 0.01; // 1% tolerance for floating point comparison
+
+    // Check if all keys exist in both objects
+    if (!keys.every(key => key in weights2)) return false;
+
+    // Check if all values match within tolerance
+    return keys.every(key => {
+        const diff = Math.abs(weights1[key] - weights2[key]);
+        return diff < tolerance;
+    });
+}
+
+/**
+ * Find which preset (if any) matches the given weights
+ * @param {Object} weights - Current weight configuration
+ * @returns {string|null} Preset key or null if no match
+ */
+function findMatchingPreset(weights) {
+    // Check all presets
+    for (const [key, preset] of Object.entries(WEIGHT_PRESETS)) {
+        if (preset.requiresContext) continue; // Skip context-aware preset
+        if (weightsMatch(weights, preset.weights)) {
+            return key;
+        }
+    }
+    return null;
+}
 
 /**
  * Show the settings modal
@@ -127,67 +165,150 @@ export function showSettingsModal() {
     presetsTitle.style.fontSize = '16px';
     presetsTitle.style.fontWeight = '600';
     presetsTitle.style.color = '#111827';
-    presetsTitle.style.marginBottom = '12px';
+    presetsTitle.style.marginBottom = '16px';
     presetsSection.appendChild(presetsTitle);
 
-    const presetsGrid = document.createElement('div');
-    presetsGrid.style.display = 'grid';
-    presetsGrid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
-    presetsGrid.style.gap = '12px';
+    // Store button references for updating active states
+    const presetButtons = {};
 
-    // Create preset buttons
-    Object.keys(WEIGHT_PRESETS).forEach(key => {
-        const preset = WEIGHT_PRESETS[key];
+    // Helper function to update active states
+    function updatePresetActiveStates() {
+        const activePreset = findMatchingPreset(currentWeights);
 
-        // Skip context preset in this view (show only in context-aware mode)
-        if (preset.requiresContext) return;
+        Object.keys(presetButtons).forEach(key => {
+            const btn = presetButtons[key];
+            const isActive = key === activePreset;
 
-        const presetBtn = document.createElement('button');
-        presetBtn.style.padding = '12px 16px';
-        presetBtn.style.backgroundColor = '#f9fafb';
-        presetBtn.style.border = '2px solid #e5e7eb';
-        presetBtn.style.borderRadius = '8px';
-        presetBtn.style.cursor = 'pointer';
-        presetBtn.style.transition = 'all 0.2s';
-        presetBtn.style.textAlign = 'left';
-        presetBtn.title = preset.tooltip;
-
-        const presetName = document.createElement('div');
-        presetName.textContent = preset.name;
-        presetName.style.fontWeight = '600';
-        presetName.style.color = '#111827';
-        presetName.style.marginBottom = '4px';
-        presetBtn.appendChild(presetName);
-
-        const presetDesc = document.createElement('div');
-        presetDesc.textContent = preset.description;
-        presetDesc.style.fontSize = '12px';
-        presetDesc.style.color = '#6b7280';
-        presetDesc.style.lineHeight = '1.4';
-        presetBtn.appendChild(presetDesc);
-
-        presetBtn.onmouseenter = () => {
-            presetBtn.style.backgroundColor = '#eff6ff';
-            presetBtn.style.borderColor = '#3b82f6';
-        };
-        presetBtn.onmouseleave = () => {
-            presetBtn.style.backgroundColor = '#f9fafb';
-            presetBtn.style.borderColor = '#e5e7eb';
-        };
-
-        presetBtn.onclick = () => {
-            const weights = applyPreset(key, false);
-            if (weights) {
-                currentWeights = weights;
-                updateSliders();
+            if (isActive) {
+                btn.style.backgroundColor = '#dbeafe';
+                btn.style.borderColor = '#3b82f6';
+                btn.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+            } else {
+                btn.style.backgroundColor = '#f9fafb';
+                btn.style.borderColor = '#e5e7eb';
+                btn.style.boxShadow = 'none';
             }
-        };
+        });
+    }
 
-        presetsGrid.appendChild(presetBtn);
-    });
+    // Helper function to create preset section
+    const createPresetSection = (title, presets, description, emoji) => {
+        const section = document.createElement('div');
+        section.style.marginBottom = '20px';
 
-    presetsSection.appendChild(presetsGrid);
+        const sectionHeader = document.createElement('div');
+        sectionHeader.style.display = 'flex';
+        sectionHeader.style.alignItems = 'baseline';
+        sectionHeader.style.gap = '8px';
+        sectionHeader.style.marginBottom = '12px';
+
+        const sectionTitle = document.createElement('div');
+        sectionTitle.textContent = `${emoji} ${title}`;
+        sectionTitle.style.fontSize = '14px';
+        sectionTitle.style.fontWeight = '600';
+        sectionTitle.style.color = '#374151';
+        sectionHeader.appendChild(sectionTitle);
+
+        if (description) {
+            const sectionDesc = document.createElement('div');
+            sectionDesc.textContent = description;
+            sectionDesc.style.fontSize = '12px';
+            sectionDesc.style.color = '#9ca3af';
+            sectionDesc.style.fontStyle = 'italic';
+            sectionHeader.appendChild(sectionDesc);
+        }
+
+        section.appendChild(sectionHeader);
+
+        const grid = document.createElement('div');
+        grid.style.display = 'grid';
+        grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
+        grid.style.gap = '12px';
+
+        Object.keys(presets).forEach(key => {
+            const preset = presets[key];
+
+            const presetBtn = document.createElement('button');
+            presetBtn.style.padding = '12px 16px';
+            presetBtn.style.backgroundColor = '#f9fafb';
+            presetBtn.style.border = '2px solid #e5e7eb';
+            presetBtn.style.borderRadius = '8px';
+            presetBtn.style.cursor = 'pointer';
+            presetBtn.style.transition = 'all 0.2s';
+            presetBtn.style.textAlign = 'left';
+            presetBtn.title = preset.tooltip;
+
+            const presetName = document.createElement('div');
+            presetName.textContent = preset.name;
+            presetName.style.fontWeight = '600';
+            presetName.style.color = '#111827';
+            presetName.style.marginBottom = '4px';
+            presetBtn.appendChild(presetName);
+
+            const presetDesc = document.createElement('div');
+            presetDesc.textContent = preset.description;
+            presetDesc.style.fontSize = '12px';
+            presetDesc.style.color = '#6b7280';
+            presetDesc.style.lineHeight = '1.4';
+            presetBtn.appendChild(presetDesc);
+
+            presetBtn.onmouseenter = () => {
+                const isActive = findMatchingPreset(currentWeights) === key;
+                if (!isActive) {
+                    presetBtn.style.backgroundColor = '#eff6ff';
+                    presetBtn.style.borderColor = '#3b82f6';
+                }
+            };
+            presetBtn.onmouseleave = () => {
+                updatePresetActiveStates();
+            };
+
+            presetBtn.onclick = () => {
+                const weights = applyPreset(key, false);
+                if (weights) {
+                    currentWeights = weights;
+                    updateSliders();
+                    updatePresetActiveStates();
+                }
+            };
+
+            presetButtons[key] = presetBtn;
+            grid.appendChild(presetBtn);
+        });
+
+        section.appendChild(grid);
+        return section;
+    };
+
+    // Approaches section
+    const approachesSection = createPresetSection(
+        'Approaches',
+        APPROACH_PRESETS,
+        'What to prioritize',
+        '🎯'
+    );
+    presetsSection.appendChild(approachesSection);
+
+    // Separator
+    const separator = document.createElement('div');
+    separator.style.height = '1px';
+    separator.style.backgroundColor = '#e5e7eb';
+    separator.style.margin = '20px 0';
+    presetsSection.appendChild(separator);
+
+    // Genre templates section
+    const genreSection = createPresetSection(
+        'Genre Templates',
+        GENRE_TEMPLATES,
+        'Complete genre profiles',
+        '🎸'
+    );
+    presetsSection.appendChild(genreSection);
+
     modal.appendChild(presetsSection);
+
+    // Set initial active states
+    updatePresetActiveStates();
 
     // Custom weights section
     const weightsSection = document.createElement('div');
@@ -212,14 +333,16 @@ export function showSettingsModal() {
         harmonic: 'Harmonic Function',
         voiceLeading: 'Voice Leading',
         style: 'Style Fit',
-        mood: 'Mood Fit'
+        mood: 'Mood Fit',
+        modalInterchange: 'Modal Interchange'
     };
 
     const descriptions = {
         harmonic: 'How well the chord follows traditional harmonic progressions (tonic→subdominant→dominant)',
         voiceLeading: 'Smoothness of voice movement - minimal note jumps, common tones, contrary motion',
         style: 'How well the chord fits your selected musical style (pop, jazz, classical, etc.)',
-        mood: 'How well the chord matches your desired emotional character (bright, dark, jazzy, etc.)'
+        mood: 'How well the chord matches your desired emotional character (bright, dark, jazzy, etc.)',
+        modalInterchange: 'How often to suggest borrowed chords from parallel modes (♭VII, iv, ♭VI from parallel minor, etc.)'
     };
 
     function updateSliders() {
@@ -241,6 +364,7 @@ export function showSettingsModal() {
 
         // Update display
         updateSliders();
+        updatePresetActiveStates();
     }
 
     Object.keys(labels).forEach(key => {
@@ -325,6 +449,7 @@ export function showSettingsModal() {
     resetBtn.onclick = () => {
         currentWeights = resetWeightsToDefault(false);
         updateSliders();
+        updatePresetActiveStates();
     };
 
     const saveBtn = document.createElement('button');
