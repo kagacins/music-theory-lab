@@ -31,6 +31,8 @@
 
     <!-- Link to external CSS file -->
     <link rel="stylesheet" href="music.css">
+    <!-- Phase 2: Chord Recommendations Sidebar -->
+    <link rel="stylesheet" href="src/styles/recommendations-sidebar.css">
 </head>
 <body class="bg-gray-50 min-h-screen p-4 sm:p-8 font-sans antialiased">
     <!-- NEW: Sidebar Navigation -->
@@ -1257,6 +1259,94 @@
 
         <!-- TAB CONTENT: MELODY COMPOSER -->
         <div id="tab-melody" class="tab-content hidden">
+            <!-- Phase 2: Flex container for sidebar + main content -->
+            <div class="flex gap-4">
+                <!-- Phase 2: Chord Recommendations Sidebar -->
+                <aside id="chord-recommendations-sidebar" class="bg-white rounded-xl shadow-2xl border border-violet-100 p-4">
+                    <div class="sidebar-resize-handle"></div>
+                    <h3 class="sidebar-header">Chord Suggestions</h3>
+
+                    <!-- Current Context Display -->
+                    <div class="context-display">
+                        <div class="context-row">
+                            <span class="context-label">Key:</span>
+                            <span id="current-key-display" class="context-value">C Major</span>
+                        </div>
+                        <div class="context-row">
+                            <span class="context-label">Last Chord:</span>
+                            <span id="last-chord-display" class="context-value">(none)</span>
+                        </div>
+                    </div>
+
+                    <!-- Recommendations List -->
+                    <div id="recommendations-list" class="space-y-2">
+                        <p class="recommendations-empty">No suggestions available</p>
+                    </div>
+
+                    <!-- Refresh Button -->
+                    <button id="refresh-recommendations-btn" title="Refresh chord recommendations">
+                        Refresh Suggestions
+                    </button>
+
+                    <!-- Phase 2.3: Harmonic Analysis Panel -->
+                    <div id="harmony-analysis-panel" class="analysis-panel mt-4">
+                        <h4 class="analysis-header">Harmonic Analysis</h4>
+
+                        <!-- Chord Functions -->
+                        <div class="analysis-section">
+                            <span class="analysis-label">Functions:</span>
+                            <div id="chord-functions-display" class="functions-list">
+                                <span class="text-xs text-gray-500">No progression to analyze</span>
+                            </div>
+                        </div>
+
+                        <!-- Detected Patterns -->
+                        <div class="analysis-section">
+                            <span class="analysis-label">Pattern:</span>
+                            <div id="pattern-display" class="pattern-info">
+                                <span class="text-xs text-gray-500">-</span>
+                            </div>
+                        </div>
+
+                        <!-- Modal Interchange -->
+                        <div class="analysis-section">
+                            <span class="analysis-label">Borrowed Chords:</span>
+                            <div id="modal-interchange-display" class="borrowed-list">
+                                <span class="text-xs text-gray-500">None</span>
+                            </div>
+                        </div>
+
+                        <!-- Complexity -->
+                        <div class="analysis-section">
+                            <span class="analysis-label">Complexity:</span>
+                            <div id="complexity-display" class="complexity-stars">
+                                <span class="text-xs text-gray-500">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Phase 2.4: Keyboard Shortcuts Hint -->
+                    <div class="keyboard-shortcuts-hint mt-4">
+                        <h4 class="shortcuts-header">⌨️ Shortcuts</h4>
+                        <div class="shortcuts-list">
+                            <div class="shortcut-item">
+                                <kbd>1-5</kbd>
+                                <span>Insert top 5 chords</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>R</kbd>
+                                <span>Refresh suggestions</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <kbd>Esc</kbd>
+                                <span>Deselect</span>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- Main Content Area (existing melody composer) -->
+                <div class="flex-1 min-w-0">
             <div class="bg-white p-4 rounded-xl shadow-2xl border border-violet-100 mb-4">
                 <div id="melody-sections-container" class="space-y-3">
                 <!-- Progression Timeline Display (Mirrored from Progression Builder) -->
@@ -1598,18 +1688,18 @@
                                     Clear All
                                 </button>
 
-                                <!-- Clef Toggle for Chords (only visible when recording/two staves shown) -->
-                                <div id="chord-clef-toggle-container" class="hidden flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-violet-300 shadow-sm">
-                                    <label class="text-xs font-medium text-gray-700">Chord Clef:</label>
+                                <!-- Clef Toggle for LH (always visible) -->
+                                <div id="chord-clef-toggle-container" class="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-violet-300 shadow-sm">
+                                    <label class="text-xs font-medium text-gray-700">LH Clef:</label>
                                     <div class="flex gap-1">
                                         <button id="chord-clef-treble-btn" onclick="window.setChordClef && window.setChordClef('treble')" class="px-2 py-1 text-xs font-semibold rounded bg-violet-600 text-white hover:bg-violet-700 transition" title="Treble Clef">𝄞</button>
                                         <button id="chord-clef-bass-btn" onclick="window.setChordClef && window.setChordClef('bass')" class="px-2 py-1 text-xs font-semibold rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition" title="Bass Clef">𝄢</button>
                                     </div>
                                 </div>
 
-                                <!-- Clef Toggle for Melody (always visible) -->
+                                <!-- Clef Toggle for RH (always visible) -->
                                 <div class="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-violet-300 shadow-sm">
-                                    <label class="text-xs font-medium text-gray-700">Melody Clef:</label>
+                                    <label class="text-xs font-medium text-gray-700">RH Clef:</label>
                                     <div class="flex gap-1">
                                         <button id="melody-clef-treble-btn" onclick="window.setMelodyClef && window.setMelodyClef('treble')" class="px-2 py-1 text-xs font-semibold rounded bg-violet-600 text-white hover:bg-violet-700 transition" title="Treble Clef">𝄞</button>
                                         <button id="melody-clef-bass-btn" onclick="window.setMelodyClef && window.setMelodyClef('bass')" class="px-2 py-1 text-xs font-semibold rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition" title="Bass Clef">𝄢</button>
@@ -1638,6 +1728,9 @@
                                     </button>
                                     <button onclick="window.showNotationTab && window.showNotationTab('modifiers')" id="notation-tab-modifiers" class="px-3 py-1.5 text-sm font-semibold bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition flex items-center gap-1">
                                         <span>〰️</span> <span>Modifiers</span>
+                                    </button>
+                                    <button onclick="window.showNotationTab && window.showNotationTab('bass')" id="notation-tab-bass" class="px-3 py-1.5 text-sm font-semibold bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition flex items-center gap-1">
+                                        <span>🎹</span> <span>Bass Auto-Fill</span>
                                     </button>
                                 </div>
 
@@ -1723,12 +1816,62 @@
                                     </button>
                                     <p class="text-xs text-gray-500 mt-2">Crescendos and decrescendos coming soon!</p>
                                 </div>
+
+                                <!-- Bass Auto-Fill Section (Phase 1B) -->
+                                <div id="notation-content-bass" class="notation-tab-content hidden">
+                                    <div class="space-y-3">
+                                        <!-- Auto-Generate Toggle and Bass Pattern Selector (side by side) -->
+                                        <div class="flex items-end gap-3">
+                                            <!-- Auto-Generate Toggle -->
+                                            <div class="flex-1 flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-200">
+                                                <svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"></path>
+                                                </svg>
+                                                <div class="flex-1">
+                                                    <label class="text-sm font-semibold text-gray-700">Auto-Generate Bass</label>
+                                                    <p class="text-xs text-gray-500">Automatically fill bass clef from chords</p>
+                                                </div>
+                                                <div class="flex items-center gap-2">
+                                                    <span id="auto-generate-label" class="text-xs font-bold text-gray-400">OFF</span>
+                                                    <label class="relative inline-flex items-center cursor-pointer">
+                                                        <input type="checkbox" id="auto-generate-bass-toggle" class="sr-only" onchange="
+                                                            window.setAutoGenerateBass && window.setAutoGenerateBass(this.checked);
+                                                            document.getElementById('auto-generate-label').textContent = this.checked ? 'ON' : 'OFF';
+                                                            document.getElementById('auto-generate-label').className = this.checked ? 'text-xs font-bold text-blue-600' : 'text-xs font-bold text-gray-400';
+                                                            this.nextElementSibling.className = this.checked ? 'toggle-bg w-11 h-6 bg-blue-600 rounded-full border-2 border-blue-700' : 'toggle-bg w-11 h-6 bg-gray-300 rounded-full border-2 border-gray-400';
+                                                            window.renderInteractiveMelodyStaff && window.renderInteractiveMelodyStaff(document.getElementById('interactive-melody-notation-canvas'));">
+                                                        <div class="toggle-bg w-11 h-6 bg-gray-300 rounded-full border-2 border-gray-400"></div>
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Bass Pattern Selector -->
+                                            <div class="flex-1">
+                                                <label class="block text-sm font-semibold text-gray-700 mb-2">Bass Pattern:</label>
+                                                <select id="bass-pattern-select" onchange="window.setBassPattern && window.setBassPattern(this.value); window.renderInteractiveMelodyStaff && window.renderInteractiveMelodyStaff(document.getElementById('interactive-melody-notation-canvas'));" class="w-full p-2 text-sm border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 cursor-pointer transition-colors">
+                                                    <option value="whole-note">Whole Note - Single root note</option>
+                                                    <option value="root-fifth" selected>Root-Fifth - Alternating root and fifth</option>
+                                                    <option value="arpeggio">Arpeggio - Ascending chord tones</option>
+                                                    <option value="alberti">Alberti Bass - Classical pattern</option>
+                                                    <option value="walking">Walking Bass - Jazz stepwise</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <p class="text-xs text-gray-500 mt-2">
+                                            ℹ️ Bass is auto-generated from chord progression. Edit manually by clicking notes (coming soon).
+                                            <button onclick="window.regenerateAllBass && window.regenerateAllBass(); window.renderInteractiveMelodyStaff && window.renderInteractiveMelodyStaff(document.getElementById('interactive-melody-notation-canvas'));" class="ml-1 text-blue-600 hover:text-blue-800 underline text-xs" title="Force regenerate bass if needed">
+                                                Regenerate
+                                            </button>
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Staff Notation Display -->
                             <div class="mt-3 p-2 bg-white rounded-lg border border-violet-200">
                                 <div class="flex items-center justify-between mb-2">
-                                    <h5 class="text-xs font-semibold text-violet-800">Melody Notation</h5>
+                                    <h5 class="text-xs font-semibold text-violet-800">Musical Notation</h5>
                                     <div class="flex items-center gap-3">
                                         <!-- BPM Slider -->
                                         <div class="flex items-center gap-1.5" onclick="event.stopPropagation()" title="Adjust playback tempo">
@@ -1746,7 +1889,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="w-full" style="overflow-x: auto; overflow-y: hidden; max-width: 100%; -webkit-overflow-scrolling: touch;">
+                                <div class="w-full" style="overflow-x: hidden; overflow-y: auto; max-width: 100%; max-height: 600px; -webkit-overflow-scrolling: touch;">
                                     <canvas id="interactive-melody-notation-canvas" class="border border-gray-300 rounded" style="display: block;"></canvas>
                                 </div>
                             </div>
@@ -1877,8 +2020,10 @@
                 </div>
                 </div>
             </div>
-        </div>
-        
+                </div><!-- /flex-1 (main content) -->
+            </div><!-- /flex container (sidebar + main) -->
+        </div><!-- /tab-melody -->
+
         <!-- NEW: TAB CONTENT: SCALE EXPLORER -->
         <div id="tab-scales" class="tab-content hidden">
             <div class="bg-white p-4 rounded-xl shadow-2xl border border-lime-200 mb-4">
@@ -2071,6 +2216,8 @@
 
     <!-- Link to external JS files using ES6 modules -->
     <script>let isFloatingControlsVisible = true;</script>
+    <!-- Phase 2: Chord Recommendations Sidebar Module -->
+    <script type="module" src="src/modules/ui/recommendationsSidebar.js"></script>
     <!-- NEW MODULAR STRUCTURE: Main entry point loads all refactored modules -->
     <script type="module" src="src/main.js"></script>
     <!-- BACKUP: Original monolithic file kept for reference (can be removed after testing) -->

@@ -1,0 +1,770 @@
+/* ============================================
+   Chord Recommendations Sidebar Styles
+   Phase 2.1: Sidebar UI Component
+   ============================================ */
+
+/* Sidebar Container */
+#chord-recommendations-sidebar {
+    min-width: 256px;
+    max-width: 400px;
+    width: 256px;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0; /* Prevent sidebar from shrinking in flex container */
+    flex-grow: 0; /* Prevent sidebar from growing automatically */
+}
+
+/* Resize handle */
+.sidebar-resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    background: transparent;
+    z-index: 100;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: background 0.2s ease;
+}
+
+.sidebar-resize-handle:hover {
+    background: rgba(139, 92, 246, 0.3);
+}
+
+.sidebar-resize-handle:active,
+.sidebar-resize-handle.resizing {
+    background: rgba(139, 92, 246, 0.5);
+}
+
+/* Recommendation Item */
+.chord-recommendation-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+    background: white;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-bottom: 8px;
+}
+
+.chord-recommendation-item:hover {
+    background: #f3f4f6;
+    border-color: #8b5cf6;
+    transform: translateX(2px);
+    box-shadow: 0 2px 4px rgba(139, 92, 246, 0.1);
+}
+
+.chord-recommendation-item.selected {
+    background: #ede9fe;
+    border-color: #8b5cf6;
+    box-shadow: 0 2px 6px rgba(139, 92, 246, 0.2);
+}
+
+.chord-recommendation-item:active {
+    transform: translateX(1px);
+}
+
+/* Chord Information Section */
+.chord-info {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+}
+
+.chord-symbol {
+    font-weight: 600;
+    font-size: 14px;
+    color: #1f2937;
+    min-width: 40px;
+}
+
+.chord-inversion {
+    font-size: 10px;
+    color: #8b5cf6;
+    font-weight: 600;
+    background: #f5f3ff;
+    padding: 2px 5px;
+    border-radius: 3px;
+    margin-left: 0;
+    white-space: nowrap;
+}
+
+.chord-function {
+    font-size: 11px;
+    color: #6b7280;
+    font-weight: 500;
+    background: #f3f4f6;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 0;
+    white-space: nowrap;
+}
+
+/* Score Display Section */
+.chord-score {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Score Badge */
+.score-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+    min-width: 40px;
+    text-align: center;
+}
+
+.score-excellent {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.score-good {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.score-fair {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+/* Voice Leading Indicator Dot */
+.voice-leading-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.vl-excellent {
+    background: #16a34a;
+}
+
+.vl-good {
+    background: #2563eb;
+}
+
+.vl-fair {
+    background: #d97706;
+}
+
+.vl-poor {
+    background: #dc2626;
+}
+
+/* Current Context Display */
+.context-display {
+    background: #f5f3ff;
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 12px;
+    border: 1px solid #e9d5ff;
+}
+
+.context-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    font-size: 12px;
+}
+
+.context-row:last-child {
+    margin-bottom: 0;
+}
+
+.context-label {
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.context-value {
+    color: #1f2937;
+    font-weight: 600;
+}
+
+/* Empty State */
+.recommendations-empty {
+    padding: 20px;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 12px;
+}
+
+/* Refresh Button */
+#refresh-recommendations-btn {
+    width: 100%;
+    padding: 8px;
+    font-size: 12px;
+    color: #2563eb;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-top: 12px;
+}
+
+#refresh-recommendations-btn:hover {
+    background: #eff6ff;
+    border-color: #2563eb;
+    color: #1d4ed8;
+}
+
+#refresh-recommendations-btn:active {
+    background: #dbeafe;
+}
+
+/* Chord Playback Buttons */
+.chord-play-btn, .context-play-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.chord-play-btn {
+    margin-right: 6px;
+}
+
+.context-play-btn {
+    margin-left: 4px;
+}
+
+.chord-play-btn:hover, .context-play-btn:hover {
+    background: #eff6ff;
+    border-color: #3b82f6;
+    color: #3b82f6;
+}
+
+.chord-play-btn:active, .context-play-btn:active {
+    background: #dbeafe;
+    transform: scale(0.95);
+}
+
+.chord-play-btn svg, .context-play-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* Sidebar Header */
+.sidebar-header {
+    font-size: 14px;
+    font-weight: 700;
+    color: #7c3aed;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e9d5ff;
+}
+
+/* Recommendations List Container */
+#recommendations-list {
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+}
+
+/* Custom Scrollbar for Recommendations List */
+#recommendations-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+#recommendations-list::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: 3px;
+}
+
+#recommendations-list::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+}
+
+#recommendations-list::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+/* Analysis Panel (Phase 2.3) */
+#harmony-analysis-panel {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.analysis-header {
+    font-size: 12px;
+    font-weight: 600;
+    color: #7c3aed;
+    margin-bottom: 8px;
+}
+
+.analysis-item {
+    font-size: 11px;
+    color: #4b5563;
+    margin-bottom: 6px;
+    padding: 6px 8px;
+    background: #f9fafb;
+    border-radius: 4px;
+}
+
+.analysis-item strong {
+    color: #1f2937;
+    font-weight: 600;
+}
+
+/* Pattern Badge */
+.pattern-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: #fef3c7;
+    color: #d97706;
+    margin-left: 4px;
+}
+
+.pattern-badge.cadence {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+/* Modal Interchange Indicator */
+.modal-interchange-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: #ede9fe;
+    color: #7c3aed;
+    margin-left: 4px;
+}
+
+/* Enhanced Modal-like Tooltip */
+.recommendation-tooltip {
+    position: fixed;
+    background: white;
+    border: 2px solid #8b5cf6;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 10px 25px rgba(139, 92, 246, 0.3);
+    z-index: 10000;
+    max-width: 320px;
+    min-width: 280px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.recommendation-tooltip.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Close button for tooltip (mobile) */
+.tooltip-close-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: #f3f4f6;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: #6b7280;
+    line-height: 1;
+    padding: 0;
+    transition: all 0.15s ease;
+}
+
+.tooltip-close-btn:hover {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.tooltip-close-btn:active {
+    transform: scale(0.9);
+}
+
+.tooltip-header {
+    font-size: 14px;
+    font-weight: 700;
+    color: #7c3aed;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    padding-right: 24px;
+    border-bottom: 1px solid #e9d5ff;
+    position: relative;
+}
+
+.tooltip-reason {
+    font-size: 11px;
+    color: #4b5563;
+    margin-bottom: 12px;
+    line-height: 1.4;
+    font-style: italic;
+}
+
+.tooltip-section {
+    margin-bottom: 10px;
+}
+
+.tooltip-section-title {
+    font-size: 10px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.score-breakdown-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+    font-size: 11px;
+}
+
+.score-breakdown-label {
+    color: #4b5563;
+    font-weight: 500;
+}
+
+.score-breakdown-value {
+    font-weight: 700;
+    color: #7c3aed;
+}
+
+.score-bar {
+    height: 4px;
+    background: #e9d5ff;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 2px;
+}
+
+.score-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+    transition: width 0.3s ease;
+}
+
+.borrowed-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: #fef3c7;
+    color: #92400E;
+    margin-top: 4px;
+}
+
+/* Loading State */
+.recommendations-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    color: #9ca3af;
+    font-size: 12px;
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #e5e7eb;
+    border-top-color: #7c3aed;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 8px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    #chord-recommendations-sidebar {
+        min-width: 200px;
+        max-width: 200px;
+    }
+
+    .chord-symbol {
+        font-size: 13px;
+    }
+
+    .chord-function {
+        font-size: 10px;
+    }
+
+    .score-badge {
+        font-size: 10px;
+        padding: 2px 6px;
+    }
+}
+
+/* ==========================================
+   PHASE 2.3: HARMONIC ANALYSIS PANEL
+   ========================================== */
+
+.analysis-panel {
+    border-top: 2px solid #E0E7FF;
+    padding-top: 12px;
+}
+
+.analysis-header {
+    font-size: 14px;
+    font-weight: 600;
+    color: #4F46E5;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.analysis-section {
+    margin-bottom: 12px;
+    padding: 8px;
+    background: #F9FAFB;
+    border-radius: 6px;
+}
+
+.analysis-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: #6B7280;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+/* Chord Functions Display */
+.functions-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 11px;
+}
+
+.function-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.function-tonic {
+    background: #DBEAFE;
+    color: #1E40AF;
+}
+
+.function-subdominant {
+    background: #FEF3C7;
+    color: #92400E;
+}
+
+.function-dominant {
+    background: #FEE2E2;
+    color: #991B1B;
+}
+
+.function-predominant {
+    background: #E0E7FF;
+    color: #4338CA;
+}
+
+/* Pattern Display */
+.pattern-info {
+    font-size: 12px;
+}
+
+.pattern-name {
+    font-weight: 600;
+    color: #374151;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.pattern-description {
+    font-size: 10px;
+    color: #6B7280;
+    font-style: italic;
+}
+
+.pattern-strength {
+    display: inline-flex;
+    margin-top: 4px;
+    gap: 2px;
+}
+
+.pattern-strength-star {
+    color: #FBBF24;
+    font-size: 12px;
+}
+
+.pattern-strength-star.empty {
+    color: #D1D5DB;
+}
+
+/* Borrowed Chords Display */
+.borrowed-list {
+    font-size: 11px;
+}
+
+.borrowed-chord {
+    display: inline-block;
+    padding: 3px 6px;
+    background: #FEF3C7;
+    border: 1px solid #F59E0B;
+    border-radius: 4px;
+    margin: 2px;
+    font-weight: 600;
+}
+
+.borrowed-chord-source {
+    font-size: 9px;
+    color: #92400E;
+    font-weight: normal;
+    display: block;
+}
+
+/* Complexity Display */
+.complexity-stars {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.complexity-star {
+    font-size: 16px;
+    color: #10B981;
+}
+
+.complexity-star.filled {
+    color: #10B981;
+}
+
+.complexity-star.empty {
+    color: #D1D5DB;
+}
+
+.complexity-label {
+    font-size: 10px;
+    color: #6B7280;
+    margin-left: 8px;
+}
+
+/* Complexity levels */
+.complexity-simple {
+    color: #10B981;
+}
+
+.complexity-moderate {
+    color: #3B82F6;
+}
+
+.complexity-complex {
+    color: #F59E0B;
+}
+
+.complexity-very-complex {
+    color: #EF4444;
+}
+
+/* Analysis empty state */
+.analysis-empty {
+    font-size: 11px;
+    color: #9CA3AF;
+    font-style: italic;
+    text-align: center;
+    padding: 8px;
+}
+
+/* ==========================================
+   PHASE 2.4: KEYBOARD SHORTCUTS HINT
+   ========================================== */
+
+.keyboard-shortcuts-hint {
+    border-top: 2px solid #E0E7FF;
+    padding-top: 12px;
+}
+
+.shortcuts-header {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6B7280;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.shortcuts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.shortcut-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: #4B5563;
+}
+
+.shortcut-item kbd {
+    background: linear-gradient(180deg, #F9FAFB 0%, #E5E7EB 100%);
+    border: 1px solid #D1D5DB;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+    color: #374151;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    min-width: 24px;
+    text-align: center;
+    display: inline-block;
+}
+
+.shortcut-item span {
+    color: #6B7280;
+    font-size: 10px;
+}
+
+@media (max-width: 768px) {
+    /* Hide sidebar on mobile, will add toggle button in Phase 2.4 */
+    #chord-recommendations-sidebar {
+        display: none;
+    }
+}
