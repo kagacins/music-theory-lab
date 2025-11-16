@@ -4941,23 +4941,89 @@ export function playMeasure(measureIndex) {
     const chordIndex = measureIndex < progressionData.length ? measureIndex : progressionData.length - 1;
     const chord = progressionData[chordIndex];
     const rhNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
-    const lhNotes = getLHNotes(
-        chord.root,
-        chord.lhType,
-        chord.lhInversion,
-        interactiveMelody.key,
-        chord.lhOctaveShift || -12,
-        chord.type,
-        getEnharmonicPreference()
-    ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
-    const chordNotes = [...rhNotes, ...lhNotes];
+
+    // Use auto-generated bass notes if available
+    let lhNotes = [];
+    let bassNoteData = []; // Store full bass note data with beat/duration
+    let bassAutoFillActive = false;
+
+    // Check if bass auto-fill is active
+    if (window.getCompositionState) {
+        const compositionState = window.getCompositionState();
+        const settings = compositionState.getSettings();
+
+        if (settings && settings.autoGenerateBass && compositionState.getMeasureCount() > chordIndex) {
+            const measure = compositionState.getMeasure(chordIndex);
+            if (measure && measure.notation && measure.notation.bass) {
+                const bassVoice = measure.notation.bass.voices && measure.notation.bass.voices[0];
+                if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
+                    // Use auto-generated bass notes with full data
+                    bassAutoFillActive = true;
+                    bassNoteData = bassVoice.notes.filter(note => note.type !== 'rest');
+                }
+            }
+        }
+    }
+
+    // If no auto-generated bass, use traditional LH chord notes
+    if (!bassAutoFillActive) {
+        lhNotes = getLHNotes(
+            chord.root,
+            chord.lhType,
+            chord.lhInversion,
+            interactiveMelody.key,
+            chord.lhOctaveShift || -12,
+            chord.type,
+            getEnharmonicPreference()
+        ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
+    }
+
+    // Don't play chord notes if bass auto-fill is active (only play bass notes)
+    const chordNotes = bassAutoFillActive ? [] : [...rhNotes, ...lhNotes];
 
     // Set active measure for highlighting
     activeMeasureIndex = measureIndex;
 
-    // Play chord
-    if (chordNotes.length > 0) {
-        // Calculate chord duration in seconds
+    // Play bass notes with proper timing if auto-fill is active
+    if (bassAutoFillActive && bassNoteData.length > 0) {
+        const tempo = interactiveMelody.tempo || 120;
+        const beatDuration = 60.0 / tempo; // seconds per beat
+
+        bassNoteData.forEach(bassNote => {
+            const noteBeat = bassNote.beat || 0;
+            const delay = noteBeat * beatDuration;
+            const noteDuration = bassNote.duration ? Tone.Time(bassNote.duration).toSeconds() : beatDuration;
+
+            // Schedule the bass note to play at its proper beat timing
+            setTimeout(() => {
+                piano.triggerAttackRelease(bassNote.pitch, bassNote.duration || '4n', Tone.now());
+
+                // Add to activeNotes for highlighting
+                const noteId = `${measureIndex}-${noteBeat}-${bassNote.pitch}`;
+                activeNotes.add(noteId);
+
+                // Visual feedback on keyboard
+                const keyEl = document.getElementById(getNoteKeyId(bassNote.pitch));
+                if (keyEl) {
+                    keyEl.classList.add('active-progression');
+                }
+
+                // Update canvas to show bass note highlighting
+                updateCanvas();
+
+                // Remove from activeNotes after note duration
+                setTimeout(() => {
+                    activeNotes.delete(noteId);
+                    const keyEl = document.getElementById(getNoteKeyId(bassNote.pitch));
+                    if (keyEl) {
+                        keyEl.classList.remove('active-progression');
+                    }
+                    updateCanvas();
+                }, noteDuration * 1000);
+            }, delay * 1000);
+        });
+    } else if (chordNotes.length > 0) {
+        // Bass auto-fill is NOT active - play chord notes all at once
         const chordDurationSeconds = Tone.Time('1n').toSeconds();
 
         piano.triggerAttackRelease(chordNotes, '1n');

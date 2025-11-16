@@ -3941,15 +3941,44 @@ export function startProgressionChord(index) {
     // Use regenerated notes if available, otherwise fall back to stored notes
     const chordNotes = chordNotesData ? chordNotesData.notes : (chord.notes || []);
 
-    const allLhNotes = getLHNotes(
-        chord.root,
-        lhType,
-        lhInversion,
-        trainerState.currentKey,
-        lhOctaveShift,
-        chord.type,
-        getEnharmonicPreference()
-    );
+    // Use auto-generated bass notes if available
+    let allLhNotes = [];
+    let bassAutoFillActive = false;
+
+    // Check if bass auto-fill is active
+    if (window.getCompositionState) {
+        const compositionState = window.getCompositionState();
+        const settings = compositionState.getSettings();
+
+        if (settings && settings.autoGenerateBass && compositionState.getMeasureCount() > index) {
+            const measure = compositionState.getMeasure(index);
+            if (measure && measure.notation && measure.notation.bass) {
+                const bassVoice = measure.notation.bass.voices && measure.notation.bass.voices[0];
+                if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
+                    // Use auto-generated bass notes (blue notes)
+                    bassAutoFillActive = true;
+                    // Extract pitch from bass notes, filter out rests
+                    allLhNotes = bassVoice.notes
+                        .filter(note => note.type !== 'rest')
+                        .map(note => note.pitch)
+                        .filter(Boolean);
+                }
+            }
+        }
+    }
+
+    // If no auto-generated bass, use traditional LH chord notes
+    if (!bassAutoFillActive) {
+        allLhNotes = getLHNotes(
+            chord.root,
+            lhType,
+            lhInversion,
+            trainerState.currentKey,
+            lhOctaveShift,
+            chord.type,
+            getEnharmonicPreference()
+        );
+    }
 
     // Highlight the current card - find by data-index attribute
     document.querySelectorAll('#progression-visualization > div').forEach((wrapper) => {
@@ -4077,15 +4106,44 @@ function playProgressionChord(index, advance = true) {
     // Use regenerated notes if available, otherwise fall back to stored notes
     const chordNotes = chordNotesData ? chordNotesData.notes : (chord.notes || []);
 
-    const allLhNotes = getLHNotes(
-        chord.root,
-        lhType,
-        lhInversion,
-        trainerState.currentKey,
-        lhOctaveShift,
-        chord.type,
-        getEnharmonicPreference()
-    );
+    // Use auto-generated bass notes if available
+    let allLhNotes = [];
+    let bassAutoFillActive = false;
+
+    // Check if bass auto-fill is active
+    if (window.getCompositionState) {
+        const compositionState = window.getCompositionState();
+        const settings = compositionState.getSettings();
+
+        if (settings && settings.autoGenerateBass && compositionState.getMeasureCount() > index) {
+            const measure = compositionState.getMeasure(index);
+            if (measure && measure.notation && measure.notation.bass) {
+                const bassVoice = measure.notation.bass.voices && measure.notation.bass.voices[0];
+                if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
+                    // Use auto-generated bass notes (blue notes)
+                    bassAutoFillActive = true;
+                    // Extract pitch from bass notes, filter out rests
+                    allLhNotes = bassVoice.notes
+                        .filter(note => note.type !== 'rest')
+                        .map(note => note.pitch)
+                        .filter(Boolean);
+                }
+            }
+        }
+    }
+
+    // If no auto-generated bass, use traditional LH chord notes
+    if (!bassAutoFillActive) {
+        allLhNotes = getLHNotes(
+            chord.root,
+            lhType,
+            lhInversion,
+            trainerState.currentKey,
+            lhOctaveShift,
+            chord.type,
+            getEnharmonicPreference()
+        );
+    }
 
     // Highlight the current card - find by data-index attribute
     document.querySelectorAll('#progression-visualization > div').forEach((wrapper) => {
