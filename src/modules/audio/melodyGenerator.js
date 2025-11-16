@@ -964,6 +964,11 @@ export function initInteractiveMelody() {
     currentBeat = 0;
     isInteractiveMode = true;
 
+    // Phase 1B: Sync progression to composition state for bass auto-fill
+    if (window.syncProgressionToMelodyComposer) {
+        window.syncProgressionToMelodyComposer();
+    }
+
     // Render chord progression as whole notes
     const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
     if (interactiveCanvas) {
@@ -1481,7 +1486,7 @@ function disableKeyboardCompositionMode() {
  */
 export function renderChordProgressionStaff(canvasElement) {
     const canvas = canvasElement;
-    
+
     // Clear note click regions before rendering
     noteClickRegions.set(canvas, []);
 
@@ -1521,15 +1526,21 @@ export function renderChordProgressionStaff(canvasElement) {
         // Use FIXED measure width to prevent shrinking when more chords are added
         const numMeasures = progressionData.length; // Render ALL chords
         const desiredMeasureWidth = 220; // Fixed pixels per measure - DO NOT shrink
+
+        // Phase 2.2: Wrap measures to max 4 per row
+        const maxMeasuresPerRow = 4;
+        const numRows = Math.ceil(numMeasures / maxMeasuresPerRow);
+        const measuresThisRow = Math.min(numMeasures, maxMeasuresPerRow);
+
         const padding = 40; // Left and right padding
-        // Always use calculated width based on number of measures - enables horizontal scrolling
-        const calculatedCanvasWidth = (numMeasures * desiredMeasureWidth) + padding;
+        // Calculate canvas width for max 4 measures per row
+        const calculatedCanvasWidth = (measuresThisRow * desiredMeasureWidth) + padding;
 
         // Set canvas dimensions explicitly BEFORE clearing or creating renderer
         canvas.width = calculatedCanvasWidth;
-        // Set CSS width to match for proper display - always use calculated width for scrolling
+        // Set CSS width and height - fixed width, scrollable height if needed
         canvas.style.width = calculatedCanvasWidth + 'px';
-        canvas.style.minWidth = calculatedCanvasWidth + 'px'; // Ensure minimum width for scrolling
+        canvas.style.minWidth = calculatedCanvasWidth + 'px';
         canvas.style.height = 'auto';
         // Determine if we need extra height for ottava brackets
         // We'll use treble clef for all notes and apply 8va/8vb when needed
@@ -1554,11 +1565,15 @@ export function renderChordProgressionStaff(canvasElement) {
             });
         });
 
-        // Set canvas height - always use single stave height since we'll use one clef
-        canvas.height = 140; // Single stave height with padding
-        if (needsExtraHeight) {
-            canvas.height = 160; // Extra height for ottava brackets
-        }
+        // Set canvas height - two staves (RH and LH) per row with padding
+        // RH stave starts at Y=30, LH stave at Y=140 (30+110)
+        // Phase 2.2: Calculate height for multiple rows
+        const rowHeight = 270; // Height per row (two staves with padding)
+        const extraRowHeight = needsExtraHeight ? 20 : 0;
+        let canvasHeight = (numRows * rowHeight) + extraRowHeight;
+
+        // Set canvas height explicitly to ensure consistent height
+        canvas.height = canvasHeight;
 
         if (canvas.width === 0 || canvas.height === 0) {
             console.warn('Canvas dimensions are zero, retrying...');
@@ -1582,27 +1597,99 @@ export function renderChordProgressionStaff(canvasElement) {
         // Use a fixed measure width to ensure consistent spacing and all chords visible
         const fixedMeasureWidth = desiredMeasureWidth;
         const measureWidth = fixedMeasureWidth;
-        
-        // Vertical position for staves - single stave position
-        const staveY = 30; // Single stave position
 
-        // Create staves for each measure - ensure we create one for EVERY chord
-        // Position staves contiguously with no gaps
-        const staves = [];
+        // Phase 1C: Check if bass auto-fill is active AND enabled
+        // If auto-generate is ON and bass notes exist, use them
+        // If auto-generate is OFF or no bass notes, show chord whole notes
+        let bassAutoFillActive = false;
+        let actualChordClef = chordClef;
+
+        if (window.getCompositionState) {
+            const compositionState = window.getCompositionState();
+            const settings = compositionState.getSettings();
+
+            // Check based on progression length, not measure count
+            // Bass notes are added when chords exist, regardless of whether melody measures exist
+            const hasChords = progressionData && progressionData.length > 0;
+            const hasMeasures = compositionState && compositionState.getMeasureCount() > 0;
+
+            if (compositionState && (hasChords || hasMeasures)) {
+                // Check if auto-generate is ENABLED
+                if (settings && settings.autoGenerateBass) {
+                    // Try to get measure from compositionState
+                    let hasBassNotes = false;
+
+                    // Check if bass notes exist by checking measures based on progression length
+                    const measuresToCheck = Math.max(progressionData ? progressionData.length : 0, compositionState.getMeasureCount());
+
+                    for (let i = 0; i < measuresToCheck; i++) {
+                        const measure = compositionState.getMeasure(i);
+                        if (measure && measure.notation && measure.notation.bass) {
+                            const bassVoice = measure.notation.bass.voices && measure.notation.bass.voices[0];
+                            if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
+                                hasBassNotes = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // If auto-generate is enabled and we have chords, assume bass notes exist or will exist
+                    // This handles the case where melody hasn't been recorded yet but bass notes are present
+                    if (hasBassNotes || (hasChords && settings.autoGenerateBass)) {
+                        bassAutoFillActive = true;
+                        actualChordClef = 'bass'; // Force bass clef when bass auto-fill is ON
+                    }
+                }
+            }
+
+            // If bass auto-fill is OFF, check if chords should be in bass clef
+            if (!bassAutoFillActive && progressionData && progressionData.length > 0) {
+                const firstChord = progressionData[0];
+                const firstChordNotes = firstChord.notes || [];
+                const hasLowNotes = firstChordNotes.some(note => {
+                    const match = note.match(/([A-G][#b]?)(\d+)/);
+                    if (match) {
+                        const octave = parseInt(match[2]);
+                        return octave <= 3; // C3 and below suggests bass clef
+                    }
+                    return false;
+                });
+
+                if (hasLowNotes) {
+                    actualChordClef = 'bass';
+                }
+            }
+        }
+
+        // Vertical positions for staves - base positions for first row
+        const baseRowY = 30; // Start of first row
+        const melodyStaveOffsetY = 0; // Top stave offset from row start
+        const chordStaveOffsetY = 110; // Bottom stave offset from row start
+
+        // Create staves for melody (upper staff) - empty when not recording, but always shown
+        // Phase 2.2: Position staves in rows with max 4 measures per row
+        const melodyStaves = [];
         for (let i = 0; i < numMeasures; i++) {
-            // Position each stave to start where the previous one ended (no gaps)
-            const staveX = 20 + (i * measureWidth);
+            // Calculate which row and column this measure is in
+            const row = Math.floor(i / maxMeasuresPerRow);
+            const col = i % maxMeasuresPerRow;
+
+            // Position stave based on row and column
+            const staveX = 20 + (col * measureWidth);
+            const staveY = baseRowY + (row * rowHeight) + melodyStaveOffsetY;
+
             // Stave width equals measure width for seamless connection
             const stave = new Stave(staveX, staveY, measureWidth);
 
-            if (i === 0) {
-                    // Use selected melody clef (for chord progression display, we use melody clef since it's a single stave)
-                    stave.addClef(melodyClef);
-                    const vexFlowKey = getVexFlowKeySignature(currentKey);
+            // Add clef, key signature, and time signature at start of each row
+            if (col === 0) {
+                // Use selected melody clef (RH clef) for top stave
+                stave.addClef(melodyClef);
+                const vexFlowKey = getVexFlowKeySignature(currentKey);
                 try {
-                        if (vexFlowKey) {
-                    stave.addKeySignature(vexFlowKey);
-                        }
+                    if (vexFlowKey) {
+                        stave.addKeySignature(vexFlowKey);
+                    }
                 } catch (e) {
                     console.warn('Key signature error:', e);
                 }
@@ -1610,7 +1697,41 @@ export function renderChordProgressionStaff(canvasElement) {
             }
 
             stave.setContext(context).draw();
-            staves.push(stave);
+            melodyStaves.push(stave);
+        }
+
+        // Create staves for chords (lower staff) - chord progression always on bottom
+        // Phase 2.2: Position staves in rows with max 4 measures per row
+        const chordStaves = [];
+        for (let i = 0; i < numMeasures; i++) {
+            // Calculate which row and column this measure is in
+            const row = Math.floor(i / maxMeasuresPerRow);
+            const col = i % maxMeasuresPerRow;
+
+            // Position stave based on row and column
+            const staveX = 20 + (col * measureWidth);
+            const staveY = baseRowY + (row * rowHeight) + chordStaveOffsetY;
+
+            // Stave width equals measure width for seamless connection
+            const stave = new Stave(staveX, staveY, measureWidth);
+
+            // Add clef, key signature, and time signature at start of each row
+            if (col === 0) {
+                // Use selected chord clef (LH clef) for bottom stave
+                stave.addClef(actualChordClef);
+                const vexFlowKey = getVexFlowKeySignature(currentKey);
+                try {
+                    if (vexFlowKey) {
+                        stave.addKeySignature(vexFlowKey);
+                    }
+                } catch (e) {
+                    console.warn('Key signature error:', e);
+                }
+                stave.addTimeSignature('4/4');
+            }
+
+            stave.setContext(context).draw();
+            chordStaves.push(stave);
         }
 
         // Create whole notes for each chord - render ALL chords (no slice limit)
@@ -1622,11 +1743,11 @@ export function renderChordProgressionStaff(canvasElement) {
             const chord = progressionData[index];
             
             // Ensure we don't exceed the number of staves we created
-            if (index >= staves.length) {
-                console.warn(`Chord at index ${index} exceeds available staves (${staves.length})`);
+            if (index >= melodyStaves.length || index >= chordStaves.length) {
+                console.warn(`Chord at index ${index} exceeds available staves`);
                 continue;
             }
-            // Get all notes for the chord (RH and LH)
+            // Get RH and LH notes separately
             const rhNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
             const lhNotes = getLHNotes(
                 chord.root,
@@ -1638,285 +1759,299 @@ export function renderChordProgressionStaff(canvasElement) {
                 getEnharmonicPreference()
             ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
 
-            const allNotes = [...rhNotes, ...lhNotes];
+            // Helper function to render notes on a specific stave
+            const renderNotesOnStave = (notes, stave, clef, staveIndex) => {
+                if (notes.length === 0) return null;
 
-            if (allNotes.length === 0) {
-                continue; // Skip if no notes
-            }
-
-            // Process notes with octave shift detection
-            // Strategy:
-            // 1. If ALL notes need the SAME ottava type, use that type
-            // 2. For treble clef: If the LOWEST note needs ottava (8va/15va), apply 8va to all notes
-            //    This makes high chords readable even if notes span different ottava ranges
-            // 3. If there's a conflict where some notes need ottava but lowest doesn't, render at actual pitches
-            
-            const noteOctaveInfo = []; // Track ottava info for each note
-            
-            allNotes.forEach(note => {
+                // Process notes with octave shift detection
+                const noteOctaveInfo = [];
+                
+                notes.forEach(note => {
                 const match = note.match(/^([A-G][#b]?)(\d+)$/);
                 if (!match) {
                     noteOctaveInfo.push(null);
                     return;
                 }
                 
-                // Use melody clef for chord progression display
-                const octaveInfo = getOctaveShift(note, melodyClef);
-                noteOctaveInfo.push(octaveInfo);
-            });
-            
-            // Determine ottava handling for the chord
-            const uniqueOttavaTypes = new Set();
-            noteOctaveInfo.forEach(info => {
-                if (info && info.label) {
-                    uniqueOttavaTypes.add(info.label);
-                } else {
-                    uniqueOttavaTypes.add(null); // No ottava needed
-                }
-            });
-            
-            let shouldApplyOttava = false;
-            let ottavaType = null;
-            let ottavaShift = 0;
-            
-            // Case 1: All notes need the same ottava type
-            if (uniqueOttavaTypes.size === 1 && !uniqueOttavaTypes.has(null)) {
-                shouldApplyOttava = true;
-                ottavaType = Array.from(uniqueOttavaTypes)[0];
-                ottavaShift = noteOctaveInfo[0] ? noteOctaveInfo[0].shift : 0;
-            } 
-            // Case 2: Mixed ottava needs - check based on clef
-            else if (uniqueOttavaTypes.size > 1 || (uniqueOttavaTypes.size === 2 && uniqueOttavaTypes.has(null))) {
-                if (melodyClef === 'treble') {
-                    // For treble clef: If the LOWEST note needs ottava (8va/15va), apply 8va to all
-                    let lowestMidi = Infinity;
-                    let lowestNoteIndex = -1;
-                    
-                    allNotes.forEach((note, idx) => {
-                        try {
-                            const midi = noteToMidi(note);
-                            if (midi < lowestMidi) {
-                                lowestMidi = midi;
-                                lowestNoteIndex = idx;
-                            }
-                        } catch (e) {
-                            // Skip if MIDI calculation fails
-                        }
-                    });
-                    
-                    // If lowest note needs ottava (8va or 15va for treble clef), apply 8va to all
-                    if (lowestNoteIndex >= 0 && noteOctaveInfo[lowestNoteIndex] && noteOctaveInfo[lowestNoteIndex].label) {
-                        const lowestOttavaInfo = noteOctaveInfo[lowestNoteIndex];
-                        // Check if it's a high ottava (8va or 15va) - these are for treble clef high notes
-                        if (lowestOttavaInfo.label.includes('va') && !lowestOttavaInfo.label.includes('vb')) {
-                            shouldApplyOttava = true;
-                            ottavaType = '8va'; // Use 8va as standard (transposes down one octave)
-                            ottavaShift = -1; // Standard 8va shift
-                        }
-                    }
-                } else {
-                    // For bass clef: If the HIGHEST note needs ottava (8va/15va for high notes), apply 8va to all
-                    // OR if the LOWEST note needs 8va/15va (very low notes), apply 8va to all
-                    let highestMidi = -Infinity;
-                    let highestNoteIndex = -1;
-                    let lowestMidi = Infinity;
-                    let lowestNoteIndex = -1;
-                    
-                    allNotes.forEach((note, idx) => {
-                        try {
-                            const midi = noteToMidi(note);
-                            if (midi > highestMidi) {
-                                highestMidi = midi;
-                                highestNoteIndex = idx;
-                            }
-                            if (midi < lowestMidi) {
-                                lowestMidi = midi;
-                                lowestNoteIndex = idx;
-                            }
-                        } catch (e) {
-                            // Skip if MIDI calculation fails
-                        }
-                    });
-                    
-                    // Check highest note for 8va/15va (high notes for bass clef)
-                    // High notes in bass clef use 8va (transpose down for display, play up)
-                    if (highestNoteIndex >= 0 && noteOctaveInfo[highestNoteIndex] && noteOctaveInfo[highestNoteIndex].label) {
-                        const highestOttavaInfo = noteOctaveInfo[highestNoteIndex];
-                        if (highestOttavaInfo.label.includes('va') && !highestOttavaInfo.label.includes('vb')) {
-                            shouldApplyOttava = true;
-                            ottavaType = '8va'; // Use 8va as standard (transposes down one octave for display)
-                            ottavaShift = -1; // Standard 8va shift for high notes in bass clef
-                        }
-                    }
-                    // Check lowest note for 8vb/15vb (very low notes for bass clef)
-                    else if (lowestNoteIndex >= 0 && noteOctaveInfo[lowestNoteIndex] && noteOctaveInfo[lowestNoteIndex].label) {
-                        const lowestOttavaInfo = noteOctaveInfo[lowestNoteIndex];
-                        if (lowestOttavaInfo.label.includes('vb')) {
-                            shouldApplyOttava = true;
-                            ottavaType = '8vb'; // Use 8vb as standard (transposes up one octave for display, play lower)
-                            ottavaShift = 1; // Standard 8vb shift for low notes in bass clef
-                        }
-                    }
-                }
-            }
-            
-            // Process notes for display (apply ottava transposition only if all agree)
-            const processedNotes = [];
-            
-            allNotes.forEach((note, noteIdx) => {
-                const match = note.match(/^([A-G][#b]?)(\d+)$/);
-                if (!match) return;
-                
-                // Apply ottava transposition only if all notes agree
-                const displayNote = shouldApplyOttava 
-                    ? transposeNoteForDisplay(note, ottavaShift)
-                    : note; // Render at actual pitch if conflict
-                
-                const displayMatch = displayNote.match(/^([A-G][#b]?)(\d+)$/);
-                if (!displayMatch) return;
-
-                const noteName = displayMatch[1];
-                const octave = parseInt(displayMatch[2]);
-                const vexFlowNote = `${noteName}/${octave}`;
-
-                processedNotes.push({
-                    note: vexFlowNote,
-                    original: note,
-                    noteName: noteName,
-                    octaveInfo: noteOctaveInfo[noteIdx]
+                    // Use the specified clef for octave shift calculation
+                    const octaveInfo = getOctaveShift(note, clef);
+                    noteOctaveInfo.push(octaveInfo);
                 });
-            });
-
-            if (processedNotes.length === 0) {
-                continue;
-            }
-
-            // Create stave note with all processed notes (using selected melody clef)
-            const keys = processedNotes.map(n => n.note);
-            const staveNote = new StaveNote({ clef: melodyClef, keys: keys, duration: 'w' });
-
-            // Add accidentals
-            processedNotes.forEach((n, idx) => {
-                if (n.noteName.includes('#')) {
-                    staveNote.addModifier(new Accidental('#'), idx);
-                } else if (n.noteName.includes('b')) {
-                    staveNote.addModifier(new Accidental('b'), idx);
-            }
-            });
-
-            const voice = new Voice({ num_beats: 4, beat_value: 4 });
-            voice.setStrict(false);
-            voice.addTickables([staveNote]);
-
-            // Format with stave width minus padding for note spacing
-            // First measure has key/time signatures, so needs more padding
-            // Subsequent measures don't have signatures, so can use less padding
-            let chordProgFormatWidth;
-            if (index === 0) {
-                // First measure: account for key/time signatures (typically 60-80px)
-                chordProgFormatWidth = Math.max(measureWidth - 100, 100); // Reduced padding for first measure (was 120)
-            } else {
-                // Subsequent measures: standard padding (no signatures)
-                chordProgFormatWidth = Math.max(measureWidth - 40, 100); // Less padding for subsequent measures
-            }
-            new Formatter().joinVoices([voice]).format([voice], chordProgFormatWidth);
-            voice.draw(context, staves[index]);
-            
-            // Store note clickable regions for chord notes (renderChordProgressionStaff)
-            if (!noteClickRegions.has(canvas)) {
-                noteClickRegions.set(canvas, []);
-            }
-            const clickRegions = noteClickRegions.get(canvas);
-            
-            // Highlight currently playing chord notes in red and store click regions
-            const chordDefaultColor = '#111827';
-            const chordActiveFill = '#EF4444';
-            const chordActiveStroke = '#DC2626';
-            let chordIsActive = false;
-
-            allNotes.forEach(note => {
-                const noteId = `${index}-0-${note}`;
-                if (highlightEnabled && activeNotes.has(noteId)) {
-                    chordIsActive = true;
-                }
-            });
-
-            if (typeof staveNote.setStyle === 'function') {
-                staveNote.setStyle({
-                    fillStyle: chordIsActive ? chordActiveFill : chordDefaultColor,
-                    strokeStyle: chordIsActive ? chordActiveStroke : chordDefaultColor
+                
+                // Determine ottava handling for the chord
+                const uniqueOttavaTypes = new Set();
+                noteOctaveInfo.forEach(info => {
+                    if (info && info.label) {
+                        uniqueOttavaTypes.add(info.label);
+                    } else {
+                        uniqueOttavaTypes.add(null); // No ottava needed
+                    }
                 });
-            }
-            if (typeof staveNote.setStemStyle === 'function') {
-                staveNote.setStemStyle({ strokeStyle: chordIsActive ? chordActiveStroke : chordDefaultColor });
-            }
-
-            try {
-                const boundingBox = staveNote.getBoundingBox();
-                if (!boundingBox) {
-                    return;
-                }
-
-                const glyphs = staveNote.getGlyphs ? staveNote.getGlyphs() : null;
-
-                allNotes.forEach((note, noteIdx) => {
-                    const noteId = `${index}-0-${note}`;
-
-                    let noteX;
-                    let noteY;
-                    let noteWidth = 15;
-                    let noteHeight = 15;
-
-                    try {
-                        if (glyphs && glyphs.length > noteIdx) {
-                            const glyph = glyphs[noteIdx];
-                            if (glyph && glyph.getBoundingBox) {
-                                const glyphBounds = glyph.getBoundingBox();
-                                if (glyphBounds) {
-                                    noteX = glyphBounds.getX();
-                                    noteY = glyphBounds.getY();
-                                    noteWidth = glyphBounds.getW();
-                                    noteHeight = glyphBounds.getH();
+                
+                let shouldApplyOttava = false;
+                let ottavaType = null;
+                let ottavaShift = 0;
+                
+                // Case 1: All notes need the same ottava type
+                if (uniqueOttavaTypes.size === 1 && !uniqueOttavaTypes.has(null)) {
+                    shouldApplyOttava = true;
+                    ottavaType = Array.from(uniqueOttavaTypes)[0];
+                    ottavaShift = noteOctaveInfo[0] ? noteOctaveInfo[0].shift : 0;
+                } 
+                // Case 2: Mixed ottava needs - check based on clef
+                else if (uniqueOttavaTypes.size > 1 || (uniqueOttavaTypes.size === 2 && uniqueOttavaTypes.has(null))) {
+                    if (clef === 'treble') {
+                        // For treble clef: If the LOWEST note needs ottava (8va/15va), apply 8va to all
+                        let lowestMidi = Infinity;
+                        let lowestNoteIndex = -1;
+                        
+                        notes.forEach((note, idx) => {
+                            try {
+                                const midi = noteToMidi(note);
+                                if (midi < lowestMidi) {
+                                    lowestMidi = midi;
+                                    lowestNoteIndex = idx;
                                 }
+                            } catch (e) {
+                                // Skip if MIDI calculation fails
+                            }
+                        });
+                        
+                        // If lowest note needs ottava (8va or 15va for treble clef), apply 8va to all
+                        if (lowestNoteIndex >= 0 && noteOctaveInfo[lowestNoteIndex] && noteOctaveInfo[lowestNoteIndex].label) {
+                            const lowestOttavaInfo = noteOctaveInfo[lowestNoteIndex];
+                            // Check if it's a high ottava (8va or 15va) - these are for treble clef high notes
+                            if (lowestOttavaInfo.label.includes('va') && !lowestOttavaInfo.label.includes('vb')) {
+                                shouldApplyOttava = true;
+                                ottavaType = '8va'; // Use 8va as standard (transposes down one octave)
+                                ottavaShift = -1; // Standard 8va shift
                             }
                         }
-                    } catch (glyphErr) {
-                        // Ignore glyph errors, fall back to bounding box distribution
+                    } else {
+                        // For bass clef: If the HIGHEST note needs ottava (8va/15va for high notes), apply 8va to all
+                        // OR if the LOWEST note needs 8va/15va (very low notes), apply 8va to all
+                        let highestMidi = -Infinity;
+                        let highestNoteIndex = -1;
+                        let lowestMidi = Infinity;
+                        let lowestNoteIndex = -1;
+                        
+                        notes.forEach((note, idx) => {
+                            try {
+                                const midi = noteToMidi(note);
+                                if (midi > highestMidi) {
+                                    highestMidi = midi;
+                                    highestNoteIndex = idx;
+                                }
+                                if (midi < lowestMidi) {
+                                    lowestMidi = midi;
+                                    lowestNoteIndex = idx;
+                                }
+                            } catch (e) {
+                                // Skip if MIDI calculation fails
+                            }
+                        });
+                        
+                        // Check highest note for 8va/15va (high notes for bass clef)
+                        // High notes in bass clef use 8va (transpose down for display, play up)
+                        if (highestNoteIndex >= 0 && noteOctaveInfo[highestNoteIndex] && noteOctaveInfo[highestNoteIndex].label) {
+                            const highestOttavaInfo = noteOctaveInfo[highestNoteIndex];
+                            if (highestOttavaInfo.label.includes('va') && !highestOttavaInfo.label.includes('vb')) {
+                                shouldApplyOttava = true;
+                                ottavaType = '8va'; // Use 8va as standard (transposes down one octave for display)
+                                ottavaShift = -1; // Standard 8va shift for high notes in bass clef
+                            }
+                        }
+                        // Check lowest note for 8vb/15vb (very low notes for bass clef)
+                        else if (lowestNoteIndex >= 0 && noteOctaveInfo[lowestNoteIndex] && noteOctaveInfo[lowestNoteIndex].label) {
+                            const lowestOttavaInfo = noteOctaveInfo[lowestNoteIndex];
+                            if (lowestOttavaInfo.label.includes('vb')) {
+                                shouldApplyOttava = true;
+                                ottavaType = '8vb'; // Use 8vb as standard (transposes up one octave for display, play lower)
+                                ottavaShift = 1; // Standard 8vb shift for low notes in bass clef
+                            }
+                        }
                     }
+                }
+                
+                // Process notes for display (apply ottava transposition only if all agree)
+                const processedNotes = [];
+                
+                notes.forEach((note, noteIdx) => {
+                    const match = note.match(/^([A-G][#b]?)(\d+)$/);
+                    if (!match) return;
+                    
+                    // Apply ottava transposition only if all notes agree
+                    const displayNote = shouldApplyOttava 
+                        ? transposeNoteForDisplay(note, ottavaShift)
+                        : note; // Render at actual pitch if conflict
+                    
+                    const displayMatch = displayNote.match(/^([A-G][#b]?)(\d+)$/);
+                    if (!displayMatch) return;
 
-                    if (typeof noteX !== 'number' || typeof noteY !== 'number') {
-                        const noteSpacing = boundingBox.getW() / allNotes.length;
-                        noteX = boundingBox.getX() + (noteIdx * noteSpacing);
-                        noteY = boundingBox.getY();
-                        noteWidth = noteSpacing;
-                        noteHeight = boundingBox.getH();
-                    }
+                    const noteName = displayMatch[1];
+                    const octave = parseInt(displayMatch[2]);
+                    const vexFlowNote = `${noteName}/${octave}`;
 
-                    clickRegions.push({
-                        type: 'chord',
-                        measure: index,
-                        beat: 0,
-                        pitch: note,
-                        x: noteX - 10,
-                        y: noteY - 10,
-                        width: noteWidth + 20,
-                        height: noteHeight + 20
+                    processedNotes.push({
+                        note: vexFlowNote,
+                        original: note,
+                        noteName: noteName,
+                        octaveInfo: noteOctaveInfo[noteIdx]
                     });
                 });
-            } catch (e) {
-                // Ignore highlight errors
-            }
 
-            // Store stave note for ottava bracket tracking (only if all notes agree)
-            if (shouldApplyOttava && ottavaType) {
-                ottavaBracketsToDraw.push({
-                    staveNote: staveNote,
-                    stave: staves[index],
-                    ottavaType: ottavaType,
-                    measureIndex: index
+                if (processedNotes.length === 0) {
+                    return null;
+                }
+
+                // Create stave note with all processed notes (using specified clef)
+                const keys = processedNotes.map(n => n.note);
+                const staveNote = new StaveNote({ clef: clef, keys: keys, duration: 'w' });
+
+                // Add accidentals
+                processedNotes.forEach((n, idx) => {
+                    if (n.noteName.includes('#')) {
+                        staveNote.addModifier(new Accidental('#'), idx);
+                    } else if (n.noteName.includes('b')) {
+                        staveNote.addModifier(new Accidental('b'), idx);
+                    }
                 });
+
+                const voice = new Voice({ num_beats: 4, beat_value: 4 });
+                voice.setStrict(false);
+                voice.addTickables([staveNote]);
+
+                // Format with stave width minus padding for note spacing
+                // First measure has key/time signatures, so needs more padding
+                // Subsequent measures don't have signatures, so can use less padding
+                let chordProgFormatWidth;
+                if (staveIndex === 0) {
+                    // First measure: account for key/time signatures (typically 60-80px)
+                    chordProgFormatWidth = Math.max(measureWidth - 100, 100); // Reduced padding for first measure (was 120)
+                } else {
+                    // Subsequent measures: standard padding (no signatures)
+                    chordProgFormatWidth = Math.max(measureWidth - 40, 100); // Less padding for subsequent measures
+                }
+                new Formatter().joinVoices([voice]).format([voice], chordProgFormatWidth);
+                voice.draw(context, stave);
+                
+                // Store note clickable regions for chord notes
+                if (!noteClickRegions.has(canvas)) {
+                    noteClickRegions.set(canvas, []);
+                }
+                const clickRegions = noteClickRegions.get(canvas);
+                
+                // Highlight currently playing chord notes in red and store click regions
+                const chordDefaultColor = '#111827';
+                const chordActiveFill = '#EF4444';
+                const chordActiveStroke = '#DC2626';
+                let chordIsActive = false;
+
+                notes.forEach(note => {
+                    const noteId = `${staveIndex}-0-${note}`;
+                    if (highlightEnabled && activeNotes.has(noteId)) {
+                        chordIsActive = true;
+                    }
+                });
+
+                if (typeof staveNote.setStyle === 'function') {
+                    staveNote.setStyle({
+                        fillStyle: chordIsActive ? chordActiveFill : chordDefaultColor,
+                        strokeStyle: chordIsActive ? chordActiveStroke : chordDefaultColor
+                    });
+                }
+                if (typeof staveNote.setStemStyle === 'function') {
+                    staveNote.setStemStyle({ strokeStyle: chordIsActive ? chordActiveStroke : chordDefaultColor });
+                }
+
+                try {
+                    const boundingBox = staveNote.getBoundingBox();
+                    if (boundingBox) {
+                        const glyphs = staveNote.getGlyphs ? staveNote.getGlyphs() : null;
+
+                        // Get stave absolute position for converting relative coords to absolute
+                        const staveAbsX = stave ? stave.getX() : 0;
+                        const staveAbsY = stave ? stave.getY() : 0;
+
+                        notes.forEach((note, noteIdx) => {
+                            const noteId = `${staveIndex}-0-${note}`;
+
+                            let noteX;
+                            let noteY;
+                            let noteWidth = 15;
+                            let noteHeight = 15;
+
+                            try {
+                                if (glyphs && glyphs.length > noteIdx) {
+                                    const glyph = glyphs[noteIdx];
+                                    if (glyph && glyph.getBoundingBox) {
+                                        const glyphBounds = glyph.getBoundingBox();
+                                        if (glyphBounds) {
+                                            noteX = glyphBounds.getX();
+                                            noteY = glyphBounds.getY();
+                                            noteWidth = glyphBounds.getW();
+                                            noteHeight = glyphBounds.getH();
+                                        }
+                                    }
+                                }
+                            } catch (glyphErr) {
+                                // Ignore glyph errors, fall back to bounding box distribution
+                            }
+
+                            if (typeof noteX !== 'number' || typeof noteY !== 'number') {
+                                const noteSpacing = boundingBox.getW() / notes.length;
+                                noteX = boundingBox.getX() + (noteIdx * noteSpacing);
+                                noteY = boundingBox.getY();
+                                noteWidth = noteSpacing;
+                                noteHeight = boundingBox.getH();
+                            }
+
+                            // VexFlow bounding boxes are relative to the stave, so add stave position
+                            clickRegions.push({
+                                type: 'chord',
+                                measure: staveIndex,
+                                beat: 0,
+                                pitch: note,
+                                x: staveAbsX + noteX - 10,
+                                y: staveAbsY + noteY - 10,
+                                width: noteWidth + 20,
+                                height: noteHeight + 20
+                            });
+                        });
+                    }
+                } catch (e) {
+                    // Ignore highlight errors
+                }
+
+                // Return stave note and ottava info for bracket tracking
+                return {
+                    staveNote: staveNote,
+                    stave: stave,
+                    ottavaType: shouldApplyOttava && ottavaType ? ottavaType : null,
+                    measureIndex: staveIndex
+                };
+            };
+
+            // Phase 1C: Render bass notes OR chord notes depending on bassAutoFillActive
+            if (bassAutoFillActive) {
+                // Bass auto-fill is ON - bass notes will be rendered separately after the loop
+                // DO NOT render chord notes here, just skip this measure
+            } else {
+                // Bass auto-fill is OFF - render chord notes as before
+                // Render all chord notes (RH + LH) on the bottom stave (chord stave)
+                // Top stave (melody stave) remains empty when not recording
+                const allChordNotes = [...rhNotes, ...lhNotes];
+                const chordResult = renderNotesOnStave(allChordNotes, chordStaves[index], actualChordClef, index);
+                if (chordResult && chordResult.ottavaType) {
+                    ottavaBracketsToDraw.push(chordResult);
+                }
             }
         } // Closes the for loop for notes (renders ALL chords)
+
+        // Phase 1C: Render bass notes from compositionState if bass auto-fill is active
+        if (bassAutoFillActive) {
+            renderBassFromCompositionState(context, chordStaves, numMeasures, actualChordClef, canvas);
+        }
 
         // Draw ottava brackets after all notes are rendered
         // Group consecutive measures with the same ottava type
@@ -1931,21 +2066,48 @@ export function renderChordProgressionStaff(canvasElement) {
                     // Draw previous group if it exists
                     if (currentBracketGroup.length > 0) {
                         try {
+                            const is8va = currentOttavaType.includes('va');
+                            const position = is8va ? 1 : -1; // 1 = above, -1 = below
+                            
+                            // Find the highest note for 8va or lowest note for 8vb
+                            let targetNote = currentBracketGroup[0].staveNote;
+                            let targetY = null;
+                            
+                            currentBracketGroup.forEach(bracketInfo => {
+                                try {
+                                    const staveNote = bracketInfo.staveNote;
+                                    const boundingBox = staveNote.getBoundingBox();
+                                    if (boundingBox) {
+                                        // For 8va, find the note with the lowest Y (highest on screen = highest pitch)
+                                        // For 8vb, find the note with the highest Y (lowest on screen = lowest pitch)
+                                        const noteY = boundingBox.getY();
+                                        
+                                        if (targetY === null || (is8va ? noteY < targetY : noteY > targetY)) {
+                                            targetY = noteY;
+                                            targetNote = staveNote;
+                                        }
+                                    }
+                                } catch (e) {
+                                    // If bounding box fails, fall back to first note
+                                }
+                            });
+                            
+                            // Use the target note for both start and stop to ensure bracket is positioned correctly
+                            // But span from first to last measure for visual continuity
                             const startNote = currentBracketGroup[0].staveNote;
                             const endNote = currentBracketGroup[currentBracketGroup.length - 1].staveNote;
-                            const position = currentOttavaType.includes('va') ? 1 : -1; // 1 = above, -1 = below
                             
-                            // Debug logging (can be removed later)
-                            // console.log('Creating TextBracket:', currentOttavaType, 'from measure', currentBracketGroup[0].measureIndex, 'to', currentBracketGroup[currentBracketGroup.length - 1].measureIndex);
+                            // For 8va, use the highest note (lowest Y); for 8vb, use the lowest note (highest Y)
+                            const bracketStart = targetNote;
+                            const bracketStop = targetNote;
                             
                             const textBracket = new TextBracket({
-                                start: startNote,
-                                stop: endNote,
+                                start: bracketStart,
+                                stop: bracketStop,
                                 text: currentOttavaType,
                                 position: position
                             });
                             textBracket.setContext(context).draw();
-                            // console.log('Successfully drew ottava bracket:', currentOttavaType);
                         } catch (e) {
                             console.error('Error drawing ottava bracket:', e, e.stack);
                         }
@@ -1962,21 +2124,48 @@ export function renderChordProgressionStaff(canvasElement) {
             // Draw last group
             if (currentBracketGroup.length > 0) {
                 try {
+                    const is8va = currentOttavaType.includes('va');
+                    const position = is8va ? 1 : -1; // 1 = above, -1 = below
+                    
+                    // Find the highest note for 8va or lowest note for 8vb
+                    let targetNote = currentBracketGroup[0].staveNote;
+                    let targetY = null;
+                    
+                    currentBracketGroup.forEach(bracketInfo => {
+                        try {
+                            const staveNote = bracketInfo.staveNote;
+                            const boundingBox = staveNote.getBoundingBox();
+                            if (boundingBox) {
+                                // For 8va, find the note with the highest Y (lowest on screen = highest pitch)
+                                // For 8vb, find the note with the lowest Y (highest on screen = lowest pitch)
+                                const noteY = is8va ? -boundingBox.getY() : boundingBox.getY();
+                                
+                                if (targetY === null || (is8va ? noteY > targetY : noteY > targetY)) {
+                                    targetY = noteY;
+                                    targetNote = staveNote;
+                                }
+                            }
+                        } catch (e) {
+                            // If bounding box fails, fall back to first note
+                        }
+                    });
+                    
+                    // Use the target note for both start and stop to ensure bracket is positioned correctly
+                    // But span from first to last measure for visual continuity
                     const startNote = currentBracketGroup[0].staveNote;
                     const endNote = currentBracketGroup[currentBracketGroup.length - 1].staveNote;
-                    const position = currentOttavaType.includes('va') ? 1 : -1; // 1 = above, -1 = below
                     
-                    // Debug logging (can be removed later)
-                    // console.log('Creating final TextBracket:', currentOttavaType, 'from measure', currentBracketGroup[0].measureIndex, 'to', currentBracketGroup[currentBracketGroup.length - 1].measureIndex);
+                    // For 8va, use the highest note; for 8vb, use the lowest note
+                    const bracketStart = is8va ? targetNote : startNote;
+                    const bracketStop = is8va ? targetNote : endNote;
                     
                     const textBracket = new TextBracket({
-                        start: startNote,
-                        stop: endNote,
+                        start: bracketStart,
+                        stop: bracketStop,
                         text: currentOttavaType,
                         position: position
                     });
                     textBracket.setContext(context).draw();
-                    // console.log('Successfully drew final ottava bracket:', currentOttavaType);
                 } catch (e) {
                     console.error('Error drawing final ottava bracket:', e, e.stack);
                 }
@@ -1990,27 +2179,32 @@ export function renderChordProgressionStaff(canvasElement) {
         // Chord names removed - user requested no text notes in Melody Notation area
 
         // Draw highlight for active measure (currently playing) if enabled
+        // Phase 2.2: Update highlight to work with multi-row layout
         if (highlightEnabled && activeMeasureIndex >= 0 && activeMeasureIndex < numMeasures) {
-            const highlightX = 20 + (activeMeasureIndex * measureWidth);
+            const row = Math.floor(activeMeasureIndex / maxMeasuresPerRow);
+            const col = activeMeasureIndex % maxMeasuresPerRow;
+            const highlightX = 20 + (col * measureWidth);
             const highlightWidth = measureWidth;
-            const highlightY = 10;
-            const highlightHeight = canvas.height - 20;
-            
+            const highlightY = (row * rowHeight) + 10;
+            const highlightHeight = rowHeight - 20;
+
             // Use the raw canvas context for drawing the highlight overlay
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = 'rgba(255, 200, 0, 0.25)'; // Semi-transparent yellow for playing
             ctx.fillRect(highlightX, highlightY, highlightWidth, highlightHeight);
         }
-        
+
         // Draw border for selected measure (if different from active/playing measure)
         // Hide blue border during playback (when activeMeasureIndex >= 0)
-        // Now includes first measure (selectedMeasureIndex >= 0 instead of > 0)
-        if (selectedMeasureIndex >= 0 && selectedMeasureIndex < numMeasures && 
+        // Phase 2.2: Update selected border to work with multi-row layout
+        if (selectedMeasureIndex >= 0 && selectedMeasureIndex < numMeasures &&
             selectedMeasureIndex !== activeMeasureIndex && activeMeasureIndex < 0) {
-            const selectedX = 20 + (selectedMeasureIndex * measureWidth);
+            const row = Math.floor(selectedMeasureIndex / maxMeasuresPerRow);
+            const col = selectedMeasureIndex % maxMeasuresPerRow;
+            const selectedX = 20 + (col * measureWidth);
             const selectedWidth = measureWidth;
-            const selectedY = 10;
-            const selectedHeight = canvas.height - 20;
+            const selectedY = (row * rowHeight) + 10;
+            const selectedHeight = rowHeight - 20;
             
             // Use the raw canvas context for drawing the selection border
             const ctx = canvas.getContext('2d');
@@ -2073,10 +2267,13 @@ export function renderInteractiveMelodyStaff(canvasElement) {
 
         // Calculate dimensions dynamically - ensure all chords are visible and dense melodies fit
         // Auto-add measures: use the maximum of progression length and highest measure in melody notes
-        const maxMeasureFromMelody = interactiveMelody.melodyNotes.length > 0 
+        const maxMeasureFromMelody = interactiveMelody.melodyNotes.length > 0
             ? Math.max(...interactiveMelody.melodyNotes.map(n => n.measure)) + 1
             : 0;
         const numMeasures = Math.max(progressionData.length, maxMeasureFromMelody); // Render ALL chords and any additional measures from melody
+
+        // Debug: Log measure count to help diagnose duplication issues
+        console.log('[Phase 1C Debug] Progression length:', progressionData.length, 'Max melody measure:', maxMeasureFromMelody, 'Total measures to render:', numMeasures);
         
         // Initialize dynamics array for manual drawing
         window.dynamicsToDraw = [];
@@ -2100,14 +2297,22 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         // 8 eighth notes (dense): 220 + (8-4)*30 = 340px
         // 16 sixteenth notes (very dense): 220 + (16-4)*30 = 580px
         const desiredMeasureWidth = Math.max(220, 220 + Math.max(0, maxNotesInMeasure - 4) * 30);
-        
+
+        // Phase 2.2: Wrap measures to max 4 per row
+        const maxMeasuresPerRow = 4;
+        const numRows = Math.ceil(numMeasures / maxMeasuresPerRow);
+        const measuresThisRow = Math.min(numMeasures, maxMeasuresPerRow);
+
         const padding = 40; // Left and right padding
-        // Always use calculated width based on number of measures - enables horizontal scrolling
-        const calculatedCanvasWidth = (numMeasures * desiredMeasureWidth) + padding;
-        
+        // Calculate canvas width for max 4 measures per row
+        const calculatedCanvasWidth = (measuresThisRow * desiredMeasureWidth) + padding;
+
         if (maxNotesInMeasure > 4) {
             console.log(`Dense melody detected: ${maxNotesInMeasure} notes in a measure. Measure width: ${desiredMeasureWidth}px`);
         }
+
+        console.log(`[Notation] Rendering ${numMeasures} measures in ${numRows} rows (${maxMeasuresPerRow} per row max)`);
+
 
         // Determine if we need extra height for ottava brackets
         // We'll use treble clef for all notes and apply 8va/8vb when needed
@@ -2141,21 +2346,21 @@ export function renderInteractiveMelodyStaff(canvasElement) {
             }
         });
 
-        // Set canvas height - two staves (melody and chords) with padding
+        // Set canvas height - two staves (melody and chords) per row with padding
         // Melody stave starts at Y=30, chord stave at Y=140 (30+110)
         // Each stave is ~80px tall, so chord stave ends at ~220
         // Need padding at bottom for low notes in bass clef, plus space for dynamics above melody
-        let canvasHeight = 270; // Increased height for two staves with dynamics spacing
-        if (needsExtraHeight) {
-            canvasHeight = 290; // Extra height for ottava brackets
-        }
+        // Phase 2.2: Calculate height for multiple rows
+        const rowHeight = 270; // Height per row (two staves with dynamics spacing)
+        const extraRowHeight = needsExtraHeight ? 20 : 0;
+        let canvasHeight = (numRows * rowHeight) + extraRowHeight;
 
         // Set canvas dimensions explicitly BEFORE clearing or creating renderer
         canvas.width = calculatedCanvasWidth;
         canvas.height = canvasHeight;
-        // Set CSS width to match for proper display - always use calculated width for scrolling
+        // Set CSS width and height - fixed width, scrollable height if needed
         canvas.style.width = calculatedCanvasWidth + 'px';
-        canvas.style.minWidth = calculatedCanvasWidth + 'px'; // Ensure minimum width for scrolling
+        canvas.style.minWidth = calculatedCanvasWidth + 'px';
         canvas.style.height = 'auto';
 
         // Resize renderer to match canvas dimensions
@@ -2166,21 +2371,94 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         const fixedMeasureWidth = desiredMeasureWidth;
         const measureWidth = fixedMeasureWidth;
 
-        // Vertical positions for staves - single stave positions
+        // Phase 1C: Check if bass auto-fill is active AND enabled
+        // If auto-generate is ON and bass notes exist, use them
+        // If auto-generate is OFF or no bass notes, show chord whole notes
+        let bassAutoFillActive = false;
+        let actualChordClef = chordClef;
+
+        if (window.getCompositionState) {
+            const compositionState = window.getCompositionState();
+            const settings = compositionState.getSettings();
+
+            // Check based on progression length, not measure count
+            // Bass notes are added when chords exist, regardless of whether melody measures exist
+            const hasChords = progressionData && progressionData.length > 0;
+            const hasMeasures = compositionState && compositionState.getMeasureCount() > 0;
+
+            if (compositionState && (hasChords || hasMeasures)) {
+                // Check if auto-generate is ENABLED
+                if (settings && settings.autoGenerateBass) {
+                    // Try to get measure from compositionState
+                    let hasBassNotes = false;
+
+                    // Check if bass notes exist by checking measures based on progression length
+                    const measuresToCheck = Math.max(progressionData ? progressionData.length : 0, compositionState.getMeasureCount());
+
+                    for (let i = 0; i < measuresToCheck; i++) {
+                        const measure = compositionState.getMeasure(i);
+                        if (measure && measure.notation && measure.notation.bass) {
+                            const bassVoice = measure.notation.bass.voices && measure.notation.bass.voices[0];
+                            if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
+                                hasBassNotes = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // If auto-generate is enabled and we have chords, assume bass notes exist or will exist
+                    // This handles the case where melody hasn't been recorded yet but bass notes are present
+                    if (hasBassNotes || (hasChords && settings.autoGenerateBass)) {
+                        bassAutoFillActive = true;
+                        actualChordClef = 'bass'; // Force bass clef when bass auto-fill is ON
+                    }
+                }
+            }
+
+            // If bass auto-fill is OFF, check if chords should be in bass clef
+            if (!bassAutoFillActive && progressionData && progressionData.length > 0) {
+                const firstChord = progressionData[0];
+                if (firstChord && firstChord.notes && firstChord.notes.length > 0) {
+                    // Check if chord notes are low (should use bass clef)
+                    const hasLowNotes = firstChord.notes.some(note => {
+                        const match = note.match(/^([A-G][#b]?)(\d+)$/);
+                        if (match) {
+                            const octave = parseInt(match[2]);
+                            return octave <= 3; // C3 and below suggests bass clef
+                        }
+                        return false;
+                    });
+
+                    if (hasLowNotes) {
+                        actualChordClef = 'bass';
+                    }
+                }
+            }
+        }
+
+        // Vertical positions for staves - base positions for first row
         // Increased spacing to accommodate dynamics above melody notes
-        const melodyStaveY = 30; // Melody stave position (moved down to make room for dynamics above)
-        const chordStaveY = melodyStaveY + 110; // Chord stave position (increased from 90 to 110 for more space)
+        const baseRowY = 30; // Start of first row
+        const melodyStaveOffsetY = 0; // Melody stave offset from row start
+        const chordStaveOffsetY = 110; // Chord stave offset from row start (increased from 90 to 110 for more space)
 
         // Create staves for melody (upper staff) - ensure we create one for EVERY chord
-        // Position staves contiguously with no gaps
+        // Phase 2.2: Position staves in rows with max 4 measures per row
         const melodyStaves = [];
         for (let i = 0; i < numMeasures; i++) {
-            // Position each stave to start where the previous one ended (no gaps)
-            const staveX = 20 + (i * measureWidth);
-            // Stave width equals measure width for seamless connection
-            const stave = new Stave(staveX, melodyStaveY, measureWidth);
+            // Calculate which row and column this measure is in
+            const row = Math.floor(i / maxMeasuresPerRow);
+            const col = i % maxMeasuresPerRow;
 
-            if (i === 0) {
+            // Position stave based on row and column
+            const staveX = 20 + (col * measureWidth);
+            const staveY = baseRowY + (row * rowHeight) + melodyStaveOffsetY;
+
+            // Stave width equals measure width for seamless connection
+            const stave = new Stave(staveX, staveY, measureWidth);
+
+            // Add clef, key signature, and time signature at start of each row
+            if (col === 0) {
                 // Use selected melody clef
                 stave.addClef(melodyClef);
                 const vexFlowKey = getVexFlowKeySignature(interactiveMelody.key);
@@ -2199,13 +2477,15 @@ export function renderInteractiveMelodyStaff(canvasElement) {
 
         // Draw highlight for active measure BEFORE notes are rendered
         // This ensures notes are drawn on top and stay black
-        // We'll draw it again after notes if needed for visual feedback, but notes take priority
+        // Phase 2.2: Update highlight to work with multi-row layout
         if (highlightEnabled && activeMeasureIndex >= 0 && activeMeasureIndex < numMeasures) {
-            const highlightX = 20 + (activeMeasureIndex * measureWidth);
+            const row = Math.floor(activeMeasureIndex / maxMeasuresPerRow);
+            const col = activeMeasureIndex % maxMeasuresPerRow;
+            const highlightX = 20 + (col * measureWidth);
             const highlightWidth = measureWidth;
-            const highlightY = 5; // Start from top of canvas (moved up slightly for dynamics space)
-            const highlightHeight = canvas.height - 10;
-            
+            const highlightY = (row * rowHeight) + 5; // Start from top of this row
+            const highlightHeight = rowHeight - 10; // Only highlight this row
+
             // Draw background highlight using raw canvas context (ctx already declared at start of function)
             ctx.save();
             ctx.fillStyle = 'rgba(255, 200, 0, 0.2)'; // Semi-transparent yellow background
@@ -2214,16 +2494,23 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         }
 
         // Create staves for chords (lower staff) - ensure we create one for EVERY chord
-        // Position staves contiguously with no gaps
+        // Phase 2.2: Position staves in rows with max 4 measures per row
         const chordStaves = [];
         for (let i = 0; i < numMeasures; i++) {
-            // Position each stave to start where the previous one ended (no gaps)
-            const staveX = 20 + (i * measureWidth);
-            // Stave width equals measure width for seamless connection
-            const stave = new Stave(staveX, chordStaveY, measureWidth);
+            // Calculate which row and column this measure is in
+            const row = Math.floor(i / maxMeasuresPerRow);
+            const col = i % maxMeasuresPerRow;
 
-            if (i === 0) {
-                // Use selected chord clef
+            // Position stave based on row and column
+            const staveX = 20 + (col * measureWidth);
+            const staveY = baseRowY + (row * rowHeight) + chordStaveOffsetY;
+
+            // Stave width equals measure width for seamless connection
+            const stave = new Stave(staveX, staveY, measureWidth);
+
+            // Add clef, key signature, and time signature at start of each row
+            if (col === 0) {
+                // Use chordClef (user's choice via LH Clef toggle) for bottom stave
                 stave.addClef(chordClef);
                 const vexFlowKey = getVexFlowKeySignature(interactiveMelody.key);
                 try {
@@ -2240,14 +2527,18 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         }
 
         // Draw chord whole notes on lower staff - render ALL chords
+        // Phase 1C: Skip rendering chord whole notes when bass auto-fill is active
+        // to avoid visual clutter (bass notes will be shown instead)
         // Use for loop instead of forEach to allow continue statements
         // Collect ottava brackets to draw after all notes are rendered
         const ottavaBracketsToDrawChords = [];
-        
-        for (let index = 0; index < progressionData.length; index++) {
-            const chord = progressionData[index];
-            
-            // Ensure we don't exceed the number of staves we created
+
+        if (!bassAutoFillActive) {
+            // Only render chord whole notes if bass auto-fill is NOT active
+            for (let index = 0; index < progressionData.length; index++) {
+                const chord = progressionData[index];
+
+                // Ensure we don't exceed the number of staves we created
             if (index >= chordStaves.length) {
                 console.warn(`Chord at index ${index} exceeds available chord staves (${chordStaves.length})`);
                 continue;
@@ -2479,6 +2770,10 @@ export function renderInteractiveMelodyStaff(canvasElement) {
             try {
                 const boundingBox = staveNote.getBoundingBox();
                 if (boundingBox) {
+                    // Get stave absolute position for converting relative coords to absolute
+                    const staveAbsX = chordStaves[index] ? chordStaves[index].getX() : 0;
+                    const staveAbsY = chordStaves[index] ? chordStaves[index].getY() : 0;
+
                     allNotes.forEach((note, noteIdx) => {
                         // Create noteId: "measure-0-pitch" (chords use beat 0)
                         const noteId = `${index}-0-${note}`;
@@ -2513,14 +2808,15 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                             noteHeight = boundingBox.getH();
                         }
 
+                        // VexFlow bounding boxes are relative to the stave, so add stave position
                         // Store clickable region (expand slightly for easier clicking)
                         clickRegions.push({
                             type: 'chord',
                             measure: index,
                             beat: 0, // Chords use beat 0 (whole measure)
                             pitch: note,
-                            x: noteX - 10,
-                            y: noteY - 10,
+                            x: staveAbsX + noteX - 10,
+                            y: staveAbsY + noteY - 10,
                             width: noteWidth + 20,
                             height: noteHeight + 20
                         });
@@ -2540,6 +2836,7 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 });
             }
         }
+        } // End of if (!bassAutoFillActive) - skip chord rendering when bass auto-fill is active
 
         // Draw ottava brackets for chord staves after all notes are rendered
         if (ottavaBracketsToDrawChords.length > 0) {
@@ -2553,21 +2850,48 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                     // Draw previous group if it exists
                     if (currentBracketGroup.length > 0) {
                         try {
+                            const is8va = currentOttavaType.includes('va');
+                            const position = is8va ? 1 : -1; // 1 = above, -1 = below
+                            
+                            // Find the highest note for 8va or lowest note for 8vb
+                            let targetNote = currentBracketGroup[0].staveNote;
+                            let targetY = null;
+                            
+                            currentBracketGroup.forEach(bracketInfo => {
+                                try {
+                                    const staveNote = bracketInfo.staveNote;
+                                    const boundingBox = staveNote.getBoundingBox();
+                                    if (boundingBox) {
+                                        // For 8va, find the note with the lowest Y (highest on screen = highest pitch)
+                                        // For 8vb, find the note with the highest Y (lowest on screen = lowest pitch)
+                                        const noteY = boundingBox.getY();
+                                        
+                                        if (targetY === null || (is8va ? noteY < targetY : noteY > targetY)) {
+                                            targetY = noteY;
+                                            targetNote = staveNote;
+                                        }
+                                    }
+                                } catch (e) {
+                                    // If bounding box fails, fall back to first note
+                                }
+                            });
+                            
+                            // Use the target note for both start and stop to ensure bracket is positioned correctly
+                            // But span from first to last measure for visual continuity
                             const startNote = currentBracketGroup[0].staveNote;
                             const endNote = currentBracketGroup[currentBracketGroup.length - 1].staveNote;
-                            const position = currentOttavaType.includes('va') ? 1 : -1; // 1 = above, -1 = below
                             
-                            // Debug logging (can be removed later)
-                            // console.log('Creating TextBracket for chords:', currentOttavaType, 'from measure', currentBracketGroup[0].measureIndex, 'to', currentBracketGroup[currentBracketGroup.length - 1].measureIndex);
+                            // For 8va, use the highest note (lowest Y); for 8vb, use the lowest note (highest Y)
+                            const bracketStart = targetNote;
+                            const bracketStop = targetNote;
                             
                             const textBracket = new TextBracket({
-                                start: startNote,
-                                stop: endNote,
+                                start: bracketStart,
+                                stop: bracketStop,
                                 text: currentOttavaType,
                                 position: position
                             });
                             textBracket.setContext(context).draw();
-                            // console.log('Successfully drew ottava bracket for chords:', currentOttavaType);
                         } catch (e) {
                             console.error('Error drawing ottava bracket for chords:', e, e.stack);
                         }
@@ -2584,21 +2908,48 @@ export function renderInteractiveMelodyStaff(canvasElement) {
             // Draw last group
             if (currentBracketGroup.length > 0) {
                 try {
+                    const is8va = currentOttavaType.includes('va');
+                    const position = is8va ? 1 : -1; // 1 = above, -1 = below
+                    
+                    // Find the highest note for 8va or lowest note for 8vb
+                    let targetNote = currentBracketGroup[0].staveNote;
+                    let targetY = null;
+                    
+                    currentBracketGroup.forEach(bracketInfo => {
+                        try {
+                            const staveNote = bracketInfo.staveNote;
+                            const boundingBox = staveNote.getBoundingBox();
+                            if (boundingBox) {
+                                // For 8va, find the note with the lowest Y (highest on screen = highest pitch)
+                                // For 8vb, find the note with the highest Y (lowest on screen = lowest pitch)
+                                const noteY = boundingBox.getY();
+                                
+                                if (targetY === null || (is8va ? noteY < targetY : noteY > targetY)) {
+                                    targetY = noteY;
+                                    targetNote = staveNote;
+                                }
+                            }
+                        } catch (e) {
+                            // If bounding box fails, fall back to first note
+                        }
+                    });
+                    
+                    // Use the target note for both start and stop to ensure bracket is positioned correctly
+                    // But span from first to last measure for visual continuity
                     const startNote = currentBracketGroup[0].staveNote;
                     const endNote = currentBracketGroup[currentBracketGroup.length - 1].staveNote;
-                    const position = currentOttavaType.includes('va') ? 1 : -1; // 1 = above, -1 = below
                     
-                    // Debug logging (can be removed later)
-                    // console.log('Creating final TextBracket for chords:', currentOttavaType, 'from measure', currentBracketGroup[0].measureIndex, 'to', currentBracketGroup[currentBracketGroup.length - 1].measureIndex);
+                    // For 8va, use the highest note; for 8vb, use the lowest note
+                    const bracketStart = is8va ? targetNote : startNote;
+                    const bracketStop = is8va ? targetNote : endNote;
                     
                     const textBracket = new TextBracket({
-                        start: startNote,
-                        stop: endNote,
+                        start: bracketStart,
+                        stop: bracketStop,
                         text: currentOttavaType,
                         position: position
                     });
                     textBracket.setContext(context).draw();
-                    // console.log('Successfully drew final ottava bracket for chords:', currentOttavaType);
                 } catch (e) {
                     console.error('Error drawing final ottava bracket for chords:', e, e.stack);
                 }
@@ -2608,6 +2959,16 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         // else {
         //     console.log('No ottava brackets to draw for chords');
         // }
+
+        // Phase 1C: Render bass notes from CompositionState
+        // This renders the auto-generated bass on the chord staves
+        // Use actualChordClef (bass clef if bass auto-fill is active)
+        // IMPORTANT: Only render bass when auto-generate is enabled
+        if (bassAutoFillActive) {
+            renderBassFromCompositionState(context, chordStaves, numMeasures, actualChordClef, canvas);
+        } else {
+            console.log('[Phase 1C] Skipping bass rendering - auto-generate is OFF');
+        }
 
         // Draw melody notes on upper staff with 8va/8vb logic
         // Collect ottava brackets to draw after all notes are rendered
@@ -2627,6 +2988,11 @@ export function renderInteractiveMelodyStaff(canvasElement) {
             Object.keys(notesByMeasure).forEach(measureIndex => {
                 const measureNum = parseInt(measureIndex);
                 if (measureNum >= numMeasures) return;
+
+                // Calculate which column this measure is in (0-3 for a 4-measure row)
+                const maxMeasuresPerRow = 4;
+                const col = measureNum % maxMeasuresPerRow;
+                const isFirstMeasureInRow = (col === 0);
 
                 // Sort notes by beat within the measure to ensure correct order
                 // This ensures notes are rendered in the order they were played (by beat position)
@@ -3040,14 +3406,14 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 // 8 eighth notes in first measure: 120px available / 8 notes = 15px per note
                 // We use 12px to be conservative and ensure notes fit
                 // In subsequent measures: 200px available / 16 notes = 12.5px per note
-                const minSpacePerNote = measureNum === 0 ? 12 : 13; // Tighter packing to stay within measure
+                const minSpacePerNote = isFirstMeasureInRow ? 12 : 13; // Tighter packing to stay within measure
                 const minSpaceNeeded = vexNoteObjects.length * minSpacePerNote;
-                
-                // For first measure, be very aggressive with padding to leave room for clef/signature
+
+                // For first measure of any row, be very aggressive with padding to leave room for clef/signature
                 // The clef and time signature can take 80-100px
                 let availableWidth;
-                if (measureNum === 0) {
-                    // First measure: reserve 100px for clef and signature, use rest for notes
+                if (isFirstMeasureInRow) {
+                    // First measure of row: reserve 100px for clef and signature, use rest for notes
                     availableWidth = Math.max(measureWidth - 100, 80);
                 } else {
                     // Other measures: only need 10-20px padding for barline and margins
@@ -3177,6 +3543,11 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 }
                 const clickRegions = noteClickRegions.get(canvas);
 
+                // Get the stave position for this measure to convert relative coords to absolute
+                const melodyStave = melodyStaves[measureNum];
+                const staveAbsX = melodyStave ? melodyStave.getX() : 0;
+                const staveAbsY = melodyStave ? melodyStave.getY() : 0;
+
                 notesToProcess.forEach((note, noteIdx) => {
                     if (noteIdx >= vexNoteObjects.length) {
                         return;
@@ -3189,6 +3560,7 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                     const notePitch = isRest ? 'rest' : String(note.pitch);
 
                     // Store clickable region for this note/rest
+                    // VexFlow bounding boxes are relative to the stave, so add stave position
                     try {
                         const boundingBox = vexNote.getBoundingBox();
                         if (boundingBox) {
@@ -3197,8 +3569,8 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                                 measure: noteMeasure,
                                 beat: noteBeat,
                                 pitch: notePitch,
-                                x: boundingBox.getX() - 10,
-                                y: boundingBox.getY() - 10,
+                                x: staveAbsX + boundingBox.getX() - 10,
+                                y: staveAbsY + boundingBox.getY() - 10,
                                 width: boundingBox.getW() + 20,
                                 height: boundingBox.getH() + 20
                             });
@@ -3221,13 +3593,44 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                     // Draw previous group if it exists
                     if (currentBracketGroup.length > 0) {
                         try {
+                            const is8va = currentOttavaType.includes('va');
+                            const position = is8va ? 1 : -1; // 1 = above, -1 = below
+                            
+                            // Find the highest note for 8va or lowest note for 8vb
+                            let targetNote = currentBracketGroup[0].staveNote;
+                            let targetY = null;
+                            
+                            currentBracketGroup.forEach(bracketInfo => {
+                                try {
+                                    const staveNote = bracketInfo.staveNote;
+                                    const boundingBox = staveNote.getBoundingBox();
+                                    if (boundingBox) {
+                                        // For 8va, find the note with the lowest Y (highest on screen = highest pitch)
+                                        // For 8vb, find the note with the highest Y (lowest on screen = lowest pitch)
+                                        const noteY = boundingBox.getY();
+                                        
+                                        if (targetY === null || (is8va ? noteY < targetY : noteY > targetY)) {
+                                            targetY = noteY;
+                                            targetNote = staveNote;
+                                        }
+                                    }
+                                } catch (e) {
+                                    // If bounding box fails, fall back to first note
+                                }
+                            });
+                            
+                            // Use the target note for both start and stop to ensure bracket is positioned correctly
+                            // But span from first to last measure for visual continuity
                             const startNote = currentBracketGroup[0].staveNote;
                             const endNote = currentBracketGroup[currentBracketGroup.length - 1].staveNote;
-                            const position = currentOttavaType.includes('va') ? 1 : -1; // 1 = above, -1 = below
+                            
+                            // For 8va, use the highest note (lowest Y); for 8vb, use the lowest note (highest Y)
+                            const bracketStart = targetNote;
+                            const bracketStop = targetNote;
                             
                             const textBracket = new TextBracket({
-                                start: startNote,
-                                stop: endNote,
+                                start: bracketStart,
+                                stop: bracketStop,
                                 text: currentOttavaType,
                                 position: position
                             });
@@ -3248,13 +3651,44 @@ export function renderInteractiveMelodyStaff(canvasElement) {
             // Draw last group
             if (currentBracketGroup.length > 0) {
                 try {
+                    const is8va = currentOttavaType.includes('va');
+                    const position = is8va ? 1 : -1; // 1 = above, -1 = below
+                    
+                    // Find the highest note for 8va or lowest note for 8vb
+                    let targetNote = currentBracketGroup[0].staveNote;
+                    let targetY = null;
+                    
+                    currentBracketGroup.forEach(bracketInfo => {
+                        try {
+                            const staveNote = bracketInfo.staveNote;
+                            const boundingBox = staveNote.getBoundingBox();
+                            if (boundingBox) {
+                                // For 8va, find the note with the lowest Y (highest on screen = highest pitch)
+                                // For 8vb, find the note with the highest Y (lowest on screen = lowest pitch)
+                                const noteY = boundingBox.getY();
+                                
+                                if (targetY === null || (is8va ? noteY < targetY : noteY > targetY)) {
+                                    targetY = noteY;
+                                    targetNote = staveNote;
+                                }
+                            }
+                        } catch (e) {
+                            // If bounding box fails, fall back to first note
+                        }
+                    });
+                    
+                    // Use the target note for both start and stop to ensure bracket is positioned correctly
+                    // But span from first to last measure for visual continuity
                     const startNote = currentBracketGroup[0].staveNote;
                     const endNote = currentBracketGroup[currentBracketGroup.length - 1].staveNote;
-                    const position = currentOttavaType.includes('va') ? 1 : -1; // 1 = above, -1 = below
+                    
+                    // For 8va, use the highest note; for 8vb, use the lowest note
+                    const bracketStart = is8va ? targetNote : startNote;
+                    const bracketStop = is8va ? targetNote : endNote;
                     
                     const textBracket = new TextBracket({
-                        start: startNote,
-                        stop: endNote,
+                        start: bracketStart,
+                        stop: bracketStop,
                         text: currentOttavaType,
                         position: position
                     });
@@ -3356,17 +3790,39 @@ export function renderInteractiveMelodyStaff(canvasElement) {
 
         // Draw borders AFTER all notes are drawn (highlight was drawn before notes)
         // ctx already declared at start of function - reuse it
-        
+
+        // Draw highlight for active measure (currently playing) if enabled
+        // Phase 2.2: Update highlight to work with multi-row layout
+        if (highlightEnabled && activeMeasureIndex >= 0 && activeMeasureIndex < numMeasures) {
+            const maxMeasuresPerRow = 4;
+            const rowHeight = 270;
+            const row = Math.floor(activeMeasureIndex / maxMeasuresPerRow);
+            const col = activeMeasureIndex % maxMeasuresPerRow;
+            const highlightX = 20 + (col * measureWidth);
+            const highlightWidth = measureWidth;
+            const highlightY = (row * rowHeight) + 10;
+            const highlightHeight = rowHeight - 20;
+
+            // Use the raw canvas context for drawing the highlight overlay
+            ctx.fillStyle = 'rgba(255, 200, 0, 0.25)'; // Semi-transparent yellow for playing
+            ctx.fillRect(highlightX, highlightY, highlightWidth, highlightHeight);
+        }
+
         // Draw border for selected measure (if different from active/playing measure)
         // Hide blue border during playback (when activeMeasureIndex >= 0)
-        // Now includes first measure (selectedMeasureIndex >= 0 instead of > 0)
-        if (selectedMeasureIndex >= 0 && selectedMeasureIndex < numMeasures && 
+        // Phase 2.2: Update for multi-row layout - only highlight the selected measure's row
+        if (selectedMeasureIndex >= 0 && selectedMeasureIndex < numMeasures &&
             selectedMeasureIndex !== activeMeasureIndex && activeMeasureIndex < 0) {
-            const selectedX = 20 + (selectedMeasureIndex * measureWidth);
+            const maxMeasuresPerRow = 4;
+            const rowHeight = 270;
+            const row = Math.floor(selectedMeasureIndex / maxMeasuresPerRow);
+            const col = selectedMeasureIndex % maxMeasuresPerRow;
+
+            const selectedX = 20 + (col * measureWidth);
             const selectedWidth = measureWidth;
-            const selectedY = 10;
-            const selectedHeight = canvas.height - 20;
-            
+            const selectedY = (row * rowHeight) + 10;
+            const selectedHeight = rowHeight - 20;
+
             // Border doesn't affect note fill colors - it's just a stroke
             ctx.save();
             ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)'; // Blue border for selected
@@ -3434,6 +3890,7 @@ function setupCanvasClickToPlay(canvas, numMeasures, measureWidth) {
             activeChordNotes: [],
             activeMelodyNotes: [],
             melodyTimeouts: [],
+            chordTimeouts: [],  // For bass note playback timeouts
             isPlaying: false
         });
     }
@@ -3464,27 +3921,41 @@ function setupCanvasClickToPlay(canvas, numMeasures, measureWidth) {
             playNotesInBeat(canvas, clickedNote.measure, clickedNote.beat, clickedNote.type);
         } else {
             // No note clicked - fall back to measure click behavior
-            // Calculate which measure was clicked
+            // Calculate which measure was clicked (multi-row support)
+            // Phase 2.2 fix: Account for multiple rows of measures
+            const maxMeasuresPerRow = 4;
+            const rowHeight = 270;
+            const baseRowY = 30;
+
+            // Calculate which row was clicked
+            const row = Math.floor((y - baseRowY) / rowHeight);
+
+            // Calculate which column was clicked within that row
             // Measures start at x = 20, each measure is measureWidth wide
-            const measureIndex = Math.floor((x - 20) / measureWidth);
-            
-            if (measureIndex >= 0 && measureIndex < numMeasures) {
+            const col = Math.floor((x - 20) / measureWidth);
+
+            // Calculate the actual measure index
+            const measureIndex = (row * maxMeasuresPerRow) + col;
+
+            if (measureIndex >= 0 && measureIndex < numMeasures && col >= 0 && col < maxMeasuresPerRow) {
                 // Update selected measure for Play Measure button
                 selectedMeasureIndex = measureIndex;
-                // Re-render canvas to show selection border
-                setTimeout(() => {
+
+                // Re-render to show selection border immediately
+                requestAnimationFrame(() => {
                     const isRecording = window.isInteractiveMode || false;
                     if (isRecording && window.renderInteractiveMelodyStaff) {
                         window.renderInteractiveMelodyStaff(canvas);
                     } else if (window.renderChordProgressionStaff) {
                         window.renderChordProgressionStaff(canvas);
                     }
-                }, 10);
+                });
+
                 startMeasurePlayback(canvas, measureIndex);
             }
         }
     };
-    
+
     // Create mouseup handler (on document to catch mouse release even if outside canvas)
     const mouseUpHandler = (e) => {
         // Only stop playback if this canvas was the one being pressed
@@ -3522,25 +3993,39 @@ function setupCanvasClickToPlay(canvas, numMeasures, measureWidth) {
             playNotesInBeat(canvas, clickedNote.measure, clickedNote.beat, clickedNote.type);
         } else {
             // No note clicked - fall back to measure click behavior
-            const measureIndex = Math.floor((x - 20) / measureWidth);
-            
-            if (measureIndex >= 0 && measureIndex < numMeasures) {
+            // Phase 2.2 fix: Account for multiple rows of measures
+            const maxMeasuresPerRow = 4;
+            const rowHeight = 270;
+            const baseRowY = 30;
+
+            // Calculate which row was clicked
+            const row = Math.floor((y - baseRowY) / rowHeight);
+
+            // Calculate which column was clicked within that row
+            const col = Math.floor((x - 20) / measureWidth);
+
+            // Calculate the actual measure index
+            const measureIndex = (row * maxMeasuresPerRow) + col;
+
+            if (measureIndex >= 0 && measureIndex < numMeasures && col >= 0 && col < maxMeasuresPerRow) {
                 // Update selected measure for Play Measure button
                 selectedMeasureIndex = measureIndex;
-                // Re-render canvas to show selection border
-                setTimeout(() => {
+
+                // Re-render to show selection border immediately
+                requestAnimationFrame(() => {
                     const isRecording = window.isInteractiveMode || false;
                     if (isRecording && window.renderInteractiveMelodyStaff) {
                         window.renderInteractiveMelodyStaff(canvas);
                     } else if (window.renderChordProgressionStaff) {
                         window.renderChordProgressionStaff(canvas);
                     }
-                }, 10);
+                });
+
                 startMeasurePlayback(canvas, measureIndex);
             }
         }
     };
-    
+
     // Create touchend/touchcancel handler
     const touchEndHandler = (e) => {
         e.preventDefault();
@@ -3611,17 +4096,47 @@ function playNotesInBeat(canvas, measure, beat, clickedType) {
         const chord = progressionData[chordIndex];
         if (chord) {
             const rhNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
-            const lhNotes = getLHNotes(
-                chord.root,
-                chord.lhType,
-                chord.lhInversion,
-                interactiveMelody.key,
-                chord.lhOctaveShift || -12,
-                chord.type,
-                getEnharmonicPreference()
-            ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
+
+            // Use auto-generated bass notes if available
+            let lhNotes = [];
+            let bassAutoFillActive = false;
+
+            if (window.getCompositionState) {
+                const compositionState = window.getCompositionState();
+                const settings = compositionState.getSettings();
+
+                if (settings && settings.autoGenerateBass && compositionState.getMeasureCount() > chordIndex) {
+                    const measureData = compositionState.getMeasure(chordIndex);
+                    if (measureData && measureData.notation && measureData.notation.bass) {
+                        const bassVoice = measureData.notation.bass.voices && measureData.notation.bass.voices[0];
+                        if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
+                            // Use auto-generated bass notes (blue notes)
+                            bassAutoFillActive = true;
+                            // Bass notes from CompositionState have 'pitch' property, not 'keys'
+                            lhNotes = bassVoice.notes
+                                .filter(note => note.type !== 'rest') // Exclude rests
+                                .map(note => note.pitch)
+                                .filter(Boolean);
+                        }
+                    }
+                }
+            }
+
+            // If no auto-generated bass, use traditional LH chord notes
+            if (!bassAutoFillActive) {
+                lhNotes = getLHNotes(
+                    chord.root,
+                    chord.lhType,
+                    chord.lhInversion,
+                    interactiveMelody.key,
+                    chord.lhOctaveShift || -12,
+                    chord.type,
+                    getEnharmonicPreference()
+                ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
+            }
+
             const chordNotes = [...rhNotes, ...lhNotes];
-            
+
             chordNotes.forEach(note => {
                 notesToPlay.push({ note, type: 'chord', instrument: piano });
             });
@@ -3651,17 +4166,47 @@ function playNotesInBeat(canvas, measure, beat, clickedType) {
             const chord = progressionData[chordIndex];
             if (chord) {
                 const rhNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
-                const lhNotes = getLHNotes(
-                    chord.root,
-                    chord.lhType,
-                    chord.lhInversion,
-                    interactiveMelody.key,
-                    chord.lhOctaveShift || -12,
-                    chord.type,
-                    getEnharmonicPreference()
-                ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
+
+                // Use auto-generated bass notes if available
+                let lhNotes = [];
+                let bassAutoFillActive = false;
+
+                if (window.getCompositionState) {
+                    const compositionState = window.getCompositionState();
+                    const settings = compositionState.getSettings();
+
+                    if (settings && settings.autoGenerateBass && compositionState.getMeasureCount() > chordIndex) {
+                        const measureData = compositionState.getMeasure(chordIndex);
+                        if (measureData && measureData.notation && measureData.notation.bass) {
+                            const bassVoice = measureData.notation.bass.voices && measureData.notation.bass.voices[0];
+                            if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
+                                // Use auto-generated bass notes (blue notes)
+                                bassAutoFillActive = true;
+                                // Bass notes from CompositionState have 'pitch' property, not 'keys'
+                                lhNotes = bassVoice.notes
+                                    .filter(note => note.type !== 'rest') // Exclude rests
+                                    .map(note => note.pitch)
+                                    .filter(Boolean);
+                            }
+                        }
+                    }
+                }
+
+                // If no auto-generated bass, use traditional LH chord notes
+                if (!bassAutoFillActive) {
+                    lhNotes = getLHNotes(
+                        chord.root,
+                        chord.lhType,
+                        chord.lhInversion,
+                        interactiveMelody.key,
+                        chord.lhOctaveShift || -12,
+                        chord.type,
+                        getEnharmonicPreference()
+                    ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
+                }
+
                 const chordNotes = [...rhNotes, ...lhNotes];
-                
+
                 chordNotes.forEach(note => {
                     notesToPlay.push({ note, type: 'chord', instrument: piano });
                 });
@@ -3764,26 +4309,116 @@ function startMeasurePlayback(canvas, measureIndex) {
     // Get chord for this measure
     const chord = progressionData[measureIndex];
     const rhNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
-    const lhNotes = getLHNotes(
-        chord.root,
-        chord.lhType,
-        chord.lhInversion,
-        interactiveMelody.key,
-        chord.lhOctaveShift || -12,
-        chord.type,
-        getEnharmonicPreference()
-    ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
-    const chordNotes = [...rhNotes, ...lhNotes];
-    
-    // Start playing chord (hold-to-play)
-    if (chordNotes.length > 0) {
+
+    // Phase 2: Use auto-generated bass notes if available
+    let lhNotes = [];
+    let bassNoteData = []; // Store full bass note data with beat/duration
+    let bassAutoFillActive = false;
+
+    // Check if bass auto-fill is active
+    if (window.getCompositionState) {
+        const compositionState = window.getCompositionState();
+        const settings = compositionState.getSettings();
+
+        if (settings && settings.autoGenerateBass && compositionState.getMeasureCount() > measureIndex) {
+            const measure = compositionState.getMeasure(measureIndex);
+            if (measure && measure.notation && measure.notation.bass) {
+                const bassVoice = measure.notation.bass.voices && measure.notation.bass.voices[0];
+                if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
+                    // Use auto-generated bass notes with full data
+                    bassAutoFillActive = true;
+                    bassNoteData = bassVoice.notes.filter(note => note.type !== 'rest');
+                }
+            }
+        }
+    }
+
+    // If no auto-generated bass, use traditional LH chord notes
+    if (!bassAutoFillActive) {
+        lhNotes = getLHNotes(
+            chord.root,
+            chord.lhType,
+            chord.lhInversion,
+            interactiveMelody.key,
+            chord.lhOctaveShift || -12,
+            chord.type,
+            getEnharmonicPreference()
+        ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
+    }
+
+    // Don't play chord notes if bass auto-fill is active (only play bass notes)
+    const chordNotes = bassAutoFillActive ? [] : [...rhNotes, ...lhNotes];
+
+    // CRITICAL: Only play ONE set of notes - either chord notes OR bass notes, never both
+    if (bassAutoFillActive && bassNoteData.length > 0) {
+        // Bass auto-fill is active - play ONLY bass notes with proper timing
+
+        const tempo = interactiveMelody.tempo || 120;
+        const beatDuration = 60.0 / tempo; // seconds per beat (based on tempo)
+
+        bassNoteData.forEach(bassNote => {
+            const noteBeat = bassNote.beat || 0;
+            const delay = noteBeat * beatDuration; // Calculate delay based on beat position
+            const noteDuration = bassNote.duration ? Tone.Time(bassNote.duration).toSeconds() : beatDuration;
+
+            // Schedule the bass note to play at its proper beat timing
+            const timeoutId = setTimeout(() => {
+                piano.triggerAttackRelease(bassNote.pitch, bassNote.duration || '4n', Tone.now());
+
+                // Add to activeNotes for highlighting (use actual beat value)
+                const noteId = `${measureIndex}-${noteBeat}-${bassNote.pitch}`;
+                activeNotes.add(noteId);
+
+                // Visual feedback on piano keyboard
+                const keyEl = document.getElementById(getNoteKeyId(bassNote.pitch));
+                if (keyEl) {
+                    keyEl.classList.add('active-progression');
+                }
+
+                // Re-render to show red bass note highlighting
+                requestAnimationFrame(() => {
+                    const isRecording = window.isInteractiveMode || false;
+                    if (isRecording && window.renderInteractiveMelodyStaff) {
+                        window.renderInteractiveMelodyStaff(canvas);
+                    } else if (window.renderChordProgressionStaff) {
+                        window.renderChordProgressionStaff(canvas);
+                    }
+                });
+
+                // Remove from activeNotes after note duration
+                setTimeout(() => {
+                    activeNotes.delete(noteId);
+                    const keyEl = document.getElementById(getNoteKeyId(bassNote.pitch));
+                    if (keyEl) {
+                        keyEl.classList.remove('active-progression');
+                    }
+
+                    // Re-render to clear red highlighting
+                    requestAnimationFrame(() => {
+                        const isRecording = window.isInteractiveMode || false;
+                        if (isRecording && window.renderInteractiveMelodyStaff) {
+                            window.renderInteractiveMelodyStaff(canvas);
+                        } else if (window.renderChordProgressionStaff) {
+                            window.renderChordProgressionStaff(canvas);
+                        }
+                    });
+                }, noteDuration * 1000);
+            }, delay * 1000);
+
+            state.chordTimeouts.push(timeoutId);
+        });
+
+        // Store bass notes for cleanup when playback stops
+        state.activeChordNotes = bassNoteData.map(note => note.pitch);
+    } else if (chordNotes.length > 0) {
+        // Bass auto-fill is NOT active - play chord notes all at once
         chordNotes.forEach(note => {
             piano.triggerAttack(note, Tone.now());
-            
+
             // Add to activeNotes for highlighting (format: "measure-0-pitch")
             const noteId = `${measureIndex}-0-${note}`;
             activeNotes.add(noteId);
-            
+
             // Visual feedback
             const keyEl = document.getElementById(getNoteKeyId(note));
             if (keyEl) {
@@ -3791,6 +4426,8 @@ function startMeasurePlayback(canvas, measureIndex) {
             }
         });
         state.activeChordNotes = chordNotes;
+    } else {
+        state.activeChordNotes = [];
     }
     
     // Get melody notes for this measure
@@ -3799,19 +4436,16 @@ function startMeasurePlayback(canvas, measureIndex) {
     // Set active measure for highlighting
     activeMeasureIndex = measureIndex;
     state.activeMeasureIndex = measureIndex;
-    
-    // Re-render canvas to show highlighting if enabled
-    // Use setTimeout to avoid blocking audio playback
-    if (highlightEnabled) {
-        setTimeout(() => {
-            const isRecording = window.isInteractiveMode || false;
-            if (isRecording && window.renderInteractiveMelodyStaff) {
-                window.renderInteractiveMelodyStaff(canvas);
-            } else if (window.renderChordProgressionStaff) {
-                window.renderChordProgressionStaff(canvas);
-            }
-        }, 10);
-    }
+
+    // Re-render to show yellow measure highlighting
+    requestAnimationFrame(() => {
+        const isRecording = window.isInteractiveMode || false;
+        if (isRecording && window.renderInteractiveMelodyStaff) {
+            window.renderInteractiveMelodyStaff(canvas);
+        } else if (window.renderChordProgressionStaff) {
+            window.renderChordProgressionStaff(canvas);
+        }
+    });
     
     // Start playing melody notes sequentially (quarter notes)
     if (measureMelodyNotes.length > 0) {
@@ -3833,10 +4467,7 @@ function startMeasurePlayback(canvas, measureIndex) {
                 const noteDuration = note.duration ? Tone.Time(note.duration).toSeconds() : beatDuration;
                 setTimeout(() => {
                     activeNotes.delete(noteId);
-                    // Update canvas to remove highlighting
-                    if (window.renderInteractiveMelodyStaff) {
-                        window.renderInteractiveMelodyStaff(canvas);
-                    }
+                    // Note: We don't re-render here to avoid resetting the bass display
                 }, noteDuration * 1000);
                 
                 // Visual feedback
@@ -3873,10 +4504,15 @@ function stopMeasurePlayback(canvas) {
     state.activeChordNotes.forEach(note => {
         piano.triggerRelease(note, Tone.now());
 
-        // Remove from activeNotes for highlighting (format: "measure-0-pitch")
+        // Remove from activeNotes for highlighting
+        // For bass notes, we need to check all possible beat values, not just beat 0
         if (previousMeasureIndex >= 0) {
-            const noteId = `${previousMeasureIndex}-0-${note}`;
-            activeNotes.delete(noteId);
+            // Try to remove from beat 0 (traditional chord notes)
+            activeNotes.delete(`${previousMeasureIndex}-0-${note}`);
+            // Also try other beat values (for bass notes that might be at beat 2, etc.)
+            for (let beat = 0; beat < 4; beat++) {
+                activeNotes.delete(`${previousMeasureIndex}-${beat}-${note}`);
+            }
         }
 
         // Remove visual feedback
@@ -3912,28 +4548,33 @@ function stopMeasurePlayback(canvas) {
         clearTimeout(timeoutId);
     });
 
+    // Clear any scheduled bass/chord note timeouts
+    if (state.chordTimeouts) {
+        state.chordTimeouts.forEach(timeoutId => {
+            clearTimeout(timeoutId);
+        });
+    }
+
     // Reset state
     state.activeChordNotes = [];
     state.activeMelodyNotes = [];
     state.melodyTimeouts = [];
+    state.chordTimeouts = [];
     state.isPlaying = false;
 
     // Clear active measure highlighting
     activeMeasureIndex = -1;
     state.activeMeasureIndex = -1;
 
-    // Re-render canvas to remove highlighting if enabled
-    // Use setTimeout to avoid blocking audio release
-    if (highlightEnabled && previousMeasureIndex !== -1) {
-        setTimeout(() => {
-            const isRecording = window.isInteractiveMode || false;
-            if (isRecording && window.renderInteractiveMelodyStaff) {
-                window.renderInteractiveMelodyStaff(canvas);
-            } else if (window.renderChordProgressionStaff) {
-                window.renderChordProgressionStaff(canvas);
-            }
-        }, 10);
-    }
+    // Re-render to clear highlighting and restore selection border
+    requestAnimationFrame(() => {
+        const isRecording = window.isInteractiveMode || false;
+        if (isRecording && window.renderInteractiveMelodyStaff) {
+            window.renderInteractiveMelodyStaff(canvas);
+        } else if (window.renderChordProgressionStaff) {
+            window.renderChordProgressionStaff(canvas);
+        }
+    });
 }
 
 /**
@@ -4846,18 +5487,47 @@ export function playAllMelody() {
             }
             currentlyPlayingChordNotes = [];
         }
-        
+
         const rhNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
-        const lhNotes = getLHNotes(
-            chord.root,
-            chord.lhType,
-            chord.lhInversion,
-            interactiveMelody.key,
-            chord.lhOctaveShift || -12,
-            chord.type,
-            getEnharmonicPreference()
-        ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
-        const chordNotes = [...rhNotes, ...lhNotes];
+
+        // Check for auto-generated bass notes with beat/duration info
+        let bassNoteData = [];
+        let bassAutoFillActive = false;
+
+        if (window.getCompositionState) {
+            const compositionState = window.getCompositionState();
+            const settings = compositionState.getSettings();
+
+            if (settings && settings.autoGenerateBass && compositionState.getMeasureCount() > measureIndex) {
+                const measureData = compositionState.getMeasure(measureIndex);
+                if (measureData && measureData.notation && measureData.notation.bass) {
+                    const bassVoice = measureData.notation.bass.voices && measureData.notation.bass.voices[0];
+                    if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
+                        // Use auto-generated bass notes with their beat/duration info
+                        bassAutoFillActive = true;
+                        bassNoteData = bassVoice.notes.filter(note => note.type !== 'rest');
+                    }
+                }
+            }
+        }
+
+        // Get traditional LH notes if no auto-generated bass
+        let lhNotes = [];
+        if (!bassAutoFillActive) {
+            lhNotes = getLHNotes(
+                chord.root,
+                chord.lhType,
+                chord.lhInversion,
+                interactiveMelody.key,
+                chord.lhOctaveShift || -12,
+                chord.type,
+                getEnharmonicPreference()
+            ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
+        }
+
+        // For non-auto-generated bass, use chordNotes as before
+        // If bass auto-fill is active, don't play chord notes at all (only bass notes will be played separately)
+        const chordNotes = bassAutoFillActive ? [] : [...rhNotes, ...lhNotes];
         
         if (chordNotes.length > 0) {
             // Add chord notes to activeNotes for highlighting BEFORE scheduling
@@ -4906,6 +5576,34 @@ export function playAllMelody() {
                 });
                 updateCanvas();
             }, time + chordDuration);
+        }
+
+        // Schedule auto-generated bass notes separately if active
+        if (bassAutoFillActive && bassNoteData.length > 0) {
+            bassNoteData.forEach(bassNote => {
+                const bassTime = time + (bassNote.beat * beatDuration);
+                const bassDuration = Tone.Time(bassNote.duration).toSeconds();
+                const noteId = `${measureIndex}-${bassNote.beat}-${bassNote.pitch}`;
+
+                // Play the bass note
+                piano.triggerAttackRelease(bassNote.pitch, bassNote.duration, bassTime);
+
+                // Add to activeNotes when bass note starts
+                Tone.Draw.schedule(() => {
+                    activeNotes.add(noteId);
+                    const keyEl = document.getElementById(getNoteKeyId(bassNote.pitch));
+                    if (keyEl) keyEl.classList.add('active-progression');
+                    updateCanvas();
+                }, bassTime);
+
+                // Remove from activeNotes when bass note ends
+                Tone.Draw.schedule(() => {
+                    activeNotes.delete(noteId);
+                    const keyEl = document.getElementById(getNoteKeyId(bassNote.pitch));
+                    if (keyEl) keyEl.classList.remove('active-progression');
+                    updateCanvas();
+                }, bassTime + bassDuration);
+            });
         }
     }, progressionData.map((chord, index) => {
         const chordTime = index * measureDuration;
@@ -5343,13 +6041,17 @@ export function setChordClef(clef) {
         // Update button states immediately
         updateClefButtonStates();
         
-        // Re-render if interactive mode is active (two staves)
+        // Always re-render the notation when clef changes
         // Use setTimeout to ensure DOM updates are complete
         setTimeout(() => {
-            if (window.isInteractiveMode && window.renderInteractiveMelodyStaff) {
-                const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
-                if (interactiveCanvas) {
+            const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
+            if (interactiveCanvas) {
+                // Re-render based on current mode
+                if (window.isInteractiveMode && window.renderInteractiveMelodyStaff) {
                     window.renderInteractiveMelodyStaff(interactiveCanvas);
+                } else if (window.renderChordProgressionStaff) {
+                    // Re-render chord progression staff if not in interactive mode
+                    window.renderChordProgressionStaff(interactiveCanvas);
                 }
             }
         }, 10);
@@ -5360,7 +6062,7 @@ export function setChordClef(clef) {
  * Update the visual state of clef toggle buttons
  */
 function updateClefButtonStates() {
-    // Update melody clef buttons
+    // Update melody clef buttons (RH Clef toggle)
     const melodyTrebleBtn = document.getElementById('melody-clef-treble-btn');
     const melodyBassBtn = document.getElementById('melody-clef-bass-btn');
     
@@ -5375,7 +6077,7 @@ function updateClefButtonStates() {
         }
     }
     
-    // Update chord clef buttons
+    // Update chord clef buttons (LH Clef toggle)
     const chordTrebleBtn = document.getElementById('chord-clef-treble-btn');
     const chordBassBtn = document.getElementById('chord-clef-bass-btn');
     
@@ -5389,5 +6091,253 @@ function updateClefButtonStates() {
             chordBassBtn.setAttribute('class', 'px-2 py-1 text-xs font-semibold rounded bg-violet-600 text-white hover:bg-violet-700 transition');
         }
     }
+}
+
+/**
+ * Render bass notes from CompositionState on the chord staves
+ * Phase 1C: Bass Auto-Fill Visualization
+ * @param {object} context - VexFlow context
+ * @param {array} chordStaves - Array of chord staves
+ * @param {number} numMeasures - Number of measures to render
+ * @param {string} chordClef - Clef for chord staff
+ */
+function renderBassFromCompositionState(context, chordStaves, numMeasures, chordClef, canvas) {
+    // Check if CompositionState is available
+    if (!window.getCompositionState) {
+        return;
+    }
+
+    try {
+        const compositionState = window.getCompositionState();
+        if (!compositionState || compositionState.getMeasureCount() === 0) {
+            return;
+        }
+
+        const { Voice, Formatter, StaveNote, Accidental, Beam } = VexFlow;
+
+        // Render bass for each measure
+        for (let measureIndex = 0; measureIndex < Math.min(numMeasures, compositionState.getMeasureCount()); measureIndex++) {
+            const measure = compositionState.getMeasure(measureIndex);
+            if (!measure || !measure.notation || !measure.notation.bass) {
+                continue;
+            }
+
+            const bassVoice = measure.notation.bass.voices[0];
+            if (!bassVoice || !bassVoice.notes || bassVoice.notes.length === 0) {
+                continue;
+            }
+
+            // Debug: Log bass notes for this measure
+            console.log(`[Phase 1C DEBUG] Measure ${measureIndex} bass notes:`, bassVoice.notes.map(n => `${n.pitch}(${n.duration})`).join(', '));
+
+            // Convert bass notes to VexFlow format
+            const vexBassNotes = [];
+            const beamGroups = []; // Track notes that should be beamed together
+
+            bassVoice.notes.forEach((note, noteIndex) => {
+                try {
+                    // Handle rests
+                    if (note.type === 'rest') {
+                        const restDuration = convertToVexFlowDuration(note.duration, note.dotted);
+                        const staveRest = new StaveNote({
+                            clef: chordClef,
+                            keys: ['b/4'], // Default rest position
+                            duration: restDuration + 'r'
+                        });
+                        vexBassNotes.push(staveRest);
+                        return;
+                    }
+
+                    // Convert pitch to VexFlow format (e.g., 'C2' -> 'c/2')
+                    const vexFlowKey = convertToVexFlowKey(note.pitch);
+                    if (!vexFlowKey) {
+                        console.warn('Invalid bass note pitch:', note.pitch);
+                        return;
+                    }
+
+                    const vexFlowDuration = convertToVexFlowDuration(note.duration, note.dotted);
+
+                    const staveNote = new StaveNote({
+                        clef: chordClef,
+                        keys: [vexFlowKey],
+                        duration: vexFlowDuration
+                    });
+
+                    // Add accidentals
+                    if (note.pitch && (note.pitch.includes('#') || note.pitch.includes('b'))) {
+                        const accidental = note.pitch.includes('#') ? '#' : 'b';
+                        staveNote.addModifier(new Accidental(accidental), 0);
+                    }
+
+                    // Check if this bass note is currently playing (for red highlighting)
+                    // Use the note's actual beat value, not just 0
+                    const noteBeat = note.beat || 0;
+                    const noteId = `${measureIndex}-${noteBeat}-${note.pitch}`;
+                    const isActive = highlightEnabled && activeNotes.has(noteId);
+
+                    // Add styling for auto-generated bass
+                    if (measure.notation.bass.autoGenerated) {
+                        if (isActive) {
+                            // Active bass note - use red highlighting
+                            staveNote.setStyle({ fillStyle: '#DC2626', strokeStyle: '#DC2626' }); // Red color
+                        } else {
+                            // Inactive bass note - use blue color
+                            staveNote.setStyle({ fillStyle: '#3b82f6', strokeStyle: '#3b82f6' }); // Blue color
+                        }
+                    }
+
+                    vexBassNotes.push(staveNote);
+
+                    // Track eighth notes and shorter for beaming
+                    if (note.duration === '8n' || note.duration === '16n' || note.duration === '32n') {
+                        beamGroups.push({ note: staveNote, index: vexBassNotes.length - 1 });
+                    }
+                } catch (error) {
+                    console.error('Error creating bass note:', error, note);
+                }
+            });
+
+            if (vexBassNotes.length === 0) {
+                continue;
+            }
+
+            try {
+                // Create voice for bass notes
+                const timeSignature = measure.timeSignature || interactiveMelody.timeSignature || { num: 4, denom: 4 };
+                const voice = new Voice({
+                    num_beats: timeSignature.num,
+                    beat_value: timeSignature.denom
+                });
+                voice.setStrict(false); // Allow incomplete measures
+                voice.addTickables(vexBassNotes);
+
+                // Format and draw
+                const stave = chordStaves[measureIndex];
+                if (!stave) {
+                    console.warn('No chord stave for measure:', measureIndex);
+                    continue;
+                }
+
+                const formatter = new Formatter();
+                formatter.joinVoices([voice]);
+
+                // Calculate actual available width for notes
+                // First measure has clef/key/time signature, so less space available
+                let availableWidth;
+                if (measureIndex === 0) {
+                    // First measure: account for clef, key signature, and time signature
+                    // These take up roughly 80-100px, leaving less space for notes
+                    availableWidth = stave.getWidth() - 100; // More conservative margin for first measure
+                } else {
+                    // Subsequent measures: only need margin for bar lines
+                    availableWidth = stave.getWidth() - 20;
+                }
+
+                formatter.format([voice], availableWidth);
+
+                voice.draw(context, stave);
+
+                // Store clickable regions for bass notes (AFTER drawing to get bounding boxes)
+                if (!noteClickRegions.has(canvas)) {
+                    noteClickRegions.set(canvas, []);
+                }
+                const clickRegions = noteClickRegions.get(canvas);
+
+                // Get stave absolute position for converting relative coords to absolute
+                const staveAbsX = stave ? stave.getX() : 0;
+                const staveAbsY = stave ? stave.getY() : 0;
+
+                vexBassNotes.forEach((vexNote, noteIdx) => {
+                    if (noteIdx >= bassVoice.notes.length) return;
+
+                    const bassNote = bassVoice.notes[noteIdx];
+                    const isRest = bassNote.type === 'rest';
+                    const notePitch = isRest ? 'rest' : String(bassNote.pitch);
+
+                    try {
+                        const boundingBox = vexNote.getBoundingBox();
+                        if (boundingBox) {
+                            // VexFlow bounding boxes are relative to the stave, so add stave position
+                            clickRegions.push({
+                                type: 'chord', // Use 'chord' type since bass plays with chords
+                                measure: measureIndex,
+                                beat: 0, // Bass notes are for the whole measure (beat 0)
+                                pitch: notePitch,
+                                x: staveAbsX + boundingBox.getX() - 10,
+                                y: staveAbsY + boundingBox.getY() - 10,
+                                width: boundingBox.getW() + 20,
+                                height: boundingBox.getH() + 20
+                            });
+                        }
+                    } catch (e) {
+                        // Ignore bounding box errors
+                    }
+                });
+
+                // Apply beaming to eighth notes and shorter
+                if (beamGroups.length >= 2) {
+                    try {
+                        // Group consecutive eighth/sixteenth notes for beaming
+                        const beamableNotes = beamGroups.map(g => g.note);
+                        const beam = new Beam(beamableNotes);
+                        beam.setContext(context).draw();
+                    } catch (beamError) {
+                        // Beaming might fail for complex patterns, just skip it
+                    }
+                }
+            } catch (error) {
+                console.error('Error rendering bass for measure', measureIndex, ':', error);
+            }
+        }
+    } catch (error) {
+        console.error('Error in renderBassFromCompositionState:', error);
+    }
+}
+
+/**
+ * Convert pitch to VexFlow key format
+ * @param {string} pitch - Pitch like 'C2', 'D#3', 'Eb2'
+ * @returns {string} - VexFlow key like 'c/2', 'd#/3'
+ */
+function convertToVexFlowKey(pitch) {
+    if (!pitch) return null;
+
+    const match = pitch.match(/^([A-G][#b]?)(\d+)$/);
+    if (!match) return null;
+
+    const noteName = match[1].toLowerCase();
+    const octave = match[2];
+
+    return `${noteName}/${octave}`;
+}
+
+/**
+ * Convert duration to VexFlow format
+ * @param {string} duration - Tone.js duration like '4n', '2n', '8n'
+ * @param {boolean} dotted - Whether note is dotted
+ * @returns {string} - VexFlow duration like '4', '2d', '8'
+ */
+function convertToVexFlowDuration(duration, dotted = false) {
+    if (!duration) return '4'; // Default to quarter note
+
+    // Map Tone.js durations to VexFlow durations
+    const durationMap = {
+        '1n': 'w',   // Whole note
+        '2n': 'h',   // Half note
+        '4n': 'q',   // Quarter note
+        '8n': '8',   // Eighth note
+        '16n': '16', // Sixteenth note
+        '32n': '32'  // Thirty-second note
+    };
+
+    const baseDuration = duration.replace('.', ''); // Remove dot if present
+    let vexDuration = durationMap[baseDuration] || 'q';
+
+    // Add dot if needed
+    if (dotted || duration.includes('.')) {
+        vexDuration += 'd';
+    }
+
+    return vexDuration;
 }
 

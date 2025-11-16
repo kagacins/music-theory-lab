@@ -13,7 +13,10 @@
       "Bash($null)",
       "Bash(node --version:*)",
       "Bash(node -e:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(start index.html)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

@@ -2867,6 +2867,24 @@ export function addSpecificChordToProgression(chordType, inversion, playShutterS
     // Add to trainer state using window function
     if (window.addToProgressionData) {
         window.addToProgressionData(newChordData);
+        
+        // Explicitly re-render melody notation to ensure it updates immediately
+        // (addToProgressionData calls renderMelodyNotationIfNeeded, but we want to ensure it happens)
+        setTimeout(() => {
+            const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
+            if (interactiveCanvas) {
+                // Sync progression to composition state before rendering
+                if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
+                    window.syncProgressionToMelodyComposer();
+                }
+                
+                if (window.renderInteractiveMelodyStaff) {
+                    window.renderInteractiveMelodyStaff(interactiveCanvas);
+                } else if (window.renderChordProgressionStaff) {
+                    window.renderChordProgressionStaff(interactiveCanvas);
+                }
+            }
+        }, 100);
     } else {
         // Fallback: manually add to progression
         const trainerState = getTrainerState();
@@ -2875,7 +2893,32 @@ export function addSpecificChordToProgression(chordType, inversion, playShutterS
             trainerState.progressionRomans.push(newChordData.roman);
         }
         if (window.renderProgressionDisplay) {
-            window.renderProgressionDisplay();
+            window.renderProgressionDisplay('progression-visualization', true);
+            window.renderProgressionDisplay('melody-progression-visualization', false);
+        }
+        
+        // Re-render melody notation if needed (same logic as addToProgressionData)
+        const currentTab = window.getCurrentTab ? window.getCurrentTab() : 'builder';
+        const isMelodyTab = currentTab === 'melody';
+        const freeModeControls = document.getElementById('free-mode-controls');
+        const isFreeModeActive = freeModeControls && !freeModeControls.classList.contains('hidden');
+        
+        if (isMelodyTab || isFreeModeActive) {
+            // Sync progression to composition state before rendering
+            if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
+                window.syncProgressionToMelodyComposer();
+            }
+            
+            const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
+            if (interactiveCanvas) {
+                setTimeout(() => {
+                    if (window.renderInteractiveMelodyStaff) {
+                        window.renderInteractiveMelodyStaff(interactiveCanvas);
+                    } else if (window.renderChordProgressionStaff) {
+                        window.renderChordProgressionStaff(interactiveCanvas);
+                    }
+                }, 50);
+            }
         }
     }
     
