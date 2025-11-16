@@ -112,7 +112,10 @@ import {
     toggleProgressionCardsPanel,
     toggleAllStaffNotation,
     clearProgression,
-    importChordList
+    importChordList,
+    openTemplateBrowser,
+    toggleSimplifiedView,
+    toggleTensionCurve
 } from './modules/features/progressionBuilder.js';
 import {
     renderScaleSelectors,
@@ -991,6 +994,9 @@ window.toggleProgressionCardsPanel = toggleProgressionCardsPanel;
 window.triggerSectionSidebarUpdate = triggerSectionSidebarUpdate;
 window.toggleAllStaffNotation = toggleAllStaffNotation;
 window.importChordList = importChordList;
+window.openTemplateBrowser = openTemplateBrowser;
+window.toggleSimplifiedView = toggleSimplifiedView;
+window.toggleTensionCurve = toggleTensionCurve;
 
 // Debug: Verify function is available
 if (typeof window.importChordList !== 'function') {

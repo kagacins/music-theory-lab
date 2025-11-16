@@ -277,12 +277,14 @@ export class HarmonyAnalyzer {
 
         // Complexity from chord types
         const advancedChords = progression.filter(chord =>
-            chord.type.includes('7') ||
-            chord.type.includes('9') ||
-            chord.type.includes('11') ||
-            chord.type.includes('13') ||
-            chord.type === 'Diminished' ||
-            chord.type === 'Augmented'
+            chord.type && (
+                chord.type.includes('7') ||
+                chord.type.includes('9') ||
+                chord.type.includes('11') ||
+                chord.type.includes('13') ||
+                chord.type === 'Diminished' ||
+                chord.type === 'Augmented'
+            )
         );
         if (advancedChords.length >= 2) complexity += 1;
         if (advancedChords.length >= 4) complexity += 1;
@@ -328,12 +330,28 @@ export class HarmonyAnalyzer {
     }
 
     /**
+     * Get harmonic function for a chord object
+     * @param {Object} chord - Chord object {root, type}
+     * @param {string} key - Current key
+     * @returns {string} Harmonic function
+     */
+    getChordFunction(chord, key) {
+        if (!chord || !chord.root) return HARMONIC_FUNCTIONS.TONIC;
+        
+        const degree = this.getScaleDegree(chord.root, key);
+        return this.getHarmonicFunction(degree, chord.type);
+    }
+
+    /**
      * Get Roman numeral for a chord
      * @param {Object} chord - Chord object
      * @param {string} key - Current key
      * @returns {string} Roman numeral
      */
     getRomanNumeral(chord, key) {
+        // Safety check for chord object
+        if (!chord || !chord.root) return '?';
+
         const degree = this.getScaleDegree(chord.root, key);
         if (degree === null) return '?';
 
@@ -341,14 +359,16 @@ export class HarmonyAnalyzer {
         const minorRomanNumerals = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii'];
 
         const index = degree - 1;
-        const isMinor = chord.type === 'Minor' || chord.type === 'Diminished';
+        const isMinor = chord.type && (chord.type === 'Minor' || chord.type === 'Diminished');
 
         let numeral = isMinor ? minorRomanNumerals[index] : romanNumerals[index];
 
         // Add quality indicators
-        if (chord.type === 'Diminished') numeral += '°';
-        if (chord.type === 'Augmented') numeral += '+';
-        if (chord.type.includes('7')) numeral += '7';
+        if (chord.type) {
+            if (chord.type === 'Diminished') numeral += '°';
+            if (chord.type === 'Augmented') numeral += '+';
+            if (chord.type.includes('7')) numeral += '7';
+        }
 
         return numeral;
     }
@@ -453,6 +473,81 @@ export class HarmonyAnalyzer {
         return scaleChords.some(scaleChord =>
             scaleChord.root === chord.root &&
             scaleChord.type === chord.type
+        );
+    }
+
+    /**
+     * Calculate harmonic tension for a chord
+     * @param {Object} chord - Chord object {root, type}
+     * @param {string} key - Current key
+     * @param {number} position - Position in progression (0-based)
+     * @param {number} total - Total chords in progression
+     * @returns {number} Tension value (0-100)
+     */
+    calculateChordTension(chord, key, position = 0, total = 1) {
+        if (!chord || !chord.root) return 0;
+
+        let tension = 0;
+
+        // 1. Base tension from harmonic function (40 points max)
+        const func = this.getChordFunction(chord, key);
+        const functionTension = {
+            'Tonic': 10,           // Low tension - stable
+            'Subdominant': 40,     // Medium tension - prepares dominant
+            'Predominant': 50,     // Medium-high tension - leads to dominant
+            'Dominant': 80         // High tension - wants to resolve
+        };
+        tension += functionTension[func] || 30;
+
+        // 2. Chord type complexity (20 points max)
+        if (chord.type) {
+            if (chord.type.includes('Diminished')) tension += 20;
+            else if (chord.type.includes('Augmented')) tension += 18;
+            else if (chord.type.includes('13')) tension += 16;
+            else if (chord.type.includes('11')) tension += 14;
+            else if (chord.type.includes('9')) tension += 12;
+            else if (chord.type.includes('7')) tension += 10;
+            else if (chord.type.includes('sus')) tension += 8;
+        }
+
+        // 3. Chromaticism - borrowed chords (20 points max)
+        const scaleChords = this.getMajorScaleChords(key);
+        const isInKey = this.isChordInKey(chord, scaleChords);
+        if (!isInKey) {
+            tension += 20;
+        }
+
+        // 4. Position in progression (20 points max)
+        // Tension often builds towards climax, then releases
+        if (total > 1) {
+            const progressPosition = position / (total - 1); // 0 to 1
+            // Create arc: low at start, peak at 60-70%, resolve at end
+            let positionTension;
+            if (progressPosition < 0.6) {
+                positionTension = progressPosition * 33.3; // Rise to 20
+            } else if (progressPosition < 0.8) {
+                positionTension = 20; // Peak
+            } else {
+                positionTension = 20 - ((progressPosition - 0.8) * 100); // Fall
+            }
+            tension += Math.max(0, positionTension);
+        }
+
+        // Normalize to 0-100 range
+        return Math.min(100, Math.max(0, tension));
+    }
+
+    /**
+     * Calculate tension curve for entire progression
+     * @param {Array} progression - Array of chord objects
+     * @param {string} key - Current key
+     * @returns {Array} Array of tension values (0-100)
+     */
+    calculateTensionCurve(progression, key) {
+        if (!progression || progression.length === 0) return [];
+
+        return progression.map((chord, index) =>
+            this.calculateChordTension(chord, key, index, progression.length)
         );
     }
 

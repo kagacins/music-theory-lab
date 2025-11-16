@@ -2153,3 +2153,60 @@ body:has(#piano-keyboard.modern-keyboard) #guitar-fretboard-container {
     outline: 1px solid rgba(107, 114, 128, 0.2);
     outline-offset: -1px;
 }
+
+/* ============================================================================
+   PHASE 3.3: Pattern Highlighting Animation
+   ============================================================================ */
+
+/* Pattern highlight pulse animation */
+@keyframes pattern-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.7);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(168, 85, 247, 0);
+        transform: scale(1.05);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(168, 85, 247, 0);
+        transform: scale(1);
+    }
+}
+
+/* Active pattern highlight */
+.pattern-highlight-active {
+    animation: pattern-pulse 0.6s ease-out 3;
+    border: 2px solid rgba(168, 85, 247, 0.8) !important;
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(236, 72, 153, 0.1)) !important;
+}
+
+/* ============================================================================
+   PHASE 3.3: Simplified Chord Sequence View
+   ============================================================================ */
+
+/* Simplified chord card styles */
+.simplified-chord-card {
+    transition: all 0.2s ease;
+}
+
+.simplified-chord-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Sortable drag states for simplified cards */
+.simplified-chord-card.sortable-ghost {
+    opacity: 0.4;
+    background-color: #1f2937;
+}
+
+.simplified-chord-card.sortable-chosen {
+    background-color: #374151;
+    border-color: #60a5fa !important;
+}
+
+.simplified-chord-card.sortable-drag {
+    opacity: 0.9;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+}

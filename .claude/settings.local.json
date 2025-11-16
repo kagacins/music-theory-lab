@@ -16,7 +16,8 @@
       "Bash(cd:*)",
       "Bash(start index.html)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

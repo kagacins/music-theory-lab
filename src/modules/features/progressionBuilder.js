@@ -94,6 +94,12 @@ import {
 // Import chord suggestion modal
 import { showChordSuggestionModal } from '../ui/chordSuggestionModal.js';
 
+// Import template browser modal (Phase 3.1)
+import { showTemplateBrowser } from '../ui/templateBrowserModal.js';
+
+// Import harmony analyzer (Phase 3.3)
+import { HarmonyAnalyzer } from '../analysis/harmonyAnalyzer.js';
+
 // Import undo/redo utilities
 import {
     saveState,
@@ -114,7 +120,7 @@ import {
 } from './chordSuggestionEngine.js';
 
 // ============================================================================
-// Chord Function Helper
+// Chord Function Helper (Phase 3.3: Enhanced with Color-Coding)
 // ============================================================================
 
 /**
@@ -139,10 +145,48 @@ function getChordFunction(roman) {
         'vii°': 'Dominant',
         'VII': 'Dominant'
     };
-    
+
     // Handle roman numerals with suffixes (like 'V7', 'ii7', etc.)
     const baseRoman = roman.replace(/[0-9°]/g, '');
     return functionMap[baseRoman] || null;
+}
+
+/**
+ * Get color classes for roman numeral based on harmonic function
+ * PHASE 3.3: Color-coded harmonic analysis
+ * @param {string} roman - Roman numeral
+ * @returns {object} Object with romanColor and functionColor CSS classes
+ */
+function getFunctionColors(roman) {
+    const func = getChordFunction(roman);
+
+    const colorMap = {
+        'Tonic': {
+            romanColor: 'text-blue-600 dark:text-blue-400',
+            functionColor: 'text-blue-500 dark:text-blue-400',
+            bgColor: 'bg-blue-100 dark:bg-blue-900',
+            borderColor: 'border-blue-300 dark:border-blue-700'
+        },
+        'Dominant': {
+            romanColor: 'text-red-600 dark:text-red-400',
+            functionColor: 'text-red-500 dark:text-red-400',
+            bgColor: 'bg-red-100 dark:bg-red-900',
+            borderColor: 'border-red-300 dark:border-red-700'
+        },
+        'Subdominant': {
+            romanColor: 'text-green-600 dark:text-green-400',
+            functionColor: 'text-green-500 dark:text-green-400',
+            bgColor: 'bg-green-100 dark:bg-green-900',
+            borderColor: 'border-green-300 dark:border-green-700'
+        }
+    };
+
+    return colorMap[func] || {
+        romanColor: 'text-indigo-700 dark:text-indigo-300',
+        functionColor: 'text-indigo-500 dark:text-indigo-400',
+        bgColor: 'bg-indigo-100 dark:bg-indigo-900',
+        borderColor: 'border-indigo-300 dark:border-indigo-700'
+    };
 }
 
 /**
@@ -1801,6 +1845,394 @@ export function renderChordStaffNotation(canvas, chordData, key) {
 // Progression Display and Visualization
 // ============================================================================
 
+// Create singleton HarmonyAnalyzer instance
+const harmonyAnalyzer = new HarmonyAnalyzer();
+
+/**
+ * PHASE 3.3: Add pattern highlighting badges above progression
+ * @param {HTMLElement} container - Container element
+ * @param {Array} progressionData - Progression data
+ * @param {string} key - Current key
+ */
+function renderPatternHighlights(container, progressionData, key) {
+    if (!progressionData || progressionData.length === 0) return;
+
+    // Analyze progression for patterns
+    const analysis = harmonyAnalyzer.analyzeProgression(progressionData, key);
+
+    if (!analysis.patterns || analysis.patterns.length === 0) return;
+
+    // Create pattern overlay container
+    const patternContainer = document.createElement('div');
+    patternContainer.className = 'flex justify-center items-center gap-2 mb-2 flex-wrap px-4';
+    patternContainer.id = 'pattern-highlights';
+
+    // Display detected patterns as badges
+    analysis.patterns.forEach((pattern, idx) => {
+        const badge = document.createElement('div');
+        badge.className = 'px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-semibold shadow-md flex items-center gap-2';
+        badge.title = `${pattern.description}\nFound at: ${pattern.matches.map(m => `measure ${m + 1}`).join(', ')}`;
+
+        badge.innerHTML = `
+            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/>
+            </svg>
+            <span>${pattern.name}</span>
+            <span class="bg-white bg-opacity-30 px-1.5 py-0.5 rounded text-[10px]">${pattern.matches.length}×</span>
+        `;
+
+        // Add click handler to highlight matching chords
+        badge.style.cursor = 'pointer';
+        badge.addEventListener('click', () => {
+            highlightPatternChords(pattern);
+        });
+
+        patternContainer.appendChild(badge);
+    });
+
+    // Insert at the top of the container
+    container.insertBefore(patternContainer, container.firstChild);
+}
+
+/**
+ * PHASE 3.3: Render simplified chord sequence view
+ * Compact horizontal cards showing chord symbol, roman numeral, and inversion
+ * @param {HTMLElement} container - Container to insert the view into
+ * @param {Array} progressionData - Array of chord objects
+ * @param {string} key - Current key
+ */
+function renderSimplifiedChordSequence(container, progressionData, key) {
+    if (!progressionData || progressionData.length === 0) return;
+
+    // Create simplified sequence container
+    const sequenceContainer = document.createElement('div');
+    sequenceContainer.id = 'simplified-chord-sequence';
+    sequenceContainer.className = 'mb-4 px-4';
+
+    const sequenceInner = document.createElement('div');
+    sequenceInner.id = 'simplified-sequence-inner';
+    sequenceInner.className = 'flex items-center gap-2 overflow-x-auto pb-2 pt-1';
+    sequenceInner.style.minHeight = '60px';
+
+    // Create simplified cards for each chord
+    progressionData.forEach((chord, index) => {
+        const card = document.createElement('div');
+        card.className = 'simplified-chord-card flex-shrink-0 bg-gray-800 border-2 border-gray-600 rounded-lg px-3 py-2 cursor-move transition-all hover:border-blue-500 hover:shadow-lg';
+        card.setAttribute('data-simplified-index', index);
+        card.style.minWidth = '80px';
+
+        // Get roman numeral for this chord
+        const roman = chord.roman || harmonyAnalyzer.getRomanNumeral(chord, key);
+
+        // Get function colors
+        const colors = getFunctionColors(roman);
+
+        // Chord symbol
+        const chordSymbol = chord.simpleName || chord.name || `${chord.root}${chord.type}`;
+
+        // Inversion indicator
+        let inversionText = '';
+        if (chord.inversion === 1) inversionText = '₁'; // First inversion
+        else if (chord.inversion === 2) inversionText = '₂'; // Second inversion
+        else if (chord.inversion === 3) inversionText = '₃'; // Third inversion
+
+        card.innerHTML = `
+            <div class="text-center">
+                <div class="text-xs font-semibold text-white mb-0.5">${chordSymbol}${inversionText}</div>
+                <div class="text-xs ${colors.romanColor} font-bold">${roman}</div>
+            </div>
+        `;
+
+        sequenceInner.appendChild(card);
+    });
+
+    sequenceContainer.appendChild(sequenceInner);
+    container.insertBefore(sequenceContainer, container.firstChild);
+
+    // Make simplified sequence sortable
+    initializeSimplifiedSortable(sequenceInner);
+}
+
+/**
+ * Initialize drag/drop sorting for simplified chord sequence
+ * @param {HTMLElement} container - Container with simplified cards
+ */
+function initializeSimplifiedSortable(container) {
+    if (typeof Sortable === 'undefined') return;
+
+    if (container.sortableInstance) {
+        container.sortableInstance.destroy();
+    }
+
+    container.sortableInstance = new Sortable(container, {
+        animation: 200,
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        dragClass: 'sortable-drag',
+        handle: '.simplified-chord-card',
+        onEnd: function(evt) {
+            if (evt.oldIndex !== evt.newIndex) {
+                // Reorder progression data
+                const trainerState = getTrainerState();
+                const progressionData = [...trainerState.progressionData];
+                const progressionRomans = [...trainerState.progressionRomans];
+
+                // Move items
+                const [movedChord] = progressionData.splice(evt.oldIndex, 1);
+                progressionData.splice(evt.newIndex, 0, movedChord);
+
+                const [movedRoman] = progressionRomans.splice(evt.oldIndex, 1);
+                progressionRomans.splice(evt.newIndex, 0, movedRoman);
+
+                // Update state
+                setProgressionData(progressionData);
+                setProgressionRomans(progressionRomans);
+
+                // Save state for undo/redo
+                saveState({
+                    type: 'reorder',
+                    data: { fromIndex: evt.oldIndex, toIndex: evt.newIndex }
+                });
+
+                // Re-render both views
+                renderProgressionDisplay();
+            }
+        }
+    });
+}
+
+/**
+ * PHASE 3.3: Highlight chords that are part of a detected pattern
+ * @param {Object} pattern - Pattern object with matches array and pattern info
+ */
+function highlightPatternChords(pattern) {
+    // Remove existing highlights
+    document.querySelectorAll('.pattern-highlight-active').forEach(el => {
+        el.classList.remove('pattern-highlight-active');
+    });
+
+    // Get pattern length from COMMON_PROGRESSIONS
+    const patternInfo = COMMON_PROGRESSIONS[pattern.id];
+    if (!patternInfo) return;
+
+    const patternLength = patternInfo.pattern.length;
+
+    // Highlight all chords in each pattern match
+    pattern.matches.forEach(startIndex => {
+        // Highlight in both simplified and detailed views
+        for (let i = 0; i < patternLength; i++) {
+            const chordIndex = startIndex + i;
+
+            // Highlight simplified card
+            const simplifiedCard = document.querySelector(`[data-simplified-index="${chordIndex}"]`);
+            if (simplifiedCard) {
+                simplifiedCard.classList.add('pattern-highlight-active');
+                setTimeout(() => {
+                    simplifiedCard.classList.remove('pattern-highlight-active');
+                }, 2000);
+            }
+
+            // Highlight detailed card
+            const detailedCard = document.querySelector(`[data-index="${chordIndex}"]`);
+            if (detailedCard) {
+                detailedCard.classList.add('pattern-highlight-active');
+                setTimeout(() => {
+                    detailedCard.classList.remove('pattern-highlight-active');
+                }, 2000);
+            }
+        }
+    });
+}
+
+/**
+ * PHASE 3.3: Render tension curve visualization
+ * Displays harmonic tension as an SVG curve above the progression
+ * @param {HTMLElement} container - Container to insert the curve into
+ * @param {Array} progressionData - Array of chord objects
+ * @param {string} key - Current key
+ */
+function renderTensionCurve(container, progressionData, key) {
+    if (!progressionData || progressionData.length === 0) return;
+
+    // Calculate tension values for each chord
+    const tensionValues = harmonyAnalyzer.calculateTensionCurve(progressionData, key);
+
+    if (!tensionValues || tensionValues.length === 0) return;
+
+    // Create tension curve container
+    const curveContainer = document.createElement('div');
+    curveContainer.id = 'tension-curve-container';
+    curveContainer.className = 'mb-4 px-4';
+
+    // SVG dimensions
+    const width = Math.min(1000, window.innerWidth - 100);
+    const height = 120;
+    const padding = { top: 20, right: 30, bottom: 30, left: 40 };
+    const graphWidth = width - padding.left - padding.right;
+    const graphHeight = height - padding.top - padding.bottom;
+
+    // Calculate SVG path for smooth curve
+    const xStep = graphWidth / Math.max(1, tensionValues.length - 1);
+    const points = tensionValues.map((tension, i) => ({
+        x: padding.left + (i * xStep),
+        y: padding.top + graphHeight - (tension / 100 * graphHeight)
+    }));
+
+    // Create smooth curve using quadratic bezier curves
+    let pathData = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+        const current = points[i];
+        const next = points[i + 1];
+        const controlX = (current.x + next.x) / 2;
+        const controlY = (current.y + next.y) / 2;
+        pathData += ` Q ${controlX} ${current.y}, ${controlX} ${controlY}`;
+        pathData += ` Q ${controlX} ${next.y}, ${next.x} ${next.y}`;
+    }
+
+    // Create gradient for tension coloring
+    const gradientId = 'tension-gradient';
+    const gradientStops = [
+        { offset: '0%', color: '#10b981', label: 'Low' },    // Green
+        { offset: '50%', color: '#f59e0b', label: 'Medium' }, // Amber
+        { offset: '100%', color: '#ef4444', label: 'High' }   // Red
+    ];
+
+    // Build SVG
+    curveContainer.innerHTML = `
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+                    </svg>
+                    <h3 class="text-sm font-semibold text-white">Harmonic Tension</h3>
+                </div>
+                <div class="flex items-center gap-3 text-xs">
+                    <div class="flex items-center gap-1">
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                        <span class="text-gray-400">Low</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <div class="w-3 h-3 rounded-full bg-amber-500"></div>
+                        <span class="text-gray-400">Medium</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                        <span class="text-gray-400">High</span>
+                    </div>
+                </div>
+            </div>
+            <svg width="${width}" height="${height}" class="mx-auto">
+                <defs>
+                    <linearGradient id="${gradientId}" x1="0%" y1="100%" x2="0%" y2="0%">
+                        ${gradientStops.map(stop =>
+                            `<stop offset="${stop.offset}" stop-color="${stop.color}" />`
+                        ).join('')}
+                    </linearGradient>
+                    <linearGradient id="${gradientId}-fill" x1="0%" y1="100%" x2="0%" y2="0%">
+                        ${gradientStops.map(stop =>
+                            `<stop offset="${stop.offset}" stop-color="${stop.color}" stop-opacity="0.15" />`
+                        ).join('')}
+                    </linearGradient>
+                </defs>
+
+                <!-- Grid lines -->
+                ${[0, 25, 50, 75, 100].map(tension => {
+                    const y = padding.top + graphHeight - (tension / 100 * graphHeight);
+                    return `
+                        <line
+                            x1="${padding.left}"
+                            y1="${y}"
+                            x2="${padding.left + graphWidth}"
+                            y2="${y}"
+                            stroke="#374151"
+                            stroke-width="1"
+                            stroke-dasharray="2,2"
+                        />
+                        <text
+                            x="${padding.left - 8}"
+                            y="${y + 4}"
+                            text-anchor="end"
+                            font-size="10"
+                            fill="#9ca3af"
+                        >${tension}</text>
+                    `;
+                }).join('')}
+
+                <!-- Area fill under curve -->
+                <path
+                    d="${pathData} L ${points[points.length - 1].x} ${padding.top + graphHeight} L ${points[0].x} ${padding.top + graphHeight} Z"
+                    fill="url(#${gradientId}-fill)"
+                />
+
+                <!-- Tension curve line -->
+                <path
+                    d="${pathData}"
+                    stroke="url(#${gradientId})"
+                    stroke-width="3"
+                    fill="none"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                />
+
+                <!-- Data points -->
+                ${points.map((point, i) => {
+                    const tension = tensionValues[i];
+                    let color = '#10b981'; // Green
+                    if (tension > 66) color = '#ef4444'; // Red
+                    else if (tension > 33) color = '#f59e0b'; // Amber
+
+                    return `
+                        <circle
+                            cx="${point.x}"
+                            cy="${point.y}"
+                            r="4"
+                            fill="${color}"
+                            stroke="#1f2937"
+                            stroke-width="2"
+                        >
+                            <title>Chord ${i + 1}: ${Math.round(tension)}% tension</title>
+                        </circle>
+                    `;
+                }).join('')}
+
+                <!-- Chord labels -->
+                ${points.map((point, i) => `
+                    <text
+                        x="${point.x}"
+                        y="${padding.top + graphHeight + 20}"
+                        text-anchor="middle"
+                        font-size="11"
+                        fill="#9ca3af"
+                    >${i + 1}</text>
+                `).join('')}
+
+                <!-- Y-axis label -->
+                <text
+                    x="${padding.left / 2}"
+                    y="${height / 2}"
+                    text-anchor="middle"
+                    font-size="11"
+                    fill="#9ca3af"
+                    transform="rotate(-90, ${padding.left / 2}, ${height / 2})"
+                >Tension</text>
+
+                <!-- X-axis label -->
+                <text
+                    x="${width / 2}"
+                    y="${height - 5}"
+                    text-anchor="middle"
+                    font-size="11"
+                    fill="#9ca3af"
+                >Chord Position</text>
+            </svg>
+        </div>
+    `;
+
+    // Insert at the top of the container
+    container.insertBefore(curveContainer, container.firstChild);
+}
+
 /**
  * Render the progression display with all chord cards
  * Shows chord cards with controls for type, inversion, voicing, LH settings
@@ -1810,13 +2242,13 @@ export function renderChordStaffNotation(canvas, chordData, key) {
 export function renderProgressionDisplay(containerId = 'progression-visualization', syncBothTabs = true) {
     // Capture staff notation states before clearing DOM (always capture from both tabs)
     captureStaffNotationStates();
-    
+
     const container = document.getElementById(containerId);
     if (!container) {
         console.warn(`Container with ID "${containerId}" not found`);
         return;
     }
-    
+
     // IMPORTANT: Destroy Sortable BEFORE clearing innerHTML
     // because innerHTML = '' destroys all DOM elements Sortable is tracking
     // Destroy Sortable for both progression builder and melody tab
@@ -1829,10 +2261,22 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             container.sortableInstance = null;
         }
     }
-    
+
     container.innerHTML = '';
 
     const trainerState = getTrainerState();
+
+    // PHASE 3.3: Add analysis visualizations (only for main progression builder tab)
+    if (containerId === 'progression-visualization' && trainerState.progressionData.length > 0) {
+        // 1. Pattern highlighting badges at top
+        renderPatternHighlights(container, trainerState.progressionData, trainerState.currentKey || 'C');
+
+        // 2. Simplified chord sequence (compact, draggable)
+        renderSimplifiedChordSequence(container, trainerState.progressionData, trainerState.currentKey || 'C');
+
+        // 3. Tension curve visualization (below simplified sequence)
+        renderTensionCurve(container, trainerState.progressionData, trainerState.currentKey || 'C');
+    }
 
     trainerState.progressionData.forEach((chordData, index) => {
         // Create wrapper container for controls above and card below
@@ -1947,8 +2391,11 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         const nameContainer = document.createElement('div');
         nameContainer.className = 'flex flex-col text-left';
 
+        // PHASE 3.3: Color-coded roman numerals by harmonic function
+        const colors = getFunctionColors(chordData.roman);
+
         const romanEl = document.createElement('span');
-        romanEl.className = 'font-mono font-bold text-sm text-indigo-700 leading-tight';
+        romanEl.className = `font-mono font-bold text-sm ${colors.romanColor} leading-tight`;
         romanEl.textContent = chordData.roman;
         nameContainer.appendChild(romanEl);
 
@@ -1961,7 +2408,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         const functionLabel = getChordFunction(chordData.roman);
         if (functionLabel) {
             const functionEl = document.createElement('span');
-            functionEl.className = 'px-0.5 font-sans text-[10px] text-indigo-500 font-medium leading-tight';
+            functionEl.className = `px-0.5 font-sans text-[10px] ${colors.functionColor} font-medium leading-tight`;
             functionEl.textContent = functionLabel;
             nameContainer.appendChild(functionEl);
         }
@@ -5732,4 +6179,232 @@ export function importChordList(mode = 'replace') {
             window.showModal('No valid chords could be imported. Please check the format.', true);
         }
     }
+}
+
+// ============================================================================
+// PHASE 3.1: Template Browser Integration
+// ============================================================================
+
+/**
+ * Open the template browser modal
+ * Allows users to browse and select progression templates by category
+ */
+export function openTemplateBrowser() {
+    showTemplateBrowser((template, action) => {
+        loadTemplateToProgression(template, action);
+    });
+}
+
+/**
+ * Load a selected template into the progression
+ * @param {object} template - Template object from template browser
+ * @param {string} action - 'load' (replace) or 'append' (add to end)
+ */
+function loadTemplateToProgression(template, action = 'load') {
+    console.log('Loading template:', template.name);
+
+    const keySelect = document.getElementById('trainer-key-select');
+    const currentKey = keySelect ? keySelect.value : 'C';
+
+    // Stop playback if currently playing
+    const trainerState = getTrainerState();
+    if (trainerState.isPlaying && window.handleAutoPlayback) {
+        handleAutoPlayback();
+    }
+
+    // Get roman numerals from template
+    const romans = template.progressions;
+
+    // Set the key
+    setCurrentKey(currentKey);
+
+    // Calculate scale notes for the key
+    const keyIndex = SHARP_NOTES.indexOf(currentKey);
+    const scaleNotes = MAJOR_SCALE_STEPS.map(step => {
+        const noteIndex = (keyIndex + step) % 12;
+        return SHARP_NOTES[noteIndex];
+    });
+    setScaleNotes(scaleNotes);
+
+    // Build progression data from template
+    let progressionData = [];
+    let progressionRomans = [];
+
+    // If appending, start with existing progression
+    if (action === 'append' && trainerState.progressionData && trainerState.progressionData.length > 0) {
+        progressionData = [...trainerState.progressionData];
+        progressionRomans = [...trainerState.progressionRomans];
+    }
+
+    romans.forEach((roman, index) => {
+        // Parse roman numeral to extract base and quality
+        // Examples: "I", "ii", "V7", "Imaj7", "ii7", "vii°"
+        let baseRoman = roman;
+        let chordQuality = null;
+
+        // Check for 7th chord suffixes
+        if (roman.includes('maj7')) {
+            baseRoman = roman.replace('maj7', '');
+            chordQuality = 'Major 7th';
+        } else if (roman.includes('7')) {
+            baseRoman = roman.replace('7', '');
+            // Determine if it's dominant 7th or minor 7th based on case
+            if (baseRoman === baseRoman.toUpperCase() || baseRoman === 'V' || baseRoman === 'VII') {
+                chordQuality = 'Dominant 7th';
+            } else {
+                chordQuality = 'Minor 7th';
+            }
+        }
+
+        // Look up the default quality from ROMAN_MAP_BASE
+        const mapEntry = ROMAN_MAP_BASE[baseRoman];
+        const defaultQuality = mapEntry ? mapEntry.quality : 'Major'; // Default to Major if not found
+
+        // Determine final quality - use 7th chord quality if present, otherwise use default
+        const finalQuality = chordQuality || defaultQuality;
+
+        // Get chord info from base roman numeral with the correct quality
+        const chordInfo = getProgressionChordNotes(currentKey, baseRoman, finalQuality, 0);
+
+        if (chordInfo && chordInfo.root && chordInfo.type) {
+            // Use the quality we already determined
+            const finalType = finalQuality;
+
+            const chordData = {
+                root: chordInfo.root,
+                type: finalType,
+                inversion: chordInfo.inversion || 0,
+                voicing: 'close',
+                roman: roman,
+                name: chordInfo.name || `${chordInfo.root} ${finalType}`,
+                simpleName: chordInfo.name || `${chordInfo.root}${finalType === 'Major' ? '' : finalType.includes('7') ? '7' : 'm'}`,
+                notes: chordInfo.notes || [],
+                lhNotes: chordInfo.lhNotes || [],
+                key: currentKey
+            };
+
+            progressionData.push(chordData);
+            progressionRomans.push(roman);
+        } else {
+            console.warn(`Could not generate chord for roman numeral: ${roman} (base: ${baseRoman}) in key ${currentKey}`, chordInfo);
+        }
+    });
+
+    // Update state
+    setProgressionData(progressionData);
+    setProgressionRomans(progressionRomans);
+    setCurrentIndex(0);
+    setIsReady(true);
+
+    // Clear undo/redo history for fresh start (only on load, not append)
+    if (action === 'load') {
+        clearHistory();
+    }
+
+    // Save initial state
+    saveState({
+        progressionData: [...progressionData],
+        progressionRomans: [...progressionRomans]
+    });
+
+    // Render progression display
+    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', false);
+
+    // Update UI controls
+    updateProgressionControlsUI();
+
+    // Show success message with template info
+    const actionText = action === 'append' ? 'Appended' : 'Loaded';
+    const message = `${actionText} template: "${template.name}"\n${progressionData.length} total chords in ${currentKey}`;
+    if (window.showModal) {
+        setTimeout(() => {
+            window.showModal(message, false);
+            // Auto-hide after 2 seconds
+            setTimeout(() => {
+                if (window.hideModal) window.hideModal();
+            }, 2000);
+        }, 100);
+    }
+
+    console.log('Template loaded successfully:', {
+        template: template.name,
+        chords: progressionData.length,
+        key: currentKey
+    });
+}
+
+// ============================================================================
+// PHASE 3.3: View Toggle Controls
+// ============================================================================
+
+// Track visibility state for analysis visualizations
+let simplifiedViewVisible = true;
+let tensionCurveVisible = true;
+
+/**
+ * Toggle simplified chord sequence view visibility
+ */
+export function toggleSimplifiedView() {
+    simplifiedViewVisible = !simplifiedViewVisible;
+
+    const container = document.getElementById('simplified-chord-sequence');
+    const btn = document.getElementById('toggle-simplified-view-btn');
+
+    if (container) {
+        if (simplifiedViewVisible) {
+            container.style.display = '';
+            if (btn) {
+                btn.classList.remove('opacity-50');
+                btn.classList.add('bg-purple-100', 'hover:bg-purple-200', 'border-purple-300', 'text-purple-700');
+                btn.classList.remove('bg-gray-200', 'border-gray-300', 'text-gray-500');
+            }
+        } else {
+            container.style.display = 'none';
+            if (btn) {
+                btn.classList.add('opacity-50');
+                btn.classList.remove('bg-purple-100', 'hover:bg-purple-200', 'border-purple-300', 'text-purple-700');
+                btn.classList.add('bg-gray-200', 'border-gray-300', 'text-gray-500');
+            }
+        }
+    }
+}
+
+/**
+ * Toggle tension curve visualization visibility
+ */
+export function toggleTensionCurve() {
+    tensionCurveVisible = !tensionCurveVisible;
+
+    const container = document.getElementById('tension-curve-container');
+    const btn = document.getElementById('toggle-tension-curve-btn');
+
+    if (container) {
+        if (tensionCurveVisible) {
+            container.style.display = '';
+            if (btn) {
+                btn.classList.remove('opacity-50');
+                btn.classList.add('bg-blue-100', 'hover:bg-blue-200', 'border-blue-300', 'text-blue-700');
+                btn.classList.remove('bg-gray-200', 'border-gray-300', 'text-gray-500');
+            }
+        } else {
+            container.style.display = 'none';
+            if (btn) {
+                btn.classList.add('opacity-50');
+                btn.classList.remove('bg-blue-100', 'hover:bg-blue-200', 'border-blue-300', 'text-blue-700');
+                btn.classList.add('bg-gray-200', 'border-gray-300', 'text-gray-500');
+            }
+        }
+    }
+}
+
+/**
+ * Get visibility state for analysis views
+ * @returns {Object} Visibility state
+ */
+export function getAnalysisViewState() {
+    return {
+        simplifiedViewVisible,
+        tensionCurveVisible
+    };
 }
