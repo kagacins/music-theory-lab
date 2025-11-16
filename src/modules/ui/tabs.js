@@ -146,10 +146,27 @@ export function switchTab(tabId) {
         updateKeyboardLabels();
     } else if (tabId === 'melody') {
         const trainerState = getTrainerState();
+
+        // Phase 1B: Initialize composition bridge
+        if (window.initMelodyComposerBridge) {
+            window.initMelodyComposerBridge();
+        }
+
         // Sync progression timeline to melody tab
         if (window.syncProgressionToMelodyTab) {
             window.syncProgressionToMelodyTab();
         }
+
+        // Phase 1B: Sync progression to composition state
+        if (window.syncProgressionToMelodyComposer) {
+            window.syncProgressionToMelodyComposer();
+        }
+
+        // Phase 2.2: Initialize chord recommendations sidebar
+        if (window.initializeRecommendationsSidebar) {
+            window.initializeRecommendationsSidebar();
+        }
+
         // Update key signature display
         if (trainerState.currentKey && window.updateKeySignatureDisplay) {
             updateKeySignatureDisplay(trainerState.currentKey);

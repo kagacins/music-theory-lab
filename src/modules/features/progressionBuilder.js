@@ -4427,10 +4427,30 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0) {
     renderProgressionDisplay('progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
 
+    // Phase 1B: Sync to melody composer if it's active
+    // This ensures bass auto-fill updates when chords are added while on melody tab
+    if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
+        window.syncProgressionToMelodyComposer();
+
+        // Re-render melody staff to show the new chord
+        const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
+        if (melodyCanvas && window.renderInteractiveMelodyStaff) {
+            window.renderInteractiveMelodyStaff(melodyCanvas);
+        }
+    }
+
     // Update unified suggestions
     if (window.updateUnifiedSuggestions) {
         window.updateUnifiedSuggestions();
     }
+
+    // Phase 2.2: Dispatch event for chord recommendations sidebar
+    window.dispatchEvent(new CustomEvent('progressionUpdated', {
+        detail: {
+            progression: updatedProgression,
+            key: trainerState.currentKey
+        }
+    }));
 }
 
 // Make it available globally
@@ -4476,22 +4496,30 @@ function renderMelodyNotationIfNeeded() {
     // Check if we're on the Melody Composer tab
     const currentTab = getCurrentTab();
     const isMelodyTab = currentTab === 'melody';
-    
+
     // Check if Free mode controls are visible (Free mode is active)
     const freeModeControls = document.getElementById('free-mode-controls');
     const isFreeModeActive = freeModeControls && !freeModeControls.classList.contains('hidden');
-    
+
     // Only render if on Melody tab or if Free mode is active
     if (isMelodyTab || isFreeModeActive) {
+        // Phase 1B: Sync progression to composition state before rendering
+        // This ensures bass auto-fill is updated when chords are added
+        if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
+            window.syncProgressionToMelodyComposer();
+        }
+
         // Get the canvas
         const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
         if (interactiveCanvas) {
             // Use setTimeout to ensure DOM updates are complete
             setTimeout(() => {
-                // Check if we're in interactive mode (recording) or just showing chords
-                if (window.isInteractiveMode && window.renderInteractiveMelodyStaff) {
+                // Always use renderInteractiveMelodyStaff for melody tab since it supports bass auto-fill
+                // renderChordProgressionStaff doesn't know about bass, so we avoid it
+                if (window.renderInteractiveMelodyStaff) {
                     window.renderInteractiveMelodyStaff(interactiveCanvas);
                 } else if (window.renderChordProgressionStaff) {
+                    // Fallback only if renderInteractiveMelodyStaff doesn't exist
                     window.renderChordProgressionStaff(interactiveCanvas);
                 }
             }, 50);
@@ -4533,9 +4561,17 @@ export function clearProgression() {
     
     // Re-render the display
     renderProgressionDisplay();
-    
+
     // Update UI
     updateProgressionControlsUI();
+
+    // Phase 2.2: Dispatch event for chord recommendations sidebar
+    window.dispatchEvent(new CustomEvent('progressionUpdated', {
+        detail: {
+            progression: [],
+            key: trainerState.currentKey
+        }
+    }));
 }
 
 export function removeChordFromProgression(index) {
@@ -4548,15 +4584,23 @@ export function removeChordFromProgression(index) {
 
     trainerState.progressionData.splice(index, 1);
     trainerState.progressionRomans.splice(index, 1);
-    
+
     // Re-render both tabs to ensure synchronization
     // First render the main progression builder
     renderProgressionDisplay('progression-visualization', true);
     // Then render the melody composer tab (syncBothTabs=false to avoid infinite recursion)
     renderProgressionDisplay('melody-progression-visualization', false);
-    
+
     // Auto-render melody notation if on Melody Composer tab or if Free mode is active
     renderMelodyNotationIfNeeded();
+
+    // Phase 2.2: Dispatch event for chord recommendations sidebar
+    window.dispatchEvent(new CustomEvent('progressionUpdated', {
+        detail: {
+            progression: trainerState.progressionData,
+            key: trainerState.currentKey
+        }
+    }));
 }
 
 /**

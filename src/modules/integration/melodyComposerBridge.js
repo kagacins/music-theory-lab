@@ -1,0 +1,308 @@
+/**
+ * Melody Composer Bridge Module
+ *
+ * Bridges the existing melodyGenerator.js with the new CompositionState architecture.
+ * Maintains backward compatibility while enabling new features.
+ *
+ * This module will be gradually phased out as we migrate melodyGenerator.js
+ * to use CompositionState directly.
+ */
+
+import { getCompositionState, resetCompositionState } from '../state/compositionState.js';
+import {
+    getProgressionNotationSync,
+    syncProgressionToComposition
+} from './progressionNotationSync.js';
+import { getProgressionData, getCurrentKey } from '../state/trainerState.js';
+
+// Reference to composition state
+let compositionState = null;
+let syncInstance = null;
+
+// Track whether we're using new or old system
+let useCompositionState = true; // Feature flag
+
+/**
+ * Initialize the bridge between old and new systems
+ * Call this when melody composer tab is activated
+ */
+export function initMelodyComposerBridge() {
+    compositionState = getCompositionState();
+    syncInstance = getProgressionNotationSync();
+
+    console.log('[Bridge] Melody Composer Bridge initialized');
+
+    return {
+        compositionState,
+        syncInstance
+    };
+}
+
+/**
+ * Sync progression data to composition state
+ * Called when user switches to melody tab or loads a progression
+ */
+export function syncProgressionToMelodyComposer() {
+    if (!useCompositionState) return;
+
+    const progressionData = getProgressionData();
+    const currentKey = getCurrentKey();
+
+    if (!progressionData || progressionData.length === 0) {
+        console.log('[Bridge] No progression to sync');
+        return;
+    }
+
+    // Debug: Log actual progression data to diagnose duplication
+    console.log('[Bridge DEBUG] Progression data:', progressionData.map(c => c.root || c.name).join('-'));
+    console.log('[Bridge DEBUG] Progression count:', progressionData.length);
+
+    // IMPORTANT: Disable bi-directional sync during import to prevent circular updates
+    // The progressionNotationSync listens to 'measureAdded' events and would sync back
+    // to the progression builder, creating duplicates
+    if (syncInstance && syncInstance.isUpdating !== undefined) {
+        syncInstance.isUpdating = true;
+    }
+
+    try {
+        // Import progression into composition state
+        compositionState.importFromProgressionData(progressionData, {
+            key: currentKey
+        });
+
+        // Failsafe: Ensure bass is generated if auto-generate is ON
+        // This handles cases where import might not generate bass correctly
+        const autoGenSetting = compositionState.getSettings().autoGenerateBass;
+        console.log(`[Bridge] Auto-generate bass setting: ${autoGenSetting}`);
+
+        if (autoGenSetting) {
+            // Force regenerate bass for all measures to ensure it's there
+            for (let i = 0; i < compositionState.getMeasureCount(); i++) {
+                compositionState.updateBassFromChord(i);
+            }
+            console.log(`[Bridge] Force-regenerated bass for ${compositionState.getMeasureCount()} measures`);
+        }
+
+        console.log(`[Bridge] Synced ${progressionData.length} chords to composition state`);
+    } finally {
+        // Re-enable bi-directional sync after import
+        if (syncInstance && syncInstance.isUpdating !== undefined) {
+            syncInstance.isUpdating = false;
+        }
+    }
+}
+
+/**
+ * Convert old interactiveMelody format to composition state
+ * @param {object} interactiveMelody - Old melody format
+ */
+export function importInteractiveMelodyToComposition(interactiveMelody) {
+    if (!useCompositionState || !interactiveMelody) return;
+
+    compositionState.importFromInteractiveMelody(interactiveMelody);
+
+    console.log('[Bridge] Imported interactive melody to composition state');
+}
+
+/**
+ * Export composition state to old interactiveMelody format
+ * Used for backward compatibility with rendering functions
+ * @returns {object} Interactive melody format
+ */
+export function exportCompositionToInteractiveMelody() {
+    if (!useCompositionState) return null;
+
+    return compositionState.exportToInteractiveMelody();
+}
+
+/**
+ * Get the current composition state
+ * @returns {object} CompositionState instance
+ */
+export function getBridgeCompositionState() {
+    return compositionState;
+}
+
+/**
+ * Add note to composition (called from melody composer UI)
+ * @param {number} measureIndex - Measure index
+ * @param {string} staff - 'treble' or 'bass'
+ * @param {object} note - Note data
+ */
+export function addNoteViaBridge(measureIndex, staff, note) {
+    if (!useCompositionState) return;
+
+    // Ensure measure exists
+    while (compositionState.getMeasureCount() <= measureIndex) {
+        compositionState.addMeasure({});
+    }
+
+    // Add note to the staff
+    compositionState.addNote(measureIndex, staff, 0, note);
+}
+
+/**
+ * Update bass pattern setting
+ * @param {string} pattern - Bass pattern ('whole-note', 'root-fifth', 'arpeggio', etc.)
+ */
+export function setBassPattern(pattern) {
+    if (!useCompositionState) return;
+
+    compositionState.updateSettings({ bassPattern: pattern });
+
+    // Regenerate bass for all measures
+    for (let i = 0; i < compositionState.getMeasureCount(); i++) {
+        const measure = compositionState.getMeasure(i);
+        if (measure && measure.notation.bass.autoGenerated) {
+            compositionState.updateBassFromChord(i);
+        }
+    }
+
+    console.log(`[Bridge] Bass pattern changed to: ${pattern}`);
+}
+
+/**
+ * Toggle auto-generate bass on/off
+ * @param {boolean} enabled - Whether to enable auto-generation
+ */
+export function setAutoGenerateBass(enabled) {
+    if (!useCompositionState) return;
+
+    compositionState.updateSettings({ autoGenerateBass: enabled });
+
+    if (enabled) {
+        // Regenerate bass for all measures when turning ON
+        // This ensures bass is generated even if it didn't exist before
+        for (let i = 0; i < compositionState.getMeasureCount(); i++) {
+            const measure = compositionState.getMeasure(i);
+            if (measure) {
+                // Always regenerate when turning ON (don't check autoGenerated flag)
+                compositionState.updateBassFromChord(i);
+            }
+        }
+    }
+
+    console.log(`[Bridge] Auto-generate bass: ${enabled}`);
+}
+
+/**
+ * Check if a measure's bass is auto-generated
+ * @param {number} measureIndex - Measure index
+ * @returns {boolean} True if auto-generated
+ */
+export function isBassAutoGenerated(measureIndex) {
+    if (!useCompositionState) return false;
+
+    const measure = compositionState.getMeasure(measureIndex);
+    return measure ? measure.notation.bass.autoGenerated : false;
+}
+
+/**
+ * Manually edit bass note (marks as user-edited)
+ * @param {number} measureIndex - Measure index
+ * @param {number} noteIndex - Note index in bass staff
+ * @param {object} changes - Changes to apply
+ */
+export function editBassNote(measureIndex, noteIndex, changes) {
+    if (!useCompositionState) return;
+
+    compositionState.updateNote(measureIndex, 'bass', 0, noteIndex, changes);
+
+    // Mark as not auto-generated
+    const measure = compositionState.getMeasure(measureIndex);
+    if (measure) {
+        measure.notation.bass.autoGenerated = false;
+    }
+
+    console.log(`[Bridge] Bass note edited at measure ${measureIndex}, note ${noteIndex}`);
+}
+
+/**
+ * Add bass note manually (marks measure as user-edited)
+ * @param {number} measureIndex - Measure index
+ * @param {object} note - Note data
+ */
+export function addBassNote(measureIndex, note) {
+    if (!useCompositionState) return;
+
+    // Ensure measure exists
+    while (compositionState.getMeasureCount() <= measureIndex) {
+        compositionState.addMeasure({});
+    }
+
+    compositionState.addNote(measureIndex, 'bass', 0, note);
+
+    // Mark as not auto-generated
+    const measure = compositionState.getMeasure(measureIndex);
+    if (measure) {
+        measure.notation.bass.autoGenerated = false;
+    }
+
+    console.log(`[Bridge] Bass note added manually at measure ${measureIndex}`);
+}
+
+/**
+ * Regenerate bass for a specific measure
+ * @param {number} measureIndex - Measure index
+ */
+export function regenerateBassForMeasure(measureIndex) {
+    if (!useCompositionState) return;
+
+    compositionState.updateBassFromChord(measureIndex);
+
+    console.log(`[Bridge] Bass regenerated for measure ${measureIndex}`);
+}
+
+/**
+ * Regenerate bass for all measures
+ */
+export function regenerateAllBass() {
+    if (!useCompositionState) return;
+
+    for (let i = 0; i < compositionState.getMeasureCount(); i++) {
+        compositionState.updateBassFromChord(i);
+    }
+
+    console.log('[Bridge] Bass regenerated for all measures');
+}
+
+/**
+ * Get bass pattern options
+ * @returns {array} Array of pattern objects
+ */
+export function getBassPatternOptions() {
+    return [
+        { value: 'whole-note', label: 'Whole Note', description: 'Single root note per measure' },
+        { value: 'root-fifth', label: 'Root-Fifth', description: 'Alternating root and fifth' },
+        { value: 'arpeggio', label: 'Arpeggio', description: 'Ascending chord tones' },
+        { value: 'alberti', label: 'Alberti Bass', description: 'Classical pattern (C-G-E-G)' },
+        { value: 'walking', label: 'Walking Bass', description: 'Jazz stepwise motion' }
+    ];
+}
+
+/**
+ * Get current settings
+ * @returns {object} Settings object
+ */
+export function getBridgeSettings() {
+    if (!useCompositionState) return {};
+
+    return compositionState.getSettings();
+}
+
+/**
+ * Enable/disable composition state (feature flag)
+ * @param {boolean} enabled - Whether to use composition state
+ */
+export function setUseCompositionState(enabled) {
+    useCompositionState = enabled;
+    console.log(`[Bridge] CompositionState ${enabled ? 'enabled' : 'disabled'}`);
+}
+
+/**
+ * Check if composition state is enabled
+ * @returns {boolean} True if enabled
+ */
+export function isUsingCompositionState() {
+    return useCompositionState;
+}
