@@ -86,15 +86,20 @@ export class RecommendationService {
             // Get user's recommendation weight settings
             const customWeights = getSavedWeights(true); // true for context mode
 
+            // Get user's saved style/mood preferences (same as modal uses)
+            const savedStyle = localStorage.getItem('chord-suggestion-style') || 'balanced';
+            const savedMood = localStorage.getItem('chord-suggestion-mood') || 'bright';
+            const savedTension = localStorage.getItem('chord-suggestion-tension') || 'resolve';
+
             // Use advanced 3D scoring system with context awareness
             rawRecommendations = generateComprehensiveRecommendations(
                 lastChord.root,
                 lastChord.type,
                 lastChord.inversion || 0,
                 currentKey,
-                'balanced',      // style - could be made configurable later
-                'bright',        // mood - could be made configurable later
-                'resolve',       // tensionDirection - could be made configurable
+                savedStyle,      // Use user's saved style preference
+                savedMood,       // Use user's saved mood preference
+                savedTension,    // Use user's saved tension preference
                 10,              // limit to top 10
                 currentProgression,
                 true,            // contextMode - enables progression pattern analysis
