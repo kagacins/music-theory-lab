@@ -4,6 +4,7 @@
  */
 
 import { CHORD_DEFINITIONS, ALL_NOTES } from '../../data/music-data.js';
+import { getHarmonyAnalyzer } from '../analysis/harmonyAnalyzer.js';
 
 /**
  * Functional harmony categories for chord analysis
@@ -511,6 +512,10 @@ export function analyzeProgression(progression, key) {
     if (voiceLeadingQuality < 60) complexity++;
     complexity = Math.min(5, complexity);
 
+    // Calculate tension curve using HarmonyAnalyzer
+    const harmonyAnalyzer = getHarmonyAnalyzer();
+    const tensionCurve = harmonyAnalyzer.calculateTensionCurve(progression, key);
+
     return {
         romanNumerals,
         functions,
@@ -518,6 +523,7 @@ export function analyzeProgression(progression, key) {
         mood,
         complexity,
         voiceLeadingQuality,
-        similarSongs
+        similarSongs,
+        tensionCurve
     };
 }

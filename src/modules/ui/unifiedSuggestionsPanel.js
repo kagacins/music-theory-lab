@@ -5,6 +5,7 @@
 
 import { analyzeProgression } from '../features/chordRecommendations.js';
 import { getProgressionData, getCurrentKey } from '../state/trainerState.js';
+import { getHarmonyAnalyzer } from '../analysis/harmonyAnalyzer.js';
 
 /**
  * Initialize modals and event listeners for analysis features
@@ -182,8 +183,13 @@ function updateQuickAnalysis(progression, key) {
     const moodEmoji = getMoodEmoji(analysis.mood);
     moodEl.textContent = `${moodEmoji} ${analysis.mood}`;
 
-    // Calculate average tension (simplified - would integrate with existing tension calculation)
-    const avgTension = Math.round(analysis.voiceLeadingQuality / 2); // Placeholder
+    // Calculate average HARMONIC tension (NOT voice leading)
+    // Use the same tension curve calculation for consistency - inversions don't affect harmonic tension
+    let avgTension = 0;
+    if (analysis.tensionCurve && analysis.tensionCurve.length > 0) {
+        const sum = analysis.tensionCurve.reduce((acc, val) => acc + val, 0);
+        avgTension = Math.round(sum / analysis.tensionCurve.length);
+    }
     tensionEl.textContent = `${avgTension}%`;
 }
 
@@ -191,9 +197,8 @@ function updateQuickAnalysis(progression, key) {
  * Update tension map in modal
  */
 function updateTensionMap() {
-    // This would integrate with existing tension calculation logic
-    // Placeholder implementation
     const progression = getProgressionData();
+    const key = getCurrentKey();
 
     if (!progression || progression.length === 0) {
         document.getElementById('modal-tension-meter').innerHTML = '';
@@ -201,11 +206,9 @@ function updateTensionMap() {
         return;
     }
 
-    // Calculate tension for each chord (simplified)
-    const tensions = progression.map((chord, i) => {
-        // Placeholder - would use actual tension calculation
-        return Math.random() * 100;
-    });
+    // Calculate tension for each chord using HarmonyAnalyzer
+    const harmonyAnalyzer = getHarmonyAnalyzer();
+    const tensions = harmonyAnalyzer.calculateTensionCurve(progression, key);
 
     const avgTension = tensions.reduce((a, b) => a + b, 0) / tensions.length;
     const maxTension = Math.max(...tensions);

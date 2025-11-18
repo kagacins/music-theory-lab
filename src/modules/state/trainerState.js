@@ -24,7 +24,8 @@ let trainerState = {
     styleMoodSuggestions: [],
     tensionProfile: [],
     contextAwareMode: false, // Enable/disable context-aware chord suggestions
-    progressionLookback: 4   // Number of previous chords to analyze for context
+    progressionLookback: 4,   // Number of previous chords to analyze for context
+    selectedChordIndex: 0    // Currently selected chord card index (for persistent purple ring)
 };
 
 // Getters and Setters for progressionData
@@ -207,6 +208,15 @@ export function setProgressionLookback(value) {
     trainerState.progressionLookback = value;
 }
 
+// Getters and Setters for selectedChordIndex
+export function getSelectedChordIndex() {
+    return trainerState.selectedChordIndex;
+}
+
+export function setSelectedChordIndex(value) {
+    trainerState.selectedChordIndex = value;
+}
+
 // Get complete trainer state
 export function getTrainerState() {
     return {
@@ -229,7 +239,8 @@ export function getTrainerState() {
         styleMoodSuggestions: trainerState.styleMoodSuggestions,
         tensionProfile: trainerState.tensionProfile,
         contextAwareMode: trainerState.contextAwareMode,
-        progressionLookback: trainerState.progressionLookback
+        progressionLookback: trainerState.progressionLookback,
+        selectedChordIndex: trainerState.selectedChordIndex
     };
 }
 
@@ -255,7 +266,8 @@ export function initializeTrainerState() {
         styleMoodSuggestions: [],
         tensionProfile: [],
         contextAwareMode: false,
-        progressionLookback: 4
+        progressionLookback: 4,
+        selectedChordIndex: 0
     };
 }
 

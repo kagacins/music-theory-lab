@@ -95,8 +95,8 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     function generateRecommendations(customWeights = null) {
         const tensionDirection = getTensionDirection(currentMood);
         return generateAllRecommendations(
-            currentRoot,
-            currentChordType,
+        currentRoot,
+        currentChordType,
             activeInversion, // Use active inversion
             key,
             currentStyle,
@@ -1627,7 +1627,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
         try {
             console.log(`Playing chord: ${root} ${chordType} (inversion ${inversion})`);
 
-            // Stop any currently playing notes
+        // Stop any currently playing notes
             if (piano && currentNotes) {
                 piano.releaseAll();
             }
@@ -1648,7 +1648,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
 
             // Initialize piano sampler if needed (same as used elsewhere on the site)
             if (!piano) {
-                await Tone.start();
+            await Tone.start();
                 
                 // Create a promise that resolves when the sampler is loaded
                 const samplerLoaded = new Promise((resolve, reject) => {
@@ -1675,8 +1675,8 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
                         onerror: (error) => {
                             console.error('Error loading piano samples:', error);
                             reject(error);
-                        }
-                    }).toDestination();
+                }
+            }).toDestination();
                 });
                 
                 console.log('Piano sampler initialized, waiting for samples to load...');
@@ -1939,7 +1939,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
         try {
             if (piano && currentNotes) {
                 piano.triggerRelease(currentNotes);
-                currentNotes = null;
+            currentNotes = null;
                 console.log('Stopped playing');
             }
         } catch (error) {
@@ -2082,7 +2082,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
 
                 console.log('Add chord to progression');
                 if (onAddChord) {
-                    onAddChord(rec.type, rec.root, rec.inversion);
+                onAddChord(rec.type, rec.root, rec.inversion);
                 } else {
                     console.error('onAddChord callback not provided');
                 }

@@ -866,6 +866,41 @@ button:active:not(:disabled),
     -ms-user-select: none;
 }
 
+/* Expanded chord card wrapper - width controlled by JavaScript based on key signature */
+.expanded-card-wrapper {
+    /* Remove !important to allow JavaScript to set width based on notation complexity */
+    min-width: 125%;
+    z-index: 10;
+    position: relative;
+    box-sizing: border-box;
+}
+
+/* Ensure detailed card inside expanded wrapper takes full width */
+.expanded-card-wrapper .detailed-card {
+    width: 100%;
+    min-width: 100%;
+    box-sizing: border-box;
+}
+
+/* Ensure simplified cards maintain their width (except when showing notation) */
+.chord-card-wrapper:not(.expanded-card-wrapper):not(.has-notation) {
+    min-width: 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+}
+
+/* Shift cards to the right when they come after an expanded card */
+.chord-card-wrapper.shift-right {
+    position: relative;
+    /* transform is set dynamically via JavaScript to preserve card width */
+    /* Using transform instead of margin prevents cards from shrinking */
+    /* Cards maintain their full width and are just visually shifted */
+    /* Use CSS custom property to persist transform even when inline style is reset */
+    transform: translateX(var(--card-shift, 0px));
+    will-change: transform; /* Hint to browser to optimize transform */
+}
+
 @keyframes card-pulse {
     0%, 100% {
         box-shadow: 0 0 20px rgba(99, 102, 241, 0.5), 0 8px 20px rgba(0, 0, 0, 0.15);
@@ -2182,10 +2217,88 @@ body:has(#piano-keyboard.modern-keyboard) #guitar-fretboard-container {
 }
 
 /* ============================================================================
-   PHASE 3.3: Simplified Chord Sequence View
+   PHASE 3.3: Simplified Chord Sequence View (Refactored with Inline Expansion)
    ============================================================================ */
 
+/* Card wrapper with smooth grid transitions */
+.chord-card-wrapper {
+    transition: all 0.3s ease-out;
+}
+
+/* Fade-in animation for card content */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.chord-card-wrapper > div {
+    animation: fadeIn 0.2s ease-out;
+}
+
+/* Disable all transitions and animations when updating card content */
+.chord-card-wrapper.no-animation,
+.chord-card-wrapper.no-animation > *,
+.chord-card-wrapper.no-animation * {
+    transition: none !important;
+    animation: none !important;
+}
+
 /* Simplified chord card styles */
+.simplified-card {
+    transition: all 0.2s ease;
+}
+
+/* Interactive tooltip for simplified cards */
+.chord-tooltip {
+    pointer-events: auto !important;
+    z-index: 1000;
+    white-space: normal;
+}
+
+/* Info button should not be draggable */
+.info-tooltip-btn {
+    pointer-events: auto;
+    z-index: 10;
+}
+
+/* Prevent info button from triggering drag */
+.info-tooltip-btn:active {
+    pointer-events: auto;
+}
+
+/* Tooltip inversion buttons */
+.tooltip-inversion-btn {
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Detailed card styles (expanded view) */
+.detailed-card {
+    transition: all 0.2s ease;
+}
+
+/* Sortable drag states for card wrappers */
+.chord-card-wrapper.sortable-ghost {
+    opacity: 0.4;
+}
+
+.chord-card-wrapper.sortable-chosen .simplified-card {
+    background-color: #374151;
+    border-color: #60a5fa !important;
+}
+
+.chord-card-wrapper.sortable-drag {
+    opacity: 0.9;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+}
+
+/* Legacy simplified chord card styles (for backward compatibility) */
 .simplified-chord-card {
     transition: all 0.2s ease;
 }
@@ -2195,7 +2308,6 @@ body:has(#piano-keyboard.modern-keyboard) #guitar-fretboard-container {
     box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
-/* Sortable drag states for simplified cards */
 .simplified-chord-card.sortable-ghost {
     opacity: 0.4;
     background-color: #1f2937;

@@ -53,6 +53,12 @@ export function syncProgressionToMelodyComposer() {
         return;
     }
 
+    // Check if compositionState has been initialized (user must be on melody tab)
+    if (!compositionState) {
+        console.log('[Bridge] Composition state not initialized - user not on melody tab');
+        return;
+    }
+
     // Debug: Log actual progression data to diagnose duplication
     console.log('[Bridge DEBUG] Progression data:', progressionData.map(c => c.root || c.name).join('-'));
     console.log('[Bridge DEBUG] Progression count:', progressionData.length);

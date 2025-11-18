@@ -27,8 +27,8 @@ export const HARMONIC_FUNCTIONS = {
 export const COMMON_PROGRESSIONS = {
     'POP_PROGRESSION': {
         pattern: ['I', 'V', 'vi', 'IV'],
-        name: 'Pop Progression',
-        description: 'I-V-vi-IV (Axis of Awesome)',
+        name: 'Pop Axis',
+        description: 'I-V-vi-IV (Pop Axis)',
         strength: 5
     },
     'TWELVE_BAR_BLUES': {
@@ -37,10 +37,34 @@ export const COMMON_PROGRESSIONS = {
         description: 'Classic blues progression',
         strength: 5
     },
+    'TWELVE_BAR_BLUES_7TH': {
+        pattern: ['I7', 'I7', 'I7', 'I7', 'IV7', 'IV7', 'I7', 'I7', 'V7', 'IV7', 'I7', 'V7'],
+        name: '12-Bar Blues',
+        description: 'Classic 12-bar blues form with dominant 7ths',
+        strength: 5
+    },
+    'TWELVE_BAR_BLUES_QUICK_CHANGE': {
+        pattern: ['I7', 'IV7', 'I7', 'I7', 'IV7', 'IV7', 'I7', 'I7', 'V7', 'IV7', 'I7', 'V7'],
+        name: '12-Bar Blues (Quick Change)',
+        description: 'Blues variation with IV chord in bar 2 for quicker harmonic movement',
+        strength: 5
+    },
+    'TWELVE_BAR_BLUES_MINOR': {
+        pattern: ['i7', 'i7', 'i7', 'i7', 'iv7', 'iv7', 'i7', 'i7', 'V7', 'iv7', 'i7', 'V7'],
+        name: '12-Bar Blues (Minor)',
+        description: 'Minor blues with moodier, more introspective feel',
+        strength: 5
+    },
     'TWO_FIVE_ONE': {
         pattern: ['ii', 'V', 'I'],
         name: 'ii-V-I',
         description: 'Jazz turnaround',
+        strength: 5
+    },
+    'JAZZ_TURNAROUND': {
+        pattern: ['ii7', 'V7', 'Imaj7'],
+        name: 'Jazz Turnaround',
+        description: 'ii7-V7-Imaj7 (Jazz Turnaround)',
         strength: 5
     },
     'ONE_FOUR_FIVE': {
@@ -48,12 +72,6 @@ export const COMMON_PROGRESSIONS = {
         name: 'I-IV-V',
         description: 'Classic rock progression',
         strength: 5
-    },
-    'ONE_FIVE_SIX_FOUR': {
-        pattern: ['I', 'V', 'vi', 'IV'],
-        name: 'I-V-vi-IV',
-        description: 'Alternative pop progression',
-        strength: 4
     },
     'ONE_SIX_FOUR_FIVE': {
         pattern: ['I', 'vi', 'IV', 'V'],
@@ -68,7 +86,7 @@ export const COMMON_PROGRESSIONS = {
         strength: 4
     },
     'ANDALUSIAN_CADENCE': {
-        pattern: ['i', 'VII', 'VI', 'V'],
+        pattern: ['i', 'bVII', 'bVI', 'V'],
         name: 'Andalusian Cadence',
         description: 'Descending minor progression',
         strength: 4
@@ -78,6 +96,90 @@ export const COMMON_PROGRESSIONS = {
         name: 'Royal Road',
         description: 'Japanese pop progression',
         strength: 4
+    },
+    'SENSITIVE_PROGRESSION': {
+        pattern: ['vi', 'IV', 'I', 'V'],
+        name: 'vi-IV-I-V',
+        description: 'Sensitive/emotional variation starting on minor chord',
+        strength: 4
+    },
+    'MIXOLYDIAN_ROCK': {
+        pattern: ['I', 'bVII', 'IV', 'I'],
+        name: 'I-bVII-IV',
+        description: 'Mixolydian rock progression with modal flavor',
+        strength: 4
+    },
+    'POWER_BALLAD': {
+        pattern: ['I', 'V', 'vi', 'iii', 'IV', 'I', 'IV', 'V'],
+        name: 'Power Ballad',
+        description: 'Extended progression for dramatic rock ballads',
+        strength: 3
+    },
+    'MINOR_BASIC': {
+        pattern: ['i', 'iv', 'V', 'i'],
+        name: 'i-iv-V-i',
+        description: 'Basic minor key progression',
+        strength: 4
+    },
+    'CIRCLE_OF_FIFTHS': {
+        pattern: ['I', 'IV', 'vii°', 'iii', 'vi', 'ii', 'V', 'I'],
+        name: 'Circle of Fifths',
+        description: 'Complete circle of fifths progression',
+        strength: 3
+    },
+    'WALTZ_BASIC': {
+        pattern: ['I', 'V', 'I'],
+        name: 'I-V-I Waltz',
+        description: 'Classic waltz progression',
+        strength: 3
+    },
+    'FOLK_WALTZ': {
+        pattern: ['I', 'IV', 'I', 'V', 'I'],
+        name: 'I-IV-I-V-I',
+        description: 'Extended waltz progression',
+        strength: 3
+    },
+    'IRISH_JIG': {
+        pattern: ['I', 'IV', 'I', 'V'],
+        name: 'Irish Jig',
+        description: 'Traditional Irish jig in 6/8 time',
+        strength: 3
+    },
+    'JAZZ_CIRCLE': {
+        pattern: ['Imaj7', 'vi7', 'ii7', 'V7'],
+        name: 'I-vi-ii-V',
+        description: 'Jazz circle progression with 7ths',
+        strength: 4
+    },
+    'RHYTHM_CHANGES': {
+        pattern: ['Imaj7', 'vi7', 'ii7', 'V7', 'Imaj7', 'vi7', 'ii7', 'V7'],
+        name: 'Rhythm Changes (A)',
+        description: 'Based on "I Got Rhythm". Foundation for hundreds of jazz tunes',
+        strength: 5
+    },
+    'JAZZ_TURNAROUND_EXTENDED': {
+        pattern: ['ii7', 'V7', 'Imaj7', 'Imaj7'],
+        name: 'ii-V-I Extended',
+        description: 'Extended jazz turnaround with held I chord',
+        strength: 4
+    },
+    'MINOR_JAZZ_TURNAROUND': {
+        pattern: ['ii°7', 'V7', 'i7'],
+        name: 'ii°-V-i',
+        description: 'Minor jazz turnaround',
+        strength: 4
+    },
+    'CLASSIC_TURNAROUND': {
+        pattern: ['I', 'IV', 'V', 'I'],
+        name: 'I-IV-V-I',
+        description: 'Classic turnaround with return to I',
+        strength: 4
+    },
+    'PROG_ROCK_7_4': {
+        pattern: ['i', 'bVII', 'IV', 'i'],
+        name: 'Prog Rock 7/4',
+        description: 'Progressive rock in 7/4 time',
+        strength: 3
     }
 };
 
@@ -162,7 +264,8 @@ export class HarmonyAnalyzer {
      * @returns {Array} Detected patterns
      */
     detectCommonPatterns(progression, key) {
-        const romanNumerals = progression.map(chord => this.getRomanNumeral(chord, key));
+        // Use stored roman numeral if available (from templates), otherwise calculate it
+        const romanNumerals = progression.map(chord => chord.roman || this.getRomanNumeral(chord, key));
         const detectedPatterns = [];
 
         // Check for each common progression pattern
@@ -173,6 +276,7 @@ export class HarmonyAnalyzer {
                     id,
                     name: pattern.name,
                     description: pattern.description,
+                    pattern: pattern.pattern,  // Include the pattern array for badge display
                     strength: pattern.strength,
                     matches,  // Array of start indices where pattern was found
                     coverage: (matches.length * pattern.pattern.length) / progression.length

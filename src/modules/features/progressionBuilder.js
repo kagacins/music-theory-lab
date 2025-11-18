@@ -41,7 +41,9 @@ import {
     getStyleMoodSuggestions,
     setStyleMoodSuggestions,
     getTensionProfile,
-    setTensionProfile
+    setTensionProfile,
+    getSelectedChordIndex,
+    setSelectedChordIndex
 } from '../state/trainerState.js';
 
 import {
@@ -62,9 +64,15 @@ import {
 // Track last step time to determine if we're in a stepping sequence
 let lastStepTime = 0;
 
+// Track whether we're currently playing a step chord (to prevent mouseleave from advancing when not playing)
+let isStepPlaying = false;
+
 // Track staff notation visibility state for each chord position
 // This persists across key/progression changes
 let staffNotationStates = new Map(); // Map<position, boolean>
+
+// Track which chords are expanded in simplified view (Phase 3.3)
+const expandedChords = new Set();
 
 // Import note/chord utilities
 import {
@@ -87,8 +95,7 @@ import {
     INVERSION_NAMES,
     MAJOR_SCALE_STEPS,
     ENHARMONIC_MAP,
-    ROMAN_MAP_BASE,
-    COMMON_PROGRESSIONS
+    ROMAN_MAP_BASE
 } from '../../data/music-data.js';
 
 // Import chord suggestion modal
@@ -97,8 +104,8 @@ import { showChordSuggestionModal } from '../ui/chordSuggestionModal.js';
 // Import template browser modal (Phase 3.1)
 import { showTemplateBrowser } from '../ui/templateBrowserModal.js';
 
-// Import harmony analyzer (Phase 3.3)
-import { HarmonyAnalyzer } from '../analysis/harmonyAnalyzer.js';
+// Import harmony analyzer (Phase 3.3) - use its COMMON_PROGRESSIONS as the single source of truth
+import { HarmonyAnalyzer, COMMON_PROGRESSIONS } from '../analysis/harmonyAnalyzer.js';
 
 // Import undo/redo utilities
 import {
@@ -145,7 +152,7 @@ function getChordFunction(roman) {
         'vii°': 'Dominant',
         'VII': 'Dominant'
     };
-
+    
     // Handle roman numerals with suffixes (like 'V7', 'ii7', etc.)
     const baseRoman = roman.replace(/[0-9°]/g, '');
     return functionMap[baseRoman] || null;
@@ -479,7 +486,7 @@ function addSuggestedChordToProgression(suggestion) {
     chordData.isVoicingExpanded = true;
     chordData.lhType = 'off';
     chordData.lhInversion = 0;
-    chordData.lhOctaveShift = -12;
+    chordData.lhOctaveShift = 0;
     chordData.lhOmittedNotes = [];
     chordData.omittedNotes = [];
     chordData.rhythmPattern = 'block';
@@ -780,78 +787,107 @@ function toggleStaffNotation(chordIndex, sourceContainerId = null) {
 }
 
 /**
- * Toggle all chord cards between staff notation and text/controls view
- * @param {boolean} showStaff - If true, show staff notation for all cards. If false, show text/controls.
+ * Toggle all simplified chord cards between notation and chord info views
+ * Used by the global toggle switch next to "Current Chord Progression" header
+ * @param {boolean} showNotation - True to show notation, false to show chord info
  */
-export function toggleAllStaffNotation(showStaff) {
-    // Get progression data to know how many chords we have
-    const progressionData = getProgressionData();
-    if (!progressionData || progressionData.length === 0) {
-        return; // No chords to toggle
-    }
+export function toggleAllStaffNotation(showNotation) {
+    const container = document.getElementById('progression-visualization');
+    if (!container) return;
 
-    // Toggle all cards
-    for (let i = 0; i < progressionData.length; i++) {
-        // Update the state map
-        staffNotationStates.set(i, showStaff);
+    const trainerState = getTrainerState();
+    const allWrappers = Array.from(container.querySelectorAll('.chord-card-wrapper[data-chord-index]'));
 
-        // Update both containers (Progression Builder and Melody Composer)
-        const containers = ['progression-visualization', 'melody-progression-visualization'];
+    // Process all cards synchronously (no counting needed)
+    allWrappers.forEach(wrapper => {
+        // Skip expanded cards - they always show notation
+        if (wrapper.classList.contains('expanded-card-wrapper')) return;
 
-        containers.forEach(containerId => {
-            const wrapper = document.querySelectorAll(`#${containerId} > div`)[i];
-            if (!wrapper) return;
+        const index = parseInt(wrapper.getAttribute('data-chord-index'));
+        if (isNaN(index)) return;
 
-            const card = wrapper.querySelector('.progression-chord-item');
-            if (!card) return;
+        const card = wrapper.querySelector('.simplified-card');
+        const chordInfoView = wrapper.querySelector('.chord-info-view');
+        const notationView = wrapper.querySelector('.notation-view');
+        const canvas = wrapper.querySelector('.simplified-notation-canvas');
+        const toggleBtn = wrapper.querySelector('.notation-toggle-btn');
+        const musicNoteIcon = toggleBtn?.querySelector('.music-note-icon');
+        const abcText = toggleBtn?.querySelector('.abc-text');
 
-            // Find elements within this specific container
-            const staffContainer = card.querySelector(`#staff-notation-${i}`) || document.getElementById(`staff-notation-${i}`);
-            const staffCanvas = card.querySelector(`#staff-canvas-${i}`) || document.getElementById(`staff-canvas-${i}`);
-            const staffToggleBtn = wrapper.querySelector('button[title="Toggle staff notation view"], button[title="Show chord card"]');
+        if (!card || !chordInfoView || !notationView || !canvas) return;
 
-            if (!staffContainer || !staffCanvas) return;
+        const chord = trainerState.progressionData[index];
+        const key = trainerState.currentKey || 'C';
 
-            // Get all card content except the staff container and header
-            const header = card.querySelector(`#chord-header-${i}`) || document.getElementById(`chord-header-${i}`);
-            const cardContent = Array.from(card.children).filter(child =>
-                child.id !== `staff-notation-${i}` &&
-                child.id !== `chord-header-${i}`
-            );
+        if (showNotation) {
+            // Show notation view
+            chordInfoView.classList.add('hidden');
+            notationView.classList.remove('hidden');
 
-            if (showStaff) {
-                // Show staff, hide card content (but keep header visible)
-                staffContainer.classList.remove('hidden');
-                cardContent.forEach(child => {
-                    child.style.display = 'none';
-                });
+            // Change toggle to show ABC text
+            if (musicNoteIcon) musicNoteIcon.classList.add('hidden');
+            if (abcText) abcText.classList.remove('hidden');
 
-                // Change icon to "abc" text
-                if (staffToggleBtn) {
-                    staffToggleBtn.innerHTML = '<span class="font-bold text-sm">abc</span>';
-                    staffToggleBtn.title = 'Show chord card';
-                }
+            // Add class to bypass CSS width constraints
+            wrapper.classList.add('has-notation');
 
-                renderStaffNotation(i, staffCanvas);
-            } else {
-                // Hide staff, show card content
-                staffContainer.classList.add('hidden');
-                cardContent.forEach(child => {
-                    child.style.display = '';
-                });
+            // Calculate dimensions and set width immediately
+            const dimensions = calculateCanvasDimensions(key, chord.notes);
+            card.style.minHeight = `${dimensions.height + 20}px`;
+            card.style.minWidth = `${dimensions.width + 20}px`;
+            notationView.style.minHeight = `${dimensions.height + 20}px`;
+            notationView.style.minWidth = `${dimensions.width + 20}px`;
+            wrapper.style.minWidth = `${dimensions.width + 40}px`; // Set wrapper width
 
-                // Change icon back to music note
-                if (staffToggleBtn) {
-                    staffToggleBtn.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>';
-                    staffToggleBtn.title = 'Toggle staff notation view';
-                }
-            }
+            // Render notation on canvas
+            requestAnimationFrame(() => {
+                renderChordNotation(chord, key, canvas);
+            });
+        } else {
+            // Show chord info view
+            notationView.classList.add('hidden');
+            chordInfoView.classList.remove('hidden');
+
+            // Change toggle to show music note icon
+            if (musicNoteIcon) musicNoteIcon.classList.remove('hidden');
+            if (abcText) abcText.classList.add('hidden');
+
+            // Remove class to restore CSS width constraints
+            wrapper.classList.remove('has-notation');
+
+            // Reset ALL dimension styles to ensure clean state
+            card.style.minHeight = '80px';
+            card.style.minWidth = '';
+            card.style.width = '';
+            notationView.style.minHeight = '';
+            notationView.style.minWidth = '';
+            notationView.style.width = '';
+            wrapper.style.minWidth = '';
+            wrapper.style.width = '';
+        }
+    });
+
+    // Force a synchronous layout by reading dimensions
+    container.getBoundingClientRect();
+
+    // Also force layout on each wrapper to ensure minWidth is applied
+    allWrappers.forEach(wrapper => {
+        wrapper.getBoundingClientRect();
+    });
+
+    // Update card shifts after all widths have been set
+    // Use triple requestAnimationFrame to ensure all style updates are processed
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                updateCardShifts();
+            });
         });
-    }
-
-    // Update the global toggle button states in both tabs
-    updateGlobalToggleButtons(showStaff);
+    });
 }
+
+// Make it available globally for the toggle switch in index.html
+window.toggleAllStaffNotation = toggleAllStaffNotation;
 
 /**
  * Update the visual state of the global toggle switches
@@ -1086,6 +1122,227 @@ function getKeySignatureAccidentals(key) {
     }
 
     return { sharps, flats };
+}
+
+/**
+ * Calculate dynamic canvas dimensions based on key signature and note range
+ * @param {string} key - Current key signature
+ * @param {Array} notes - Array of note strings (e.g., ["C4", "E4", "G4"])
+ * @returns {Object} { width, height } dimensions
+ */
+function calculateCanvasDimensions(key, notes) {
+    // Count accidentals in key signature
+    const keySignature = getKeySignatureAccidentals(key);
+    const accidentalCount = keySignature.sharps.size + keySignature.flats.size;
+
+    // Reduced widths to eliminate wasted white space
+    let width = 130;
+    if (accidentalCount >= 6) {
+        width = 180; // Keys with 6-7 accidentals (F#, C#, Gb, Cb)
+    } else if (accidentalCount >= 5) {
+        width = 165; // Keys with 5 accidentals (B, Db)
+    } else if (accidentalCount >= 3) {
+        width = 150; // Keys with 3-4 accidentals
+    }
+
+    // Check note range for height calculation
+    let minOctave = 10;
+    let maxOctave = 0;
+    notes.forEach(note => {
+        const match = note.match(/^([A-G][#b]?)(\d+)$/);
+        if (match) {
+            const octave = parseInt(match[2]);
+            minOctave = Math.min(minOctave, octave);
+            maxOctave = Math.max(maxOctave, octave);
+        }
+    });
+
+    // Increased heights to prevent clef cutoff and accommodate extreme notes
+    let height = 120;
+    const octaveRange = maxOctave - minOctave;
+    if (minOctave <= 2 || maxOctave >= 6) {
+        height = 160; // Extreme notes need more vertical space
+    } else if (octaveRange > 2) {
+        height = 140; // Wide range needs a bit more space
+    }
+
+    return { width, height };
+}
+
+/**
+ * Render compact chord notation for display on chord cards
+ * Only shows RH notes as whole notes in treble clef with key signature
+ * @param {Object} chord - Chord object containing notes, omittedNotes, etc.
+ * @param {string} key - Current key signature
+ * @param {HTMLCanvasElement} canvas - Canvas element to render on
+ */
+function renderChordNotation(chord, key, canvas) {
+    try {
+        // VexFlow 5.x browser build exposes VexFlow namespace
+        if (typeof VexFlow === 'undefined') {
+            console.error('VexFlow library not loaded');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#666';
+            ctx.font = '12px Arial';
+            ctx.fillText('VexFlow not loaded', 10, 30);
+            return;
+        }
+
+        // Use VexFlow 5.x namespace
+        const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental } = VexFlow;
+
+        if (!Renderer || !Stave || !StaveNote || !Voice || !Formatter || !Accidental) {
+            console.error('Missing VexFlow classes');
+            return;
+        }
+
+        // Get the key signature accidentals
+        const keySignature = getKeySignatureAccidentals(key);
+
+        // Get notes that are actually being played (respecting omitted notes)
+        const rhNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
+
+        if (rhNotes.length === 0) {
+            // Show message if no notes
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#666';
+            ctx.font = '12px Arial';
+            ctx.fillText('No notes to display', 10, 30);
+            return;
+        }
+
+        // Convert notes to VexFlow format (e.g., "C4" -> "C/4")
+        const vexFlowNotes = rhNotes.map(note => {
+            const match = note.match(/^([A-G][#b]?)(\d+)$/);
+            if (!match) return null;
+            const noteName = match[1];
+            const octave = parseInt(match[2]);
+            return {
+                vexNote: `${noteName}/${octave}`,
+                original: note
+            };
+        }).filter(n => n !== null);
+
+        if (vexFlowNotes.length === 0) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#666';
+            ctx.font = '12px Arial';
+            ctx.fillText('Invalid note format', 10, 30);
+            return;
+        }
+
+        // Calculate dynamic canvas size based on key signature and note range
+        const dimensions = calculateCanvasDimensions(key, rhNotes);
+        const displayWidth = dimensions.width;
+        const displayHeight = dimensions.height;
+
+        canvas.width = displayWidth;
+        canvas.height = displayHeight;
+        canvas.style.width = `${displayWidth}px`;
+        canvas.style.height = `${displayHeight}px`;
+
+        // Clear canvas
+        const context = canvas.getContext('2d');
+        context.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Create renderer
+        const renderer = new Renderer(canvas, Renderer.Backends.CANVAS);
+        renderer.resize(canvas.width, canvas.height);
+        const ctx = renderer.getContext();
+
+        // Create stave with treble clef
+        const staveX = 5;
+        const staveY = 10;
+        const staveWidth = displayWidth - 10;
+        const stave = new Stave(staveX, staveY, staveWidth);
+        stave.addClef('treble');
+
+        // Add key signature - VexFlow handles minor keys better via relative major
+        const vexFlowKey = getVexFlowKeySignature(key);
+        try {
+            stave.addKeySignature(vexFlowKey);
+        } catch (e) {
+            console.warn(`VexFlow key signature error for ${key} (tried ${vexFlowKey}):`, e);
+            // Continue without key signature
+        }
+
+        // Adjust note start position based on key signature complexity
+        // More accidentals = need more space for key signature
+        const accidentalCount = keySignature.sharps.size + keySignature.flats.size;
+        let noteStartOffset = 40; // Base offset
+        if (accidentalCount >= 6) {
+            noteStartOffset = 100; // Large offset for keys with 6-7 accidentals (F#, C#, Gb, Cb)
+        } else if (accidentalCount >= 5) {
+            noteStartOffset = 85; // Medium-large offset for 5 accidentals (B, Db)
+        } else if (accidentalCount >= 3) {
+            noteStartOffset = 65; // Medium offset for 3-4 accidentals
+        }
+
+        try {
+            if (typeof stave.setNoteStartX === 'function') {
+                stave.setNoteStartX(stave.getX() + noteStartOffset);
+            }
+        } catch (e) {
+            // Ignore if API not available
+        }
+
+        stave.setContext(ctx).draw();
+
+        // Create a single chord (all notes stacked as whole notes)
+        const keys = vexFlowNotes.map(n => n.vexNote);
+        const staveNote = new StaveNote({ clef: 'treble', keys: keys, duration: 'w' });
+
+        // Center the notes horizontally
+        try {
+            staveNote.setXShift(15);
+        } catch (e) {
+            // Ignore if API differs
+        }
+
+        // Add accidentals only for notes NOT in the key signature
+        vexFlowNotes.forEach((n, idx) => {
+            const noteName = n.original.replace(/\d+$/, ''); // Remove octave
+            const naturalNote = noteName.replace(/[#b]/, ''); // Get base note without accidental
+            const hasSharp = noteName.includes('#');
+            const hasFlat = noteName.includes('b');
+
+            // Determine if this note matches what the key signature expects
+            const isSharpInKey = keySignature.sharps.has(naturalNote);
+            const isFlatInKey = keySignature.flats.has(naturalNote);
+
+            // Only add an accidental if:
+            // 1. The note has an accidental AND it doesn't match what's in the key signature
+            // 2. The note is natural BUT the key signature expects it sharp/flat (needs natural sign)
+
+            if (hasSharp) {
+                // Note has a sharp - only add accidental if natural note is NOT sharp in key signature
+                if (!isSharpInKey) {
+                    staveNote.addModifier(new Accidental('#'), idx);
+                }
+            } else if (hasFlat) {
+                // Note has a flat - only add accidental if natural note is NOT flat in key signature
+                if (!isFlatInKey) {
+                    staveNote.addModifier(new Accidental('b'), idx);
+                }
+            } else {
+                // Natural note - need natural sign if key signature expects sharp/flat
+                if (isSharpInKey || isFlatInKey) {
+                    staveNote.addModifier(new Accidental('n'), idx);
+                }
+            }
+        });
+
+        const voice = new Voice({ num_beats: 4, beat_value: 4 });
+        voice.addTickables([staveNote]);
+        new Formatter().joinVoices([voice]).format([voice], staveWidth - 50);
+        voice.draw(ctx, stave);
+
+    } catch (e) {
+        console.error('Error rendering chord notation:', e);
+    }
 }
 
 /**
@@ -1857,6 +2114,12 @@ const harmonyAnalyzer = new HarmonyAnalyzer();
 function renderPatternHighlights(container, progressionData, key) {
     if (!progressionData || progressionData.length === 0) return;
 
+    // Remove old pattern highlights if they exist
+    const oldHighlights = document.querySelector('#pattern-highlights-container');
+    if (oldHighlights) {
+        oldHighlights.remove();
+    }
+
     // Analyze progression for patterns
     const analysis = harmonyAnalyzer.analyzeProgression(progressionData, key);
 
@@ -1865,26 +2128,62 @@ function renderPatternHighlights(container, progressionData, key) {
     // Create pattern overlay container
     const patternContainer = document.createElement('div');
     patternContainer.className = 'flex justify-center items-center gap-2 mb-2 flex-wrap px-4';
-    patternContainer.id = 'pattern-highlights';
+    patternContainer.id = 'pattern-highlights-container';
 
     // Display detected patterns as badges
     analysis.patterns.forEach((pattern, idx) => {
         const badge = document.createElement('div');
-        badge.className = 'px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-semibold shadow-md flex items-center gap-2';
-        badge.title = `${pattern.description}\nFound at: ${pattern.matches.map(m => `measure ${m + 1}`).join(', ')}`;
+        badge.className = 'pattern-badge px-3 py-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-semibold shadow-md flex items-center gap-2 hover:shadow-lg transition-all';
+        badge.title = `${pattern.description}\nFound at: ${pattern.matches.map(m => `measure ${m + 1}`).join(', ')}\n\nClick to highlight • Click again to clear`;
+        badge.setAttribute('data-pattern-id', pattern.id);
 
-        badge.innerHTML = `
-            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+        // Determine what to show based on pattern length
+        const showChordSymbols = pattern.pattern && pattern.pattern.length <= 6;
+        const chordSymbols = pattern.pattern ? pattern.pattern.join('-') : '';
+
+        // Build badge content with two rows if pattern is short enough
+        let badgeContent = `
+            <svg class="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/>
             </svg>
-            <span>${pattern.name}</span>
-            <span class="bg-white bg-opacity-30 px-1.5 py-0.5 rounded text-[10px]">${pattern.matches.length}×</span>
+            <div class="flex flex-col items-center gap-0.5">
+                ${showChordSymbols ? `<div class="text-[10px] font-semibold leading-tight">${chordSymbols}</div>` : ''}
+                <div class="text-xs font-semibold leading-tight">${pattern.name}</div>
+            </div>
+            <span class="bg-white bg-opacity-30 px-1.5 py-0.5 rounded text-[10px] flex-shrink-0">${pattern.matches.length}×</span>
         `;
 
-        // Add click handler to highlight matching chords
+        badge.innerHTML = badgeContent;
+
+        // Add click handler to highlight matching chords with toggle functionality
         badge.style.cursor = 'pointer';
         badge.addEventListener('click', () => {
-            highlightPatternChords(pattern);
+            console.log('Badge clicked:', pattern.name, pattern);
+
+            // Check if this badge is already active
+            const isActive = badge.classList.contains('pattern-badge-active');
+
+            // Remove active state from all badges
+            document.querySelectorAll('.pattern-badge-active').forEach(b => {
+                b.classList.remove('pattern-badge-active');
+                b.style.transform = '';
+                b.style.boxShadow = '';
+            });
+
+            if (!isActive) {
+                // Activate this badge
+                badge.classList.add('pattern-badge-active');
+                badge.style.transform = 'scale(1.05)';
+                badge.style.boxShadow = '0 4px 12px rgba(168, 85, 247, 0.4)';
+
+                console.log('Activating badge and highlighting pattern');
+                // Highlight the pattern
+                highlightPatternChords(pattern);
+            } else {
+                console.log('Clearing highlights');
+                // Clear highlights
+                clearPatternHighlights();
+            }
         });
 
         patternContainer.appendChild(badge);
@@ -1896,7 +2195,7 @@ function renderPatternHighlights(container, progressionData, key) {
 
 /**
  * PHASE 3.3: Render simplified chord sequence view
- * Compact horizontal cards showing chord symbol, roman numeral, and inversion
+ * Compact cards that can expand inline to show detailed controls
  * @param {HTMLElement} container - Container to insert the view into
  * @param {Array} progressionData - Array of chord objects
  * @param {string} key - Current key
@@ -1904,53 +2203,2021 @@ function renderPatternHighlights(container, progressionData, key) {
 function renderSimplifiedChordSequence(container, progressionData, key) {
     if (!progressionData || progressionData.length === 0) return;
 
-    // Create simplified sequence container
-    const sequenceContainer = document.createElement('div');
-    sequenceContainer.id = 'simplified-chord-sequence';
-    sequenceContainer.className = 'mb-4 px-4';
+    // Render cards directly into the grid container (like Melody Composer)
+    // Clear existing content
+    container.innerHTML = '';
 
-    const sequenceInner = document.createElement('div');
-    sequenceInner.id = 'simplified-sequence-inner';
-    sequenceInner.className = 'flex items-center gap-2 overflow-x-auto pb-2 pt-1';
-    sequenceInner.style.minHeight = '60px';
+    // Add "Add Chord" and "Clear All" buttons as first grid item
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'chord-card-wrapper flex flex-col justify-center items-center gap-2 p-2 bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl';
+    buttonContainer.innerHTML = `
+        <button onclick="window.toggleQuickAddChord && window.toggleQuickAddChord()"
+                class="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                title="Add chord">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Add
+        </button>
+        <button onclick="window.clearProgression && window.clearProgression()"
+                class="w-full px-3 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                title="Clear all">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"></path>
+            </svg>
+            Clear
+        </button>
+    `;
+    container.appendChild(buttonContainer);
 
-    // Create simplified cards for each chord
+    // Create card wrappers for each chord
     progressionData.forEach((chord, index) => {
-        const card = document.createElement('div');
-        card.className = 'simplified-chord-card flex-shrink-0 bg-gray-800 border-2 border-gray-600 rounded-lg px-3 py-2 cursor-move transition-all hover:border-blue-500 hover:shadow-lg';
-        card.setAttribute('data-simplified-index', index);
-        card.style.minWidth = '80px';
-
-        // Get roman numeral for this chord
-        const roman = chord.roman || harmonyAnalyzer.getRomanNumeral(chord, key);
-
-        // Get function colors
-        const colors = getFunctionColors(roman);
-
-        // Chord symbol
-        const chordSymbol = chord.simpleName || chord.name || `${chord.root}${chord.type}`;
-
-        // Inversion indicator
-        let inversionText = '';
-        if (chord.inversion === 1) inversionText = '₁'; // First inversion
-        else if (chord.inversion === 2) inversionText = '₂'; // Second inversion
-        else if (chord.inversion === 3) inversionText = '₃'; // Third inversion
-
-        card.innerHTML = `
-            <div class="text-center">
-                <div class="text-xs font-semibold text-white mb-0.5">${chordSymbol}${inversionText}</div>
-                <div class="text-xs ${colors.romanColor} font-bold">${roman}</div>
-            </div>
-        `;
-
-        sequenceInner.appendChild(card);
+        const wrapper = createChordCardWrapper(chord, index, key);
+        container.appendChild(wrapper);
     });
 
-    sequenceContainer.appendChild(sequenceInner);
-    container.insertBefore(sequenceContainer, container.firstChild);
+    // Update shift classes based on expanded state
+    // Use a small delay to ensure all cards are rendered before calculating shifts
+    requestAnimationFrame(() => {
+        updateCardShifts();
+    });
 
-    // Make simplified sequence sortable
-    initializeSimplifiedSortable(sequenceInner);
+    // Make container sortable
+    initializeSimplifiedSortable(container);
+}
+
+/**
+ * Create a chord card wrapper (holds either simplified or detailed view)
+ * @param {Object} chord - Chord data
+ * @param {number} index - Chord index
+ * @param {string} key - Current key
+ * @returns {HTMLElement} Wrapper element
+ */
+function createChordCardWrapper(chord, index, key) {
+    const wrapper = document.createElement('div');
+    // Use class for grid layout - Add no-animation class to prevent all transitions/animations
+    const isExpanded = expandedChords.has(index);
+    wrapper.className = isExpanded
+        ? 'chord-card-wrapper expanded-card-wrapper no-animation'
+        : 'chord-card-wrapper no-animation'; // All cards take 1 grid cell
+    wrapper.setAttribute('data-chord-index', index);
+
+    // Render simplified or detailed based on state
+    if (isExpanded) {
+        wrapper.innerHTML = createDetailedCardHTML(chord, index, key);
+
+        // Render chord notation on the canvas (after DOM is ready)
+        requestAnimationFrame(() => {
+            const canvas = wrapper.querySelector('.chord-notation-canvas');
+            if (canvas) {
+                renderChordNotation(chord, key, canvas);
+
+                // Adjust card dimensions based on canvas size
+                const dimensions = calculateCanvasDimensions(key, chord.notes);
+                const detailedCard = wrapper.querySelector('.detailed-card');
+                if (detailedCard) {
+                    detailedCard.style.minWidth = `${dimensions.width + 20}px`;
+                }
+                // Also set wrapper width so it takes up space in grid
+                // Use extra padding for expanded cards to prevent overlap
+                wrapper.style.minWidth = `${dimensions.width + 80}px`;
+
+                // Force layout by reading dimensions
+                wrapper.getBoundingClientRect();
+
+                // Update card shifts after layout is applied
+                requestAnimationFrame(() => {
+                    updateCardShifts();
+                });
+            }
+        });
+    } else {
+        // For simplified cards, create control bar above the card
+        const simplifiedStructure = createSimplifiedCardStructure(chord, index, key);
+        wrapper.appendChild(simplifiedStructure);
+    }
+
+    // Attach event listeners after rendering
+    attachCardEventListeners(wrapper, index);
+
+    return wrapper;
+}
+
+/**
+ * Create simplified card structure with control bar above
+ * @param {Object} chord - Chord data
+ * @param {number} index - Chord index
+ * @param {string} key - Current key
+ * @returns {DocumentFragment} Fragment containing control bar and card
+ */
+function createSimplifiedCardStructure(chord, index, key) {
+    const fragment = document.createDocumentFragment();
+
+    // Create control bar
+    const controlBar = document.createElement('div');
+    controlBar.className = 'flex items-center justify-center gap-2 mb-1';
+    controlBar.innerHTML = `
+        <!-- Music Note/ABC Toggle -->
+        <button class="notation-toggle-btn bg-indigo-600 hover:bg-indigo-700 border-2 border-indigo-400 rounded px-2 py-1.5 transition flex items-center justify-center shadow-md" title="Toggle Notation View">
+            <svg class="music-note-icon w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path>
+            </svg>
+            <span class="abc-text hidden text-white text-xs font-bold">abc</span>
+        </button>
+        <!-- Lightbulb for Suggestions -->
+        <button class="suggestions-lightbulb-btn bg-amber-500 hover:bg-amber-600 border-2 border-amber-400 rounded px-2 py-1.5 transition flex items-center justify-center shadow-md" title="Chord Suggestions">
+            <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/>
+            </svg>
+        </button>
+    `;
+
+    // Create card element
+    const cardContainer = document.createElement('div');
+    cardContainer.innerHTML = createSimplifiedCardHTML(chord, index, key);
+    const cardElement = cardContainer.querySelector('.simplified-card');
+
+    // Create tooltip wrapper for the card
+    const cardWrapper = document.createElement('div');
+    cardWrapper.className = 'relative'; // Position relative for tooltip positioning
+    cardWrapper.style.position = 'relative';
+
+    // Add card to wrapper
+    if (cardElement) {
+        cardWrapper.appendChild(cardElement);
+    }
+
+    // Create and add tooltip outside the card but inside the wrapper
+    const tooltipElement = createTooltipElement(chord, index, key);
+    if (tooltipElement) {
+        cardWrapper.appendChild(tooltipElement);
+    }
+
+    fragment.appendChild(controlBar);
+    fragment.appendChild(cardWrapper);
+
+    return fragment;
+}
+
+/**
+ * Create tooltip element for simplified cards
+ */
+function createTooltipElement(chord, index, key) {
+    const roman = chord.roman || harmonyAnalyzer.getRomanNumeral(chord, key);
+    const colors = getFunctionColors(roman);
+    const fullChordName = `${chord.root} ${chord.type}`;
+    const notesText = chord.notes ? chord.notes.join(', ') : '';
+
+    // Get chord description from CHORD_DEFINITIONS
+    const def = CHORD_DEFINITIONS ? CHORD_DEFINITIONS[chord.type] : null;
+    const chordDescription = def && def.description ? def.description : '';
+
+    // Get harmonic function label
+    const functionLabels = {
+        'Tonic': 'Tonic (I)',
+        'Subdominant': 'Subdominant (IV)',
+        'Dominant': 'Dominant (V)',
+        'Predominant': 'Predominant',
+        'Mediant': 'Mediant',
+        'Submediant': 'Submediant (vi)',
+        'Leading Tone': 'Leading Tone (vii°)'
+    };
+    const harmonicFunction = colors.function || 'Unknown';
+    const functionLabel = functionLabels[harmonicFunction] || harmonicFunction;
+
+    // Generate inversion buttons for tooltip
+    const maxInversion = def ? def.intervals.length - 1 : 2;
+    const currentInversion = chord.inversion || 0;
+    const tooltipInversionButtons = [];
+    for (let inv = 0; inv <= maxInversion; inv++) {
+        const isActive = inv === currentInversion;
+        const label = inv === 0 ? 'Root' : `${inv}${inv === 1 ? 'st' : inv === 2 ? 'nd' : 'rd'}`;
+        tooltipInversionButtons.push(`
+            <button class="tooltip-inversion-btn px-2 py-1 text-xs font-semibold rounded transition-colors ${
+                isActive ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }" data-inversion="${inv}" data-card-index="${index}">${label}</button>
+        `);
+    }
+
+    const tooltip = document.createElement('div');
+    tooltip.className = 'chord-tooltip hidden absolute z-50 bg-gray-800 border-2 border-indigo-500 rounded-lg shadow-xl p-4 pointer-events-auto';
+    tooltip.style.cssText = 'bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 8px; min-width: 250px; max-width: 350px;';
+    tooltip.innerHTML = `
+        <!-- Close button for touch devices -->
+        <button class="tooltip-close-btn absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center text-white text-sm font-bold transition bg-gray-700 hover:bg-gray-600" title="Close">×</button>
+
+        <div class="text-base font-bold text-white mb-2 pr-6">${fullChordName}</div>
+        ${chordDescription ? `<div class="text-xs text-gray-300 mb-3 italic leading-relaxed">${chordDescription}</div>` : ''}
+        <div class="text-xs text-gray-300 mb-1.5"><strong class="text-gray-200">Notes:</strong> ${notesText}</div>
+        <div class="text-xs text-gray-300 mb-1.5"><strong class="text-gray-200">Roman Numeral:</strong> ${roman}</div>
+        <div class="text-xs text-gray-300 mb-3"><strong class="text-gray-200">Function:</strong> ${functionLabel}</div>
+        <div class="border-t border-gray-600 pt-2.5">
+            <div class="text-xs text-gray-300 mb-2 font-semibold">Inversion (hold to play):</div>
+            <div class="flex gap-1.5 flex-wrap">
+                ${tooltipInversionButtons.join('')}
+            </div>
+        </div>
+        <!-- Tooltip arrow -->
+        <div class="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-indigo-500"></div>
+    `;
+
+    return tooltip;
+}
+
+/**
+ * Create simplified card HTML - minimal design with buttons on right edge
+ */
+function createSimplifiedCardHTML(chord, index, key) {
+    const roman = chord.roman || harmonyAnalyzer.getRomanNumeral(chord, key);
+    const colors = getFunctionColors(roman);
+
+    // Use simpleName for accurate chord symbol (e.g., "Gm9" for G Minor 9th)
+    // Falls back to building symbol if simpleName not available
+    let chordSymbol = chord.simpleName || chord.root;
+
+    // If no simpleName, build it manually (backup)
+    if (!chord.simpleName) {
+        if (chord.type === 'Dominant 7th') chordSymbol += '7';
+        else if (chord.type === 'Major 7th') chordSymbol += 'maj7';
+        else if (chord.type === 'Minor 7th') chordSymbol += 'm7';
+        else if (chord.type === 'Minor 9th') chordSymbol += 'm9';
+        else if (chord.type === 'Major 9th') chordSymbol += 'maj9';
+        else if (chord.type === 'Dominant 9th') chordSymbol += '9';
+        else if (chord.type === 'Minor') chordSymbol += 'm';
+        else if (chord.type === 'Diminished') chordSymbol += '°';
+        else if (chord.type === 'Diminished 7th') chordSymbol += 'dim7';
+        else if (chord.type === 'Half-Diminished 7th') chordSymbol += 'ø7';
+        else if (chord.type === 'Augmented') chordSymbol += '+';
+        else if (chord.type === 'Suspended 4th') chordSymbol += 'sus4';
+        else if (chord.type === 'Suspended 2nd') chordSymbol += 'sus2';
+        else if (chord.type === 'Add9') chordSymbol += 'add9';
+        else if (chord.type === 'Major 6th') chordSymbol += '6';
+        else if (chord.type === 'Minor 6th') chordSymbol += 'm6';
+    }
+
+    let inversionText = '';
+    if (chord.inversion === 1) { inversionText = '¹'; }
+    else if (chord.inversion === 2) { inversionText = '²'; }
+    else if (chord.inversion === 3) { inversionText = '³'; }
+
+    return `
+        <div class="simplified-card bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-700 rounded-xl overflow-hidden hover:border-indigo-500 transition-all shadow-lg relative" style="min-height: 80px;">
+            <!-- Inversion indicator (top-left corner) -->
+            ${inversionText ? `<div class="absolute top-1 left-1 text-xl text-red-400 font-bold">${inversionText}</div>` : ''}
+
+            <!-- Info icon (bottom-left corner) for touchscreen devices -->
+            <button class="info-tooltip-btn absolute bottom-1 left-1 w-5 h-5 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold transition" title="Show chord info">
+                i
+            </button>
+
+            <!-- Main content: horizontal layout with chord info on left, buttons on right -->
+            <div class="chord-info-view flex items-center justify-between h-full p-2 pt-2.5 drag-handle cursor-grab active:cursor-grabbing">
+                <!-- Left: Chord info -->
+                <div class="flex flex-col items-center flex-1">
+                    <!-- Chord Symbol -->
+                    <div class="text-base font-bold text-white mb-0.5">${chordSymbol}</div>
+                    <!-- Roman Numeral -->
+                    <div class="text-xs ${colors.romanColor} font-bold">${roman}</div>
+                    <!-- Position Label -->
+                    <div class="text-[9px] text-gray-400 mt-0.5">Pos: ${index + 1}</div>
+                </div>
+
+                <!-- Right: Vertically stacked compact buttons -->
+                <div class="flex flex-col gap-0.5 ml-1">
+                    <button class="play-btn px-1 py-0.5 bg-white hover:bg-gray-100 rounded transition shadow-sm flex items-center justify-center" title="Play">
+                        <svg class="w-2.5 h-2.5" fill="#1f2937" viewBox="0 0 20 20">
+                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.841z"></path>
+                        </svg>
+                    </button>
+                    <button class="delete-btn px-1 py-0.5 bg-red-600/80 hover:bg-red-600 text-white text-[8px] rounded transition" title="Delete">
+                        ✕
+                    </button>
+                    <button class="expand-btn px-1 py-0.5 bg-gray-600/80 hover:bg-gray-600 text-white text-[8px] rounded transition" title="Expand">
+                        ⋯
+                    </button>
+                </div>
+            </div>
+
+            <!-- Notation view (hidden by default, light background) -->
+            <div class="notation-view hidden flex items-center justify-center h-full p-2 bg-gray-50" style="min-height: 80px;">
+                <canvas class="simplified-notation-canvas"></canvas>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Create comprehensive detailed card HTML (expanded view)
+ * Full-featured card with RH/LH octave shifts, inversions, voicing controls, and staff notation
+ */
+function createDetailedCardHTML(chord, index, key) {
+    const roman = chord.roman || harmonyAnalyzer.getRomanNumeral(chord, key);
+    const colors = getFunctionColors(roman);
+    const chordSymbol = chord.simpleName || chord.name || `${chord.root}${chord.type}`;
+    const functionLabel = getChordFunction(roman);
+
+    // Get scale notes for highlighting
+    const scaleNotes = getScaleNotesForKey(key);
+
+    // RH: Generate note checkboxes with scale indicators
+    const rhNotes = chord.notes || [];
+    const rhOctaveShift = chord.octaveShift || 0;
+    const noteCheckboxes = rhNotes.map(note => {
+        const isChecked = !(chord.omittedNotes || []).includes(note);
+        const noteWithoutOctave = note.replace(/\d+$/, '');
+        const isInScale = scaleNotes.includes(noteWithoutOctave);
+
+        return `
+            <label class="flex items-center gap-0.5 cursor-pointer text-gray-700 text-[10px] ${isInScale ? 'font-semibold' : ''}">
+                <input type="checkbox" value="${note}" ${isChecked ? 'checked' : ''}
+                    class="note-checkbox w-2.5 h-2.5 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500">
+                <span class="${isInScale ? 'text-green-700' : ''}">${note}</span>
+                ${isInScale ? '<span class="text-[8px] text-green-600">●</span>' : ''}
+            </label>
+        `;
+    }).join('');
+
+    // Generate inversion buttons (RH)
+    const def = CHORD_DEFINITIONS ? CHORD_DEFINITIONS[chord.type] : null;
+    const maxInversion = def ? def.intervals.length - 1 : 2;
+    const currentInversion = chord.inversion || 0;
+    const inversionButtons = [];
+    for (let inv = 0; inv <= maxInversion; inv++) {
+        const isActive = inv === currentInversion;
+        const label = inv === 0 ? 'R' : inv.toString();
+        inversionButtons.push(`
+            <button class="inversion-btn w-8 px-0.5 py-0.5 text-[9px] font-semibold rounded transition-colors ${
+                isActive ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }" data-inversion="${inv}">${label}</button>
+        `);
+    }
+
+    // LH: Generate notes based on pattern
+    // Ensure lhType has a default value
+    if (!chord.lhType) {
+        chord.lhType = 'rootOnly';
+    }
+
+    // Generate LH notes if missing and lhType is not 'off'
+    if (chord.lhType !== 'off' && (!chord.lhNotes || chord.lhNotes.length === 0)) {
+        const rhOctaveShift = chord.octaveShift || 0;
+        const lhRelativeShift = chord.lhOctaveShift || -12;
+        const absoluteLHOctaveShift = rhOctaveShift + lhRelativeShift;
+        const lhInversion = chord.lhInversion || 0;
+        chord.lhNotes = getLHNotes(
+            chord.root,
+            chord.lhType,
+            lhInversion,
+            key,
+            absoluteLHOctaveShift,
+            chord.type,
+            getEnharmonicPreference()
+        );
+    }
+
+    const lhNotes = chord.lhNotes || [];
+    const lhOctaveShift = chord.lhOctaveShift || -12;
+    const lhInversion = chord.lhInversion || 0;
+    const lhNoteCheckboxes = lhNotes.map(note => {
+        const isChecked = !(chord.lhOmittedNotes || []).includes(note);
+        const noteWithoutOctave = note.replace(/\d+$/, '');
+        const isInScale = scaleNotes.includes(noteWithoutOctave);
+
+        return `
+            <label class="flex items-center gap-0.5 cursor-pointer text-gray-700 text-[10px] ${isInScale ? 'font-semibold' : ''}">
+                <input type="checkbox" value="${note}" ${isChecked ? 'checked' : ''}
+                    class="lh-note-checkbox w-2.5 h-2.5 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500">
+                <span class="${isInScale ? 'text-green-700' : ''}">${note}</span>
+                ${isInScale ? '<span class="text-[8px] text-green-600">●</span>' : ''}
+            </label>
+        `;
+    }).join('');
+
+    // LH Inversion buttons
+    const lhInversionButtons = [];
+    for (let inv = 0; inv <= maxInversion; inv++) {
+        const isActive = inv === lhInversion;
+        const label = inv === 0 ? 'R' : inv.toString();
+        lhInversionButtons.push(`
+            <button class="lh-inversion-btn w-8 px-0.5 py-0.5 text-[9px] font-semibold rounded transition-colors ${
+                isActive ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }" data-inversion="${inv}">${label}</button>
+        `);
+    }
+
+    // LH Pattern options - matching Melody Composer
+    const lhPatterns = [
+        { value: 'off', label: 'Off' },
+        { value: 'rootOnly', label: 'Root Only' },
+        { value: 'rootAnd5th', label: 'Root + 5th' },
+        { value: 'powerChord', label: 'Power Chord' },
+        { value: 'Major', label: 'Major Triad' },
+        { value: 'Minor', label: 'Minor Triad' },
+        { value: 'shell_maj7', label: 'Shell (R-3-7)' },
+        { value: 'shell_min7', label: 'Minor 7th Shell (R-b3-b7)' },
+        { value: 'shell_dom7', label: 'Dominant 7th Shell (R-3-b7)' },
+        { value: 'spread', label: 'Spread Triad (R-5-10)' },
+        { value: 'quartal', label: 'Quartal (R-4-7)' },
+        { value: 'Dominant 7th', label: 'Dominant 7th' }
+    ];
+    const lhOptions = lhPatterns.map(p =>
+        `<option value="${p.value}" ${(chord.lhType || 'rootOnly') === p.value ? 'selected' : ''}>${p.label}</option>`
+    ).join('');
+
+    return `
+        <div class="detailed-card bg-white border-2 border-blue-500 rounded-lg overflow-hidden shadow-lg">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1.5">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <div class="text-sm font-bold">${chordSymbol}</div>
+                        <div class="text-xs" style="color: rgba(255,255,255,0.9);">${roman}</div>
+                        ${functionLabel ? `<div class="text-[9px] text-blue-200">${functionLabel}</div>` : ''}
+                        <div class="text-[9px] text-blue-200">Pos: ${index + 1}</div>
+                    </div>
+                    <div class="flex gap-0.5">
+                        <button class="collapse-btn p-0.5 text-white hover:bg-white hover:bg-opacity-20 rounded transition" title="Collapse">
+                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                            </svg>
+                        </button>
+                        <button class="delete-btn p-0.5 text-white hover:bg-red-500 hover:bg-opacity-90 rounded transition" title="Delete">
+                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Control Buttons -->
+            <div class="bg-gray-50 border-b border-gray-200 p-1 flex gap-0.5">
+                <button class="play-btn px-1.5 py-0.5 bg-green-600 hover:bg-green-700 text-white text-[9px] font-medium rounded transition flex items-center justify-center gap-0.5 whitespace-nowrap">
+                    <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.841z"/>
+                    </svg>
+                    Play
+                </button>
+                <button class="suggestions-btn px-1.5 py-0.5 bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-medium rounded transition flex items-center justify-center gap-0.5 whitespace-nowrap" title="Open Suggestions">
+                    <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/>
+                    </svg>
+                    Suggest
+                </button>
+            </div>
+
+            <!-- Controls -->
+            <div class="p-1.5 space-y-1.5 text-xs">
+                <!-- Chord Type -->
+                <div>
+                    <label class="block text-[10px] font-semibold text-gray-700 mb-0.5">Chord Type</label>
+                    <select class="type-select w-full px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
+                        ${getChordTypeOptions(chord.type)}
+                    </select>
+                </div>
+
+                <!-- RH SECTION -->
+                <div class="border-2 border-blue-200 rounded p-1 bg-blue-50">
+                    <div class="text-[10px] font-bold text-blue-700 mb-0.5">RIGHT HAND (Treble)</div>
+
+                    <!-- RH Octave Shift -->
+                    <div class="mb-0.5">
+                        <label class="block text-[9px] font-semibold text-gray-700 mb-0.5">Octave Shift</label>
+                        <select class="rh-octave-select w-full px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
+                            <option value="-36" ${rhOctaveShift === -36 ? 'selected' : ''}>-3 octaves (-36)</option>
+                            <option value="-24" ${rhOctaveShift === -24 ? 'selected' : ''}>-2 octaves (-24)</option>
+                            <option value="-12" ${rhOctaveShift === -12 ? 'selected' : ''}>-1 octave (-12)</option>
+                            <option value="0" ${rhOctaveShift === 0 ? 'selected' : ''}>0 (default)</option>
+                            <option value="12" ${rhOctaveShift === 12 ? 'selected' : ''}>+1 octave (+12)</option>
+                            <option value="24" ${rhOctaveShift === 24 ? 'selected' : ''}>+2 octaves (+24)</option>
+                            <option value="36" ${rhOctaveShift === 36 ? 'selected' : ''}>+3 octaves (+36)</option>
+                        </select>
+                    </div>
+
+                    <!-- RH Notes/Voicing -->
+                    <div class="border border-gray-300 rounded p-1 bg-white mb-0.5">
+                        <div class="flex items-center justify-between mb-0.5">
+                            <label class="text-[9px] font-semibold text-indigo-600">Notes <span class="text-green-600">●</span> = in scale</label>
+                            <div class="flex gap-0.5">
+                                <button class="notes-all-btn px-1.5 py-0.5 text-[9px] font-semibold bg-indigo-500 hover:bg-indigo-600 text-white rounded">All</button>
+                                <button class="notes-none-btn px-1.5 py-0.5 text-[9px] font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded">None</button>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-x-2 gap-y-0.5">
+                            ${noteCheckboxes}
+                        </div>
+                    </div>
+
+                    <!-- RH Inversion -->
+                    <div>
+                        <label class="block text-[9px] font-semibold text-gray-700 mb-0.5">Inversion</label>
+                        <div class="flex gap-0.5">
+                            ${inversionButtons.join('')}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LH SECTION -->
+                <div class="border-2 border-green-200 rounded p-1 bg-green-50">
+                    <div class="text-[10px] font-bold text-green-700 mb-0.5">LEFT HAND (Bass)</div>
+
+                    <!-- LH Pattern -->
+                    <div class="mb-0.5">
+                        <label class="block text-[9px] font-semibold text-gray-700 mb-0.5">Pattern</label>
+                        <select class="lh-pattern-select w-full px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
+                            ${lhOptions}
+                        </select>
+                    </div>
+
+                    <!-- LH Octave Shift (Relative to RH) -->
+                    <div class="mb-0.5">
+                        <label class="block text-[9px] font-semibold text-gray-700 mb-0.5">Octave (from RH)</label>
+                        <select class="lh-octave-select w-full px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
+                            <option value="-36" ${lhOctaveShift === -36 ? 'selected' : ''}>-3 octaves</option>
+                            <option value="-24" ${lhOctaveShift === -24 ? 'selected' : ''}>-2 octaves</option>
+                            <option value="-12" ${lhOctaveShift === -12 ? 'selected' : ''}>-1 octave (default)</option>
+                            <option value="0" ${lhOctaveShift === 0 ? 'selected' : ''}>Same as RH</option>
+                            <option value="12" ${lhOctaveShift === 12 ? 'selected' : ''}>+1 octave</option>
+                            <option value="24" ${lhOctaveShift === 24 ? 'selected' : ''}>+2 octaves</option>
+                            <option value="36" ${lhOctaveShift === 36 ? 'selected' : ''}>+3 octaves</option>
+                        </select>
+                    </div>
+
+                    <!-- LH Inversion -->
+                    <div class="mb-0.5">
+                        <label class="block text-[9px] font-semibold text-gray-700 mb-0.5">Inversion</label>
+                        <div class="flex gap-0.5">
+                            ${lhInversionButtons.join('')}
+                        </div>
+                    </div>
+
+                    <!-- LH Notes/Voicing -->
+                    ${lhNotes.length > 0 ? `
+                    <div class="border border-gray-300 rounded p-1 bg-white">
+                        <div class="flex items-center justify-between mb-0.5">
+                            <label class="text-[9px] font-semibold text-green-600">Notes</label>
+                            <div class="flex gap-0.5">
+                                <button class="lh-notes-all-btn px-1.5 py-0.5 text-[9px] font-semibold bg-green-500 hover:bg-green-600 text-white rounded">All</button>
+                                <button class="lh-notes-none-btn px-1.5 py-0.5 text-[9px] font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded">None</button>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-x-2 gap-y-0.5">
+                            ${lhNoteCheckboxes}
+                        </div>
+                    </div>
+                    ` : '<div class="text-[9px] text-gray-500 italic">No LH notes (pattern is Off)</div>'}
+                </div>
+
+                <!-- Musical Notation (Permanent) -->
+                <div class="border-t border-gray-200 pt-1.5 mt-1.5">
+                    <div class="text-[10px] font-semibold text-gray-700 mb-1">Musical Notation</div>
+                    <canvas class="chord-notation-canvas mx-auto" style="display: block;"></canvas>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="flex gap-1 pt-1 border-t border-gray-200">
+                    <button class="collapse-btn flex-1 px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white text-[10px] rounded transition">
+                        Collapse
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Attach event listeners to card buttons
+ */
+function attachCardEventListeners(wrapper, index) {
+    const expandBtn = wrapper.querySelector('.expand-btn');
+    const collapseBtns = wrapper.querySelectorAll('.collapse-btn'); // Get ALL collapse buttons
+    const playBtn = wrapper.querySelector('.play-btn');
+    const deleteBtn = wrapper.querySelector('.delete-btn');
+    const typeSelect = wrapper.querySelector('.type-select');
+    const lhPatternSelect = wrapper.querySelector('.lh-pattern-select');
+    const inversionBtns = wrapper.querySelectorAll('.inversion-btn');
+    const noteCheckboxes = wrapper.querySelectorAll('.note-checkbox');
+    const notesAllBtn = wrapper.querySelector('.notes-all-btn');
+    const notesNoneBtn = wrapper.querySelector('.notes-none-btn');
+    const notationToggleBtn = wrapper.querySelector('.notation-toggle-btn');
+    const suggestionsLightbulbBtn = wrapper.querySelector('.suggestions-lightbulb-btn');
+
+    // Notation toggle button (simplified cards - in control bar above card)
+    if (notationToggleBtn) {
+        notationToggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleSimplifiedCardNotation(wrapper, index);
+        });
+    }
+
+    // Suggestions lightbulb button (simplified cards - in control bar above card)
+    if (suggestionsLightbulbBtn) {
+        suggestionsLightbulbBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (window.showProgressionChordSuggestions) {
+                window.showProgressionChordSuggestions(index);
+            }
+        });
+    }
+
+    // Expand button
+    if (expandBtn) {
+        expandBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            // Preserve transform before expanding
+            const currentShift = wrapper.style.getPropertyValue('--card-shift') || '';
+            const currentTransform = wrapper.style.transform || '';
+            const hadShiftClass = wrapper.classList.contains('shift-right');
+            
+            expandChordCard(index);
+            
+            // Restore transform immediately after expansion
+            if (currentShift) {
+                requestAnimationFrame(() => {
+                    wrapper.style.setProperty('--card-shift', currentShift);
+                    wrapper.style.transform = currentTransform || `translateX(${currentShift})`;
+                    if (hadShiftClass) {
+                        wrapper.classList.add('shift-right');
+                    }
+                    updateCardShifts();
+                });
+            }
+        });
+    }
+
+    // Collapse buttons (there may be multiple - header and footer)
+    collapseBtns.forEach(collapseBtn => {
+        collapseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            collapseChordCard(index);
+        });
+    });
+
+    // Play button
+    if (playBtn) {
+        // Helper function to preserve transform when button is clicked
+        const preserveTransform = () => {
+            const currentShift = wrapper.style.getPropertyValue('--card-shift') || '';
+            const currentTransform = wrapper.style.transform || '';
+            const hadShiftClass = wrapper.classList.contains('shift-right');
+            
+            if (currentShift) {
+                wrapper.style.setProperty('--card-shift', currentShift);
+                wrapper.style.transform = currentTransform || `translateX(${currentShift})`;
+                if (hadShiftClass) {
+                    wrapper.classList.add('shift-right');
+                }
+            } else if (currentTransform) {
+                wrapper.style.transform = currentTransform;
+                if (hadShiftClass) {
+                    wrapper.classList.add('shift-right');
+                }
+            }
+        };
+        
+        playBtn.addEventListener('mousedown', () => {
+            // Preserve transform before any operations
+            preserveTransform();
+
+            // Select this card (persistent purple ring)
+            selectChordCard(index);
+
+            if (window.startProgressionChord) {
+                window.startProgressionChord(index);
+                // Highlight corresponding tension curve point and chord card
+                highlightTensionPoint(index);
+                highlightChordCard(index);
+            }
+
+            // Ensure transform is maintained after highlighting
+            requestAnimationFrame(() => {
+                preserveTransform();
+            });
+        });
+        playBtn.addEventListener('mouseup', () => {
+            // Preserve transform
+            preserveTransform();
+
+            if (window.stopTrainerChord) window.stopTrainerChord();
+            // Remove playback highlighting but keep selection (purple ring persists)
+            unhighlightAllTensionPoints();
+            unhighlightAllChordCards();
+
+            // Ensure transform is maintained
+            requestAnimationFrame(() => {
+                preserveTransform();
+            });
+        });
+        playBtn.addEventListener('mouseleave', () => {
+            // Preserve transform
+            preserveTransform();
+
+            if (window.stopTrainerChord) window.stopTrainerChord();
+            // Remove playback highlighting but keep selection (purple ring persists)
+            unhighlightAllTensionPoints();
+            unhighlightAllChordCards();
+
+            // Ensure transform is maintained
+            requestAnimationFrame(() => {
+                preserveTransform();
+            });
+        });
+        
+        // Also handle touch events
+        playBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            preserveTransform();
+
+            // Select this card (persistent purple ring)
+            selectChordCard(index);
+
+            if (window.startProgressionChord) {
+                window.startProgressionChord(index);
+                highlightTensionPoint(index);
+                highlightChordCard(index);
+            }
+
+            requestAnimationFrame(() => {
+                preserveTransform();
+            });
+        }, { passive: false });
+
+        playBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            preserveTransform();
+
+            if (window.stopTrainerChord) window.stopTrainerChord();
+            // Remove playback highlighting but keep selection (purple ring persists)
+            unhighlightAllTensionPoints();
+            unhighlightAllChordCards();
+
+            requestAnimationFrame(() => {
+                preserveTransform();
+            });
+        }, { passive: false });
+    }
+
+    // Delete button
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', () => {
+            // Preserve transform before deletion (though card will be removed anyway)
+            const currentShift = wrapper.style.getPropertyValue('--card-shift') || '';
+            const currentTransform = wrapper.style.transform || '';
+            const hadShiftClass = wrapper.classList.contains('shift-right');
+            
+            if (window.removeChordFromProgression) {
+                window.removeChordFromProgression(index);
+            }
+            
+            // After deletion, update shifts for remaining cards
+            requestAnimationFrame(() => {
+                updateCardShifts();
+            });
+        });
+    }
+
+    // Add click handler to simplified and detailed cards
+    // Clicking anywhere on the card (except buttons) selects it WITHOUT playing
+    const clickableCards = wrapper.querySelectorAll('.simplified-card, .detailed-card');
+    clickableCards.forEach(card => {
+        card.addEventListener('click', (e) => {
+            // Don't interfere with button clicks, inputs, or selects - they have their own handlers
+            if (e.target.closest('button') || e.target.closest('select') || e.target.closest('input')) return;
+
+            // Preserve the current shift immediately to prevent visual flash
+            const currentShift = wrapper.style.getPropertyValue('--card-shift') || '';
+            const currentTransform = wrapper.style.transform || '';
+            const hadShiftClass = wrapper.classList.contains('shift-right');
+
+            // Select this card (persistent purple ring) - NO playback, only selection
+            selectChordCard(index);
+
+            // Restore shift immediately using CSS custom property (persists even if inline style is reset)
+            if (currentShift) {
+                wrapper.style.setProperty('--card-shift', currentShift);
+                wrapper.style.transform = currentTransform || `translateX(${currentShift})`;
+                if (hadShiftClass) {
+                    wrapper.classList.add('shift-right');
+                }
+            } else if (currentTransform) {
+                wrapper.style.transform = currentTransform;
+                if (hadShiftClass) {
+                    wrapper.classList.add('shift-right');
+                }
+            }
+
+            // Then recalculate shifts properly after any potential updates
+            requestAnimationFrame(() => {
+                updateCardShifts();
+            });
+        });
+    });
+
+    // Chord type select
+    if (typeSelect) {
+        typeSelect.addEventListener('change', (e) => {
+            e.stopPropagation();
+            updateChordType(index, e.target.value);
+        });
+    }
+
+    // LH pattern select
+    if (lhPatternSelect) {
+        lhPatternSelect.addEventListener('change', (e) => {
+            e.stopPropagation();
+            updateChordLHPattern(index, e.target.value);
+        });
+    }
+
+    // Inversion buttons
+    inversionBtns.forEach(btn => {
+        // Update inversion and start playing on mousedown
+        btn.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            const inversion = parseInt(btn.getAttribute('data-inversion'));
+            updateChordInversion(index, inversion);
+
+            // Start playing the chord with the new inversion
+            if (window.startProgressionChord) {
+                window.startProgressionChord(index);
+            }
+        });
+
+        // Stop playing on mouseup
+        btn.addEventListener('mouseup', (e) => {
+            e.stopPropagation();
+            if (window.stopTrainerChord) {
+                window.stopTrainerChord();
+            }
+        });
+
+        // Also stop if mouse leaves button
+        btn.addEventListener('mouseleave', (e) => {
+            if (window.stopTrainerChord) {
+                window.stopTrainerChord();
+            }
+        });
+    });
+
+    // Note checkboxes
+    noteCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const note = checkbox.value;
+            if (window.toggleProgressionNote) {
+                window.toggleProgressionNote(index, note);
+            }
+        });
+    });
+
+    // All/None buttons for notes
+    if (notesAllBtn) {
+        notesAllBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const trainerState = getTrainerState();
+            const chord = trainerState.progressionData[index];
+            if (chord) {
+                chord.omittedNotes = [];
+                // Update checkboxes
+                noteCheckboxes.forEach(cb => cb.checked = true);
+                // Play the chord
+                if (window.startProgressionChord && window.stopTrainerChord) {
+                    window.startProgressionChord(index);
+                    setTimeout(() => window.stopTrainerChord(), 500);
+                }
+            }
+        });
+    }
+
+    if (notesNoneBtn) {
+        notesNoneBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const trainerState = getTrainerState();
+            const chord = trainerState.progressionData[index];
+            if (chord && chord.notes) {
+                chord.omittedNotes = [...chord.notes];
+                // Update checkboxes
+                noteCheckboxes.forEach(cb => cb.checked = false);
+            }
+        });
+    }
+
+    // === COMPREHENSIVE CARD CONTROLS ===
+
+    // RH Octave shift dropdown
+    const rhOctaveSelect = wrapper.querySelector('.rh-octave-select');
+    if (rhOctaveSelect) {
+        rhOctaveSelect.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const shift = parseInt(e.target.value);
+            updateRHOctaveShift(index, shift);
+        });
+    }
+
+    // LH Octave shift dropdown
+    const lhOctaveSelect = wrapper.querySelector('.lh-octave-select');
+    if (lhOctaveSelect) {
+        lhOctaveSelect.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const shift = parseInt(e.target.value);
+            updateLHOctaveShift(index, shift);
+        });
+    }
+
+    // LH Inversion buttons
+    const lhInversionBtns = wrapper.querySelectorAll('.lh-inversion-btn');
+    lhInversionBtns.forEach(btn => {
+        btn.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            const inversion = parseInt(btn.getAttribute('data-inversion'));
+            updateLHInversion(index, inversion);
+
+            // Start playing the chord with the new LH inversion
+            if (window.startProgressionChord) {
+                window.startProgressionChord(index);
+            }
+        });
+
+        // Stop playing on mouseup
+        btn.addEventListener('mouseup', (e) => {
+            e.stopPropagation();
+            if (window.stopTrainerChord) {
+                window.stopTrainerChord();
+            }
+        });
+
+        // Also stop if mouse leaves button
+        btn.addEventListener('mouseleave', (e) => {
+            if (window.stopTrainerChord) {
+                window.stopTrainerChord();
+            }
+        });
+    });
+
+    // LH Note checkboxes
+    const lhNoteCheckboxes = wrapper.querySelectorAll('.lh-note-checkbox');
+    lhNoteCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const note = checkbox.value;
+            toggleLHNote(index, note);
+
+            // Update the card to reflect the change
+            updateSingleCard(index);
+        });
+    });
+
+    // LH All/None buttons
+    const lhAllBtn = wrapper.querySelector('.lh-notes-all-btn');
+    const lhNoneBtn = wrapper.querySelector('.lh-notes-none-btn');
+
+    if (lhAllBtn) {
+        lhAllBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const trainerState = getTrainerState();
+            const chord = trainerState.progressionData[index];
+            if (chord) {
+                chord.lhOmittedNotes = [];
+                // Update checkboxes
+                lhNoteCheckboxes.forEach(cb => cb.checked = true);
+                // Play the chord
+                if (window.startProgressionChord && window.stopTrainerChord) {
+                    window.startProgressionChord(index);
+                    setTimeout(() => window.stopTrainerChord(), 500);
+                }
+            }
+        });
+    }
+
+    if (lhNoneBtn) {
+        lhNoneBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const trainerState = getTrainerState();
+            const chord = trainerState.progressionData[index];
+            if (chord && chord.lhNotes) {
+                chord.lhOmittedNotes = [...chord.lhNotes];
+                // Update checkboxes
+                lhNoteCheckboxes.forEach(cb => cb.checked = false);
+            }
+        });
+    }
+
+    // Staff Notation Toggle button
+    // Suggestions button
+    const suggestionsBtn = wrapper.querySelector('.suggestions-btn');
+    if (suggestionsBtn) {
+        suggestionsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Open the chord suggestions modal
+            if (window.showProgressionChordSuggestions) {
+                window.showProgressionChordSuggestions(index);
+            }
+        });
+    }
+
+    // === SIMPLIFIED CARD INTERACTIVE TOOLTIP ===
+    const simplifiedCard = wrapper.querySelector('.simplified-card');
+    const chordTooltip = wrapper.querySelector('.chord-tooltip');
+    const infoTooltipBtn = wrapper.querySelector('.info-tooltip-btn');
+    const tooltipInversionBtns = wrapper.querySelectorAll('.tooltip-inversion-btn');
+
+    // Get the card wrapper (parent of simplified-card) for hover events
+    const cardWrapper = simplifiedCard ? simplifiedCard.parentElement : null;
+
+    if (simplifiedCard && chordTooltip && cardWrapper) {
+        let tooltipTimeout = null;
+        let isTooltipPinned = false;
+        let hideTimeout = null;
+
+        const showTooltip = () => {
+            if (hideTimeout) {
+                clearTimeout(hideTimeout);
+                hideTimeout = null;
+            }
+            chordTooltip.classList.remove('hidden');
+        };
+
+        const hideTooltip = () => {
+            if (!isTooltipPinned) {
+                // Longer delay before hiding to allow mouse to move to tooltip
+                hideTimeout = setTimeout(() => {
+                    chordTooltip.classList.add('hidden');
+                    // Update the card UI after tooltip closes to show any inversion changes
+                    updateSingleCard(index);
+                    updateTensionCurveIfVisible();
+                }, 500);
+            }
+        };
+
+        // Show tooltip on hover (desktop) - use cardWrapper since tooltip is sibling to card
+        cardWrapper.addEventListener('mouseenter', () => {
+            if (!isTooltipPinned) {
+                tooltipTimeout = setTimeout(() => {
+                    showTooltip();
+                }, 300); // Small delay for hover
+            }
+        });
+
+        // Hide tooltip when mouse leaves cardWrapper (if not pinned)
+        cardWrapper.addEventListener('mouseleave', (e) => {
+            if (tooltipTimeout) {
+                clearTimeout(tooltipTimeout);
+                tooltipTimeout = null;
+            }
+            // Only hide if not moving to the tooltip
+            if (!chordTooltip.contains(e.relatedTarget)) {
+                hideTooltip();
+            }
+        });
+
+        // Keep tooltip open when mouse enters tooltip
+        chordTooltip.addEventListener('mouseenter', () => {
+            if (hideTimeout) {
+                clearTimeout(hideTimeout);
+                hideTimeout = null;
+            }
+        });
+
+        // Hide tooltip when mouse leaves tooltip (if not pinned)
+        chordTooltip.addEventListener('mouseleave', () => {
+            hideTooltip();
+        });
+
+        // Close button click - close tooltip
+        const tooltipCloseBtn = chordTooltip.querySelector('.tooltip-close-btn');
+        if (tooltipCloseBtn) {
+            tooltipCloseBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                chordTooltip.classList.add('hidden');
+                isTooltipPinned = false;
+                // Update the card UI after closing to show any inversion changes
+                updateSingleCard(index);
+                updateTensionCurveIfVisible();
+            });
+        }
+
+        // Info button click - toggle tooltip (for touchscreens)
+        if (infoTooltipBtn) {
+            infoTooltipBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isVisible = !chordTooltip.classList.contains('hidden');
+                if (isVisible) {
+                    chordTooltip.classList.add('hidden');
+                    isTooltipPinned = false;
+                    // Update the card UI after closing to show any inversion changes
+                    updateSingleCard(index);
+                    updateTensionCurveIfVisible();
+                } else {
+                    chordTooltip.classList.remove('hidden');
+                    isTooltipPinned = true;
+                }
+            });
+        }
+
+        // Function to update inversion button highlighting
+        const updateInversionButtonHighlight = (selectedInversion) => {
+            tooltipInversionBtns.forEach(btn => {
+                const btnInversion = parseInt(btn.getAttribute('data-inversion'));
+                if (btnInversion === selectedInversion) {
+                    btn.classList.add('bg-indigo-600', 'text-white');
+                    btn.classList.remove('bg-gray-700', 'text-gray-300', 'hover:bg-gray-600');
+                } else {
+                    btn.classList.remove('bg-indigo-600', 'text-white');
+                    btn.classList.add('bg-gray-700', 'text-gray-300', 'hover:bg-gray-600');
+                }
+            });
+        };
+
+        // Initialize button highlighting with current inversion
+        const trainerState = getTrainerState();
+        const chord = trainerState.progressionData[index];
+        if (chord && tooltipInversionBtns.length > 0) {
+            updateInversionButtonHighlight(chord.inversion || 0);
+        }
+
+        // Tooltip inversion buttons - hold to play
+        tooltipInversionBtns.forEach(btn => {
+            // Mousedown - start playing chord
+            btn.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                const inversion = parseInt(btn.getAttribute('data-inversion'));
+
+                // Update the chord inversion (but don't update UI to prevent tooltip closing)
+                updateChordInversion(index, inversion, false);
+
+                // Update button highlighting
+                updateInversionButtonHighlight(inversion);
+
+                // Start playing the chord with new inversion
+                if (window.startProgressionChord) {
+                    window.startProgressionChord(index);
+                }
+            });
+
+            // Mouseup - stop playing chord (keep tooltip open)
+            btn.addEventListener('mouseup', (e) => {
+                e.stopPropagation();
+                if (window.stopTrainerChord) {
+                    window.stopTrainerChord();
+                }
+                // Don't update UI here - tooltip stays open for trying other inversions
+            });
+
+            // Mouseleave - stop playing if user drags off button (keep tooltip open)
+            btn.addEventListener('mouseleave', (e) => {
+                if (window.stopTrainerChord) {
+                    window.stopTrainerChord();
+                }
+                // Don't update UI here - tooltip stays open for trying other inversions
+            });
+
+            // Touch events for mobile
+            btn.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+                const inversion = parseInt(btn.getAttribute('data-inversion'));
+
+                // Update the chord inversion (but don't update UI to prevent tooltip closing)
+                updateChordInversion(index, inversion, false);
+
+                // Update button highlighting
+                updateInversionButtonHighlight(inversion);
+
+                // Start playing the chord with new inversion
+                if (window.startProgressionChord) {
+                    window.startProgressionChord(index);
+                }
+            }, { passive: true });
+
+            btn.addEventListener('touchend', (e) => {
+                e.stopPropagation();
+                if (window.stopTrainerChord) {
+                    window.stopTrainerChord();
+                }
+                // Don't update UI here - tooltip stays open for trying other inversions
+            }, { passive: true });
+
+            // Prevent click event from bubbling
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        });
+
+        // Close tooltip when clicking outside
+        document.addEventListener('click', (e) => {
+            if (isTooltipPinned && !cardWrapper.contains(e.target) && !chordTooltip.contains(e.target)) {
+                chordTooltip.classList.add('hidden');
+                isTooltipPinned = false;
+                // Update the card UI after closing to show any inversion changes
+                updateSingleCard(index);
+                updateTensionCurveIfVisible();
+            }
+        });
+    }
+}
+
+/**
+ * Update shift classes for all cards based on expanded state
+ * Shifts cards to the right when they come after an expanded card
+ * Accumulates shifts when multiple cards are expanded
+ * Uses transform instead of margin to preserve card width
+ */
+function updateCardShifts() {
+    const container = document.getElementById('progression-visualization');
+    if (!container) return;
+
+    // Use double requestAnimationFrame to ensure DOM is fully rendered and all updates are complete
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            const allWrappers = Array.from(container.querySelectorAll('.chord-card-wrapper[data-chord-index]'));
+
+            if (allWrappers.length === 0) return;
+
+            // Determine baseline card width (unexpanded, simplified card without notation)
+            // Look for a simplified card without notation showing
+            let baselineWidth = 0;
+            let allCardsHaveNotation = true;
+
+            for (const wrapper of allWrappers) {
+                const chordIndex = parseInt(wrapper.getAttribute('data-chord-index'));
+                const isExpanded = expandedChords.has(chordIndex);
+                const notationView = wrapper.querySelector('.notation-view');
+                const notationShowing = notationView && !notationView.classList.contains('hidden');
+
+                // If this is a simplified card without notation, use its width as baseline
+                if (!isExpanded && !notationShowing) {
+                    baselineWidth = wrapper.offsetWidth;
+                    allCardsHaveNotation = false;
+                    break;
+                }
+            }
+
+            // If no baseline found (all cards expanded or showing notation), use a small fixed baseline
+            // This ensures all wider cards will cause shifts
+            if (baselineWidth === 0 || allCardsHaveNotation) {
+                // Use a small baseline so all cards with notation/expanded will cause shifts
+                // This represents the minimum "slot" width in the grid
+                baselineWidth = 120;
+            }
+
+            // If card width is 0, cards might not be rendered yet, try again after a short delay
+            if (baselineWidth === 0) {
+                setTimeout(() => updateCardShifts(), 50);
+                return;
+            }
+
+            // Calculate accumulated shift for each card based on actual card widths
+            // Any card wider than baseline causes subsequent cards to shift
+            allWrappers.forEach((wrapper, idx) => {
+                let accumulatedShift = 0;
+
+                // Check each previous card to see if it's wider than baseline
+                for (let i = 0; i < idx; i++) {
+                    const prevWrapper = allWrappers[i];
+                    const prevWidth = prevWrapper.offsetWidth;
+
+                    // If previous card is wider than baseline, shift this card
+                    if (prevWidth > baselineWidth + 10) { // 10px tolerance
+                        const extraWidth = prevWidth - baselineWidth;
+                        const shiftAmount = extraWidth + 10;
+                        accumulatedShift += shiftAmount; // Full extra width + 10px gap
+                    }
+                }
+
+                // Apply shift if needed using CSS custom property to persist transform
+                // This prevents flash when inline styles are reset
+                if (accumulatedShift > 0) {
+                    wrapper.classList.add('shift-right');
+                    // Set CSS custom property which persists even if inline style is reset
+                    wrapper.style.setProperty('--card-shift', `${accumulatedShift}px`);
+                    // Also set inline transform as backup
+                    wrapper.style.transform = `translateX(${accumulatedShift}px)`;
+                } else {
+                    wrapper.classList.remove('shift-right');
+                    // Clear CSS custom property
+                    wrapper.style.removeProperty('--card-shift');
+                    wrapper.style.transform = '';
+                }
+            });
+        });
+    });
+}
+
+/**
+ * Expand a chord card to detailed view
+ */
+function expandChordCard(index) {
+    expandedChords.add(index);
+    const wrapper = document.querySelector(`.chord-card-wrapper[data-chord-index="${index}"]`);
+    if (wrapper) {
+        const trainerState = getTrainerState();
+        const chord = trainerState.progressionData[index];
+        const key = trainerState.currentKey || 'C';
+
+        // Ensure no-animation class is present and add expanded class for wider width
+        wrapper.classList.add('no-animation', 'expanded-card-wrapper');
+
+        // Replace content with detailed view immediately (no delay needed with no-animation class)
+        wrapper.innerHTML = createDetailedCardHTML(chord, index, key);
+        attachCardEventListeners(wrapper, index);
+
+        // Render chord notation on the canvas (after DOM is ready)
+        requestAnimationFrame(() => {
+            const canvas = wrapper.querySelector('.chord-notation-canvas');
+            if (canvas) {
+                renderChordNotation(chord, key, canvas);
+
+                // Adjust card dimensions based on canvas size
+                const dimensions = calculateCanvasDimensions(key, chord.notes);
+                const detailedCard = wrapper.querySelector('.detailed-card');
+                if (detailedCard) {
+                    detailedCard.style.minWidth = `${dimensions.width + 20}px`;
+                }
+                // Also set wrapper width so it takes up space in grid
+                // Use extra padding for expanded cards to prevent overlap
+                wrapper.style.minWidth = `${dimensions.width + 80}px`;
+
+                // Force layout by reading dimensions
+                wrapper.getBoundingClientRect();
+
+                // Update card shifts after layout is applied
+                requestAnimationFrame(() => {
+                    updateCardShifts();
+                });
+            }
+        });
+
+        // Force layout by reading dimensions
+        wrapper.getBoundingClientRect();
+    }
+
+    // Update shifts for all cards after layout is applied
+    // (will be called again after notation renders and sets minWidth)
+    requestAnimationFrame(() => {
+        updateCardShifts();
+    });
+}
+
+/**
+ * Collapse a chord card back to simplified view
+ */
+function collapseChordCard(index) {
+    expandedChords.delete(index);
+    const wrapper = document.querySelector(`.chord-card-wrapper[data-chord-index="${index}"]`);
+    if (wrapper) {
+        const trainerState = getTrainerState();
+        const chord = trainerState.progressionData[index];
+        const key = trainerState.currentKey || 'C';
+
+        // Ensure no-animation class is present and remove expanded class
+        wrapper.classList.add('no-animation');
+        wrapper.classList.remove('expanded-card-wrapper');
+
+        // Replace content with simplified view (control bar + card)
+        wrapper.innerHTML = '';
+        const simplifiedStructure = createSimplifiedCardStructure(chord, index, key);
+        wrapper.appendChild(simplifiedStructure);
+        attachCardEventListeners(wrapper, index);
+
+        // Reset wrapper width
+        wrapper.style.minWidth = '';
+
+        // Force layout by reading dimensions
+        wrapper.getBoundingClientRect();
+    }
+
+    // Update shifts for all cards after layout is applied
+    requestAnimationFrame(() => {
+        updateCardShifts();
+    });
+}
+
+/**
+ * Helper: Get chord type options HTML
+ * Includes all chord types from CHORD_DEFINITIONS, organized by category
+ */
+function getChordTypeOptions(currentType) {
+    // Organized by chord groups for better UX
+    const chordGroups = [
+        { label: 'Triads', types: ['Major', 'Minor', 'Diminished', 'Augmented', 'Suspended 2nd', 'Suspended 4th', 'Power Chord'] },
+        { label: '7th Chords', types: ['Dominant 7th', 'Major 7th', 'Minor 7th', 'Minor-Major 7th', 'Diminished 7th', 'Half-Diminished 7th', 'Augmented 7th'] },
+        { label: '6th Chords', types: ['Major 6th', 'Minor 6th'] },
+        { label: '9th Chords', types: ['Add9', 'Major 9th', 'Dominant 9th', 'Minor 9th', '6/9'] },
+        { label: 'Extended', types: ['Dominant 11th', 'Minor 11th', 'Dominant 13th'] },
+        { label: 'Altered', types: ['7b5', '7#5', '7b9', '7#9'] }
+    ];
+
+    let html = '';
+    chordGroups.forEach(group => {
+        html += `<optgroup label="${group.label}">`;
+        group.types.forEach(type => {
+            // Check if this type exists in CHORD_DEFINITIONS
+            if (CHORD_DEFINITIONS[type]) {
+                html += `<option value="${type}" ${type === currentType ? 'selected' : ''}>${type}</option>`;
+            }
+        });
+        html += '</optgroup>';
+    });
+
+    return html;
+}
+
+/**
+ * Helper: Get inversion options HTML
+ */
+function getInversionOptions(currentInversion) {
+    const labels = ['Root Position', '1st Inversion', '2nd Inversion', '3rd Inversion'];
+    return [0, 1, 2, 3].map(inv =>
+        `<option value="${inv}" ${inv === currentInversion ? 'selected' : ''}>${labels[inv]}</option>`
+    ).join('');
+}
+
+/**
+ * Helper: Get voicing options HTML
+ */
+function getVoicingOptions(currentVoicing) {
+    const voicings = [
+        { value: 'close', label: 'Close' },
+        { value: 'open', label: 'Open' },
+        { value: 'drop-2', label: 'Drop-2' },
+        { value: 'drop-3', label: 'Drop-3' }
+    ];
+    return voicings.map(v =>
+        `<option value="${v.value}" ${v.value === currentVoicing ? 'selected' : ''}>${v.label}</option>`
+    ).join('');
+}
+
+/**
+ * Helper: Update a single card without re-rendering everything
+ */
+function updateSingleCard(index) {
+    const trainerState = getTrainerState();
+    const chord = trainerState.progressionData[index];
+    const key = trainerState.currentKey || 'C';
+    const wrapper = document.querySelector(`.chord-card-wrapper[data-chord-index="${index}"]`);
+
+    if (!wrapper || !chord) return;
+
+    // Preserve the current shift before updating to prevent visual flash
+    const currentShift = wrapper.style.getPropertyValue('--card-shift') || '';
+    const currentTransform = wrapper.style.transform || '';
+    const hadShiftClass = wrapper.classList.contains('shift-right');
+
+    // Check if this card is currently expanded
+    const isExpanded = expandedChords.has(index);
+
+    // Completely disable ALL transitions and animations using CSS class
+    // This overrides the global .chord-card-wrapper transition and animation rules
+    wrapper.classList.add('no-animation');
+
+    // Replace the card's HTML with updated version
+    if (isExpanded) {
+        wrapper.innerHTML = createDetailedCardHTML(chord, index, key);
+        // Ensure expanded class is present
+        wrapper.classList.add('expanded-card-wrapper');
+
+        // Render chord notation on the canvas (after DOM is ready)
+        requestAnimationFrame(() => {
+            const canvas = wrapper.querySelector('.chord-notation-canvas');
+            if (canvas) {
+                renderChordNotation(chord, key, canvas);
+
+                // Adjust card dimensions based on canvas size
+                const dimensions = calculateCanvasDimensions(key, chord.notes);
+                const detailedCard = wrapper.querySelector('.detailed-card');
+                if (detailedCard) {
+                    detailedCard.style.minWidth = `${dimensions.width + 20}px`;
+                }
+                // Also set wrapper width so it takes up space in grid
+                // Use extra padding for expanded cards to prevent overlap
+                wrapper.style.minWidth = `${dimensions.width + 80}px`;
+
+                // Force layout by reading dimensions
+                wrapper.getBoundingClientRect();
+
+                // Update card shifts after layout is applied
+                requestAnimationFrame(() => {
+                    updateCardShifts();
+                });
+            }
+        });
+    } else {
+        wrapper.innerHTML = '';
+        const simplifiedStructure = createSimplifiedCardStructure(chord, index, key);
+        wrapper.appendChild(simplifiedStructure);
+        // Ensure expanded class is removed
+        wrapper.classList.remove('expanded-card-wrapper');
+    }
+
+    // Immediately restore the shift using CSS custom property (persists even if inline style is reset)
+    if (currentShift) {
+        wrapper.style.setProperty('--card-shift', currentShift);
+        wrapper.style.transform = currentTransform || `translateX(${currentShift})`;
+        if (hadShiftClass) {
+            wrapper.classList.add('shift-right');
+        }
+    } else if (currentTransform) {
+        // Fallback to inline transform if custom property wasn't set
+        wrapper.style.transform = currentTransform;
+        if (hadShiftClass) {
+            wrapper.classList.add('shift-right');
+        }
+    }
+
+    // Re-attach event listeners
+    attachCardEventListeners(wrapper, index);
+
+    // Keep no-animation class permanently to prevent any flash
+    // The CSS rule ensures all children also have transitions/animations disabled
+
+    // Restore selection (purple ring) if this card was selected
+    const selectedIndex = getSelectedChordIndex();
+    if (selectedIndex === index) {
+        const card = wrapper.querySelector('.simplified-card, .detailed-card');
+        if (card) {
+            card.classList.add('ring-4', 'ring-purple-500', 'ring-offset-2');
+            card.setAttribute('data-selected', 'true');
+        }
+    }
+
+    // Recalculate and update shifts properly after DOM is ready
+    // This ensures all cards have correct shifts, but we've already prevented the flash
+    requestAnimationFrame(() => {
+        updateCardShifts();
+    });
+}
+
+/**
+ * Helper: Update tension curve if visible
+ */
+function updateTensionCurveIfVisible() {
+    const tensionContainer = document.getElementById('tension-curve-container');
+    if (tensionContainer && tensionContainer.style.display !== 'none') {
+        const trainerState = getTrainerState();
+        const panel = document.getElementById('progression-visualization')?.parentElement;
+        if (panel) {
+            // Remove old tension curve
+            const oldTension = panel.querySelector('#tension-curve-container');
+            if (oldTension) oldTension.remove();
+
+            // Re-render tension curve with updated data
+            renderTensionCurve(panel, trainerState.progressionData, trainerState.currentKey || 'C');
+
+            // Reposition Quick Analysis Bar above tension curve
+            const quickAnalysisBar = panel?.querySelector('#quick-analysis-bar-container');
+            const tensionCurve = panel?.querySelector('#tension-curve-container');
+            if (quickAnalysisBar && tensionCurve) {
+                quickAnalysisBar.remove();
+                panel.insertBefore(quickAnalysisBar, tensionCurve);
+            }
+        }
+    }
+}
+
+/**
+ * Update chord type from simplified view
+ */
+function updateChordType(index, newType) {
+    const trainerState = getTrainerState();
+    const chord = trainerState.progressionData[index];
+    chord.type = newType;
+
+    // Regenerate chord notes with new type
+    const chordInfo = getProgressionChordNotes(
+        chord.key || trainerState.currentKey,
+        chord.roman,
+        newType,
+        chord.inversion
+    );
+
+    if (chordInfo) {
+        chord.notes = chordInfo.notes;
+        chord.lhNotes = chordInfo.lhNotes;
+        chord.name = chordInfo.name;
+        chord.simpleName = chordInfo.simpleName;
+
+        // Reapply octave shift if it was previously set
+        if (chord.octaveShift && chord.octaveShift !== 0) {
+            chord.notes = chord.notes.map(note => {
+                const match = note.match(/^([A-G][#b]?)(\d+)$/);
+                if (!match) return note;
+                const noteName = match[1];
+                const octave = parseInt(match[2]);
+                const newOctave = octave + Math.floor(chord.octaveShift / 12);
+                // Clamp octave to valid MIDI range (0-8)
+                const clampedOctave = Math.max(0, Math.min(8, newOctave));
+                return `${noteName}${clampedOctave}`;
+            });
+        }
+    }
+
+    // Save state
+    saveState({ type: 'chord-update', data: { index, property: 'type', value: newType } });
+
+    // Update only this card and tension curve (type changes affect tension)
+    updateSingleCard(index);
+    updateTensionCurveIfVisible();
+
+    // Play the chord with the new type
+    const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
+    const rhOctaveShift = chord.octaveShift || 0;
+    const lhRelativeShift = chord.lhOctaveShift || -12;
+    const absoluteLHOctaveShift = rhOctaveShift + lhRelativeShift;
+    const lhNotes = getLHNotes(
+        chord.root,
+        chord.lhType,
+        chord.lhInversion,
+        trainerState.currentKey,
+        absoluteLHOctaveShift,
+        chord.type,
+        getEnharmonicPreference()
+    ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
+    const allNotes = voicedNotes.concat(lhNotes);
+    if (allNotes.length > 0) {
+        playTrainerChordOnce(allNotes);
+    }
+}
+
+/**
+ * Update chord inversion from simplified view
+ */
+function updateChordInversion(index, newInversion, shouldUpdateUI = true) {
+    const trainerState = getTrainerState();
+    const chord = trainerState.progressionData[index];
+    chord.inversion = newInversion;
+
+    // Regenerate chord notes with new inversion
+    const chordInfo = getProgressionChordNotes(
+        chord.key || trainerState.currentKey,
+        chord.roman,
+        chord.type,
+        newInversion
+    );
+
+    if (chordInfo) {
+        chord.notes = chordInfo.notes;
+        chord.lhNotes = chordInfo.lhNotes;
+
+        // Reapply octave shift if it was previously set
+        if (chord.octaveShift && chord.octaveShift !== 0) {
+            chord.notes = chord.notes.map(note => {
+                const match = note.match(/^([A-G][#b]?)(\d+)$/);
+                if (!match) return note;
+                const noteName = match[1];
+                const octave = parseInt(match[2]);
+                const newOctave = octave + Math.floor(chord.octaveShift / 12);
+                // Clamp octave to valid MIDI range (0-8)
+                const clampedOctave = Math.max(0, Math.min(8, newOctave));
+                return `${noteName}${clampedOctave}`;
+            });
+        }
+    }
+
+    // Save state
+    saveState({ type: 'chord-update', data: { index, property: 'inversion', value: newInversion } });
+
+    // Update only this card and tension curve (inversions affect tension and voice leading)
+    // Skip UI update if called from tooltip to prevent closing the tooltip
+    if (shouldUpdateUI) {
+        updateSingleCard(index);
+        updateTensionCurveIfVisible();
+    }
+}
+
+/**
+ * Update chord voicing from simplified view
+ */
+function updateChordVoicing(index, newVoicing) {
+    const trainerState = getTrainerState();
+    const chord = trainerState.progressionData[index];
+    chord.voicing = newVoicing;
+
+    // Save state
+    saveState({ type: 'chord-update', data: { index, property: 'voicing', value: newVoicing } });
+
+    // Update only this card (voicing doesn't affect tension curve)
+    updateSingleCard(index);
+}
+
+/**
+ * Update chord LH pattern from simplified view
+ */
+function updateChordLHPattern(index, newLHPattern) {
+    const trainerState = getTrainerState();
+    const chord = trainerState.progressionData[index];
+    chord.lhType = newLHPattern;
+
+    // Regenerate LH notes with new pattern (using relative LH octave shift)
+    const rhOctaveShift = chord.octaveShift || 0;
+    const lhRelativeShift = chord.lhOctaveShift || -12;
+    const absoluteLHOctaveShift = rhOctaveShift + lhRelativeShift;
+    chord.lhNotes = getLHNotes(
+        chord.root,
+        newLHPattern,
+        chord.lhInversion || 0,
+        trainerState.currentKey,
+        absoluteLHOctaveShift,
+        chord.type,
+        getEnharmonicPreference()
+    );
+
+    // Save state
+    saveState({ type: 'chord-update', data: { index, property: 'lhType', value: newLHPattern } });
+
+    // Update only this card (LH pattern doesn't affect tension curve)
+    updateSingleCard(index);
+
+    // Play the chord with the new LH pattern
+    const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
+    const lhNotes = (chord.lhNotes || []).filter(n => !(chord.lhOmittedNotes || []).includes(n));
+    const allNotes = voicedNotes.concat(lhNotes);
+    if (allNotes.length > 0) {
+        playTrainerChordOnce(allNotes);
+    }
+}
+
+/**
+ * Get scale notes for a given key (for highlighting scale degree indicators)
+ */
+function getScaleNotesForKey(key) {
+    const scalePattern = [0, 2, 4, 5, 7, 9, 11]; // Major scale intervals
+    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const flatNames = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+    // Normalize key to root note
+    const rootNote = key.replace(/\s*(major|minor|m)$/i, '').trim();
+
+    // Find root index
+    let rootIndex = noteNames.indexOf(rootNote);
+    if (rootIndex === -1) {
+        rootIndex = flatNames.indexOf(rootNote);
+    }
+    if (rootIndex === -1) return [];
+
+    // Generate scale notes
+    const useFlats = rootNote.includes('b');
+    const names = useFlats ? flatNames : noteNames;
+
+    return scalePattern.map(interval => {
+        const noteIndex = (rootIndex + interval) % 12;
+        return names[noteIndex];
+    });
+}
+
+/**
+ * Update RH octave shift
+ */
+function updateRHOctaveShift(index, shift) {
+    const trainerState = getTrainerState();
+    const chord = trainerState.progressionData[index];
+    chord.octaveShift = shift;
+
+    // Regenerate notes with new octave
+    const chordInfo = getProgressionChordNotes(
+        chord.key || trainerState.currentKey,
+        chord.roman,
+        chord.type,
+        chord.inversion
+    );
+
+    if (chordInfo && chordInfo.notes) {
+        // Apply octave shift
+        chord.notes = chordInfo.notes.map(note => {
+            const match = note.match(/^([A-G][#b]?)(\d+)$/);
+            if (!match) return note;
+            const noteName = match[1];
+            const octave = parseInt(match[2]);
+            const newOctave = octave + Math.floor(shift / 12);
+            // Clamp octave to valid MIDI range (0-8)
+            const clampedOctave = Math.max(0, Math.min(8, newOctave));
+            return `${noteName}${clampedOctave}`;
+        });
+    }
+
+    // Save state
+    saveState({ type: 'chord-update', data: { index, property: 'octaveShift', value: shift } });
+
+    // Update only this card
+    updateSingleCard(index);
+
+    // Play the chord with the new octave (LH is relative to RH, so update LH too)
+    const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
+    const lhRelativeShift = chord.lhOctaveShift || -12;
+    const absoluteLHOctaveShift = shift + lhRelativeShift;
+    const lhNotes = getLHNotes(
+        chord.root,
+        chord.lhType,
+        chord.lhInversion,
+        trainerState.currentKey,
+        absoluteLHOctaveShift,
+        chord.type,
+        getEnharmonicPreference()
+    ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
+    const allNotes = voicedNotes.concat(lhNotes);
+    if (allNotes.length > 0) {
+        playTrainerChordOnce(allNotes);
+    }
+}
+
+/**
+ * Update LH octave shift (relative to RH)
+ */
+function updateLHOctaveShift(index, shift) {
+    const trainerState = getTrainerState();
+    const chord = trainerState.progressionData[index];
+    chord.lhOctaveShift = shift;
+
+    // Regenerate LH notes with new relative octave shift
+    const rhOctaveShift = chord.octaveShift || 0;
+    const absoluteLHOctaveShift = rhOctaveShift + shift;
+    chord.lhNotes = getLHNotes(
+        chord.root,
+        chord.lhType || 'off',
+        chord.lhInversion || 0,
+        trainerState.currentKey,
+        absoluteLHOctaveShift,
+        chord.type,
+        getEnharmonicPreference()
+    );
+
+    // Save state
+    saveState({ type: 'chord-update', data: { index, property: 'lhOctaveShift', value: shift } });
+
+    // Update only this card
+    updateSingleCard(index);
+
+    // Play the chord with the new LH octave
+    const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
+    const lhNotes = (chord.lhNotes || []).filter(n => !(chord.lhOmittedNotes || []).includes(n));
+    const allNotes = voicedNotes.concat(lhNotes);
+    if (allNotes.length > 0) {
+        playTrainerChordOnce(allNotes);
+    }
+}
+
+/**
+ * Update LH inversion
+ */
+function updateLHInversion(index, newInversion) {
+    const trainerState = getTrainerState();
+    const chord = trainerState.progressionData[index];
+    chord.lhInversion = newInversion;
+
+    // Regenerate LH notes with new inversion (using relative LH octave shift)
+    const rhOctaveShift = chord.octaveShift || 0;
+    const lhRelativeShift = chord.lhOctaveShift || -12;
+    const absoluteLHOctaveShift = rhOctaveShift + lhRelativeShift;
+    chord.lhNotes = getLHNotes(
+        chord.root,
+        chord.lhType || 'off',
+        newInversion,
+        trainerState.currentKey,
+        absoluteLHOctaveShift,
+        chord.type,
+        getEnharmonicPreference()
+    );
+
+    // Save state
+    saveState({ type: 'chord-update', data: { index, property: 'lhInversion', value: newInversion } });
+
+    // Update only this card
+    updateSingleCard(index);
+
+    // Note: Playback is handled by the press-and-hold event handler on the button
+    // Don't call playTrainerChordOnce here as it would conflict with the hold behavior
+}
+
+/**
+ * Toggle LH note on/off
+ */
+function toggleLHNote(index, note) {
+    const trainerState = getTrainerState();
+    const chord = trainerState.progressionData[index];
+
+    if (!chord.lhOmittedNotes) chord.lhOmittedNotes = [];
+
+    const idx = chord.lhOmittedNotes.indexOf(note);
+    if (idx > -1) {
+        chord.lhOmittedNotes.splice(idx, 1);
+    } else {
+        chord.lhOmittedNotes.push(note);
+    }
+
+    // Save state
+    saveState({ type: 'chord-update', data: { index, property: 'lhOmittedNotes', value: chord.lhOmittedNotes } });
+}
+
+/**
+ * Toggle staff notation visibility in expanded chord card
+ */
+function toggleStaffNotationInCard(index) {
+    const wrapper = document.querySelector(`.chord-card-wrapper[data-chord-index="${index}"]`);
+    if (!wrapper) return;
+
+    const container = wrapper.querySelector('.staff-notation-container');
+    const toggleBtn = wrapper.querySelector('.staff-notation-toggle-btn');
+
+    if (!container) return;
+
+    if (container.classList.contains('hidden')) {
+        container.classList.remove('hidden');
+        if (toggleBtn) toggleBtn.textContent = '♪ Hide Notation';
+        // TODO: Render staff notation using VexFlow when available
+        // renderStaffNotation(index);
+    } else {
+        container.classList.add('hidden');
+        if (toggleBtn) toggleBtn.textContent = '♪ Show Notation';
+    }
+}
+
+/**
+ * Toggle between chord info and notation view in simplified cards
+ * @param {HTMLElement} wrapper - The card wrapper element
+ * @param {number} index - The chord index
+ */
+function toggleSimplifiedCardNotation(wrapper, index) {
+    const card = wrapper.querySelector('.simplified-card');
+    const chordInfoView = wrapper.querySelector('.chord-info-view');
+    const notationView = wrapper.querySelector('.notation-view');
+    const canvas = wrapper.querySelector('.simplified-notation-canvas');
+    const toggleBtn = wrapper.querySelector('.notation-toggle-btn');
+    const musicNoteIcon = toggleBtn?.querySelector('.music-note-icon');
+    const abcText = toggleBtn?.querySelector('.abc-text');
+
+    if (!card || !chordInfoView || !notationView || !canvas || !toggleBtn) return;
+
+    const trainerState = getTrainerState();
+    const chord = trainerState.progressionData[index];
+    const key = trainerState.currentKey || 'C';
+
+    // Toggle views
+    if (notationView.classList.contains('hidden')) {
+        // Show notation view
+        chordInfoView.classList.add('hidden');
+        notationView.classList.remove('hidden');
+
+        // Change toggle to show ABC text (indicating you can go back to chord info)
+        if (musicNoteIcon) musicNoteIcon.classList.add('hidden');
+        if (abcText) abcText.classList.remove('hidden');
+
+        // Render notation on canvas with dynamic sizing
+        requestAnimationFrame(() => {
+            renderChordNotation(chord, key, canvas);
+
+            // Adjust card dimensions based on canvas size
+            const dimensions = calculateCanvasDimensions(key, chord.notes);
+            card.style.minHeight = `${dimensions.height + 20}px`; // Add padding
+            card.style.minWidth = `${dimensions.width + 20}px`; // Set width for notation view
+            notationView.style.minHeight = `${dimensions.height + 20}px`;
+            notationView.style.minWidth = `${dimensions.width + 20}px`;
+
+            // IMPORTANT: Add class to bypass CSS width constraints
+            wrapper.classList.add('has-notation');
+
+            // Set minWidth on the wrapper so it actually takes up space in the grid
+            const targetWidth = dimensions.width + 40;
+            wrapper.style.minWidth = `${targetWidth}px`;
+
+            // Force layout by reading dimensions
+            wrapper.getBoundingClientRect();
+
+            // Update card shifts after layout is applied
+            requestAnimationFrame(() => {
+                updateCardShifts();
+            });
+        });
+    } else {
+        // Show chord info view
+        notationView.classList.add('hidden');
+        chordInfoView.classList.remove('hidden');
+
+        // Change toggle to show music note icon (indicating you can view notation)
+        if (musicNoteIcon) musicNoteIcon.classList.remove('hidden');
+        if (abcText) abcText.classList.add('hidden');
+
+        // Remove class to restore CSS width constraints
+        wrapper.classList.remove('has-notation');
+
+        // Reset ALL dimension styles to ensure clean state
+        card.style.minHeight = '80px';
+        card.style.minWidth = '';
+        card.style.width = '';
+        notationView.style.minHeight = '';
+        notationView.style.minWidth = '';
+        notationView.style.width = '';
+        wrapper.style.minWidth = '';
+        wrapper.style.width = '';
+
+        // Force layout by reading dimensions
+        wrapper.getBoundingClientRect();
+
+        // Update card shifts after layout is applied with proper timing
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                updateCardShifts();
+            });
+        });
+    }
 }
 
 /**
@@ -1969,20 +4236,28 @@ function initializeSimplifiedSortable(container) {
         ghostClass: 'sortable-ghost',
         chosenClass: 'sortable-chosen',
         dragClass: 'sortable-drag',
-        handle: '.simplified-chord-card',
+        handle: '.drag-handle',
+        filter: '.chord-card-wrapper:first-child', // Exclude Add/Clear buttons (first child)
         onEnd: function(evt) {
             if (evt.oldIndex !== evt.newIndex) {
+                // Account for button container at index 0
+                // Subtract 1 from both indices since buttons take up position 0
+                const actualOldIndex = evt.oldIndex - 1;
+                const actualNewIndex = evt.newIndex - 1;
+
+                if (actualOldIndex < 0 || actualNewIndex < 0) return; // Shouldn't happen, but safety check
+
                 // Reorder progression data
                 const trainerState = getTrainerState();
                 const progressionData = [...trainerState.progressionData];
                 const progressionRomans = [...trainerState.progressionRomans];
 
                 // Move items
-                const [movedChord] = progressionData.splice(evt.oldIndex, 1);
-                progressionData.splice(evt.newIndex, 0, movedChord);
+                const [movedChord] = progressionData.splice(actualOldIndex, 1);
+                progressionData.splice(actualNewIndex, 0, movedChord);
 
-                const [movedRoman] = progressionRomans.splice(evt.oldIndex, 1);
-                progressionRomans.splice(evt.newIndex, 0, movedRoman);
+                const [movedRoman] = progressionRomans.splice(actualOldIndex, 1);
+                progressionRomans.splice(actualNewIndex, 0, movedRoman);
 
                 // Update state
                 setProgressionData(progressionData);
@@ -1991,7 +4266,7 @@ function initializeSimplifiedSortable(container) {
                 // Save state for undo/redo
                 saveState({
                     type: 'reorder',
-                    data: { fromIndex: evt.oldIndex, toIndex: evt.newIndex }
+                    data: { fromIndex: actualOldIndex, toIndex: actualNewIndex }
                 });
 
                 // Re-render both views
@@ -2003,44 +4278,95 @@ function initializeSimplifiedSortable(container) {
 
 /**
  * PHASE 3.3: Highlight chords that are part of a detected pattern
+ * Creates persistent shaded backgrounds behind matched chord sequences
  * @param {Object} pattern - Pattern object with matches array and pattern info
  */
 function highlightPatternChords(pattern) {
     // Remove existing highlights
     document.querySelectorAll('.pattern-highlight-active').forEach(el => {
         el.classList.remove('pattern-highlight-active');
+        el.removeAttribute('data-pattern-match');
+        el.removeAttribute('data-match-index');
+        el.style.backgroundColor = '';
+        el.style.borderRadius = '';
+        el.style.padding = '';
     });
 
-    // Get pattern length from COMMON_PROGRESSIONS
+    // Get pattern length from COMMON_PROGRESSIONS (from harmonyAnalyzer.js)
     const patternInfo = COMMON_PROGRESSIONS[pattern.id];
-    if (!patternInfo) return;
+    if (!patternInfo) {
+        console.warn('Pattern not found in COMMON_PROGRESSIONS:', pattern.id);
+        console.log('Available patterns:', Object.keys(COMMON_PROGRESSIONS));
+        console.log('Pattern object:', pattern);
+        return;
+    }
 
+    // patternInfo.pattern is an array like ['I', 'IV', 'V']
     const patternLength = patternInfo.pattern.length;
 
+    // Array of colors for multiple occurrences (very prominent with higher opacity, thick borders, and shadows)
+    const highlightColors = [
+        { bg: 'rgba(168, 85, 247, 0.3)', border: 'rgba(168, 85, 247, 0.8)', shadow: '0 4px 12px rgba(168, 85, 247, 0.4)' },   // Purple
+        { bg: 'rgba(236, 72, 153, 0.3)', border: 'rgba(236, 72, 153, 0.8)', shadow: '0 4px 12px rgba(236, 72, 153, 0.4)' },   // Pink
+        { bg: 'rgba(59, 130, 246, 0.3)', border: 'rgba(59, 130, 246, 0.8)', shadow: '0 4px 12px rgba(59, 130, 246, 0.4)' },   // Blue
+        { bg: 'rgba(16, 185, 129, 0.3)', border: 'rgba(16, 185, 129, 0.8)', shadow: '0 4px 12px rgba(16, 185, 129, 0.4)' },   // Green
+        { bg: 'rgba(251, 146, 60, 0.3)', border: 'rgba(251, 146, 60, 0.8)', shadow: '0 4px 12px rgba(251, 146, 60, 0.4)' },   // Orange
+        { bg: 'rgba(244, 63, 94, 0.3)', border: 'rgba(244, 63, 94, 0.8)', shadow: '0 4px 12px rgba(244, 63, 94, 0.4)' },     // Rose
+    ];
+
+    console.log(`Highlighting ${pattern.matches.length} occurrence(s) of pattern "${pattern.id}" with length ${patternLength}`);
+
     // Highlight all chords in each pattern match
-    pattern.matches.forEach(startIndex => {
-        // Highlight in both simplified and detailed views
+    pattern.matches.forEach((startIndex, matchIdx) => {
+        const color = highlightColors[matchIdx % highlightColors.length];
+
+        console.log(`  Match ${matchIdx + 1}: Starting at index ${startIndex}, using colors bg:${color.bg}, border:${color.border}`);
+
+        // Highlight the sequence of cards
         for (let i = 0; i < patternLength; i++) {
             const chordIndex = startIndex + i;
 
-            // Highlight simplified card
-            const simplifiedCard = document.querySelector(`[data-simplified-index="${chordIndex}"]`);
-            if (simplifiedCard) {
-                simplifiedCard.classList.add('pattern-highlight-active');
-                setTimeout(() => {
-                    simplifiedCard.classList.remove('pattern-highlight-active');
-                }, 2000);
-            }
-
-            // Highlight detailed card
-            const detailedCard = document.querySelector(`[data-index="${chordIndex}"]`);
-            if (detailedCard) {
-                detailedCard.classList.add('pattern-highlight-active');
-                setTimeout(() => {
-                    detailedCard.classList.remove('pattern-highlight-active');
-                }, 2000);
+            // Highlight card wrapper (works for both simplified and detailed views)
+            const wrapper = document.querySelector(`.chord-card-wrapper[data-chord-index="${chordIndex}"]`);
+            if (wrapper) {
+                console.log(`    ✓ Found wrapper for chord ${chordIndex}`);
+                wrapper.classList.add('pattern-highlight-active');
+                wrapper.setAttribute('data-pattern-match', pattern.id);
+                wrapper.setAttribute('data-match-index', matchIdx);
+                wrapper.style.backgroundColor = color.bg;
+                wrapper.style.border = `3px solid ${color.border}`;
+                wrapper.style.boxShadow = color.shadow;
+                wrapper.style.borderRadius = '12px';
+                wrapper.style.padding = '4px';
+                wrapper.style.transition = 'all 0.3s ease';
+            } else {
+                console.warn(`    ✗ Could not find wrapper for chord index ${chordIndex}`);
             }
         }
+    });
+
+    // Scroll to first match
+    if (pattern.matches.length > 0) {
+        const firstMatchWrapper = document.querySelector(`.chord-card-wrapper[data-chord-index="${pattern.matches[0]}"]`);
+        if (firstMatchWrapper) {
+            firstMatchWrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+}
+
+/**
+ * Clear all pattern highlights from chord cards
+ */
+function clearPatternHighlights() {
+    document.querySelectorAll('.pattern-highlight-active').forEach(el => {
+        el.classList.remove('pattern-highlight-active');
+        el.removeAttribute('data-pattern-match');
+        el.removeAttribute('data-match-index');
+        el.style.backgroundColor = '';
+        el.style.border = '';
+        el.style.boxShadow = '';
+        el.style.borderRadius = '';
+        el.style.padding = '';
     });
 }
 
@@ -2062,12 +4388,12 @@ function renderTensionCurve(container, progressionData, key) {
     // Create tension curve container
     const curveContainer = document.createElement('div');
     curveContainer.id = 'tension-curve-container';
-    curveContainer.className = 'mb-4 px-4';
+    curveContainer.className = 'mb-2 px-2';
 
-    // SVG dimensions
-    const width = Math.min(1000, window.innerWidth - 100);
-    const height = 120;
-    const padding = { top: 20, right: 30, bottom: 30, left: 40 };
+    // SVG dimensions - use more of the available width, increase bottom padding for x-axis labels
+    const width = Math.min(1200, window.innerWidth - 40);
+    const height = 140; // Increased from 120 to accommodate x-axis labels
+    const padding = { top: 20, right: 30, bottom: 30, left: 40 }; // Increased bottom padding
     const graphWidth = width - padding.left - padding.right;
     const graphHeight = height - padding.top - padding.bottom;
 
@@ -2097,28 +4423,28 @@ function renderTensionCurve(container, progressionData, key) {
         { offset: '100%', color: '#ef4444', label: 'High' }   // Red
     ];
 
-    // Build SVG
+    // Build SVG (no dark background panel)
     curveContainer.innerHTML = `
-        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <div class="p-1">
             <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-2">
-                    <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
                     </svg>
-                    <h3 class="text-sm font-semibold text-white">Harmonic Tension</h3>
+                    <h3 class="text-sm font-semibold text-gray-700">Harmonic Tension</h3>
                 </div>
                 <div class="flex items-center gap-3 text-xs">
                     <div class="flex items-center gap-1">
                         <div class="w-3 h-3 rounded-full bg-green-500"></div>
-                        <span class="text-gray-400">Low</span>
+                        <span class="text-gray-600">Low</span>
                     </div>
                     <div class="flex items-center gap-1">
                         <div class="w-3 h-3 rounded-full bg-amber-500"></div>
-                        <span class="text-gray-400">Medium</span>
+                        <span class="text-gray-600">Medium</span>
                     </div>
                     <div class="flex items-center gap-1">
                         <div class="w-3 h-3 rounded-full bg-red-500"></div>
-                        <span class="text-gray-400">High</span>
+                        <span class="text-gray-600">High</span>
                     </div>
                 </div>
             </div>
@@ -2178,32 +4504,45 @@ function renderTensionCurve(container, progressionData, key) {
                 <!-- Data points -->
                 ${points.map((point, i) => {
                     const tension = tensionValues[i];
+                    const chord = progressionData[i];
                     let color = '#10b981'; // Green
                     if (tension > 66) color = '#ef4444'; // Red
                     else if (tension > 33) color = '#f59e0b'; // Amber
 
                     return `
                         <circle
+                            class="tension-curve-point"
+                            data-chord-index="${i}"
                             cx="${point.x}"
                             cy="${point.y}"
-                            r="4"
+                            r="5"
                             fill="${color}"
                             stroke="#1f2937"
                             stroke-width="2"
-                        >
-                            <title>Chord ${i + 1}: ${Math.round(tension)}% tension</title>
-                        </circle>
+                            style="cursor: pointer; transition: all 0.2s;"
+                            onmouseover="this.setAttribute('r', '7'); this.setAttribute('stroke-width', '3');"
+                            onmouseout="this.setAttribute('r', '5'); this.setAttribute('stroke-width', '2');"
+                        />
                     `;
                 }).join('')}
 
-                <!-- Chord labels -->
+                <!-- X-axis tick marks -->
                 ${points.map((point, i) => `
+                    <line
+                        x1="${point.x}"
+                        y1="${padding.top + graphHeight}"
+                        x2="${point.x}"
+                        y2="${padding.top + graphHeight + 5}"
+                        stroke="#9ca3af"
+                        stroke-width="1"
+                    />
                     <text
                         x="${point.x}"
-                        y="${padding.top + graphHeight + 20}"
+                        y="${padding.top + graphHeight + 18}"
                         text-anchor="middle"
-                        font-size="11"
-                        fill="#9ca3af"
+                        font-size="10"
+                        fill="#6b7280"
+                        font-weight="500"
                     >${i + 1}</text>
                 `).join('')}
 
@@ -2220,7 +4559,7 @@ function renderTensionCurve(container, progressionData, key) {
                 <!-- X-axis label -->
                 <text
                     x="${width / 2}"
-                    y="${height - 5}"
+                    y="${padding.top + graphHeight + 32}"
                     text-anchor="middle"
                     font-size="11"
                     fill="#9ca3af"
@@ -2231,6 +4570,244 @@ function renderTensionCurve(container, progressionData, key) {
 
     // Insert at the top of the container
     container.insertBefore(curveContainer, container.firstChild);
+
+    // Add event listeners to data points for click and hover
+    const dataPoints = curveContainer.querySelectorAll('.tension-curve-point');
+    dataPoints.forEach((circle, index) => {
+        const chord = progressionData[index];
+        const tension = tensionValues[index];
+
+        // Press and hold to play chord
+        circle.addEventListener('mousedown', () => {
+            if (window.startProgressionChord) {
+                window.startProgressionChord(index);
+                // Highlight this point and the corresponding chord card
+                highlightTensionPoint(index);
+                highlightChordCard(index);
+            }
+        });
+
+        // Release to stop playing
+        circle.addEventListener('mouseup', () => {
+            if (window.stopTrainerChord) {
+                window.stopTrainerChord();
+            }
+            unhighlightAllTensionPoints();
+            unhighlightAllChordCards();
+        });
+
+        // Create detailed tooltip on hover (but not if it interferes with playback)
+        circle.addEventListener('mouseenter', (e) => {
+            showTensionTooltip(e, chord, tension, index, key);
+        });
+
+        // Stop playing and hide tooltip if mouse leaves the circle
+        circle.addEventListener('mouseleave', () => {
+            if (window.stopTrainerChord) {
+                window.stopTrainerChord();
+            }
+            unhighlightAllTensionPoints();
+            unhighlightAllChordCards();
+            hideTensionTooltip();
+        });
+    });
+}
+
+/**
+ * Highlight a specific tension curve point
+ * @param {number} index - Chord index to highlight
+ */
+function highlightTensionPoint(index) {
+    const container = document.getElementById('tension-curve-container');
+    if (!container) return;
+
+    const points = container.querySelectorAll('.tension-curve-point');
+    points.forEach((point, i) => {
+        if (i === index) {
+            point.setAttribute('r', '8');
+            point.setAttribute('stroke', '#3b82f6');
+            point.setAttribute('stroke-width', '4');
+            point.classList.add('highlighted-tension-point');
+        }
+    });
+}
+
+/**
+ * Highlight a specific chord card
+ * @param {number} index - Chord index to highlight
+ */
+function highlightChordCard(index) {
+    // First remove all existing highlights
+    unhighlightAllChordCards();
+
+    // Highlight the specified card
+    const wrapper = document.querySelector(`.chord-card-wrapper[data-chord-index="${index}"]`);
+    if (wrapper) {
+        const card = wrapper.querySelector('.simplified-card, .detailed-card');
+        if (card) {
+            card.classList.add('ring-4', 'ring-blue-400', 'ring-offset-2');
+            card.setAttribute('data-highlighted', 'true');
+        }
+    }
+    
+    // Ensure shifts are maintained after highlighting (in case highlighting triggered any layout changes)
+    updateCardShifts();
+}
+
+/**
+ * Remove highlighting from all chord cards
+ */
+function unhighlightAllChordCards() {
+    const allCards = document.querySelectorAll('.simplified-card[data-highlighted="true"], .detailed-card[data-highlighted="true"]');
+    allCards.forEach(card => {
+        card.classList.remove('ring-4', 'ring-blue-400', 'ring-offset-2');
+        card.removeAttribute('data-highlighted');
+    });
+}
+
+/**
+ * Select a chord card (persistent selection state, different from playback highlighting)
+ * @param {number} index - Chord index to select
+ */
+export function selectChordCard(index) {
+    // Save selection to state and also update currentIndex to keep them in sync
+    setSelectedChordIndex(index);
+    setCurrentIndex(index);
+
+    // First remove all existing selections
+    deselectAllChordCards();
+
+    // Select the specified card
+    const wrapper = document.querySelector(`.chord-card-wrapper[data-chord-index="${index}"]`);
+    if (wrapper) {
+        const card = wrapper.querySelector('.simplified-card, .detailed-card');
+        if (card) {
+            card.classList.add('ring-4', 'ring-purple-500', 'ring-offset-2');
+            card.setAttribute('data-selected', 'true');
+        }
+    }
+
+    // Ensure shifts are maintained after selection
+    updateCardShifts();
+}
+
+/**
+ * Remove selection from all chord cards
+ */
+function deselectAllChordCards() {
+    const allCards = document.querySelectorAll('.simplified-card[data-selected="true"], .detailed-card[data-selected="true"]');
+    allCards.forEach(card => {
+        card.classList.remove('ring-4', 'ring-purple-500', 'ring-offset-2');
+        card.removeAttribute('data-selected');
+    });
+}
+
+/**
+ * Remove highlighting from all tension curve points
+ */
+function unhighlightAllTensionPoints() {
+    const container = document.getElementById('tension-curve-container');
+    if (!container) return;
+
+    const points = container.querySelectorAll('.tension-curve-point');
+    points.forEach(point => {
+        if (point.classList.contains('highlighted-tension-point')) {
+            point.setAttribute('r', '5');
+            point.setAttribute('stroke', '#1f2937');
+            point.setAttribute('stroke-width', '2');
+            point.classList.remove('highlighted-tension-point');
+        }
+    });
+}
+
+/**
+ * Show detailed tooltip for tension curve point
+ * @param {MouseEvent} e - Mouse event
+ * @param {Object} chord - Chord data
+ * @param {number} tension - Tension value
+ * @param {number} index - Chord index
+ * @param {string} key - Current key
+ */
+function showTensionTooltip(e, chord, tension, index, key) {
+    // Remove any existing tooltip
+    hideTensionTooltip();
+
+    // Get chord function and details
+    const func = harmonyAnalyzer.getChordFunction(chord, key);
+    const roman = chord.roman || harmonyAnalyzer.getRomanNumeral(chord, key);
+    const chordName = chord.simpleName || chord.name || `${chord.root}${chord.type}`;
+    const notes = chord.notes ? chord.notes.join(', ') : '';
+
+    // Calculate tension breakdown
+    let breakdown = [];
+
+    // Function tension
+    const functionTension = {
+        'Tonic': 10,
+        'Subdominant': 40,
+        'Predominant': 50,
+        'Dominant': 80
+    };
+    const funcTension = functionTension[func] || 30;
+    breakdown.push(`Function (${func}): ${funcTension}%`);
+
+    // Chord type complexity
+    let typeTension = 0;
+    if (chord.type) {
+        if (chord.type.includes('Diminished')) typeTension = 20;
+        else if (chord.type.includes('Augmented')) typeTension = 18;
+        else if (chord.type.includes('13')) typeTension = 16;
+        else if (chord.type.includes('11')) typeTension = 14;
+        else if (chord.type.includes('9')) typeTension = 12;
+        else if (chord.type.includes('7')) typeTension = 10;
+        else if (chord.type.includes('sus')) typeTension = 8;
+    }
+    if (typeTension > 0) {
+        breakdown.push(`Complexity: ${typeTension}%`);
+    }
+
+    // Chromaticism
+    const scaleChords = harmonyAnalyzer.getMajorScaleChords(key);
+    const isInKey = harmonyAnalyzer.isChordInKey(chord, scaleChords);
+    if (!isInKey) {
+        breakdown.push(`Chromatic: 20%`);
+    }
+
+    // Create tooltip element
+    const tooltip = document.createElement('div');
+    tooltip.id = 'tension-tooltip';
+    tooltip.className = 'fixed z-50 bg-gray-900 text-white p-3 rounded-lg shadow-2xl border border-gray-700 text-sm max-w-xs';
+    tooltip.style.left = `${e.clientX + 10}px`;
+    tooltip.style.top = `${e.clientY - 10}px`;
+    tooltip.style.pointerEvents = 'none';
+
+    tooltip.innerHTML = `
+        <div class="font-bold mb-2 text-blue-400">Chord ${index + 1}: ${chordName}</div>
+        <div class="space-y-1 text-xs">
+            <div><span class="text-gray-400">Roman:</span> ${roman}</div>
+            <div><span class="text-gray-400">Type:</span> ${chord.type || 'Major'}</div>
+            ${notes ? `<div><span class="text-gray-400">Notes:</span> ${notes}</div>` : ''}
+            <div class="border-t border-gray-700 mt-2 pt-2">
+                <div class="font-semibold mb-1">Tension: ${Math.round(tension)}%</div>
+                <div class="text-gray-400 space-y-0.5">
+                    ${breakdown.map(line => `<div>• ${line}</div>`).join('')}
+                </div>
+            </div>
+            <div class="text-xs text-gray-500 italic mt-2">Click to play</div>
+        </div>
+    `;
+
+    document.body.appendChild(tooltip);
+}
+
+/**
+ * Hide tension tooltip
+ */
+function hideTensionTooltip() {
+    const tooltip = document.getElementById('tension-tooltip');
+    if (tooltip) {
+        tooltip.remove();
+    }
 }
 
 /**
@@ -2242,13 +4819,13 @@ function renderTensionCurve(container, progressionData, key) {
 export function renderProgressionDisplay(containerId = 'progression-visualization', syncBothTabs = true) {
     // Capture staff notation states before clearing DOM (always capture from both tabs)
     captureStaffNotationStates();
-
+    
     const container = document.getElementById(containerId);
     if (!container) {
         console.warn(`Container with ID "${containerId}" not found`);
         return;
     }
-
+    
     // IMPORTANT: Destroy Sortable BEFORE clearing innerHTML
     // because innerHTML = '' destroys all DOM elements Sortable is tracking
     // Destroy Sortable for both progression builder and melody tab
@@ -2261,23 +4838,58 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             container.sortableInstance = null;
         }
     }
-
+    
     container.innerHTML = '';
 
     const trainerState = getTrainerState();
 
     // PHASE 3.3: Add analysis visualizations (only for main progression builder tab)
     if (containerId === 'progression-visualization' && trainerState.progressionData.length > 0) {
-        // 1. Pattern highlighting badges at top
-        renderPatternHighlights(container, trainerState.progressionData, trainerState.currentKey || 'C');
+        // Get parent panel to render pattern badges and tension curve outside the grid
+        const panel = container.parentElement;
 
-        // 2. Simplified chord sequence (compact, draggable)
+        // Remove old pattern badges and tension curve if they exist
+        const oldPatterns = panel?.querySelector('#pattern-highlights-container');
+        const oldTension = panel?.querySelector('#tension-curve-container');
+        if (oldPatterns) oldPatterns.remove();
+        if (oldTension) oldTension.remove();
+
+        // Clear any existing pattern highlights from chord cards
+        clearPatternHighlights();
+
+        // 1. Pattern highlighting badges at top of panel (before grid)
+        if (panel) {
+            renderPatternHighlights(panel, trainerState.progressionData, trainerState.currentKey || 'C');
+            // Move it before the grid container
+            const badges = panel.querySelector('#pattern-highlights-container');
+            if (badges) {
+                panel.insertBefore(badges, container);
+            }
+        }
+
+        // 2. Simplified chord cards with Add Chord/Clear All buttons as first grid item
         renderSimplifiedChordSequence(container, trainerState.progressionData, trainerState.currentKey || 'C');
 
-        // 3. Tension curve visualization (below simplified sequence)
-        renderTensionCurve(container, trainerState.progressionData, trainerState.currentKey || 'C');
+        // 3. Tension curve visualization (after grid, at bottom of panel)
+        if (panel) {
+            renderTensionCurve(panel, trainerState.progressionData, trainerState.currentKey || 'C');
+        }
+
+        // 4. Move Quick Analysis Bar above tension curve
+        const quickAnalysisBar = panel?.querySelector('#quick-analysis-bar-container');
+        const tensionCurve = panel?.querySelector('#tension-curve-container');
+        if (quickAnalysisBar && tensionCurve) {
+            // Remove from current position and insert before tension curve
+            quickAnalysisBar.remove();
+            panel.insertBefore(quickAnalysisBar, tensionCurve);
+        }
+
+        // Don't render old-style detailed cards below - they expand inline from simplified
+        // (Sortable is already initialized in renderSimplifiedChordSequence)
+        return;
     }
 
+    // For melody tab or other views, render traditional detailed cards
     trainerState.progressionData.forEach((chordData, index) => {
         // Create wrapper container for controls above and card below
         const wrapper = document.createElement('div');
@@ -2363,7 +4975,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             }
         };
         topControls.appendChild(suggestionBtn);
-
+        
         wrapper.appendChild(topControls);
         
         // Create the card itself
@@ -3454,6 +6066,22 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
     if (window.updateUnifiedSuggestions) {
         window.updateUnifiedSuggestions();
     }
+
+    // Restore selection state after rendering (persistent purple ring)
+    const selectedIndex = getSelectedChordIndex();
+    const freshState = getTrainerState();
+    const totalChords = freshState.progressionData ? freshState.progressionData.length : 0;
+
+    // Use setTimeout to ensure DOM has fully updated
+    setTimeout(() => {
+        if (selectedIndex !== undefined && selectedIndex !== null && selectedIndex >= 0 && selectedIndex < totalChords) {
+            // Restore previous selection
+            selectChordCard(selectedIndex);
+        } else if (totalChords > 0) {
+            // No selection - select first chord by default
+            selectChordCard(0);
+        }
+    }, 0);
 }
 
 // ============================================================================
@@ -3549,6 +6177,12 @@ export function loadProgression() {
         const keyForCalculation = isMinorKey ? currentKey.replace(/m$/, '') : currentKey;
         const chordData = getProgressionChordNotes(keyForCalculation, roman, chordType, 0, freshTrainerState.octaveShift);
         if (chordData) {
+            // Validate and filter notes to ensure they're all valid strings
+            if (chordData.notes && Array.isArray(chordData.notes)) {
+                chordData.notes = chordData.notes.filter(note => 
+                    note != null && note !== '' && typeof note === 'string' && note !== 'NaN' && !note.includes('undefined') && !note.includes('NaN')
+                );
+            }
             // Use the converted Roman numeral for display
             chordData.roman = displayRoman;
             // Set default LH settings for newly loaded progressions
@@ -3595,6 +6229,132 @@ export function loadProgression() {
     if (window.updateKeySignatureText) {
         window.updateKeySignatureText(freshTrainerState.currentKey);
     }
+
+    // Update unified suggestions (tension score, mood, etc.)
+    if (window.updateUnifiedSuggestions) {
+        window.updateUnifiedSuggestions();
+    }
+
+    // Update "Current Key" display text
+    updateCurrentKeyDisplay();
+}
+
+/**
+ * Update enharmonic spellings for all chords in the progression without regenerating chord data
+ * Called when the user changes the accidental preference (sharp/flat)
+ */
+export function updateProgressionEnharmonics() {
+    const trainerState = getTrainerState();
+    const progressionData = trainerState.progressionData;
+
+    if (!progressionData || progressionData.length === 0) {
+        return;
+    }
+
+    const enharmonicPref = getEnharmonicPreference();
+    const targetNotes = enharmonicPref === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+    const sourceNotes = enharmonicPref === 'sharp' ? FLAT_NOTES : SHARP_NOTES;
+
+    // Helper to convert a note name (without octave) to the target enharmonic
+    const convertNoteName = (noteName) => {
+        if (!noteName) return noteName;
+
+        // Check if it's already in the target array
+        if (targetNotes.includes(noteName)) {
+            return noteName;
+        }
+
+        // Find in source array and get equivalent from target
+        const sourceIndex = sourceNotes.indexOf(noteName);
+        if (sourceIndex !== -1) {
+            return targetNotes[sourceIndex];
+        }
+
+        // Handle special cases like double sharps/flats or unusual spellings
+        // Try ALL_NOTES as fallback
+        const allNotesIndex = ALL_NOTES.indexOf(noteName);
+        if (allNotesIndex !== -1) {
+            return targetNotes[allNotesIndex];
+        }
+
+        // If not found in any array, check ENHARMONIC_MAP
+        if (ENHARMONIC_MAP[noteName]) {
+            const mappedNote = ENHARMONIC_MAP[noteName];
+            const mappedIndex = sourceNotes.indexOf(mappedNote);
+            if (mappedIndex !== -1) {
+                return targetNotes[mappedIndex];
+            }
+            return mappedNote;
+        }
+
+        return noteName;
+    };
+
+    // Update each chord in the progression
+    progressionData.forEach(chord => {
+        if (!chord) return;
+
+        // Convert root note
+        const oldRoot = chord.root;
+        const newRoot = convertNoteName(oldRoot);
+        chord.root = newRoot;
+
+        // Convert notes array (notes with octaves)
+        if (chord.notes && Array.isArray(chord.notes)) {
+            chord.notes = chord.notes.map(noteWithOctave => {
+                if (!noteWithOctave || typeof noteWithOctave !== 'string') return noteWithOctave;
+                return resolveEnharmonic(noteWithOctave, trainerState.currentKey, enharmonicPref);
+            });
+        }
+
+        // Update simpleName with new root
+        if (chord.simpleName && oldRoot !== newRoot) {
+            chord.simpleName = chord.simpleName.replace(new RegExp('^' + escapeRegex(oldRoot)), newRoot);
+        }
+
+        // Update name with new root
+        if (chord.name && oldRoot !== newRoot) {
+            chord.name = chord.name.replace(new RegExp('^' + escapeRegex(oldRoot)), newRoot);
+        }
+
+        // Convert lhNotes if present
+        if (chord.lhNotes && Array.isArray(chord.lhNotes)) {
+            chord.lhNotes = chord.lhNotes.map(noteWithOctave => {
+                if (!noteWithOctave || typeof noteWithOctave !== 'string') return noteWithOctave;
+                return resolveEnharmonic(noteWithOctave, trainerState.currentKey, enharmonicPref);
+            });
+        }
+    });
+
+    // Update the state with modified data
+    setProgressionData(progressionData);
+
+    // Re-render the display
+    renderProgressionDisplay();
+
+    // Update keyboard labels
+    if (window.updateKeyboardLabels) {
+        setTimeout(() => {
+            window.updateKeyboardLabels();
+        }, 10);
+    }
+}
+
+// Helper function to escape special regex characters
+function escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Update the "Current Key: X" display text
+ */
+function updateCurrentKeyDisplay() {
+    const displayText = document.getElementById('current-key-display-text');
+    if (displayText) {
+        const trainerState = getTrainerState();
+        const currentKey = trainerState.currentKey || 'C';
+        displayText.textContent = `Current Key: ${currentKey}`;
+    }
 }
 
 /**
@@ -3629,20 +6389,81 @@ function calculateScaleNotes(key, octave = 4, octaveShift = 0) {
 export function getProgressionChordNotes(key, romanNumeral, selectedType, selectedInversion, octaveShift = 0) {
     let mapEntry = ROMAN_MAP_BASE[romanNumeral];
     let chordRootNote = '';
-    
+
     // Handle roman numerals with flat (#) or flat (b) prefixes (e.g., bVII, #IV)
     let accidental = '';
     let baseRoman = romanNumeral;
-    
-    // Check for flat or sharp prefix
-    if (romanNumeral.startsWith('b')) {
-        accidental = 'flat';
-        baseRoman = romanNumeral.substring(1); // Remove 'b' prefix
-    } else if (romanNumeral.startsWith('#') || romanNumeral.startsWith('♯')) {
-        accidental = 'sharp';
-        baseRoman = romanNumeral.substring(1); // Remove '#' or '♯' prefix
+
+    // Handle secondary dominants (e.g., V/iii, V/vi, V/V)
+    if (romanNumeral.includes('/')) {
+        const parts = romanNumeral.split('/');
+        const targetRoman = parts[1]; // The chord we're targeting (e.g., 'iii' in 'V/iii')
+
+        // Find the root of the target chord
+        const targetEntry = ROMAN_MAP_BASE[targetRoman] || ROMAN_MAP_BASE[targetRoman.replace(/[°7]/g, '')];
+        if (targetEntry) {
+            let scaleRootIndex = ALL_NOTES.indexOf(key);
+            if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
+
+            const targetStep = MAJOR_SCALE_STEPS[targetEntry.index];
+            const targetRootIndex = (scaleRootIndex + targetStep) % 12;
+
+            // The secondary dominant is a perfect 5th above the target
+            // V/x means the dominant of x, which is 7 semitones above x
+            const secondaryDomIndex = (targetRootIndex + 7) % 12;
+            chordRootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[secondaryDomIndex];
+
+            // Return early with the resolved chord
+            if (chordRootNote) {
+                const chordResult = getInvertedChordNotes(
+                    chordRootNote,
+                    selectedType,
+                    selectedInversion,
+                    key,
+                    octaveShift,
+                    getEnharmonicPreference(),
+                    getNotationPreference()
+                );
+
+                if (chordResult && chordResult.specificNotes) {
+                    const validNotes = (chordResult.specificNotes || []).filter(note =>
+                        note != null && note !== '' && typeof note === 'string' && note !== 'NaN' && !note.includes('undefined') && !note.includes('NaN')
+                    );
+
+                    if (validNotes.length > 0) {
+                        return {
+                            roman: romanNumeral,
+                            name: chordResult.name || 'N/A',
+                            simpleName: chordResult.simpleName || 'N/A',
+                            notes: validNotes,
+                            root: chordRootNote,
+                            type: selectedType,
+                            inversion: selectedInversion
+                        };
+                    }
+                }
+            }
+        }
     }
-    
+
+    // Strip chord quality suffixes from roman numeral before lookup (e.g., ii7 -> ii, Imaj7 -> I)
+    // This handles cases like ii7, V7, Imaj7, viio7, IVmaj9, Vsus4, vi6, etc.
+    const cleanRoman = romanNumeral.replace(
+        /maj13|min13|maj11|min11|maj9|min9|maj7|min7|dim7|aug7|add13|add11|add9|sus4|sus2|13|11|9|7|6|°|ø|\+/gi,
+        ''
+    );
+
+    // Check for flat or sharp prefix
+    if (cleanRoman.startsWith('b')) {
+        accidental = 'flat';
+        baseRoman = cleanRoman.substring(1); // Remove 'b' prefix
+    } else if (cleanRoman.startsWith('#') || cleanRoman.startsWith('♯')) {
+        accidental = 'sharp';
+        baseRoman = cleanRoman.substring(1); // Remove '#' or '♯' prefix
+    } else {
+        baseRoman = cleanRoman;
+    }
+
     // Try to find the base roman numeral in the map
     mapEntry = ROMAN_MAP_BASE[baseRoman];
 
@@ -3664,24 +6485,24 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
             if (scaleDegreeIndex !== undefined) {
                 let scaleRootIndex = ALL_NOTES.indexOf(key);
                 if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
-                
+
                 // Get the diatonic scale step
                 const scaleStep = MAJOR_SCALE_STEPS[scaleDegreeIndex];
                 let chordRootIndex = (scaleRootIndex + scaleStep) % 12;
-                
+
                 // Apply accidental (flat lowers by 1 semitone, sharp raises by 1 semitone)
                 if (accidental === 'flat') {
                     chordRootIndex = (chordRootIndex - 1 + 12) % 12;
                 } else if (accidental === 'sharp') {
                     chordRootIndex = (chordRootIndex + 1) % 12;
                 }
-                
+
                 chordRootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[chordRootIndex];
             } else {
-                chordRootNote = romanNumeral; // Fall back to treating as note name
+                chordRootNote = cleanRoman; // Fall back to treating as note name (use cleaned version)
             }
         } else {
-            chordRootNote = romanNumeral; // The 'romanNumeral' is actually the root note.
+            chordRootNote = cleanRoman; // The 'romanNumeral' is actually the root note (use cleaned version)
         }
     } else {
         let scaleRootIndex = ALL_NOTES.indexOf(key);
@@ -3714,11 +6535,28 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
         getNotationPreference()
     );
 
+    // Validate chordResult
+    if (!chordResult || !chordResult.specificNotes) {
+        console.warn(`Invalid chord result for ${chordRootNote} ${selectedType} (inversion ${selectedInversion})`);
+        return null;
+    }
+
+    // Validate and filter notes to ensure they're all valid strings
+    const validNotes = (chordResult.specificNotes || []).filter(note => 
+        note != null && note !== '' && typeof note === 'string' && note !== 'NaN' && !note.includes('undefined') && !note.includes('NaN')
+    );
+    
+    // If no valid notes, return null
+    if (validNotes.length === 0) {
+        console.warn(`No valid notes generated for ${chordRootNote} ${selectedType} (inversion ${selectedInversion})`);
+        return null;
+    }
+
     return {
         roman: romanNumeral,
-        name: chordResult.name,
-        simpleName: chordResult.simpleName,
-        notes: chordResult.specificNotes,
+        name: chordResult.name || 'N/A',
+        simpleName: chordResult.simpleName || 'N/A',
+        notes: validNotes,
         root: chordRootNote,
         type: selectedType,
         inversion: selectedInversion
@@ -3851,6 +6689,10 @@ export function handleAutoPlayback() {
         document.querySelectorAll('.active-progression-card').forEach(card => {
             card.classList.remove('active-progression-card');
         });
+
+        // Clear tension curve and chord card highlights
+        unhighlightAllTensionPoints();
+        unhighlightAllChordCards();
         
         // Update UI immediately - this must be called after state is updated
         // Use fresh state to ensure UI reflects the correct state
@@ -3880,12 +6722,8 @@ export function handleAutoPlayback() {
         }
     }
 
-    // Always start playback from the first chord
-    setCurrentIndex(0);
-
-    if (trainerState.currentIndex >= trainerState.progressionData.length) {
-        setCurrentIndex(0);
-    }
+    // Always start playback from the first chord and select it (purple outline)
+    selectChordCard(0);
 
     setIsPlaying(true);
     
@@ -3966,6 +6804,10 @@ export function handleAutoPlayback() {
                 });
                 document.getElementById('progression-chord-notes-display').textContent = `${chord.roman} (${chord.name})`;
                 highlightTrainer(trainerState.scaleNotes, rhNotes.concat(lhNotes));
+
+                // Highlight chord card and tension curve point during Auto Play
+                highlightTensionPoint(index);
+                highlightChordCard(index);
             }, time);
         }, `${measure}m`);
         
@@ -4224,28 +7066,35 @@ export function startStepChord() {
     // Check if we're continuing a step sequence (stepped within last 3 seconds)
     const now = Date.now();
     const isSteppingSequence = (now - lastStepTime) < 3000;
-    
+
+    const totalChords = trainerState.progressionData ? trainerState.progressionData.length : 0;
+
+    // Determine which chord to play
+    let chordIndexToPlay;
+
     // Only use selected chord as starting point if we're NOT in the middle of stepping
     if (!isSteppingSequence && window.getSelectedChordIndex) {
         const selectedIndex = window.getSelectedChordIndex();
-        const totalChords = trainerState.progressionData ? trainerState.progressionData.length : 0;
-        
+
         // If there's a valid selected chord, start from there
         if (selectedIndex !== null && selectedIndex >= 0 && selectedIndex < totalChords) {
-            setCurrentIndex(selectedIndex);
-        } else if (trainerState.currentIndex === undefined || trainerState.currentIndex < 0 || trainerState.currentIndex >= totalChords) {
-            // No selected chord and currentIndex is invalid - start from first chord
-            setCurrentIndex(0);
+            chordIndexToPlay = selectedIndex;
+        } else {
+            // No selected chord - start from first chord
+            chordIndexToPlay = 0;
         }
-        // Otherwise, continue from current currentIndex
-    } else if (trainerState.currentIndex === undefined || trainerState.currentIndex < 0) {
-        // Fallback: ensure we start from a valid index
-        const totalChords = trainerState.progressionData ? trainerState.progressionData.length : 0;
-        if (trainerState.currentIndex >= totalChords) {
-            setCurrentIndex(0);
+    } else {
+        // In the middle of stepping sequence - use currentIndex
+        if (trainerState.currentIndex === undefined || trainerState.currentIndex < 0 || trainerState.currentIndex >= totalChords) {
+            chordIndexToPlay = 0;
+        } else {
+            chordIndexToPlay = trainerState.currentIndex;
         }
     }
-    
+
+    // Always update the visual selection (purple ring) to match the chord we're about to play
+    selectChordCard(chordIndexToPlay);
+
     // Update last step time
     lastStepTime = now;
 
@@ -4278,6 +7127,8 @@ export function startStepChord() {
         }
 
         if (currentState.currentIndex < totalChords) {
+            // Mark that we're playing a step chord
+            isStepPlaying = true;
             // Play the current chord using triggerAttack (hold to play)
             startProgressionChord(currentState.currentIndex);
         }
@@ -4289,9 +7140,18 @@ export function startStepChord() {
  * Called when Step button is released
  */
 export function stopStepChord() {
+    // Only process if we were actually playing a step chord
+    // This prevents mouseleave from advancing when user just hovers over button
+    if (!isStepPlaying) {
+        return;
+    }
+
+    // Reset the playing flag
+    isStepPlaying = false;
+
     // Stop the currently playing chord immediately
     stopTrainerChord();
-    
+
     // Aggressively stop all notes
     const instrument = getInstrument();
     if (instrument && getAudioIsReady()) {
@@ -4302,20 +7162,25 @@ export function stopStepChord() {
             // Ignore errors
         }
     }
-    
+
     // Clear highlights
     if (window.clearHighlights) {
         window.clearHighlights();
     }
+    // Clear chord card and tension curve highlights
+    unhighlightAllTensionPoints();
+    unhighlightAllChordCards();
 
-    // Advance to next chord
+    // Advance to next chord and update selection (purple outline)
     const trainerState = getTrainerState();
     const totalChords = trainerState.progressionData ? trainerState.progressionData.length : 0;
 
     if (totalChords > 0) {
         const nextIndex = (trainerState.currentIndex + 1) % totalChords;
-        setCurrentIndex(nextIndex);
-        
+
+        // Select the next chord (this updates both selectedChordIndex and currentIndex)
+        selectChordCard(nextIndex);
+
         // Update display
         if (nextIndex === 0) {
             const display = document.getElementById('progression-chord-notes-display');
@@ -4323,9 +7188,9 @@ export function stopStepChord() {
                 display.textContent = 'Ready to Play (Progression Complete)';
             }
         }
-        
+
         updateProgressionControlsUI();
-        
+
         // Update last step time to maintain stepping sequence
         lastStepTime = Date.now();
     }
@@ -4386,7 +7251,19 @@ export function startProgressionChord(index) {
     );
     
     // Use regenerated notes if available, otherwise fall back to stored notes
-    const chordNotes = chordNotesData ? chordNotesData.notes : (chord.notes || []);
+    // Filter out any invalid notes (null, undefined, empty strings, NaN values)
+    const rawChordNotes = chordNotesData ? chordNotesData.notes : (chord.notes || []);
+    const chordNotes = rawChordNotes.filter(note => {
+        // Check for null, undefined, empty string
+        if (note == null || note === '') return false;
+        // Check if it's a string
+        if (typeof note !== 'string') return false;
+        // Check for 'NaN' string or notes containing 'NaN' in octave position
+        if (note === 'NaN' || note.includes('NaN')) return false;
+        // Check if note matches valid format (letter + optional accidental + number)
+        if (!/^[A-G][#b]?\d+$/.test(note)) return false;
+        return true;
+    });
 
     // Use auto-generated bass notes if available
     let allLhNotes = [];
@@ -4404,11 +7281,17 @@ export function startProgressionChord(index) {
                 if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
                     // Use auto-generated bass notes (blue notes)
                     bassAutoFillActive = true;
-                    // Extract pitch from bass notes, filter out rests
+                    // Extract pitch from bass notes, filter out rests and invalid pitches
                     allLhNotes = bassVoice.notes
-                        .filter(note => note.type !== 'rest')
+                        .filter(note => note.type !== 'rest' && note.pitch)
                         .map(note => note.pitch)
-                        .filter(Boolean);
+                        .filter(pitch => {
+                            if (pitch == null || pitch === '') return false;
+                            if (typeof pitch !== 'string') return false;
+                            if (pitch === 'NaN' || pitch.includes('NaN')) return false;
+                            if (!/^[A-G][#b]?\d+$/.test(pitch)) return false;
+                            return true;
+                        });
                 }
             }
         }
@@ -4416,15 +7299,23 @@ export function startProgressionChord(index) {
 
     // If no auto-generated bass, use traditional LH chord notes
     if (!bassAutoFillActive) {
-        allLhNotes = getLHNotes(
-            chord.root,
-            lhType,
-            lhInversion,
-            trainerState.currentKey,
-            lhOctaveShift,
-            chord.type,
-            getEnharmonicPreference()
-        );
+        const rawLhNotes = getLHNotes(
+        chord.root,
+        lhType,
+        lhInversion,
+        trainerState.currentKey,
+        lhOctaveShift,
+        chord.type,
+        getEnharmonicPreference()
+    );
+        // Filter out any invalid notes
+        allLhNotes = (rawLhNotes || []).filter(note => {
+            if (note == null || note === '') return false;
+            if (typeof note !== 'string') return false;
+            if (note === 'NaN' || note.includes('NaN')) return false;
+            if (!/^[A-G][#b]?\d+$/.test(note)) return false;
+            return true;
+        });
     }
 
     // Highlight the current card - find by data-index attribute
@@ -4441,9 +7332,15 @@ export function startProgressionChord(index) {
     // Apply saved voicing from the chord data
     const voicedNotes = chordNotes.filter(note => !omittedNotes.includes(note));
     const lhNotes = allLhNotes.filter(note => !lhOmittedNotes.includes(note));
-    const allNotes = voicedNotes.concat(lhNotes);
+    // Filter out any invalid notes (null, undefined, empty strings, NaN values) before playing
+    const allNotes = voicedNotes.concat(lhNotes)
+        .filter(note => note != null && note !== '' && typeof note === 'string' && note !== 'NaN');
 
     highlightTrainer(trainerState.scaleNotes, allNotes);
+
+    // Highlight chord card and tension curve point during Step playback
+    highlightTensionPoint(index);
+    highlightChordCard(index);
 
     // Play the chord with triggerAttack (hold to play)
     if (allNotes.length > 0) {
@@ -4582,14 +7479,14 @@ function playProgressionChord(index, advance = true) {
     // If no auto-generated bass, use traditional LH chord notes
     if (!bassAutoFillActive) {
         allLhNotes = getLHNotes(
-            chord.root,
-            lhType,
-            lhInversion,
-            trainerState.currentKey,
-            lhOctaveShift,
-            chord.type,
-            getEnharmonicPreference()
-        );
+        chord.root,
+        lhType,
+        lhInversion,
+        trainerState.currentKey,
+        lhOctaveShift,
+        chord.type,
+        getEnharmonicPreference()
+    );
     }
 
     // Highlight the current card - find by data-index attribute
@@ -4602,6 +7499,10 @@ function playProgressionChord(index, advance = true) {
             card.classList.remove('active-progression-card');
         }
     });
+
+    // Highlight corresponding tension curve point and chord card
+    highlightTensionPoint(index);
+    highlightChordCard(index);
 
     // Apply saved voicing from the chord data
     const voicedNotes = chordNotes.filter(note => !omittedNotes.includes(note));
@@ -4907,6 +7808,22 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0) {
     // Calculate roman numeral for the chord
     const roman = noteToRomanNumeral(root, trainerState.currentKey, chordType) || '';
 
+    // Generate default LH notes (default pattern: 'rootOnly', same octave as RH)
+    const defaultLHType = 'rootOnly';
+    const defaultLHInversion = 0;
+    const defaultLHRelativeShift = 0; // Same octave as RH by default
+    const defaultRHOctaveShift = 0; // New chords start at default octave
+    const absoluteLHOctaveShift = defaultRHOctaveShift + defaultLHRelativeShift;
+    const lhNotes = getLHNotes(
+        root,
+        defaultLHType,
+        defaultLHInversion,
+        trainerState.currentKey,
+        absoluteLHOctaveShift,
+        chordType,
+        getEnharmonicPreference()
+    );
+
     // Create complete chord data with all required properties
     const newChordData = {
         name: result.name,
@@ -4918,6 +7835,10 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0) {
         selectionMode: 'chord',
         omittedNotes: [],
         octaveShift: 0,
+        lhType: defaultLHType,
+        lhInversion: defaultLHInversion,
+        lhOctaveShift: defaultLHRelativeShift,
+        lhNotes: lhNotes,
         lhOmittedNotes: [],
         roman: roman
     };
@@ -5001,11 +7922,11 @@ function renderMelodyNotationIfNeeded() {
     // Check if we're on the Melody Composer tab
     const currentTab = getCurrentTab();
     const isMelodyTab = currentTab === 'melody';
-
+    
     // Check if Free mode controls are visible (Free mode is active)
     const freeModeControls = document.getElementById('free-mode-controls');
     const isFreeModeActive = freeModeControls && !freeModeControls.classList.contains('hidden');
-
+    
     // Only render if on Melody tab or if Free mode is active
     if (isMelodyTab || isFreeModeActive) {
         // Phase 1B: Sync progression to composition state before rendering
@@ -5066,7 +7987,7 @@ export function clearProgression() {
     
     // Re-render the display
     renderProgressionDisplay();
-
+    
     // Update UI
     updateProgressionControlsUI();
 
@@ -5089,6 +8010,28 @@ export function removeChordFromProgression(index) {
 
     trainerState.progressionData.splice(index, 1);
     trainerState.progressionRomans.splice(index, 1);
+
+    // Handle selection state after deletion
+    const selectedIndex = getSelectedChordIndex();
+    const progressionLength = trainerState.progressionData.length;
+
+    if (progressionLength === 0) {
+        // No chords left, reset selection
+        setSelectedChordIndex(0);
+    } else if (index === selectedIndex) {
+        // Deleted the selected chord - move selection to next chord (or first if this was last)
+        if (index < progressionLength) {
+            // Stay at same index (which is now the next chord)
+            setSelectedChordIndex(index);
+        } else {
+            // Deleted the last chord, select the new last chord
+            setSelectedChordIndex(progressionLength - 1);
+        }
+    } else if (index < selectedIndex) {
+        // Deleted a chord before the selected one - decrement selected index
+        setSelectedChordIndex(selectedIndex - 1);
+    }
+    // else: deleted a chord after the selected one - selected index stays the same
 
     // Re-render both tabs to ensure synchronization
     // First render the main progression builder
@@ -5133,10 +8076,8 @@ export function toggleProgressionNote(chordIndex, note) {
         chordData.omittedNotes.push(note); // Note was played, so omit it
     }
 
-    // Re-render the progression display to update the UI (checkbox states, etc.)
-    // This ensures the UI reflects the current state, especially important after ottava shifts
-    renderProgressionDisplay('progression-visualization', true);
-    renderProgressionDisplay('melody-progression-visualization', false);
+    // Skip ALL re-rendering to avoid blinking - checkbox state is already correct in DOM
+    // The UI will update when user makes other changes (type, inversion, etc.)
 
     // Play chord with duration after voicing change
     const voicedNotes = chordData.notes.filter(n => !chordData.omittedNotes.includes(n));
@@ -5183,10 +8124,8 @@ export function toggleProgressionLHNote(chordIndex, note) {
         chordData.lhOmittedNotes.push(note);
     }
 
-    // Re-render the progression display to update the UI (checkbox states, etc.)
-    // This ensures the UI reflects the current state, especially important after ottava shifts
-    renderProgressionDisplay('progression-visualization', true);
-    renderProgressionDisplay('melody-progression-visualization', false);
+    // Skip ALL re-rendering to avoid blinking - checkbox state is already correct in DOM
+    // The UI will update when user makes other changes (type, inversion, etc.)
 
     // Play chord with duration after LH voicing change
     const voicedNotes = chordData.notes.filter(n => !(chordData.omittedNotes || []).includes(n));
@@ -5637,19 +8576,28 @@ export function renderProgressionControls() {
         keySelect.appendChild(option);
     });
 
-    // Populate progression selector
+    // Populate progression selector using analyzer's pattern definitions
     progressionSelect.innerHTML = '';
-    Object.keys(COMMON_PROGRESSIONS).forEach(progName => {
+    const progressionKeys = Object.keys(COMMON_PROGRESSIONS);
+    progressionKeys.forEach((progKey, index) => {
+        const pattern = COMMON_PROGRESSIONS[progKey];
         const option = document.createElement('option');
-        option.value = COMMON_PROGRESSIONS[progName].join(',');
-        option.textContent = progName;
-        if (progName === 'I-IV-V-I (Basic)') option.selected = true;
+        option.value = pattern.pattern.join(',');
+        option.textContent = pattern.name;
+        option.setAttribute('data-pattern-id', progKey);
+        // Select first one by default (Pop Progression)
+        if (index === 0) {
+            option.selected = true;
+        }
         progressionSelect.appendChild(option);
     });
 
     // Add event listeners
     keySelect.onchange = () => loadProgression();
     progressionSelect.onchange = () => loadProgression();
+    
+    // Update "Current Key" display text on initial render
+    updateCurrentKeyDisplay();
     
     // Add event listener for speed selector - restart playback if currently playing
     const speedSelect = document.getElementById('trainer-speed-select');
@@ -5671,7 +8619,7 @@ export function renderProgressionControls() {
     // Style & mood controls are now initialized in the Smart Chord Suggestions panel
     // initializeStyleMoodControls();
     // refreshStyleMoodInsights(true);
-
+    
     // If progression data is empty, load default progression
     const trainerState = getTrainerState();
     if (trainerState.progressionData.length === 0) {
@@ -5887,31 +8835,51 @@ function parseChordSymbol(chordSymbol) {
     const typeAndExtensions = match[3]; // e.g., "m", "m7", "maj7", "sus4", ""
     
     // Determine chord type from the suffix
+    // Check more specific patterns first before generic patterns
     let chordType = 'Major'; // default
-    if (typeAndExtensions.startsWith('m') && !typeAndExtensions.startsWith('maj')) {
-        chordType = 'Minor';
-    } else if (typeAndExtensions.includes('dim')) {
-        chordType = 'Diminished';
-    } else if (typeAndExtensions.includes('aug')) {
-        chordType = 'Augmented';
-    } else if (typeAndExtensions.includes('sus')) {
-        chordType = typeAndExtensions.includes('sus2') ? 'Sus2' : 'Sus4';
-    } else if (typeAndExtensions.includes('7')) {
-        if (typeAndExtensions.includes('maj7') || typeAndExtensions.includes('M7')) {
-            chordType = 'Major 7th';
-        } else if (typeAndExtensions.startsWith('m7')) {
-            chordType = 'Minor 7th';
-        } else {
-            chordType = 'Dominant 7th';
-        }
+
+    // Check for extended chords first (9ths, then 7ths, then 6ths)
+    if (typeAndExtensions.includes('add9') || typeAndExtensions.includes('add2')) {
+        chordType = 'Add9';
     } else if (typeAndExtensions.includes('9')) {
         if (typeAndExtensions.includes('maj9') || typeAndExtensions.includes('M9')) {
             chordType = 'Major 9th';
         } else if (typeAndExtensions.startsWith('m9')) {
             chordType = 'Minor 9th';
+        } else if (typeAndExtensions.includes('6/9')) {
+            chordType = '6/9';
         } else {
             chordType = 'Dominant 9th';
         }
+    } else if (typeAndExtensions.includes('7')) {
+        // Check for major 7th first (maj7, M7, Maj7, etc.)
+        if (typeAndExtensions.toLowerCase().includes('maj7') || typeAndExtensions.includes('M7') || typeAndExtensions.includes('Δ7')) {
+            chordType = 'Major 7th';
+        } else if (typeAndExtensions.startsWith('m7') || typeAndExtensions.startsWith('min7') || typeAndExtensions.startsWith('-7')) {
+            chordType = 'Minor 7th';
+        } else if (typeAndExtensions.includes('dim7')) {
+            chordType = 'Diminished 7th';
+        } else if (typeAndExtensions.includes('m7b5') || typeAndExtensions.includes('ø7') || typeAndExtensions.includes('ø')) {
+            chordType = 'Half-Diminished 7th';
+        } else {
+            // Plain 7 = Dominant 7th
+            chordType = 'Dominant 7th';
+        }
+    } else if (typeAndExtensions.includes('6')) {
+        if (typeAndExtensions.startsWith('m6')) {
+            chordType = 'Minor 6th';
+        } else {
+            chordType = 'Major 6th';
+        }
+    } else if (typeAndExtensions.includes('dim')) {
+        chordType = 'Diminished';
+    } else if (typeAndExtensions.includes('aug') || typeAndExtensions.includes('+')) {
+        chordType = 'Augmented';
+    } else if (typeAndExtensions.includes('sus')) {
+        chordType = typeAndExtensions.includes('sus2') || typeAndExtensions.includes('2') ? 'Suspended 2nd' : 'Suspended 4th';
+    } else if (typeAndExtensions.startsWith('m') && !typeAndExtensions.startsWith('maj')) {
+        // Plain minor (only after checking for m7, m9, m6, etc.)
+        chordType = 'Minor';
     }
     
     return { root, type: chordType };
@@ -6085,6 +9053,21 @@ export function importChordList(mode = 'replace') {
             romanNumeral = minorMap[romanNumeral] || romanNumeral;
         }
         
+        // Generate default LH notes (1 octave below RH)
+        const defaultLHType = 'rootOnly';
+        const defaultRHOctaveShift = 0; // New chords start at default octave
+        const defaultLHRelativeShift = -12; // 1 octave below RH
+        const absoluteLHOctaveShift = defaultRHOctaveShift + defaultLHRelativeShift;
+        const defaultLHNotes = getLHNotes(
+            root,
+            defaultLHType,
+            0,  // lhInversion
+            key,
+            absoluteLHOctaveShift,
+            parsed.type,
+            getEnharmonicPreference()
+        );
+        
         // Create chord data object
         const chordData = {
             roman: romanNumeral,
@@ -6097,9 +9080,10 @@ export function importChordList(mode = 'replace') {
             selectionMode: 'chord',
             omittedNotes: [],
             octaveShift: octaveShift,
-            lhType: 'off',
+            lhType: defaultLHType,
             lhInversion: 0,
             lhOctaveShift: -12,
+            lhNotes: defaultLHNotes,
             lhOmittedNotes: [],
             rhythmPattern: 'block',
             isVoicingExpanded: true
@@ -6270,6 +9254,7 @@ function loadTemplateToProgression(template, action = 'load') {
             // Use the quality we already determined
             const finalType = finalQuality;
 
+            // LH defaults to 'off' for template-loaded chords (no left hand playing by default)
             const chordData = {
                 root: chordInfo.root,
                 type: finalType,
@@ -6277,9 +9262,15 @@ function loadTemplateToProgression(template, action = 'load') {
                 voicing: 'close',
                 roman: roman,
                 name: chordInfo.name || `${chordInfo.root} ${finalType}`,
-                simpleName: chordInfo.name || `${chordInfo.root}${finalType === 'Major' ? '' : finalType.includes('7') ? '7' : 'm'}`,
+                simpleName: chordInfo.simpleName || `${chordInfo.root} ${finalType}`,
                 notes: chordInfo.notes || [],
-                lhNotes: chordInfo.lhNotes || [],
+                lhType: 'off',
+                lhInversion: 0,
+                lhOctaveShift: 0,
+                lhNotes: [],
+                lhOmittedNotes: [],
+                omittedNotes: [],
+                octaveShift: 0,
                 key: currentKey
             };
 
@@ -6407,4 +9398,15 @@ export function getAnalysisViewState() {
         simplifiedViewVisible,
         tensionCurveVisible
     };
+}
+
+// ============================================================================
+// PHASE 3.4: Export tension curve and card highlighting functions to window
+// ============================================================================
+
+if (typeof window !== 'undefined') {
+    window.highlightTensionPoint = highlightTensionPoint;
+    window.unhighlightAllTensionPoints = unhighlightAllTensionPoints;
+    window.highlightChordCard = highlightChordCard;
+    window.unhighlightAllChordCards = unhighlightAllChordCards;
 }

@@ -9,17 +9,22 @@ import {
     getCurrentKey,
     getProgressionData,
     setProgressionData,
-    getProgressionRomans
+    getProgressionRomans,
+    getSelectedChordIndex as getGlobalSelectedChordIndex,
+    setSelectedChordIndex as setGlobalSelectedChordIndex
 } from '../state/trainerState.js';
 import { saveState } from '../utils/undoRedo.js';
 import { showModalHTML } from '../ui/modals.js';
 import { noteToRomanNumeral } from '../utils/romanNumerals.js';
 import { noteToMidi, getInvertedChordNotes } from '../utils/noteUtils.js';
 
-// Track currently selected chord for substitution
-let selectedChordIndex = null;
 // Track whether substitution suggestions are currently shown
 let substitutionsShown = false;
+
+// Helper to get the selected chord index from global state
+function getSelectedIndex() {
+    return getGlobalSelectedChordIndex();
+}
 
 /**
  * Toggle the theory panel open/closed
@@ -51,7 +56,7 @@ export function toggleTheoryPanel() {
  * @param {string} targetRoman - Target scale degree (e.g., 'ii', 'IV', 'V')
  */
 export function insertSecondaryDominant(targetRoman) {
-    if (selectedChordIndex === null || selectedChordIndex < 0) {
+    if (getSelectedIndex() === null || getSelectedIndex() < 0) {
         showTheoryMessage('Please select a chord from your progression first by clicking on it.');
         return;
     }
@@ -81,11 +86,11 @@ export function insertSecondaryDominant(targetRoman) {
     }
 
     // Insert before the selected chord
-    progressionData.splice(selectedChordIndex, 0, secondaryDominant);
+    progressionData.splice(getSelectedIndex(), 0, secondaryDominant);
     setProgressionData(progressionData);
 
-    // Store the original selected index - after insertion, the selected chord is now at selectedChordIndex + 1
-    const originalSelectedIndex = selectedChordIndex;
+    // Store the original selected index - after insertion, the selected chord is now at getSelectedIndex() + 1
+    const originalSelectedIndex = getSelectedIndex();
     const newSelectedIndex = originalSelectedIndex + 1;
 
     // Re-render progression
@@ -176,8 +181,6 @@ function buildChordNotes(rootNote, chordType) {
         'Augmented': { intervals: [0, 4, 8] },
         'Suspended 2nd': { intervals: [0, 2, 7] },
         'Suspended 4th': { intervals: [0, 5, 7] },
-        'Sus2': { intervals: [0, 2, 7] },
-        'Sus4': { intervals: [0, 5, 7] },
         'Add 9': { intervals: [0, 4, 7, 14] },
         'Minor 9th': { intervals: [0, 3, 7, 10, 14] },
         'Major 9th': { intervals: [0, 4, 7, 11, 14] },
@@ -324,7 +327,7 @@ function getModalInterchangeChords(key, mode) {
  * @param {string} romanNumeral - Roman numeral
  */
 export function insertBorrowedChord(rootNote, chordType, romanNumeral) {
-    if (selectedChordIndex === null || selectedChordIndex < 0) {
+    if (getSelectedIndex() === null || getSelectedIndex() < 0) {
         showTheoryMessage('Please select a chord from your progression first by clicking on it.');
         return;
     }
@@ -360,11 +363,11 @@ export function insertBorrowedChord(rootNote, chordType, romanNumeral) {
     };
 
     // Insert before the selected chord
-    progressionData.splice(selectedChordIndex, 0, borrowedChord);
+    progressionData.splice(getSelectedIndex(), 0, borrowedChord);
     setProgressionData(progressionData);
 
-    // Store the original selected index - after insertion, the selected chord is now at selectedChordIndex + 1
-    const originalSelectedIndex = selectedChordIndex;
+    // Store the original selected index - after insertion, the selected chord is now at getSelectedIndex() + 1
+    const originalSelectedIndex = getSelectedIndex();
     const newSelectedIndex = originalSelectedIndex + 1;
 
     // Re-render progression
@@ -399,8 +402,6 @@ function getChordSymbol(rootNote, chordType) {
         'Augmented': 'aug',
         'Suspended 2nd': 'sus2',
         'Suspended 4th': 'sus4',
-        'Sus2': 'sus2',
-        'Sus4': 'sus4',
         'Add 9': 'add9',
         'Minor 9th': 'm9',
         'Major 9th': 'maj9'
@@ -419,12 +420,12 @@ export function updateSubstitutionButton() {
 
     // Check if there are substitutions available
     let hasSubstitutions = false;
-    if (selectedChordIndex !== null && selectedChordIndex >= 0) {
+    if (getSelectedIndex() !== null && getSelectedIndex() >= 0) {
         const progressionData = getProgressionData();
-        if (progressionData && selectedChordIndex < progressionData.length) {
-            const selectedChord = progressionData[selectedChordIndex];
+        if (progressionData && getSelectedIndex() < progressionData.length) {
+            const selectedChord = progressionData[getSelectedIndex()];
             const currentKey = getCurrentKey();
-            const substitutions = getChordSubstitutions(selectedChord, currentKey, selectedChordIndex, progressionData);
+            const substitutions = getChordSubstitutions(selectedChord, currentKey, getSelectedIndex(), progressionData);
             hasSubstitutions = substitutions.length > 0;
         }
     }
@@ -438,7 +439,7 @@ export function updateSubstitutionButton() {
         // Has substitutions but not shown - show green "Show" button
         button.textContent = 'Show Substitution Suggestions';
         button.className = 'w-full px-3 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded shadow transition text-sm';
-    } else if (selectedChordIndex === null || selectedChordIndex < 0) {
+    } else if (getSelectedIndex() === null || getSelectedIndex() < 0) {
         // No chord selected - show default button
         button.textContent = 'Show Substitution Suggestions';
         button.className = 'w-full px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded shadow transition text-sm';
@@ -465,7 +466,7 @@ export function showChordSubstitutions() {
     }
 
     // Show substitutions
-    if (selectedChordIndex === null || selectedChordIndex < 0) {
+    if (getSelectedIndex() === null || getSelectedIndex() < 0) {
         resultsDiv.innerHTML = '<p class="text-red-600 font-semibold">Please select a chord from your progression first.</p>';
         substitutionsShown = false;
         updateSubstitutionButton();
@@ -473,17 +474,17 @@ export function showChordSubstitutions() {
     }
 
     const progressionData = getProgressionData();
-    if (!progressionData || selectedChordIndex >= progressionData.length) {
+    if (!progressionData || getSelectedIndex() >= progressionData.length) {
         resultsDiv.innerHTML = '<p class="text-red-600 font-semibold">Invalid chord selection.</p>';
         substitutionsShown = false;
         updateSubstitutionButton();
         return;
     }
 
-    const selectedChord = progressionData[selectedChordIndex];
+    const selectedChord = progressionData[getSelectedIndex()];
     const currentKey = getCurrentKey();
 
-    const substitutions = getChordSubstitutions(selectedChord, currentKey, selectedChordIndex, progressionData);
+    const substitutions = getChordSubstitutions(selectedChord, currentKey, getSelectedIndex(), progressionData);
 
     if (substitutions.length === 0) {
         resultsDiv.innerHTML = '<p class="text-gray-600">No substitutions found for this chord.</p>';
@@ -744,7 +745,7 @@ function analyzeVoiceLeading(rootNote, chordType, previousChord, nextChord, key)
  * @param {number} substitutionIndex - Index of the substitution
  */
 export function replaceWithSubstitution(substitutionIndex) {
-    if (selectedChordIndex === null || selectedChordIndex < 0) {
+    if (getSelectedIndex() === null || getSelectedIndex() < 0) {
         showTheoryMessage('No chord selected.');
         return;
     }
@@ -753,10 +754,10 @@ export function replaceWithSubstitution(substitutionIndex) {
     if (!resultsDiv) return;
 
     const progressionData = getProgressionData();
-    const selectedChord = progressionData[selectedChordIndex];
+    const selectedChord = progressionData[getSelectedIndex()];
     const currentKey = getCurrentKey();
 
-    const substitutions = getChordSubstitutions(selectedChord, currentKey, selectedChordIndex, progressionData);
+    const substitutions = getChordSubstitutions(selectedChord, currentKey, getSelectedIndex(), progressionData);
 
     if (substitutionIndex >= substitutions.length) {
         showTheoryMessage('Invalid substitution index.');
@@ -806,7 +807,7 @@ export function replaceWithSubstitution(substitutionIndex) {
     const omittedNotes = substitution.omittedNotes || [];
 
     // Replace the chord with voicing suggestions applied
-    progressionData[selectedChordIndex] = {
+    progressionData[getSelectedIndex()] = {
         root: substitution.rootNote,
         type: substitution.chordType,
         roman: newRoman, // Use calculated roman numeral for the substitution chord
@@ -816,17 +817,17 @@ export function replaceWithSubstitution(substitutionIndex) {
         inversion: suggestedInversion, // Apply suggested inversion
         omittedNotes: omittedNotes, // Apply suggested omitted notes
         // Preserve other voicing settings from original chord if available
-        lhType: progressionData[selectedChordIndex].lhType,
-        lhInversion: progressionData[selectedChordIndex].lhInversion,
-        lhOctaveShift: progressionData[selectedChordIndex].lhOctaveShift,
-        lhOmittedNotes: progressionData[selectedChordIndex].lhOmittedNotes,
-        octaveShift: progressionData[selectedChordIndex].octaveShift
+        lhType: progressionData[getSelectedIndex()].lhType,
+        lhInversion: progressionData[getSelectedIndex()].lhInversion,
+        lhOctaveShift: progressionData[getSelectedIndex()].lhOctaveShift,
+        lhOmittedNotes: progressionData[getSelectedIndex()].lhOmittedNotes,
+        octaveShift: progressionData[getSelectedIndex()].octaveShift
     };
 
     setProgressionData(progressionData);
 
     // Store the selected index to restore after re-render
-    const currentSelectedIndex = selectedChordIndex;
+    const currentSelectedIndex = getSelectedIndex();
 
     // Re-render progression
     if (window.renderProgressionDisplay) {
@@ -853,7 +854,7 @@ export function replaceWithSubstitution(substitutionIndex) {
  * @returns {number|null} Selected chord index or null if none selected
  */
 export function getSelectedChordIndex() {
-    return selectedChordIndex;
+    return getSelectedIndex();
 }
 
 /**
@@ -861,31 +862,38 @@ export function getSelectedChordIndex() {
  * @param {number} index - Chord index
  */
 export function setSelectedChordIndex(index) {
-    selectedChordIndex = index;
+    // Update the global state
+    setGlobalSelectedChordIndex(index);
 
-    // Visual feedback - highlight the selected chord
-    // Find by wrapper's data-index attribute to handle drag-and-drop
-    const wrappers = document.querySelectorAll('#progression-visualization > div');
-    
-    wrappers.forEach((wrapper) => {
-        const card = wrapper.querySelector('.progression-chord-item');
-        if (!card) return;
-        
-        const wrapperIndex = parseInt(wrapper.getAttribute('data-index'));
-        if (wrapperIndex === index) {
-            // Remove first to ensure clean state
-            card.classList.remove('ring-4', 'ring-purple-500');
-            // Use requestAnimationFrame to ensure the removal is processed
-            requestAnimationFrame(() => {
-                card.classList.add('ring-4', 'ring-purple-500');
-                // Add inline style as backup to ensure visibility
-                card.style.boxShadow = '0 0 0 4px rgba(168, 85, 247, 0.5)';
-            });
-        } else {
-            card.classList.remove('ring-4', 'ring-purple-500');
-            card.style.boxShadow = '';
-        }
-    });
+    // Use the unified selectChordCard function if available (handles both state and visuals)
+    if (window.selectChordCard) {
+        window.selectChordCard(index);
+    } else {
+        // Fallback: Visual feedback - highlight the selected chord
+        // Find by wrapper's data-index attribute to handle drag-and-drop
+        const wrappers = document.querySelectorAll('#progression-visualization > div');
+
+        wrappers.forEach((wrapper) => {
+            const card = wrapper.querySelector('.progression-chord-item, .simplified-card, .detailed-card');
+            if (!card) return;
+
+            const wrapperIndex = parseInt(wrapper.getAttribute('data-index') || wrapper.getAttribute('data-chord-index'));
+            if (wrapperIndex === index) {
+                // Remove first to ensure clean state
+                card.classList.remove('ring-4', 'ring-purple-500', 'ring-offset-2');
+                card.removeAttribute('data-selected');
+                // Use requestAnimationFrame to ensure the removal is processed
+                requestAnimationFrame(() => {
+                    card.classList.add('ring-4', 'ring-purple-500', 'ring-offset-2');
+                    card.setAttribute('data-selected', 'true');
+                });
+            } else {
+                card.classList.remove('ring-4', 'ring-purple-500', 'ring-offset-2');
+                card.removeAttribute('data-selected');
+                card.style.boxShadow = '';
+            }
+        });
+    }
 
     // Automatically show substitution suggestions when a chord is selected
     const resultsDiv = document.getElementById('substitution-results');
@@ -1149,7 +1157,7 @@ export function showModalInterchangeInfo() {
  * Insert a classic ii-V-I jazz progression
  */
 export function insertTwoFiveOne() {
-    if (selectedChordIndex === null || selectedChordIndex < 0) {
+    if (getSelectedIndex() === null || getSelectedIndex() < 0) {
         showTheoryMessage('Please select a chord from your progression first by clicking on it.');
         return;
     }
@@ -1246,7 +1254,7 @@ export function insertTwoFiveOne() {
     };
 
     // Insert all three chords before the selected chord
-    progressionData.splice(selectedChordIndex, 0, iiChord, vChord, iChord);
+    progressionData.splice(getSelectedIndex(), 0, iiChord, vChord, iChord);
     setProgressionData(progressionData);
 
     // Re-render progression
@@ -1257,7 +1265,7 @@ export function insertTwoFiveOne() {
     // Restore selection (now shifted by 3)
     setTimeout(() => {
         if (window.setSelectedChordIndex) {
-            window.setSelectedChordIndex(selectedChordIndex + 3);
+            window.setSelectedChordIndex(getSelectedIndex() + 3);
         }
     }, 0);
 
@@ -1268,7 +1276,7 @@ export function insertTwoFiveOne() {
  * Insert a diminished 7th passing chord between selected and next chord
  */
 export function insertDiminishedPassing() {
-    if (selectedChordIndex === null || selectedChordIndex < 0) {
+    if (getSelectedIndex() === null || getSelectedIndex() < 0) {
         showTheoryMessage('Please select a chord from your progression first.');
         return;
     }
@@ -1280,7 +1288,7 @@ export function insertDiminishedPassing() {
         return;
     }
 
-    if (selectedChordIndex >= progressionData.length - 1) {
+    if (getSelectedIndex() >= progressionData.length - 1) {
         showTheoryMessage('Please select a chord that has a chord after it.');
         return;
     }
@@ -1295,8 +1303,8 @@ export function insertDiminishedPassing() {
     });
     saveState(captureState());
 
-    const currentChord = progressionData[selectedChordIndex];
-    const nextChord = progressionData[selectedChordIndex + 1];
+    const currentChord = progressionData[getSelectedIndex()];
+    const nextChord = progressionData[getSelectedIndex() + 1];
 
     const enharmonic = getEnharmonicPreference();
     const notes = enharmonic === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
@@ -1345,7 +1353,7 @@ export function insertDiminishedPassing() {
     };
 
     // Insert after selected chord
-    progressionData.splice(selectedChordIndex + 1, 0, dimChord);
+    progressionData.splice(getSelectedIndex() + 1, 0, dimChord);
     setProgressionData(progressionData);
 
     // Re-render
@@ -1356,7 +1364,7 @@ export function insertDiminishedPassing() {
     // Restore selection
     setTimeout(() => {
         if (window.setSelectedChordIndex) {
-            window.setSelectedChordIndex(selectedChordIndex);
+            window.setSelectedChordIndex(getSelectedIndex());
         }
     }, 0);
 
@@ -1368,7 +1376,7 @@ export function insertDiminishedPassing() {
  * @param {string} direction - 'above' or 'below'
  */
 export function insertChromaticApproach(direction) {
-    if (selectedChordIndex === null || selectedChordIndex < 0) {
+    if (getSelectedIndex() === null || getSelectedIndex() < 0) {
         showTheoryMessage('Please select a chord from your progression first.');
         return;
     }
@@ -1389,7 +1397,7 @@ export function insertChromaticApproach(direction) {
     });
     saveState(captureState());
 
-    const targetChord = progressionData[selectedChordIndex];
+    const targetChord = progressionData[getSelectedIndex()];
     const enharmonic = getEnharmonicPreference();
     const notes = enharmonic === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
 
@@ -1422,7 +1430,7 @@ export function insertChromaticApproach(direction) {
     };
 
     // Insert before selected chord
-    progressionData.splice(selectedChordIndex, 0, approachChord);
+    progressionData.splice(getSelectedIndex(), 0, approachChord);
     setProgressionData(progressionData);
 
     // Re-render
@@ -1433,7 +1441,7 @@ export function insertChromaticApproach(direction) {
     // Restore selection (shifted by 1)
     setTimeout(() => {
         if (window.setSelectedChordIndex) {
-            window.setSelectedChordIndex(selectedChordIndex + 1);
+            window.setSelectedChordIndex(getSelectedIndex() + 1);
         }
     }, 0);
 
@@ -1445,7 +1453,7 @@ export function insertChromaticApproach(direction) {
  * @param {string} alteration - e.g., '7b9', '7#9', '7b5', '7#5'
  */
 export function applyAlteration(alteration) {
-    if (selectedChordIndex === null || selectedChordIndex < 0) {
+    if (getSelectedIndex() === null || getSelectedIndex() < 0) {
         showTheoryMessage('Please select a chord from your progression first.');
         return;
     }
@@ -1458,7 +1466,7 @@ export function applyAlteration(alteration) {
         return;
     }
 
-    const chord = progressionData[selectedChordIndex];
+    const chord = progressionData[getSelectedIndex()];
 
     // Save state for undo
     const captureState = () => ({
@@ -1500,7 +1508,7 @@ export function applyAlteration(alteration) {
     // Restore selection
     setTimeout(() => {
         if (window.setSelectedChordIndex) {
-            window.setSelectedChordIndex(selectedChordIndex);
+            window.setSelectedChordIndex(getSelectedIndex());
         }
     }, 0);
 
@@ -1511,7 +1519,7 @@ export function applyAlteration(alteration) {
  * Insert tritone substitution of selected chord
  */
 export function insertTritoneSubstitution() {
-    if (selectedChordIndex === null || selectedChordIndex < 0) {
+    if (getSelectedIndex() === null || getSelectedIndex() < 0) {
         showTheoryMessage('Please select a chord from your progression first.');
         return;
     }
@@ -1524,7 +1532,7 @@ export function insertTritoneSubstitution() {
         return;
     }
 
-    const chord = progressionData[selectedChordIndex];
+    const chord = progressionData[getSelectedIndex()];
 
     // Check if it's a dominant chord
     if (!chord.type.includes('Dominant') && !chord.type.includes('7')) {
@@ -1575,7 +1583,7 @@ export function insertTritoneSubstitution() {
     };
 
     // Replace the selected chord
-    progressionData.splice(selectedChordIndex, 1, subChord);
+    progressionData.splice(getSelectedIndex(), 1, subChord);
     setProgressionData(progressionData);
 
     // Re-render
@@ -1586,7 +1594,7 @@ export function insertTritoneSubstitution() {
     // Restore selection
     setTimeout(() => {
         if (window.setSelectedChordIndex) {
-            window.setSelectedChordIndex(selectedChordIndex);
+            window.setSelectedChordIndex(getSelectedIndex());
         }
     }, 0);
 
@@ -1598,7 +1606,7 @@ export function insertTritoneSubstitution() {
  * @param {string} extension - '9', '11', or '13'
  */
 export function addExtension(extension) {
-    if (selectedChordIndex === null || selectedChordIndex < 0) {
+    if (getSelectedIndex() === null || getSelectedIndex() < 0) {
         showTheoryMessage('Please select a chord from your progression first.');
         return;
     }
@@ -1611,7 +1619,7 @@ export function addExtension(extension) {
         return;
     }
 
-    const chord = progressionData[selectedChordIndex];
+    const chord = progressionData[getSelectedIndex()];
 
     // Save state for undo
     const captureState = () => ({
@@ -1675,7 +1683,7 @@ export function addExtension(extension) {
     // Restore selection
     setTimeout(() => {
         if (window.setSelectedChordIndex) {
-            window.setSelectedChordIndex(selectedChordIndex);
+            window.setSelectedChordIndex(getSelectedIndex());
         }
     }, 0);
 
@@ -1686,7 +1694,7 @@ export function addExtension(extension) {
  * Show reharmonization suggestions for the selected chord
  */
 export function suggestReharmonization() {
-    if (selectedChordIndex === null || selectedChordIndex < 0) {
+    if (getSelectedIndex() === null || getSelectedIndex() < 0) {
         showTheoryMessage('Please select a chord from your progression first.');
         return;
     }
@@ -1698,7 +1706,7 @@ export function suggestReharmonization() {
         return;
     }
 
-    const chord = progressionData[selectedChordIndex];
+    const chord = progressionData[getSelectedIndex()];
     const rootNote = chord.root || chord.rootNote;
     const chordType = chord.type;
 

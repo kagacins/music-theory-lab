@@ -105,11 +105,26 @@ export function noteToRomanNumeral(noteName, key, chordType) {
     const scaleDegreeIndex = MAJOR_SCALE_STEPS.indexOf(interval);
     if (scaleDegreeIndex === -1) return null; // Not in the diatonic scale
 
-    // Find the matching Roman numeral
+    // Find the matching Roman numeral for the base triad quality
     const romanKeys = Object.keys(ROMAN_MAP_BASE);
+
+    // Determine the base quality for finding the roman numeral
+    // For extended chords, we need to find the base triad (Major, Minor, Diminished)
+    let baseQuality = chordType;
+    if (chordType.includes('Major') || chordType === 'Dominant 7th' || chordType === 'Add9' ||
+        chordType.includes('6th') && !chordType.includes('Minor')) {
+        baseQuality = 'Major';
+    } else if (chordType.includes('Minor') || chordType === 'Half-Diminished 7th') {
+        baseQuality = 'Minor';
+    } else if (chordType.includes('Diminished')) {
+        baseQuality = 'Diminished';
+    } else if (chordType.includes('Augmented')) {
+        baseQuality = 'Augmented';
+    }
+
     const foundKey = romanKeys.find(key =>
         ROMAN_MAP_BASE[key].index === scaleDegreeIndex &&
-        ROMAN_MAP_BASE[key].quality === chordType
+        ROMAN_MAP_BASE[key].quality === baseQuality
     );
 
     // Fallback: find by scale degree only if no exact match
@@ -117,7 +132,100 @@ export function noteToRomanNumeral(noteName, key, chordType) {
         ROMAN_MAP_BASE[key].index === scaleDegreeIndex
     );
 
-    return foundKey || fallbackKey || null;
+    let baseRoman = foundKey || fallbackKey || null;
+    if (!baseRoman) return null;
+
+    // Add chord quality suffix for extended chords
+    const qualitySuffix = getChordQualitySuffix(chordType, baseRoman);
+
+    return baseRoman + qualitySuffix;
+}
+
+/**
+ * Get the quality suffix for a chord type to append to roman numeral
+ * @param {string} chordType - Chord type from CHORD_DEFINITIONS
+ * @param {string} baseRoman - Base roman numeral (e.g., "I", "ii", "V")
+ * @returns {string} Quality suffix (e.g., "maj7", "7", "°7")
+ */
+function getChordQualitySuffix(chordType, baseRoman) {
+    // Basic triads - no suffix needed
+    if (['Major', 'Minor', 'Augmented', 'Suspended 2nd', 'Suspended 4th', 'Power Chord'].includes(chordType)) {
+        return '';
+    }
+
+    // Diminished triad gets ° symbol
+    if (chordType === 'Diminished') {
+        return '°';
+    }
+
+    // 7th chords
+    if (chordType === 'Major 7th') {
+        return 'maj7';
+    }
+    if (chordType === 'Dominant 7th') {
+        return '7';
+    }
+    if (chordType === 'Minor 7th') {
+        return '7'; // Minor roman (ii, iii, vi) already indicates minor quality
+    }
+    if (chordType === 'Minor-Major 7th') {
+        return 'maj7'; // Minor roman with major 7
+    }
+    if (chordType === 'Diminished 7th') {
+        return '°7';
+    }
+    if (chordType === 'Half-Diminished 7th') {
+        return 'ø7';
+    }
+    if (chordType === 'Augmented 7th') {
+        return '+7';
+    }
+
+    // 6th chords
+    if (chordType === 'Major 6th' || chordType === 'Minor 6th') {
+        return '6';
+    }
+
+    // 9th chords
+    if (chordType === 'Add9') {
+        return 'add9';
+    }
+    if (chordType === 'Major 9th') {
+        return 'maj9';
+    }
+    if (chordType === 'Dominant 9th') {
+        return '9';
+    }
+    if (chordType === 'Minor 9th') {
+        return '9';
+    }
+    if (chordType === '6/9') {
+        return '6/9';
+    }
+
+    // 11th and 13th chords
+    if (chordType === 'Dominant 11th' || chordType === 'Minor 11th') {
+        return '11';
+    }
+    if (chordType === 'Dominant 13th') {
+        return '13';
+    }
+
+    // Altered chords
+    if (chordType === '7b5') {
+        return '7b5';
+    }
+    if (chordType === '7#5') {
+        return '7#5';
+    }
+    if (chordType === '7b9') {
+        return '7b9';
+    }
+    if (chordType === '7#9') {
+        return '7#9';
+    }
+
+    return '';
 }
 
 /**

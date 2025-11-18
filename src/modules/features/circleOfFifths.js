@@ -426,6 +426,8 @@ function handleKeyClick(event) {
                     if (window.loadProgression) {
                         window.loadProgression();
                     }
+                    // Close the modal after key is set
+                    closeCircleOfFifthsPanel();
                 } else {
                     // If key not found yet or dropdown doesn't match preference, try again after a short delay
                     // Also try to force renderProgressionControls again if it hasn't updated
@@ -475,6 +477,8 @@ function handleKeyClick(event) {
         if (window.loadProgression) {
             window.loadProgression();
         }
+        // Close the modal after key is set
+        closeCircleOfFifthsPanel();
     }
 
     // Switch to trainer tab if not already there

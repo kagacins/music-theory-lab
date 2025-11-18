@@ -427,8 +427,8 @@ export class RecommendationsSidebarController {
             'Dominant7': '7',
             'Diminished7': 'dim7',
             'HalfDiminished7': 'm7♭5',
-            'Sus2': 'sus2',
-            'Sus4': 'sus4',
+            'Suspended 2nd': 'sus2',
+            'Suspended 4th': 'sus4',
             'Add9': 'add9',
             'Major6': '6',
             'Minor6': 'm6'

@@ -2977,8 +2977,8 @@ export function selectBuilderChordBySymbol(root, type, playShutterSound = true, 
         'minor': 'Minor',
         'diminished': 'Diminished',
         'augmented': 'Augmented',
-        'sus2': 'Sus2',
-        'sus4': 'Sus4',
+        'sus2': 'Suspended 2nd',
+        'sus4': 'Suspended 4th',
         'major7': 'Major 7th',  // Note: CHORD_DEFINITIONS uses 'Major 7th' with space
         'minor7': 'Minor 7th',  // Note: CHORD_DEFINITIONS uses 'Minor 7th' with space
         'dominant7': 'Dominant 7th',  // Note: CHORD_DEFINITIONS uses 'Dominant 7th' with space

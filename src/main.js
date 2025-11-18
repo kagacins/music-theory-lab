@@ -26,6 +26,7 @@ import { toggleSidebar } from './modules/ui/sidebar.js';
 import { showSettingsModal } from './modules/ui/settingsModal.js';
 import { initPresetUI, togglePresetPanel, openPresetPanel, closePresetPanel } from './modules/ui/presetUI.js';
 import { initUnifiedSuggestionsPanel, updateUnifiedSuggestions } from './modules/ui/unifiedSuggestionsPanel.js';
+import { openManualChordEntryModal, closeManualChordEntryModal } from './modules/ui/manualChordEntryModal.js';
 import { initCircleOfFifths, toggleCircleOfFifthsPanel, openCircleOfFifthsPanel, closeCircleOfFifthsPanel } from './modules/features/circleOfFifths.js';
 import { initGuitarFretboard, toggleGuitarFretboardPanel, openGuitarFretboardPanel, closeGuitarFretboardPanel, updateGuitarFretboard } from './modules/features/guitarFretboard.js';
 import {
@@ -115,7 +116,8 @@ import {
     importChordList,
     openTemplateBrowser,
     toggleSimplifiedView,
-    toggleTensionCurve
+    toggleTensionCurve,
+    selectChordCard
 } from './modules/features/progressionBuilder.js';
 import {
     renderScaleSelectors,
@@ -987,6 +989,7 @@ window.toggleProgressionLHNote = toggleProgressionLHNote;
 window.handleUndo = handleUndo;
 window.handleRedo = handleRedo;
 window.updateUndoRedoButtons = updateUndoRedoButtons;
+window.selectChordCard = selectChordCard;
 
 window.toggleStyleMoodInsightsPanel = toggleStyleMoodInsightsPanel;
 window.toggleProgressionControlsPanel = toggleProgressionControlsPanel;

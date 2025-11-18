@@ -23,7 +23,20 @@ import {
  * @returns {number} MIDI number
  */
 export function noteToMidi(note) {
-    return Tone.Midi(note).toMidi();
+    if (!note || typeof note !== 'string') {
+        console.warn(`Invalid note passed to noteToMidi: ${note}`);
+        return NaN;
+    }
+    try {
+        const midi = Tone.Midi(note).toMidi();
+        if (isNaN(midi)) {
+            console.warn(`noteToMidi returned NaN for note: ${note}`);
+        }
+        return midi;
+    } catch (e) {
+        console.warn(`Error converting note to MIDI: ${note}`, e);
+        return NaN;
+    }
 }
 
 /**
@@ -102,12 +115,35 @@ export function getChordNotes(rootNoteName, chordType, key, octave = 4, enharmon
     if (!chordDef) { return { baseNotes: [], specificNotes: [] }; }
 
     const rootMidi = noteToMidi(`${rootNoteName}${octave}`);
+    // Validate rootMidi - if it's NaN or invalid, return empty notes
+    if (isNaN(rootMidi) || rootMidi === null || rootMidi === undefined) {
+        console.warn(`Invalid root note for chord: ${rootNoteName}${octave}`);
+        return { baseNotes: [], specificNotes: [] };
+    }
+    
     const noteNameArray = (enharmonicPreference === 'sharp' ? SHARP_NOTES : FLAT_NOTES);
 
     const specificNotes = chordDef.intervals.map(interval => {
     const noteMidi = rootMidi + interval;
+    // Validate noteMidi before converting
+    if (isNaN(noteMidi) || noteMidi === null || noteMidi === undefined) {
+        console.warn(`Invalid MIDI value: ${rootMidi} + ${interval} = ${noteMidi}`);
+        return null;
+    }
+    
     const rawNote = Tone.Midi(noteMidi).toNote();
+    if (!rawNote || typeof rawNote !== 'string') {
+        console.warn(`Invalid note from MIDI ${noteMidi}: ${rawNote}`);
+        return null;
+    }
+    
     let [noteName, noteOctave] = [rawNote.slice(0, -1), parseInt(rawNote.slice(-1))];
+    
+    // Validate noteOctave
+    if (isNaN(noteOctave) || noteOctave === null || noteOctave === undefined) {
+        console.warn(`Invalid octave parsed from note ${rawNote}`);
+        return null;
+    }
 
     // Fix enharmonic spellings (Cb, Fb, B#, E#)
     if (noteName === "Cb") {
@@ -127,7 +163,7 @@ export function getChordNotes(rootNoteName, chordType, key, octave = 4, enharmon
     // Final return — this single string is what's used for both playback and highlighting
     return `${noteName}${noteOctave}`;
 
-    });
+    }).filter(note => note != null); // Filter out any null values from invalid notes
 
     const baseNotes = specificNotes.map(n => n.slice(0, -1));
     return { baseNotes, specificNotes };
@@ -148,7 +184,9 @@ export function getInvertedChordNotes(rootNote, chordType, inversion, key, octav
     const isStringLookup = typeof chordType === 'string';
     const chordDef = isStringLookup ? CHORD_DEFINITIONS[chordType] : chordType;
 
-    const baseOctave = 4 + octaveShift;
+    // Convert octaveShift from semitones to octaves (12 semitones = 1 octave)
+    // Clamp to valid MIDI range (0-8)
+    const baseOctave = Math.max(0, Math.min(8, 4 + Math.floor(octaveShift / 12)));
     // Pass the correct definition to getChordNotes
     const baseChord = getChordNotes(rootNote, isStringLookup ? chordType : chordDef, key, baseOctave, enharmonicPreference);
 
@@ -161,11 +199,32 @@ export function getInvertedChordNotes(rootNote, chordType, inversion, key, octav
 
     for (let i = 0; i < inversion; i++) {
         const noteToShift = invertedNotes.shift();
+        if (!noteToShift) {
+            console.warn(`No note to shift for inversion ${i} of chord ${rootNote} ${chordType}`);
+            break;
+        }
+        
         const shiftedMidi = noteToMidi(noteToShift) + 12;
+        // Validate shiftedMidi before converting
+        if (isNaN(shiftedMidi) || shiftedMidi === null || shiftedMidi === undefined) {
+            console.warn(`Invalid MIDI value for shifted note: ${noteToShift} -> ${shiftedMidi}`);
+            break;
+        }
+        
         // Convert the new MIDI value back to a note name. Tone.js handles the octave correctly.
         const rawShiftedNote = Tone.Midi(shiftedMidi).toNote();
+        if (!rawShiftedNote || typeof rawShiftedNote !== 'string') {
+            console.warn(`Invalid note from MIDI ${shiftedMidi}: ${rawShiftedNote}`);
+            break;
+        }
+        
         // Now, resolve its enharmonic spelling based on the key and user preference.
-        invertedNotes.push(resolveEnharmonic(rawShiftedNote, key, enharmonicPreference));
+        const resolvedNote = resolveEnharmonic(rawShiftedNote, key, enharmonicPreference);
+        if (resolvedNote && typeof resolvedNote === 'string') {
+            invertedNotes.push(resolvedNote);
+        } else {
+            console.warn(`Invalid resolved note: ${resolvedNote} from ${rawShiftedNote}`);
+        }
     }
 
     const simpleName = rootNote + (chordDef.symbol || '');
