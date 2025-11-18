@@ -106,6 +106,7 @@ import { showTemplateBrowser } from '../ui/templateBrowserModal.js';
 
 // Import harmony analyzer (Phase 3.3) - use its COMMON_PROGRESSIONS as the single source of truth
 import { HarmonyAnalyzer, COMMON_PROGRESSIONS } from '../analysis/harmonyAnalyzer.js';
+import { PATTERN_CATEGORIES } from '../analysis/patternDetection.js';
 
 // Import undo/redo utilities
 import {
@@ -2106,7 +2107,7 @@ export function renderChordStaffNotation(canvas, chordData, key) {
 const harmonyAnalyzer = new HarmonyAnalyzer();
 
 /**
- * PHASE 3.3: Add pattern highlighting badges above progression
+ * PHASE 3.3/3.4: Add pattern highlighting badges above progression with collapsible categories
  * @param {HTMLElement} container - Container element
  * @param {Array} progressionData - Progression data
  * @param {string} key - Current key
@@ -2123,74 +2124,363 @@ function renderPatternHighlights(container, progressionData, key) {
     // Analyze progression for patterns
     const analysis = harmonyAnalyzer.analyzeProgression(progressionData, key);
 
-    if (!analysis.patterns || analysis.patterns.length === 0) return;
+    // Use enhanced patterns if available, fallback to legacy patterns
+    const enhancedPatterns = analysis.enhancedPatterns || {
+        progressions: analysis.patterns || [],
+        cadences: [],
+        sequences: [],
+        modal: [],
+        borrowed: []
+    };
 
-    // Create pattern overlay container
+    // Check if we have any patterns to display
+    const hasAnyPatterns = Object.values(enhancedPatterns).some(arr => arr && arr.length > 0);
+    if (!hasAnyPatterns) return;
+
+    // Create master collapsible pattern container
     const patternContainer = document.createElement('div');
-    patternContainer.className = 'flex justify-center items-center gap-2 mb-2 flex-wrap px-4';
+    patternContainer.className = 'mb-2 px-4';
     patternContainer.id = 'pattern-highlights-container';
 
-    // Display detected patterns as badges
-    analysis.patterns.forEach((pattern, idx) => {
-        const badge = document.createElement('div');
-        badge.className = 'pattern-badge px-3 py-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-semibold shadow-md flex items-center gap-2 hover:shadow-lg transition-all';
-        badge.title = `${pattern.description}\nFound at: ${pattern.matches.map(m => `measure ${m + 1}`).join(', ')}\n\nClick to highlight • Click again to clear`;
-        badge.setAttribute('data-pattern-id', pattern.id);
+    // Add CSS for compact horizontal layout
+    const style = document.createElement('style');
+    style.textContent = `
+        .pattern-master-container {
+            background: rgba(20, 20, 30, 0.8);
+            border: 1px solid rgba(100, 100, 120, 0.3);
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        .pattern-master-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.375rem 0.75rem;
+            background: rgba(30, 30, 40, 0.6);
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 1px solid rgba(100, 100, 120, 0.2);
+        }
+        .pattern-master-header:hover {
+            background: rgba(40, 40, 50, 0.8);
+        }
+        .pattern-master-header.collapsed {
+            border-bottom: none;
+        }
+        .pattern-master-title {
+            flex: 1;
+            font-weight: 600;
+            color: #e5e7eb;
+            font-size: 0.7rem;
+        }
+        .pattern-master-expand {
+            font-size: 0.625rem;
+            transition: transform 0.2s;
+            color: #9ca3af;
+        }
+        .pattern-master-header:not(.collapsed) .pattern-master-expand {
+            transform: rotate(180deg);
+        }
+        .pattern-master-content {
+            padding: 0.5rem;
+            max-height: 300px;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+        }
+        .pattern-master-content.collapsed {
+            max-height: 0;
+            padding: 0 0.5rem;
+        }
+        .pattern-category-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            margin-bottom: 0.375rem;
+        }
+        .pattern-category-row:last-child {
+            margin-bottom: 0;
+        }
+        .pattern-category-label {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            background: rgba(50, 50, 60, 0.6);
+            border-radius: 0.375rem;
+            font-size: 0.5rem;
+            font-weight: 600;
+            color: #d1d5db;
+            white-space: nowrap;
+            min-width: 70px;
+        }
+        .pattern-category-label-icon {
+            font-size: 0.625rem;
+        }
+        .pattern-badges-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.375rem;
+            flex: 1;
+        }
+        .enhanced-pattern-badge {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.125rem;
+            padding: 0.375rem 0.5rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        .enhanced-pattern-badge:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+        }
+        .enhanced-pattern-badge.progressions {
+            background: linear-gradient(135deg, #a855f7, #8b5cf6);
+            color: white;
+        }
+        .enhanced-pattern-badge.cadences {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+        }
+        .enhanced-pattern-badge.sequences {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: white;
+        }
+        .enhanced-pattern-badge.modal {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+        }
+        .enhanced-pattern-badge.borrowed {
+            background: linear-gradient(135deg, #ec4899, #db2777);
+            color: white;
+        }
+        .pattern-badge-chords {
+            font-size: 0.5rem;
+            font-weight: 700;
+            opacity: 0.95;
+            letter-spacing: -0.02em;
+        }
+        .pattern-badge-name {
+            font-size: 0.5rem;
+            font-weight: 500;
+            opacity: 0.9;
+        }
+        .pattern-badge-count {
+            font-size: 0.45rem;
+            opacity: 0.8;
+            background: rgba(255, 255, 255, 0.25);
+            padding: 0.0625rem 0.25rem;
+            border-radius: 0.25rem;
+            margin-left: 0.25rem;
+        }
+        .pattern-highlight {
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.6) !important;
+            border-color: #a855f7 !important;
+        }
+    `;
+    patternContainer.appendChild(style);
 
-        // Determine what to show based on pattern length
-        const showChordSymbols = pattern.pattern && pattern.pattern.length <= 6;
-        const chordSymbols = pattern.pattern ? pattern.pattern.join('-') : '';
+    // Create master container
+    const masterContainer = document.createElement('div');
+    masterContainer.className = 'pattern-master-container';
 
-        // Build badge content with two rows if pattern is short enough
-        let badgeContent = `
-            <svg class="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/>
-            </svg>
-            <div class="flex flex-col items-center gap-0.5">
-                ${showChordSymbols ? `<div class="text-[10px] font-semibold leading-tight">${chordSymbols}</div>` : ''}
-                <div class="text-xs font-semibold leading-tight">${pattern.name}</div>
-            </div>
-            <span class="bg-white bg-opacity-30 px-1.5 py-0.5 rounded text-[10px] flex-shrink-0">${pattern.matches.length}×</span>
+    // Count total patterns
+    const totalPatterns = Object.values(enhancedPatterns).reduce((sum, arr) => sum + (arr?.length || 0), 0);
+
+    // Create master header
+    const masterHeader = document.createElement('button');
+    masterHeader.className = 'pattern-master-header';
+    masterHeader.innerHTML = `
+        <span class="pattern-master-title">Detected Patterns (${totalPatterns})</span>
+        <span class="pattern-master-expand">▼</span>
+    `;
+
+    // Create master content
+    const masterContent = document.createElement('div');
+    masterContent.className = 'pattern-master-content';
+
+    // Sort categories by priority
+    const sortedCategories = Object.entries(PATTERN_CATEGORIES)
+        .sort((a, b) => a[1].priority - b[1].priority);
+
+    for (const [categoryKey, categoryInfo] of sortedCategories) {
+        const patterns = enhancedPatterns[categoryKey];
+
+        // Skip empty categories
+        if (!patterns || patterns.length === 0) continue;
+
+        // Create horizontal category row
+        const categoryRow = document.createElement('div');
+        categoryRow.className = 'pattern-category-row';
+
+        // Category label
+        const categoryLabel = document.createElement('div');
+        categoryLabel.className = 'pattern-category-label';
+        categoryLabel.style.borderLeft = `2px solid ${categoryInfo.color}`;
+        categoryLabel.innerHTML = `
+            <span class="pattern-category-label-icon">${categoryInfo.icon}</span>
+            <span>${categoryInfo.label}</span>
         `;
 
-        badge.innerHTML = badgeContent;
+        // Badges container
+        const badgesRow = document.createElement('div');
+        badgesRow.className = 'pattern-badges-row';
 
-        // Add click handler to highlight matching chords with toggle functionality
-        badge.style.cursor = 'pointer';
-        badge.addEventListener('click', () => {
-            console.log('Badge clicked:', pattern.name, pattern);
-
-            // Check if this badge is already active
-            const isActive = badge.classList.contains('pattern-badge-active');
-
-            // Remove active state from all badges
-            document.querySelectorAll('.pattern-badge-active').forEach(b => {
-                b.classList.remove('pattern-badge-active');
-                b.style.transform = '';
-                b.style.boxShadow = '';
-            });
-
-            if (!isActive) {
-                // Activate this badge
-                badge.classList.add('pattern-badge-active');
-                badge.style.transform = 'scale(1.05)';
-                badge.style.boxShadow = '0 4px 12px rgba(168, 85, 247, 0.4)';
-
-                console.log('Activating badge and highlighting pattern');
-                // Highlight the pattern
-                highlightPatternChords(pattern);
-            } else {
-                console.log('Clearing highlights');
-                // Clear highlights
-                clearPatternHighlights();
-            }
+        // Add badges for each pattern
+        patterns.forEach(pattern => {
+            const badge = createEnhancedPatternBadge(pattern, categoryKey);
+            badgesRow.appendChild(badge);
         });
 
-        patternContainer.appendChild(badge);
+        categoryRow.appendChild(categoryLabel);
+        categoryRow.appendChild(badgesRow);
+        masterContent.appendChild(categoryRow);
+    }
+
+    // Toggle expand/collapse
+    masterHeader.addEventListener('click', () => {
+        masterHeader.classList.toggle('collapsed');
+        masterContent.classList.toggle('collapsed');
     });
+
+    masterContainer.appendChild(masterHeader);
+    masterContainer.appendChild(masterContent);
+    patternContainer.appendChild(masterContainer);
 
     // Insert at the top of the container
     container.insertBefore(patternContainer, container.firstChild);
+}
+
+/**
+ * Create an enhanced pattern badge element
+ * @param {Object} pattern - Pattern data
+ * @param {string} category - Pattern category
+ * @returns {HTMLElement} Badge element
+ */
+function createEnhancedPatternBadge(pattern, category) {
+    const badge = document.createElement('button');
+    badge.className = `enhanced-pattern-badge ${category}`;
+
+    // Get display name and count
+    const name = pattern.name || pattern.shortName || pattern.type;
+    const count = pattern.matches?.length || pattern.count || 1;
+
+    // Get chord symbols if available and <= 6 chords
+    const chordSymbols = pattern.pattern && pattern.pattern.length <= 6
+        ? pattern.pattern.join('-')
+        : (pattern.chords && pattern.chords.length <= 6 ? pattern.chords.join('-') : '');
+
+    // Build tooltip
+    let tooltip = pattern.description || pattern.fullName || name;
+    if (pattern.positions) {
+        tooltip += `\nPositions: ${pattern.positions.map(p => p + 1).join(', ')}`;
+    } else if (pattern.matches) {
+        tooltip += `\nFound at: ${pattern.matches.map(m => `measure ${m + 1}`).join(', ')}`;
+    }
+    tooltip += '\n\nClick to highlight';
+
+    badge.title = tooltip;
+
+    // Badge content with two rows: chords on top (if short), name below
+    let content = '';
+    if (chordSymbols) {
+        content += `<div class="pattern-badge-chords">${chordSymbols}</div>`;
+    }
+    content += `<div class="pattern-badge-name">${name}`;
+    if (count > 1) {
+        content += `<span class="pattern-badge-count">${count}×</span>`;
+    }
+    content += `</div>`;
+
+    badge.innerHTML = content;
+
+    // Click handler to highlight chords
+    badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+
+        // Clear any existing highlights first
+        clearPatternHighlights();
+
+        // Remove active state from all badges
+        document.querySelectorAll('.enhanced-pattern-badge').forEach(b => {
+            b.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.3)';
+        });
+
+        // Check if this badge is already active
+        const isActive = badge.dataset.active === 'true';
+
+        if (!isActive) {
+            // Activate this badge
+            badge.dataset.active = 'true';
+            badge.style.boxShadow = `0 4px 12px ${PATTERN_CATEGORIES[category]?.color || '#a855f7'}88`;
+
+            // Calculate positions to highlight
+            let positions = [];
+            if (pattern.positions && Array.isArray(pattern.positions)) {
+                positions = pattern.positions;
+            } else if (pattern.matches) {
+                // For progressions, expand matches to full pattern length
+                const patternLen = pattern.pattern?.length || 1;
+                positions = pattern.matches.flatMap(m =>
+                    Array.from({ length: patternLen }, (_, i) => m + i)
+                );
+            }
+
+            console.log('Highlighting positions:', positions, 'for pattern:', name);
+            highlightPatternChordsByPositions(positions);
+        } else {
+            // Deactivate this badge
+            badge.dataset.active = 'false';
+            badge.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.3)';
+        }
+    });
+
+    return badge;
+}
+
+/**
+ * Highlight chords at specific positions
+ * @param {Array} positions - Array of chord positions to highlight
+ */
+function highlightPatternChordsByPositions(positions) {
+    // Clear existing highlights
+    clearPatternHighlights();
+
+    if (!positions || positions.length === 0) return;
+
+    // Use specific selector for chord card wrappers with data-chord-index
+    const chordCards = document.querySelectorAll('.chord-card-wrapper[data-chord-index]');
+
+    console.log('Found chord cards:', chordCards.length, 'Highlighting positions:', positions);
+
+    positions.forEach(pos => {
+        // Find card by data-chord-index attribute
+        const card = document.querySelector(`.chord-card-wrapper[data-chord-index="${pos}"]`);
+
+        if (card) {
+            card.classList.add('pattern-highlight');
+            // Apply styles directly to ensure they work
+            card.style.setProperty('box-shadow', '0 0 15px rgba(168, 85, 247, 0.6)', 'important');
+            card.style.setProperty('border-color', '#a855f7', 'important');
+            card.style.setProperty('border-width', '2px', 'important');
+            console.log('Highlighted card at position:', pos);
+        } else {
+            console.log('Could not find card at position:', pos);
+        }
+    });
+
+    // Auto-clear after 3 seconds
+    setTimeout(() => {
+        clearPatternHighlights();
+        // Also reset badge active states
+        document.querySelectorAll('.enhanced-pattern-badge').forEach(b => {
+            b.dataset.active = 'false';
+            b.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.3)';
+        });
+    }, 3000);
 }
 
 /**
@@ -4495,6 +4785,7 @@ function highlightPatternChords(pattern) {
  * Clear all pattern highlights from chord cards
  */
 function clearPatternHighlights() {
+    // Clear old highlight style
     document.querySelectorAll('.pattern-highlight-active').forEach(el => {
         el.classList.remove('pattern-highlight-active');
         el.removeAttribute('data-pattern-match');
@@ -4504,6 +4795,14 @@ function clearPatternHighlights() {
         el.style.boxShadow = '';
         el.style.borderRadius = '';
         el.style.padding = '';
+    });
+
+    // Clear new highlight style
+    document.querySelectorAll('.pattern-highlight').forEach(el => {
+        el.classList.remove('pattern-highlight');
+        el.style.boxShadow = '';
+        el.style.borderColor = '';
+        el.style.borderWidth = '';
     });
 }
 

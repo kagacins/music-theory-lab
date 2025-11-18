@@ -10,6 +10,7 @@
  */
 
 import { ALL_NOTES } from '../../data/music-data.js';
+import { detectAllPatterns, PATTERN_CATEGORIES } from './patternDetection.js';
 
 /**
  * Harmonic function types
@@ -208,9 +209,15 @@ export class HarmonyAnalyzer {
         const modalInterchange = this.detectModalInterchange(progression, key);
         const complexity = this.calculateComplexity(progression, modalInterchange);
 
+        // Enhanced pattern detection (cadences, sequences, modal, borrowed)
+        const enhancedPatterns = detectAllPatterns(progression, key);
+        // Merge progression patterns into the enhanced patterns
+        enhancedPatterns.progressions = patterns;
+
         const analysis = {
             functions,
             patterns,
+            enhancedPatterns, // New: Categorized patterns for collapsible UI
             modalInterchange,
             complexity,
             key,
@@ -228,6 +235,13 @@ export class HarmonyAnalyzer {
         return {
             functions: [],
             patterns: [],
+            enhancedPatterns: {
+                progressions: [],
+                cadences: [],
+                sequences: [],
+                modal: [],
+                borrowed: []
+            },
             modalInterchange: [],
             complexity: 0,
             key: null,

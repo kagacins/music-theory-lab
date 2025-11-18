@@ -546,186 +546,917 @@ compositionState.on('chordChanged', (measureIndex, chord) => {
 
 ## Phase 7: New Feature Ideas (Expanded)
 
-### For Beginners (Accessibility)
-
-#### Guided Songwriting Wizard
-**Duration:** 2 weeks
-
-Step-by-step composition flow:
-1. "What mood?" → Select emotion
-2. "What style?" → Select genre
-3. "Pick a template" → Show filtered options
-4. "Write your melody" → AI suggestions enabled
-5. "Export your song" → Multiple formats
-
-#### Theory Explanations on Hover
-**Duration:** 1 week
-
-Tooltips explaining:
-- "V → I is called an authentic cadence"
-- "The IV chord is subdominant - creates gentle tension"
-- "This Am is the relative minor of C"
-
-#### Difficulty Ratings
-**Duration:** 3 days
-
-Mark features and templates:
-- 🟢 Beginner
-- 🟡 Intermediate
-- 🔴 Advanced
-
-Show skill-appropriate defaults.
+These features are organized by user skill level and include detailed specifications for implementation.
 
 ---
 
-### For Intermediate Users (Productivity)
-
-#### Song Form Builder
-**Duration:** 2 weeks
-
-Pre-built structures:
-- Verse (4-8 bars) → Chorus (8 bars) → Bridge (4 bars)
-- AABA jazz form
-- 12-bar blues
-
-Visual timeline with sections.
-
-#### Rhythm Pattern Library
-**Duration:** 1-2 weeks
-
-Genre-specific comping:
-- Ballad: whole notes
-- Rock: steady eighths
-- Jazz: comping rhythms
-- Latin: montuno patterns
-
-Apply to bass or chords.
-
-#### Quick Arrangement Styles
-**Duration:** 1 week
-
-One-click arrangements:
-- "Ballad": arpeggiated bass, sustained chords
-- "Rock": power chord voicings
-- "Jazz": walking bass, shell voicings
-- "Classical": Alberti bass
-
-#### Progression Variations
-**Duration:** 1 week
-
-Suggestions like:
-- "Try substituting vi for I"
-- "Add a passing chord between IV and V"
-- "Use tritone substitution for V"
-
----
-
-### For Advanced Users (Power)
-
-#### Custom Scale Support
-**Duration:** 2 weeks
-
-Beyond major/minor:
-- Harmonic minor
-- Melodic minor
-- All 7 modes
-- Pentatonic scales
-- Blues scale
-
-Affects melody suggestions and chord recommendations.
-
-#### Reharmonization Tools
+### 7.1 Guided Songwriting Wizard
 **Duration:** 2-3 weeks
+**Priority:** High
+**Target Users:** Beginners
 
-Advanced substitutions:
-- Tritone substitution
-- Chord substitution chart
-- "Jazz up this progression" one-click
-- Secondary dominants
+#### Features
 
-#### Multi-Section Compositions
-**Duration:** 2 weeks
+**Step-by-Step Flow:**
+1. **Welcome Screen**: "Let's write a song together!"
+2. **Mood Selection**: Visual cards with emotions (Happy, Sad, Energetic, Calm, Mysterious)
+3. **Style Selection**: Genre cards (Pop, Rock, Jazz, Classical, Electronic)
+4. **Template Selection**: Filtered templates based on mood/style
+5. **Structure Selection**: Verse-Chorus, AABA, 12-bar, Custom
+6. **Composition Mode**: AI suggestions enabled, guided tooltips
+7. **Export Options**: MIDI, PDF, Audio, Share link
 
-Full song structure:
-- Intro → Verse → Pre-Chorus → Chorus → Bridge → Outro
-- Section navigation
-- Section-specific key/tempo
-- Section repeat markers
+**Intelligent Defaults:**
+- Auto-set tempo based on mood (Energetic = 130bpm, Calm = 70bpm)
+- Pre-select appropriate key (Bright = C Major, Dark = A Minor)
+- Enable melody suggestions by default
+- Show only beginner-friendly chord types
 
-#### Modulation Assistant
-**Duration:** 1-2 weeks
+**Progress Tracking:**
+- Visual progress bar through steps
+- "Skip to advanced" option for experienced users
+- Save progress and resume later
 
-Key change helpers:
-- Common pivot chords
-- Chromatic modulation options
-- Visual key relationship (circle of fifths)
-- Smooth transition suggestions
+#### UI Components
+
+**Wizard Modal:**
+```
+┌──────────────────────────────────────────────────────┐
+│ 🎵 Songwriting Wizard                    Step 2 of 7 │
+├──────────────────────────────────────────────────────┤
+│                                                       │
+│  What style are you going for?                       │
+│                                                       │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐              │
+│  │   🎸    │  │   🎹    │  │   🎷    │              │
+│  │   Pop   │  │Classical│  │   Jazz  │              │
+│  │ ✓ Selected│ │         │  │         │              │
+│  └─────────┘  └─────────┘  └─────────┘              │
+│                                                       │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐              │
+│  │   🎸    │  │   🎹    │  │   🎧    │              │
+│  │   Rock  │  │  Blues  │  │Electronic│              │
+│  └─────────┘  └─────────┘  └─────────┘              │
+│                                                       │
+│         [← Back]              [Next →]               │
+└──────────────────────────────────────────────────────┘
+```
+
+#### Implementation Files
+- `src/modules/ui/songwritingWizard.js` - Main wizard controller
+- `src/modules/ui/wizardSteps/moodSelector.js` - Mood selection step
+- `src/modules/ui/wizardSteps/styleSelector.js` - Style selection step
+- `src/modules/ui/wizardSteps/structureBuilder.js` - Song structure step
+- `src/modules/config/wizardDefaults.js` - Mood/style → settings mapping
+
+#### Success Metrics
+- [ ] Complete wizard flow in <3 minutes
+- [ ] 90%+ beginner users complete first song
+- [ ] Mood → settings mapping produces appropriate results
+- [ ] Skip option works for experienced users
+- [ ] Progress saves to localStorage
 
 ---
 
-### For All Users (Polish)
+### 7.2 Theory Explanations on Hover
+**Duration:** 1-2 weeks
+**Priority:** High
+**Target Users:** Beginners, Intermediate
 
-#### Practice Mode
-**Duration:** 2 weeks
+#### Features
 
-Ear training with user's progressions:
-- "What chord comes next?"
-- "Is this note a chord tone?"
-- Interval recognition
-- Rhythm dictation
+**Contextual Tooltips:**
+- Hover over any chord → see theory explanation
+- Hover over roman numeral → see function description
+- Hover over pattern badge → see pattern explanation
+- Hover over tension score → see what creates tension
 
-#### Session History
+**Explanation Categories:**
+
+**Chord Function Explanations:**
+```javascript
+const FUNCTION_EXPLANATIONS = {
+  tonic: {
+    title: "Tonic (I)",
+    description: "Home base - feels resolved and stable",
+    examples: "Usually starts and ends songs"
+  },
+  subdominant: {
+    title: "Subdominant (IV, ii)",
+    description: "Creates gentle movement away from home",
+    examples: "Often leads to dominant chords"
+  },
+  dominant: {
+    title: "Dominant (V, vii°)",
+    description: "Creates tension that wants to resolve to tonic",
+    examples: "V → I is the strongest resolution"
+  }
+};
+```
+
+**Progression Explanations:**
+- "V → I is called an **authentic cadence** - the strongest resolution"
+- "IV → I is a **plagal cadence** - sometimes called the 'Amen' cadence"
+- "ii → V → I is the **most common jazz progression**"
+
+**Modal Interchange Explanations:**
+- "This bVII is **borrowed from the parallel minor** - adds darkness"
+- "The iv chord is a **common borrowed chord** - heard in many pop songs"
+
+**Voice Leading Explanations:**
+- "These chords share **2 common tones** - creates smooth connection"
+- "The bass moves by **step** (C → D) - very smooth"
+- "Warning: **parallel fifths** between soprano and alto"
+
+#### UI Components
+
+**Tooltip Design:**
+```
+┌─────────────────────────────────┐
+│ F Major (IV) - Subdominant      │
+├─────────────────────────────────┤
+│ Creates gentle tension, often   │
+│ leads to V (dominant).          │
+│                                 │
+│ Common progressions:            │
+│ • I → IV → V → I               │
+│ • IV → iv → I (minor plagal)   │
+│                                 │
+│ Famous uses:                    │
+│ • "Let It Be" (Beatles)        │
+│ • "No Woman No Cry" (Marley)   │
+│                                 │
+│ [Learn More →]                  │
+└─────────────────────────────────┘
+```
+
+#### Implementation Files
+- `src/modules/ui/theoryTooltips.js` - Tooltip rendering system
+- `src/modules/data/theoryExplanations.js` - All explanation content
+- `src/modules/data/famousSongs.js` - Song examples database
+- `src/modules/analysis/tooltipTriggers.js` - When to show tooltips
+
+#### Success Metrics
+- [ ] Tooltips appear within 200ms of hover
+- [ ] 100+ unique explanations
+- [ ] Toggle on/off in settings
+- [ ] "Learn More" links to external resources
+- [ ] Mobile long-press support
+
+---
+
+### 7.3 Difficulty Ratings System
 **Duration:** 1 week
+**Priority:** Medium
+**Target Users:** All
 
-Full timeline:
-- Auto-save every 30 seconds
-- Named restore points
-- Compare versions
-- Revert to any point
+#### Features
 
-#### Collaborative Features
+**Rating Levels:**
+- 🟢 **Beginner**: Simple triads, common progressions, basic rhythms
+- 🟡 **Intermediate**: 7th chords, borrowed chords, syncopation
+- 🔴 **Advanced**: Extended chords, complex voice leading, modulation
+
+**Applied To:**
+- Templates in browser
+- Chord types in recommendations
+- Features in UI (hide advanced by default)
+- Patterns detected
+
+**User Skill Setting:**
+- Set in preferences
+- Filters content appropriately
+- Can always "show advanced"
+
+#### Implementation
+```javascript
+const DIFFICULTY_RATINGS = {
+  chordTypes: {
+    'Major': 'beginner',
+    'Minor': 'beginner',
+    'Dominant 7th': 'intermediate',
+    'Major 7th': 'intermediate',
+    'Minor 7th': 'intermediate',
+    'Diminished': 'intermediate',
+    'Augmented': 'advanced',
+    'Half-Diminished': 'advanced',
+    '9th': 'advanced',
+    '11th': 'advanced',
+    '13th': 'advanced'
+  },
+  patterns: {
+    'I-IV-V': 'beginner',
+    'I-V-vi-IV': 'beginner',
+    'ii-V-I': 'intermediate',
+    'I-vi-ii-V': 'intermediate',
+    'Rhythm Changes': 'advanced'
+  }
+};
+```
+
+#### Implementation Files
+- `src/modules/config/difficultyRatings.js` - Rating definitions
+- `src/modules/ui/difficultyFilter.js` - Filter UI component
+- Update `src/modules/ui/templateBrowserModal.js` - Show badges
+- Update `src/modules/features/chordRecommendations.js` - Filter by skill
+
+#### Success Metrics
+- [ ] All templates have difficulty rating
+- [ ] All chord types have rating
+- [ ] User preference persists
+- [ ] Filter reduces noise for beginners
+- [ ] Advanced users see everything
+
+---
+
+### 7.4 Song Form Builder
+**Duration:** 2-3 weeks
+**Priority:** High
+**Target Users:** Intermediate, Advanced
+
+#### Features
+
+**Pre-Built Forms:**
+```javascript
+const SONG_FORMS = {
+  'verse-chorus': {
+    name: 'Verse-Chorus',
+    sections: [
+      { type: 'verse', measures: 8, label: 'Verse 1' },
+      { type: 'chorus', measures: 8, label: 'Chorus' },
+      { type: 'verse', measures: 8, label: 'Verse 2' },
+      { type: 'chorus', measures: 8, label: 'Chorus' },
+      { type: 'bridge', measures: 4, label: 'Bridge' },
+      { type: 'chorus', measures: 8, label: 'Final Chorus' }
+    ]
+  },
+  'aaba': {
+    name: 'AABA (32-bar)',
+    sections: [
+      { type: 'A', measures: 8 },
+      { type: 'A', measures: 8 },
+      { type: 'B', measures: 8, label: 'Bridge' },
+      { type: 'A', measures: 8 }
+    ]
+  },
+  '12-bar-blues': {
+    name: '12-Bar Blues',
+    sections: [
+      { type: 'I', measures: 4 },
+      { type: 'IV', measures: 2 },
+      { type: 'I', measures: 2 },
+      { type: 'V', measures: 1 },
+      { type: 'IV', measures: 1 },
+      { type: 'I', measures: 2 }
+    ]
+  }
+};
+```
+
+**Visual Timeline:**
+- Drag-and-drop sections
+- Color-coded by section type
+- Resize sections by dragging edges
+- Double-click to edit section properties
+
+**Section Properties:**
+- Name/label
+- Number of measures
+- Key (for modulation)
+- Tempo (for tempo changes)
+- Repeat count
+
+**Navigation:**
+- Click section to jump
+- Keyboard shortcuts (1-9 for sections)
+- Mini-map showing full structure
+
+#### UI Components
+
+**Timeline View:**
+```
+┌──────────────────────────────────────────────────────────┐
+│ Song Structure                              [+ Section]   │
+├──────────────────────────────────────────────────────────┤
+│                                                           │
+│ ┌────────┬────────┬────────┬────────┬──────┬──────────┐ │
+│ │ Intro  │ Verse 1│ Chorus │ Verse 2│Bridge│  Outro   │ │
+│ │  4m    │   8m   │   8m   │   8m   │  4m  │    4m    │ │
+│ │  🔵    │   🟢   │   🟣   │   🟢   │  🟡  │    🔵    │ │
+│ └────────┴────────┴────────┴────────┴──────┴──────────┘ │
+│                                                           │
+│ Total: 36 measures | ~2:24 at 120 BPM                    │
+└──────────────────────────────────────────────────────────┘
+```
+
+#### Implementation Files
+- `src/modules/features/songFormBuilder.js` - Core logic
+- `src/modules/ui/songFormTimeline.js` - Visual timeline
+- `src/modules/ui/sectionEditor.js` - Section properties modal
+- `src/modules/data/songForms.js` - Pre-built form templates
+- `src/modules/state/songStructure.js` - Structure state management
+
+#### Success Metrics
+- [ ] 10+ pre-built forms
+- [ ] Drag-and-drop works smoothly
+- [ ] Section navigation works
+- [ ] Key/tempo per section
+- [ ] Export respects structure
+
+---
+
+### 7.5 Rhythm Pattern Library
+**Duration:** 2 weeks
+**Priority:** High
+**Target Users:** Intermediate
+
+#### Features
+
+**Pattern Categories:**
+```javascript
+const RHYTHM_PATTERNS = {
+  bass: {
+    'whole-notes': { name: 'Whole Notes', pattern: ['w'] },
+    'root-fifth': { name: 'Root-Fifth', pattern: ['q', 'q', 'q', 'q'] },
+    'walking': { name: 'Walking Bass', pattern: ['q', 'q', 'q', 'q'], melodic: true },
+    'alberti': { name: 'Alberti Bass', pattern: ['e', 'e', 'e', 'e', 'e', 'e', 'e', 'e'] },
+    'arpeggio': { name: 'Arpeggio', pattern: ['e', 'e', 'e', 'e'] },
+    'shuffle': { name: 'Shuffle', pattern: ['q.', 'e', 'q.', 'e'], swing: true }
+  },
+  comping: {
+    'block': { name: 'Block Chords', pattern: ['w'] },
+    'charleston': { name: 'Charleston', pattern: ['q.', 'e', 'h'] },
+    'bossa': { name: 'Bossa Nova', pattern: ['e.', 's', 'e', 'e.', 's', 'e', 'q'] },
+    'rock-steady': { name: 'Rock Steady', pattern: ['e', 'e', 'e', 'e', 'e', 'e', 'e', 'e'] }
+  }
+};
+```
+
+**Pattern Browser:**
+- Filter by genre (Jazz, Latin, Rock, Pop, Classical)
+- Preview pattern with current chord
+- Apply to selected measures or all
+- Customize pattern (edit individual hits)
+
+**Visual Pattern Editor:**
+- Grid showing beats and subdivisions
+- Click to toggle hits
+- Drag to adjust duration
+- Save custom patterns
+
+#### UI Components
+
+**Pattern Browser:**
+```
+┌─────────────────────────────────────────────┐
+│ Rhythm Patterns           [Bass ▼] [All ▼]  │
+├─────────────────────────────────────────────┤
+│ ┌─────────────────┐ ┌─────────────────┐    │
+│ │ Root-Fifth      │ │ Walking Bass    │    │
+│ │ ♩ ♩ ♩ ♩        │ │ ♩ ♩ ♩ ♩        │    │
+│ │ [▶] [Apply]     │ │ [▶] [Apply]     │    │
+│ └─────────────────┘ └─────────────────┘    │
+│ ┌─────────────────┐ ┌─────────────────┐    │
+│ │ Arpeggio        │ │ Alberti         │    │
+│ │ ♪♪♪♪           │ │ ♪♪♪♪♪♪♪♪       │    │
+│ │ [▶] [Apply]     │ │ [▶] [Apply]     │    │
+│ └─────────────────┘ └─────────────────┘    │
+└─────────────────────────────────────────────┘
+```
+
+#### Implementation Files
+- `src/modules/features/rhythmPatternLibrary.js` - Pattern database
+- `src/modules/ui/rhythmPatternBrowser.js` - Browser UI
+- `src/modules/ui/rhythmPatternEditor.js` - Custom pattern editor
+- `src/modules/audio/patternPlayer.js` - Pattern preview playback
+
+#### Success Metrics
+- [ ] 20+ pre-built patterns
+- [ ] Genre filtering works
+- [ ] Preview plays correctly
+- [ ] Apply updates notation
+- [ ] Custom patterns save
+
+---
+
+### 7.6 Reharmonization Tools
 **Duration:** 3-4 weeks
+**Priority:** Medium
+**Target Users:** Advanced
 
-Share and collaborate:
-- Share progression via link
-- Embed in websites
-- Real-time collaboration (future)
-- Community template library
+#### Features
 
-#### Mobile Companion
+**Substitution Types:**
+```javascript
+const SUBSTITUTIONS = {
+  tritone: {
+    name: 'Tritone Substitution',
+    description: 'Replace dominant with chord a tritone away',
+    example: 'G7 → Db7',
+    apply: (chord) => transposeSemitones(chord, 6)
+  },
+  relativeMinor: {
+    name: 'Relative Minor',
+    description: 'Replace major with its relative minor',
+    example: 'C → Am',
+    apply: (chord) => getRelativeMinor(chord)
+  },
+  secondaryDominant: {
+    name: 'Secondary Dominant',
+    description: 'Add dominant before any chord',
+    example: 'Dm → A7 → Dm',
+    apply: (chord) => getDominantOf(chord)
+  },
+  diminishedPassing: {
+    name: 'Diminished Passing',
+    description: 'Add diminished chord between',
+    example: 'C → C#dim → Dm',
+    apply: (chord1, chord2) => getDiminishedBetween(chord1, chord2)
+  }
+};
+```
+
+**"Jazz It Up" One-Click:**
+- Analyze progression
+- Apply appropriate substitutions
+- Add 7ths to all chords
+- Insert passing chords
+- Show before/after comparison
+
+**Chord Substitution Chart:**
+- Visual matrix of substitution options
+- Click to apply
+- Hear comparison
+- Undo instantly
+
+#### UI Components
+
+**Reharmonization Panel:**
+```
+┌──────────────────────────────────────────────────┐
+│ Reharmonization Tools                             │
+├──────────────────────────────────────────────────┤
+│ Original: C → Am → F → G                         │
+│                                                   │
+│ Suggestions:                                      │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ ✨ Jazz It Up                               │ │
+│ │ Cmaj7 → A7 → Dm7 → G7 → Cmaj7              │ │
+│ │ [▶ Preview] [Apply]                         │ │
+│ └─────────────────────────────────────────────┘ │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ 🔄 Tritone Sub on V                        │ │
+│ │ C → Am → F → Db7                           │ │
+│ │ [▶ Preview] [Apply]                         │ │
+│ └─────────────────────────────────────────────┘ │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ ➕ Add Secondary Dominants                  │ │
+│ │ C → E7 → Am → C7 → F → D7 → G              │ │
+│ │ [▶ Preview] [Apply]                         │ │
+│ └─────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────┘
+```
+
+#### Implementation Files
+- `src/modules/features/reharmonization.js` - Substitution algorithms
+- `src/modules/ui/reharmonizationPanel.js` - Panel UI
+- `src/modules/analysis/substitutionAnalyzer.js` - Suggest substitutions
+- `src/modules/data/substitutionRules.js` - Substitution definitions
+
+#### Success Metrics
+- [ ] All substitution types work correctly
+- [ ] "Jazz It Up" produces musical results
+- [ ] Preview plays comparison
+- [ ] Undo restores original
+- [ ] Voice leading maintained
+
+---
+
+### 7.7 Custom Scale Support
+**Duration:** 2 weeks
+**Priority:** Medium
+**Target Users:** Intermediate, Advanced
+
+#### Features
+
+**Supported Scales:**
+```javascript
+const SCALES = {
+  // Major modes
+  'ionian': [0, 2, 4, 5, 7, 9, 11],      // Major
+  'dorian': [0, 2, 3, 5, 7, 9, 10],
+  'phrygian': [0, 1, 3, 5, 7, 8, 10],
+  'lydian': [0, 2, 4, 6, 7, 9, 11],
+  'mixolydian': [0, 2, 4, 5, 7, 9, 10],
+  'aeolian': [0, 2, 3, 5, 7, 8, 10],     // Natural minor
+  'locrian': [0, 1, 3, 5, 6, 8, 10],
+
+  // Other scales
+  'harmonic-minor': [0, 2, 3, 5, 7, 8, 11],
+  'melodic-minor': [0, 2, 3, 5, 7, 9, 11],
+  'pentatonic-major': [0, 2, 4, 7, 9],
+  'pentatonic-minor': [0, 3, 5, 7, 10],
+  'blues': [0, 3, 5, 6, 7, 10],
+  'whole-tone': [0, 2, 4, 6, 8, 10],
+  'diminished': [0, 2, 3, 5, 6, 8, 9, 11]
+};
+```
+
+**Scale Integration:**
+- Melody suggestions use selected scale
+- Chord recommendations match scale
+- Scale degree colors on keyboard
+- Scale reference in sidebar
+
+**Scale Visualization:**
+- Circle of fifths with scale highlighted
+- Keyboard with scale tones marked
+- Staff with scale ascending/descending
+
+#### Implementation Files
+- `src/modules/data/scales.js` - Scale definitions
+- `src/modules/analysis/scaleAnalyzer.js` - Scale detection
+- `src/modules/ui/scaleSelector.js` - Scale picker UI
+- Update `src/modules/ai/melodySuggestion.js` - Use selected scale
+- Update `src/modules/features/chordRecommendations.js` - Scale-aware
+
+#### Success Metrics
+- [ ] 15+ scales supported
+- [ ] Melody suggestions respect scale
+- [ ] Chord recommendations match
+- [ ] Visual scale display accurate
+- [ ] Mode interchange detection
+
+---
+
+### 7.8 Practice Mode (Ear Training)
+**Duration:** 2-3 weeks
+**Priority:** Medium
+**Target Users:** All
+
+#### Features
+
+**Exercise Types:**
+
+**Chord Identification:**
+- Hear chord → identify type (Major, Minor, Dom7, etc.)
+- Progressive difficulty
+- Use chords from user's progression
+
+**Progression Dictation:**
+- Hear 4-chord progression → identify chords
+- Start with I-IV-V, advance to jazz changes
+- Show roman numerals or chord names
+
+**Interval Recognition:**
+- Hear two notes → identify interval
+- Melodic and harmonic modes
+- Use intervals from user's melody
+
+**Chord Tone Ear Training:**
+- Hear chord + single note → is it a chord tone?
+- Identify which degree (root, 3rd, 5th, 7th)
+- Builds melody writing intuition
+
+**Progress Tracking:**
+- Accuracy percentage per exercise
+- Streak counter
+- Difficulty auto-adjusts
+- Badges/achievements
+
+#### UI Components
+
+**Practice Mode Screen:**
+```
+┌──────────────────────────────────────────────────┐
+│ 🎧 Ear Training - Chord Identification           │
+├──────────────────────────────────────────────────┤
+│                                                   │
+│                 [▶ Play Again]                    │
+│                                                   │
+│  What type of chord is this?                     │
+│                                                   │
+│  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐   │
+│  │ Major  │ │ Minor  │ │  Dom7  │ │ Maj7   │   │
+│  └────────┘ └────────┘ └────────┘ └────────┘   │
+│                                                   │
+│  Streak: 🔥 7 | Accuracy: 82% | Level: 3        │
+│                                                   │
+│  [Exit Practice]                                 │
+└──────────────────────────────────────────────────┘
+```
+
+#### Implementation Files
+- `src/modules/features/practiceMode.js` - Exercise controller
+- `src/modules/features/exercises/chordIdentification.js`
+- `src/modules/features/exercises/progressionDictation.js`
+- `src/modules/features/exercises/intervalRecognition.js`
+- `src/modules/ui/practiceUI.js` - Practice mode UI
+- `src/modules/storage/practiceProgress.js` - Progress persistence
+
+#### Success Metrics
+- [ ] 4+ exercise types
+- [ ] Difficulty progression works
+- [ ] Progress saves to localStorage
+- [ ] Uses user's own progressions
+- [ ] Accuracy tracking accurate
+
+---
+
+### 7.9 Multi-Section Compositions
+**Duration:** 2-3 weeks
+**Priority:** High
+**Target Users:** Intermediate, Advanced
+
+#### Features
+
+**Section Management:**
+- Add/remove sections (Intro, Verse, Chorus, Bridge, Outro, Custom)
+- Reorder sections via drag-and-drop
+- Copy sections (Verse 1 → Verse 2)
+- Section-specific settings:
+  - Key signature (for modulation)
+  - Tempo (for tempo changes)
+  - Time signature
+
+**Section Linking:**
+- Repeat markers (1st/2nd endings)
+- D.C. al Coda, D.S. al Fine
+- Section repeat count
+
+**Navigation:**
+- Section tabs/dropdown
+- Mini-map showing full composition
+- Keyboard shortcuts (Ctrl+1-9)
+- "Go to section" command
+
+**Transitions:**
+- Auto-suggest transition chords between sections
+- Modulation detection and assistance
+- Common tone highlighting
+
+#### UI Components
+
+**Section Tabs:**
+```
+┌──────────────────────────────────────────────────────────┐
+│ [Intro] [Verse 1] [Chorus] [Verse 2] [Bridge] [Outro] [+]│
+├──────────────────────────────────────────────────────────┤
+│                                                           │
+│  Section: Chorus | Key: G Major | Tempo: 128 | 4/4       │
+│  Measures: 1-8 of 8                                       │
+│                                                           │
+│  [Notation content...]                                    │
+│                                                           │
+└──────────────────────────────────────────────────────────┘
+```
+
+#### Implementation Files
+- `src/modules/features/sectionManager.js` - Section CRUD
+- `src/modules/state/sectionState.js` - Section data model
+- `src/modules/ui/sectionTabs.js` - Tab navigation
+- `src/modules/ui/sectionMinimap.js` - Overview minimap
+- `src/modules/analysis/transitionAnalyzer.js` - Transition suggestions
+
+#### Success Metrics
+- [ ] 6+ section types
+- [ ] Modulation between sections works
+- [ ] Navigation is intuitive
+- [ ] Export includes all sections
+- [ ] Playback respects repeats
+
+---
+
+### 7.10 Session History & Auto-Save
+**Duration:** 1-2 weeks
+**Priority:** High
+**Target Users:** All
+
+#### Features
+
+**Auto-Save:**
+- Save every 30 seconds
+- Save on every significant action
+- Background save (non-blocking)
+- localStorage + optional cloud
+
+**Version History:**
+- Timeline of all saves
+- Named checkpoints ("Before jazz reharmonization")
+- Preview any version
+- Restore with confirmation
+
+**Compare Versions:**
+- Side-by-side diff view
+- Highlight changes
+- Cherry-pick specific changes
+
+**Crash Recovery:**
+- Detect unsaved work on load
+- Offer to restore
+- Never lose more than 30 seconds
+
+#### UI Components
+
+**History Panel:**
+```
+┌─────────────────────────────────────────┐
+│ Session History                   [×]   │
+├─────────────────────────────────────────┤
+│ 📌 Before adding bridge (checkpoint)    │
+│    Today, 3:45 PM                       │
+│    [Preview] [Restore]                  │
+│                                         │
+│ ○  Auto-save                           │
+│    Today, 3:42 PM                       │
+│    [Preview] [Restore]                  │
+│                                         │
+│ ○  Auto-save                           │
+│    Today, 3:38 PM                       │
+│    [Preview] [Restore]                  │
+│                                         │
+│ ○  Added chorus section                │
+│    Today, 3:35 PM                       │
+│    [Preview] [Restore]                  │
+│                                         │
+│ [+ Create Checkpoint]                   │
+└─────────────────────────────────────────┘
+```
+
+#### Implementation Files
+- `src/modules/storage/autoSave.js` - Auto-save controller
+- `src/modules/storage/versionHistory.js` - History management
+- `src/modules/ui/historyPanel.js` - History UI
+- `src/modules/ui/versionCompare.js` - Diff view
+
+#### Success Metrics
+- [ ] Auto-save every 30 seconds
+- [ ] 50+ versions retained
+- [ ] Restore works correctly
+- [ ] Crash recovery works
+- [ ] Minimal performance impact
+
+---
+
+### 7.11 Collaboration & Sharing
+**Duration:** 3-4 weeks
+**Priority:** Medium
+**Target Users:** All
+
+#### Features
+
+**Share via Link:**
+- Generate unique URL
+- Viewer mode (read-only)
+- Editor mode (with password)
+- Embed code for websites
+
+**Export/Import:**
+- Export as .mtl file (Music Theory Lab format)
+- Import .mtl files
+- Include all settings and history
+
+**Community Templates:**
+- Submit templates to community library
+- Browse community creations
+- Rate and review
+- Fork and modify
+
+**Future: Real-Time Collaboration:**
+- Multiple users editing simultaneously
+- Cursor presence
+- Chat/comments
+- Conflict resolution
+
+#### Implementation Files
+- `src/modules/sharing/linkGenerator.js` - Share link creation
+- `src/modules/sharing/embedCode.js` - Embed generation
+- `src/modules/export/mtlFormat.js` - Native file format
+- `src/modules/ui/shareModal.js` - Sharing UI
+- `src/modules/api/communityTemplates.js` - Community API
+
+#### Success Metrics
+- [ ] Share links work correctly
+- [ ] Embed displays properly
+- [ ] .mtl import/export round-trips
+- [ ] Community templates load
+
+---
+
+### 7.12 Mobile Companion
 **Duration:** 4-6 weeks
+**Priority:** Low
+**Target Users:** All
 
-Responsive design:
-- View progressions on phone
+#### Features
+
+**Responsive Design:**
+- Works on tablets and phones
+- Touch-friendly controls
+- Gesture support (swipe, pinch)
+
+**Mobile-Optimized Features:**
+- View progressions
 - Playback controls
-- Basic editing
-- Sync with desktop
+- Basic chord editing
+- Export and share
+
+**Progressive Web App:**
+- Install on home screen
+- Offline support
+- Push notifications (optional)
+
+**Sync:**
+- Cloud storage backend
+- Sync between devices
+- Conflict resolution
+
+#### Implementation
+- CSS media queries for responsive layout
+- Touch event handlers
+- Service worker for offline
+- Cloud API for sync
+
+#### Success Metrics
+- [ ] Usable on 320px width
+- [ ] Touch targets 44px+
+- [ ] Playback works on mobile
+- [ ] PWA installable
+- [ ] Offline viewing works
 
 ---
 
 ## Implementation Timeline
+
+### Core Phases (4-6)
 
 | Phase | Feature | Duration | Priority | Dependencies |
 |-------|---------|----------|----------|--------------|
 | **4.1** | Melody Suggestion Engine | 2-3 weeks | 🔥 Critical | None |
 | **4.2** | Auto-Harmonize | 2 weeks | 🔥 Critical | 4.1 |
 | **4.3** | Chord Tone Highlighting | 1 week | High | None |
+| **4.4** | VexFlow Professional Notation | 4-6 weeks | High | None |
 | **5.1** | Bi-Directional Sync | 1-2 weeks | High | None |
 | **5.2** | Voice Leading Visualization | 2 weeks | Medium | 5.1 |
 | **5.3** | Real-Time Sidebar | 1 week | Medium | 5.1 |
-| **6.1** | Export System | 2-3 weeks | High | None |
+| **6.1** | Export System | 2-3 weeks | High | 4.4 |
 | **6.2** | Copy/Paste/Undo | 1-2 weeks | Medium | None |
-| **6.3** | VexFlow Integration | 4-6 weeks | Lower | 6.2 |
-| --- | **New Ideas** | --- | --- | --- |
-| | Guided Wizard | 2 weeks | Medium | 4.1, 4.2 |
-| | Theory Tooltips | 1 week | Medium | None |
-| | Song Form Builder | 2 weeks | Medium | 5.1 |
-| | Custom Scales | 2 weeks | Low | 4.1 |
-| | Reharmonization | 2-3 weeks | Low | 5.1 |
-| | Practice Mode | 2 weeks | Low | None |
-| | Mobile Companion | 4-6 weeks | Low | 6.1 |
 
-**Total Estimated Time:** 16-24 weeks for core features (Phases 4-6)
+### Phase 7: Extended Features
+
+| Phase | Feature | Duration | Priority | Dependencies | Target Users |
+|-------|---------|----------|----------|--------------|--------------|
+| **7.1** | Guided Songwriting Wizard | 2-3 weeks | High | 4.1, 4.2 | Beginners |
+| **7.2** | Theory Explanations on Hover | 1-2 weeks | High | None | Beginners, Intermediate |
+| **7.3** | Difficulty Ratings System | 1 week | Medium | None | All |
+| **7.4** | Song Form Builder | 2-3 weeks | High | 5.1 | Intermediate, Advanced |
+| **7.5** | Rhythm Pattern Library | 2 weeks | High | None | Intermediate |
+| **7.6** | Reharmonization Tools | 3-4 weeks | Medium | 5.1 | Advanced |
+| **7.7** | Custom Scale Support | 2 weeks | Medium | 4.1 | Intermediate, Advanced |
+| **7.8** | Practice Mode (Ear Training) | 2-3 weeks | Medium | None | All |
+| **7.9** | Multi-Section Compositions | 2-3 weeks | High | 5.1 | Intermediate, Advanced |
+| **7.10** | Session History & Auto-Save | 1-2 weeks | High | None | All |
+| **7.11** | Collaboration & Sharing | 3-4 weeks | Medium | 6.1 | All |
+| **7.12** | Mobile Companion | 4-6 weeks | Low | 6.1 | All |
+
+### Suggested Implementation Order
+
+**Sprint 1 (Weeks 1-6): AI Foundation**
+- 4.1 Melody Suggestion Engine
+- 4.2 Auto-Harmonize
+- 4.3 Chord Tone Highlighting
+- 7.2 Theory Explanations
+
+**Sprint 2 (Weeks 7-12): Professional Notation**
+- 4.4 VexFlow Integration (Phase 4.4a-c)
+- 5.1 Bi-Directional Sync
+- 7.10 Session History & Auto-Save
+
+**Sprint 3 (Weeks 13-18): Production Features**
+- 6.1 Export System
+- 6.2 Copy/Paste/Undo
+- 7.1 Guided Songwriting Wizard
+- 7.3 Difficulty Ratings
+
+**Sprint 4 (Weeks 19-24): Advanced Composition**
+- 7.4 Song Form Builder
+- 7.9 Multi-Section Compositions
+- 7.5 Rhythm Pattern Library
+- 5.2 Voice Leading Visualization
+
+**Sprint 5 (Weeks 25-30): Power User Features**
+- 7.6 Reharmonization Tools
+- 7.7 Custom Scale Support
+- 5.3 Real-Time Sidebar
+- 7.8 Practice Mode
+
+**Sprint 6 (Weeks 31-38): Polish & Share**
+- 7.11 Collaboration & Sharing
+- 7.12 Mobile Companion
+
+**Total Estimated Time:**
+- Core features (Phases 4-6): 18-26 weeks
+- All features (Phases 4-7): 30-38 weeks
 
 ---
 
@@ -741,9 +1472,12 @@ Responsive design:
 | **Modal Interchange** | ❌ | ❌ | ❌ | ⚠️ | ✅✅ |
 | **Tension Visualization** | ❌ | ❌ | ❌ | ⚠️ | ✅✅ |
 | **Template Library** | ❌ | ❌ | ❌ | ✅ | ✅✅ |
-| **Professional Notation** | ✅✅ | ✅ | ✅ | ❌ | ⚠️ → ✅ (Phase 6.3) |
-| **Beginner-Friendly** | ⚠️ | ✅ | ✅ | ✅ | ✅✅ (with wizard) |
+| **Professional Notation** | ✅✅ | ✅ | ✅ | ❌ | ⚠️ → ✅ (Phase 4.4) |
+| **Beginner-Friendly** | ⚠️ | ✅ | ✅ | ✅ | ✅✅ (Phase 7.1 wizard) |
 | **MusicXML Export** | ✅✅ | ✅ | ✅ | ❌ | ⚠️ → ✅ (Phase 6.1) |
+| **Song Form Builder** | ⚠️ | ❌ | ❌ | ⚠️ | ✅✅ (Phase 7.4) |
+| **Ear Training** | ❌ | ❌ | ❌ | ❌ | ✅✅ (Phase 7.8) |
+| **Reharmonization** | ❌ | ❌ | ❌ | ⚠️ | ✅✅ (Phase 7.6) |
 
 **Unique Value Proposition:**
 
@@ -777,30 +1511,64 @@ Responsive design:
 
 ## Immediate Next Steps
 
-### Week 1-2: Melody Suggestion Engine Foundation
-1. Design `melodySuggestion.js` algorithm
-2. Create sidebar UI component
-3. Implement chord tone detection
-4. Add stepwise motion analysis
+### Sprint 1: AI Foundation (Weeks 1-6)
+
+#### Week 1-2: Melody Suggestion Engine Foundation (4.1)
+1. Design `melodySuggestion.js` algorithm structure
+2. Implement chord tone detection and scoring
+3. Add stepwise motion analysis from previous notes
+4. Create sidebar UI component with suggestion cards
 5. Build click-to-insert workflow
 
-### Week 3: Integration & Testing
-1. Connect to existing Melody Composer
-2. Add style-aware filtering
-3. Test with various progressions
-4. Gather feedback and iterate
+#### Week 3: Auto-Harmonize Foundation (4.2)
+1. Build melody analysis algorithm (group by measure)
+2. Create chord matching scoring system
+3. Design auto-harmonize modal UI
+4. Implement apply workflow with bass auto-fill
 
-### Week 4-5: Auto-Harmonize
-1. Build melody analysis algorithm
-2. Create chord matching system
-3. Design modal UI
-4. Implement apply workflow
+#### Week 4: Integration & Polish (4.1, 4.2)
+1. Connect melody suggestions to existing Melody Composer
+2. Add style-aware filtering for suggestions
+3. Test with various progressions and genres
+4. Gather feedback and iterate on UI
 
-### Week 6: Polish & Documentation
-1. Performance optimization
-2. User documentation
-3. Tutorial/onboarding
-4. Bug fixes
+#### Week 5: Chord Tone Highlighting (4.3)
+1. Implement real-time analysis during playback
+2. Create color-coded note highlighting
+3. Add educational tooltips for each note type
+4. Build toggle system in settings
+
+#### Week 6: Theory Explanations (7.2)
+1. Create theory explanation database
+2. Implement hover tooltip system
+3. Add famous song examples
+4. Test across all UI touchpoints
+
+### Sprint 2: Professional Notation (Weeks 7-12)
+
+#### Week 7-8: VexFlow Core Integration (4.4a)
+1. Install and configure VexFlow library
+2. Create `vexFlowRenderer.js` with basic measure rendering
+3. Implement note format conversion from existing data
+4. Build single-staff display with clef/key/time
+
+#### Week 9-10: Grand Staff & Multi-System (4.4b)
+1. Implement grand staff with brace connector
+2. Create synchronized treble/bass clef display
+3. Build multi-system layout algorithm
+4. Add measure number display
+
+#### Week 11: Note Editing & Bi-Directional Sync (4.4c, 5.1)
+1. Implement click-to-add note entry
+2. Add duration selector toolbar
+3. Complete bi-directional sync with Progression Builder
+4. Test full round-trip editing
+
+#### Week 12: Session History (7.10)
+1. Implement auto-save every 30 seconds
+2. Create version history storage
+3. Build history panel UI
+4. Add crash recovery detection
 
 ---
 
@@ -849,5 +1617,10 @@ This feature will create immediate "wow moments" for users, demonstrate the uniq
 ---
 
 **Document Created:** November 2024
+**Last Updated:** November 2024
 **Project:** Music Theory Lab
-**Version:** 1.0
+**Version:** 2.0
+
+### Changelog
+- v2.0: Moved VexFlow to Phase 4.4, expanded Phase 7 with detailed specs for 12 features, added sprint-based implementation timeline
+- v1.0: Initial roadmap with Phases 4-6 and basic new feature ideas

@@ -114,6 +114,9 @@ function createTemplateModal() {
                 <button class="category-tab" data-category="${TEMPLATE_CATEGORIES.BLUES}">Blues</button>
                 <button class="category-tab" data-category="${TEMPLATE_CATEGORIES.ROCK}">Rock</button>
                 <button class="category-tab" data-category="${TEMPLATE_CATEGORIES.CLASSICAL}">Classical</button>
+                <button class="category-tab" data-category="${TEMPLATE_CATEGORIES.GOSPEL}">Gospel/Soul</button>
+                <button class="category-tab" data-category="${TEMPLATE_CATEGORIES.WORLD}">World</button>
+                <button class="category-tab" data-category="${TEMPLATE_CATEGORIES.EDM}">EDM</button>
                 <button class="category-tab" data-category="${TEMPLATE_CATEGORIES.CUSTOM}">Custom</button>
             </div>
 
@@ -169,6 +172,34 @@ function createTemplateModal() {
             transform: translateY(-2px);
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
             border-color: #60a5fa !important;
+        }
+        .aka-badge {
+            position: relative;
+        }
+        .aka-tooltip {
+            pointer-events: none;
+        }
+        .aka-badge:hover .aka-tooltip {
+            display: block !important;
+        }
+        /* Ensure tooltip stays within viewport */
+        .aka-badge:first-child .aka-tooltip {
+            left: 0;
+            transform: translateX(0);
+        }
+        .aka-badge:first-child .aka-tooltip > div:last-child {
+            left: 1rem;
+            transform: translateX(0);
+        }
+        .aka-badge:last-child .aka-tooltip {
+            left: auto;
+            right: 0;
+            transform: translateX(0);
+        }
+        .aka-badge:last-child .aka-tooltip > div:last-child {
+            left: auto;
+            right: 1rem;
+            transform: translateX(0);
         }
     `;
     modal.appendChild(style);
@@ -296,6 +327,42 @@ function createTemplateCard(template) {
                     <span class="text-white">${template.arrangement?.timeSignature?.num || 4}/${template.arrangement?.timeSignature?.denom || 4}</span>
                 </div>
             </div>
+
+            <!-- Also Known As -->
+            ${template.alsoKnownAs && template.alsoKnownAs.length > 0 ? `
+                <div class="text-xs text-gray-500 mb-1">Also used in:</div>
+                <div class="flex flex-wrap gap-1 mb-2">
+                    ${template.alsoKnownAs.map(aka => {
+                        // Handle both old string format and new object format
+                        const isObject = typeof aka === 'object';
+                        const name = isObject ? aka.name : aka;
+                        const tempo = isObject ? aka.tempo : null;
+                        const timeSig = isObject && aka.timeSignature ? `${aka.timeSignature.num}/${aka.timeSignature.denom}` : null;
+                        const examples = isObject && aka.examples ? aka.examples : [];
+
+                        const tooltipContent = isObject ?
+                            `${tempo ? `Tempo: ${tempo} BPM` : ''}${timeSig ? `\\nTime: ${timeSig}` : ''}${examples.length > 0 ? `\\nExamples: ${examples.join(', ')}` : ''}` : '';
+
+                        return `
+                            <span class="aka-badge px-2 py-0.5 text-xs bg-purple-900 bg-opacity-50 text-purple-300 rounded border border-purple-700 cursor-help relative group"
+                                  ${isObject ? `data-tooltip="${tooltipContent.replace(/"/g, '&quot;')}"` : ''}>
+                                ${name}
+                                ${isObject ? `
+                                    <div class="aka-tooltip hidden group-hover:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 border border-gray-600 rounded-lg shadow-xl text-left whitespace-nowrap z-50 min-w-max">
+                                        <div class="text-purple-300 font-semibold mb-1">${name}</div>
+                                        ${tempo ? `<div class="text-gray-300"><span class="text-gray-500">Tempo:</span> ${tempo} BPM</div>` : ''}
+                                        ${timeSig ? `<div class="text-gray-300"><span class="text-gray-500">Time:</span> ${timeSig}</div>` : ''}
+                                        ${examples.length > 0 ? `<div class="text-gray-300 mt-1"><span class="text-gray-500">Examples:</span><br/>${examples.map(ex => `<span class="text-gray-400 italic text-xs">${ex}</span>`).join('<br/>')}</div>` : ''}
+                                        <div class="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                                            <div class="border-4 border-transparent border-t-gray-600"></div>
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </span>
+                        `;
+                    }).join('')}
+                </div>
+            ` : ''}
 
             <!-- Examples -->
             ${template.examples && template.examples.length > 0 ? `
