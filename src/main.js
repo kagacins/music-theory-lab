@@ -1029,9 +1029,10 @@ window.addChordFromRecommendation = function(root, type, inversion) {
                     setBuilderChordType(type);
                     setBuilderInversion(inversion);
 
-                    // Import and call addChordToProgression
+                    // Import and call addChordToProgression with fromRecommendation=true
+                    // This sets the default LH pattern to 'off'
                     import('./modules/features/chordBuilder.js').then(builderModule => {
-                        builderModule.addChordToProgression(false, true);
+                        builderModule.addChordToProgression(false, true, true);
                     });
                 }
             });

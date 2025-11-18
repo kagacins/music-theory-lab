@@ -2624,8 +2624,9 @@ export function renderVoicingEditor(notes, editorId, containerId, omittedNotes, 
  * Add the current builder chord to the progression
  * @param {boolean} switchToTrainer - Whether to switch to trainer tab after adding
  * @param {boolean} playShutterSound - Whether to play the camera shutter sound (default: true)
+ * @param {boolean} fromRecommendation - Whether adding from recommendations (sets LH to 'off')
  */
-export function addChordToProgression(switchToTrainer = false, playShutterSound = true) {
+export function addChordToProgression(switchToTrainer = false, playShutterSound = true, fromRecommendation = false) {
     const rootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[getBuilderRootIndex()];
 
     // Play camera shutter sound effect (only if requested)
@@ -2633,7 +2634,8 @@ export function addChordToProgression(switchToTrainer = false, playShutterSound 
         getCameraShutter().start();
     }
 
-    const lhType = document.getElementById('builder-lh-type-select').value;
+    // When adding from recommendations, default LH pattern to 'off'
+    const lhType = fromRecommendation ? 'off' : document.getElementById('builder-lh-type-select').value;
     const lhInversion = parseInt(document.getElementById('builder-lh-inversion-select').value, 10) || 0;
     const lhOctaveShift = parseInt(document.getElementById('builder-lh-octave-select').value, 10);
     const omittedNotes = [...getBuilderOmittedNotes()]; // Capture current voicing

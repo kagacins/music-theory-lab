@@ -2199,36 +2199,42 @@ function renderPatternHighlights(container, progressionData, key) {
  * @param {HTMLElement} container - Container to insert the view into
  * @param {Array} progressionData - Array of chord objects
  * @param {string} key - Current key
+ * @param {Object} options - Rendering options
+ * @param {boolean} options.showActionButtons - Whether to show Add/Clear buttons (default: true)
  */
-function renderSimplifiedChordSequence(container, progressionData, key) {
+function renderSimplifiedChordSequence(container, progressionData, key, options = {}) {
+    const { showActionButtons = true } = options;
+
     if (!progressionData || progressionData.length === 0) return;
 
     // Render cards directly into the grid container (like Melody Composer)
     // Clear existing content
     container.innerHTML = '';
 
-    // Add "Add Chord" and "Clear All" buttons as first grid item
-    const buttonContainer = document.createElement('div');
-    buttonContainer.className = 'chord-card-wrapper flex flex-col justify-center items-center gap-2 p-2 bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl';
-    buttonContainer.innerHTML = `
-        <button onclick="window.toggleQuickAddChord && window.toggleQuickAddChord()"
-                class="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
-                title="Add chord">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-            </svg>
-            Add
-        </button>
-        <button onclick="window.clearProgression && window.clearProgression()"
-                class="w-full px-3 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
-                title="Clear all">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"></path>
-            </svg>
-            Clear
-        </button>
-    `;
-    container.appendChild(buttonContainer);
+    // Add "Add Chord" and "Clear All" buttons as first grid item (only for Progression Builder)
+    if (showActionButtons) {
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'chord-card-wrapper flex flex-col justify-center items-center gap-2 p-2 bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl';
+        buttonContainer.innerHTML = `
+            <button onclick="window.toggleQuickAddChord && window.toggleQuickAddChord()"
+                    class="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    title="Add chord">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Add
+            </button>
+            <button onclick="window.clearProgression && window.clearProgression()"
+                    class="w-full px-3 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    title="Clear all">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"></path>
+                </svg>
+                Clear
+            </button>
+        `;
+        container.appendChild(buttonContainer);
+    }
 
     // Create card wrappers for each chord
     progressionData.forEach((chord, index) => {
@@ -2626,8 +2632,8 @@ function createDetailedCardHTML(chord, index, key) {
 
     return `
         <div class="detailed-card bg-white border-2 border-blue-500 rounded-lg overflow-hidden shadow-lg">
-            <!-- Header -->
-            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1.5">
+            <!-- Header - drag handle for reordering -->
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1.5 drag-handle cursor-grab active:cursor-grabbing">
                 <div class="flex justify-between items-start">
                     <div class="flex-1">
                         <div class="text-sm font-bold">${chordSymbol}</div>
@@ -3338,7 +3344,7 @@ function attachCardEventListeners(wrapper, index) {
 
         // Tooltip inversion buttons - hold to play
         tooltipInversionBtns.forEach(btn => {
-            // Mousedown - start playing chord
+            // Mousedown - start playing chord and render notation immediately
             btn.addEventListener('mousedown', (e) => {
                 e.stopPropagation();
                 const inversion = parseInt(btn.getAttribute('data-inversion'));
@@ -3353,23 +3359,29 @@ function attachCardEventListeners(wrapper, index) {
                 if (window.startProgressionChord) {
                     window.startProgressionChord(index);
                 }
+
+                // Render notation immediately alongside playback
+                const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
+                if (melodyCanvas && window.renderChordProgressionStaff) {
+                    requestAnimationFrame(() => {
+                        window.renderChordProgressionStaff(melodyCanvas);
+                    });
+                }
             });
 
-            // Mouseup - stop playing chord (keep tooltip open)
+            // Mouseup - stop playing chord
             btn.addEventListener('mouseup', (e) => {
                 e.stopPropagation();
                 if (window.stopTrainerChord) {
                     window.stopTrainerChord();
                 }
-                // Don't update UI here - tooltip stays open for trying other inversions
             });
 
-            // Mouseleave - stop playing if user drags off button (keep tooltip open)
+            // Mouseleave - stop playing if user drags off button
             btn.addEventListener('mouseleave', (e) => {
                 if (window.stopTrainerChord) {
                     window.stopTrainerChord();
                 }
-                // Don't update UI here - tooltip stays open for trying other inversions
             });
 
             // Touch events for mobile
@@ -3387,6 +3399,14 @@ function attachCardEventListeners(wrapper, index) {
                 if (window.startProgressionChord) {
                     window.startProgressionChord(index);
                 }
+
+                // Render notation immediately alongside playback
+                const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
+                if (melodyCanvas && window.renderChordProgressionStaff) {
+                    requestAnimationFrame(() => {
+                        window.renderChordProgressionStaff(melodyCanvas);
+                    });
+                }
             }, { passive: true });
 
             btn.addEventListener('touchend', (e) => {
@@ -3394,7 +3414,6 @@ function attachCardEventListeners(wrapper, index) {
                 if (window.stopTrainerChord) {
                     window.stopTrainerChord();
                 }
-                // Don't update UI here - tooltip stays open for trying other inversions
             }, { passive: true });
 
             // Prevent click event from bubbling
@@ -3411,6 +3430,14 @@ function attachCardEventListeners(wrapper, index) {
                 // Update the card UI after closing to show any inversion changes
                 updateSingleCard(index);
                 updateTensionCurveIfVisible();
+
+                // Also update the Melody Composer's main staff notation
+                const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
+                if (melodyCanvas && window.renderChordProgressionStaff) {
+                    requestAnimationFrame(() => {
+                        window.renderChordProgressionStaff(melodyCanvas);
+                    });
+                }
             }
         });
     }
@@ -3423,7 +3450,21 @@ function attachCardEventListeners(wrapper, index) {
  * Uses transform instead of margin to preserve card width
  */
 function updateCardShifts() {
-    const container = document.getElementById('progression-visualization');
+    // Update shifts for both containers
+    const containers = [
+        document.getElementById('progression-visualization'),
+        document.getElementById('melody-progression-visualization')
+    ].filter(c => c); // Filter out null containers
+
+    containers.forEach(container => {
+        updateContainerShifts(container);
+    });
+}
+
+/**
+ * Update shift classes for a specific container
+ */
+function updateContainerShifts(container) {
     if (!container) return;
 
     // Use double requestAnimationFrame to ensure DOM is fully rendered and all updates are complete
@@ -3505,11 +3546,15 @@ function updateCardShifts() {
 
 /**
  * Expand a chord card to detailed view
+ * Updates cards in both containers to keep them in sync
  */
 function expandChordCard(index) {
     expandedChords.add(index);
-    const wrapper = document.querySelector(`.chord-card-wrapper[data-chord-index="${index}"]`);
-    if (wrapper) {
+
+    // Find wrappers in both containers
+    const wrappers = document.querySelectorAll(`.chord-card-wrapper[data-chord-index="${index}"]`);
+
+    wrappers.forEach(wrapper => {
         const trainerState = getTrainerState();
         const chord = trainerState.progressionData[index];
         const key = trainerState.currentKey || 'C';
@@ -3549,7 +3594,7 @@ function expandChordCard(index) {
 
         // Force layout by reading dimensions
         wrapper.getBoundingClientRect();
-    }
+    });
 
     // Update shifts for all cards after layout is applied
     // (will be called again after notation renders and sets minWidth)
@@ -3560,11 +3605,15 @@ function expandChordCard(index) {
 
 /**
  * Collapse a chord card back to simplified view
+ * Updates cards in both containers to keep them in sync
  */
 function collapseChordCard(index) {
     expandedChords.delete(index);
-    const wrapper = document.querySelector(`.chord-card-wrapper[data-chord-index="${index}"]`);
-    if (wrapper) {
+
+    // Find wrappers in both containers
+    const wrappers = document.querySelectorAll(`.chord-card-wrapper[data-chord-index="${index}"]`);
+
+    wrappers.forEach(wrapper => {
         const trainerState = getTrainerState();
         const chord = trainerState.progressionData[index];
         const key = trainerState.currentKey || 'C';
@@ -3584,7 +3633,7 @@ function collapseChordCard(index) {
 
         // Force layout by reading dimensions
         wrapper.getBoundingClientRect();
-    }
+    });
 
     // Update shifts for all cards after layout is applied
     requestAnimationFrame(() => {
@@ -3654,8 +3703,22 @@ function updateSingleCard(index) {
     const trainerState = getTrainerState();
     const chord = trainerState.progressionData[index];
     const key = trainerState.currentKey || 'C';
-    const wrapper = document.querySelector(`.chord-card-wrapper[data-chord-index="${index}"]`);
 
+    if (!chord) return;
+
+    // Update cards in both containers
+    const wrappers = document.querySelectorAll(`.chord-card-wrapper[data-chord-index="${index}"]`);
+    if (wrappers.length === 0) return;
+
+    wrappers.forEach(wrapper => {
+        updateSingleCardWrapper(wrapper, chord, index, key);
+    });
+}
+
+/**
+ * Update a single card wrapper with new chord data
+ */
+function updateSingleCardWrapper(wrapper, chord, index, key) {
     if (!wrapper || !chord) return;
 
     // Preserve the current shift before updating to prevent visual flash
@@ -3858,6 +3921,10 @@ function updateChordInversion(index, newInversion, shouldUpdateUI = true) {
         chord.notes = chordInfo.notes;
         chord.lhNotes = chordInfo.lhNotes;
 
+        // Clear omittedNotes since note names change with inversion (e.g., C4 becomes C5)
+        // This ensures all notes are played and checkboxes show correct state
+        chord.omittedNotes = [];
+
         // Reapply octave shift if it was previously set
         if (chord.octaveShift && chord.octaveShift !== 0) {
             chord.notes = chord.notes.map(note => {
@@ -3881,6 +3948,14 @@ function updateChordInversion(index, newInversion, shouldUpdateUI = true) {
     if (shouldUpdateUI) {
         updateSingleCard(index);
         updateTensionCurveIfVisible();
+
+        // Also update the Melody Composer's main staff notation
+        const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
+        if (melodyCanvas && window.renderChordProgressionStaff) {
+            requestAnimationFrame(() => {
+                window.renderChordProgressionStaff(melodyCanvas);
+            });
+        }
     }
 }
 
@@ -3926,6 +4001,14 @@ function updateChordLHPattern(index, newLHPattern) {
 
     // Update only this card (LH pattern doesn't affect tension curve)
     updateSingleCard(index);
+
+    // Also update the Melody Composer's main staff notation
+    const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
+    if (melodyCanvas && window.renderChordProgressionStaff) {
+        requestAnimationFrame(() => {
+            window.renderChordProgressionStaff(melodyCanvas);
+        });
+    }
 
     // Play the chord with the new LH pattern
     const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
@@ -4000,6 +4083,14 @@ function updateRHOctaveShift(index, shift) {
     // Update only this card
     updateSingleCard(index);
 
+    // Also update the Melody Composer's main staff notation
+    const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
+    if (melodyCanvas && window.renderChordProgressionStaff) {
+        requestAnimationFrame(() => {
+            window.renderChordProgressionStaff(melodyCanvas);
+        });
+    }
+
     // Play the chord with the new octave (LH is relative to RH, so update LH too)
     const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
     const lhRelativeShift = chord.lhOctaveShift || -12;
@@ -4046,6 +4137,14 @@ function updateLHOctaveShift(index, shift) {
     // Update only this card
     updateSingleCard(index);
 
+    // Also update the Melody Composer's main staff notation
+    const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
+    if (melodyCanvas && window.renderChordProgressionStaff) {
+        requestAnimationFrame(() => {
+            window.renderChordProgressionStaff(melodyCanvas);
+        });
+    }
+
     // Play the chord with the new LH octave
     const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
     const lhNotes = (chord.lhNotes || []).filter(n => !(chord.lhOmittedNotes || []).includes(n));
@@ -4077,11 +4176,22 @@ function updateLHInversion(index, newInversion) {
         getEnharmonicPreference()
     );
 
+    // Clear lhOmittedNotes since note names change with inversion
+    chord.lhOmittedNotes = [];
+
     // Save state
     saveState({ type: 'chord-update', data: { index, property: 'lhInversion', value: newInversion } });
 
     // Update only this card
     updateSingleCard(index);
+
+    // Also update the Melody Composer's main staff notation
+    const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
+    if (melodyCanvas && window.renderChordProgressionStaff) {
+        requestAnimationFrame(() => {
+            window.renderChordProgressionStaff(melodyCanvas);
+        });
+    }
 
     // Note: Playback is handled by the press-and-hold event handler on the button
     // Don't call playTrainerChordOnce here as it would conflict with the hold behavior
@@ -4238,7 +4348,29 @@ function initializeSimplifiedSortable(container) {
         dragClass: 'sortable-drag',
         handle: '.drag-handle',
         filter: '.chord-card-wrapper:first-child', // Exclude Add/Clear buttons (first child)
+        swapThreshold: 0.65, // More tolerant swapping for transformed elements
+        onStart: function(evt) {
+            // Clear all transforms during drag so Sortable can calculate positions correctly
+            const allWrappers = container.querySelectorAll('.chord-card-wrapper[data-chord-index]');
+            allWrappers.forEach(wrapper => {
+                // Store current transform for restoration
+                wrapper.setAttribute('data-stored-transform', wrapper.style.transform || '');
+                wrapper.style.transform = '';
+                wrapper.classList.remove('shift-right');
+            });
+        },
         onEnd: function(evt) {
+            // First, restore transforms for all cards (in case drag was cancelled)
+            const allWrappers = container.querySelectorAll('.chord-card-wrapper[data-chord-index]');
+            allWrappers.forEach(wrapper => {
+                const storedTransform = wrapper.getAttribute('data-stored-transform') || '';
+                if (storedTransform) {
+                    wrapper.style.transform = storedTransform;
+                    wrapper.classList.add('shift-right');
+                }
+                wrapper.removeAttribute('data-stored-transform');
+            });
+
             if (evt.oldIndex !== evt.newIndex) {
                 // Account for button container at index 0
                 // Subtract 1 from both indices since buttons take up position 0
@@ -4269,8 +4401,9 @@ function initializeSimplifiedSortable(container) {
                     data: { fromIndex: actualOldIndex, toIndex: actualNewIndex }
                 });
 
-                // Re-render both views
-                renderProgressionDisplay();
+                // Re-render both views (this will recalculate shifts properly)
+                renderProgressionDisplay('progression-visualization', true);
+                renderProgressionDisplay('melody-progression-visualization', false);
             }
         }
     });
@@ -4640,16 +4773,16 @@ function highlightChordCard(index) {
     // First remove all existing highlights
     unhighlightAllChordCards();
 
-    // Highlight the specified card
-    const wrapper = document.querySelector(`.chord-card-wrapper[data-chord-index="${index}"]`);
-    if (wrapper) {
+    // Highlight the specified card in both containers
+    const wrappers = document.querySelectorAll(`.chord-card-wrapper[data-chord-index="${index}"]`);
+    wrappers.forEach(wrapper => {
         const card = wrapper.querySelector('.simplified-card, .detailed-card');
         if (card) {
             card.classList.add('ring-4', 'ring-blue-400', 'ring-offset-2');
             card.setAttribute('data-highlighted', 'true');
         }
-    }
-    
+    });
+
     // Ensure shifts are maintained after highlighting (in case highlighting triggered any layout changes)
     updateCardShifts();
 }
@@ -4677,15 +4810,15 @@ export function selectChordCard(index) {
     // First remove all existing selections
     deselectAllChordCards();
 
-    // Select the specified card
-    const wrapper = document.querySelector(`.chord-card-wrapper[data-chord-index="${index}"]`);
-    if (wrapper) {
+    // Select the specified card in both containers
+    const wrappers = document.querySelectorAll(`.chord-card-wrapper[data-chord-index="${index}"]`);
+    wrappers.forEach(wrapper => {
         const card = wrapper.querySelector('.simplified-card, .detailed-card');
         if (card) {
             card.classList.add('ring-4', 'ring-purple-500', 'ring-offset-2');
             card.setAttribute('data-selected', 'true');
         }
-    }
+    });
 
     // Ensure shifts are maintained after selection
     updateCardShifts();
@@ -4889,7 +5022,26 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         return;
     }
 
-    // For melody tab or other views, render traditional detailed cards
+    // MELODY COMPOSER: Use same simplified/detailed card style with Add/Clear buttons
+    if (containerId === 'melody-progression-visualization' && trainerState.progressionData.length > 0) {
+        // Render simplified chord cards with action buttons (same as Progression Builder)
+        renderSimplifiedChordSequence(container, trainerState.progressionData, trainerState.currentKey || 'C', {
+            showActionButtons: true
+        });
+
+        // Also update the Melody Composer's musical notation staff
+        const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
+        if (melodyCanvas && window.renderChordProgressionStaff) {
+            // Use requestAnimationFrame to ensure DOM is ready
+            requestAnimationFrame(() => {
+                window.renderChordProgressionStaff(melodyCanvas);
+            });
+        }
+
+        return;
+    }
+
+    // For other views, render traditional detailed cards
     trainerState.progressionData.forEach((chordData, index) => {
         // Create wrapper container for controls above and card below
         const wrapper = document.createElement('div');
@@ -6054,7 +6206,8 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
                     cont.sortableInstance = null;
                 }
             } catch (_) {}
-            renderProgressionDisplay();
+            renderProgressionDisplay('progression-visualization', true);
+            renderProgressionDisplay('melody-progression-visualization', false);
             return window.ddInspect();
         };
     }
@@ -6201,7 +6354,8 @@ export function loadProgression() {
     setProgressionData(progressionData);
 
     updateProgressionControlsUI();
-    renderProgressionDisplay();
+    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', false);
     highlightTrainer(scaleNotes, null);
 
     // Update keyboard labels (function to be imported from UI module)
@@ -6330,7 +6484,8 @@ export function updateProgressionEnharmonics() {
     setProgressionData(progressionData);
 
     // Re-render the display
-    renderProgressionDisplay();
+    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', false);
 
     // Update keyboard labels
     if (window.updateKeyboardLabels) {
@@ -6793,15 +6948,6 @@ export function handleAutoPlayback() {
             }, time);
             
             Tone.Draw.schedule(() => {
-                document.querySelectorAll('#progression-visualization > div').forEach((wrapper) => {
-                    const card = wrapper.querySelector('.progression-chord-item');
-                    const wrapperIndex = parseInt(wrapper.getAttribute('data-index'));
-                    if (card && wrapperIndex === index) {
-                        card.classList.add('active-progression-card');
-                    } else if (card) {
-                        card.classList.remove('active-progression-card');
-                    }
-                });
                 document.getElementById('progression-chord-notes-display').textContent = `${chord.roman} (${chord.name})`;
                 highlightTrainer(trainerState.scaleNotes, rhNotes.concat(lhNotes));
 
@@ -7299,12 +7445,14 @@ export function startProgressionChord(index) {
 
     // If no auto-generated bass, use traditional LH chord notes
     if (!bassAutoFillActive) {
+        // Calculate absolute LH octave shift (RH octave + relative LH shift)
+        const absoluteLHOctaveShift = octaveShift + (lhOctaveShift || -12);
         const rawLhNotes = getLHNotes(
         chord.root,
-        lhType,
-        lhInversion,
+        lhType || 'off',
+        lhInversion || 0,
         trainerState.currentKey,
-        lhOctaveShift,
+        absoluteLHOctaveShift,
         chord.type,
         getEnharmonicPreference()
     );
@@ -7317,17 +7465,6 @@ export function startProgressionChord(index) {
             return true;
         });
     }
-
-    // Highlight the current card - find by data-index attribute
-    document.querySelectorAll('#progression-visualization > div').forEach((wrapper) => {
-        const card = wrapper.querySelector('.progression-chord-item');
-        const wrapperIndex = parseInt(wrapper.getAttribute('data-index'));
-        if (card && wrapperIndex === index) {
-            card.classList.add('active-progression-card');
-        } else if (card) {
-            card.classList.remove('active-progression-card');
-        }
-    });
 
     // Apply saved voicing from the chord data
     const voicedNotes = chordNotes.filter(note => !omittedNotes.includes(note));
@@ -7488,17 +7625,6 @@ function playProgressionChord(index, advance = true) {
         getEnharmonicPreference()
     );
     }
-
-    // Highlight the current card - find by data-index attribute
-    document.querySelectorAll('#progression-visualization > div').forEach((wrapper) => {
-        const card = wrapper.querySelector('.progression-chord-item');
-        const wrapperIndex = parseInt(wrapper.getAttribute('data-index'));
-        if (card && wrapperIndex === index) {
-            card.classList.add('active-progression-card');
-        } else if (card) {
-            card.classList.remove('active-progression-card');
-        }
-    });
 
     // Highlight corresponding tension curve point and chord card
     highlightTensionPoint(index);
@@ -7984,10 +8110,11 @@ export function clearProgression() {
     document.querySelectorAll('.active-progression-card').forEach(card => {
         card.classList.remove('active-progression-card');
     });
-    
+
     // Re-render the display
-    renderProgressionDisplay();
-    
+    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', false);
+
     // Update UI
     updateProgressionControlsUI();
 
@@ -8484,7 +8611,8 @@ export function toggleRecording() {
         setRecordedProgression([]);
         setProgressionData([]);
         setProgressionRomans([]);
-        renderProgressionDisplay();
+        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', false);
 
         recordText.textContent = 'Stop';
         recordBtn.classList.add('animate-pulse');
@@ -8626,7 +8754,8 @@ export function renderProgressionControls() {
         loadProgression();
     } else {
         // Render progression display
-        renderProgressionDisplay();
+        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', false);
     }
 }
 
@@ -8694,7 +8823,8 @@ function restoreProgressionState(state) {
     setCurrentKey(state.currentKey);
 
     // Re-render display
-    renderProgressionDisplay();
+    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', false);
 
     // Update keyboard labels if function exists
     if (window.updateKeyboardLabels) {
