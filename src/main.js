@@ -208,6 +208,7 @@ import {
     playSelectedMeasure,
     playFromSelectedMeasure,
     getSelectedMeasureIndex,
+    setSelectedMeasureIndex,
     startStepMeasureMelody,
     stopStepMeasureMelody,
     setMelodyClef,
@@ -1751,6 +1752,7 @@ window.stopPlayAllMelody = stopPlayAllMelody;
 window.playMeasure = playMeasure;
 window.playSelectedMeasure = playSelectedMeasure;
 window.playFromSelectedMeasure = playFromSelectedMeasure;
+window.setSelectedMeasureIndex = setSelectedMeasureIndex;
 window.startStepMeasureMelody = startStepMeasureMelody;
 window.stopStepMeasureMelody = stopStepMeasureMelody;
 window.setMelodyClef = setMelodyClef;

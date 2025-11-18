@@ -2211,12 +2211,16 @@ function renderSimplifiedChordSequence(container, progressionData, key, options 
     // Clear existing content
     container.innerHTML = '';
 
-    // Add "Add Chord" and "Clear All" buttons as first grid item (only for Progression Builder)
+    // Add "Add Chord" and "Clear All" buttons as first grid item
     if (showActionButtons) {
+        // Determine which toggle function to use based on container
+        const isMelodyComposer = container.id === 'melody-progression-visualization';
+        const toggleFunction = isMelodyComposer ? 'toggleQuickAddChordMelody' : 'toggleQuickAddChord';
+
         const buttonContainer = document.createElement('div');
         buttonContainer.className = 'chord-card-wrapper flex flex-col justify-center items-center gap-2 p-2 bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl';
         buttonContainer.innerHTML = `
-            <button onclick="window.toggleQuickAddChord && window.toggleQuickAddChord()"
+            <button onclick="window.${toggleFunction} && window.${toggleFunction}()"
                     class="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
                     title="Add chord">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4793,8 +4797,18 @@ function highlightChordCard(index) {
 function unhighlightAllChordCards() {
     const allCards = document.querySelectorAll('.simplified-card[data-highlighted="true"], .detailed-card[data-highlighted="true"]');
     allCards.forEach(card => {
-        card.classList.remove('ring-4', 'ring-blue-400', 'ring-offset-2');
+        // Remove blue highlight color
+        card.classList.remove('ring-blue-400');
         card.removeAttribute('data-highlighted');
+
+        // Only remove ring-4 and ring-offset-2 if card is NOT selected
+        // (selected cards need these classes for their purple ring)
+        if (!card.hasAttribute('data-selected')) {
+            card.classList.remove('ring-4', 'ring-offset-2');
+        } else {
+            // Card is selected, ensure purple ring color is applied
+            card.classList.add('ring-purple-500');
+        }
     });
 }
 
@@ -4822,6 +4836,11 @@ export function selectChordCard(index) {
 
     // Ensure shifts are maintained after selection
     updateCardShifts();
+
+    // Sync measure selection with chord card selection
+    if (window.setSelectedMeasureIndex) {
+        window.setSelectedMeasureIndex(index);
+    }
 }
 
 /**
@@ -7298,12 +7317,29 @@ export function stopStepChord() {
     // Stop the currently playing chord immediately
     stopTrainerChord();
 
-    // Aggressively stop all notes
+    // Stop Tone.Transport to cancel any scheduled events
+    try {
+        Tone.Transport.stop();
+        Tone.Transport.cancel();
+    } catch (e) {
+        // Ignore errors
+    }
+
+    // Aggressively stop all notes from both synth and piano
     const instrument = getInstrument();
+    const piano = getPiano();
+
     if (instrument && getAudioIsReady()) {
         try {
             instrument.releaseAll(Tone.now());
-            instrument.releaseAll(Tone.now() - 0.001);
+        } catch (e) {
+            // Ignore errors
+        }
+    }
+
+    if (piano) {
+        try {
+            piano.releaseAll(Tone.now());
         } catch (e) {
             // Ignore errors
         }
@@ -7317,14 +7353,14 @@ export function stopStepChord() {
     unhighlightAllTensionPoints();
     unhighlightAllChordCards();
 
-    // Advance to next chord and update selection (purple outline)
+    // Advance to next chord and update selection
     const trainerState = getTrainerState();
     const totalChords = trainerState.progressionData ? trainerState.progressionData.length : 0;
 
     if (totalChords > 0) {
         const nextIndex = (trainerState.currentIndex + 1) % totalChords;
 
-        // Select the next chord (this updates both selectedChordIndex and currentIndex)
+        // Select the next chord card (this also syncs the measure in notation)
         selectChordCard(nextIndex);
 
         // Update display
@@ -7335,11 +7371,11 @@ export function stopStepChord() {
             }
         }
 
-        updateProgressionControlsUI();
-
         // Update last step time to maintain stepping sequence
         lastStepTime = Date.now();
     }
+
+    updateProgressionControlsUI();
 }
 
 /**
@@ -7934,10 +7970,10 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0) {
     // Calculate roman numeral for the chord
     const roman = noteToRomanNumeral(root, trainerState.currentKey, chordType) || '';
 
-    // Generate default LH notes (default pattern: 'rootOnly', same octave as RH)
-    const defaultLHType = 'rootOnly';
+    // Generate default LH notes (default pattern: 'off' - no LH by default for recommendations)
+    const defaultLHType = 'off';
     const defaultLHInversion = 0;
-    const defaultLHRelativeShift = 0; // Same octave as RH by default
+    const defaultLHRelativeShift = -12; // One octave below RH by default (for when LH is enabled later)
     const defaultRHOctaveShift = 0; // New chords start at default octave
     const absoluteLHOctaveShift = defaultRHOctaveShift + defaultLHRelativeShift;
     const lhNotes = getLHNotes(
@@ -7960,7 +7996,7 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0) {
         inversion: inversion || 0,
         selectionMode: 'chord',
         omittedNotes: [],
-        octaveShift: 0,
+        octaveShift: defaultRHOctaveShift,
         lhType: defaultLHType,
         lhInversion: defaultLHInversion,
         lhOctaveShift: defaultLHRelativeShift,

@@ -24,6 +24,9 @@ let chordClef = 'treble'; // 'treble' or 'bass'
 // Track currently playing notes for highlighting (format: "measure-beat-pitch")
 let activeNotes = new Set();
 
+// Track timeouts for playMeasure so they can be cleared on stop
+let measurePlaybackTimeouts = [];
+
 /**
  * Get notes available for melody based on chord and style
  */
@@ -3951,6 +3954,11 @@ function setupCanvasClickToPlay(canvas, numMeasures, measureWidth) {
                     }
                 });
 
+                // Sync chord card selection with measure selection
+                if (window.selectChordCard) {
+                    window.selectChordCard(measureIndex);
+                }
+
                 startMeasurePlayback(canvas, measureIndex);
             }
         }
@@ -4020,6 +4028,11 @@ function setupCanvasClickToPlay(canvas, numMeasures, measureWidth) {
                         window.renderChordProgressionStaff(canvas);
                     }
                 });
+
+                // Sync chord card selection with measure selection
+                if (window.selectChordCard) {
+                    window.selectChordCard(measureIndex);
+                }
 
                 startMeasurePlayback(canvas, measureIndex);
             }
@@ -4612,9 +4625,37 @@ export function getSelectedMeasureIndex() {
     return selectedMeasureIndex;
 }
 
+/**
+ * Set the selected measure index and re-render the notation
+ * @param {number} index - The measure index to select (0-based)
+ */
+export function setSelectedMeasureIndex(index) {
+    const progressionData = getProgressionData();
+    const maxMeasureFromMelody = interactiveMelody.melodyNotes.length > 0
+        ? Math.max(...interactiveMelody.melodyNotes.map(n => n.measure)) + 1
+        : 0;
+    const numMeasures = Math.max(progressionData ? progressionData.length : 0, maxMeasureFromMelody);
+
+    if (index >= 0 && index < numMeasures) {
+        selectedMeasureIndex = index;
+
+        // Re-render canvas to show new selection
+        const canvas = document.getElementById('interactive-melody-notation-canvas');
+        if (canvas) {
+            const isRecording = window.isInteractiveMode || false;
+            if (isRecording && window.renderInteractiveMelodyStaff) {
+                window.renderInteractiveMelodyStaff(canvas);
+            } else if (window.renderChordProgressionStaff) {
+                window.renderChordProgressionStaff(canvas);
+            }
+        }
+    }
+}
+
 // Step measure functionality for Melody Composer
 let currentStepMeasureIndex = -1;
 let stepMeasureTimeout = null;
+let isStepMeasurePlaying = false; // Track if step measure is currently playing
 
 /**
  * Start playing the current step measure (hold to play)
@@ -4622,19 +4663,19 @@ let stepMeasureTimeout = null;
 export function startStepMeasureMelody() {
     const progressionData = getProgressionData();
     if (!progressionData || progressionData.length === 0) return;
-    
+
     initAudio();
     if (!getAudioIsReady()) return;
-    
+
     // Use selected measure, or default to first measure (0)
     // Make sure selectedMeasureIndex is valid, otherwise use 0
     // IMPORTANT: selectedMeasureIndex can be up to numMeasures-1, not just progressionData.length-1
     // because melody notes can extend beyond the chord progression
-    const maxMeasureFromMelody = interactiveMelody.melodyNotes.length > 0 
+    const maxMeasureFromMelody = interactiveMelody.melodyNotes.length > 0
         ? Math.max(...interactiveMelody.melodyNotes.map(n => n.measure)) + 1
         : 0;
     const numMeasures = Math.max(progressionData.length, maxMeasureFromMelody);
-    
+
     let measureToPlay = 0;
     if (selectedMeasureIndex >= 0 && selectedMeasureIndex < numMeasures) {
         measureToPlay = selectedMeasureIndex;
@@ -4643,8 +4684,9 @@ export function startStepMeasureMelody() {
         selectedMeasureIndex = 0;
         measureToPlay = 0;
     }
-    
+
     currentStepMeasureIndex = measureToPlay;
+    isStepMeasurePlaying = true;
     playMeasure(measureToPlay);
 }
 
@@ -4652,10 +4694,25 @@ export function startStepMeasureMelody() {
  * Stop playing the current step measure and advance to next
  */
 export function stopStepMeasureMelody() {
+    // Only process if we were actually playing
+    if (!isStepMeasurePlaying) {
+        return;
+    }
+
+    // Reset the playing flag
+    isStepMeasurePlaying = false;
+
+    // Clear all scheduled timeouts from playMeasure
+    measurePlaybackTimeouts.forEach(timeoutId => {
+        clearTimeout(timeoutId);
+    });
+    measurePlaybackTimeouts = [];
+
     // Stop any currently playing measure
     Tone.Transport.stop();
     Tone.Transport.cancel();
 
+    // Release all notes - this works properly now that we use triggerAttack instead of triggerAttackRelease
     const piano = getPiano();
     const synth = getInstrument();
     if (piano) {
@@ -4689,6 +4746,11 @@ export function stopStepMeasureMelody() {
         const nextIndex = (currentStepMeasureIndex + 1) % progressionData.length;
         selectedMeasureIndex = nextIndex;
         currentStepMeasureIndex = nextIndex;
+
+        // Sync chord card selection with measure advancement
+        if (window.selectChordCard) {
+            window.selectChordCard(nextIndex);
+        }
 
         // Re-render canvas to show new selection
         const canvas = document.getElementById('interactive-melody-notation-canvas');
@@ -4910,6 +4972,12 @@ export function playMeasure(measureIndex) {
     const progressionData = getProgressionData();
     if (!progressionData || progressionData.length === 0) return;
 
+    // Clear any previous timeouts from a prior playMeasure call
+    measurePlaybackTimeouts.forEach(timeoutId => {
+        clearTimeout(timeoutId);
+    });
+    measurePlaybackTimeouts = [];
+
     // Calculate numMeasures to allow melody notes beyond chord progression
     const maxMeasureFromMelody = interactiveMelody.melodyNotes.length > 0
         ? Math.max(...interactiveMelody.melodyNotes.map(n => n.measure)) + 1
@@ -4995,8 +5063,8 @@ export function playMeasure(measureIndex) {
             const noteDuration = bassNote.duration ? Tone.Time(bassNote.duration).toSeconds() : beatDuration;
 
             // Schedule the bass note to play at its proper beat timing
-            setTimeout(() => {
-                piano.triggerAttackRelease(bassNote.pitch, bassNote.duration || '4n', Tone.now());
+            const timeoutId = setTimeout(() => {
+                piano.triggerAttack(bassNote.pitch, Tone.now());
 
                 // Add to activeNotes for highlighting
                 const noteId = `${measureIndex}-${noteBeat}-${bassNote.pitch}`;
@@ -5012,7 +5080,7 @@ export function playMeasure(measureIndex) {
                 updateCanvas();
 
                 // Remove from activeNotes after note duration
-                setTimeout(() => {
+                const cleanupId = setTimeout(() => {
                     activeNotes.delete(noteId);
                     const keyEl = document.getElementById(getNoteKeyId(bassNote.pitch));
                     if (keyEl) {
@@ -5020,13 +5088,15 @@ export function playMeasure(measureIndex) {
                     }
                     updateCanvas();
                 }, noteDuration * 1000);
+                measurePlaybackTimeouts.push(cleanupId);
             }, delay * 1000);
+            measurePlaybackTimeouts.push(timeoutId);
         });
     } else if (chordNotes.length > 0) {
         // Bass auto-fill is NOT active - play chord notes all at once
         const chordDurationSeconds = Tone.Time('1n').toSeconds();
 
-        piano.triggerAttackRelease(chordNotes, '1n');
+        piano.triggerAttack(chordNotes, Tone.now());
 
         // Add to activeNotes for highlighting (format: "measure-0-pitch")
         chordNotes.forEach(note => {
@@ -5044,7 +5114,7 @@ export function playMeasure(measureIndex) {
         updateCanvas();
 
         // Remove chord highlights after duration
-        setTimeout(() => {
+        const chordCleanupId = setTimeout(() => {
             chordNotes.forEach(note => {
                 const noteId = `${measureIndex}-0-${note}`;
                 activeNotes.delete(noteId);
@@ -5056,6 +5126,7 @@ export function playMeasure(measureIndex) {
             });
             updateCanvas();
         }, chordDurationSeconds * 1000);
+        measurePlaybackTimeouts.push(chordCleanupId);
     }
 
     // Get melody notes for this measure
@@ -5071,9 +5142,9 @@ export function playMeasure(measureIndex) {
 
             const delay = note.beat * beatDuration; // Use actual beat position for timing
 
-            setTimeout(() => {
+            const melodyTimeoutId = setTimeout(() => {
                 const noteDuration = note.duration ? Tone.Time(note.duration).toSeconds() : 0.5;
-                synth.triggerAttackRelease(note.pitch, noteDuration);
+                synth.triggerAttack(note.pitch, Tone.now());
 
                 // Add to activeNotes for highlighting (format: "measure-beat-pitch")
                 const noteBeat = typeof note.beat === 'number' ? note.beat : index;
@@ -5090,7 +5161,7 @@ export function playMeasure(measureIndex) {
                 }
 
                 // Remove highlights after note duration
-                setTimeout(() => {
+                const melodyCleanupId = setTimeout(() => {
                     activeNotes.delete(noteId);
                     updateCanvas();
 
@@ -5098,7 +5169,9 @@ export function playMeasure(measureIndex) {
                         keyEl.classList.remove('active-melody-playback');
                     }
                 }, noteDuration * 1000);
+                measurePlaybackTimeouts.push(melodyCleanupId);
             }, delay * 1000);
+            measurePlaybackTimeouts.push(melodyTimeoutId);
         });
     }
 }
