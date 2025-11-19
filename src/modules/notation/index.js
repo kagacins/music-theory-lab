@@ -37,6 +37,10 @@ export { default as ComposerIntegration } from './composerIntegration.js';
 export * from './noteEditor.js';
 export { default as NoteEditorModule } from './noteEditor.js';
 
+// Initialization and wiring
+export * from './notationInit.js';
+export { default as NotationInit } from './notationInit.js';
+
 /**
  * Create a complete notation system instance
  * @param {Object} options - Configuration options

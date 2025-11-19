@@ -432,50 +432,15 @@ export class NotationToolbar {
    * @param {KeyboardEvent} e - Keyboard event
    */
   handleKeyDown(e) {
-    // Duration shortcuts (1-6)
-    if (e.key >= '1' && e.key <= '6') {
-      const index = parseInt(e.key, 10) - 1;
-      if (index < DURATIONS.length) {
-        e.preventDefault();
-        this.setDuration(DURATIONS[index].id);
-      }
+    // Skip if user is typing in an input field
+    if (e.target.matches('input, textarea')) {
+      return;
     }
 
-    // Rest mode (R)
-    if (e.key === 'r' || e.key === 'R') {
-      e.preventDefault();
-      this.toggleRestMode();
-    }
+    // Allow browser shortcuts when Ctrl/Meta is pressed (except for undo/redo)
+    const hasModifier = e.ctrlKey || e.metaKey || e.altKey;
 
-    // Dotted (.)
-    if (e.key === '.') {
-      e.preventDefault();
-      this.toggleDotted();
-    }
-
-    // Accidentals
-    if (e.key === '#' || e.key === 's' || e.key === 'S') {
-      e.preventDefault();
-      this.setAccidental('#');
-    }
-    if (e.key === '-' || e.key === 'f' || e.key === 'F') {
-      e.preventDefault();
-      this.setAccidental('b');
-    }
-    if (e.key === '=' || e.key === 'n' || e.key === 'N') {
-      e.preventDefault();
-      this.setAccidental('n');
-    }
-
-    // Delete
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      if (!e.target.matches('input, textarea')) {
-        e.preventDefault();
-        this.onDelete();
-      }
-    }
-
-    // Undo/Redo
+    // Undo/Redo - these intentionally override browser shortcuts
     if (e.ctrlKey || e.metaKey) {
       if (e.key === 'z' || e.key === 'Z') {
         e.preventDefault();
@@ -484,19 +449,65 @@ export class NotationToolbar {
         } else {
           this.onUndo();
         }
+        return;
       }
       if (e.key === 'y' || e.key === 'Y') {
         e.preventDefault();
         this.onRedo();
+        return;
+      }
+      // Let all other Ctrl/Cmd shortcuts pass through to the browser
+      // (e.g., Ctrl+Plus/Minus for zoom, Ctrl+F for find, etc.)
+      return;
+    }
+
+    // Duration shortcuts (1-6) - only when no modifiers
+    if (!hasModifier && e.key >= '1' && e.key <= '6') {
+      const index = parseInt(e.key, 10) - 1;
+      if (index < DURATIONS.length) {
+        e.preventDefault();
+        this.setDuration(DURATIONS[index].id);
       }
     }
 
-    // Tie (T)
-    if (e.key === 't' || e.key === 'T') {
-      if (!e.target.matches('input, textarea')) {
+    // Rest mode (R)
+    if (!hasModifier && (e.key === 'r' || e.key === 'R')) {
+      e.preventDefault();
+      this.toggleRestMode();
+    }
+
+    // Dotted (.)
+    if (!hasModifier && e.key === '.') {
+      e.preventDefault();
+      this.toggleDotted();
+    }
+
+    // Accidentals - only when no modifiers to avoid conflicts with browser shortcuts
+    if (!hasModifier) {
+      if (e.key === '#' || e.key === 's' || e.key === 'S') {
         e.preventDefault();
-        this.onTie();
+        this.setAccidental('#');
       }
+      if (e.key === '-' || e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        this.setAccidental('b');
+      }
+      if (e.key === '=' || e.key === 'n' || e.key === 'N') {
+        e.preventDefault();
+        this.setAccidental('n');
+      }
+    }
+
+    // Delete
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      this.onDelete();
+    }
+
+    // Tie (T)
+    if (!hasModifier && (e.key === 't' || e.key === 'T')) {
+      e.preventDefault();
+      this.onTie();
     }
   }
 

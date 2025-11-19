@@ -4242,15 +4242,21 @@ function updateChordInversion(index, newInversion, shouldUpdateUI = true) {
     if (shouldUpdateUI) {
         updateSingleCard(index);
         updateTensionCurveIfVisible();
+    }
 
-        // Also update the Melody Composer's main staff notation
+    // Always update the grand staff notation (even from tooltip) since the chord notes changed
+    requestAnimationFrame(() => {
+        // Try enhanced notation system first (returns true if it rendered)
+        const result = window.refreshNotationFromProgression ? window.refreshNotationFromProgression() : false;
+        if (result) {
+            return;
+        }
+        // Fallback for old renderer
         const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
         if (melodyCanvas && window.renderChordProgressionStaff) {
-            requestAnimationFrame(() => {
-                window.renderChordProgressionStaff(melodyCanvas);
-            });
+            window.renderChordProgressionStaff(melodyCanvas);
         }
-    }
+    });
 }
 
 /**
@@ -4296,13 +4302,18 @@ function updateChordLHPattern(index, newLHPattern) {
     // Update only this card (LH pattern doesn't affect tension curve)
     updateSingleCard(index);
 
-    // Also update the Melody Composer's main staff notation
-    const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
-    if (melodyCanvas && window.renderChordProgressionStaff) {
-        requestAnimationFrame(() => {
+    // Also update the grand staff notation
+    requestAnimationFrame(() => {
+        // Try enhanced notation system first (returns true if it rendered)
+        if (window.refreshNotationFromProgression && window.refreshNotationFromProgression()) {
+            return;
+        }
+        // Fallback for old renderer
+        const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
+        if (melodyCanvas && window.renderChordProgressionStaff) {
             window.renderChordProgressionStaff(melodyCanvas);
-        });
-    }
+        }
+    });
 
     // Play the chord with the new LH pattern
     const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
@@ -4377,13 +4388,18 @@ function updateRHOctaveShift(index, shift) {
     // Update only this card
     updateSingleCard(index);
 
-    // Also update the Melody Composer's main staff notation
-    const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
-    if (melodyCanvas && window.renderChordProgressionStaff) {
-        requestAnimationFrame(() => {
+    // Also update the grand staff notation
+    requestAnimationFrame(() => {
+        // Try enhanced notation system first (returns true if it rendered)
+        if (window.refreshNotationFromProgression && window.refreshNotationFromProgression()) {
+            return;
+        }
+        // Fallback for old renderer
+        const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
+        if (melodyCanvas && window.renderChordProgressionStaff) {
             window.renderChordProgressionStaff(melodyCanvas);
-        });
-    }
+        }
+    });
 
     // Play the chord with the new octave (LH is relative to RH, so update LH too)
     const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
@@ -4431,13 +4447,18 @@ function updateLHOctaveShift(index, shift) {
     // Update only this card
     updateSingleCard(index);
 
-    // Also update the Melody Composer's main staff notation
-    const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
-    if (melodyCanvas && window.renderChordProgressionStaff) {
-        requestAnimationFrame(() => {
+    // Also update the grand staff notation
+    requestAnimationFrame(() => {
+        // Try enhanced notation system first (returns true if it rendered)
+        if (window.refreshNotationFromProgression && window.refreshNotationFromProgression()) {
+            return;
+        }
+        // Fallback for old renderer
+        const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
+        if (melodyCanvas && window.renderChordProgressionStaff) {
             window.renderChordProgressionStaff(melodyCanvas);
-        });
-    }
+        }
+    });
 
     // Play the chord with the new LH octave
     const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
@@ -4479,13 +4500,18 @@ function updateLHInversion(index, newInversion) {
     // Update only this card
     updateSingleCard(index);
 
-    // Also update the Melody Composer's main staff notation
-    const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
-    if (melodyCanvas && window.renderChordProgressionStaff) {
-        requestAnimationFrame(() => {
+    // Also update the grand staff notation
+    requestAnimationFrame(() => {
+        // Try enhanced notation system first (returns true if it rendered)
+        if (window.refreshNotationFromProgression && window.refreshNotationFromProgression()) {
+            return;
+        }
+        // Fallback for old renderer
+        const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
+        if (melodyCanvas && window.renderChordProgressionStaff) {
             window.renderChordProgressionStaff(melodyCanvas);
-        });
-    }
+        }
+    });
 
     // Note: Playback is handled by the press-and-hold event handler on the button
     // Don't call playTrainerChordOnce here as it would conflict with the hold behavior
@@ -5136,9 +5162,16 @@ export function selectChordCard(index) {
     // Ensure shifts are maintained after selection
     updateCardShifts();
 
-    // Sync measure selection with chord card selection
+    // Sync measure selection with chord card selection (legacy system)
     if (window.setSelectedMeasureIndex) {
         window.setSelectedMeasureIndex(index);
+    }
+
+    // Fire event for new notation system bi-directional sync
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('chordCardSelected', {
+            detail: { index }
+        }));
     }
 }
 
@@ -8320,10 +8353,9 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
     if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
         window.syncProgressionToMelodyComposer();
 
-        // Re-render melody staff to show the new chord
-        const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
-        if (melodyCanvas && window.renderInteractiveMelodyStaff) {
-            window.renderInteractiveMelodyStaff(melodyCanvas);
+        // Re-render NEW grand staff notation to show the new chord
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
         }
     }
 
@@ -8384,13 +8416,23 @@ function renderMelodyNotationIfNeeded() {
     // Check if we're on the Melody Composer tab
     const currentTab = getCurrentTab();
     const isMelodyTab = currentTab === 'melody';
-    
+
     // Check if Free mode controls are visible (Free mode is active)
     const freeModeControls = document.getElementById('free-mode-controls');
     const isFreeModeActive = freeModeControls && !freeModeControls.classList.contains('hidden');
-    
+
     // Only render if on Melody tab or if Free mode is active
     if (isMelodyTab || isFreeModeActive) {
+        // Phase 4.4: Use enhanced notation system if available
+        // refreshNotationFromProgression returns true if it rendered, false otherwise
+        if (window.refreshNotationFromProgression) {
+            const result = window.refreshNotationFromProgression();
+            if (result) {
+                return;
+            }
+        }
+
+        // Fallback to old renderers if enhanced notation not available or didn't render
         // Phase 1B: Sync progression to composition state before rendering
         // This ensures bass auto-fill is updated when chords are added
         if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
@@ -8560,7 +8602,7 @@ export function toggleProgressionNote(chordIndex, note) {
     if (allNotes.length > 0) {
         playTrainerChordOnce(allNotes);
     }
-    
+
     // Auto-render melody notation if on Melody Composer tab or if Free mode is active
     // This needs to happen after re-rendering the progression display
     renderMelodyNotationIfNeeded();
@@ -9197,11 +9239,19 @@ export function handleUndo() {
     // Restore previous state
     if (previousState) {
         restoreProgressionState(previousState);
-        
+
         // Re-render progression display in both tabs
         if (window.renderProgressionDisplay) {
             window.renderProgressionDisplay('progression-visualization', true);
             window.renderProgressionDisplay('melody-progression-visualization', false);
+        }
+
+        // Sync to composition state and refresh VexFlow notation
+        if (window.syncProgressionToMelodyComposer) {
+            window.syncProgressionToMelodyComposer();
+        }
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
         }
 
         // Show feedback
@@ -9209,7 +9259,7 @@ export function handleUndo() {
         if (display) {
             display.textContent = 'Undo: Restored previous state';
         }
-        
+
         // Update undo/redo button states
         updateUndoRedoButtons();
     }
@@ -9231,11 +9281,19 @@ export function handleRedo() {
     // Restore next state
     if (nextState) {
         restoreProgressionState(nextState);
-        
+
         // Re-render progression display in both tabs
         if (window.renderProgressionDisplay) {
             window.renderProgressionDisplay('progression-visualization', true);
             window.renderProgressionDisplay('melody-progression-visualization', false);
+        }
+
+        // Sync to composition state and refresh VexFlow notation
+        if (window.syncProgressionToMelodyComposer) {
+            window.syncProgressionToMelodyComposer();
+        }
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
         }
 
         // Show feedback
@@ -9243,7 +9301,7 @@ export function handleRedo() {
         if (display) {
             display.textContent = 'Redo: Restored next state';
         }
-        
+
         // Update undo/redo button states
         updateUndoRedoButtons();
     }

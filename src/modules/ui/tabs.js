@@ -15,6 +15,7 @@ import { loadProgression, renderProgressionDisplay, renderProgressionControls, u
 import { updateScaleDisplay, renderScaleSelectors } from '../features/scaleExplorer.js';
 import { updateButtonVisibility } from './presetUI.js';
 import { updateTabSidebarHeight } from './sectionSidebar.js';
+import { initEnhancedNotation } from '../notation/notationInit.js';
 
 /**
  * Switches between tabs and manages their visibility and state
@@ -147,6 +148,13 @@ export function switchTab(tabId) {
     } else if (tabId === 'melody') {
         const trainerState = getTrainerState();
 
+        // Phase 4.4: Initialize enhanced notation system FIRST
+        // This must be done before other initializations that might trigger old renderers
+        initEnhancedNotation({
+            canvasId: 'interactive-melody-notation-canvas',
+            createToolbar: true,
+        });
+
         // Phase 1B: Initialize composition bridge
         if (window.initMelodyComposerBridge) {
             window.initMelodyComposerBridge();
@@ -160,6 +168,11 @@ export function switchTab(tabId) {
         // Phase 1B: Sync progression to composition state
         if (window.syncProgressionToMelodyComposer) {
             window.syncProgressionToMelodyComposer();
+        }
+
+        // Re-sync notation after compositionState is populated with bass notes
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
         }
 
         // Phase 2.2: Initialize chord recommendations sidebar
@@ -187,7 +200,14 @@ export function switchTab(tabId) {
         }
         updateKeyboardLabels();
         // Render chord progression on staff if in Free mode and progression exists
+        // Skip if new enhanced notation system is active (Phase 4.4)
         setTimeout(() => {
+            // Check if new notation system is initialized - if so, skip old renderer
+            if (window.isNotationInitialized && window.isNotationInitialized()) {
+                // Enhanced notation system handles rendering
+                return;
+            }
+
             const panel = document.getElementById('melody-controls-panel');
             const freeModeControls = document.getElementById('free-mode-controls');
             const canvas = document.getElementById('interactive-melody-notation-canvas');

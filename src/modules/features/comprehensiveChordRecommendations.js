@@ -397,7 +397,9 @@ export function generateComprehensiveRecommendations(
 
     // Get current chord's harmonic function in the key
     const currentDegree = getScaleDegree(currentRoot, key);
-    const currentFunction = DEGREE_TO_FUNCTION[currentDegree] || HARMONIC_FUNCTIONS.TONIC;
+    // IMPORTANT: Don't default borrowed chords (null degree) to TONIC!
+    // Borrowed chords should be handled separately, not treated as I
+    const currentFunction = currentDegree !== null ? (DEGREE_TO_FUNCTION[currentDegree] || HARMONIC_FUNCTIONS.TONIC) : null;
 
     // Analyze progression context if context mode is enabled
     let context = null;
@@ -408,7 +410,9 @@ export function generateComprehensiveRecommendations(
     // Evaluate all possible next chords across all three dimensions
     ALL_NOTES.forEach(nextRoot => {
         const nextDegree = getScaleDegree(nextRoot, key);
-        const nextFunction = DEGREE_TO_FUNCTION[nextDegree] || HARMONIC_FUNCTIONS.TONIC;
+        // IMPORTANT: Don't default borrowed chords (null degree) to TONIC!
+        // This was causing D#add9 to be scored as I chord (tonic)
+        const nextFunction = nextDegree !== null ? (DEGREE_TO_FUNCTION[nextDegree] || HARMONIC_FUNCTIONS.TONIC) : null;
 
         // Get harmonic function score (how well does this root fit the progression?)
         const functionScore = scoreHarmonicFunction(currentFunction, nextFunction, tensionDirection);
@@ -537,6 +541,14 @@ export function generateComprehensiveRecommendations(
  */
 function scoreHarmonicFunction(currentFunction, nextFunction, tensionDirection) {
     let score = 50; // Base score
+
+    // Handle borrowed chords (chords outside the key)
+    // These have null function and should NOT be treated as TONIC
+    if (currentFunction === null || nextFunction === null) {
+        // Borrowed chords get a neutral base score
+        // Modal interchange scoring will handle their appropriateness separately
+        return 50; // Neutral - let modal interchange score decide
+    }
 
     // Common harmonic progressions (music theory fundamentals)
     if (currentFunction === HARMONIC_FUNCTIONS.TONIC) {

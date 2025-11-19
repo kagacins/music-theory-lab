@@ -85,7 +85,6 @@ export function renderSuggestionItem(suggestion, index = -1) {
         // Don't trigger if clicking preview button
         if (e.target.closest('.preview-note-btn')) return;
 
-        console.log('[MelodySuggestion] Selected note:', suggestion.note);
         selectSuggestionItem(item);
 
         if (selectedNoteCallback) {
@@ -97,7 +96,6 @@ export function renderSuggestionItem(suggestion, index = -1) {
     const previewBtn = item.querySelector('.preview-note-btn');
     previewBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        console.log('[MelodySuggestion] Preview note:', suggestion.note);
 
         if (previewNoteCallback) {
             previewNoteCallback(suggestion.note);
@@ -206,7 +204,6 @@ function hideSuggestionTooltip() {
 export function renderSuggestions(suggestions) {
     const container = document.getElementById('melody-suggestions-list');
     if (!container) {
-        console.warn('[MelodySuggestion] Suggestions list container not found');
         return;
     }
 
@@ -227,8 +224,6 @@ export function renderSuggestions(suggestions) {
         const item = renderSuggestionItem(suggestion, index);
         container.appendChild(item);
     });
-
-    console.log(`[MelodySuggestion] Rendered ${suggestions.length} suggestions`);
 }
 
 /**
@@ -350,19 +345,15 @@ export function getCurrentSuggestions() {
  * Initialize the melody suggestion panel
  */
 export function initMelodySuggestionPanel() {
-    console.log('[MelodySuggestion] Initializing panel...');
-
     // Check if container exists
     const container = document.getElementById('melody-suggestions-list');
     if (!container) {
-        console.warn('[MelodySuggestion] Container not found, creating placeholder');
         return false;
     }
 
     // Show initial empty state
     showEmptyState('Select a measure to see note suggestions');
 
-    console.log('[MelodySuggestion] Panel initialized');
     return true;
 }
 
@@ -370,8 +361,6 @@ export function initMelodySuggestionPanel() {
  * Test the panel with sample data
  */
 export function testMelodySuggestionPanel() {
-    console.log('[MelodySuggestion] Running test...');
-
     const testResult = updateSuggestions({
         chord: { root: 'C', type: 'Major' },
         key: 'C',
@@ -379,8 +368,6 @@ export function testMelodySuggestionPanel() {
         styleId: 'pop',
         octave: 4
     });
-
-    console.log('[MelodySuggestion] Test result:', testResult);
 }
 
 // -----------------------------------------------------------------------------

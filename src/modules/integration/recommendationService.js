@@ -34,7 +34,6 @@ export class RecommendationService {
     initialize() {
         if (this.isInitialized) return;
 
-        console.log('[RecommendationService] Initializing...');
         this.setupEventListeners();
         this.isInitialized = true;
 
@@ -49,13 +48,11 @@ export class RecommendationService {
     setupEventListeners() {
         // Listen for progression updates from the progression builder
         window.addEventListener('progressionUpdated', () => {
-            console.log('[RecommendationService] Progression updated, refreshing recommendations');
             this.refreshRecommendations();
         });
 
         // Listen for key changes
         window.addEventListener('keyChanged', () => {
-            console.log('[RecommendationService] Key changed, refreshing recommendations');
             this.refreshRecommendations();
         });
     }
@@ -70,11 +67,6 @@ export class RecommendationService {
         // Use provided params or get from state
         const currentProgression = progression || getProgressionData();
         const currentKey = key || getCurrentKey();
-
-        console.log('[RecommendationService] Getting recommendations for:', {
-            progression: currentProgression,
-            key: currentKey
-        });
 
         let rawRecommendations;
 
@@ -106,8 +98,6 @@ export class RecommendationService {
                 4,               // lookbackDepth
                 customWeights    // Use user's saved recommendation weights
             );
-
-            console.log('[RecommendationService] Using comprehensive 3D scoring system');
         } else {
             // Fallback to basic recommendations for empty progression
             rawRecommendations = generateChordRecommendations(
@@ -116,8 +106,6 @@ export class RecommendationService {
                 'any',
                 'neutral'
             );
-
-            console.log('[RecommendationService] Using basic recommendations for empty progression');
         }
 
         // Transform recommendations to match sidebar format
@@ -131,13 +119,6 @@ export class RecommendationService {
             currentProgression,
             currentKey
         );
-
-        console.log('[RecommendationService] Harmonic analysis complete:', {
-            functions: analysis.functions.length,
-            patterns: analysis.patterns.length,
-            borrowedChords: analysis.modalInterchange.length,
-            complexity: analysis.complexity
-        });
 
         // Store recommendations and analysis
         this.currentRecommendations = formattedRecommendations;
@@ -220,7 +201,6 @@ export class RecommendationService {
 
             return isMinor ? minorRomanNumerals[index] : romanNumerals[index];
         } catch (error) {
-            console.warn('[RecommendationService] Error getting Roman numeral:', error);
             return '?';
         }
     }
@@ -277,8 +257,6 @@ export class RecommendationService {
         });
 
         window.dispatchEvent(event);
-
-        console.log(`[RecommendationService] Notified listeners of ${this.currentRecommendations.length} recommendations and analysis`);
     }
 
     /**

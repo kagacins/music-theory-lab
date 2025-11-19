@@ -82,7 +82,9 @@ function getScaleDegree(chordRoot, key) {
  */
 function getHarmonicFunction(root, key) {
     const degree = getScaleDegree(root, key);
-    return DEGREE_TO_FUNCTION[degree] || HARMONIC_FUNCTIONS.TONIC;
+    // IMPORTANT: Don't default borrowed chords (null degree) to TONIC!
+    // Return null for borrowed chords so they're not treated as I
+    return degree !== null ? (DEGREE_TO_FUNCTION[degree] || HARMONIC_FUNCTIONS.TONIC) : null;
 }
 
 /**

@@ -25,6 +25,9 @@ import {
   noteToMidi,
   getVexFlowKeySignature,
 } from './vexFlowRenderer.js';
+import { getInteractiveMelody } from '../audio/melodyGenerator.js';
+import { generateBassVoicing } from '../integration/bassAutoFill.js';
+import { showNoteTooltip, hideNoteTooltip } from '../ui/noteHighlighter.js';
 
 // ============================================================================
 // NOTATION COMPOSER CLASS
@@ -56,9 +59,15 @@ export class NotationComposer {
 
     // Rendering state
     this.renderedSystem = null;
+    this.noteRegions = [];  // Bounding boxes for notes with analysis for tooltips
     this.selectedMeasure = null;
     this.selectedStaff = null;
     this.selectedNote = null;
+
+    // Highlighting state
+    this.selectedMeasureIndex = -1;   // Blue border for selected measure
+    this.activeMeasureIndex = -1;     // Yellow background for playing measure
+    this.activeNotes = new Set();     // Note IDs for red highlighting during playback
 
     // Event handlers
     this.onUpdate = options.onUpdate || (() => {});
@@ -106,7 +115,10 @@ export class NotationComposer {
       this.compositionState.events.on('noteRemoved', () => this.render());
       this.compositionState.events.on('measureAdded', () => this.render());
       this.compositionState.events.on('measureRemoved', () => this.render());
-      this.compositionState.events.on('bassUpdated', () => this.render());
+      // When bass is updated, we need to re-sync from compositionState to get the new bass data
+      this.compositionState.events.on('bassUpdated', () => {
+        this.syncFromProgression();
+      });
     }
 
     // Set up canvas event listeners
@@ -114,7 +126,48 @@ export class NotationComposer {
       this.setupCanvasEvents();
     }
 
-    console.log('[NotationComposer] Initialized');
+    // Set up bi-directional sync with chord progression cards
+    this.setupProgressionSync();
+
+    // Export methods to window for external access
+    this.exportToWindow();
+  }
+
+  /**
+   * Set up bi-directional sync with chord progression cards
+   */
+  setupProgressionSync() {
+    // Listen for chord progression card clicks
+    if (typeof window !== 'undefined') {
+      window.addEventListener('chordCardSelected', (e) => {
+        const { index } = e.detail || {};
+        if (typeof index === 'number' && index !== this.selectedMeasureIndex) {
+          this.selectedMeasureIndex = index;
+          this.render();
+        }
+      });
+    }
+  }
+
+  /**
+   * Export methods to window for external access
+   */
+  exportToWindow() {
+    if (typeof window !== 'undefined') {
+      const self = this;
+
+      // Expose setSelectedMeasure for external calls
+      window.setNotationSelectedMeasure = (index) => self.setSelectedMeasure(index);
+      window.getNotationSelectedMeasure = () => self.getSelectedMeasure();
+
+      // Expose playback highlighting methods
+      window.setNotationActiveMeasure = (index) => self.setActiveMeasure(index);
+      window.getNotationActiveMeasure = () => self.getActiveMeasure();
+      window.addNotationActiveNote = (noteId) => self.addActiveNote(noteId);
+      window.removeNotationActiveNote = (noteId) => self.removeActiveNote(noteId);
+      window.clearNotationActiveNotes = () => self.clearActiveNotes();
+      window.stopNotationPlaybackHighlighting = () => self.stopPlaybackHighlighting();
+    }
   }
 
   // ============================================================================
@@ -142,23 +195,49 @@ export class NotationComposer {
         bassNotes: [],
         chordSymbol: null,
         measureNumber: i + 1,
+        // Include chord object for harmonic analysis
+        chord: measure.chord ? {
+          root: measure.chord.root,
+          type: measure.chord.type,
+          notes: measure.chord.notes,
+        } : null,
       };
 
-      // Convert treble clef notes
+      // Convert treble clef notes from notation voices
       const trebleVoices = measure.notation.treble.voices;
-      if (trebleVoices && trebleVoices[0]) {
+      if (trebleVoices && trebleVoices[0] && trebleVoices[0].notes.length > 0) {
         measureData.trebleNotes = trebleVoices[0].notes.map(note => ({
           pitch: note.pitch,
+          pitches: note.pitches,
           duration: note.duration || '4n',
           isRest: note.isRest || false,
           dotted: note.dotted || false,
           accidental: note.accidental || null,
         }));
+      } else {
+        // Fallback: Check interactiveMelody for melody notes in this measure
+        const interactiveMelody = getInteractiveMelody();
+        if (interactiveMelody && interactiveMelody.melodyNotes) {
+          const melodyNotesInMeasure = interactiveMelody.melodyNotes.filter(
+            note => note.measure === i
+          );
+          if (melodyNotesInMeasure.length > 0) {
+            measureData.trebleNotes = melodyNotesInMeasure.map((note, index) => ({
+              pitch: note.pitch,
+              duration: note.duration || '4n',
+              isRest: note.type === 'rest',
+              dotted: note.dotted || false,
+              accidental: note.accidental || null,
+              // Include beat for note ID matching during red highlighting
+              beat: typeof note.beat === 'number' ? note.beat : index,
+            }));
+          }
+        }
       }
 
-      // Convert bass clef notes
+      // Convert bass clef notes from notation voices
       const bassVoices = measure.notation.bass.voices;
-      if (bassVoices && bassVoices[0]) {
+      if (bassVoices && bassVoices[0] && bassVoices[0].notes.length > 0) {
         measureData.bassNotes = bassVoices[0].notes.map(note => {
           // Handle both single notes and chords
           if (note.pitches && Array.isArray(note.pitches)) {
@@ -173,6 +252,22 @@ export class NotationComposer {
             isRest: note.isRest || false,
           };
         });
+      }
+
+      // If notation voices are empty but chord data exists, use chord notes
+      // Chord progression notes go in bass clef (left hand accompaniment)
+      // Treble clef is reserved for melody
+      if (measureData.trebleNotes.length === 0 && measureData.bassNotes.length === 0) {
+        if (measure.chord && measure.chord.notes && measure.chord.notes.length > 0) {
+          // All chord notes go to bass clef
+          // If notes are very high, they'll still display correctly with ledger lines
+          const chordNotes = [...measure.chord.notes];
+
+          measureData.bassNotes.push({
+            pitches: chordNotes,
+            duration: '1n',
+          });
+        }
       }
 
       // Add chord symbol if available
@@ -226,49 +321,98 @@ export class NotationComposer {
     const currentKey = getCurrentKey();
 
     if (!progressionData || progressionData.length === 0) {
-      console.log('[NotationComposer] No progression to sync');
+      // Render empty state instead of just returning
+      this.renderEmptyState();
       return;
     }
+
+    // Check if auto-generate bass is enabled
+    const autoGenerateBass = this.compositionState
+      ? this.compositionState.getSettings().autoGenerateBass
+      : false;
+    const bassPattern = this.compositionState
+      ? this.compositionState.getSettings().bassPattern
+      : 'whole-note';
 
     // Clear and rebuild measure manager
     this.measureManager.setMeasures([]);
 
     for (let i = 0; i < progressionData.length; i++) {
       const chord = progressionData[i];
+      const previousChord = i > 0 ? progressionData[i - 1] : null;
+
       const measureData = {
         trebleNotes: [],
         bassNotes: [],
         keySignature: currentKey,
         timeSignature: '4/4',
+        // Include chord object for harmonic analysis
+        chord: {
+          root: chord.root,
+          type: chord.type,
+          notes: chord.notes,
+        },
+        // Track if bass is auto-generated for coloring
+        isAutoGeneratedBass: false,
       };
 
-      // Add chord notes to bass as whole note chord
-      if (chord.notes && chord.notes.length > 0) {
-        // Separate into treble and bass based on octave
-        const trebleNotes = [];
-        const bassNotes = [];
+      // Get bass notes - prefer reading from compositionState (where melodyComposerBridge puts them)
+      let foundBassInState = false;
 
-        chord.notes.forEach(note => {
-          const midi = noteToMidi(note);
-          if (midi >= 60) { // Middle C and above
-            trebleNotes.push(note);
-          } else {
-            bassNotes.push(note);
+      if (this.compositionState && this.compositionState.getMeasureCount() > i) {
+        const stateMeasure = this.compositionState.getMeasure(i);
+        if (stateMeasure && stateMeasure.notation && stateMeasure.notation.bass) {
+          const bassVoices = stateMeasure.notation.bass.voices;
+          if (bassVoices && bassVoices[0] && bassVoices[0].notes && bassVoices[0].notes.length > 0) {
+            // Use bass notes from compositionState
+            measureData.bassNotes = bassVoices[0].notes
+              .filter(note => note.type !== 'rest')
+              .map(note => ({
+                pitch: note.pitch,
+                pitches: note.pitches,
+                duration: note.duration || '4n',
+                beat: note.beat || 0,
+              }));
+            // Check if this is auto-generated bass
+            measureData.isAutoGeneratedBass = stateMeasure.notation.bass.autoGenerated || false;
+            foundBassInState = measureData.bassNotes.length > 0;
           }
-        });
+        }
+      }
 
-        if (trebleNotes.length > 0) {
-          measureData.trebleNotes.push({
-            pitches: trebleNotes,
-            duration: '1n',
-          });
+      // If no bass in compositionState, generate or use chord notes
+      if (!foundBassInState) {
+        if (autoGenerateBass && chord.root) {
+          // Use bass auto-fill to generate pattern-based bass
+          try {
+            const bassVoicing = generateBassVoicing(chord, previousChord, {
+              bassPattern: bassPattern,
+              timeSignature: { num: 4, denom: 4 },
+            });
+
+            if (bassVoicing && bassVoicing.notes && bassVoicing.notes.length > 0) {
+              measureData.bassNotes = bassVoicing.notes.map(note => ({
+                pitch: note.pitch,
+                pitches: note.pitches,
+                duration: note.duration || '4n',
+                beat: note.beat || 0,
+              }));
+              measureData.isAutoGeneratedBass = true;
+            }
+          } catch (e) {
+            // Fall back to chord notes if bass generation fails
+          }
         }
 
-        if (bassNotes.length > 0) {
-          measureData.bassNotes.push({
-            pitches: bassNotes,
-            duration: '1n',
-          });
+        // If still no bass, use chord notes
+        if (measureData.bassNotes.length === 0 && chord.notes && chord.notes.length > 0) {
+          const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
+          if (voicedNotes.length > 0) {
+            measureData.bassNotes.push({
+              pitches: [...voicedNotes],
+              duration: '1n',
+            });
+          }
         }
       }
 
@@ -276,7 +420,6 @@ export class NotationComposer {
     }
 
     this.render();
-    console.log(`[NotationComposer] Synced ${progressionData.length} chords`);
   }
 
   // ============================================================================
@@ -288,22 +431,41 @@ export class NotationComposer {
    */
   render() {
     if (!this.config.container) {
-      console.warn('[NotationComposer] No container specified');
       return;
     }
 
     // Get measures to render
-    let measures;
-    if (this.compositionState && this.compositionState.getMeasureCount() > 0) {
-      measures = this.convertMeasuresToGrandStaff();
-    } else {
-      measures = this.measureManager.getAllMeasures();
-    }
+    // ALWAYS use measureManager for rendering - it has the freshest data from syncFromProgression
+    // compositionState is synced by melodyComposerBridge and may have stale data
+    const measures = this.measureManager.getAllMeasures();
 
     if (measures.length === 0) {
       // Render empty state
       this.renderEmptyState();
       return;
+    }
+
+    // Add melody notes from interactiveMelody to treble clef if empty
+    const interactiveMelody = getInteractiveMelody();
+    if (interactiveMelody && interactiveMelody.melodyNotes) {
+      measures.forEach((measure, i) => {
+        if (!measure.trebleNotes || measure.trebleNotes.length === 0) {
+          const melodyNotesInMeasure = interactiveMelody.melodyNotes.filter(
+            note => note.measure === i
+          );
+          if (melodyNotesInMeasure.length > 0) {
+            measure.trebleNotes = melodyNotesInMeasure.map((note, index) => ({
+              pitch: note.pitch,
+              duration: note.duration || '4n',
+              isRest: note.type === 'rest',
+              dotted: note.dotted || false,
+              accidental: note.accidental || null,
+              // Include beat for note ID matching during red highlighting
+              beat: typeof note.beat === 'number' ? note.beat : index,
+            }));
+          }
+        }
+      });
     }
 
     // Get key signature
@@ -322,13 +484,25 @@ export class NotationComposer {
       timeSignature: timeSig,
     });
 
-    // Render the grand staff system
+    // Render the grand staff system with highlighting
     this.renderedSystem = renderGrandStaffSystem(this.config.container, measures, {
       measuresPerLine: this.config.measuresPerLine,
       keySignature: key,
       timeSignature: timeSig,
       showMeasureNumbers: this.config.showMeasureNumbers,
+      // Highlighting options
+      selectedMeasureIndex: this.selectedMeasureIndex,
+      activeMeasureIndex: this.activeMeasureIndex,
+      activeNotes: this.activeNotes,
+      enableHarmonicColoring: this.config.enableHarmonicColoring,
     });
+
+    // Store note regions for tooltip detection
+    if (this.renderedSystem && this.renderedSystem.noteRegions) {
+      this.noteRegions = this.renderedSystem.noteRegions;
+    } else {
+      this.noteRegions = [];
+    }
 
     // Apply harmonic coloring if enabled
     if (this.config.enableHarmonicColoring) {
@@ -423,6 +597,9 @@ export class NotationComposer {
       this.selectedMeasure = position.measure.index;
       this.selectedStaff = position.staff;
 
+      // Update selectedMeasureIndex for highlighting
+      this.setSelectedMeasure(position.measure.index);
+
       // If we have a pitch, add a note
       if (position.pitch && this.toolbar) {
         const toolState = this.toolbar.getState();
@@ -446,19 +623,149 @@ export class NotationComposer {
     }
   }
 
+  // ============================================================================
+  // SELECTION AND HIGHLIGHTING CONTROL
+  // ============================================================================
+
+  /**
+   * Set the selected measure index
+   * @param {number} index - Measure index (-1 for none)
+   */
+  setSelectedMeasure(index) {
+    const prevIndex = this.selectedMeasureIndex;
+    this.selectedMeasureIndex = index;
+
+    // Fire bi-directional sync event
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('notationMeasureSelected', {
+        detail: { measureIndex: index, previousIndex: prevIndex }
+      }));
+
+      // Also update the chord progression card highlight
+      if (window.setSelectedChordIndex) {
+        window.setSelectedChordIndex(index);
+      }
+    }
+
+    // Re-render to show highlight
+    if (prevIndex !== index) {
+      this.render();
+    }
+  }
+
+  /**
+   * Get the selected measure index
+   * @returns {number} Selected measure index
+   */
+  getSelectedMeasure() {
+    return this.selectedMeasureIndex;
+  }
+
+  /**
+   * Set the active measure for playback highlighting
+   * @param {number} index - Measure index (-1 for none)
+   */
+  setActiveMeasure(index) {
+    const prevIndex = this.activeMeasureIndex;
+    this.activeMeasureIndex = index;
+
+    // Re-render to show yellow highlight
+    if (prevIndex !== index) {
+      this.render();
+    }
+  }
+
+  /**
+   * Get the active measure index
+   * @returns {number} Active measure index
+   */
+  getActiveMeasure() {
+    return this.activeMeasureIndex;
+  }
+
+  /**
+   * Add a note to the active notes set (for red highlighting during playback)
+   * @param {string} noteId - Note ID in format "measureIndex-beat-pitch"
+   */
+  addActiveNote(noteId) {
+    this.activeNotes.add(noteId);
+    this.render();
+  }
+
+  /**
+   * Remove a note from the active notes set
+   * @param {string} noteId - Note ID
+   */
+  removeActiveNote(noteId) {
+    this.activeNotes.delete(noteId);
+    this.render();
+  }
+
+  /**
+   * Clear all active notes
+   */
+  clearActiveNotes() {
+    this.activeNotes.clear();
+    this.render();
+  }
+
+  /**
+   * Check if a note is active
+   * @param {string} noteId - Note ID
+   * @returns {boolean}
+   */
+  isNoteActive(noteId) {
+    return this.activeNotes.has(noteId);
+  }
+
+  /**
+   * Stop playback highlighting (reset both active measure and notes)
+   */
+  stopPlaybackHighlighting() {
+    this.activeMeasureIndex = -1;
+    this.activeNotes.clear();
+    this.render();
+  }
+
   /**
    * Handle mouse move for hover effects
    * @param {MouseEvent} e - Mouse event
    */
   handleMouseMove(e) {
-    // Future: Show ghost note preview
+    const rect = this.config.container.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Check if mouse is over any note region (uses actual VexFlow bounding boxes)
+    let hoveredRegion = null;
+    for (const region of this.noteRegions) {
+      if (
+        x >= region.x &&
+        x <= region.x + region.width &&
+        y >= region.y &&
+        y <= region.y + region.height
+      ) {
+        hoveredRegion = region;
+        break;
+      }
+    }
+
+    // Show tooltip if we found a note region with analysis
+    if (hoveredRegion && !hoveredRegion.isRest && hoveredRegion.analysis && hoveredRegion.analysis.tooltip) {
+      // Use document.body to avoid overflow clipping issues
+      showNoteTooltip(document.body, hoveredRegion.analysis, e.clientX, e.clientY);
+      return;
+    }
+
+    // Hide tooltip when not over a note
+    hideNoteTooltip();
   }
 
   /**
    * Handle mouse leave
    */
   handleMouseLeave() {
-    // Future: Hide ghost note preview
+    hideNoteTooltip();
   }
 
   // ============================================================================
@@ -641,8 +948,6 @@ export class NotationComposer {
     // Clear state
     this.compositionState = null;
     this.renderedSystem = null;
-
-    console.log('[NotationComposer] Destroyed');
   }
 }
 

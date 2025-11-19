@@ -70,9 +70,6 @@ export function renderRecommendationItem(recommendation, index = -1) {
     // Click handler - provide visual feedback
     // Actual insertion is handled by RecommendationsSidebarController via delegated events
     item.addEventListener('click', () => {
-        console.log('[Sidebar] Clicked recommendation:', recommendation);
-        console.log('[Sidebar] Chord:', chordSymbol, 'Score:', recommendation.totalScore);
-
         // Visual feedback - mark as selected
         selectRecommendationItem(item);
     });
@@ -235,7 +232,6 @@ export function showLoadingState() {
 export function renderRecommendations(recommendations) {
     const container = document.getElementById('recommendations-list');
     if (!container) {
-        console.warn('[Sidebar] Recommendations list container not found');
         return;
     }
 
@@ -253,8 +249,6 @@ export function renderRecommendations(recommendations) {
         const item = renderRecommendationItem(rec, index);
         container.appendChild(item);
     });
-
-    console.log(`[Sidebar] Rendered ${recommendations.length} recommendations`);
 }
 
 /**
@@ -338,8 +332,6 @@ export function initStyleMoodDisplay() {
  * This can be called from browser console for testing
  */
 export function testSidebar() {
-    console.log('[Sidebar] Running test with sample data...');
-
     // Sample test data
     const testRecommendations = [
         {
@@ -376,8 +368,6 @@ export function testSidebar() {
 
     renderRecommendations(testRecommendations);
     updateContextDisplay('C', 'C');
-
-    console.log('[Sidebar] Test complete. You should see 5 recommendations.');
 }
 
 /**
@@ -615,28 +605,22 @@ export function clearAnalysis() {
  * @param {number} inversion - Chord inversion
  */
 export function playChordPreview(root, type, inversion = 0) {
-    console.log('[Sidebar] Playing chord preview:', { root, type, inversion });
-
     // Check if Tone.js and piano are available
     if (typeof Tone === 'undefined') {
-        console.warn('[Sidebar] Tone.js not loaded');
         return;
     }
 
     if (typeof window.getPiano !== 'function') {
-        console.warn('[Sidebar] getPiano function not available');
         return;
     }
 
     if (typeof window.initAudio !== 'function' || typeof window.getAudioIsReady !== 'function') {
-        console.warn('[Sidebar] Audio functions not available');
         return;
     }
 
     // Initialize audio if needed
     window.initAudio();
     if (!window.getAudioIsReady()) {
-        console.warn('[Sidebar] Audio not ready');
         return;
     }
 
@@ -662,8 +646,6 @@ export function playChordPreview(root, type, inversion = 0) {
                 piano.triggerRelease(note, Tone.now());
             });
         }, 1000);
-    } else {
-        console.warn('[Sidebar] Could not get chord notes for preview');
     }
 }
 

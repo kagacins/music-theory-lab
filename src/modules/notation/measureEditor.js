@@ -169,6 +169,17 @@ export class MeasureManager {
       // Simple pitch string
       return { ...NOTE_TEMPLATE, pitch: note };
     }
+
+    // Handle chord notes with pitches array
+    if (note.pitches && Array.isArray(note.pitches)) {
+      // Chord - keep pitches array format
+      return {
+        ...NOTE_TEMPLATE,
+        ...note,
+        pitch: null, // Chords use pitches, not pitch
+      };
+    }
+
     return { ...NOTE_TEMPLATE, ...note };
   }
 

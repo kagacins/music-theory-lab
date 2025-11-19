@@ -59,12 +59,9 @@ function getDurationInBeats(duration) {
  * @param {object} options - Configuration options
  */
 export function initMelodySuggestionController(options = {}) {
-    console.log('[MelodySuggestionController] Initializing...');
-
     // Get composition state
     compositionState = getCompositionState();
     if (!compositionState) {
-        console.error('[MelodySuggestionController] Composition state not available');
         return false;
     }
 
@@ -84,13 +81,11 @@ export function initMelodySuggestionController(options = {}) {
     setupEventListeners();
 
     isInitialized = true;
-    console.log('[MelodySuggestionController] Initialized successfully');
 
     // Initial refresh with delay to ensure progression data is available
     setTimeout(() => {
         if (compositionState && compositionState.getMeasureCount() > 0) {
             refreshSuggestions();
-            console.log('[MelodySuggestionController] Initial suggestions refreshed');
         }
     }, 100);
 
@@ -105,7 +100,6 @@ function setupEventListeners() {
 
     // Listen for chord changes to update suggestions
     compositionState.events.on('chordChanged', (measureIndex, newChord, previousChord) => {
-        console.log('[MelodySuggestionController] Chord changed in measure', measureIndex);
         if (measureIndex === currentMeasureIndex) {
             refreshSuggestions();
         }
@@ -129,7 +123,6 @@ function setupEventListeners() {
 
     // Listen for progression imports
     compositionState.events.on('progressionImported', () => {
-        console.log('[MelodySuggestionController] Progression imported, refreshing');
         refreshSuggestions();
     });
 }
@@ -196,8 +189,6 @@ export function refreshSuggestions() {
         octave: targetOctave,
         recentNotes: recentNotes
     });
-
-    console.log('[MelodySuggestionController] Suggestions refreshed for measure', currentMeasureIndex);
 }
 
 // -----------------------------------------------------------------------------
@@ -210,11 +201,8 @@ export function refreshSuggestions() {
  */
 function handleNoteSelected(suggestion) {
     if (!compositionState) {
-        console.error('[MelodySuggestionController] No composition state available');
         return;
     }
-
-    console.log('[MelodySuggestionController] Inserting note:', suggestion.note);
 
     // Get the selected note duration from UI (defaults to quarter note)
     const duration = window.getCurrentNoteDuration ? window.getCurrentNoteDuration() : '4n';
@@ -245,9 +233,18 @@ function handleNoteSelected(suggestion) {
     showInsertFeedback(suggestion);
 
     // Re-render the notation canvas to show the new note
-    const canvas = document.getElementById('interactive-melody-notation-canvas');
-    if (canvas && window.renderInteractiveMelodyStaff) {
-        window.renderInteractiveMelodyStaff(canvas);
+    // Use the enhanced notation system if available
+    if (window.isNotationInitialized && window.isNotationInitialized()) {
+        const notationComposer = window.getNotationComposer && window.getNotationComposer();
+        if (notationComposer) {
+            notationComposer.render();
+        }
+    } else {
+        // Fallback to legacy renderer
+        const canvas = document.getElementById('interactive-melody-notation-canvas');
+        if (canvas && window.renderInteractiveMelodyStaff) {
+            window.renderInteractiveMelodyStaff(canvas);
+        }
     }
 
     // Refresh suggestions with new context
@@ -259,7 +256,6 @@ function handleNoteSelected(suggestion) {
  * @param {string} noteName - Note to preview (e.g., 'C4')
  */
 function handleNotePreview(noteName) {
-    console.log('[MelodySuggestionController] Previewing note:', noteName);
     playNote(noteName, '8n');
 }
 
@@ -274,11 +270,9 @@ function playNote(noteName, duration = '8n') {
         if (piano && getAudioIsReady()) {
             // Use the piano sampler for authentic sound
             piano.triggerAttackRelease(noteName, duration);
-        } else {
-            console.warn('[MelodySuggestionController] Piano not ready, cannot play note');
         }
     } catch (error) {
-        console.warn('[MelodySuggestionController] Error playing note:', error);
+        // Audio playback error - silent fail
     }
 }
 

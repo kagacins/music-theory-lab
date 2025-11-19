@@ -276,6 +276,21 @@ import {
     isUsingCompositionState
 } from './modules/integration/melodyComposerBridge.js';
 
+// Phase 4.4: Enhanced notation system
+import {
+    initEnhancedNotation,
+    renderEnhancedNotation,
+    refreshNotationFromProgression,
+    setNotationDuration,
+    setNotationRestMode,
+    setNotationDotted,
+    setNotationAccidental,
+    highlightPlayingNote,
+    clearPlaybackHighlights,
+    getNotationComposer,
+    isNotationInitialized
+} from './modules/notation/notationInit.js';
+
 import {
     ENHARMONIC_MAP,
     SHARP_NOTES,
@@ -2729,11 +2744,8 @@ let melodySuggestionControllerInitialized = false;
 window.initializeRecommendationsSidebar = function() {
     // Only initialize once
     if (recommendationService && recommendationsSidebarController) {
-        console.log('[Main] Recommendations sidebar already initialized');
         return;
     }
-
-    console.log('[Main] Initializing recommendations sidebar...');
 
     try {
         // Get singleton instances
@@ -2751,10 +2763,8 @@ window.initializeRecommendationsSidebar = function() {
 
         // Expose updateStyleMoodDisplay globally for settings changes
         window.updateStyleMoodDisplay = updateStyleMoodDisplay;
-
-        console.log('[Main] Recommendations sidebar initialized successfully');
     } catch (error) {
-        console.error('[Main] Error initializing recommendations sidebar:', error);
+        // Error initializing recommendations sidebar
     }
 };
 
@@ -2765,13 +2775,10 @@ window.initializeRecommendationsSidebar = function() {
 window.initMelodySuggestionController = function(options = {}) {
     // Only initialize once
     if (melodySuggestionControllerInitialized) {
-        console.log('[Main] Melody suggestion controller already initialized');
         // Just refresh suggestions if already initialized
         refreshMelodySuggestions();
         return;
     }
-
-    console.log('[Main] Initializing melody suggestion controller...');
 
     try {
         // Initialize the controller
@@ -2814,10 +2821,8 @@ window.initMelodySuggestionController = function(options = {}) {
                 }
             }
         };
-
-        console.log('[Main] Melody suggestion controller initialized successfully');
     } catch (error) {
-        console.error('[Main] Error initializing melody suggestion controller:', error);
+        // Error initializing melody suggestion controller
     }
 };
 
@@ -2863,8 +2868,6 @@ window.switchSuggestionMode = function(mode) {
         chordsSection.classList.toggle('hidden', mode !== 'chords');
         melodySection.classList.toggle('hidden', mode !== 'melody');
     }
-
-    console.log('[Main] Switched suggestion mode to:', mode);
 };
 
 /**
@@ -2971,6 +2974,19 @@ window.initMelodyComposerBridge = initMelodyComposerBridge;
 window.syncProgressionToMelodyComposer = syncProgressionToMelodyComposer;
 window.importInteractiveMelodyToComposition = importInteractiveMelodyToComposition;
 window.exportCompositionToInteractiveMelody = exportCompositionToInteractiveMelody;
+
+// Phase 4.4: Enhanced Notation System
+window.initEnhancedNotation = initEnhancedNotation;
+window.renderEnhancedNotation = renderEnhancedNotation;
+window.refreshNotationFromProgression = refreshNotationFromProgression;
+window.setNotationDuration = setNotationDuration;
+window.setNotationRestMode = setNotationRestMode;
+window.setNotationDotted = setNotationDotted;
+window.setNotationAccidental = setNotationAccidental;
+window.highlightPlayingNote = highlightPlayingNote;
+window.clearPlaybackHighlights = clearPlaybackHighlights;
+window.getNotationComposer = getNotationComposer;
+window.isNotationInitialized = isNotationInitialized;
 window.getBridgeCompositionState = getBridgeCompositionState;
 window.addNoteViaBridge = addNoteViaBridge;
 window.setBassPattern = setBassPattern;

@@ -130,7 +130,7 @@ export function showNoteTooltip(container, analysis, x, y) {
     const tooltip = document.createElement('div');
     tooltip.className = 'chord-tone-tooltip';
     tooltip.style.cssText = `
-        position: absolute;
+        position: fixed;
         left: ${x}px;
         top: ${y - 80}px;
         background: white;

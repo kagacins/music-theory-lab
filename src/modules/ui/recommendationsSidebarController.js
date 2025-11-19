@@ -41,7 +41,6 @@ export class RecommendationsSidebarController {
     initialize() {
         if (this.isInitialized) return;
 
-        console.log('[SidebarController] Initializing...');
         this.setupEventListeners();
         this.setupResizeHandle();
         this.setupKeyboardShortcuts();
@@ -59,7 +58,6 @@ export class RecommendationsSidebarController {
         const resizeHandle = sidebar?.querySelector('.sidebar-resize-handle');
         
         if (!sidebar || !resizeHandle) {
-            console.warn('[SidebarController] Sidebar or resize handle not found');
             return;
         }
         
@@ -138,8 +136,6 @@ export class RecommendationsSidebarController {
                 sidebar.style.setProperty('flex-shrink', '0', 'important');
             }
         }
-        
-        console.log('[SidebarController] Resize handle initialized');
     }
 
     /**
@@ -157,9 +153,6 @@ export class RecommendationsSidebarController {
             refreshBtn.addEventListener('click', () => {
                 this.refresh();
             });
-            console.log('[SidebarController] Refresh button listener attached');
-        } else {
-            console.warn('[SidebarController] Refresh button not found in DOM');
         }
 
         // Listen for chord clicks (delegated event handling)
@@ -184,9 +177,6 @@ export class RecommendationsSidebarController {
                     this.handleRecommendationClick(item);
                 }
             });
-            console.log('[SidebarController] Recommendation click listener attached');
-        } else {
-            console.warn('[SidebarController] Recommendations list not found in DOM');
         }
 
         // Listen for context play button clicks (delegated event handling)
@@ -201,9 +191,6 @@ export class RecommendationsSidebarController {
                     playChordPreview(root, type, inversion);
                 }
             });
-            console.log('[SidebarController] Context play button listener attached');
-        } else {
-            console.warn('[SidebarController] Last chord display not found in DOM');
         }
     }
 
@@ -284,8 +271,6 @@ export class RecommendationsSidebarController {
                 return;
             }
         });
-
-        console.log('[SidebarController] Keyboard shortcuts enabled (1-5: insert, R: refresh, Esc: deselect)');
     }
 
     /**
@@ -295,14 +280,11 @@ export class RecommendationsSidebarController {
     insertRecommendationByIndex(index) {
         const items = document.querySelectorAll('.chord-recommendation-item');
         if (index < 0 || index >= items.length) {
-            console.log('[SidebarController] No recommendation at index', index);
             return;
         }
 
         const item = items[index];
         this.handleRecommendationClick(item);
-
-        console.log(`[SidebarController] Inserted recommendation ${index + 1} via keyboard`);
     }
 
     /**
@@ -311,7 +293,6 @@ export class RecommendationsSidebarController {
     deselectAllRecommendations() {
         const items = document.querySelectorAll('.chord-recommendation-item');
         items.forEach(item => item.classList.remove('selected'));
-        console.log('[SidebarController] Deselected all recommendations');
     }
 
     /**
@@ -321,13 +302,6 @@ export class RecommendationsSidebarController {
      */
     handleRecommendationsUpdate(event) {
         const { recommendations, key, progression, analysis } = event.detail;
-
-        console.log('[SidebarController] Received recommendations update:', {
-            count: recommendations.length,
-            key,
-            progressionLength: progression ? progression.length : 0,
-            hasAnalysis: !!analysis
-        });
 
         // Render recommendations in sidebar
         renderRecommendations(recommendations);
@@ -352,14 +326,8 @@ export class RecommendationsSidebarController {
         const chordType = item.dataset.chordType;
 
         if (!chordRoot || !chordType) {
-            console.warn('[SidebarController] Clicked item missing chord data');
             return;
         }
-
-        console.log('[SidebarController] Clicked recommendation:', {
-            root: chordRoot,
-            type: chordType
-        });
 
         // Insert the chord into the progression
         this.insertChordFromRecommendation(chordRoot, chordType);
@@ -372,18 +340,14 @@ export class RecommendationsSidebarController {
      */
     insertChordFromRecommendation(root, type) {
         try {
-            console.log('[SidebarController] Inserting chord:', { root, type });
-
             // Insert chord into progression
             // Note: addChordToProgressionByParams has signature: (chordType, root, inversion)
             addChordToProgressionByParams(type, root, this.currentInversion);
 
             // The progression will automatically trigger bass auto-fill via existing integration
             // The progressionUpdated event will trigger recommendation refresh
-
-            console.log('[SidebarController] Chord inserted successfully');
         } catch (error) {
-            console.error('[SidebarController] Error inserting chord:', error);
+            // Error inserting chord
         }
     }
 
@@ -391,8 +355,6 @@ export class RecommendationsSidebarController {
      * Refresh recommendations based on current progression and key
      */
     async refresh() {
-        console.log('[SidebarController] Refreshing recommendations...');
-
         // Show loading state
         showLoadingState();
 
@@ -407,7 +369,6 @@ export class RecommendationsSidebarController {
             // Service will dispatch 'recommendationsUpdated' event
             // which will trigger handleRecommendationsUpdate
         } catch (error) {
-            console.error('[SidebarController] Error refreshing recommendations:', error);
             showEmptyState('Error loading recommendations');
         }
     }

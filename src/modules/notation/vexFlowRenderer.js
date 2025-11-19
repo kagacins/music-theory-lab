@@ -7,7 +7,11 @@
  */
 
 // VexFlow is loaded globally from the browser build
-const VF = window.Vex ? window.Vex.Flow : null;
+// Use a getter function to check at runtime, not at module load time
+// VexFlow 5.x uses window.VexFlow, older versions use window.Vex.Flow
+function getVF() {
+  return window.VexFlow || (window.Vex ? window.Vex.Flow : null);
+}
 
 // ============================================================================
 // CONSTANTS
@@ -361,6 +365,7 @@ export function applyOctaveShift(noteStr, shift) {
  * @returns {Object} - { renderer, context }
  */
 export function createRenderer(container, width, height) {
+  const VF = getVF();
   if (!VF) {
     console.error('VexFlow not loaded');
     return null;
@@ -389,6 +394,7 @@ export function createRenderer(container, width, height) {
  * @returns {Object} - VexFlow Stave object
  */
 export function createStave(options = {}) {
+  const VF = getVF();
   if (!VF) return null;
 
   const {
@@ -429,6 +435,7 @@ export function createStave(options = {}) {
  * @returns {Object} - VexFlow StaveNote
  */
 export function createStaveNote(noteData, key = 'C', clef = 'treble') {
+  const VF = getVF();
   if (!VF) return null;
 
   const {
@@ -492,6 +499,7 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
  * @returns {Object} - VexFlow StaveNote with multiple keys
  */
 export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble') {
+  const VF = getVF();
   if (!VF || !pitches || pitches.length === 0) return null;
 
   // Convert duration
@@ -543,6 +551,7 @@ export function createRest(duration = '4n', clef = 'treble') {
  * @returns {Object} - VexFlow Voice
  */
 export function createVoice(notes, options = {}) {
+  const VF = getVF();
   if (!VF) return null;
 
   const {
@@ -570,6 +579,7 @@ export function createVoice(notes, options = {}) {
  * @param {Array} voiceStavePairs - Array of { voice, stave } objects
  */
 export function formatAndDraw(context, voiceStavePairs) {
+  const VF = getVF();
   if (!VF || !voiceStavePairs || voiceStavePairs.length === 0) return;
 
   const formatter = new VF.Formatter();
@@ -599,6 +609,7 @@ export function formatAndDraw(context, voiceStavePairs) {
  * @returns {Array} - Array of VexFlow Beam objects
  */
 export function generateBeams(notes, options = {}) {
+  const VF = getVF();
   if (!VF || !notes || notes.length === 0) return [];
 
   const {
@@ -638,6 +649,7 @@ export function drawBeams(context, beams) {
  * @param {Object} options - Rendering options
  */
 export function renderMeasure(context, measureData, options = {}) {
+  const VF = getVF();
   if (!VF) return;
 
   const {
