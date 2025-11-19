@@ -5445,11 +5445,19 @@ export function playMeasure(measureIndex) {
             }, delay * 1000);
             measurePlaybackTimeouts.push(timeoutId);
         });
-    } else if (chordNotes.length > 0) {
-        // Bass auto-fill is NOT active - play chord notes all at once
+    }
+
+    // Get melody notes for this measure
+    const measureMelodyNotes = interactiveMelody.melodyNotes.filter(note => note.measure === measureIndex);
+
+    // Get common start time for perfect synchronization
+    const startTime = Tone.now() + 0.01; // Small buffer to ensure scheduling works
+
+    // Play chord notes at exact start time (if bass auto-fill is NOT active)
+    if (!bassAutoFillActive && chordNotes.length > 0) {
         const chordDurationSeconds = Tone.Time('1n').toSeconds();
 
-        piano.triggerAttack(chordNotes, Tone.now());
+        piano.triggerAttack(chordNotes, startTime);
 
         // Add to activeNotes for highlighting (format: "measure-0-pitch")
         chordNotes.forEach(note => {
@@ -5482,10 +5490,7 @@ export function playMeasure(measureIndex) {
         measurePlaybackTimeouts.push(chordCleanupId);
     }
 
-    // Get melody notes for this measure
-    const measureMelodyNotes = interactiveMelody.melodyNotes.filter(note => note.measure === measureIndex);
-
-    // Play melody notes sequentially
+    // Play melody notes with Tone.js scheduling for perfect sync
     if (measureMelodyNotes.length > 0) {
         const tempo = interactiveMelody.tempo || 120;
         const beatDuration = 60.0 / tempo; // seconds per beat (based on tempo)
@@ -5494,11 +5499,14 @@ export function playMeasure(measureIndex) {
             if (note.type === 'rest') return; // Skip rests
 
             const delay = note.beat * beatDuration; // Use actual beat position for timing
+            const noteDuration = note.duration ? Tone.Time(note.duration).toSeconds() : 0.5;
+            const noteStartTime = startTime + delay;
 
+            // Schedule note attack at exact time using Tone.js
+            synth.triggerAttack(note.pitch, noteStartTime);
+
+            // Use setTimeout for visual feedback since it needs DOM updates
             const melodyTimeoutId = setTimeout(() => {
-                const noteDuration = note.duration ? Tone.Time(note.duration).toSeconds() : 0.5;
-                synth.triggerAttack(note.pitch, Tone.now());
-
                 // Add to activeNotes for highlighting (format: "measure-beat-pitch")
                 const noteBeat = typeof note.beat === 'number' ? note.beat : index;
                 const noteId = `${measureIndex}-${noteBeat}-${note.pitch}`;

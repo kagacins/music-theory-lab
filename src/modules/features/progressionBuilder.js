@@ -2290,17 +2290,17 @@ function renderPatternHighlights(container, progressionData, key) {
     // Count total patterns
     const totalPatterns = Object.values(enhancedPatterns).reduce((sum, arr) => sum + (arr?.length || 0), 0);
 
-    // Create master header
+    // Create master header (collapsed by default)
     const masterHeader = document.createElement('button');
-    masterHeader.className = 'pattern-master-header';
+    masterHeader.className = 'pattern-master-header collapsed';
     masterHeader.innerHTML = `
         <span class="pattern-master-title">Detected Patterns (${totalPatterns})</span>
         <span class="pattern-master-expand">▼</span>
     `;
 
-    // Create master content
+    // Create master content (collapsed by default)
     const masterContent = document.createElement('div');
-    masterContent.className = 'pattern-master-content';
+    masterContent.className = 'pattern-master-content collapsed';
 
     // Sort categories by priority
     const sortedCategories = Object.entries(PATTERN_CATEGORIES)

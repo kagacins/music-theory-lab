@@ -1805,16 +1805,8 @@ window.playChordWithMelody = function(root, type, melodyNotes, inversion = 0, te
     const key = getCurrentKey();
     const chordData = getInvertedChordNotes(root, type, inversion, key, -12);
 
-    // Play chord (sustained throughout)
-    if (chordData && chordData.specificNotes && chordData.specificNotes.length > 0) {
-        activePreviewNotes = chordData.specificNotes;
-        activePreviewNotes.forEach(note => {
-            piano.triggerAttack(note, Tone.now());
-        });
-    }
-
-    // Calculate note durations in milliseconds
-    const beatDuration = 60000 / tempo; // ms per quarter note
+    // Calculate note durations in seconds for Tone.js scheduling
+    const beatDuration = 60 / tempo; // seconds per quarter note
     const durationMap = {
         'w': beatDuration * 4,      // whole note
         'h': beatDuration * 2,      // half note
@@ -1823,8 +1815,19 @@ window.playChordWithMelody = function(root, type, melodyNotes, inversion = 0, te
         '16': beatDuration / 4      // sixteenth note
     };
 
-    // Play melody notes sequentially
-    let currentTime = 0;
+    // Get a common start time for perfect synchronization
+    const startTime = Tone.now() + 0.01; // Small buffer to ensure scheduling works
+
+    // Play chord (sustained throughout) at exact start time
+    if (chordData && chordData.specificNotes && chordData.specificNotes.length > 0) {
+        activePreviewNotes = chordData.specificNotes;
+        activePreviewNotes.forEach(note => {
+            piano.triggerAttack(note, startTime);
+        });
+    }
+
+    // Schedule melody notes using Tone.js timing for perfect sync
+    let currentTime = 0; // in seconds
     activePreviewMelodyNotes = [];
 
     if (melodyNotes && melodyNotes.length > 0) {
@@ -1832,32 +1835,25 @@ window.playChordWithMelody = function(root, type, melodyNotes, inversion = 0, te
             const duration = durationMap[noteObj.duration] || beatDuration;
 
             if (noteObj.pitch && noteObj.type !== 'rest') {
-                // Schedule note attack
-                const attackId = setTimeout(() => {
-                    activePreviewMelodyNotes.push(noteObj.pitch);
-                    piano.triggerAttack(noteObj.pitch, Tone.now());
-                }, currentTime);
-                melodyTimeoutIds.push(attackId);
+                // Schedule note attack at exact time
+                const noteStartTime = startTime + currentTime;
+                piano.triggerAttack(noteObj.pitch, noteStartTime);
+                activePreviewMelodyNotes.push(noteObj.pitch);
 
                 // Schedule note release
-                const releaseId = setTimeout(() => {
-                    piano.triggerRelease(noteObj.pitch, Tone.now());
-                    // Remove from active notes
-                    const idx = activePreviewMelodyNotes.indexOf(noteObj.pitch);
-                    if (idx > -1) activePreviewMelodyNotes.splice(idx, 1);
-                }, currentTime + duration * 0.9); // Slight gap between notes
-                melodyTimeoutIds.push(releaseId);
+                const noteEndTime = noteStartTime + duration * 0.9;
+                piano.triggerRelease(noteObj.pitch, noteEndTime);
             }
 
             currentTime += duration;
         });
     }
 
-    // Stop chord after all melody notes have played
-    const totalDuration = currentTime + 200; // Add small buffer
+    // Calculate total duration in milliseconds for the cleanup timeout
+    const totalDurationMs = (currentTime + 0.2) * 1000; // Add small buffer
     previewTimeoutId = setTimeout(() => {
         window.stopChordPreview();
-    }, totalDuration);
+    }, totalDurationMs);
 };
 // New notation editor functions
 window.addRestToMelody = addRestToMelody;

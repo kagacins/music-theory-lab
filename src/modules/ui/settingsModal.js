@@ -287,15 +287,8 @@ export function showSettingsModal(initialTab = 'chords') {
     });
 
     styleSelect.onchange = () => {
-        localStorage.setItem('chord-suggestion-style', styleSelect.value);
-        // Update sidebar display
-        if (window.updateStyleMoodDisplay) {
-            window.updateStyleMoodDisplay(styleSelect.value, moodSelect.value);
-        }
-        // Dispatch event for other components
-        document.dispatchEvent(new CustomEvent('chord-suggestion-preference-changed', {
-            detail: { style: styleSelect.value, mood: moodSelect.value }
-        }));
+        // Don't save immediately - will be saved when user clicks "Save Settings"
+        // Just show a visual indicator that there are unsaved changes
     };
 
     styleContainer.appendChild(styleSelect);
@@ -342,15 +335,8 @@ export function showSettingsModal(initialTab = 'chords') {
     });
 
     moodSelect.onchange = () => {
-        localStorage.setItem('chord-suggestion-mood', moodSelect.value);
-        // Update sidebar display
-        if (window.updateStyleMoodDisplay) {
-            window.updateStyleMoodDisplay(styleSelect.value, moodSelect.value);
-        }
-        // Dispatch event for other components
-        document.dispatchEvent(new CustomEvent('chord-suggestion-preference-changed', {
-            detail: { style: styleSelect.value, mood: moodSelect.value }
-        }));
+        // Don't save immediately - will be saved when user clicks "Save Settings"
+        // Just show a visual indicator that there are unsaved changes
     };
 
     moodContainer.appendChild(moodSelect);
@@ -403,7 +389,23 @@ export function showSettingsModal(initialTab = 'chords') {
         chordQuickSaveBtn.style.backgroundColor = '#3b82f6';
     };
     chordQuickSaveBtn.onclick = () => {
+        // Save chord weights
         saveWeights(currentChordWeights);
+
+        // Save style and mood settings
+        localStorage.setItem('chord-suggestion-style', styleSelect.value);
+        localStorage.setItem('chord-suggestion-mood', moodSelect.value);
+
+        // Update sidebar display
+        if (window.updateStyleMoodDisplay) {
+            window.updateStyleMoodDisplay(styleSelect.value, moodSelect.value);
+        }
+
+        // Dispatch event for other components
+        document.dispatchEvent(new CustomEvent('chord-suggestion-preference-changed', {
+            detail: { style: styleSelect.value, mood: moodSelect.value }
+        }));
+
         chordQuickSaveBtn.textContent = '✓ Saved!';
         chordQuickSaveBtn.style.backgroundColor = '#10b981';
         setTimeout(() => {
@@ -733,7 +735,23 @@ export function showSettingsModal(initialTab = 'chords') {
         chordSaveBtn.style.backgroundColor = '#3b82f6';
     };
     chordSaveBtn.onclick = () => {
+        // Save chord weights
         saveWeights(currentChordWeights);
+
+        // Save style and mood settings
+        localStorage.setItem('chord-suggestion-style', styleSelect.value);
+        localStorage.setItem('chord-suggestion-mood', moodSelect.value);
+
+        // Update sidebar display
+        if (window.updateStyleMoodDisplay) {
+            window.updateStyleMoodDisplay(styleSelect.value, moodSelect.value);
+        }
+
+        // Dispatch event for other components
+        document.dispatchEvent(new CustomEvent('chord-suggestion-preference-changed', {
+            detail: { style: styleSelect.value, mood: moodSelect.value }
+        }));
+
         chordSaveBtn.textContent = '✓ Saved!';
         chordSaveBtn.style.backgroundColor = '#10b981';
         setTimeout(() => {
