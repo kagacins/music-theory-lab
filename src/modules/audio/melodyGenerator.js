@@ -1344,6 +1344,66 @@ export function addNoteToInteractiveMelody(noteName, skipPlayback = false) {
 }
 
 /**
+ * Add a note to a specific measure (for sidebar suggestions)
+ * Unlike addNoteToInteractiveMelody, this doesn't require interactive mode
+ * @param {string} noteName - Note name with octave (e.g., 'C4')
+ * @param {number} targetMeasure - Target measure index
+ * @param {string} duration - Duration string (e.g., '4n')
+ * @param {boolean} dotted - Whether note is dotted
+ */
+export function addNoteToMeasure(noteName, targetMeasure, duration = '4n', dotted = false) {
+    const progressionData = getProgressionData();
+    if (!progressionData || progressionData.length === 0) return false;
+
+    // Calculate beat position based on existing notes in this measure
+    const existingNotesInMeasure = interactiveMelody.melodyNotes.filter(
+        n => n.measure === targetMeasure
+    );
+
+    let beatPosition = 0;
+    existingNotesInMeasure.forEach(n => {
+        const noteBeat = n.beat || 0;
+        const noteDur = getDurationInQuarterNotes(
+            n.duration.replace('.', ''),
+            n.duration.includes('.') || n.dotted
+        );
+        const noteEnd = noteBeat + noteDur;
+        if (noteEnd > beatPosition) {
+            beatPosition = noteEnd;
+        }
+    });
+
+    // Check if note would exceed measure
+    const durationInQuarters = getDurationInQuarterNotes(duration, dotted);
+    if (beatPosition + durationInQuarters > interactiveMelody.beatsPerMeasure) {
+        console.warn('[MelodyGenerator] Note would exceed measure, not adding');
+        return false;
+    }
+
+    const chordIndex = targetMeasure % progressionData.length;
+    const toneDuration = getToneDurationString(duration, dotted);
+
+    const newNote = {
+        type: 'note',
+        pitch: noteName,
+        duration: toneDuration,
+        measure: targetMeasure,
+        beat: beatPosition,
+        chordIndex: chordIndex,
+        dotted: dotted,
+        tied: false,
+        accidental: null,
+        dynamic: null
+    };
+
+    interactiveMelody.melodyNotes.push(newNote);
+
+    console.log('[MelodyGenerator] Added note to measure', targetMeasure, ':', newNote);
+
+    return true;
+}
+
+/**
  * Set the duration for the next note to be recorded
  * @param {string} duration - Tone.js duration string (e.g., '1n', '2n', '4n', '8n', '16n', '32n')
  */
@@ -3947,7 +4007,8 @@ function setupCanvasClickToPlay(canvas, numMeasures, measureWidth) {
                 // Re-render to show selection border immediately
                 requestAnimationFrame(() => {
                     const isRecording = window.isInteractiveMode || false;
-                    if (isRecording && window.renderInteractiveMelodyStaff) {
+                    const hasMelodyNotes = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+                    if ((isRecording || hasMelodyNotes) && window.renderInteractiveMelodyStaff) {
                         window.renderInteractiveMelodyStaff(canvas);
                     } else if (window.renderChordProgressionStaff) {
                         window.renderChordProgressionStaff(canvas);
@@ -3972,7 +4033,7 @@ function setupCanvasClickToPlay(canvas, numMeasures, measureWidth) {
             activeCanvas = null;
         }
     };
-    
+
     // Create touchstart handler
     const touchStartHandler = (e) => {
         e.preventDefault();
@@ -3980,14 +4041,14 @@ function setupCanvasClickToPlay(canvas, numMeasures, measureWidth) {
         const rect = canvas.getBoundingClientRect();
         const x = touch.clientX - rect.left;
         const y = touch.clientY - rect.top;
-        
+
         // Track that this canvas is being pressed
         activeCanvas = canvas;
-        
+
         // First, check if a note was clicked
         const clickRegions = noteClickRegions.get(canvas) || [];
         let clickedNote = null;
-        
+
         for (const region of clickRegions) {
             if (x >= region.x && x <= region.x + region.width &&
                 y >= region.y && y <= region.y + region.height) {
@@ -3995,7 +4056,7 @@ function setupCanvasClickToPlay(canvas, numMeasures, measureWidth) {
                 break;
             }
         }
-        
+
         if (clickedNote) {
             // A note was clicked - play all notes in the same beat
             playNotesInBeat(canvas, clickedNote.measure, clickedNote.beat, clickedNote.type);
@@ -4022,7 +4083,8 @@ function setupCanvasClickToPlay(canvas, numMeasures, measureWidth) {
                 // Re-render to show selection border immediately
                 requestAnimationFrame(() => {
                     const isRecording = window.isInteractiveMode || false;
-                    if (isRecording && window.renderInteractiveMelodyStaff) {
+                    const hasMelodyNotes = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+                    if ((isRecording || hasMelodyNotes) && window.renderInteractiveMelodyStaff) {
                         window.renderInteractiveMelodyStaff(canvas);
                     } else if (window.renderChordProgressionStaff) {
                         window.renderChordProgressionStaff(canvas);
@@ -4391,7 +4453,8 @@ function startMeasurePlayback(canvas, measureIndex) {
                 // Re-render to show red bass note highlighting
                 requestAnimationFrame(() => {
                     const isRecording = window.isInteractiveMode || false;
-                    if (isRecording && window.renderInteractiveMelodyStaff) {
+                    const hasMelodyNotes = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+                    if ((isRecording || hasMelodyNotes) && window.renderInteractiveMelodyStaff) {
                         window.renderInteractiveMelodyStaff(canvas);
                     } else if (window.renderChordProgressionStaff) {
                         window.renderChordProgressionStaff(canvas);
@@ -4409,7 +4472,8 @@ function startMeasurePlayback(canvas, measureIndex) {
                     // Re-render to clear red highlighting
                     requestAnimationFrame(() => {
                         const isRecording = window.isInteractiveMode || false;
-                        if (isRecording && window.renderInteractiveMelodyStaff) {
+                        const hasMelodyNotes = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+                        if ((isRecording || hasMelodyNotes) && window.renderInteractiveMelodyStaff) {
                             window.renderInteractiveMelodyStaff(canvas);
                         } else if (window.renderChordProgressionStaff) {
                             window.renderChordProgressionStaff(canvas);
@@ -4453,7 +4517,8 @@ function startMeasurePlayback(canvas, measureIndex) {
     // Re-render to show yellow measure highlighting
     requestAnimationFrame(() => {
         const isRecording = window.isInteractiveMode || false;
-        if (isRecording && window.renderInteractiveMelodyStaff) {
+        const hasMelodyNotes = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+        if ((isRecording || hasMelodyNotes) && window.renderInteractiveMelodyStaff) {
             window.renderInteractiveMelodyStaff(canvas);
         } else if (window.renderChordProgressionStaff) {
             window.renderChordProgressionStaff(canvas);
@@ -4467,31 +4532,39 @@ function startMeasurePlayback(canvas, measureIndex) {
         
         measureMelodyNotes.forEach((note, index) => {
             const delay = index * beatDuration;
-            
+
             const timeoutId = setTimeout(() => {
                 synth.triggerAttack(note.pitch, Tone.now());
-                
+
                 // Add to activeNotes for highlighting (format: "measure-beat-pitch")
                 const noteBeat = typeof note.beat === 'number' ? note.beat : index; // Use note's beat or index as fallback
                 const noteId = `${measureIndex}-${noteBeat}-${note.pitch}`;
                 activeNotes.add(noteId);
-                
+
+                // Re-render to show red highlighting on the note
+                if (highlightEnabled && window.renderInteractiveMelodyStaff) {
+                    window.renderInteractiveMelodyStaff(canvas);
+                }
+
                 // Remove from activeNotes after note duration
                 const noteDuration = note.duration ? Tone.Time(note.duration).toSeconds() : beatDuration;
                 setTimeout(() => {
                     activeNotes.delete(noteId);
-                    // Note: We don't re-render here to avoid resetting the bass display
+                    // Re-render to clear red highlighting
+                    if (highlightEnabled && window.renderInteractiveMelodyStaff) {
+                        window.renderInteractiveMelodyStaff(canvas);
+                    }
                 }, noteDuration * 1000);
-                
-                // Visual feedback
+
+                // Visual feedback on keyboard
                 const keyEl = document.getElementById(getNoteKeyId(note.pitch));
                 if (keyEl) {
                     keyEl.classList.add('active-melody-playback');
                 }
-                
+
                 state.activeMelodyNotes.push(note.pitch);
             }, delay * 1000);
-            
+
             state.melodyTimeouts.push(timeoutId);
         });
     }
@@ -4582,7 +4655,8 @@ function stopMeasurePlayback(canvas) {
     // Re-render to clear highlighting and restore selection border
     requestAnimationFrame(() => {
         const isRecording = window.isInteractiveMode || false;
-        if (isRecording && window.renderInteractiveMelodyStaff) {
+        const hasMelodyNotes = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+        if ((isRecording || hasMelodyNotes) && window.renderInteractiveMelodyStaff) {
             window.renderInteractiveMelodyStaff(canvas);
         } else if (window.renderChordProgressionStaff) {
             window.renderChordProgressionStaff(canvas);
@@ -4643,7 +4717,8 @@ export function setSelectedMeasureIndex(index) {
         const canvas = document.getElementById('interactive-melody-notation-canvas');
         if (canvas) {
             const isRecording = window.isInteractiveMode || false;
-            if (isRecording && window.renderInteractiveMelodyStaff) {
+            const hasMelodyNotes = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+            if ((isRecording || hasMelodyNotes) && window.renderInteractiveMelodyStaff) {
                 window.renderInteractiveMelodyStaff(canvas);
             } else if (window.renderChordProgressionStaff) {
                 window.renderChordProgressionStaff(canvas);
@@ -4756,7 +4831,8 @@ export function stopStepMeasureMelody() {
         const canvas = document.getElementById('interactive-melody-notation-canvas');
         if (canvas) {
             const isRecording = window.isInteractiveMode || false;
-            if (isRecording && window.renderInteractiveMelodyStaff) {
+            const hasMelodyNotes = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+            if ((isRecording || hasMelodyNotes) && window.renderInteractiveMelodyStaff) {
                 window.renderInteractiveMelodyStaff(canvas);
             } else if (window.renderChordProgressionStaff) {
                 window.renderChordProgressionStaff(canvas);
@@ -4887,7 +4963,8 @@ export function playFromSelectedMeasure() {
                     const canvas = document.getElementById('interactive-melody-notation-canvas');
                     if (canvas) {
                         const isRecording = window.isInteractiveMode || false;
-                        if (isRecording && window.renderInteractiveMelodyStaff) {
+                        const hasMelodyNotes = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+                        if ((isRecording || hasMelodyNotes) && window.renderInteractiveMelodyStaff) {
                             window.renderInteractiveMelodyStaff(canvas);
                         } else if (window.renderChordProgressionStaff) {
                             window.renderChordProgressionStaff(canvas);
@@ -4951,7 +5028,8 @@ export function playFromSelectedMeasure() {
             const canvas = document.getElementById('interactive-melody-notation-canvas');
             if (canvas) {
                 const isRecording = window.isInteractiveMode || false;
-                if (isRecording && window.renderInteractiveMelodyStaff) {
+                const hasMelodyNotes = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+                if ((isRecording || hasMelodyNotes) && window.renderInteractiveMelodyStaff) {
                     window.renderInteractiveMelodyStaff(canvas);
                 } else if (window.renderChordProgressionStaff) {
                     window.renderChordProgressionStaff(canvas);
@@ -5408,7 +5486,8 @@ export function stopPlayAllMelody() {
     if (highlightEnabled) {
         if (canvas) {
             const isRecording = window.isInteractiveMode || false;
-            if (isRecording && window.renderInteractiveMelodyStaff) {
+            const hasMelodyNotes = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+            if ((isRecording || hasMelodyNotes) && window.renderInteractiveMelodyStaff) {
                 window.renderInteractiveMelodyStaff(canvas);
             } else if (window.renderChordProgressionStaff) {
                 window.renderChordProgressionStaff(canvas);

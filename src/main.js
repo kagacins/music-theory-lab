@@ -23,7 +23,7 @@ import { showModal, hideModal } from './modules/ui/modals.js';
 import { renderKeyboard, updateKeyboardLabels, updateKeyNames, clearHighlights, g_KeyboardKeys } from './modules/ui/keyboard.js';
 import { updateKeySignatureDisplay, setupResponsiveTitle } from './modules/ui/header.js';
 import { toggleSidebar } from './modules/ui/sidebar.js';
-import { showSettingsModal } from './modules/ui/settingsModal.js';
+import { showSettingsModal, showChordWeightsModal, showMelodyWeightsModal } from './modules/ui/settingsModal.js';
 import { initPresetUI, togglePresetPanel, openPresetPanel, closePresetPanel } from './modules/ui/presetUI.js';
 import { initUnifiedSuggestionsPanel, updateUnifiedSuggestions } from './modules/ui/unifiedSuggestionsPanel.js';
 import { openManualChordEntryModal, closeManualChordEntryModal } from './modules/ui/manualChordEntryModal.js';
@@ -191,6 +191,7 @@ import {
     // Interactive melody composition
     initInteractiveMelody,
     addNoteToInteractiveMelody,
+    addNoteToMeasure,
     deleteLastNote,
     clearInteractiveMelody,
     setNoteDuration,
@@ -870,6 +871,8 @@ window.showModal = showModal;
 window.hideModal = hideModal;
 window.toggleSidebar = toggleSidebar;
 window.showSettingsModal = showSettingsModal;
+window.showChordWeightsModal = showChordWeightsModal;
+window.showMelodyWeightsModal = showMelodyWeightsModal;
 window.toggleEnharmonic = toggleEnharmonic;
 window.toggleNotationStyle = toggleNotationStyle;
 window.toggleSuggestionEngine = toggleSuggestionEngine;
@@ -1699,6 +1702,7 @@ window.refreshMelodyDisplay = refreshMelodyDisplay;
 // Expose interactive melody composition functions
 window.initInteractiveMelody = initInteractiveMelody;
 window.addNoteToInteractiveMelody = addNoteToInteractiveMelody;
+window.addNoteToMeasure = addNoteToMeasure;
 window.deleteLastNote = deleteLastNote;
 window.clearInteractiveMelody = clearInteractiveMelody;
 window.setNoteDuration = setNoteDuration;
@@ -1752,7 +1756,14 @@ window.stopPlayAllMelody = stopPlayAllMelody;
 window.playMeasure = playMeasure;
 window.playSelectedMeasure = playSelectedMeasure;
 window.playFromSelectedMeasure = playFromSelectedMeasure;
-window.setSelectedMeasureIndex = setSelectedMeasureIndex;
+// Wrap setSelectedMeasureIndex to also update melody suggestions
+window.setSelectedMeasureIndex = function(index) {
+    setSelectedMeasureIndex(index);
+    // Phase 4.1: Update melody suggestions when measure is selected
+    if (window.setMelodySuggestionMeasure) {
+        window.setMelodySuggestionMeasure(index);
+    }
+};
 window.startStepMeasureMelody = startStepMeasureMelody;
 window.stopStepMeasureMelody = stopStepMeasureMelody;
 window.setMelodyClef = setMelodyClef;
@@ -2463,9 +2474,20 @@ window.restoreFromBackup = restoreFromBackup;
 import { getRecommendationService } from './modules/integration/recommendationService.js';
 import { getRecommendationsSidebarController } from './modules/ui/recommendationsSidebarController.js';
 
+// Phase 4.1: Import melody suggestion modules
+import {
+    initMelodySuggestionController,
+    refreshSuggestions as refreshMelodySuggestions,
+    setCurrentMeasure as setMelodySuggestionMeasure,
+    setStyle as setMelodySuggestionStyle,
+    setOctave as setMelodySuggestionOctave,
+    insertNote as insertSuggestedNote
+} from './modules/ai/melodySuggestionController.js';
+
 // Global instances for recommendations (singleton pattern)
 let recommendationService = null;
 let recommendationsSidebarController = null;
+let melodySuggestionControllerInitialized = false;
 
 /**
  * Initialize the chord recommendations sidebar
@@ -2496,6 +2518,214 @@ window.initializeRecommendationsSidebar = function() {
         console.error('[Main] Error initializing recommendations sidebar:', error);
     }
 };
+
+/**
+ * Initialize the melody suggestions controller
+ * Called when the Melody Composer tab is first loaded
+ */
+window.initMelodySuggestionController = function(options = {}) {
+    // Only initialize once
+    if (melodySuggestionControllerInitialized) {
+        console.log('[Main] Melody suggestion controller already initialized');
+        // Just refresh suggestions if already initialized
+        refreshMelodySuggestions();
+        return;
+    }
+
+    console.log('[Main] Initializing melody suggestion controller...');
+
+    try {
+        // Initialize the controller
+        initMelodySuggestionController(options);
+        melodySuggestionControllerInitialized = true;
+
+        // Set up style selector event listener
+        const styleSelect = document.getElementById('melody-style-select');
+        if (styleSelect) {
+            styleSelect.addEventListener('change', (e) => {
+                setMelodySuggestionStyle(e.target.value);
+            });
+        }
+
+        // Set up refresh button
+        const refreshBtn = document.getElementById('refresh-melody-suggestions-btn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                refreshMelodySuggestions();
+            });
+        }
+
+        // Set up panel toggle
+        window.toggleMelodySuggestionsPanel = function() {
+            const panel = document.getElementById('melody-suggestions-panel');
+            const chevron = document.getElementById('melody-suggestions-chevron');
+
+            if (panel) {
+                const listEl = document.getElementById('melody-suggestions-list');
+                const contextEl = document.getElementById('melody-suggestion-context');
+                const styleEl = panel.querySelector('.style-selector');
+                const btnEl = document.getElementById('refresh-melody-suggestions-btn');
+
+                [listEl, contextEl, styleEl, btnEl].forEach(el => {
+                    if (el) el.classList.toggle('hidden');
+                });
+
+                if (chevron) {
+                    chevron.classList.toggle('rotate-180');
+                }
+            }
+        };
+
+        console.log('[Main] Melody suggestion controller initialized successfully');
+    } catch (error) {
+        console.error('[Main] Error initializing melody suggestion controller:', error);
+    }
+};
+
+// Expose melody suggestion functions to window
+window.refreshMelodySuggestions = refreshMelodySuggestions;
+window.setMelodySuggestionMeasure = setMelodySuggestionMeasure;
+window.setMelodySuggestionStyle = setMelodySuggestionStyle;
+window.setMelodySuggestionOctave = setMelodySuggestionOctave;
+window.insertSuggestedNote = insertSuggestedNote;
+
+// ===========================
+// SUGGESTION MODE TOGGLE (Chords/Melody)
+// ===========================
+
+// Track current suggestion mode
+let currentSuggestionMode = 'chords';
+
+/**
+ * Switch between Chords and Melody suggestion modes
+ * @param {string} mode - 'chords' or 'melody'
+ */
+window.switchSuggestionMode = function(mode) {
+    if (mode !== 'chords' && mode !== 'melody') return;
+
+    currentSuggestionMode = mode;
+
+    // Update toggle buttons
+    const chordsBtn = document.getElementById('toggle-chords-btn');
+    const melodyBtn = document.getElementById('toggle-melody-btn');
+
+    if (chordsBtn && melodyBtn) {
+        chordsBtn.classList.toggle('active', mode === 'chords');
+        melodyBtn.classList.toggle('active', mode === 'melody');
+        chordsBtn.setAttribute('aria-selected', mode === 'chords');
+        melodyBtn.setAttribute('aria-selected', mode === 'melody');
+    }
+
+    // Show/hide sections
+    const chordsSection = document.getElementById('chord-suggestions-section');
+    const melodySection = document.getElementById('melody-suggestions-section');
+
+    if (chordsSection && melodySection) {
+        chordsSection.classList.toggle('hidden', mode !== 'chords');
+        melodySection.classList.toggle('hidden', mode !== 'melody');
+    }
+
+    console.log('[Main] Switched suggestion mode to:', mode);
+};
+
+/**
+ * Get the current suggestion mode
+ * @returns {string} 'chords' or 'melody'
+ */
+window.getCurrentSuggestionMode = function() {
+    return currentSuggestionMode;
+};
+
+/**
+ * Open the suggestion weights modal to the appropriate tab based on current mode
+ */
+window.openSuggestionWeights = function() {
+    const mode = currentSuggestionMode;
+    if (mode === 'melody') {
+        showMelodyWeightsModal();
+    } else {
+        showChordWeightsModal();
+    }
+};
+
+/**
+ * Refresh melody suggestions (called after weights are saved)
+ */
+window.refreshMelodySuggestions = function() {
+    // Import refreshSuggestions from controller if available
+    if (window.melodySuggestionController && window.melodySuggestionController.refreshSuggestions) {
+        window.melodySuggestionController.refreshSuggestions();
+    } else {
+        // Fallback: click the refresh button
+        const refreshBtn = document.getElementById('refresh-melody-suggestions-btn');
+        if (refreshBtn) refreshBtn.click();
+    }
+};
+
+/**
+ * Refresh chord recommendations (called after weights are saved)
+ */
+window.refreshChordRecommendations = function() {
+    // Use the sidebar controller's refresh method
+    if (window.recommendationsSidebarController && window.recommendationsSidebarController.refresh) {
+        window.recommendationsSidebarController.refresh();
+    } else {
+        // Fallback: click the refresh button
+        const refreshBtn = document.getElementById('refresh-recommendations-btn');
+        if (refreshBtn) refreshBtn.click();
+    }
+};
+
+// Set up keyboard shortcuts for suggestions
+document.addEventListener('keydown', function(e) {
+    // Only handle shortcuts when in Melody Composer tab
+    if (window.currentTab !== 'melody') return;
+
+    // Don't handle if typing in an input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+
+    // Handle number keys 1-5 for inserting suggestions
+    // Only handle melody mode here - chords mode is handled by RecommendationsSidebarController
+    if (e.key >= '1' && e.key <= '5') {
+        if (currentSuggestionMode === 'melody') {
+            const index = parseInt(e.key) - 1;
+            // Insert melody note suggestion
+            const items = document.querySelectorAll('#melody-suggestions-list .melody-suggestion-item');
+            if (items[index]) {
+                // Add pulse animation
+                items[index].classList.add('shortcut-pulse');
+                setTimeout(() => items[index].classList.remove('shortcut-pulse'), 500);
+
+                items[index].click();
+                // Refresh is handled by handleNoteSelected after insertion
+            }
+        }
+        // Chords mode handled by RecommendationsSidebarController
+        return;
+    }
+
+    // Handle R key for refresh
+    // Only handle melody mode here - chords mode is handled by RecommendationsSidebarController
+    if (e.key === 'r' || e.key === 'R') {
+        if (currentSuggestionMode === 'melody') {
+            const refreshBtn = document.getElementById('refresh-melody-suggestions-btn');
+            if (refreshBtn) refreshBtn.click();
+        }
+        // Chords mode handled by RecommendationsSidebarController
+        return;
+    }
+
+    // Handle Escape for deselect
+    // Only handle melody mode here - chords mode is handled by RecommendationsSidebarController
+    if (e.key === 'Escape') {
+        if (currentSuggestionMode === 'melody') {
+            const selected = document.querySelector('#melody-suggestions-list .melody-suggestion-item.selected');
+            if (selected) selected.classList.remove('selected');
+        }
+        // Chords mode handled by RecommendationsSidebarController
+        return;
+    }
+});
 
 // Melody Composer Bridge (Phase 1B)
 window.initMelodyComposerBridge = initMelodyComposerBridge;

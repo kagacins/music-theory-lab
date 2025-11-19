@@ -1,6 +1,6 @@
 /**
  * Settings Modal Component
- * Universal settings for chord recommendation weights
+ * Universal settings for chord and melody recommendation weights
  */
 
 import {
@@ -13,7 +13,17 @@ import {
     saveWeights,
     resetWeightsToDefault,
     applyPreset,
-    normalizeWeights
+    normalizeWeights,
+    // Melody weight imports
+    DEFAULT_MELODY_WEIGHTS,
+    MELODY_APPROACH_PRESETS,
+    MELODY_GENRE_TEMPLATES,
+    MELODY_WEIGHT_PRESETS,
+    getSavedMelodyWeights,
+    saveMelodyWeights,
+    resetMelodyWeightsToDefault,
+    applyMelodyPreset,
+    findMatchingMelodyPreset
 } from '../config/weightPresets.js';
 
 /**
@@ -54,14 +64,19 @@ function findMatchingPreset(weights) {
 
 /**
  * Show the settings modal
+ * @param {string} initialTab - Which tab to show initially: 'chords' or 'melody'
  */
-export function showSettingsModal() {
+export function showSettingsModal(initialTab = 'chords') {
     // Remove existing modal if any
     const existing = document.getElementById('settings-modal');
     if (existing) existing.remove();
 
     // Get current weights
-    let currentWeights = getSavedWeights(false); // Start with non-context mode
+    let currentChordWeights = getSavedWeights(false);
+    let currentMelodyWeights = getSavedMelodyWeights();
+
+    // Track which tab is active
+    let activeTab = initialTab;
 
     // Create overlay
     const overlay = document.createElement('div');
@@ -100,7 +115,7 @@ export function showSettingsModal() {
     header.style.marginBottom = '24px';
 
     const title = document.createElement('h2');
-    title.textContent = 'Chord Recommendation Settings';
+    title.textContent = 'Recommendation Settings';
     title.style.margin = '0';
     title.style.fontSize = '24px';
     title.style.fontWeight = '700';
@@ -126,23 +141,86 @@ export function showSettingsModal() {
     header.appendChild(closeBtn);
     modal.appendChild(header);
 
+    // Tab navigation
+    const tabNav = document.createElement('div');
+    tabNav.style.display = 'flex';
+    tabNav.style.gap = '8px';
+    tabNav.style.marginBottom = '24px';
+    tabNav.style.borderBottom = '2px solid #e5e7eb';
+    tabNav.style.paddingBottom = '0';
+
+    const createTab = (id, label, emoji) => {
+        const tab = document.createElement('button');
+        tab.dataset.tab = id;
+        tab.innerHTML = `${emoji} ${label}`;
+        tab.style.padding = '12px 20px';
+        tab.style.border = 'none';
+        tab.style.background = 'none';
+        tab.style.fontSize = '14px';
+        tab.style.fontWeight = '600';
+        tab.style.cursor = 'pointer';
+        tab.style.borderBottom = '2px solid transparent';
+        tab.style.marginBottom = '-2px';
+        tab.style.transition = 'all 0.2s';
+        tab.style.color = '#6b7280';
+
+        tab.onclick = () => {
+            activeTab = id;
+            updateTabs();
+        };
+
+        return tab;
+    };
+
+    const chordsTab = createTab('chords', 'Chord Weights', '🎹');
+    const melodyTab = createTab('melody', 'Melody Weights', '🎵');
+
+    tabNav.appendChild(chordsTab);
+    tabNav.appendChild(melodyTab);
+    modal.appendChild(tabNav);
+
+    // Content containers
+    const chordsContent = document.createElement('div');
+    chordsContent.id = 'chords-tab-content';
+
+    const melodyContent = document.createElement('div');
+    melodyContent.id = 'melody-tab-content';
+
+    // Function to update tab styles
+    function updateTabs() {
+        const isChords = activeTab === 'chords';
+
+        chordsTab.style.color = isChords ? '#3b82f6' : '#6b7280';
+        chordsTab.style.borderBottomColor = isChords ? '#3b82f6' : 'transparent';
+
+        melodyTab.style.color = !isChords ? '#3b82f6' : '#6b7280';
+        melodyTab.style.borderBottomColor = !isChords ? '#3b82f6' : 'transparent';
+
+        chordsContent.style.display = isChords ? 'block' : 'none';
+        melodyContent.style.display = !isChords ? 'block' : 'none';
+    }
+
+    // ==========================================================================
+    // CHORD WEIGHTS CONTENT
+    // ==========================================================================
+
     // Description
-    const description = document.createElement('p');
-    description.textContent = 'Customize how chord suggestions are scored and ranked. These settings will be used across all chord recommendation features.';
-    description.style.color = '#6b7280';
-    description.style.fontSize = '14px';
-    description.style.marginBottom = '24px';
-    description.style.lineHeight = '1.6';
-    modal.appendChild(description);
+    const chordDescription = document.createElement('p');
+    chordDescription.textContent = 'Customize how chord suggestions are scored and ranked. These settings will be used across all chord recommendation features.';
+    chordDescription.style.color = '#6b7280';
+    chordDescription.style.fontSize = '14px';
+    chordDescription.style.marginBottom = '24px';
+    chordDescription.style.lineHeight = '1.6';
+    chordsContent.appendChild(chordDescription);
 
     // Normalization notice
-    const notice = document.createElement('div');
-    notice.style.backgroundColor = '#eff6ff';
-    notice.style.border = '1px solid #bfdbfe';
-    notice.style.borderRadius = '8px';
-    notice.style.padding = '12px 16px';
-    notice.style.marginBottom = '24px';
-    notice.innerHTML = `
+    const chordNotice = document.createElement('div');
+    chordNotice.style.backgroundColor = '#eff6ff';
+    chordNotice.style.border = '1px solid #bfdbfe';
+    chordNotice.style.borderRadius = '8px';
+    chordNotice.style.padding = '12px 16px';
+    chordNotice.style.marginBottom = '24px';
+    chordNotice.innerHTML = `
         <div style="display: flex; align-items: start; gap: 12px;">
             <span style="font-size: 20px;">ℹ️</span>
             <div style="flex: 1;">
@@ -154,29 +232,69 @@ export function showSettingsModal() {
             </div>
         </div>
     `;
-    modal.appendChild(notice);
+    chordsContent.appendChild(chordNotice);
 
-    // Presets section
-    const presetsSection = document.createElement('div');
-    presetsSection.style.marginBottom = '28px';
+    // Quick save button at top
+    const chordQuickSaveRow = document.createElement('div');
+    chordQuickSaveRow.style.display = 'flex';
+    chordQuickSaveRow.style.justifyContent = 'flex-end';
+    chordQuickSaveRow.style.marginBottom = '20px';
 
-    const presetsTitle = document.createElement('h3');
-    presetsTitle.textContent = 'Presets';
-    presetsTitle.style.fontSize = '16px';
-    presetsTitle.style.fontWeight = '600';
-    presetsTitle.style.color = '#111827';
-    presetsTitle.style.marginBottom = '16px';
-    presetsSection.appendChild(presetsTitle);
+    const chordQuickSaveBtn = document.createElement('button');
+    chordQuickSaveBtn.textContent = 'Save Settings';
+    chordQuickSaveBtn.style.padding = '8px 16px';
+    chordQuickSaveBtn.style.backgroundColor = '#3b82f6';
+    chordQuickSaveBtn.style.border = 'none';
+    chordQuickSaveBtn.style.borderRadius = '6px';
+    chordQuickSaveBtn.style.cursor = 'pointer';
+    chordQuickSaveBtn.style.fontSize = '13px';
+    chordQuickSaveBtn.style.fontWeight = '600';
+    chordQuickSaveBtn.style.color = 'white';
+    chordQuickSaveBtn.style.transition = 'all 0.2s';
+    chordQuickSaveBtn.onmouseenter = () => {
+        chordQuickSaveBtn.style.backgroundColor = '#2563eb';
+    };
+    chordQuickSaveBtn.onmouseleave = () => {
+        chordQuickSaveBtn.style.backgroundColor = '#3b82f6';
+    };
+    chordQuickSaveBtn.onclick = () => {
+        saveWeights(currentChordWeights);
+        chordQuickSaveBtn.textContent = '✓ Saved!';
+        chordQuickSaveBtn.style.backgroundColor = '#10b981';
+        setTimeout(() => {
+            chordQuickSaveBtn.textContent = 'Save Settings';
+            chordQuickSaveBtn.style.backgroundColor = '#3b82f6';
+            overlay.remove();
+            if (window.refreshChordRecommendations) {
+                window.refreshChordRecommendations();
+            }
+        }, 1000);
+    };
 
-    // Store button references for updating active states
-    const presetButtons = {};
+    chordQuickSaveRow.appendChild(chordQuickSaveBtn);
+    chordsContent.appendChild(chordQuickSaveRow);
 
-    // Helper function to update active states
-    function updatePresetActiveStates() {
-        const activePreset = findMatchingPreset(currentWeights);
+    // Chord presets section
+    const chordPresetsSection = document.createElement('div');
+    chordPresetsSection.style.marginBottom = '28px';
 
-        Object.keys(presetButtons).forEach(key => {
-            const btn = presetButtons[key];
+    const chordPresetsTitle = document.createElement('h3');
+    chordPresetsTitle.textContent = 'Presets';
+    chordPresetsTitle.style.fontSize = '16px';
+    chordPresetsTitle.style.fontWeight = '600';
+    chordPresetsTitle.style.color = '#111827';
+    chordPresetsTitle.style.marginBottom = '16px';
+    chordPresetsSection.appendChild(chordPresetsTitle);
+
+    // Store chord button references for updating active states
+    const chordPresetButtons = {};
+
+    // Helper function to update chord active states
+    function updateChordPresetActiveStates() {
+        const activePreset = findMatchingPreset(currentChordWeights);
+
+        Object.keys(chordPresetButtons).forEach(key => {
+            const btn = chordPresetButtons[key];
             const isActive = key === activePreset;
 
             if (isActive) {
@@ -191,8 +309,8 @@ export function showSettingsModal() {
         });
     }
 
-    // Helper function to create preset section
-    const createPresetSection = (title, presets, description, emoji) => {
+    // Helper function to create chord preset section
+    const createChordPresetSection = (sectionTitle, presets, description, emoji) => {
         const section = document.createElement('div');
         section.style.marginBottom = '20px';
 
@@ -202,12 +320,12 @@ export function showSettingsModal() {
         sectionHeader.style.gap = '8px';
         sectionHeader.style.marginBottom = '12px';
 
-        const sectionTitle = document.createElement('div');
-        sectionTitle.textContent = `${emoji} ${title}`;
-        sectionTitle.style.fontSize = '14px';
-        sectionTitle.style.fontWeight = '600';
-        sectionTitle.style.color = '#374151';
-        sectionHeader.appendChild(sectionTitle);
+        const titleEl = document.createElement('div');
+        titleEl.textContent = `${emoji} ${sectionTitle}`;
+        titleEl.style.fontSize = '14px';
+        titleEl.style.fontWeight = '600';
+        titleEl.style.color = '#374151';
+        sectionHeader.appendChild(titleEl);
 
         if (description) {
             const sectionDesc = document.createElement('div');
@@ -253,26 +371,26 @@ export function showSettingsModal() {
             presetBtn.appendChild(presetDesc);
 
             presetBtn.onmouseenter = () => {
-                const isActive = findMatchingPreset(currentWeights) === key;
+                const isActive = findMatchingPreset(currentChordWeights) === key;
                 if (!isActive) {
                     presetBtn.style.backgroundColor = '#eff6ff';
                     presetBtn.style.borderColor = '#3b82f6';
                 }
             };
             presetBtn.onmouseleave = () => {
-                updatePresetActiveStates();
+                updateChordPresetActiveStates();
             };
 
             presetBtn.onclick = () => {
                 const weights = applyPreset(key, false);
                 if (weights) {
-                    currentWeights = weights;
-                    updateSliders();
-                    updatePresetActiveStates();
+                    currentChordWeights = weights;
+                    updateChordSliders();
+                    updateChordPresetActiveStates();
                 }
             };
 
-            presetButtons[key] = presetBtn;
+            chordPresetButtons[key] = presetBtn;
             grid.appendChild(presetBtn);
         });
 
@@ -281,55 +399,55 @@ export function showSettingsModal() {
     };
 
     // Approaches section
-    const approachesSection = createPresetSection(
+    const chordApproachesSection = createChordPresetSection(
         'Approaches',
         APPROACH_PRESETS,
         'What to prioritize',
         '🎯'
     );
-    presetsSection.appendChild(approachesSection);
+    chordPresetsSection.appendChild(chordApproachesSection);
 
     // Separator
-    const separator = document.createElement('div');
-    separator.style.height = '1px';
-    separator.style.backgroundColor = '#e5e7eb';
-    separator.style.margin = '20px 0';
-    presetsSection.appendChild(separator);
+    const chordSeparator = document.createElement('div');
+    chordSeparator.style.height = '1px';
+    chordSeparator.style.backgroundColor = '#e5e7eb';
+    chordSeparator.style.margin = '20px 0';
+    chordPresetsSection.appendChild(chordSeparator);
 
     // Genre templates section
-    const genreSection = createPresetSection(
+    const chordGenreSection = createChordPresetSection(
         'Genre Templates',
         GENRE_TEMPLATES,
         'Complete genre profiles',
         '🎸'
     );
-    presetsSection.appendChild(genreSection);
+    chordPresetsSection.appendChild(chordGenreSection);
 
-    modal.appendChild(presetsSection);
+    chordsContent.appendChild(chordPresetsSection);
 
     // Set initial active states
-    updatePresetActiveStates();
+    updateChordPresetActiveStates();
 
-    // Custom weights section
-    const weightsSection = document.createElement('div');
-    weightsSection.style.marginBottom = '24px';
+    // Custom chord weights section
+    const chordWeightsSection = document.createElement('div');
+    chordWeightsSection.style.marginBottom = '24px';
 
-    const weightsTitle = document.createElement('h3');
-    weightsTitle.textContent = 'Custom Weights';
-    weightsTitle.style.fontSize = '16px';
-    weightsTitle.style.fontWeight = '600';
-    weightsTitle.style.color = '#111827';
-    weightsTitle.style.marginBottom = '16px';
-    weightsSection.appendChild(weightsTitle);
+    const chordWeightsTitle = document.createElement('h3');
+    chordWeightsTitle.textContent = 'Custom Weights';
+    chordWeightsTitle.style.fontSize = '16px';
+    chordWeightsTitle.style.fontWeight = '600';
+    chordWeightsTitle.style.color = '#111827';
+    chordWeightsTitle.style.marginBottom = '16px';
+    chordWeightsSection.appendChild(chordWeightsTitle);
 
     // Weight sliders container
-    const slidersContainer = document.createElement('div');
-    slidersContainer.style.display = 'flex';
-    slidersContainer.style.flexDirection = 'column';
-    slidersContainer.style.gap = '20px';
+    const chordSlidersContainer = document.createElement('div');
+    chordSlidersContainer.style.display = 'flex';
+    chordSlidersContainer.style.flexDirection = 'column';
+    chordSlidersContainer.style.gap = '20px';
 
-    const sliders = {};
-    const labels = {
+    const chordSliders = {};
+    const chordLabels = {
         harmonic: 'Harmonic Function',
         voiceLeading: 'Voice Leading',
         style: 'Style Fit',
@@ -337,7 +455,7 @@ export function showSettingsModal() {
         modalInterchange: 'Modal Interchange'
     };
 
-    const descriptions = {
+    const chordDescriptions = {
         harmonic: 'How well the chord follows traditional harmonic progressions (tonic→subdominant→dominant)',
         voiceLeading: 'Smoothness of voice movement - minimal note jumps, common tones, contrary motion',
         style: 'How well the chord fits your selected musical style (pop, jazz, classical, etc.)',
@@ -345,29 +463,29 @@ export function showSettingsModal() {
         modalInterchange: 'How often to suggest borrowed chords from parallel modes (♭VII, iv, ♭VI from parallel minor, etc.)'
     };
 
-    function updateSliders() {
-        Object.keys(labels).forEach(key => {
-            sliders[key].slider.value = Math.round(currentWeights[key] * 100);
-            sliders[key].valueLabel.textContent = `${Math.round(currentWeights[key] * 100)}%`;
+    function updateChordSliders() {
+        Object.keys(chordLabels).forEach(key => {
+            chordSliders[key].slider.value = Math.round(currentChordWeights[key] * 100);
+            chordSliders[key].valueLabel.textContent = `${Math.round(currentChordWeights[key] * 100)}%`;
         });
     }
 
-    function onSliderChange() {
+    function onChordSliderChange() {
         // Get current slider values
         const newWeights = {};
-        Object.keys(labels).forEach(key => {
-            newWeights[key] = parseFloat(sliders[key].slider.value) / 100;
+        Object.keys(chordLabels).forEach(key => {
+            newWeights[key] = parseFloat(chordSliders[key].slider.value) / 100;
         });
 
         // Normalize
-        currentWeights = normalizeWeights(newWeights);
+        currentChordWeights = normalizeWeights(newWeights);
 
         // Update display
-        updateSliders();
-        updatePresetActiveStates();
+        updateChordSliders();
+        updateChordPresetActiveStates();
     }
 
-    Object.keys(labels).forEach(key => {
+    Object.keys(chordLabels).forEach(key => {
         const sliderGroup = document.createElement('div');
 
         const labelRow = document.createElement('div');
@@ -377,13 +495,13 @@ export function showSettingsModal() {
         labelRow.style.marginBottom = '8px';
 
         const label = document.createElement('label');
-        label.textContent = labels[key];
+        label.textContent = chordLabels[key];
         label.style.fontSize = '14px';
         label.style.fontWeight = '600';
         label.style.color = '#374151';
 
         const valueLabel = document.createElement('span');
-        valueLabel.textContent = `${Math.round(currentWeights[key] * 100)}%`;
+        valueLabel.textContent = `${Math.round(currentChordWeights[key] * 100)}%`;
         valueLabel.style.fontSize = '14px';
         valueLabel.style.fontWeight = '600';
         valueLabel.style.color = '#3b82f6';
@@ -394,7 +512,7 @@ export function showSettingsModal() {
         labelRow.appendChild(valueLabel);
 
         const desc = document.createElement('div');
-        desc.textContent = descriptions[key];
+        desc.textContent = chordDescriptions[key];
         desc.style.fontSize = '12px';
         desc.style.color = '#6b7280';
         desc.style.marginBottom = '8px';
@@ -404,86 +522,520 @@ export function showSettingsModal() {
         slider.type = 'range';
         slider.min = '0';
         slider.max = '100';
-        slider.value = Math.round(currentWeights[key] * 100);
+        slider.value = Math.round(currentChordWeights[key] * 100);
         slider.style.width = '100%';
         slider.style.cursor = 'pointer';
-        slider.oninput = onSliderChange;
+        slider.oninput = onChordSliderChange;
 
-        sliders[key] = { slider, valueLabel };
+        chordSliders[key] = { slider, valueLabel };
 
         sliderGroup.appendChild(labelRow);
         sliderGroup.appendChild(desc);
         sliderGroup.appendChild(slider);
 
-        slidersContainer.appendChild(sliderGroup);
+        chordSlidersContainer.appendChild(sliderGroup);
     });
 
-    weightsSection.appendChild(slidersContainer);
-    modal.appendChild(weightsSection);
+    chordWeightsSection.appendChild(chordSlidersContainer);
+    chordsContent.appendChild(chordWeightsSection);
 
-    // Buttons
-    const buttonRow = document.createElement('div');
-    buttonRow.style.display = 'flex';
-    buttonRow.style.gap = '12px';
-    buttonRow.style.justifyContent = 'flex-end';
-    buttonRow.style.paddingTop = '24px';
-    buttonRow.style.borderTop = '1px solid #e5e7eb';
+    // Chord buttons
+    const chordButtonRow = document.createElement('div');
+    chordButtonRow.style.display = 'flex';
+    chordButtonRow.style.gap = '12px';
+    chordButtonRow.style.justifyContent = 'flex-end';
+    chordButtonRow.style.paddingTop = '24px';
+    chordButtonRow.style.borderTop = '1px solid #e5e7eb';
 
-    const resetBtn = document.createElement('button');
-    resetBtn.textContent = 'Reset to Default';
-    resetBtn.style.padding = '10px 20px';
-    resetBtn.style.backgroundColor = '#f9fafb';
-    resetBtn.style.border = '1px solid #d1d5db';
-    resetBtn.style.borderRadius = '6px';
-    resetBtn.style.cursor = 'pointer';
-    resetBtn.style.fontSize = '14px';
-    resetBtn.style.fontWeight = '600';
-    resetBtn.style.color = '#374151';
-    resetBtn.style.transition = 'all 0.2s';
-    resetBtn.onmouseenter = () => {
-        resetBtn.style.backgroundColor = '#f3f4f6';
+    const chordResetBtn = document.createElement('button');
+    chordResetBtn.textContent = 'Reset to Default';
+    chordResetBtn.style.padding = '10px 20px';
+    chordResetBtn.style.backgroundColor = '#f9fafb';
+    chordResetBtn.style.border = '1px solid #d1d5db';
+    chordResetBtn.style.borderRadius = '6px';
+    chordResetBtn.style.cursor = 'pointer';
+    chordResetBtn.style.fontSize = '14px';
+    chordResetBtn.style.fontWeight = '600';
+    chordResetBtn.style.color = '#374151';
+    chordResetBtn.style.transition = 'all 0.2s';
+    chordResetBtn.onmouseenter = () => {
+        chordResetBtn.style.backgroundColor = '#f3f4f6';
     };
-    resetBtn.onmouseleave = () => {
-        resetBtn.style.backgroundColor = '#f9fafb';
+    chordResetBtn.onmouseleave = () => {
+        chordResetBtn.style.backgroundColor = '#f9fafb';
     };
-    resetBtn.onclick = () => {
-        currentWeights = resetWeightsToDefault(false);
-        updateSliders();
-        updatePresetActiveStates();
+    chordResetBtn.onclick = () => {
+        currentChordWeights = resetWeightsToDefault(false);
+        updateChordSliders();
+        updateChordPresetActiveStates();
     };
 
-    const saveBtn = document.createElement('button');
-    saveBtn.textContent = 'Save Settings';
-    saveBtn.style.padding = '10px 24px';
-    saveBtn.style.backgroundColor = '#3b82f6';
-    saveBtn.style.border = 'none';
-    saveBtn.style.borderRadius = '6px';
-    saveBtn.style.cursor = 'pointer';
-    saveBtn.style.fontSize = '14px';
-    saveBtn.style.fontWeight = '600';
-    saveBtn.style.color = 'white';
-    saveBtn.style.transition = 'all 0.2s';
-    saveBtn.onmouseenter = () => {
-        saveBtn.style.backgroundColor = '#2563eb';
+    const chordSaveBtn = document.createElement('button');
+    chordSaveBtn.textContent = 'Save Settings';
+    chordSaveBtn.style.padding = '10px 24px';
+    chordSaveBtn.style.backgroundColor = '#3b82f6';
+    chordSaveBtn.style.border = 'none';
+    chordSaveBtn.style.borderRadius = '6px';
+    chordSaveBtn.style.cursor = 'pointer';
+    chordSaveBtn.style.fontSize = '14px';
+    chordSaveBtn.style.fontWeight = '600';
+    chordSaveBtn.style.color = 'white';
+    chordSaveBtn.style.transition = 'all 0.2s';
+    chordSaveBtn.onmouseenter = () => {
+        chordSaveBtn.style.backgroundColor = '#2563eb';
     };
-    saveBtn.onmouseleave = () => {
-        saveBtn.style.backgroundColor = '#3b82f6';
+    chordSaveBtn.onmouseleave = () => {
+        chordSaveBtn.style.backgroundColor = '#3b82f6';
     };
-    saveBtn.onclick = () => {
-        saveWeights(currentWeights);
-        saveBtn.textContent = '✓ Saved!';
-        saveBtn.style.backgroundColor = '#10b981';
+    chordSaveBtn.onclick = () => {
+        saveWeights(currentChordWeights);
+        chordSaveBtn.textContent = '✓ Saved!';
+        chordSaveBtn.style.backgroundColor = '#10b981';
         setTimeout(() => {
-            saveBtn.textContent = 'Save Settings';
-            saveBtn.style.backgroundColor = '#3b82f6';
+            chordSaveBtn.textContent = 'Save Settings';
+            chordSaveBtn.style.backgroundColor = '#3b82f6';
             overlay.remove();
+
+            // Trigger chord recommendations refresh
+            if (window.refreshChordRecommendations) {
+                window.refreshChordRecommendations();
+            }
         }, 1000);
     };
 
-    buttonRow.appendChild(resetBtn);
-    buttonRow.appendChild(saveBtn);
-    modal.appendChild(buttonRow);
+    chordButtonRow.appendChild(chordResetBtn);
+    chordButtonRow.appendChild(chordSaveBtn);
+    chordsContent.appendChild(chordButtonRow);
+
+    // ==========================================================================
+    // MELODY WEIGHTS CONTENT
+    // ==========================================================================
+
+    // Description
+    const melodyDescription = document.createElement('p');
+    melodyDescription.textContent = 'Customize how melody note suggestions are scored and ranked. These weights are multipliers that boost or reduce the importance of each factor.';
+    melodyDescription.style.color = '#6b7280';
+    melodyDescription.style.fontSize = '14px';
+    melodyDescription.style.marginBottom = '24px';
+    melodyDescription.style.lineHeight = '1.6';
+    melodyContent.appendChild(melodyDescription);
+
+    // Melody notice
+    const melodyNotice = document.createElement('div');
+    melodyNotice.style.backgroundColor = '#f0fdf4';
+    melodyNotice.style.border = '1px solid #bbf7d0';
+    melodyNotice.style.borderRadius = '8px';
+    melodyNotice.style.padding = '12px 16px';
+    melodyNotice.style.marginBottom = '24px';
+    melodyNotice.innerHTML = `
+        <div style="display: flex; align-items: start; gap: 12px;">
+            <span style="font-size: 20px;">ℹ️</span>
+            <div style="flex: 1;">
+                <div style="font-weight: 600; color: #166534; margin-bottom: 4px;">About Melody Weights</div>
+                <div style="font-size: 13px; color: #15803d; line-height: 1.5;">
+                    Melody weights are multipliers (0.5× to 2.0×) that adjust how much each factor influences note suggestions.
+                    A value of 1.0× is neutral, higher values increase importance, lower values decrease it.
+                </div>
+            </div>
+        </div>
+    `;
+    melodyContent.appendChild(melodyNotice);
+
+    // Quick save button at top
+    const melodyQuickSaveRow = document.createElement('div');
+    melodyQuickSaveRow.style.display = 'flex';
+    melodyQuickSaveRow.style.justifyContent = 'flex-end';
+    melodyQuickSaveRow.style.marginBottom = '20px';
+
+    const melodyQuickSaveBtn = document.createElement('button');
+    melodyQuickSaveBtn.textContent = 'Save Settings';
+    melodyQuickSaveBtn.style.padding = '8px 16px';
+    melodyQuickSaveBtn.style.backgroundColor = '#22c55e';
+    melodyQuickSaveBtn.style.border = 'none';
+    melodyQuickSaveBtn.style.borderRadius = '6px';
+    melodyQuickSaveBtn.style.cursor = 'pointer';
+    melodyQuickSaveBtn.style.fontSize = '13px';
+    melodyQuickSaveBtn.style.fontWeight = '600';
+    melodyQuickSaveBtn.style.color = 'white';
+    melodyQuickSaveBtn.style.transition = 'all 0.2s';
+    melodyQuickSaveBtn.onmouseenter = () => {
+        melodyQuickSaveBtn.style.backgroundColor = '#16a34a';
+    };
+    melodyQuickSaveBtn.onmouseleave = () => {
+        melodyQuickSaveBtn.style.backgroundColor = '#22c55e';
+    };
+    melodyQuickSaveBtn.onclick = () => {
+        saveMelodyWeights(currentMelodyWeights);
+        melodyQuickSaveBtn.textContent = '✓ Saved!';
+        melodyQuickSaveBtn.style.backgroundColor = '#10b981';
+        setTimeout(() => {
+            melodyQuickSaveBtn.textContent = 'Save Settings';
+            melodyQuickSaveBtn.style.backgroundColor = '#22c55e';
+            overlay.remove();
+            if (window.refreshMelodySuggestions) {
+                window.refreshMelodySuggestions();
+            }
+        }, 1000);
+    };
+
+    melodyQuickSaveRow.appendChild(melodyQuickSaveBtn);
+    melodyContent.appendChild(melodyQuickSaveRow);
+
+    // Melody presets section
+    const melodyPresetsSection = document.createElement('div');
+    melodyPresetsSection.style.marginBottom = '28px';
+
+    const melodyPresetsTitle = document.createElement('h3');
+    melodyPresetsTitle.textContent = 'Presets';
+    melodyPresetsTitle.style.fontSize = '16px';
+    melodyPresetsTitle.style.fontWeight = '600';
+    melodyPresetsTitle.style.color = '#111827';
+    melodyPresetsTitle.style.marginBottom = '16px';
+    melodyPresetsSection.appendChild(melodyPresetsTitle);
+
+    // Store melody button references
+    const melodyPresetButtons = {};
+
+    // Helper function to update melody active states
+    function updateMelodyPresetActiveStates() {
+        const activePreset = findMatchingMelodyPreset(currentMelodyWeights);
+
+        Object.keys(melodyPresetButtons).forEach(key => {
+            const btn = melodyPresetButtons[key];
+            const isActive = key === activePreset;
+
+            if (isActive) {
+                btn.style.backgroundColor = '#dcfce7';
+                btn.style.borderColor = '#22c55e';
+                btn.style.boxShadow = '0 0 0 3px rgba(34, 197, 94, 0.1)';
+            } else {
+                btn.style.backgroundColor = '#f9fafb';
+                btn.style.borderColor = '#e5e7eb';
+                btn.style.boxShadow = 'none';
+            }
+        });
+    }
+
+    // Helper function to create melody preset section
+    const createMelodyPresetSection = (sectionTitle, presets, description, emoji) => {
+        const section = document.createElement('div');
+        section.style.marginBottom = '20px';
+
+        const sectionHeader = document.createElement('div');
+        sectionHeader.style.display = 'flex';
+        sectionHeader.style.alignItems = 'baseline';
+        sectionHeader.style.gap = '8px';
+        sectionHeader.style.marginBottom = '12px';
+
+        const titleEl = document.createElement('div');
+        titleEl.textContent = `${emoji} ${sectionTitle}`;
+        titleEl.style.fontSize = '14px';
+        titleEl.style.fontWeight = '600';
+        titleEl.style.color = '#374151';
+        sectionHeader.appendChild(titleEl);
+
+        if (description) {
+            const sectionDesc = document.createElement('div');
+            sectionDesc.textContent = description;
+            sectionDesc.style.fontSize = '12px';
+            sectionDesc.style.color = '#9ca3af';
+            sectionDesc.style.fontStyle = 'italic';
+            sectionHeader.appendChild(sectionDesc);
+        }
+
+        section.appendChild(sectionHeader);
+
+        const grid = document.createElement('div');
+        grid.style.display = 'grid';
+        grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
+        grid.style.gap = '12px';
+
+        Object.keys(presets).forEach(key => {
+            const preset = presets[key];
+
+            const presetBtn = document.createElement('button');
+            presetBtn.style.padding = '12px 16px';
+            presetBtn.style.backgroundColor = '#f9fafb';
+            presetBtn.style.border = '2px solid #e5e7eb';
+            presetBtn.style.borderRadius = '8px';
+            presetBtn.style.cursor = 'pointer';
+            presetBtn.style.transition = 'all 0.2s';
+            presetBtn.style.textAlign = 'left';
+            presetBtn.title = preset.tooltip;
+
+            const presetName = document.createElement('div');
+            presetName.textContent = preset.name;
+            presetName.style.fontWeight = '600';
+            presetName.style.color = '#111827';
+            presetName.style.marginBottom = '4px';
+            presetBtn.appendChild(presetName);
+
+            const presetDesc = document.createElement('div');
+            presetDesc.textContent = preset.description;
+            presetDesc.style.fontSize = '12px';
+            presetDesc.style.color = '#6b7280';
+            presetDesc.style.lineHeight = '1.4';
+            presetBtn.appendChild(presetDesc);
+
+            presetBtn.onmouseenter = () => {
+                const isActive = findMatchingMelodyPreset(currentMelodyWeights) === key;
+                if (!isActive) {
+                    presetBtn.style.backgroundColor = '#f0fdf4';
+                    presetBtn.style.borderColor = '#22c55e';
+                }
+            };
+            presetBtn.onmouseleave = () => {
+                updateMelodyPresetActiveStates();
+            };
+
+            presetBtn.onclick = () => {
+                const weights = applyMelodyPreset(key);
+                if (weights) {
+                    currentMelodyWeights = weights;
+                    updateMelodySliders();
+                    updateMelodyPresetActiveStates();
+                }
+            };
+
+            melodyPresetButtons[key] = presetBtn;
+            grid.appendChild(presetBtn);
+        });
+
+        section.appendChild(grid);
+        return section;
+    };
+
+    // Melody approaches section
+    const melodyApproachesSection = createMelodyPresetSection(
+        'Approaches',
+        MELODY_APPROACH_PRESETS,
+        'What to prioritize',
+        '🎯'
+    );
+    melodyPresetsSection.appendChild(melodyApproachesSection);
+
+    // Separator
+    const melodySeparator = document.createElement('div');
+    melodySeparator.style.height = '1px';
+    melodySeparator.style.backgroundColor = '#e5e7eb';
+    melodySeparator.style.margin = '20px 0';
+    melodyPresetsSection.appendChild(melodySeparator);
+
+    // Genre templates section
+    const melodyGenreSection = createMelodyPresetSection(
+        'Genre Templates',
+        MELODY_GENRE_TEMPLATES,
+        'Complete genre profiles',
+        '🎸'
+    );
+    melodyPresetsSection.appendChild(melodyGenreSection);
+
+    melodyContent.appendChild(melodyPresetsSection);
+
+    // Set initial active states
+    updateMelodyPresetActiveStates();
+
+    // Custom melody weights section
+    const melodyWeightsSection = document.createElement('div');
+    melodyWeightsSection.style.marginBottom = '24px';
+
+    const melodyWeightsTitle = document.createElement('h3');
+    melodyWeightsTitle.textContent = 'Custom Weights';
+    melodyWeightsTitle.style.fontSize = '16px';
+    melodyWeightsTitle.style.fontWeight = '600';
+    melodyWeightsTitle.style.color = '#111827';
+    melodyWeightsTitle.style.marginBottom = '16px';
+    melodyWeightsSection.appendChild(melodyWeightsTitle);
+
+    // Melody sliders container
+    const melodySlidersContainer = document.createElement('div');
+    melodySlidersContainer.style.display = 'flex';
+    melodySlidersContainer.style.flexDirection = 'column';
+    melodySlidersContainer.style.gap = '20px';
+
+    const melodySliders = {};
+    const melodyLabels = {
+        chordTone: 'Chord Tone',
+        scaleTone: 'Scale Tone',
+        voiceLeading: 'Voice Leading',
+        approachTone: 'Approach Tone',
+        tensionTolerance: 'Tension Tolerance',
+        recencyPenalty: 'Recency Penalty'
+    };
+
+    const melodyDescriptions = {
+        chordTone: 'How much to favor notes that are part of the current chord (root, 3rd, 5th, 7th)',
+        scaleTone: 'How much to favor notes that are in the current key/scale',
+        voiceLeading: 'How much to favor smooth stepwise motion from the previous note',
+        approachTone: 'How much to favor chromatic approach tones that lead to chord tones',
+        tensionTolerance: 'How much to allow tension/dissonance notes (higher = more tension allowed)',
+        recencyPenalty: 'How much to penalize recently used notes (higher = more variety)'
+    };
+
+    function updateMelodySliders() {
+        Object.keys(melodyLabels).forEach(key => {
+            melodySliders[key].slider.value = Math.round(currentMelodyWeights[key] * 100);
+            melodySliders[key].valueLabel.textContent = `${currentMelodyWeights[key].toFixed(2)}×`;
+        });
+    }
+
+    function onMelodySliderChange() {
+        // Get current slider values
+        Object.keys(melodyLabels).forEach(key => {
+            currentMelodyWeights[key] = parseFloat(melodySliders[key].slider.value) / 100;
+        });
+
+        // Update display
+        updateMelodySliders();
+        updateMelodyPresetActiveStates();
+    }
+
+    Object.keys(melodyLabels).forEach(key => {
+        const sliderGroup = document.createElement('div');
+
+        const labelRow = document.createElement('div');
+        labelRow.style.display = 'flex';
+        labelRow.style.justifyContent = 'space-between';
+        labelRow.style.alignItems = 'center';
+        labelRow.style.marginBottom = '8px';
+
+        const label = document.createElement('label');
+        label.textContent = melodyLabels[key];
+        label.style.fontSize = '14px';
+        label.style.fontWeight = '600';
+        label.style.color = '#374151';
+
+        const valueLabel = document.createElement('span');
+        valueLabel.textContent = `${currentMelodyWeights[key].toFixed(2)}×`;
+        valueLabel.style.fontSize = '14px';
+        valueLabel.style.fontWeight = '600';
+        valueLabel.style.color = '#22c55e';
+        valueLabel.style.minWidth = '50px';
+        valueLabel.style.textAlign = 'right';
+
+        labelRow.appendChild(label);
+        labelRow.appendChild(valueLabel);
+
+        const desc = document.createElement('div');
+        desc.textContent = melodyDescriptions[key];
+        desc.style.fontSize = '12px';
+        desc.style.color = '#6b7280';
+        desc.style.marginBottom = '8px';
+        desc.style.lineHeight = '1.4';
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '25';  // 0.25×
+        slider.max = '200'; // 2.0×
+        slider.value = Math.round(currentMelodyWeights[key] * 100);
+        slider.style.width = '100%';
+        slider.style.cursor = 'pointer';
+        slider.oninput = onMelodySliderChange;
+
+        melodySliders[key] = { slider, valueLabel };
+
+        sliderGroup.appendChild(labelRow);
+        sliderGroup.appendChild(desc);
+        sliderGroup.appendChild(slider);
+
+        melodySlidersContainer.appendChild(sliderGroup);
+    });
+
+    melodyWeightsSection.appendChild(melodySlidersContainer);
+    melodyContent.appendChild(melodyWeightsSection);
+
+    // Melody buttons
+    const melodyButtonRow = document.createElement('div');
+    melodyButtonRow.style.display = 'flex';
+    melodyButtonRow.style.gap = '12px';
+    melodyButtonRow.style.justifyContent = 'flex-end';
+    melodyButtonRow.style.paddingTop = '24px';
+    melodyButtonRow.style.borderTop = '1px solid #e5e7eb';
+
+    const melodyResetBtn = document.createElement('button');
+    melodyResetBtn.textContent = 'Reset to Default';
+    melodyResetBtn.style.padding = '10px 20px';
+    melodyResetBtn.style.backgroundColor = '#f9fafb';
+    melodyResetBtn.style.border = '1px solid #d1d5db';
+    melodyResetBtn.style.borderRadius = '6px';
+    melodyResetBtn.style.cursor = 'pointer';
+    melodyResetBtn.style.fontSize = '14px';
+    melodyResetBtn.style.fontWeight = '600';
+    melodyResetBtn.style.color = '#374151';
+    melodyResetBtn.style.transition = 'all 0.2s';
+    melodyResetBtn.onmouseenter = () => {
+        melodyResetBtn.style.backgroundColor = '#f3f4f6';
+    };
+    melodyResetBtn.onmouseleave = () => {
+        melodyResetBtn.style.backgroundColor = '#f9fafb';
+    };
+    melodyResetBtn.onclick = () => {
+        currentMelodyWeights = resetMelodyWeightsToDefault();
+        updateMelodySliders();
+        updateMelodyPresetActiveStates();
+    };
+
+    const melodySaveBtn = document.createElement('button');
+    melodySaveBtn.textContent = 'Save Settings';
+    melodySaveBtn.style.padding = '10px 24px';
+    melodySaveBtn.style.backgroundColor = '#22c55e';
+    melodySaveBtn.style.border = 'none';
+    melodySaveBtn.style.borderRadius = '6px';
+    melodySaveBtn.style.cursor = 'pointer';
+    melodySaveBtn.style.fontSize = '14px';
+    melodySaveBtn.style.fontWeight = '600';
+    melodySaveBtn.style.color = 'white';
+    melodySaveBtn.style.transition = 'all 0.2s';
+    melodySaveBtn.onmouseenter = () => {
+        melodySaveBtn.style.backgroundColor = '#16a34a';
+    };
+    melodySaveBtn.onmouseleave = () => {
+        melodySaveBtn.style.backgroundColor = '#22c55e';
+    };
+    melodySaveBtn.onclick = () => {
+        saveMelodyWeights(currentMelodyWeights);
+        melodySaveBtn.textContent = '✓ Saved!';
+        melodySaveBtn.style.backgroundColor = '#10b981';
+        setTimeout(() => {
+            melodySaveBtn.textContent = 'Save Settings';
+            melodySaveBtn.style.backgroundColor = '#22c55e';
+            overlay.remove();
+
+            // Trigger melody suggestions refresh
+            if (window.refreshMelodySuggestions) {
+                window.refreshMelodySuggestions();
+            }
+        }, 1000);
+    };
+
+    melodyButtonRow.appendChild(melodyResetBtn);
+    melodyButtonRow.appendChild(melodySaveBtn);
+    melodyContent.appendChild(melodyButtonRow);
+
+    // ==========================================================================
+    // FINALIZE MODAL
+    // ==========================================================================
+
+    modal.appendChild(chordsContent);
+    modal.appendChild(melodyContent);
+
+    // Set initial tab
+    updateTabs();
 
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
+}
+
+/**
+ * Show settings modal with chord weights tab
+ */
+export function showChordWeightsModal() {
+    showSettingsModal('chords');
+}
+
+/**
+ * Show settings modal with melody weights tab
+ */
+export function showMelodyWeightsModal() {
+    showSettingsModal('melody');
 }

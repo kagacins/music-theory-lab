@@ -167,6 +167,14 @@ export function switchTab(tabId) {
             window.initializeRecommendationsSidebar();
         }
 
+        // Phase 4.1: Initialize melody suggestions controller
+        if (window.initMelodySuggestionController) {
+            window.initMelodySuggestionController({
+                styleId: document.getElementById('melody-style-select')?.value || 'pop',
+                octave: 4
+            });
+        }
+
         // Update key signature display
         if (trainerState.currentKey && window.updateKeySignatureDisplay) {
             updateKeySignatureDisplay(trainerState.currentKey);

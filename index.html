@@ -1243,70 +1243,134 @@
                 <!-- Phase 2: Chord Recommendations Sidebar -->
                 <aside id="chord-recommendations-sidebar" class="bg-white rounded-xl shadow-2xl border border-violet-100 p-4">
                     <div class="sidebar-resize-handle"></div>
-                    <h3 class="sidebar-header">Chord Suggestions</h3>
 
-                    <!-- Current Context Display -->
-                    <div class="context-display">
-                        <div class="context-row">
-                            <span class="context-label">Key:</span>
-                            <span id="current-key-display" class="context-value">C Major</span>
+                    <!-- Suggestions Banner and Toggle -->
+                    <div class="suggestions-banner">
+                        <div class="banner-header">
+                            <h3 class="banner-title">Suggestions</h3>
+                            <button id="suggestion-weights-btn" class="weights-btn" title="Adjust suggestion weights" onclick="window.openSuggestionWeights && window.openSuggestionWeights()">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>
+                            </button>
                         </div>
-                        <div class="context-row">
-                            <span class="context-label">Last Chord:</span>
-                            <span id="last-chord-display" class="context-value">(none)</span>
+                        <div class="suggestions-toggle" role="tablist">
+                            <button id="toggle-chords-btn" class="toggle-btn active" role="tab" aria-selected="true" onclick="window.switchSuggestionMode && window.switchSuggestionMode('chords')">
+                                Chords
+                            </button>
+                            <button id="toggle-melody-btn" class="toggle-btn" role="tab" aria-selected="false" onclick="window.switchSuggestionMode && window.switchSuggestionMode('melody')">
+                                Melody
+                            </button>
                         </div>
                     </div>
 
-                    <!-- Recommendations List -->
-                    <div id="recommendations-list" class="space-y-2">
-                        <p class="recommendations-empty">No suggestions available</p>
+                    <!-- CHORD SUGGESTIONS SECTION -->
+                    <div id="chord-suggestions-section" class="suggestions-section">
+                        <!-- Current Context Display -->
+                        <div class="context-display">
+                            <div class="context-row">
+                                <span class="context-label">Key:</span>
+                                <span id="current-key-display" class="context-value">C Major</span>
+                            </div>
+                            <div class="context-row">
+                                <span class="context-label">Last Chord:</span>
+                                <span id="last-chord-display" class="context-value">(none)</span>
+                            </div>
+                        </div>
+
+                        <!-- Recommendations List -->
+                        <div id="recommendations-list" class="space-y-2">
+                            <p class="recommendations-empty">No suggestions available</p>
+                        </div>
+
+                        <!-- Refresh Button -->
+                        <button id="refresh-recommendations-btn" title="Refresh chord recommendations">
+                            Refresh Suggestions
+                        </button>
+
+                        <!-- Phase 2.3: Harmonic Analysis Panel -->
+                        <div id="harmony-analysis-panel" class="analysis-panel mt-4">
+                            <h4 class="analysis-header">Harmonic Analysis</h4>
+
+                            <!-- Chord Functions -->
+                            <div class="analysis-section">
+                                <span class="analysis-label">Functions:</span>
+                                <div id="chord-functions-display" class="functions-list">
+                                    <span class="text-xs text-gray-500">No progression to analyze</span>
+                                </div>
+                            </div>
+
+                            <!-- Detected Patterns -->
+                            <div class="analysis-section">
+                                <span class="analysis-label">Pattern:</span>
+                                <div id="pattern-display" class="pattern-info">
+                                    <span class="text-xs text-gray-500">-</span>
+                                </div>
+                            </div>
+
+                            <!-- Modal Interchange -->
+                            <div class="analysis-section">
+                                <span class="analysis-label">Borrowed Chords:</span>
+                                <div id="modal-interchange-display" class="borrowed-list">
+                                    <span class="text-xs text-gray-500">None</span>
+                                </div>
+                            </div>
+
+                            <!-- Complexity -->
+                            <div class="analysis-section">
+                                <span class="analysis-label">Complexity:</span>
+                                <div id="complexity-display" class="complexity-stars">
+                                    <span class="text-xs text-gray-500">-</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Refresh Button -->
-                    <button id="refresh-recommendations-btn" title="Refresh chord recommendations">
-                        Refresh Suggestions
-                    </button>
-
-                    <!-- Phase 2.3: Harmonic Analysis Panel -->
-                    <div id="harmony-analysis-panel" class="analysis-panel mt-4">
-                        <h4 class="analysis-header">Harmonic Analysis</h4>
-
-                        <!-- Chord Functions -->
-                        <div class="analysis-section">
-                            <span class="analysis-label">Functions:</span>
-                            <div id="chord-functions-display" class="functions-list">
-                                <span class="text-xs text-gray-500">No progression to analyze</span>
+                    <!-- MELODY SUGGESTIONS SECTION -->
+                    <div id="melody-suggestions-section" class="suggestions-section hidden">
+                        <!-- Context Display -->
+                        <div id="melody-suggestion-context" class="suggestion-context">
+                            <div class="context-item">
+                                <span class="context-label">Chord:</span>
+                                <span class="context-value">No chord selected</span>
+                            </div>
+                            <div class="context-item">
+                                <span class="context-label">Key:</span>
+                                <span class="context-value">C</span>
+                            </div>
+                            <div class="context-item">
+                                <span class="context-label">Previous:</span>
+                                <span class="context-value">None</span>
                             </div>
                         </div>
 
-                        <!-- Detected Patterns -->
-                        <div class="analysis-section">
-                            <span class="analysis-label">Pattern:</span>
-                            <div id="pattern-display" class="pattern-info">
-                                <span class="text-xs text-gray-500">-</span>
-                            </div>
+                        <!-- Style Selector -->
+                        <div class="style-selector mb-2">
+                            <label class="text-xs text-gray-600">Style:</label>
+                            <select id="melody-style-select" class="text-xs p-1 border rounded w-full">
+                                <option value="any">Balanced</option>
+                                <option value="pop" selected>Pop / Top 40</option>
+                                <option value="jazz">Jazz</option>
+                                <option value="classical">Classical</option>
+                                <option value="rock">Rock / Blues</option>
+                            </select>
                         </div>
 
-                        <!-- Modal Interchange -->
-                        <div class="analysis-section">
-                            <span class="analysis-label">Borrowed Chords:</span>
-                            <div id="modal-interchange-display" class="borrowed-list">
-                                <span class="text-xs text-gray-500">None</span>
-                            </div>
+                        <!-- Suggestions List -->
+                        <div id="melody-suggestions-list" class="suggestions-list space-y-2">
+                            <p class="suggestions-empty">Please select a chord to see suggestions</p>
                         </div>
 
-                        <!-- Complexity -->
-                        <div class="analysis-section">
-                            <span class="analysis-label">Complexity:</span>
-                            <div id="complexity-display" class="complexity-stars">
-                                <span class="text-xs text-gray-500">-</span>
-                            </div>
-                        </div>
+                        <!-- Refresh Button -->
+                        <button id="refresh-melody-suggestions-btn" class="refresh-btn mt-2" title="Refresh note suggestions">
+                            Refresh Notes
+                        </button>
                     </div>
 
                     <!-- Phase 2.4: Keyboard Shortcuts Hint -->
                     <div class="keyboard-shortcuts-hint mt-4">
-                        <h4 class="shortcuts-header">⌨️ Shortcuts</h4>
+                        <h4 class="shortcuts-header">Shortcuts</h4>
                         <div class="shortcuts-list">
                             <div class="shortcut-item">
                                 <kbd>1-5</kbd>
@@ -1858,7 +1922,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="w-full" style="overflow-x: hidden; overflow-y: auto; max-width: 100%; max-height: 600px; -webkit-overflow-scrolling: touch;">
+                                <div class="w-full" style="overflow-x: auto; overflow-y: auto; max-width: 100%; max-height: 600px; -webkit-overflow-scrolling: touch;">
                                     <canvas id="interactive-melody-notation-canvas" class="border border-gray-300 rounded" style="display: block;"></canvas>
                                 </div>
                             </div>

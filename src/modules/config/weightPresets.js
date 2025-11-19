@@ -1,7 +1,11 @@
 /**
  * Weight Presets Configuration
- * Defines default weights and preset configurations for the chord recommendation engine
+ * Defines default weights and preset configurations for the chord and melody recommendation engines
  */
+
+// =============================================================================
+// CHORD RECOMMENDATION WEIGHTS
+// =============================================================================
 
 // Default weight values (sum to 1.0)
 export const DEFAULT_WEIGHTS = {
@@ -239,6 +243,209 @@ export const WEIGHT_PRESETS = {
     }
 };
 
+// =============================================================================
+// MELODY SUGGESTION WEIGHTS
+// =============================================================================
+
+// Default melody weight values (multipliers, not normalized to sum to 1.0)
+export const DEFAULT_MELODY_WEIGHTS = {
+    chordTone: 1.0,      // How much to favor chord tones
+    scaleTone: 1.0,      // How much to favor scale tones
+    voiceLeading: 1.0,   // How much to favor stepwise motion
+    approachTone: 1.0,   // How much to favor chromatic approach tones
+    tensionTolerance: 1.0, // Inverse of tension penalty (higher = more tension allowed)
+    recencyPenalty: 1.0  // How much to penalize recently used notes
+};
+
+// ========================================
+// MELODY APPROACH PRESETS
+// These control WHAT the melody engine prioritizes
+// ========================================
+export const MELODY_APPROACH_PRESETS = {
+    balanced: {
+        name: 'Balanced',
+        description: 'Well-rounded melody with mix of chord tones and movement',
+        tooltip: 'Default balanced approach favoring chord tones and scale tones equally, with moderate voice leading consideration. Good for general-purpose melody writing.',
+        weights: {
+            chordTone: 1.0,
+            scaleTone: 1.0,
+            voiceLeading: 1.0,
+            approachTone: 1.0,
+            tensionTolerance: 1.0,
+            recencyPenalty: 1.0
+        }
+    },
+    chordFocused: {
+        name: 'Chord Focused',
+        description: 'Strongly emphasize chord tones for harmonic clarity',
+        tooltip: 'Prioritizes chord tones (root, 3rd, 5th, 7th) for melodies that strongly outline the harmony. Great for arpeggiated melodies and strong harmonic definition.',
+        weights: {
+            chordTone: 1.5,
+            scaleTone: 0.8,
+            voiceLeading: 0.9,
+            approachTone: 0.7,
+            tensionTolerance: 0.7,
+            recencyPenalty: 1.0
+        }
+    },
+    stepwise: {
+        name: 'Stepwise Motion',
+        description: 'Smooth, conjunct melodies with minimal leaps',
+        tooltip: 'Strongly favors stepwise motion (whole and half steps) for smooth, singable melodies. Great for vocal lines and lyrical passages.',
+        weights: {
+            chordTone: 0.9,
+            scaleTone: 1.1,
+            voiceLeading: 1.6,
+            approachTone: 1.0,
+            tensionTolerance: 0.8,
+            recencyPenalty: 1.2
+        }
+    },
+    chromatic: {
+        name: 'Chromatic Color',
+        description: 'More approach tones and chromatic passing notes',
+        tooltip: 'Emphasizes chromatic approach tones and allows more tension for colorful, jazz-influenced melodies with chromatic embellishments.',
+        weights: {
+            chordTone: 0.9,
+            scaleTone: 0.8,
+            voiceLeading: 1.1,
+            approachTone: 1.5,
+            tensionTolerance: 1.4,
+            recencyPenalty: 0.8
+        }
+    },
+    varied: {
+        name: 'Varied',
+        description: 'Penalizes repetition for melodic variety',
+        tooltip: 'Strongly penalizes recently used notes to encourage melodic variety and avoid repetitive patterns. Good for developing melodic ideas.',
+        weights: {
+            chordTone: 1.0,
+            scaleTone: 1.0,
+            voiceLeading: 1.0,
+            approachTone: 1.0,
+            tensionTolerance: 1.0,
+            recencyPenalty: 1.8
+        }
+    }
+};
+
+// ========================================
+// MELODY GENRE TEMPLATES
+// Complete pre-configured profiles for specific genres
+// ========================================
+export const MELODY_GENRE_TEMPLATES = {
+    pop: {
+        name: 'Pop',
+        description: 'Singable melodies with clear chord tones',
+        tooltip: 'Pop melodies emphasize chord tones (1.3×) for singability and strong hooks. Stepwise motion (1.2×) keeps lines smooth and memorable. Tension is reduced (0.7×) for accessible sound.',
+        weights: {
+            chordTone: 1.3,
+            scaleTone: 1.1,
+            voiceLeading: 1.2,
+            approachTone: 0.7,
+            tensionTolerance: 0.7,
+            recencyPenalty: 1.1
+        }
+    },
+    jazz: {
+        name: 'Jazz',
+        description: 'Chromatic approaches and tension notes',
+        tooltip: 'Jazz melodies feature chromatic approaches (1.4×) and embrace tension (1.7× tolerance) for sophisticated, colorful lines. Approach tones and extensions are encouraged.',
+        weights: {
+            chordTone: 1.0,
+            scaleTone: 0.9,
+            voiceLeading: 1.0,
+            approachTone: 1.4,
+            tensionTolerance: 1.7,
+            recencyPenalty: 0.9
+        }
+    },
+    classical: {
+        name: 'Classical',
+        description: 'Strong voice leading with stepwise motion',
+        tooltip: 'Classical melodies prioritize smooth voice leading (1.5×) and scale tones (1.2×) for elegant, well-crafted lines following traditional counterpoint principles.',
+        weights: {
+            chordTone: 1.1,
+            scaleTone: 1.2,
+            voiceLeading: 1.5,
+            approachTone: 0.8,
+            tensionTolerance: 0.8,
+            recencyPenalty: 1.0
+        }
+    },
+    rock: {
+        name: 'Rock/Blues',
+        description: 'Pentatonic focus with blue notes',
+        tooltip: 'Rock/Blues melodies emphasize chord tones (1.2×) and allow blue notes/tension (1.25× tolerance). Less emphasis on chromatic approaches for a raw, powerful sound.',
+        weights: {
+            chordTone: 1.2,
+            scaleTone: 1.0,
+            voiceLeading: 0.9,
+            approachTone: 0.6,
+            tensionTolerance: 1.25,
+            recencyPenalty: 0.8
+        }
+    },
+    rnbSoul: {
+        name: 'R&B/Soul',
+        description: 'Smooth lines with chromatic embellishments',
+        tooltip: 'R&B/Soul melodies blend smooth voice leading (1.3×) with chromatic approaches (1.2×) for soulful, melismatic lines with tasteful embellishments.',
+        weights: {
+            chordTone: 1.1,
+            scaleTone: 1.0,
+            voiceLeading: 1.3,
+            approachTone: 1.2,
+            tensionTolerance: 1.1,
+            recencyPenalty: 0.9
+        }
+    },
+    folk: {
+        name: 'Folk/Acoustic',
+        description: 'Simple, diatonic melodies',
+        tooltip: 'Folk melodies emphasize scale tones (1.3×) and chord tones (1.2×) with minimal chromaticism for pure, accessible melodies rooted in the key.',
+        weights: {
+            chordTone: 1.2,
+            scaleTone: 1.3,
+            voiceLeading: 1.1,
+            approachTone: 0.5,
+            tensionTolerance: 0.6,
+            recencyPenalty: 1.0
+        }
+    },
+    electronic: {
+        name: 'Electronic/EDM',
+        description: 'Repetitive patterns with strong hooks',
+        tooltip: 'Electronic melodies favor chord tones (1.4×) for strong hooks and actually reduce recency penalty (0.5×) since repetition is a feature of the genre.',
+        weights: {
+            chordTone: 1.4,
+            scaleTone: 0.9,
+            voiceLeading: 0.8,
+            approachTone: 0.7,
+            tensionTolerance: 0.9,
+            recencyPenalty: 0.5
+        }
+    },
+    gospel: {
+        name: 'Gospel',
+        description: 'Soulful melismas with chromatic runs',
+        tooltip: 'Gospel melodies feature smooth voice leading (1.4×) and chromatic approaches (1.3×) for expressive, melismatic passages with soulful embellishments.',
+        weights: {
+            chordTone: 1.1,
+            scaleTone: 1.0,
+            voiceLeading: 1.4,
+            approachTone: 1.3,
+            tensionTolerance: 1.2,
+            recencyPenalty: 0.8
+        }
+    }
+};
+
+// Combined melody presets object
+export const MELODY_WEIGHT_PRESETS = {
+    ...MELODY_APPROACH_PRESETS,
+    ...MELODY_GENRE_TEMPLATES
+};
+
 /**
  * Normalize weights to sum to 1.0
  * @param {Object} weights - Weight object
@@ -332,4 +539,90 @@ export function applyPreset(presetKey, contextMode = false) {
     }
 
     return normalizeWeights(preset.weights);
+}
+
+// =============================================================================
+// MELODY WEIGHT UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Get melody weights from localStorage or return defaults
+ * @returns {Object} Melody weight configuration
+ */
+export function getSavedMelodyWeights() {
+    try {
+        const saved = localStorage.getItem('melody-suggestion-weights');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            // Ensure all required keys exist
+            const required = Object.keys(DEFAULT_MELODY_WEIGHTS);
+            const hasAllKeys = required.every(key => key in parsed);
+            if (hasAllKeys) {
+                return parsed;
+            }
+        }
+    } catch (e) {
+        console.error('Error loading saved melody weights:', e);
+    }
+
+    return { ...DEFAULT_MELODY_WEIGHTS };
+}
+
+/**
+ * Save melody weights to localStorage
+ * @param {Object} weights - Melody weight configuration
+ */
+export function saveMelodyWeights(weights) {
+    try {
+        localStorage.setItem('melody-suggestion-weights', JSON.stringify(weights));
+    } catch (e) {
+        console.error('Error saving melody weights:', e);
+    }
+}
+
+/**
+ * Reset melody weights to default
+ * @returns {Object} Default melody weights
+ */
+export function resetMelodyWeightsToDefault() {
+    saveMelodyWeights(DEFAULT_MELODY_WEIGHTS);
+    return { ...DEFAULT_MELODY_WEIGHTS };
+}
+
+/**
+ * Apply a melody preset
+ * @param {string} presetKey - Key from MELODY_WEIGHT_PRESETS
+ * @returns {Object|null} Weight configuration, or null if invalid
+ */
+export function applyMelodyPreset(presetKey) {
+    const preset = MELODY_WEIGHT_PRESETS[presetKey];
+    if (!preset) return null;
+
+    return { ...preset.weights };
+}
+
+/**
+ * Find which melody preset (if any) matches the given weights
+ * @param {Object} weights - Current weight configuration
+ * @returns {string|null} Preset key or null if no match
+ */
+export function findMatchingMelodyPreset(weights) {
+    const tolerance = 0.01;
+
+    for (const [key, preset] of Object.entries(MELODY_WEIGHT_PRESETS)) {
+        const presetWeights = preset.weights;
+        const keys = Object.keys(presetWeights);
+
+        // Check if all keys exist and values match within tolerance
+        const matches = keys.every(k => {
+            if (!(k in weights)) return false;
+            return Math.abs(presetWeights[k] - weights[k]) < tolerance;
+        });
+
+        if (matches) {
+            return key;
+        }
+    }
+
+    return null;
 }

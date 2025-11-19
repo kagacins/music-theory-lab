@@ -235,23 +235,51 @@ export class RecommendationsSidebarController {
             }
 
             // Handle number keys 1-5 (insert recommendations)
+            // Only handle when in chords mode (main.js handles melody mode)
             if (e.key >= '1' && e.key <= '5') {
+                // Check if we're in chords suggestion mode
+                const currentMode = window.getCurrentSuggestionMode ? window.getCurrentSuggestionMode() : 'chords';
+                if (currentMode !== 'chords') {
+                    // Let main.js handle melody mode shortcuts
+                    return;
+                }
+
                 e.preventDefault();
+                e.stopImmediatePropagation(); // Prevent main.js handler from also firing
                 const index = parseInt(e.key) - 1;
                 this.insertRecommendationByIndex(index);
+
+                // Add pulse animation
+                const items = document.querySelectorAll('#recommendations-list .chord-recommendation-item');
+                if (items[index]) {
+                    items[index].classList.add('shortcut-pulse');
+                    setTimeout(() => items[index].classList.remove('shortcut-pulse'), 500);
+                }
                 return;
             }
 
             // Handle 'R' key (refresh)
+            // Only handle when in chords mode (main.js handles melody mode)
             if (e.key === 'r' || e.key === 'R') {
+                const currentMode = window.getCurrentSuggestionMode ? window.getCurrentSuggestionMode() : 'chords';
+                if (currentMode !== 'chords') {
+                    return;
+                }
                 e.preventDefault();
+                e.stopImmediatePropagation();
                 this.refresh();
                 return;
             }
 
             // Handle 'Esc' key (deselect)
+            // Only handle when in chords mode (main.js handles melody mode)
             if (e.key === 'Escape') {
+                const currentMode = window.getCurrentSuggestionMode ? window.getCurrentSuggestionMode() : 'chords';
+                if (currentMode !== 'chords') {
+                    return;
+                }
                 e.preventDefault();
+                e.stopImmediatePropagation();
                 this.deselectAllRecommendations();
                 return;
             }

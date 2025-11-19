@@ -17,9 +17,10 @@ import { getCurrentKey } from '../state/trainerState.js';
  * @param {number} recommendation.totalScore - Overall recommendation score (0-100)
  * @param {number} recommendation.voiceLeadingScore - Voice leading quality (0-100)
  * @param {string} [recommendation.function] - Chord function (I, IV, V, etc.)
+ * @param {number} [index] - Index for shortcut badge (0-4 shows 1-5)
  * @returns {HTMLElement} DOM element for the recommendation
  */
-export function renderRecommendationItem(recommendation) {
+export function renderRecommendationItem(recommendation, index = -1) {
     const item = document.createElement('div');
     item.className = 'chord-recommendation-item';
     item.dataset.chordRoot = recommendation.chord.root;
@@ -37,8 +38,14 @@ export function renderRecommendationItem(recommendation) {
     const inversion = recommendation.chord.inversion || 0;
     const inversionText = getInversionName(inversion);
 
+    // Shortcut badge (only for first 5 items)
+    const shortcutBadge = index >= 0 && index < 5
+        ? `<span class="shortcut-badge">${index + 1}</span>`
+        : '';
+
     // Build HTML content - reorder so function (roman numeral) comes first, then inversion badge
     item.innerHTML = `
+        ${shortcutBadge}
         <div class="chord-info">
             <span class="chord-symbol">${chordSymbol}</span>
             ${recommendation.function ? `<span class="chord-function">${recommendation.function}</span>` : ''}
@@ -226,7 +233,7 @@ export function renderRecommendations(recommendations) {
 
     // Render each recommendation
     recommendations.forEach((rec, index) => {
-        const item = renderRecommendationItem(rec);
+        const item = renderRecommendationItem(rec, index);
         container.appendChild(item);
     });
 
@@ -386,19 +393,61 @@ function renderDetectedPatterns(patterns) {
         return;
     }
 
-    // Take the strongest/first pattern
-    const pattern = patterns[0];
+    // Consolidate duplicate patterns by name and show counts
+    const patternMap = new Map();
+    patterns.forEach(pattern => {
+        const key = pattern.name;
+        if (patternMap.has(key)) {
+            // Increment count for existing pattern
+            const existing = patternMap.get(key);
+            existing.count = (existing.count || 1) + (pattern.matches ? pattern.matches.length : 1);
+        } else {
+            // Add new pattern with count
+            patternMap.set(key, {
+                ...pattern,
+                count: pattern.matches ? pattern.matches.length : 1
+            });
+        }
+    });
 
-    // Build pattern display
-    const html = `
-        <div class="pattern-name">${pattern.name}</div>
-        <div class="pattern-description">${pattern.description}</div>
-        <div class="pattern-strength">
-            ${renderStars(pattern.strength, 5)}
-        </div>
-    `;
+    // Convert to array and sort by strength
+    const consolidatedPatterns = Array.from(patternMap.values())
+        .sort((a, b) => (b.strength || 0) - (a.strength || 0));
 
-    container.innerHTML = html;
+    // Render all patterns as badges
+    container.innerHTML = '';
+    const badgeContainer = document.createElement('div');
+    badgeContainer.className = 'pattern-badges-container';
+    badgeContainer.style.cssText = 'display: flex; flex-wrap: wrap; gap: 6px;';
+
+    consolidatedPatterns.forEach(pattern => {
+        const badge = document.createElement('span');
+        badge.className = 'pattern-badge';
+        badge.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: linear-gradient(135deg, #a855f7, #8b5cf6);
+            color: white;
+            cursor: pointer;
+        `;
+        badge.title = pattern.description || pattern.name;
+
+        // Badge content with count if > 1
+        let content = pattern.name;
+        if (pattern.count > 1) {
+            content += ` <span style="opacity: 0.8; font-size: 0.65rem;">×${pattern.count}</span>`;
+        }
+        badge.innerHTML = content;
+
+        badgeContainer.appendChild(badge);
+    });
+
+    container.appendChild(badgeContainer);
 }
 
 /**
