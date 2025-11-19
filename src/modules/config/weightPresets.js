@@ -626,3 +626,241 @@ export function findMatchingMelodyPreset(weights) {
 
     return null;
 }
+
+// =============================================================================
+// HARMONIZATION WEIGHTS
+// =============================================================================
+
+// Default harmonization weight values (sum to 1.0)
+export const DEFAULT_HARMONIZE_WEIGHTS = {
+    melodyMatch: 0.50,      // How much melody notes match chord tones
+    voiceLeading: 0.25,     // Smoothness of voice movement between chords
+    diatonicBonus: 0.15,    // Bonus for chords that are diatonic to key
+    simplicityBonus: 0.10   // Bonus for simpler chord types
+};
+
+// ========================================
+// HARMONIZATION APPROACH PRESETS
+// ========================================
+export const HARMONIZE_APPROACH_PRESETS = {
+    balanced: {
+        name: 'Balanced',
+        description: 'Well-rounded approach balancing all factors',
+        tooltip: 'Default balanced approach emphasizing melody match (50%) while considering voice leading (25%), diatonic fit (15%), and chord simplicity (10%). Good for general-purpose harmonization.',
+        weights: {
+            melodyMatch: 0.50,
+            voiceLeading: 0.25,
+            diatonicBonus: 0.15,
+            simplicityBonus: 0.10
+        }
+    },
+    melodyFirst: {
+        name: 'Melody First',
+        description: 'Strongly prioritize melody note fit',
+        tooltip: 'Heavily emphasizes melody match (70%) to ensure chord tones align with melody notes. Voice leading (15%) keeps things smooth, with minimal emphasis on diatonic fit and simplicity.',
+        weights: {
+            melodyMatch: 0.70,
+            voiceLeading: 0.15,
+            diatonicBonus: 0.10,
+            simplicityBonus: 0.05
+        }
+    },
+    smoothFlow: {
+        name: 'Smooth Flow',
+        description: 'Prioritize smooth voice leading between chords',
+        tooltip: 'Emphasizes voice leading (45%) for smooth chord transitions with minimal voice movement. Melody match (35%) is still important, with reduced emphasis on diatonic fit and simplicity.',
+        weights: {
+            melodyMatch: 0.35,
+            voiceLeading: 0.45,
+            diatonicBonus: 0.12,
+            simplicityBonus: 0.08
+        }
+    },
+    diatonic: {
+        name: 'Diatonic',
+        description: 'Favor chords that fit the key',
+        tooltip: 'Emphasizes diatonic fit (35%) to suggest chords that naturally belong to the key. Melody match (40%) remains important, with balanced voice leading (20%) and minimal simplicity bonus.',
+        weights: {
+            melodyMatch: 0.40,
+            voiceLeading: 0.20,
+            diatonicBonus: 0.35,
+            simplicityBonus: 0.05
+        }
+    },
+    simple: {
+        name: 'Simple Chords',
+        description: 'Favor basic triads and common chords',
+        tooltip: 'Emphasizes simplicity (30%) to suggest basic major/minor triads over complex 7ths and extensions. Good for beginners or when simpler harmonizations are preferred.',
+        weights: {
+            melodyMatch: 0.40,
+            voiceLeading: 0.20,
+            diatonicBonus: 0.10,
+            simplicityBonus: 0.30
+        }
+    }
+};
+
+// ========================================
+// HARMONIZATION GENRE TEMPLATES
+// ========================================
+export const HARMONIZE_GENRE_TEMPLATES = {
+    pop: {
+        name: 'Pop',
+        description: 'Simple, catchy chord choices',
+        tooltip: 'Pop harmonization favors simplicity (25%) and melody fit (45%) for accessible, memorable chord progressions. Diatonic chords (20%) keep things familiar.',
+        weights: {
+            melodyMatch: 0.45,
+            voiceLeading: 0.10,
+            diatonicBonus: 0.20,
+            simplicityBonus: 0.25
+        }
+    },
+    jazz: {
+        name: 'Jazz',
+        description: 'Complex harmonies with smooth voice leading',
+        tooltip: 'Jazz harmonization emphasizes voice leading (40%) for sophisticated chord movement. Melody fit (40%) ensures extensions color the melody properly. Simplicity is de-emphasized (5%).',
+        weights: {
+            melodyMatch: 0.40,
+            voiceLeading: 0.40,
+            diatonicBonus: 0.15,
+            simplicityBonus: 0.05
+        }
+    },
+    classical: {
+        name: 'Classical',
+        description: 'Traditional harmony with strict voice leading',
+        tooltip: 'Classical harmonization strongly emphasizes voice leading (45%) following traditional rules. Diatonic fit (25%) ensures proper key relationships. Simplicity (10%) favors traditional chord types.',
+        weights: {
+            melodyMatch: 0.20,
+            voiceLeading: 0.45,
+            diatonicBonus: 0.25,
+            simplicityBonus: 0.10
+        }
+    },
+    folk: {
+        name: 'Folk/Acoustic',
+        description: 'Simple diatonic harmonies',
+        tooltip: 'Folk harmonization emphasizes diatonic fit (35%) and simplicity (25%) for basic, accessible chord progressions that stay within the key.',
+        weights: {
+            melodyMatch: 0.30,
+            voiceLeading: 0.10,
+            diatonicBonus: 0.35,
+            simplicityBonus: 0.25
+        }
+    },
+    rock: {
+        name: 'Rock',
+        description: 'Power chords and basic progressions',
+        tooltip: 'Rock harmonization favors simplicity (30%) with strong melody fit (40%). Voice leading (10%) is less important for the energetic rock sound.',
+        weights: {
+            melodyMatch: 0.40,
+            voiceLeading: 0.10,
+            diatonicBonus: 0.20,
+            simplicityBonus: 0.30
+        }
+    },
+    rnbSoul: {
+        name: 'R&B/Soul',
+        description: 'Smooth, colorful harmonies',
+        tooltip: 'R&B harmonization balances melody fit (45%) with smooth voice leading (35%) for soulful chord progressions with rich extensions.',
+        weights: {
+            melodyMatch: 0.45,
+            voiceLeading: 0.35,
+            diatonicBonus: 0.12,
+            simplicityBonus: 0.08
+        }
+    }
+};
+
+// Combined harmonization presets object
+export const HARMONIZE_WEIGHT_PRESETS = {
+    ...HARMONIZE_APPROACH_PRESETS,
+    ...HARMONIZE_GENRE_TEMPLATES
+};
+
+// =============================================================================
+// HARMONIZATION WEIGHT UTILITY FUNCTIONS
+// =============================================================================
+
+/**
+ * Get harmonization weights from localStorage or return defaults
+ * @returns {Object} Harmonization weight configuration
+ */
+export function getSavedHarmonizeWeights() {
+    try {
+        const saved = localStorage.getItem('harmonize-weights');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            // Ensure all required keys exist
+            const required = Object.keys(DEFAULT_HARMONIZE_WEIGHTS);
+            const hasAllKeys = required.every(key => key in parsed);
+            if (hasAllKeys) {
+                return normalizeWeights(parsed);
+            }
+        }
+    } catch (e) {
+        console.error('Error loading saved harmonize weights:', e);
+    }
+
+    return { ...DEFAULT_HARMONIZE_WEIGHTS };
+}
+
+/**
+ * Save harmonization weights to localStorage
+ * @param {Object} weights - Harmonization weight configuration
+ */
+export function saveHarmonizeWeights(weights) {
+    try {
+        const normalized = normalizeWeights(weights);
+        localStorage.setItem('harmonize-weights', JSON.stringify(normalized));
+    } catch (e) {
+        console.error('Error saving harmonize weights:', e);
+    }
+}
+
+/**
+ * Reset harmonization weights to default
+ * @returns {Object} Default harmonization weights
+ */
+export function resetHarmonizeWeightsToDefault() {
+    saveHarmonizeWeights(DEFAULT_HARMONIZE_WEIGHTS);
+    return { ...DEFAULT_HARMONIZE_WEIGHTS };
+}
+
+/**
+ * Apply a harmonization preset
+ * @param {string} presetKey - Key from HARMONIZE_WEIGHT_PRESETS
+ * @returns {Object|null} Weight configuration, or null if invalid
+ */
+export function applyHarmonizePreset(presetKey) {
+    const preset = HARMONIZE_WEIGHT_PRESETS[presetKey];
+    if (!preset) return null;
+
+    return normalizeWeights(preset.weights);
+}
+
+/**
+ * Find which harmonization preset (if any) matches the given weights
+ * @param {Object} weights - Current weight configuration
+ * @returns {string|null} Preset key or null if no match
+ */
+export function findMatchingHarmonizePreset(weights) {
+    const tolerance = 0.01;
+
+    for (const [key, preset] of Object.entries(HARMONIZE_WEIGHT_PRESETS)) {
+        const presetWeights = preset.weights;
+        const keys = Object.keys(presetWeights);
+
+        // Check if all keys exist and values match within tolerance
+        const matches = keys.every(k => {
+            if (!(k in weights)) return false;
+            return Math.abs(presetWeights[k] - weights[k]) < tolerance;
+        });
+
+        if (matches) {
+            return key;
+        }
+    }
+
+    return null;
+}

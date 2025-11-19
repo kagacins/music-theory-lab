@@ -8247,8 +8247,9 @@ window.showProgressionChordSuggestions = showProgressionChordSuggestions;
  * @param {string} chordType - The chord type
  * @param {string} root - The root note
  * @param {number} inversion - The inversion
+ * @param {number} octaveShift - The octave shift in semitones (default 0, use -12 for one octave down)
  */
-export function addChordToProgressionByParams(chordType, root, inversion = 0) {
+export function addChordToProgressionByParams(chordType, root, inversion = 0, octaveShift = 0) {
     // Save current state for undo
     const currentState = captureProgressionState();
     pushToUndoStack(currentState);
@@ -8261,7 +8262,7 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0) {
         chordType,
         inversion,
         trainerState.currentKey,
-        0, // octaveShift
+        octaveShift,
         getEnharmonicPreference(),
         getNotationPreference()
     );
@@ -8273,8 +8274,8 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0) {
     const defaultLHType = 'off';
     const defaultLHInversion = 0;
     const defaultLHRelativeShift = -12; // One octave below RH by default (for when LH is enabled later)
-    const defaultRHOctaveShift = 0; // New chords start at default octave
-    const absoluteLHOctaveShift = defaultRHOctaveShift + defaultLHRelativeShift;
+    const rhOctaveShift = octaveShift; // Use the provided octave shift
+    const absoluteLHOctaveShift = rhOctaveShift + defaultLHRelativeShift;
     const lhNotes = getLHNotes(
         root,
         defaultLHType,
@@ -8295,7 +8296,7 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0) {
         inversion: inversion || 0,
         selectionMode: 'chord',
         omittedNotes: [],
-        octaveShift: defaultRHOctaveShift,
+        octaveShift: rhOctaveShift,
         lhType: defaultLHType,
         lhInversion: defaultLHInversion,
         lhOctaveShift: defaultLHRelativeShift,
@@ -8452,6 +8453,9 @@ export function clearProgression() {
 
     // Update UI
     updateProgressionControlsUI();
+
+    // Re-render melody notation canvas
+    renderMelodyNotationIfNeeded();
 
     // Phase 2.2: Dispatch event for chord recommendations sidebar
     window.dispatchEvent(new CustomEvent('progressionUpdated', {

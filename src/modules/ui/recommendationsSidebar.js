@@ -9,6 +9,7 @@
 
 import { getInvertedChordNotes } from '../utils/noteUtils.js';
 import { getCurrentKey } from '../state/trainerState.js';
+import { getStyleLabel, getMoodLabel } from '../features/unifiedChordSuggestions.js';
 
 /**
  * Render a single chord recommendation item
@@ -115,16 +116,32 @@ export function getChordSuffix(type) {
         'Minor': 'm',
         'Diminished': 'dim',
         'Augmented': 'aug',
-        'Major7': 'maj7',
-        'Minor7': 'm7',
-        'Dominant7': '7',
-        'Diminished7': 'dim7',
-        'HalfDiminished7': 'm7♭5',
+        // 7th chords - using canonical names from CHORD_DEFINITIONS
+        'Major 7th': 'maj7',
+        'Minor 7th': 'm7',
+        'Dominant 7th': '7',
+        'Diminished 7th': 'dim7',
+        'Half-Diminished 7th': 'm7♭5',
+        'Minor-Major 7th': 'm(maj7)',
+        // Suspended chords
         'Suspended 2nd': 'sus2',
         'Suspended 4th': 'sus4',
+        // Extended chords
         'Add9': 'add9',
-        'Major6': '6',
-        'Minor6': 'm6'
+        'Major 9th': 'maj9',
+        'Dominant 9th': '9',
+        'Minor 9th': 'm9',
+        '6/9': '6/9',
+        // 6th chords
+        '6th': '6',
+        'Minor 6th': 'm6',
+        // 11th and 13th
+        'Dominant 11th': '11',
+        'Minor 11th': 'm11',
+        'Dominant 13th': '13',
+        'Major 13th': 'maj13',
+        // Power chord
+        'Power Chord': '5'
     };
     return suffixes[type] || '';
 }
@@ -283,6 +300,37 @@ export function updateContextDisplay(key, lastChord = null, lastChordData = null
             lastChordDisplay.textContent = lastChord || '(none)';
         }
     }
+}
+
+/**
+ * Update style and mood display in the sidebar
+ * @param {string} styleId - Style ID (e.g., 'balanced', 'jazz', 'pop')
+ * @param {string} moodId - Mood ID (e.g., 'bright', 'dark', 'tense')
+ */
+export function updateStyleMoodDisplay(styleId, moodId) {
+    const styleDisplay = document.getElementById('current-style-display');
+    const moodDisplay = document.getElementById('current-mood-display');
+
+    if (styleDisplay) {
+        const styleLabel = getStyleLabel(styleId);
+        styleDisplay.textContent = styleLabel;
+    }
+
+    if (moodDisplay) {
+        const moodLabel = getMoodLabel(moodId);
+        // Remove emoji prefix if present for cleaner display
+        const cleanMoodLabel = moodLabel.replace(/^[^\w]+\s*/, '');
+        moodDisplay.textContent = cleanMoodLabel;
+    }
+}
+
+/**
+ * Initialize style/mood display from localStorage
+ */
+export function initStyleMoodDisplay() {
+    const savedStyle = localStorage.getItem('chord-suggestion-style') || 'balanced';
+    const savedMood = localStorage.getItem('chord-suggestion-mood') || 'bright';
+    updateStyleMoodDisplay(savedStyle, savedMood);
 }
 
 /**

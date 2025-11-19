@@ -23,7 +23,17 @@ import {
     saveMelodyWeights,
     resetMelodyWeightsToDefault,
     applyMelodyPreset,
-    findMatchingMelodyPreset
+    findMatchingMelodyPreset,
+    // Harmonization weight imports
+    DEFAULT_HARMONIZE_WEIGHTS,
+    HARMONIZE_APPROACH_PRESETS,
+    HARMONIZE_GENRE_TEMPLATES,
+    HARMONIZE_WEIGHT_PRESETS,
+    getSavedHarmonizeWeights,
+    saveHarmonizeWeights,
+    resetHarmonizeWeightsToDefault,
+    applyHarmonizePreset,
+    findMatchingHarmonizePreset
 } from '../config/weightPresets.js';
 
 /**
@@ -64,7 +74,7 @@ function findMatchingPreset(weights) {
 
 /**
  * Show the settings modal
- * @param {string} initialTab - Which tab to show initially: 'chords' or 'melody'
+ * @param {string} initialTab - Which tab to show initially: 'chords', 'melody', or 'harmonies'
  */
 export function showSettingsModal(initialTab = 'chords') {
     // Remove existing modal if any
@@ -74,6 +84,7 @@ export function showSettingsModal(initialTab = 'chords') {
     // Get current weights
     let currentChordWeights = getSavedWeights(false);
     let currentMelodyWeights = getSavedMelodyWeights();
+    let currentHarmonizeWeights = getSavedHarmonizeWeights();
 
     // Track which tab is active
     let activeTab = initialTab;
@@ -174,9 +185,11 @@ export function showSettingsModal(initialTab = 'chords') {
 
     const chordsTab = createTab('chords', 'Chord Weights', '🎹');
     const melodyTab = createTab('melody', 'Melody Weights', '🎵');
+    const harmoniesTab = createTab('harmonies', 'Harmonize Weights', '🎼');
 
     tabNav.appendChild(chordsTab);
     tabNav.appendChild(melodyTab);
+    tabNav.appendChild(harmoniesTab);
     modal.appendChild(tabNav);
 
     // Content containers
@@ -186,18 +199,27 @@ export function showSettingsModal(initialTab = 'chords') {
     const melodyContent = document.createElement('div');
     melodyContent.id = 'melody-tab-content';
 
+    const harmoniesContent = document.createElement('div');
+    harmoniesContent.id = 'harmonies-tab-content';
+
     // Function to update tab styles
     function updateTabs() {
         const isChords = activeTab === 'chords';
+        const isMelody = activeTab === 'melody';
+        const isHarmonies = activeTab === 'harmonies';
 
         chordsTab.style.color = isChords ? '#3b82f6' : '#6b7280';
         chordsTab.style.borderBottomColor = isChords ? '#3b82f6' : 'transparent';
 
-        melodyTab.style.color = !isChords ? '#3b82f6' : '#6b7280';
-        melodyTab.style.borderBottomColor = !isChords ? '#3b82f6' : 'transparent';
+        melodyTab.style.color = isMelody ? '#22c55e' : '#6b7280';
+        melodyTab.style.borderBottomColor = isMelody ? '#22c55e' : 'transparent';
+
+        harmoniesTab.style.color = isHarmonies ? '#8b5cf6' : '#6b7280';
+        harmoniesTab.style.borderBottomColor = isHarmonies ? '#8b5cf6' : 'transparent';
 
         chordsContent.style.display = isChords ? 'block' : 'none';
-        melodyContent.style.display = !isChords ? 'block' : 'none';
+        melodyContent.style.display = isMelody ? 'block' : 'none';
+        harmoniesContent.style.display = isHarmonies ? 'block' : 'none';
     }
 
     // ==========================================================================
@@ -212,6 +234,129 @@ export function showSettingsModal(initialTab = 'chords') {
     chordDescription.style.marginBottom = '24px';
     chordDescription.style.lineHeight = '1.6';
     chordsContent.appendChild(chordDescription);
+
+    // Style and Mood selectors
+    const styleMoodSection = document.createElement('div');
+    styleMoodSection.style.display = 'flex';
+    styleMoodSection.style.gap = '16px';
+    styleMoodSection.style.marginBottom = '24px';
+    styleMoodSection.style.flexWrap = 'wrap';
+
+    // Get current saved values
+    const savedStyle = localStorage.getItem('chord-suggestion-style') || 'balanced';
+    const savedMood = localStorage.getItem('chord-suggestion-mood') || 'bright';
+
+    // Style selector
+    const styleContainer = document.createElement('div');
+    styleContainer.style.flex = '1';
+    styleContainer.style.minWidth = '200px';
+
+    const styleLabel = document.createElement('label');
+    styleLabel.textContent = 'Musical Style';
+    styleLabel.style.display = 'block';
+    styleLabel.style.fontSize = '14px';
+    styleLabel.style.fontWeight = '600';
+    styleLabel.style.color = '#374151';
+    styleLabel.style.marginBottom = '8px';
+    styleContainer.appendChild(styleLabel);
+
+    const styleSelect = document.createElement('select');
+    styleSelect.style.width = '100%';
+    styleSelect.style.padding = '10px 12px';
+    styleSelect.style.border = '1px solid #d1d5db';
+    styleSelect.style.borderRadius = '6px';
+    styleSelect.style.fontSize = '14px';
+    styleSelect.style.backgroundColor = 'white';
+    styleSelect.style.cursor = 'pointer';
+
+    const styles = [
+        { value: 'balanced', label: 'Balanced Blend' },
+        { value: 'pop', label: 'Top 40 / Pop' },
+        { value: 'jazz', label: 'Jazz / Complex' },
+        { value: 'classical', label: 'Classical / Traditional' },
+        { value: 'rock', label: 'Rock / Power' },
+        { value: 'indie', label: 'Indie / Alternative' }
+    ];
+
+    styles.forEach(s => {
+        const option = document.createElement('option');
+        option.value = s.value;
+        option.textContent = s.label;
+        if (s.value === savedStyle) option.selected = true;
+        styleSelect.appendChild(option);
+    });
+
+    styleSelect.onchange = () => {
+        localStorage.setItem('chord-suggestion-style', styleSelect.value);
+        // Update sidebar display
+        if (window.updateStyleMoodDisplay) {
+            window.updateStyleMoodDisplay(styleSelect.value, moodSelect.value);
+        }
+        // Dispatch event for other components
+        document.dispatchEvent(new CustomEvent('chord-suggestion-preference-changed', {
+            detail: { style: styleSelect.value, mood: moodSelect.value }
+        }));
+    };
+
+    styleContainer.appendChild(styleSelect);
+    styleMoodSection.appendChild(styleContainer);
+
+    // Mood selector
+    const moodContainer = document.createElement('div');
+    moodContainer.style.flex = '1';
+    moodContainer.style.minWidth = '200px';
+
+    const moodLabel = document.createElement('label');
+    moodLabel.textContent = 'Intended Mood';
+    moodLabel.style.display = 'block';
+    moodLabel.style.fontSize = '14px';
+    moodLabel.style.fontWeight = '600';
+    moodLabel.style.color = '#374151';
+    moodLabel.style.marginBottom = '8px';
+    moodContainer.appendChild(moodLabel);
+
+    const moodSelect = document.createElement('select');
+    moodSelect.style.width = '100%';
+    moodSelect.style.padding = '10px 12px';
+    moodSelect.style.border = '1px solid #d1d5db';
+    moodSelect.style.borderRadius = '6px';
+    moodSelect.style.fontSize = '14px';
+    moodSelect.style.backgroundColor = 'white';
+    moodSelect.style.cursor = 'pointer';
+
+    const moods = [
+        { value: 'bright', label: '😊 Happy / Bright' },
+        { value: 'dark', label: '😔 Melancholic / Dark' },
+        { value: 'jazzy', label: '🎷 Jazzy / Complex' },
+        { value: 'tense', label: '⚡ Tense / Dramatic' },
+        { value: 'calm', label: '😌 Calm / Peaceful' },
+        { value: 'energetic', label: '⚡ Energetic / Driving' }
+    ];
+
+    moods.forEach(m => {
+        const option = document.createElement('option');
+        option.value = m.value;
+        option.textContent = m.label;
+        if (m.value === savedMood) option.selected = true;
+        moodSelect.appendChild(option);
+    });
+
+    moodSelect.onchange = () => {
+        localStorage.setItem('chord-suggestion-mood', moodSelect.value);
+        // Update sidebar display
+        if (window.updateStyleMoodDisplay) {
+            window.updateStyleMoodDisplay(styleSelect.value, moodSelect.value);
+        }
+        // Dispatch event for other components
+        document.dispatchEvent(new CustomEvent('chord-suggestion-preference-changed', {
+            detail: { style: styleSelect.value, mood: moodSelect.value }
+        }));
+    };
+
+    moodContainer.appendChild(moodSelect);
+    styleMoodSection.appendChild(moodContainer);
+
+    chordsContent.appendChild(styleMoodSection);
 
     // Normalization notice
     const chordNotice = document.createElement('div');
@@ -641,6 +786,155 @@ export function showSettingsModal(initialTab = 'chords') {
     `;
     melodyContent.appendChild(melodyNotice);
 
+    // ==========================================================================
+    // CHORD TONE HIGHLIGHTING TOGGLE
+    // ==========================================================================
+    const chordToneSection = document.createElement('div');
+    chordToneSection.style.display = 'flex';
+    chordToneSection.style.alignItems = 'center';
+    chordToneSection.style.justifyContent = 'space-between';
+    chordToneSection.style.padding = '16px';
+    chordToneSection.style.backgroundColor = '#f9fafb';
+    chordToneSection.style.borderRadius = '8px';
+    chordToneSection.style.marginBottom = '24px';
+    chordToneSection.style.border = '1px solid #e5e7eb';
+
+    // Label and description
+    const chordToneLabelDiv = document.createElement('div');
+    chordToneLabelDiv.style.flex = '1';
+
+    const chordToneLabel = document.createElement('label');
+    chordToneLabel.textContent = 'Chord Tone Highlighting';
+    chordToneLabel.style.display = 'block';
+    chordToneLabel.style.fontSize = '14px';
+    chordToneLabel.style.fontWeight = '600';
+    chordToneLabel.style.color = '#111827';
+    chordToneLabel.style.marginBottom = '4px';
+
+    const chordToneDesc = document.createElement('p');
+    chordToneDesc.textContent = 'Color-code melody notes based on their relationship to the current chord';
+    chordToneDesc.style.fontSize = '12px';
+    chordToneDesc.style.color = '#6b7280';
+    chordToneDesc.style.margin = '0';
+
+    chordToneLabelDiv.appendChild(chordToneLabel);
+    chordToneLabelDiv.appendChild(chordToneDesc);
+
+    // Toggle switch
+    const chordToneToggle = document.createElement('input');
+    chordToneToggle.type = 'checkbox';
+    chordToneToggle.id = 'chord-tone-highlighting-toggle';
+
+    // Get current setting
+    let chordToneEnabled = true;
+    try {
+        if (window.getCompositionState) {
+            const compositionState = window.getCompositionState();
+            const settings = compositionState.getSettings();
+            chordToneEnabled = settings.highlightChordTones !== false;
+        } else {
+            const stored = localStorage.getItem('chord-tone-highlighting');
+            chordToneEnabled = stored !== 'false';
+        }
+    } catch (e) {
+        chordToneEnabled = true;
+    }
+    chordToneToggle.checked = chordToneEnabled;
+
+    chordToneToggle.style.width = '44px';
+    chordToneToggle.style.height = '24px';
+    chordToneToggle.style.cursor = 'pointer';
+    chordToneToggle.style.accentColor = '#22c55e';
+    chordToneToggle.style.marginLeft = '16px';
+
+    // Handle toggle change
+    chordToneToggle.onchange = () => {
+        const enabled = chordToneToggle.checked;
+
+        // Update CompositionState
+        try {
+            if (window.getCompositionState) {
+                const compositionState = window.getCompositionState();
+                compositionState.updateSettings({ highlightChordTones: enabled });
+            }
+        } catch (e) {
+            console.warn('Could not update CompositionState:', e);
+        }
+
+        // Save to localStorage
+        localStorage.setItem('chord-tone-highlighting', enabled.toString());
+
+        // Dispatch event for other components
+        document.dispatchEvent(new CustomEvent('chord-tone-highlighting-changed', {
+            detail: { enabled }
+        }));
+
+        // Re-render notation canvas
+        const canvas = document.getElementById('interactive-melody-notation-canvas');
+        if (canvas && window.renderInteractiveMelodyStaff) {
+            window.renderInteractiveMelodyStaff(canvas);
+        }
+    };
+
+    chordToneSection.appendChild(chordToneLabelDiv);
+    chordToneSection.appendChild(chordToneToggle);
+    melodyContent.appendChild(chordToneSection);
+
+    // Color legend for chord tone highlighting
+    const legendSection = document.createElement('div');
+    legendSection.style.marginBottom = '24px';
+    legendSection.style.padding = '12px 16px';
+    legendSection.style.backgroundColor = '#fefefe';
+    legendSection.style.border = '1px solid #e5e7eb';
+    legendSection.style.borderRadius = '8px';
+
+    const legendTitle = document.createElement('div');
+    legendTitle.textContent = 'Color Legend';
+    legendTitle.style.fontSize = '12px';
+    legendTitle.style.fontWeight = '600';
+    legendTitle.style.color = '#6b7280';
+    legendTitle.style.marginBottom = '8px';
+    legendSection.appendChild(legendTitle);
+
+    const legendGrid = document.createElement('div');
+    legendGrid.style.display = 'grid';
+    legendGrid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(100px, 1fr))';
+    legendGrid.style.gap = '8px';
+
+    const legendItems = [
+        { color: '#22C55E', name: 'Root' },
+        { color: '#3B82F6', name: '3rd / 5th' },
+        { color: '#A855F7', name: '7th / Extension' },
+        { color: '#F97316', name: 'Scale Tone' },
+        { color: '#EF4444', name: 'Chromatic' }
+    ];
+
+    legendItems.forEach(item => {
+        const legendItem = document.createElement('div');
+        legendItem.style.display = 'flex';
+        legendItem.style.alignItems = 'center';
+        legendItem.style.gap = '6px';
+
+        const colorDot = document.createElement('div');
+        colorDot.style.width = '10px';
+        colorDot.style.height = '10px';
+        colorDot.style.borderRadius = '50%';
+        colorDot.style.backgroundColor = item.color;
+        colorDot.style.flexShrink = '0';
+
+        const label = document.createElement('span');
+        label.textContent = item.name;
+        label.style.fontSize = '11px';
+        label.style.color = '#374151';
+
+        legendItem.appendChild(colorDot);
+        legendItem.appendChild(label);
+        legendGrid.appendChild(legendItem);
+    });
+
+    legendSection.appendChild(legendGrid);
+    melodyContent.appendChild(legendSection);
+
     // Quick save button at top
     const melodyQuickSaveRow = document.createElement('div');
     melodyQuickSaveRow.style.display = 'flex';
@@ -1013,11 +1307,408 @@ export function showSettingsModal(initialTab = 'chords') {
     melodyContent.appendChild(melodyButtonRow);
 
     // ==========================================================================
+    // HARMONIES WEIGHTS CONTENT
+    // ==========================================================================
+
+    // Description
+    const harmoniesDescription = document.createElement('p');
+    harmoniesDescription.textContent = 'Customize how auto-harmonization chord suggestions are scored and ranked. These weights control how the algorithm matches chords to your melody.';
+    harmoniesDescription.style.color = '#6b7280';
+    harmoniesDescription.style.fontSize = '14px';
+    harmoniesDescription.style.marginBottom = '24px';
+    harmoniesDescription.style.lineHeight = '1.6';
+    harmoniesContent.appendChild(harmoniesDescription);
+
+    // Harmonies notice
+    const harmoniesNotice = document.createElement('div');
+    harmoniesNotice.style.backgroundColor = '#f5f3ff';
+    harmoniesNotice.style.border = '1px solid #ddd6fe';
+    harmoniesNotice.style.borderRadius = '8px';
+    harmoniesNotice.style.padding = '12px 16px';
+    harmoniesNotice.style.marginBottom = '24px';
+    harmoniesNotice.innerHTML = `
+        <div style="display: flex; align-items: start; gap: 12px;">
+            <span style="font-size: 20px;">ℹ️</span>
+            <div style="flex: 1;">
+                <div style="font-weight: 600; color: #5b21b6; margin-bottom: 4px;">About Harmonize Weights</div>
+                <div style="font-size: 13px; color: #6d28d9; line-height: 1.5;">
+                    These weights determine how chords are scored when harmonizing your melody. Higher values mean that factor is more important in choosing chord suggestions.
+                </div>
+            </div>
+        </div>
+    `;
+    harmoniesContent.appendChild(harmoniesNotice);
+
+    // Quick save button at top
+    const harmoniesQuickSaveRow = document.createElement('div');
+    harmoniesQuickSaveRow.style.display = 'flex';
+    harmoniesQuickSaveRow.style.justifyContent = 'flex-end';
+    harmoniesQuickSaveRow.style.marginBottom = '20px';
+
+    const harmoniesQuickSaveBtn = document.createElement('button');
+    harmoniesQuickSaveBtn.textContent = 'Save Settings';
+    harmoniesQuickSaveBtn.style.padding = '8px 16px';
+    harmoniesQuickSaveBtn.style.backgroundColor = '#8b5cf6';
+    harmoniesQuickSaveBtn.style.border = 'none';
+    harmoniesQuickSaveBtn.style.borderRadius = '6px';
+    harmoniesQuickSaveBtn.style.cursor = 'pointer';
+    harmoniesQuickSaveBtn.style.fontSize = '13px';
+    harmoniesQuickSaveBtn.style.fontWeight = '600';
+    harmoniesQuickSaveBtn.style.color = 'white';
+    harmoniesQuickSaveBtn.style.transition = 'all 0.2s';
+    harmoniesQuickSaveBtn.onmouseenter = () => {
+        harmoniesQuickSaveBtn.style.backgroundColor = '#7c3aed';
+    };
+    harmoniesQuickSaveBtn.onmouseleave = () => {
+        harmoniesQuickSaveBtn.style.backgroundColor = '#8b5cf6';
+    };
+    harmoniesQuickSaveBtn.onclick = () => {
+        saveHarmonizeWeights(currentHarmonizeWeights);
+        harmoniesQuickSaveBtn.textContent = '✓ Saved!';
+        harmoniesQuickSaveBtn.style.backgroundColor = '#10b981';
+        setTimeout(() => {
+            harmoniesQuickSaveBtn.textContent = 'Save Settings';
+            harmoniesQuickSaveBtn.style.backgroundColor = '#8b5cf6';
+            overlay.remove();
+        }, 1000);
+    };
+
+    harmoniesQuickSaveRow.appendChild(harmoniesQuickSaveBtn);
+    harmoniesContent.appendChild(harmoniesQuickSaveRow);
+
+    // Harmonies presets section
+    const harmoniesPresetsSection = document.createElement('div');
+    harmoniesPresetsSection.style.marginBottom = '28px';
+
+    const harmoniesPresetsTitle = document.createElement('h3');
+    harmoniesPresetsTitle.textContent = 'Presets';
+    harmoniesPresetsTitle.style.fontSize = '16px';
+    harmoniesPresetsTitle.style.fontWeight = '600';
+    harmoniesPresetsTitle.style.color = '#111827';
+    harmoniesPresetsTitle.style.marginBottom = '16px';
+    harmoniesPresetsSection.appendChild(harmoniesPresetsTitle);
+
+    // Store harmonies button references
+    const harmoniesPresetButtons = {};
+
+    // Helper function to update harmonies active states
+    function updateHarmoniesPresetActiveStates() {
+        const activePreset = findMatchingHarmonizePreset(currentHarmonizeWeights);
+
+        Object.keys(harmoniesPresetButtons).forEach(key => {
+            const btn = harmoniesPresetButtons[key];
+            const isActive = key === activePreset;
+
+            if (isActive) {
+                btn.style.backgroundColor = '#ede9fe';
+                btn.style.borderColor = '#8b5cf6';
+                btn.style.boxShadow = '0 0 0 3px rgba(139, 92, 246, 0.1)';
+            } else {
+                btn.style.backgroundColor = '#f9fafb';
+                btn.style.borderColor = '#e5e7eb';
+                btn.style.boxShadow = 'none';
+            }
+        });
+    }
+
+    // Helper function to create harmonies preset section
+    const createHarmoniesPresetSection = (sectionTitle, presets, description, emoji) => {
+        const section = document.createElement('div');
+        section.style.marginBottom = '20px';
+
+        const sectionHeader = document.createElement('div');
+        sectionHeader.style.display = 'flex';
+        sectionHeader.style.alignItems = 'baseline';
+        sectionHeader.style.gap = '8px';
+        sectionHeader.style.marginBottom = '12px';
+
+        const titleEl = document.createElement('div');
+        titleEl.textContent = `${emoji} ${sectionTitle}`;
+        titleEl.style.fontSize = '14px';
+        titleEl.style.fontWeight = '600';
+        titleEl.style.color = '#374151';
+        sectionHeader.appendChild(titleEl);
+
+        if (description) {
+            const sectionDesc = document.createElement('div');
+            sectionDesc.textContent = description;
+            sectionDesc.style.fontSize = '12px';
+            sectionDesc.style.color = '#9ca3af';
+            sectionDesc.style.fontStyle = 'italic';
+            sectionHeader.appendChild(sectionDesc);
+        }
+
+        section.appendChild(sectionHeader);
+
+        const grid = document.createElement('div');
+        grid.style.display = 'grid';
+        grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
+        grid.style.gap = '12px';
+
+        Object.keys(presets).forEach(key => {
+            const preset = presets[key];
+
+            const presetBtn = document.createElement('button');
+            presetBtn.style.padding = '12px 16px';
+            presetBtn.style.backgroundColor = '#f9fafb';
+            presetBtn.style.border = '2px solid #e5e7eb';
+            presetBtn.style.borderRadius = '8px';
+            presetBtn.style.cursor = 'pointer';
+            presetBtn.style.transition = 'all 0.2s';
+            presetBtn.style.textAlign = 'left';
+            presetBtn.title = preset.tooltip;
+
+            const presetName = document.createElement('div');
+            presetName.textContent = preset.name;
+            presetName.style.fontWeight = '600';
+            presetName.style.color = '#111827';
+            presetName.style.marginBottom = '4px';
+            presetBtn.appendChild(presetName);
+
+            const presetDesc = document.createElement('div');
+            presetDesc.textContent = preset.description;
+            presetDesc.style.fontSize = '12px';
+            presetDesc.style.color = '#6b7280';
+            presetDesc.style.lineHeight = '1.4';
+            presetBtn.appendChild(presetDesc);
+
+            presetBtn.onmouseenter = () => {
+                const isActive = findMatchingHarmonizePreset(currentHarmonizeWeights) === key;
+                if (!isActive) {
+                    presetBtn.style.backgroundColor = '#f5f3ff';
+                    presetBtn.style.borderColor = '#8b5cf6';
+                }
+            };
+            presetBtn.onmouseleave = () => {
+                updateHarmoniesPresetActiveStates();
+            };
+
+            presetBtn.onclick = () => {
+                const weights = applyHarmonizePreset(key);
+                if (weights) {
+                    currentHarmonizeWeights = weights;
+                    updateHarmoniesSliders();
+                    updateHarmoniesPresetActiveStates();
+                }
+            };
+
+            harmoniesPresetButtons[key] = presetBtn;
+            grid.appendChild(presetBtn);
+        });
+
+        section.appendChild(grid);
+        return section;
+    };
+
+    // Harmonies approaches section
+    const harmoniesApproachesSection = createHarmoniesPresetSection(
+        'Approaches',
+        HARMONIZE_APPROACH_PRESETS,
+        'What to prioritize',
+        '🎯'
+    );
+    harmoniesPresetsSection.appendChild(harmoniesApproachesSection);
+
+    // Separator
+    const harmoniesSeparator = document.createElement('div');
+    harmoniesSeparator.style.height = '1px';
+    harmoniesSeparator.style.backgroundColor = '#e5e7eb';
+    harmoniesSeparator.style.margin = '20px 0';
+    harmoniesPresetsSection.appendChild(harmoniesSeparator);
+
+    // Genre templates section
+    const harmoniesGenreSection = createHarmoniesPresetSection(
+        'Genre Templates',
+        HARMONIZE_GENRE_TEMPLATES,
+        'Complete genre profiles',
+        '🎸'
+    );
+    harmoniesPresetsSection.appendChild(harmoniesGenreSection);
+
+    harmoniesContent.appendChild(harmoniesPresetsSection);
+
+    // Set initial active states
+    updateHarmoniesPresetActiveStates();
+
+    // Custom harmonies weights section
+    const harmoniesWeightsSection = document.createElement('div');
+    harmoniesWeightsSection.style.marginBottom = '24px';
+
+    const harmoniesWeightsTitle = document.createElement('h3');
+    harmoniesWeightsTitle.textContent = 'Custom Weights';
+    harmoniesWeightsTitle.style.fontSize = '16px';
+    harmoniesWeightsTitle.style.fontWeight = '600';
+    harmoniesWeightsTitle.style.color = '#111827';
+    harmoniesWeightsTitle.style.marginBottom = '16px';
+    harmoniesWeightsSection.appendChild(harmoniesWeightsTitle);
+
+    // Harmonies sliders container
+    const harmoniesSlidersContainer = document.createElement('div');
+    harmoniesSlidersContainer.style.display = 'flex';
+    harmoniesSlidersContainer.style.flexDirection = 'column';
+    harmoniesSlidersContainer.style.gap = '20px';
+
+    const harmoniesSliders = {};
+    const harmoniesLabels = {
+        melodyMatch: 'Melody Match',
+        voiceLeading: 'Voice Leading',
+        diatonicBonus: 'Diatonic Bonus',
+        simplicityBonus: 'Simplicity Bonus'
+    };
+
+    const harmoniesDescriptions = {
+        melodyMatch: 'How well melody notes align with chord tones (root, 3rd, 5th, 7th)',
+        voiceLeading: 'Smoothness of voice movement between consecutive chords',
+        diatonicBonus: 'Extra points for chords that naturally fit within the key',
+        simplicityBonus: 'Extra points for simpler chord types (Major, Minor) over complex ones'
+    };
+
+    function updateHarmoniesSliders() {
+        Object.keys(harmoniesLabels).forEach(key => {
+            harmoniesSliders[key].slider.value = Math.round(currentHarmonizeWeights[key] * 100);
+            harmoniesSliders[key].valueLabel.textContent = `${Math.round(currentHarmonizeWeights[key] * 100)}%`;
+        });
+    }
+
+    function onHarmoniesSliderChange() {
+        // Get current slider values
+        const newWeights = {};
+        Object.keys(harmoniesLabels).forEach(key => {
+            newWeights[key] = parseFloat(harmoniesSliders[key].slider.value) / 100;
+        });
+
+        // Normalize
+        currentHarmonizeWeights = normalizeWeights(newWeights);
+
+        // Update display
+        updateHarmoniesSliders();
+        updateHarmoniesPresetActiveStates();
+    }
+
+    Object.keys(harmoniesLabels).forEach(key => {
+        const sliderGroup = document.createElement('div');
+
+        const labelRow = document.createElement('div');
+        labelRow.style.display = 'flex';
+        labelRow.style.justifyContent = 'space-between';
+        labelRow.style.alignItems = 'center';
+        labelRow.style.marginBottom = '8px';
+
+        const label = document.createElement('label');
+        label.textContent = harmoniesLabels[key];
+        label.style.fontSize = '14px';
+        label.style.fontWeight = '600';
+        label.style.color = '#374151';
+
+        const valueLabel = document.createElement('span');
+        valueLabel.textContent = `${Math.round(currentHarmonizeWeights[key] * 100)}%`;
+        valueLabel.style.fontSize = '14px';
+        valueLabel.style.fontWeight = '600';
+        valueLabel.style.color = '#8b5cf6';
+        valueLabel.style.minWidth = '45px';
+        valueLabel.style.textAlign = 'right';
+
+        labelRow.appendChild(label);
+        labelRow.appendChild(valueLabel);
+
+        const desc = document.createElement('div');
+        desc.textContent = harmoniesDescriptions[key];
+        desc.style.fontSize = '12px';
+        desc.style.color = '#6b7280';
+        desc.style.marginBottom = '8px';
+        desc.style.lineHeight = '1.4';
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '0';
+        slider.max = '100';
+        slider.value = Math.round(currentHarmonizeWeights[key] * 100);
+        slider.style.width = '100%';
+        slider.style.cursor = 'pointer';
+        slider.oninput = onHarmoniesSliderChange;
+
+        harmoniesSliders[key] = { slider, valueLabel };
+
+        sliderGroup.appendChild(labelRow);
+        sliderGroup.appendChild(desc);
+        sliderGroup.appendChild(slider);
+
+        harmoniesSlidersContainer.appendChild(sliderGroup);
+    });
+
+    harmoniesWeightsSection.appendChild(harmoniesSlidersContainer);
+    harmoniesContent.appendChild(harmoniesWeightsSection);
+
+    // Harmonies buttons
+    const harmoniesButtonRow = document.createElement('div');
+    harmoniesButtonRow.style.display = 'flex';
+    harmoniesButtonRow.style.gap = '12px';
+    harmoniesButtonRow.style.justifyContent = 'flex-end';
+    harmoniesButtonRow.style.paddingTop = '24px';
+    harmoniesButtonRow.style.borderTop = '1px solid #e5e7eb';
+
+    const harmoniesResetBtn = document.createElement('button');
+    harmoniesResetBtn.textContent = 'Reset to Default';
+    harmoniesResetBtn.style.padding = '10px 20px';
+    harmoniesResetBtn.style.backgroundColor = '#f9fafb';
+    harmoniesResetBtn.style.border = '1px solid #d1d5db';
+    harmoniesResetBtn.style.borderRadius = '6px';
+    harmoniesResetBtn.style.cursor = 'pointer';
+    harmoniesResetBtn.style.fontSize = '14px';
+    harmoniesResetBtn.style.fontWeight = '600';
+    harmoniesResetBtn.style.color = '#374151';
+    harmoniesResetBtn.style.transition = 'all 0.2s';
+    harmoniesResetBtn.onmouseenter = () => {
+        harmoniesResetBtn.style.backgroundColor = '#f3f4f6';
+    };
+    harmoniesResetBtn.onmouseleave = () => {
+        harmoniesResetBtn.style.backgroundColor = '#f9fafb';
+    };
+    harmoniesResetBtn.onclick = () => {
+        currentHarmonizeWeights = resetHarmonizeWeightsToDefault();
+        updateHarmoniesSliders();
+        updateHarmoniesPresetActiveStates();
+    };
+
+    const harmoniesSaveBtn = document.createElement('button');
+    harmoniesSaveBtn.textContent = 'Save Settings';
+    harmoniesSaveBtn.style.padding = '10px 24px';
+    harmoniesSaveBtn.style.backgroundColor = '#8b5cf6';
+    harmoniesSaveBtn.style.border = 'none';
+    harmoniesSaveBtn.style.borderRadius = '6px';
+    harmoniesSaveBtn.style.cursor = 'pointer';
+    harmoniesSaveBtn.style.fontSize = '14px';
+    harmoniesSaveBtn.style.fontWeight = '600';
+    harmoniesSaveBtn.style.color = 'white';
+    harmoniesSaveBtn.style.transition = 'all 0.2s';
+    harmoniesSaveBtn.onmouseenter = () => {
+        harmoniesSaveBtn.style.backgroundColor = '#7c3aed';
+    };
+    harmoniesSaveBtn.onmouseleave = () => {
+        harmoniesSaveBtn.style.backgroundColor = '#8b5cf6';
+    };
+    harmoniesSaveBtn.onclick = () => {
+        saveHarmonizeWeights(currentHarmonizeWeights);
+        harmoniesSaveBtn.textContent = '✓ Saved!';
+        harmoniesSaveBtn.style.backgroundColor = '#10b981';
+        setTimeout(() => {
+            harmoniesSaveBtn.textContent = 'Save Settings';
+            harmoniesSaveBtn.style.backgroundColor = '#8b5cf6';
+            overlay.remove();
+        }, 1000);
+    };
+
+    harmoniesButtonRow.appendChild(harmoniesResetBtn);
+    harmoniesButtonRow.appendChild(harmoniesSaveBtn);
+    harmoniesContent.appendChild(harmoniesButtonRow);
+
+    // ==========================================================================
     // FINALIZE MODAL
     // ==========================================================================
 
     modal.appendChild(chordsContent);
     modal.appendChild(melodyContent);
+    modal.appendChild(harmoniesContent);
 
     // Set initial tab
     updateTabs();
@@ -1038,4 +1729,11 @@ export function showChordWeightsModal() {
  */
 export function showMelodyWeightsModal() {
     showSettingsModal('melody');
+}
+
+/**
+ * Show settings modal with harmonies weights tab
+ */
+export function showHarmoniesWeightsModal() {
+    showSettingsModal('harmonies');
 }

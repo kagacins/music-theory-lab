@@ -27,6 +27,7 @@ import { showSettingsModal, showChordWeightsModal, showMelodyWeightsModal } from
 import { initPresetUI, togglePresetPanel, openPresetPanel, closePresetPanel } from './modules/ui/presetUI.js';
 import { initUnifiedSuggestionsPanel, updateUnifiedSuggestions } from './modules/ui/unifiedSuggestionsPanel.js';
 import { openManualChordEntryModal, closeManualChordEntryModal } from './modules/ui/manualChordEntryModal.js';
+import { showAutoHarmonizeModal } from './modules/ui/autoHarmonizeModal.js';
 import { initCircleOfFifths, toggleCircleOfFifthsPanel, openCircleOfFifthsPanel, closeCircleOfFifthsPanel } from './modules/features/circleOfFifths.js';
 import { initGuitarFretboard, toggleGuitarFretboardPanel, openGuitarFretboardPanel, closeGuitarFretboardPanel, updateGuitarFretboard } from './modules/features/guitarFretboard.js';
 import {
@@ -154,7 +155,7 @@ import {
     getNumOctaves,
     setNumOctaves
 } from './modules/state/globalState.js';
-import { getTrainerState, setProgressionData, setIsReady } from './modules/state/trainerState.js';
+import { getTrainerState, setProgressionData, setIsReady, getCurrentKey } from './modules/state/trainerState.js';
 import {
     getBuilderRootIndex,
     getBuilderChordType,
@@ -201,6 +202,7 @@ import {
     renderChordProgressionStaff,
     renderInteractiveMelodyStaff,
     getInteractiveMelody,
+    restoreInteractiveMelody,
     toggleInteractiveMode,
     playInteractiveMelodyWithChords,
     playAllMelody,
@@ -1712,8 +1714,151 @@ window.getCurrentNoteDotted = getCurrentNoteDotted;
 window.renderChordProgressionStaff = renderChordProgressionStaff;
 window.renderInteractiveMelodyStaff = renderInteractiveMelodyStaff;
 window.getInteractiveMelody = getInteractiveMelody;
+window.restoreInteractiveMelody = restoreInteractiveMelody;
 window.toggleInteractiveMode = toggleInteractiveMode;
 window.playInteractiveMelodyWithChords = playInteractiveMelodyWithChords;
+
+// Chord preview functions for harmonizer (continuous playback while pressed)
+let activePreviewNotes = [];
+let activePreviewMelodyNotes = [];
+let previewTimeoutId = null;
+let melodyTimeoutIds = [];
+
+window.startChordPreview = function(root, type, inversion = 0) {
+    // Stop any existing preview
+    window.stopChordPreview();
+
+    // Initialize audio if needed
+    if (window.initAudio) window.initAudio();
+    if (!window.getAudioIsReady || !window.getAudioIsReady()) {
+        console.warn('[ChordPreview] Audio not ready');
+        return;
+    }
+
+    const piano = window.getPiano ? window.getPiano() : null;
+    if (!piano) {
+        console.warn('[ChordPreview] Piano not available');
+        return;
+    }
+
+    // Get chord notes centered around C3 (octaveShift = -12 semitones from C4)
+    const key = getCurrentKey();
+    const chordData = getInvertedChordNotes(root, type, inversion, key, -12);
+
+    if (chordData && chordData.specificNotes && chordData.specificNotes.length > 0) {
+        activePreviewNotes = chordData.specificNotes;
+        activePreviewNotes.forEach(note => {
+            piano.triggerAttack(note, Tone.now());
+        });
+    } else {
+        console.warn('[ChordPreview] Could not get chord notes for:', root, type);
+    }
+};
+
+window.stopChordPreview = function() {
+    // Clear any pending timeouts
+    if (previewTimeoutId) {
+        clearTimeout(previewTimeoutId);
+        previewTimeoutId = null;
+    }
+    melodyTimeoutIds.forEach(id => clearTimeout(id));
+    melodyTimeoutIds = [];
+
+    const piano = window.getPiano ? window.getPiano() : null;
+    if (piano) {
+        // Stop chord notes
+        if (activePreviewNotes.length > 0) {
+            activePreviewNotes.forEach(note => {
+                piano.triggerRelease(note, Tone.now());
+            });
+        }
+        // Stop melody notes
+        if (activePreviewMelodyNotes.length > 0) {
+            activePreviewMelodyNotes.forEach(note => {
+                piano.triggerRelease(note, Tone.now());
+            });
+        }
+    }
+    activePreviewNotes = [];
+    activePreviewMelodyNotes = [];
+};
+
+// Play chord sustained while melody notes play sequentially
+window.playChordWithMelody = function(root, type, melodyNotes, inversion = 0, tempo = 120) {
+    // Stop any existing preview
+    window.stopChordPreview();
+
+    // Initialize audio if needed
+    if (window.initAudio) window.initAudio();
+    if (!window.getAudioIsReady || !window.getAudioIsReady()) {
+        console.warn('[ChordPreview] Audio not ready');
+        return;
+    }
+
+    const piano = window.getPiano ? window.getPiano() : null;
+    if (!piano) {
+        console.warn('[ChordPreview] Piano not available');
+        return;
+    }
+
+    // Get chord notes centered around C3 (octaveShift = -12 semitones from C4)
+    const key = getCurrentKey();
+    const chordData = getInvertedChordNotes(root, type, inversion, key, -12);
+
+    // Play chord (sustained throughout)
+    if (chordData && chordData.specificNotes && chordData.specificNotes.length > 0) {
+        activePreviewNotes = chordData.specificNotes;
+        activePreviewNotes.forEach(note => {
+            piano.triggerAttack(note, Tone.now());
+        });
+    }
+
+    // Calculate note durations in milliseconds
+    const beatDuration = 60000 / tempo; // ms per quarter note
+    const durationMap = {
+        'w': beatDuration * 4,      // whole note
+        'h': beatDuration * 2,      // half note
+        'q': beatDuration,          // quarter note
+        '8': beatDuration / 2,      // eighth note
+        '16': beatDuration / 4      // sixteenth note
+    };
+
+    // Play melody notes sequentially
+    let currentTime = 0;
+    activePreviewMelodyNotes = [];
+
+    if (melodyNotes && melodyNotes.length > 0) {
+        melodyNotes.forEach((noteObj, index) => {
+            const duration = durationMap[noteObj.duration] || beatDuration;
+
+            if (noteObj.pitch && noteObj.type !== 'rest') {
+                // Schedule note attack
+                const attackId = setTimeout(() => {
+                    activePreviewMelodyNotes.push(noteObj.pitch);
+                    piano.triggerAttack(noteObj.pitch, Tone.now());
+                }, currentTime);
+                melodyTimeoutIds.push(attackId);
+
+                // Schedule note release
+                const releaseId = setTimeout(() => {
+                    piano.triggerRelease(noteObj.pitch, Tone.now());
+                    // Remove from active notes
+                    const idx = activePreviewMelodyNotes.indexOf(noteObj.pitch);
+                    if (idx > -1) activePreviewMelodyNotes.splice(idx, 1);
+                }, currentTime + duration * 0.9); // Slight gap between notes
+                melodyTimeoutIds.push(releaseId);
+            }
+
+            currentTime += duration;
+        });
+    }
+
+    // Stop chord after all melody notes have played
+    const totalDuration = currentTime + 200; // Add small buffer
+    previewTimeoutId = setTimeout(() => {
+        window.stopChordPreview();
+    }, totalDuration);
+};
 // New notation editor functions
 window.addRestToMelody = addRestToMelody;
 window.setTimeSignature = setTimeSignature;
@@ -1756,6 +1901,107 @@ window.stopPlayAllMelody = stopPlayAllMelody;
 window.playMeasure = playMeasure;
 window.playSelectedMeasure = playSelectedMeasure;
 window.playFromSelectedMeasure = playFromSelectedMeasure;
+
+/**
+ * Show the Auto-Harmonize modal to suggest chords for the melody
+ */
+window.showAutoHarmonize = function() {
+    // Get the current melody notes
+    const melodyData = getInteractiveMelody();
+    if (!melodyData || !melodyData.melodyNotes || melodyData.melodyNotes.length === 0) {
+        alert('No melody notes found. Please record or enter some melody notes first.');
+        return;
+    }
+
+    // Get the current key
+    const currentKey = melodyData.key || getCurrentKey();
+
+    // Get current progression to use as defaults for suggestions
+    const currentProgression = window.getTrainerState ? window.getTrainerState().progressionData : [];
+
+    // Show the modal
+    showAutoHarmonizeModal(
+        melodyData.melodyNotes,
+        currentKey,
+        // onApply callback - apply the harmonization
+        (chordProgression) => {
+            // Save the melody notes before clearing (they're stored in interactiveMelody)
+            // Use deep copy to prevent any modifications during chord operations
+            const savedMelodyNotes = JSON.parse(JSON.stringify(melodyData.melodyNotes));
+            const savedMelodySettings = {
+                timeSignature: melodyData.timeSignature,
+                beatsPerMeasure: melodyData.beatsPerMeasure,
+                beatDuration: melodyData.beatDuration,
+                tempo: melodyData.tempo,
+                key: melodyData.key,
+                numMeasures: Math.max(melodyData.numMeasures, chordProgression.length)
+            };
+
+            // Clear existing progression and add the new chords
+            if (window.clearProgression) {
+                window.clearProgression();
+            }
+
+            // Add each chord to the progression using the proper function
+            // addChordToProgressionByParams(chordType, root, inversion, octaveShift) - note: type first, then root
+            // Use -12 semitones to center chords around C3 (one octave below default C4)
+            chordProgression.forEach(chord => {
+                if (window.addChordToProgressionByParams) {
+                    // Pass -12 for octaveShift to get chords centered around C3
+                    window.addChordToProgressionByParams(chord.type, chord.root, 0, -12);
+                }
+            });
+
+            // Regenerate bass
+            if (window.regenerateAllBass) {
+                window.regenerateAllBass();
+            }
+
+            // Make sure we stay on the Melody Composer tab
+            if (window.switchTab) {
+                window.switchTab('melody');
+            }
+
+            // Restore melody notes and re-render in a single setTimeout
+            // Use a longer delay (400ms) to ensure ALL intermediate renders have completed
+            // Each addChordToProgressionByParams triggers a render, plus clearProgression has a 50ms delayed render
+            setTimeout(() => {
+                // Restore melody notes
+                if (window.restoreInteractiveMelody) {
+                    window.restoreInteractiveMelody(savedMelodyNotes, savedMelodySettings);
+                }
+
+                // Final render - this must be the last render to show melody notes
+                const canvas = document.getElementById('interactive-melody-notation-canvas');
+                if (canvas && window.renderInteractiveMelodyStaff) {
+                    window.renderInteractiveMelodyStaff(canvas);
+                }
+            }, 400);
+        },
+        // onPlayChord callback - preview chord (continuous while pressed)
+        (root, type, inversion) => {
+            if (window.startChordPreview) {
+                window.startChordPreview(root, type, inversion);
+            }
+        },
+        // onStopChord callback - stop preview
+        () => {
+            if (window.stopChordPreview) {
+                window.stopChordPreview();
+            }
+        },
+        // Pass current progression for prioritizing current chords
+        currentProgression,
+        // onPlayChordWithMelody callback - play chord and melody together
+        (root, type, measureMelodyNotes, inversion, tempo) => {
+            if (window.playChordWithMelody) {
+                window.playChordWithMelody(root, type, measureMelodyNotes, inversion, tempo);
+            }
+        },
+        // Pass tempo for playback
+        melodyData.tempo || 120
+    );
+};
 // Wrap setSelectedMeasureIndex to also update melody suggestions
 window.setSelectedMeasureIndex = function(index) {
     setSelectedMeasureIndex(index);
@@ -1825,17 +2071,8 @@ window.toggleMelodyRecording = function(isRecording) {
                             window.renderChordProgressionStaff(interactiveCanvas);
                         }
                     }
-                } else {
-                    // Failed to start - need progression first
-                    // Uncheck the toggle
-                    const toggle = document.getElementById('melody-recording-toggle');
-                    if (toggle) {
-                        toggle.checked = false;
-                    }
-                    // Chord clef toggle remains visible (always visible)
-                    alert('Please create a chord progression first in the Progression Builder.');
-                    return;
                 }
+                // Note: toggleInteractiveMode now always returns true for melody-first workflow
             } else {
                 // Already in interactive mode
                 // Re-render the staff
@@ -1853,8 +2090,7 @@ window.toggleMelodyRecording = function(isRecording) {
             if (toggle) {
                 toggle.checked = false;
             }
-            // Chord clef toggle remains visible (always visible)
-            alert('Error starting recording. Please make sure you have a chord progression.');
+            alert('Error starting recording: ' + e.message);
         }
     } else {
         // Stop recording - disable interactive mode
@@ -2473,6 +2709,7 @@ window.restoreFromBackup = restoreFromBackup;
 // Import recommendation modules
 import { getRecommendationService } from './modules/integration/recommendationService.js';
 import { getRecommendationsSidebarController } from './modules/ui/recommendationsSidebarController.js';
+import { initStyleMoodDisplay, updateStyleMoodDisplay } from './modules/ui/recommendationsSidebar.js';
 
 // Phase 4.1: Import melody suggestion modules
 import {
@@ -2512,6 +2749,12 @@ window.initializeRecommendationsSidebar = function() {
 
         // Initialize controller (sets up UI event listeners and initial render)
         recommendationsSidebarController.initialize();
+
+        // Initialize style/mood display from saved settings
+        initStyleMoodDisplay();
+
+        // Expose updateStyleMoodDisplay globally for settings changes
+        window.updateStyleMoodDisplay = updateStyleMoodDisplay;
 
         console.log('[Main] Recommendations sidebar initialized successfully');
     } catch (error) {

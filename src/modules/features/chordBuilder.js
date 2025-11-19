@@ -1249,10 +1249,18 @@ function showChordSuggestionsModal(chordType, inversion) {
     // Listen for style and mood changes
     styleSelect.addEventListener('change', () => {
         renderSuggestions(styleSelect.value, moodSelect.value);
+        // Update sidebar display
+        if (window.updateStyleMoodDisplay) {
+            window.updateStyleMoodDisplay(styleSelect.value, moodSelect.value);
+        }
     });
 
     moodSelect.addEventListener('change', () => {
         renderSuggestions(styleSelect.value, moodSelect.value);
+        // Update sidebar display
+        if (window.updateStyleMoodDisplay) {
+            window.updateStyleMoodDisplay(styleSelect.value, moodSelect.value);
+        }
     });
 
     // Listen for changes from the Comprehensive Chord Explorer modal
@@ -1269,6 +1277,10 @@ function showChordSuggestionsModal(chordType, inversion) {
         currentStyle = style;
         currentMood = mood;
         renderSuggestions(style, mood);
+        // Update sidebar display
+        if (window.updateStyleMoodDisplay) {
+            window.updateStyleMoodDisplay(style, mood);
+        }
     };
     document.addEventListener('chord-suggestion-preference-changed', preferenceChangeHandler);
     

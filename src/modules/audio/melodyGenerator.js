@@ -8,6 +8,8 @@ import { getInstrument, getAudioIsReady, initAudio, getPiano, getPianoReverb } f
 import { getEnharmonicPreference, getNotationPreference } from '../state/globalState.js';
 import { getNoteKeyId, noteToMidi, getLHNotes } from '../utils/noteUtils.js';
 import { CHORD_DEFINITIONS, ALL_NOTES, MAJOR_SCALE_STEPS } from '../../data/music-data.js';
+import { analyzeChordTone, CHORD_TONE_COLORS, NOTE_RELATIONSHIPS } from '../analysis/chordToneAnalyzer.js';
+import { getCompositionState } from '../state/compositionState.js';
 
 // Global state
 let currentMelody = null;
@@ -947,10 +949,9 @@ export function initInteractiveMelody() {
     const progressionData = getProgressionData();
     const currentKey = getCurrentKey();
 
-    if (!progressionData || progressionData.length === 0) {
-        alert('Please add chords to the progression first.');
-        return false;
-    }
+    // Allow melody recording even without chords (for Auto-Harmonize workflow)
+    // Default to 4 measures if no progression exists
+    const numMeasures = (progressionData && progressionData.length > 0) ? progressionData.length : 4;
 
     // Reset interactive melody with expanded structure
     interactiveMelody = {
@@ -960,7 +961,8 @@ export function initInteractiveMelody() {
         beatsPerMeasure: 4,
         beatDuration: '4n',
         tempo: 120,
-        key: currentKey
+        key: currentKey,
+        numMeasures: numMeasures // Store the number of measures
     };
 
     currentMeasure = 0;
@@ -972,7 +974,7 @@ export function initInteractiveMelody() {
         window.syncProgressionToMelodyComposer();
     }
 
-    // Render chord progression as whole notes
+    // Render chord progression as whole notes (or empty staves if no chords)
     const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
     if (interactiveCanvas) {
         renderChordProgressionStaff(interactiveCanvas);
@@ -1236,13 +1238,13 @@ export function addNoteToInteractiveMelody(noteName, skipPlayback = false) {
     if (!isInteractiveMode) return;
 
     const progressionData = getProgressionData();
-    if (!progressionData || progressionData.length === 0) return;
+    // Allow adding notes even without chords (for melody-first workflow)
 
     // Get current duration settings
     const duration = currentNoteDuration;
     const dotted = currentNoteDotted;
     const durationInQuarters = getDurationInQuarterNotes(duration, dotted);
-    
+
     // Check if this note would exceed the current measure
     // If so, move to the next measure before adding the note
     if (currentBeat + durationInQuarters > interactiveMelody.beatsPerMeasure) {
@@ -1252,7 +1254,10 @@ export function addNoteToInteractiveMelody(noteName, skipPlayback = false) {
     }
 
     // Determine which chord/measure this note belongs to
-    const chordIndex = currentMeasure % progressionData.length;
+    // If no chords yet, use measure index (will be updated when chords are added)
+    const chordIndex = (progressionData && progressionData.length > 0)
+        ? currentMeasure % progressionData.length
+        : currentMeasure;
 
     const toneDuration = getToneDurationString(duration, dotted);
 
@@ -1353,7 +1358,7 @@ export function addNoteToInteractiveMelody(noteName, skipPlayback = false) {
  */
 export function addNoteToMeasure(noteName, targetMeasure, duration = '4n', dotted = false) {
     const progressionData = getProgressionData();
-    if (!progressionData || progressionData.length === 0) return false;
+    // Allow adding notes even without chords (for melody-first workflow)
 
     // Calculate beat position based on existing notes in this measure
     const existingNotesInMeasure = interactiveMelody.melodyNotes.filter(
@@ -1380,7 +1385,10 @@ export function addNoteToMeasure(noteName, targetMeasure, duration = '4n', dotte
         return false;
     }
 
-    const chordIndex = targetMeasure % progressionData.length;
+    // If no chords yet, use measure index (will be updated when chords are added)
+    const chordIndex = (progressionData && progressionData.length > 0)
+        ? targetMeasure % progressionData.length
+        : targetMeasure;
     const toneDuration = getToneDurationString(duration, dotted);
 
     const newNote = {
@@ -1554,14 +1562,21 @@ export function renderChordProgressionStaff(canvasElement) {
     noteClickRegions.set(canvas, []);
 
     const progressionData = getProgressionData();
+    // Check if we're in melody-first workflow (interactive mode or have melody notes)
+    const hasMelodyNotes = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+    const inMelodyFirstMode = isInteractiveMode || hasMelodyNotes || interactiveMelody.numMeasures > 0;
+
     if (!progressionData || progressionData.length === 0) {
-        // Show a message on the canvas if no progression
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.font = '14px Arial';
-        ctx.fillStyle = '#666';
-        ctx.fillText('No chord progression. Create one in the Progression Builder.', 10, canvas.height / 2);
-        return;
+        if (!inMelodyFirstMode) {
+            // Show a message on the canvas if no progression and not in melody-first mode
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#666';
+            ctx.fillText('No chord progression. Create one in the Progression Builder.', 10, canvas.height / 2);
+            return;
+        }
+        // In melody-first mode, continue to render empty staves
     }
 
     if (typeof VexFlow === 'undefined') {
@@ -1587,11 +1602,23 @@ export function renderChordProgressionStaff(canvasElement) {
 
         // Calculate dimensions dynamically - ensure all chords are visible
         // Use FIXED measure width to prevent shrinking when more chords are added
-        const numMeasures = progressionData.length; // Render ALL chords
+        // Use interactiveMelody.numMeasures if set (for melody-first workflow), otherwise use progression length
+        const numMeasures = (progressionData && progressionData.length > 0)
+            ? progressionData.length
+            : (interactiveMelody.numMeasures || 4); // Default to 4 measures if no chords
         const desiredMeasureWidth = 220; // Fixed pixels per measure - DO NOT shrink
 
-        // Phase 2.2: Wrap measures to max 4 per row
+        // Create arrays for per-measure widths (all same width for chord progression)
+        const measureWidths = [];
+        const measureStartX = [];
         const maxMeasuresPerRow = 4;
+        for (let i = 0; i < numMeasures; i++) {
+            measureWidths.push(desiredMeasureWidth);
+            const col = i % maxMeasuresPerRow;
+            measureStartX.push(20 + (col * desiredMeasureWidth));
+        }
+
+        // Phase 2.2: Wrap measures to max 4 per row
         const numRows = Math.ceil(numMeasures / maxMeasuresPerRow);
         const measuresThisRow = Math.min(numMeasures, maxMeasuresPerRow);
 
@@ -1655,11 +1682,6 @@ export function renderChordProgressionStaff(canvasElement) {
         // Resize to match canvas dimensions (same pattern as other parts of codebase)
         renderer.resize(canvas.width, canvas.height);
         const context = renderer.getContext();
-
-        // Calculate stave width per measure (actual width used by VexFlow)
-        // Use a fixed measure width to ensure consistent spacing and all chords visible
-        const fixedMeasureWidth = desiredMeasureWidth;
-        const measureWidth = fixedMeasureWidth;
 
         // Phase 1C: Check if bass auto-fill is active AND enabled
         // If auto-generate is ON and bass notes exist, use them
@@ -1737,9 +1759,10 @@ export function renderChordProgressionStaff(canvasElement) {
             const row = Math.floor(i / maxMeasuresPerRow);
             const col = i % maxMeasuresPerRow;
 
-            // Position stave based on row and column
-            const staveX = 20 + (col * measureWidth);
+            // Position stave based on row and column using per-measure widths
+            const staveX = measureStartX[i];
             const staveY = baseRowY + (row * rowHeight) + melodyStaveOffsetY;
+            const measureWidth = measureWidths[i];
 
             // Stave width equals measure width for seamless connection
             const stave = new Stave(staveX, staveY, measureWidth);
@@ -1771,9 +1794,10 @@ export function renderChordProgressionStaff(canvasElement) {
             const row = Math.floor(i / maxMeasuresPerRow);
             const col = i % maxMeasuresPerRow;
 
-            // Position stave based on row and column
-            const staveX = 20 + (col * measureWidth);
+            // Position stave based on row and column using per-measure widths
+            const staveX = measureStartX[i];
             const staveY = baseRowY + (row * rowHeight) + chordStaveOffsetY;
+            const measureWidth = measureWidths[i];
 
             // Stave width equals measure width for seamless connection
             const stave = new Stave(staveX, staveY, measureWidth);
@@ -1823,7 +1847,7 @@ export function renderChordProgressionStaff(canvasElement) {
             ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
 
             // Helper function to render notes on a specific stave
-            const renderNotesOnStave = (notes, stave, clef, staveIndex) => {
+            const renderNotesOnStave = (notes, stave, clef, staveIndex, measureWidth) => {
                 if (notes.length === 0) return null;
 
                 // Process notes with octave shift detection
@@ -2104,7 +2128,7 @@ export function renderChordProgressionStaff(canvasElement) {
                 // Render all chord notes (RH + LH) on the bottom stave (chord stave)
                 // Top stave (melody stave) remains empty when not recording
                 const allChordNotes = [...rhNotes, ...lhNotes];
-                const chordResult = renderNotesOnStave(allChordNotes, chordStaves[index], actualChordClef, index);
+                const chordResult = renderNotesOnStave(allChordNotes, chordStaves[index], actualChordClef, index, measureWidths[index]);
                 if (chordResult && chordResult.ottavaType) {
                     ottavaBracketsToDraw.push(chordResult);
                 }
@@ -2245,9 +2269,8 @@ export function renderChordProgressionStaff(canvasElement) {
         // Phase 2.2: Update highlight to work with multi-row layout
         if (highlightEnabled && activeMeasureIndex >= 0 && activeMeasureIndex < numMeasures) {
             const row = Math.floor(activeMeasureIndex / maxMeasuresPerRow);
-            const col = activeMeasureIndex % maxMeasuresPerRow;
-            const highlightX = 20 + (col * measureWidth);
-            const highlightWidth = measureWidth;
+            const highlightX = measureStartX[activeMeasureIndex];
+            const highlightWidth = measureWidths[activeMeasureIndex];
             const highlightY = (row * rowHeight) + 10;
             const highlightHeight = rowHeight - 20;
 
@@ -2263,12 +2286,11 @@ export function renderChordProgressionStaff(canvasElement) {
         if (selectedMeasureIndex >= 0 && selectedMeasureIndex < numMeasures &&
             selectedMeasureIndex !== activeMeasureIndex && activeMeasureIndex < 0) {
             const row = Math.floor(selectedMeasureIndex / maxMeasuresPerRow);
-            const col = selectedMeasureIndex % maxMeasuresPerRow;
-            const selectedX = 20 + (col * measureWidth);
-            const selectedWidth = measureWidth;
+            const selectedX = measureStartX[selectedMeasureIndex];
+            const selectedWidth = measureWidths[selectedMeasureIndex];
             const selectedY = (row * rowHeight) + 10;
             const selectedHeight = rowHeight - 20;
-            
+
             // Use the raw canvas context for drawing the selection border
             const ctx = canvas.getContext('2d');
             ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)'; // Blue border for selected
@@ -2277,7 +2299,7 @@ export function renderChordProgressionStaff(canvasElement) {
         }
 
         // Add click-to-play functionality for measures
-        setupCanvasClickToPlay(canvas, numMeasures, measureWidth);
+        setupCanvasClickToPlay(canvas, numMeasures, measureWidths, measureStartX);
 
     } catch (error) {
         console.error('Error rendering chord progression staff:', error);
@@ -2300,14 +2322,21 @@ export function renderInteractiveMelodyStaff(canvasElement) {
     noteClickRegions.set(canvas, []);
 
     const progressionData = getProgressionData();
+    // Check if we're in melody-first workflow
+    const hasMelodyNotes = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+    const inMelodyFirstMode = isInteractiveMode || hasMelodyNotes || interactiveMelody.numMeasures > 0;
+
     if (!progressionData || progressionData.length === 0) {
-        // Still render empty staff with message
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.font = '14px Arial';
-        ctx.fillStyle = '#666';
-        ctx.fillText('No chord progression. Create one in the Progression Builder.', 10, canvas.height / 2);
-        return;
+        if (!inMelodyFirstMode) {
+            // Still render empty staff with message if not in melody-first mode
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#666';
+            ctx.fillText('No chord progression. Create one in the Progression Builder.', 10, canvas.height / 2);
+            return;
+        }
+        // In melody-first mode, continue to render empty staves with melody
     }
 
     if (typeof VexFlow === 'undefined') {
@@ -2329,11 +2358,12 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         const context = renderer.getContext();
 
         // Calculate dimensions dynamically - ensure all chords are visible and dense melodies fit
-        // Auto-add measures: use the maximum of progression length and highest measure in melody notes
+        // Auto-add measures: use the maximum of progression length, highest measure in melody notes, or default
         const maxMeasureFromMelody = interactiveMelody.melodyNotes.length > 0
             ? Math.max(...interactiveMelody.melodyNotes.map(n => n.measure)) + 1
             : 0;
-        const numMeasures = Math.max(progressionData.length, maxMeasureFromMelody); // Render ALL chords and any additional measures from melody
+        const defaultMeasures = interactiveMelody.numMeasures || 4; // Default to 4 measures for melody-first workflow
+        const numMeasures = Math.max(progressionData.length, maxMeasureFromMelody, defaultMeasures); // Render ALL chords and any additional measures from melody
 
         // Debug: Log measure count to help diagnose duplication issues
         console.log('[Phase 1C Debug] Progression length:', progressionData.length, 'Max melody measure:', maxMeasureFromMelody, 'Total measures to render:', numMeasures);
@@ -2341,38 +2371,65 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         // Initialize dynamics array for manual drawing
         window.dynamicsToDraw = [];
         
-        // Calculate dynamic measure width based on melody density
-        // Group notes by measure to find the densest measure
-        let maxNotesInMeasure = 0;
+        // Calculate dynamic measure width based on melody density for EACH measure
+        // Group notes by measure to calculate per-measure widths
+        const notesByMeasure = {};
         if (interactiveMelody.melodyNotes.length > 0) {
-            const notesByMeasure = {};
             interactiveMelody.melodyNotes.forEach(note => {
                 if (!notesByMeasure[note.measure]) {
                     notesByMeasure[note.measure] = [];
                 }
                 notesByMeasure[note.measure].push(note);
             });
-            maxNotesInMeasure = Math.max(...Object.values(notesByMeasure).map(notes => notes.length));
         }
-        
+
+        // Calculate width for each measure individually
         // Base width: 220px; add 30px per note beyond 4 notes to accommodate density
-        // 4 quarter notes (typical): 220px
-        // 8 eighth notes (dense): 220 + (8-4)*30 = 340px
-        // 16 sixteenth notes (very dense): 220 + (16-4)*30 = 580px
-        const desiredMeasureWidth = Math.max(220, 220 + Math.max(0, maxNotesInMeasure - 4) * 30);
+        const measureWidths = [];
+        for (let i = 0; i < numMeasures; i++) {
+            const notesInMeasure = notesByMeasure[i] ? notesByMeasure[i].length : 0;
+            const width = Math.max(220, 220 + Math.max(0, notesInMeasure - 4) * 30);
+            measureWidths.push(width);
+        }
+
+        // Calculate cumulative x positions for each measure (accounting for rows)
+        const measureStartX = [];
+        const maxMeasuresPerRow = 4;
+        for (let i = 0; i < numMeasures; i++) {
+            const col = i % maxMeasuresPerRow;
+            if (col === 0) {
+                measureStartX.push(20); // Start of row
+            } else {
+                // Add previous measure's width to get this measure's start
+                measureStartX.push(measureStartX[i - 1] + measureWidths[i - 1]);
+            }
+        }
 
         // Phase 2.2: Wrap measures to max 4 per row
-        const maxMeasuresPerRow = 4;
         const numRows = Math.ceil(numMeasures / maxMeasuresPerRow);
-        const measuresThisRow = Math.min(numMeasures, maxMeasuresPerRow);
 
         const padding = 40; // Left and right padding
-        // Calculate canvas width for max 4 measures per row
-        const calculatedCanvasWidth = (measuresThisRow * desiredMeasureWidth) + padding;
-
-        if (maxNotesInMeasure > 4) {
-            console.log(`Dense melody detected: ${maxNotesInMeasure} notes in a measure. Measure width: ${desiredMeasureWidth}px`);
+        // Calculate canvas width based on the widest row (sum of widths in each row)
+        let maxRowWidth = 0;
+        for (let row = 0; row < numRows; row++) {
+            let rowWidth = 0;
+            for (let col = 0; col < maxMeasuresPerRow; col++) {
+                const measureIndex = row * maxMeasuresPerRow + col;
+                if (measureIndex < numMeasures) {
+                    rowWidth += measureWidths[measureIndex];
+                }
+            }
+            maxRowWidth = Math.max(maxRowWidth, rowWidth);
         }
+        const calculatedCanvasWidth = maxRowWidth + padding;
+
+        // Log dense measures for debugging
+        measureWidths.forEach((width, i) => {
+            if (width > 220) {
+                const notesInMeasure = notesByMeasure[i] ? notesByMeasure[i].length : 0;
+                console.log(`Dense melody in measure ${i + 1}: ${notesInMeasure} notes. Width: ${width}px`);
+            }
+        });
 
         console.log(`[Notation] Rendering ${numMeasures} measures in ${numRows} rows (${maxMeasuresPerRow} per row max)`);
 
@@ -2428,11 +2485,6 @@ export function renderInteractiveMelodyStaff(canvasElement) {
 
         // Resize renderer to match canvas dimensions
         renderer.resize(canvas.width, canvas.height);
-
-        // Calculate stave width per measure (actual width used by VexFlow)
-        // Use a fixed measure width to ensure consistent spacing
-        const fixedMeasureWidth = desiredMeasureWidth;
-        const measureWidth = fixedMeasureWidth;
 
         // Phase 1C: Check if bass auto-fill is active AND enabled
         // If auto-generate is ON and bass notes exist, use them
@@ -2513,9 +2565,10 @@ export function renderInteractiveMelodyStaff(canvasElement) {
             const row = Math.floor(i / maxMeasuresPerRow);
             const col = i % maxMeasuresPerRow;
 
-            // Position stave based on row and column
-            const staveX = 20 + (col * measureWidth);
+            // Position stave based on row and column using per-measure widths
+            const staveX = measureStartX[i];
             const staveY = baseRowY + (row * rowHeight) + melodyStaveOffsetY;
+            const measureWidth = measureWidths[i];
 
             // Stave width equals measure width for seamless connection
             const stave = new Stave(staveX, staveY, measureWidth);
@@ -2543,9 +2596,8 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         // Phase 2.2: Update highlight to work with multi-row layout
         if (highlightEnabled && activeMeasureIndex >= 0 && activeMeasureIndex < numMeasures) {
             const row = Math.floor(activeMeasureIndex / maxMeasuresPerRow);
-            const col = activeMeasureIndex % maxMeasuresPerRow;
-            const highlightX = 20 + (col * measureWidth);
-            const highlightWidth = measureWidth;
+            const highlightX = measureStartX[activeMeasureIndex];
+            const highlightWidth = measureWidths[activeMeasureIndex];
             const highlightY = (row * rowHeight) + 5; // Start from top of this row
             const highlightHeight = rowHeight - 10; // Only highlight this row
 
@@ -2564,9 +2616,10 @@ export function renderInteractiveMelodyStaff(canvasElement) {
             const row = Math.floor(i / maxMeasuresPerRow);
             const col = i % maxMeasuresPerRow;
 
-            // Position stave based on row and column
-            const staveX = 20 + (col * measureWidth);
+            // Position stave based on row and column using per-measure widths
+            const staveX = measureStartX[i];
             const staveY = baseRowY + (row * rowHeight) + chordStaveOffsetY;
+            const measureWidth = measureWidths[i];
 
             // Stave width equals measure width for seamless connection
             const stave = new Stave(staveX, staveY, measureWidth);
@@ -2812,13 +2865,14 @@ export function renderInteractiveMelodyStaff(canvasElement) {
             // Format with stave width minus padding for note spacing
             // First measure has key/time signatures, so needs more padding
             // Subsequent measures don't have signatures, so can use less padding
+            const currentMeasureWidth = measureWidths[index];
             let chordFormatWidth;
             if (index === 0) {
                 // First measure: account for key/time signatures (typically 60-80px)
-                chordFormatWidth = Math.max(measureWidth - 100, 100); // Reduced padding for first measure (was 120)
+                chordFormatWidth = Math.max(currentMeasureWidth - 100, 100); // Reduced padding for first measure (was 120)
             } else {
                 // Subsequent measures: standard padding (no signatures)
-                chordFormatWidth = Math.max(measureWidth - 40, 100); // Less padding for subsequent measures
+                chordFormatWidth = Math.max(currentMeasureWidth - 40, 100); // Less padding for subsequent measures
             }
             new Formatter().joinVoices([voice]).format([voice], chordFormatWidth);
             voice.draw(context, chordStaves[index]);
@@ -3051,6 +3105,9 @@ export function renderInteractiveMelodyStaff(canvasElement) {
             Object.keys(notesByMeasure).forEach(measureIndex => {
                 const measureNum = parseInt(measureIndex);
                 if (measureNum >= numMeasures) return;
+
+                // Get the width for this specific measure
+                const measureWidth = measureWidths[measureNum];
 
                 // Calculate which column this measure is in (0-3 for a 4-measure row)
                 const maxMeasuresPerRow = 4;
@@ -3506,7 +3563,24 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 }
                 
                 // Apply note styling BEFORE drawing
-                // Determine which notes should be highlighted based on activeNotes
+                // Determine which notes should be highlighted based on activeNotes and chord tone analysis
+
+                // Get chord tone highlighting setting
+                let chordToneHighlightEnabled = true;
+                try {
+                    const compositionState = getCompositionState();
+                    const settings = compositionState.getSettings();
+                    chordToneHighlightEnabled = settings.highlightChordTones !== false;
+                } catch (e) {
+                    // Fallback if compositionState not available
+                    const stored = localStorage.getItem('chord-tone-highlighting');
+                    chordToneHighlightEnabled = stored !== 'false';
+                }
+
+                // Get chord data for this measure
+                const measureChord = progressionData && progressionData[measureNum];
+                const currentKey = getCurrentKey() || 'C';
+
                 vexNoteObjects.forEach((vexNote, noteIdx) => {
                     if (noteIdx >= notesToProcess.length) {
                         return;
@@ -3532,14 +3606,28 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                         const activeFill = '#EF4444';    // Red
                         const activeStroke = '#DC2626';  // Dark red
 
+                        let fillColor = defaultFill;
+                        let strokeColor = defaultStroke;
+
+                        if (isActive) {
+                            // Currently playing - use red (highest priority)
+                            fillColor = activeFill;
+                            strokeColor = activeStroke;
+                        } else if (chordToneHighlightEnabled && measureChord && measureChord.root) {
+                            // Apply chord tone coloring when not actively playing
+                            const analysis = analyzeChordTone(notePitch, measureChord, currentKey);
+                            fillColor = analysis.colors.fill;
+                            strokeColor = analysis.colors.stroke;
+                        }
+
                         vexNote.setStyle({
-                            fillStyle: isActive ? activeFill : defaultFill,
-                            strokeStyle: isActive ? activeStroke : defaultStroke
+                            fillStyle: fillColor,
+                            strokeStyle: strokeColor
                         });
 
                         if (typeof vexNote.setStemStyle === 'function') {
                             vexNote.setStemStyle({
-                                strokeStyle: isActive ? activeStroke : defaultStroke
+                                strokeStyle: strokeColor
                             });
                         }
                     }
@@ -3606,11 +3694,6 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                 }
                 const clickRegions = noteClickRegions.get(canvas);
 
-                // Get the stave position for this measure to convert relative coords to absolute
-                const melodyStave = melodyStaves[measureNum];
-                const staveAbsX = melodyStave ? melodyStave.getX() : 0;
-                const staveAbsY = melodyStave ? melodyStave.getY() : 0;
-
                 notesToProcess.forEach((note, noteIdx) => {
                     if (noteIdx >= vexNoteObjects.length) {
                         return;
@@ -3622,8 +3705,29 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                     const isRest = note.type === 'rest';
                     const notePitch = isRest ? 'rest' : String(note.pitch);
 
+                    // Get chord tone analysis for tooltip (only for non-rests)
+                    let analysis = null;
+                    if (!isRest && measureChord && measureChord.root) {
+                        try {
+                            // Get previous and next notes for melodic context
+                            const prevNote = noteIdx > 0 ? notesToProcess[noteIdx - 1] : null;
+                            const nextNote = noteIdx < notesToProcess.length - 1 ? notesToProcess[noteIdx + 1] : null;
+
+                            const melodicContext = {
+                                prevPitch: prevNote && prevNote.type !== 'rest' ? prevNote.pitch : null,
+                                nextPitch: nextNote && nextNote.type !== 'rest' ? nextNote.pitch : null,
+                                beat: noteBeat,
+                                beatsPerMeasure: interactiveMelody.beatsPerMeasure || 4
+                            };
+
+                            analysis = analyzeChordTone(notePitch, measureChord, currentKey, melodicContext);
+                        } catch (e) {
+                            // Ignore analysis errors
+                        }
+                    }
+
                     // Store clickable region for this note/rest
-                    // VexFlow bounding boxes are relative to the stave, so add stave position
+                    // VexFlow bounding boxes are already in canvas coordinates
                     try {
                         const boundingBox = vexNote.getBoundingBox();
                         if (boundingBox) {
@@ -3632,10 +3736,11 @@ export function renderInteractiveMelodyStaff(canvasElement) {
                                 measure: noteMeasure,
                                 beat: noteBeat,
                                 pitch: notePitch,
-                                x: staveAbsX + boundingBox.getX() - 10,
-                                y: staveAbsY + boundingBox.getY() - 10,
+                                x: boundingBox.getX() - 10,
+                                y: boundingBox.getY() - 10,
                                 width: boundingBox.getW() + 20,
-                                height: boundingBox.getH() + 20
+                                height: boundingBox.getH() + 20,
+                                analysis: analysis  // Store chord tone analysis for tooltips
                             });
                         }
                     } catch (e) {
@@ -3857,12 +3962,9 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         // Draw highlight for active measure (currently playing) if enabled
         // Phase 2.2: Update highlight to work with multi-row layout
         if (highlightEnabled && activeMeasureIndex >= 0 && activeMeasureIndex < numMeasures) {
-            const maxMeasuresPerRow = 4;
-            const rowHeight = 270;
             const row = Math.floor(activeMeasureIndex / maxMeasuresPerRow);
-            const col = activeMeasureIndex % maxMeasuresPerRow;
-            const highlightX = 20 + (col * measureWidth);
-            const highlightWidth = measureWidth;
+            const highlightX = measureStartX[activeMeasureIndex];
+            const highlightWidth = measureWidths[activeMeasureIndex];
             const highlightY = (row * rowHeight) + 10;
             const highlightHeight = rowHeight - 20;
 
@@ -3876,13 +3978,10 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         // Phase 2.2: Update for multi-row layout - only highlight the selected measure's row
         if (selectedMeasureIndex >= 0 && selectedMeasureIndex < numMeasures &&
             selectedMeasureIndex !== activeMeasureIndex && activeMeasureIndex < 0) {
-            const maxMeasuresPerRow = 4;
-            const rowHeight = 270;
             const row = Math.floor(selectedMeasureIndex / maxMeasuresPerRow);
-            const col = selectedMeasureIndex % maxMeasuresPerRow;
 
-            const selectedX = 20 + (col * measureWidth);
-            const selectedWidth = measureWidth;
+            const selectedX = measureStartX[selectedMeasureIndex];
+            const selectedWidth = measureWidths[selectedMeasureIndex];
             const selectedY = (row * rowHeight) + 10;
             const selectedHeight = rowHeight - 20;
 
@@ -3895,7 +3994,7 @@ export function renderInteractiveMelodyStaff(canvasElement) {
         }
 
         // Add click-to-play functionality for measures
-        setupCanvasClickToPlay(canvas, numMeasures, measureWidth);
+        setupCanvasClickToPlay(canvas, numMeasures, measureWidths, measureStartX);
 
     } catch (error) {
         console.error('Error rendering interactive melody staff:', error);
@@ -3906,13 +4005,104 @@ export function renderInteractiveMelodyStaff(canvasElement) {
  * Setup click-to-play functionality for the melody notation canvas
  * @param {HTMLCanvasElement} canvas - The canvas element
  * @param {number} numMeasures - Number of measures in the progression
- * @param {number} measureWidth - Width of each measure in pixels
+ * @param {number[]} measureWidths - Array of widths for each measure in pixels
+ * @param {number[]} measureStartX - Array of x positions for each measure start
  */
 // Store event handlers per canvas to avoid duplicates
 const canvasMouseDownHandlers = new WeakMap();
 const canvasMouseUpHandlers = new WeakMap();
 const canvasTouchStartHandlers = new WeakMap();
 const canvasTouchEndHandlers = new WeakMap();
+const canvasMouseMoveHandlers = new WeakMap();
+
+// Tooltip element for chord tone highlighting
+let chordToneTooltipElement = null;
+
+/**
+ * Show chord tone tooltip near the mouse position
+ * @param {HTMLCanvasElement} canvas - The canvas element
+ * @param {object} analysis - Chord tone analysis result
+ * @param {number} clientX - Mouse X position
+ * @param {number} clientY - Mouse Y position
+ */
+function showChordToneTooltip(canvas, analysis, clientX, clientY) {
+    if (!analysis || !analysis.tooltip) return;
+
+    // Check if highlighting is enabled
+    let enabled = true;
+    try {
+        const compositionState = getCompositionState();
+        const settings = compositionState.getSettings();
+        enabled = settings.highlightChordTones !== false;
+    } catch (e) {
+        const stored = localStorage.getItem('chord-tone-highlighting');
+        enabled = stored !== 'false';
+    }
+
+    if (!enabled) {
+        hideChordToneTooltip();
+        return;
+    }
+
+    // Create tooltip if it doesn't exist
+    if (!chordToneTooltipElement) {
+        chordToneTooltipElement = document.createElement('div');
+        chordToneTooltipElement.id = 'chord-tone-tooltip';
+        chordToneTooltipElement.style.cssText = `
+            position: fixed;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            max-width: 280px;
+            z-index: 10000;
+            pointer-events: none;
+            font-family: system-ui, -apple-system, sans-serif;
+        `;
+        document.body.appendChild(chordToneTooltipElement);
+    }
+
+    // Update tooltip content
+    const relationshipColor = analysis.colors.fill;
+    chordToneTooltipElement.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <div style="width: 12px; height: 12px; border-radius: 50%; background: ${relationshipColor}; flex-shrink: 0;"></div>
+            <span style="font-weight: 600; font-size: 14px; color: #111827;">
+                ${analysis.tooltip.title}
+            </span>
+        </div>
+        <p style="margin: 0; font-size: 12px; color: #6b7280; line-height: 1.5;">
+            ${analysis.tooltip.detail}
+        </p>
+    `;
+
+    // Position tooltip above and to the right of cursor
+    const tooltipRect = chordToneTooltipElement.getBoundingClientRect();
+    let left = clientX + 15;
+    let top = clientY - tooltipRect.height - 10;
+
+    // Keep tooltip within viewport
+    if (left + tooltipRect.width > window.innerWidth) {
+        left = clientX - tooltipRect.width - 15;
+    }
+    if (top < 10) {
+        top = clientY + 20;
+    }
+
+    chordToneTooltipElement.style.left = `${left}px`;
+    chordToneTooltipElement.style.top = `${top}px`;
+    chordToneTooltipElement.style.display = 'block';
+}
+
+/**
+ * Hide the chord tone tooltip
+ */
+function hideChordToneTooltip() {
+    if (chordToneTooltipElement) {
+        chordToneTooltipElement.style.display = 'none';
+    }
+}
 
 // Store active playback state per canvas
 const activePlaybackState = new WeakMap();
@@ -3930,7 +4120,7 @@ let selectedMeasureIndex = 0; // Default to first measure
 // Store note clickable regions per canvas (for note click-to-play)
 const noteClickRegions = new WeakMap();
 
-function setupCanvasClickToPlay(canvas, numMeasures, measureWidth) {
+function setupCanvasClickToPlay(canvas, numMeasures, measureWidths, measureStartX) {
     // Remove existing listeners if any
     const existingMouseDown = canvasMouseDownHandlers.get(canvas);
     const existingMouseUp = canvasMouseUpHandlers.get(canvas);
@@ -3993,14 +4183,21 @@ function setupCanvasClickToPlay(canvas, numMeasures, measureWidth) {
             // Calculate which row was clicked
             const row = Math.floor((y - baseRowY) / rowHeight);
 
-            // Calculate which column was clicked within that row
-            // Measures start at x = 20, each measure is measureWidth wide
-            const col = Math.floor((x - 20) / measureWidth);
+            // Find which measure was clicked based on per-measure widths
+            let measureIndex = -1;
+            const rowStartIndex = row * maxMeasuresPerRow;
+            const rowEndIndex = Math.min(rowStartIndex + maxMeasuresPerRow, numMeasures);
 
-            // Calculate the actual measure index
-            const measureIndex = (row * maxMeasuresPerRow) + col;
+            for (let i = rowStartIndex; i < rowEndIndex; i++) {
+                const measureX = measureStartX[i];
+                const measureEndX = measureX + measureWidths[i];
+                if (x >= measureX && x < measureEndX) {
+                    measureIndex = i;
+                    break;
+                }
+            }
 
-            if (measureIndex >= 0 && measureIndex < numMeasures && col >= 0 && col < maxMeasuresPerRow) {
+            if (measureIndex >= 0 && measureIndex < numMeasures) {
                 // Update selected measure for Play Measure button
                 selectedMeasureIndex = measureIndex;
 
@@ -4070,13 +4267,21 @@ function setupCanvasClickToPlay(canvas, numMeasures, measureWidth) {
             // Calculate which row was clicked
             const row = Math.floor((y - baseRowY) / rowHeight);
 
-            // Calculate which column was clicked within that row
-            const col = Math.floor((x - 20) / measureWidth);
+            // Find which measure was clicked based on per-measure widths
+            let measureIndex = -1;
+            const rowStartIndex = row * maxMeasuresPerRow;
+            const rowEndIndex = Math.min(rowStartIndex + maxMeasuresPerRow, numMeasures);
 
-            // Calculate the actual measure index
-            const measureIndex = (row * maxMeasuresPerRow) + col;
+            for (let i = rowStartIndex; i < rowEndIndex; i++) {
+                const measureX = measureStartX[i];
+                const measureEndX = measureX + measureWidths[i];
+                if (x >= measureX && x < measureEndX) {
+                    measureIndex = i;
+                    break;
+                }
+            }
 
-            if (measureIndex >= 0 && measureIndex < numMeasures && col >= 0 && col < maxMeasuresPerRow) {
+            if (measureIndex >= 0 && measureIndex < numMeasures) {
                 // Update selected measure for Play Measure button
                 selectedMeasureIndex = measureIndex;
 
@@ -4122,7 +4327,47 @@ function setupCanvasClickToPlay(canvas, numMeasures, measureWidth) {
     canvas.addEventListener('touchstart', touchStartHandler, { passive: false });
     canvas.addEventListener('touchend', touchEndHandler, { passive: false });
     canvas.addEventListener('touchcancel', touchEndHandler, { passive: false });
-    
+
+    // Add mousemove handler for chord tone tooltips
+    const existingMouseMove = canvasMouseMoveHandlers.get(canvas);
+    if (existingMouseMove) {
+        canvas.removeEventListener('mousemove', existingMouseMove);
+    }
+
+    const mouseMoveHandler = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Check if mouse is over a note
+        const clickRegions = noteClickRegions.get(canvas) || [];
+        let hoveredNote = null;
+
+        for (const region of clickRegions) {
+            if (x >= region.x && x <= region.x + region.width &&
+                y >= region.y && y <= region.y + region.height) {
+                hoveredNote = region;
+                break;
+            }
+        }
+
+        // Show or hide tooltip
+        if (hoveredNote && hoveredNote.analysis && hoveredNote.analysis.tooltip) {
+            showChordToneTooltip(canvas, hoveredNote.analysis, e.clientX, e.clientY);
+        } else {
+            hideChordToneTooltip();
+        }
+    };
+
+    // Add mouseleave handler to hide tooltip when leaving canvas
+    const mouseLeaveHandler = () => {
+        hideChordToneTooltip();
+    };
+
+    canvasMouseMoveHandlers.set(canvas, mouseMoveHandler);
+    canvas.addEventListener('mousemove', mouseMoveHandler);
+    canvas.addEventListener('mouseleave', mouseLeaveHandler);
+
     // Add cursor style to indicate clickability
     canvas.style.cursor = 'pointer';
 }
@@ -4142,14 +4387,18 @@ function playNotesInBeat(canvas, measure, beat, clickedType) {
     stopMeasurePlayback(canvas);
     
     const progressionData = getProgressionData();
-    if (!progressionData || progressionData.length === 0) return;
-    
+    const hasMelody = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+    const hasChords = progressionData && progressionData.length > 0;
+
+    // Allow playback if there are melody notes or chords
+    if (!hasMelody && !hasChords) return;
+
     // Calculate numMeasures to allow melody notes beyond chord progression
-    const maxMeasureFromMelody = interactiveMelody.melodyNotes.length > 0 
+    const maxMeasureFromMelody = hasMelody
         ? Math.max(...interactiveMelody.melodyNotes.map(n => n.measure)) + 1
         : 0;
-    const numMeasures = Math.max(progressionData.length, maxMeasureFromMelody);
-    
+    const numMeasures = Math.max(hasChords ? progressionData.length : 0, maxMeasureFromMelody, interactiveMelody.numMeasures || 4);
+
     if (measure < 0 || measure >= numMeasures) return;
     
     initAudio();
@@ -4708,7 +4957,7 @@ export function setSelectedMeasureIndex(index) {
     const maxMeasureFromMelody = interactiveMelody.melodyNotes.length > 0
         ? Math.max(...interactiveMelody.melodyNotes.map(n => n.measure)) + 1
         : 0;
-    const numMeasures = Math.max(progressionData ? progressionData.length : 0, maxMeasureFromMelody);
+    const numMeasures = Math.max(progressionData ? progressionData.length : 0, maxMeasureFromMelody, interactiveMelody.numMeasures || 4);
 
     if (index >= 0 && index < numMeasures) {
         selectedMeasureIndex = index;
@@ -4737,7 +4986,11 @@ let isStepMeasurePlaying = false; // Track if step measure is currently playing
  */
 export function startStepMeasureMelody() {
     const progressionData = getProgressionData();
-    if (!progressionData || progressionData.length === 0) return;
+    const hasMelody = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+    const hasChords = progressionData && progressionData.length > 0;
+
+    // Allow playback if there are melody notes or chords
+    if (!hasMelody && !hasChords) return;
 
     initAudio();
     if (!getAudioIsReady()) return;
@@ -4746,10 +4999,10 @@ export function startStepMeasureMelody() {
     // Make sure selectedMeasureIndex is valid, otherwise use 0
     // IMPORTANT: selectedMeasureIndex can be up to numMeasures-1, not just progressionData.length-1
     // because melody notes can extend beyond the chord progression
-    const maxMeasureFromMelody = interactiveMelody.melodyNotes.length > 0
+    const maxMeasureFromMelody = hasMelody
         ? Math.max(...interactiveMelody.melodyNotes.map(n => n.measure)) + 1
         : 0;
-    const numMeasures = Math.max(progressionData.length, maxMeasureFromMelody);
+    const numMeasures = Math.max(hasChords ? progressionData.length : 0, maxMeasureFromMelody, interactiveMelody.numMeasures || 4);
 
     let measureToPlay = 0;
     if (selectedMeasureIndex >= 0 && selectedMeasureIndex < numMeasures) {
@@ -4846,16 +5099,25 @@ export function stopStepMeasureMelody() {
  */
 export function playSelectedMeasure() {
     const progressionData = getProgressionData();
-    if (!progressionData || progressionData.length === 0) {
-        alert('Please add chords to the progression first.');
+    const hasMelody = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+    const hasChords = progressionData && progressionData.length > 0;
+
+    if (!hasMelody && !hasChords) {
+        alert('Please add melody notes or chords first.');
         return;
     }
-    
-    // Use selected measure, or default to first measure (0)
-    const measureToPlay = selectedMeasureIndex >= 0 && selectedMeasureIndex < progressionData.length 
-        ? selectedMeasureIndex 
+
+    // Calculate total measures from melody and/or chords
+    const maxMeasureFromMelody = hasMelody
+        ? Math.max(...interactiveMelody.melodyNotes.map(n => n.measure)) + 1
         : 0;
-    
+    const numMeasures = Math.max(hasChords ? progressionData.length : 0, maxMeasureFromMelody, interactiveMelody.numMeasures || 4);
+
+    // Use selected measure, or default to first measure (0)
+    const measureToPlay = selectedMeasureIndex >= 0 && selectedMeasureIndex < numMeasures
+        ? selectedMeasureIndex
+        : 0;
+
     playMeasure(measureToPlay);
 }
 
@@ -4864,16 +5126,19 @@ export function playSelectedMeasure() {
  */
 export function playFromSelectedMeasure() {
     const progressionData = getProgressionData();
-    if (!progressionData || progressionData.length === 0) {
-        alert('Please add chords to the progression first.');
+    const hasMelody = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+    const hasChords = progressionData && progressionData.length > 0;
+
+    if (!hasMelody && !hasChords) {
+        alert('Please add melody notes or chords first.');
         return;
     }
-    
+
     // Stop any currently playing audio immediately
     Tone.Transport.stop();
     Tone.Transport.cancel();
     Tone.Transport.position = 0;
-    
+
     // Also stop any hold-to-play measures
     const canvas = document.getElementById('interactive-melody-notation-canvas');
     if (canvas) {
@@ -4882,9 +5147,15 @@ export function playFromSelectedMeasure() {
             stopMeasurePlayback(canvas);
         }
     }
-    
+
+    // Calculate total measures from melody and/or chords
+    const maxMeasureFromMelody = hasMelody
+        ? Math.max(...interactiveMelody.melodyNotes.map(n => n.measure)) + 1
+        : 0;
+    const numMeasures = Math.max(hasChords ? progressionData.length : 0, maxMeasureFromMelody, interactiveMelody.numMeasures || 4);
+
     // Use selected measure, or default to first measure (0)
-    const startMeasure = selectedMeasureIndex >= 0 && selectedMeasureIndex < progressionData.length 
+    const startMeasure = selectedMeasureIndex >= 0 && selectedMeasureIndex < numMeasures
         ? selectedMeasureIndex 
         : 0;
     
@@ -5048,7 +5319,11 @@ export function playFromSelectedMeasure() {
  */
 export function playMeasure(measureIndex) {
     const progressionData = getProgressionData();
-    if (!progressionData || progressionData.length === 0) return;
+    const hasMelody = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+    const hasChords = progressionData && progressionData.length > 0;
+
+    // Allow playback if there are melody notes or chords
+    if (!hasMelody && !hasChords) return;
 
     // Clear any previous timeouts from a prior playMeasure call
     measurePlaybackTimeouts.forEach(timeoutId => {
@@ -5057,10 +5332,10 @@ export function playMeasure(measureIndex) {
     measurePlaybackTimeouts = [];
 
     // Calculate numMeasures to allow melody notes beyond chord progression
-    const maxMeasureFromMelody = interactiveMelody.melodyNotes.length > 0
+    const maxMeasureFromMelody = hasMelody
         ? Math.max(...interactiveMelody.melodyNotes.map(n => n.measure)) + 1
         : 0;
-    const numMeasures = Math.max(progressionData.length, maxMeasureFromMelody);
+    const numMeasures = Math.max(hasChords ? progressionData.length : 0, maxMeasureFromMelody, interactiveMelody.numMeasures || 4);
 
     if (measureIndex < 0 || measureIndex >= numMeasures) return;
 
@@ -5259,6 +5534,45 @@ export function playMeasure(measureIndex) {
  */
 export function getInteractiveMelody() {
     return interactiveMelody;
+}
+
+/**
+ * Restore interactive melody notes and settings (for use after chord updates)
+ * @param {Array} melodyNotes - Array of melody note objects to restore
+ * @param {Object} settings - Melody settings to restore
+ */
+export function restoreInteractiveMelody(melodyNotes, settings = {}) {
+    if (melodyNotes && Array.isArray(melodyNotes)) {
+        interactiveMelody.melodyNotes = [...melodyNotes];
+    }
+
+    // Restore settings if provided
+    if (settings.timeSignature) interactiveMelody.timeSignature = settings.timeSignature;
+    if (settings.beatsPerMeasure) interactiveMelody.beatsPerMeasure = settings.beatsPerMeasure;
+    if (settings.beatDuration) interactiveMelody.beatDuration = settings.beatDuration;
+    if (settings.tempo) interactiveMelody.tempo = settings.tempo;
+    if (settings.key) interactiveMelody.key = settings.key;
+    if (settings.numMeasures) interactiveMelody.numMeasures = settings.numMeasures;
+
+    // Update current measure/beat position based on restored notes
+    if (melodyNotes && melodyNotes.length > 0) {
+        const lastNote = melodyNotes[melodyNotes.length - 1];
+        currentMeasure = lastNote.measure || 0;
+
+        // Calculate beat position after last note
+        const duration = lastNote.duration || '4n';
+        const dotted = duration.includes('.') || lastNote.dotted;
+        const durationInQuarters = getDurationInQuarterNotes(duration.replace('.', ''), dotted);
+        currentBeat = (lastNote.beat || 0) + durationInQuarters;
+
+        // Handle measure overflow
+        while (currentBeat >= interactiveMelody.beatsPerMeasure) {
+            currentBeat -= interactiveMelody.beatsPerMeasure;
+            currentMeasure++;
+        }
+    }
+
+    console.log('[MelodyGenerator] Restored melody:', melodyNotes.length, 'notes');
 }
 
 /**
@@ -5578,13 +5892,16 @@ export function playAllMelody() {
         stopPlayAllMelody();
         return;
     }
-    
+
     const progressionData = getProgressionData();
-    if (!progressionData || progressionData.length === 0) {
-        alert('Please add chords to the progression first.');
+    const hasMelody = interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0;
+    const hasChords = progressionData && progressionData.length > 0;
+
+    if (!hasMelody && !hasChords) {
+        alert('Please add melody notes or chords first.');
         return;
     }
-    
+
     // Stop any currently playing audio immediately
     Tone.Transport.stop();
     Tone.Transport.cancel();

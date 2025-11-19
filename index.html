@@ -1277,6 +1277,14 @@
                                 <span class="context-label">Last Chord:</span>
                                 <span id="last-chord-display" class="context-value">(none)</span>
                             </div>
+                            <div class="context-row">
+                                <span class="context-label">Style:</span>
+                                <span id="current-style-display" class="context-value">Balanced</span>
+                            </div>
+                            <div class="context-row">
+                                <span class="context-label">Mood:</span>
+                                <span id="current-mood-display" class="context-value">Happy</span>
+                            </div>
                         </div>
 
                         <!-- Recommendations List -->
@@ -2188,6 +2196,12 @@
                         Redo
                     </button>
                 </div>
+
+                <!-- Auto-Harmonize Button -->
+                <button id="auto-harmonize-btn" onclick="window.showAutoHarmonize && window.showAutoHarmonize()" class="w-full px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 text-sm flex items-center justify-center gap-1" title="Auto-harmonize melody with chords">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"></path></svg>
+                    Harmonize
+                </button>
             </div>
         </div>
 

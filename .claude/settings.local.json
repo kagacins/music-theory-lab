@@ -17,7 +17,8 @@
       "Bash(start index.html)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(nul)"
     ],
     "deny": [],
     "ask": []
