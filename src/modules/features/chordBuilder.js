@@ -2892,10 +2892,8 @@ export function addSpecificChordToProgression(chordType, inversion, playShutterS
                     window.syncProgressionToMelodyComposer();
                 }
                 
-                if (window.renderInteractiveMelodyStaff) {
-                    window.renderInteractiveMelodyStaff(interactiveCanvas);
-                } else if (window.renderChordProgressionStaff) {
-                    window.renderChordProgressionStaff(interactiveCanvas);
+                if (window.refreshNotationFromProgression) {
+                    window.refreshNotationFromProgression();
                 }
             }
         }, 100);
@@ -2926,10 +2924,8 @@ export function addSpecificChordToProgression(chordType, inversion, playShutterS
             const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
             if (interactiveCanvas) {
                 setTimeout(() => {
-                    if (window.renderInteractiveMelodyStaff) {
-                        window.renderInteractiveMelodyStaff(interactiveCanvas);
-                    } else if (window.renderChordProgressionStaff) {
-                        window.renderChordProgressionStaff(interactiveCanvas);
+                    if (window.refreshNotationFromProgression) {
+                        window.refreshNotationFromProgression();
                     }
                 }, 50);
             }

@@ -281,7 +281,11 @@ function updateSectionState(section, sidebar, collapsedSections, container, save
  * @param {HTMLElement} container - The container element
  */
 function updateSidebarVisibility(sidebar, collapsedSections, container) {
-    if (collapsedSections.size > 0) {
+    // Check if there are any tabs in the sidebar (including non-section tabs like suggestions)
+    const allTabs = sidebar.querySelectorAll('[data-section-id]');
+    const hasAnyTabs = allTabs.length > 0;
+
+    if (hasAnyTabs) {
         sidebar.style.display = 'flex';
         if (container) {
             container.style.marginLeft = '4rem'; // 64px = w-16
@@ -294,7 +298,7 @@ function updateSidebarVisibility(sidebar, collapsedSections, container) {
             container.style.marginLeft = '0';
         }
     }
-    
+
     // Update toggle all button state
     if (sidebar._updateToggleAllButton) {
         setTimeout(() => sidebar._updateToggleAllButton(), 50);

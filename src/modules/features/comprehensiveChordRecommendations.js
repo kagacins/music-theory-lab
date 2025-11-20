@@ -415,7 +415,7 @@ export function generateComprehensiveRecommendations(
         const nextFunction = nextDegree !== null ? (DEGREE_TO_FUNCTION[nextDegree] || HARMONIC_FUNCTIONS.TONIC) : null;
 
         // Get harmonic function score (how well does this root fit the progression?)
-        const functionScore = scoreHarmonicFunction(currentFunction, nextFunction, tensionDirection);
+        const functionScore = scoreHarmonicFunction(currentFunction, nextFunction, tensionDirection, currentDegree, nextDegree);
 
         // Skip roots with very poor harmonic relationships (unless jazz/indie style)
         if (functionScore < 10 && style !== 'jazz' && style !== 'indie') {
@@ -503,7 +503,8 @@ export function generateComprehensiveRecommendations(
                     currentRoot, nextRoot, nextType, nextInversion,
                     functionScore, voiceLeadingScore, styleFit, moodFit,
                     currentFunction, nextFunction, tensionDirection,
-                    contextScore, context, modalInterchangeScore, borrowedInfo
+                    contextScore, context, modalInterchangeScore, borrowedInfo,
+                    key, nextDegree  // Add key and degree for accurate cadence text
                 );
 
                 recommendations.push({
@@ -538,8 +539,14 @@ export function generateComprehensiveRecommendations(
 /**
  * Score harmonic function relationships
  * Returns 0-100 score based on how well the harmonic progression works
+ * @param {string|null} currentFunction - Current chord's harmonic function
+ * @param {string|null} nextFunction - Next chord's harmonic function
+ * @param {string} tensionDirection - Tension direction
+ * @param {number|null} currentDegree - Current chord's scale degree (1-7)
+ * @param {number|null} nextDegree - Next chord's scale degree (1-7)
+ * @returns {number} Score 0-100
  */
-function scoreHarmonicFunction(currentFunction, nextFunction, tensionDirection) {
+function scoreHarmonicFunction(currentFunction, nextFunction, tensionDirection, currentDegree = null, nextDegree = null) {
     let score = 50; // Base score
 
     // Handle borrowed chords (chords outside the key)
@@ -563,13 +570,33 @@ function scoreHarmonicFunction(currentFunction, nextFunction, tensionDirection) 
         if (nextFunction === HARMONIC_FUNCTIONS.DOMINANT) {
             score = tensionDirection === 'build' ? 100 : 90;
         } else if (nextFunction === HARMONIC_FUNCTIONS.TONIC) {
-            score = tensionDirection === 'resolve' ? 85 : 70;
+            // Distinguish between actual tonic (I) vs other tonic-function chords (iii, vi)
+            if (nextDegree === 1) {
+                // IV → I (plagal cadence) - very strong, common resolution
+                score = tensionDirection === 'resolve' ? 85 : 70;
+            } else if (nextDegree === 6) {
+                // IV → vi - less common but acceptable
+                score = tensionDirection === 'resolve' ? 70 : 55;
+            } else {
+                // IV → iii - unusual, lower score
+                score = tensionDirection === 'resolve' ? 60 : 45;
+            }
         } else if (nextFunction === HARMONIC_FUNCTIONS.SUBDOMINANT) {
             score = tensionDirection === 'maintain' ? 75 : 60;
         }
     } else if (currentFunction === HARMONIC_FUNCTIONS.DOMINANT) {
         if (nextFunction === HARMONIC_FUNCTIONS.TONIC) {
-            score = tensionDirection === 'resolve' ? 100 : 85;
+            // Distinguish between actual tonic (I) vs other tonic-function chords
+            if (nextDegree === 1) {
+                // V → I (authentic cadence) - strongest resolution in music
+                score = tensionDirection === 'resolve' ? 100 : 85;
+            } else if (nextDegree === 6) {
+                // V → vi (deceptive cadence) - common surprise resolution
+                score = tensionDirection === 'resolve' ? 70 : 60;
+            } else {
+                // V → iii - very unusual, much lower score
+                score = tensionDirection === 'resolve' ? 55 : 45;
+            }
         } else if (nextFunction === HARMONIC_FUNCTIONS.SUBDOMINANT) {
             score = tensionDirection === 'maintain' ? 70 : 55;
         } else if (nextFunction === HARMONIC_FUNCTIONS.DOMINANT) {
@@ -735,7 +762,8 @@ function generateReason(
     currentRoot, nextRoot, nextType, nextInversion,
     functionScore, voiceLeadingScore, styleFit, moodFit,
     currentFunction, nextFunction, tensionDirection,
-    contextScore = 0, context = null, modalInterchangeScore = 50, borrowedInfo = null
+    contextScore = 0, context = null, modalInterchangeScore = 50, borrowedInfo = null,
+    key = 'C', nextDegree = null  // Add key and degree for accurate cadence text
 ) {
     const reasons = [];
 
@@ -758,9 +786,22 @@ function generateReason(
             if (context.cadence.type === 'ii-V') {
                 reasons.push('Completes ii-V-I progression');
             } else if (context.cadence.type === 'authentic') {
-                reasons.push('Resolves V-I cadence');
+                // Check if it's actually resolving to I (degree 1)
+                if (nextDegree === 1) {
+                    reasons.push('Resolves V-I cadence');
+                } else if (nextFunction === HARMONIC_FUNCTIONS.TONIC) {
+                    // Resolving to another tonic-function chord (iii or vi)
+                    reasons.push('Resolves to tonic-function chord');
+                }
             } else if (context.cadence.type === 'plagal') {
-                reasons.push('Plagal (IV-I) resolution');
+                // Check if it's actually resolving to I (degree 1)
+                if (nextDegree === 1) {
+                    reasons.push('Plagal (IV-I) resolution');
+                } else if (nextFunction === HARMONIC_FUNCTIONS.TONIC) {
+                    // Resolving to another tonic-function chord (iii or vi)
+                    // Don't call it "plagal IV-I" when it's not actually going to I
+                    reasons.push('Resolves to tonic-function chord');
+                }
             }
         }
 
@@ -778,7 +819,13 @@ function generateReason(
     // Harmonic function reason
     if (functionScore >= 90) {
         if (nextFunction === HARMONIC_FUNCTIONS.TONIC && tensionDirection === 'resolve') {
-            reasons.push('Strong resolution to tonic');
+            // Only say "Strong resolution to tonic" if it's actually the I chord (degree 1)
+            if (nextDegree === 1) {
+                reasons.push('Strong resolution to tonic');
+            } else {
+                // For iii or vi (also tonic function but not degree 1)
+                reasons.push('Resolution to tonic-function chord');
+            }
         } else if (nextFunction === HARMONIC_FUNCTIONS.DOMINANT && tensionDirection === 'build') {
             reasons.push('Builds tension toward dominant');
         } else if (nextFunction === HARMONIC_FUNCTIONS.SUBDOMINANT) {

@@ -8,12 +8,59 @@
  * - The harmonic tone coloring system
  */
 
-import { NotationComposer, createNotationComposer } from './composerIntegration.js';
-import { NoteEditor, createNoteEditor } from './noteEditor.js';
-import { NotationToolbar } from './notationToolbar.js';
-import { getCompositionState } from '../state/compositionState.js';
-import { getProgressionData, getCurrentKey } from '../state/trainerState.js';
-import { analyzeChordTone } from '../analysis/chordToneAnalyzer.js';
+import { NotationComposer } from './composerIntegration.js';
+import { NoteEditor } from './noteEditor.js';
+import { getCurrentKey } from '../state/trainerState.js';
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Transpose a pitch by a number of scale steps
+ * @param {string} pitch - Current pitch (e.g., "C4")
+ * @param {number} steps - Number of steps (positive = up, negative = down)
+ * @param {string} staff - 'treble' or 'bass' for clef context
+ * @returns {string} - New pitch
+ */
+function transposePitchBySteps(pitch, steps, staff) {
+  // Chromatic scale
+  const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+  // Parse pitch
+  const match = pitch.match(/^([A-G]#?)(\d+)$/);
+  if (!match) return pitch;
+
+  const [, noteName, octave] = match;
+  const octaveNum = parseInt(octave, 10);
+
+  // Find note index
+  let noteIndex = notes.indexOf(noteName);
+  if (noteIndex === -1) {
+    // Try flat notation
+    const flats = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+    const sharp = flats[noteName];
+    if (sharp) noteIndex = notes.indexOf(sharp);
+  }
+
+  if (noteIndex === -1) return pitch;
+
+  // Calculate new position (steps are half-steps for now)
+  let newIndex = noteIndex + steps;
+  let newOctave = octaveNum;
+
+  // Handle octave wrapping
+  while (newIndex < 0) {
+    newIndex += 12;
+    newOctave--;
+  }
+  while (newIndex >= 12) {
+    newIndex -= 12;
+    newOctave++;
+  }
+
+  return notes[newIndex] + newOctave;
+}
 
 // ============================================================================
 // GLOBAL STATE
@@ -28,6 +75,45 @@ let isInitialized = false;
 let primaryCanvas = null;
 let overlayCanvas = null;
 let toolbarContainer = null;
+
+/**
+ * Create or get overlay canvas for visual feedback
+ * @param {HTMLCanvasElement} baseCanvas - Base canvas element
+ * @returns {HTMLCanvasElement} - Overlay canvas
+ */
+function getOrCreateOverlayCanvas(baseCanvas) {
+  // Check if overlay already exists
+  let overlay = document.getElementById(baseCanvas.id + '-overlay');
+
+  if (!overlay) {
+    // Create new overlay canvas
+    overlay = document.createElement('canvas');
+    overlay.id = baseCanvas.id + '-overlay';
+    overlay.style.position = 'absolute';
+    overlay.style.left = baseCanvas.offsetLeft + 'px';
+    overlay.style.top = baseCanvas.offsetTop + 'px';
+    overlay.style.pointerEvents = 'none'; // Let clicks pass through to base canvas
+    overlay.style.zIndex = '10';
+
+    // Match dimensions
+    overlay.width = baseCanvas.width;
+    overlay.height = baseCanvas.height;
+
+    // Insert after base canvas
+    baseCanvas.parentElement.insertBefore(overlay, baseCanvas.nextSibling);
+
+    // Update overlay position/size when base canvas changes
+    const resizeObserver = new ResizeObserver(() => {
+      overlay.width = baseCanvas.width;
+      overlay.height = baseCanvas.height;
+      overlay.style.left = baseCanvas.offsetLeft + 'px';
+      overlay.style.top = baseCanvas.offsetTop + 'px';
+    });
+    resizeObserver.observe(baseCanvas);
+  }
+
+  return overlay;
+}
 
 // ============================================================================
 // INITIALIZATION
@@ -65,9 +151,12 @@ export function initEnhancedNotation(options = {}) {
   // Create or reuse the notation composer
   if (notationComposer) {
     // Already initialized - just sync and render
+    console.log('[NotationInit] Already initialized, syncing from progression');
     notationComposer.syncFromProgression();
     return notationComposer;
   }
+
+  console.log('[NotationInit] Initializing enhanced notation system...');
 
   // Create new notation composer
   notationComposer = new NotationComposer({
@@ -87,34 +176,309 @@ export function initEnhancedNotation(options = {}) {
   // Initialize now
   notationComposer.init();
 
+  // Create overlay canvas for visual feedback
+  overlayCanvas = getOrCreateOverlayCanvas(primaryCanvas);
+
   // Create note editor for interactive editing
   noteEditor = new NoteEditor({
     canvas: primaryCanvas,
+    overlayCanvas: overlayCanvas,
     layoutManager: notationComposer.layoutManager,
     onNoteAdd: (data) => {
-      notationComposer.addNote(data.measureIndex, data.staff, data.note);
+      console.log('[NoteEditor] onNoteAdd called:', {
+        measureIndex: data.measureIndex,
+        staff: data.staff,
+        pitch: data.note.pitch,
+        duration: data.note.duration,
+        isRest: data.note.isRest
+      });
+
+      // Add note to BOTH compositionState (source) AND measureManager (cache)
+      // This ensures persistence even when syncFromProgression() runs
+
+      // 1. Add to compositionState (source of truth)
+      if (notationComposer.compositionState) {
+        const measure = notationComposer.compositionState.getMeasure(data.measureIndex);
+        if (measure) {
+          const voiceKey = data.staff === 'treble' ? 'treble' : 'bass';
+          const voice = measure.notation[voiceKey].voices[0];
+
+          if (voice) {
+            voice.notes.push({
+              pitch: data.note.pitch,
+              pitches: data.note.pitches,
+              duration: data.note.duration,
+              isRest: data.note.isRest,
+              dotted: data.note.dotted,
+              accidental: data.note.accidental,
+            });
+            console.log('[NoteEditor] Note added to compositionState', voiceKey, 'voice');
+          }
+        }
+      }
+
+      // 2. Add to measureManager (for immediate rendering without full sync)
+      if (notationComposer.measureManager) {
+        const measure = notationComposer.measureManager.getMeasure(data.measureIndex);
+        if (measure) {
+          const notesArray = data.staff === 'treble' ? 'trebleNotes' : 'bassNotes';
+          const autoGenFlag = data.staff === 'treble' ? 'isAutoGeneratedMelody' : 'isAutoGeneratedBass';
+
+          const noteData = {
+            pitch: data.note.pitch,
+            pitches: data.note.pitches,
+            duration: data.note.duration,
+            isRest: data.note.isRest,
+            dotted: data.note.dotted,
+            accidental: data.note.accidental,
+          };
+
+          if (!measure[notesArray]) {
+            measure[notesArray] = [];
+          }
+
+          // CRITICAL: If this is the first manual note added to a staff with auto-generated notes,
+          // clear the auto-generated notes first
+          // Only clear if the flag is explicitly TRUE (auto-generated)
+          // If it's false or undefined with existing notes, those are manual notes - don't clear
+          if (measure[autoGenFlag] === true && measure[notesArray].length > 0) {
+            console.log(`[NoteEditor] Clearing ${measure[notesArray].length} auto-generated ${data.staff} notes before adding first manual note`);
+            measure[notesArray] = [];
+          }
+
+          measure[notesArray].push(noteData);
+
+          // Mark that this measure has manually added notes (not auto-generated)
+          measure[autoGenFlag] = false;
+          console.log(`[NoteEditor] Set ${autoGenFlag} = false on measure`, data.measureIndex);
+
+          console.log('[NoteEditor] Note added to measureManager', data.staff, 'staff');
+          console.log('[NoteEditor] Measure after update:', {
+            trebleNotes: measure.trebleNotes?.length,
+            bassNotes: measure.bassNotes?.length,
+            isAutoGeneratedMelody: measure.isAutoGeneratedMelody,
+            isAutoGeneratedBass: measure.isAutoGeneratedBass
+          });
+        }
+      }
+
+      // Trigger re-render
+      notationComposer.render();
+
+      // Update note editor with new note regions
+      if (notationComposer.noteRegions) {
+        noteEditor.setNoteRegions(notationComposer.noteRegions);
+      }
+
+      // Notify callbacks
+      if (notationComposer.onNoteAdded) {
+        notationComposer.onNoteAdded(data.measureIndex, data.staff, data.note);
+      }
     },
     onNoteMove: (moves) => {
-      // Handle note moves
+      // Handle note pitch changes (drag operations) - update both data sources
+      moves.forEach(move => {
+        // 1. Update compositionState
+        if (notationComposer.compositionState) {
+          const measure = notationComposer.compositionState.getMeasure(move.measureIndex);
+          if (measure) {
+            const voiceKey = move.staff === 'treble' ? 'treble' : 'bass';
+            const note = measure.notation[voiceKey]?.voices[0]?.notes[move.noteIndex];
+
+            if (note && move.steps !== 0) {
+              const currentPitch = note.pitch || note.pitches?.[0] || 'C4';
+              const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff);
+
+              if (note.pitches) {
+                note.pitches = note.pitches.map(p => transposePitchBySteps(p, move.steps, move.staff));
+              } else {
+                note.pitch = newPitch;
+              }
+            }
+          }
+        }
+
+        // 2. Update measureManager
+        if (notationComposer.measureManager) {
+          const measure = notationComposer.measureManager.getMeasure(move.measureIndex);
+          if (measure) {
+            const notesArray = move.staff === 'treble' ? 'trebleNotes' : 'bassNotes';
+            const note = measure[notesArray]?.[move.noteIndex];
+
+            if (note && move.steps !== 0) {
+              const currentPitch = note.pitch || note.pitches?.[0] || 'C4';
+              const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff);
+
+              if (note.pitches) {
+                note.pitches = note.pitches.map(p => transposePitchBySteps(p, move.steps, move.staff));
+              } else {
+                note.pitch = newPitch;
+              }
+            }
+          }
+        }
+      });
+
+      notationComposer.render();
+
+      // Update note regions after move
+      if (notationComposer.noteRegions) {
+        noteEditor.setNoteRegions(notationComposer.noteRegions);
+      }
     },
     onNoteSelect: (noteIds) => {
-      // Handle note selection
+      // Handle note selection changes
+      noteEditor.selectedNotes = new Set(noteIds);
+      noteEditor.renderOverlay();
     },
     onNoteDelete: (deletion) => {
+      // Delete from both data sources
+      // 1. Delete from compositionState
       if (notationComposer.compositionState) {
-        notationComposer.compositionState.removeNote(
-          deletion.measureIndex,
-          deletion.staff,
-          0,
-          deletion.noteIndex
-        );
-        notationComposer.render();
+        const measure = notationComposer.compositionState.getMeasure(deletion.measureIndex);
+        if (measure) {
+          const voiceKey = deletion.staff === 'treble' ? 'treble' : 'bass';
+          const notes = measure.notation[voiceKey]?.voices[0]?.notes;
+          if (notes && deletion.noteIndex < notes.length) {
+            notes.splice(deletion.noteIndex, 1);
+          }
+        }
+      }
+
+      // 2. Delete from measureManager
+      if (notationComposer.measureManager) {
+        const measure = notationComposer.measureManager.getMeasure(deletion.measureIndex);
+        if (measure) {
+          const notesArray = deletion.staff === 'treble' ? 'trebleNotes' : 'bassNotes';
+          if (measure[notesArray] && deletion.noteIndex < measure[notesArray].length) {
+            measure[notesArray].splice(deletion.noteIndex, 1);
+
+            // If all notes are deleted from a staff, reset the auto-generated flag
+            // so auto-generation can populate the measure again
+            if (deletion.staff === 'treble' && measure.trebleNotes.length === 0) {
+              delete measure.isAutoGeneratedMelody;
+            } else if (deletion.staff === 'bass' && measure.bassNotes.length === 0) {
+              delete measure.isAutoGeneratedBass;
+            }
+          }
+        }
+      }
+
+      notationComposer.render();
+
+      // Update note regions after delete
+      if (notationComposer.noteRegions) {
+        noteEditor.setNoteRegions(notationComposer.noteRegions);
+      }
+    },
+    onPolyphonyAdd: (data) => {
+      // Add pitch to existing note to create chord - update both data sources
+      // 1. Update compositionState
+      if (notationComposer.compositionState) {
+        const measure = notationComposer.compositionState.getMeasure(data.measureIndex);
+        if (measure) {
+          const voiceKey = data.staff === 'treble' ? 'treble' : 'bass';
+          const note = measure.notation[voiceKey]?.voices[0]?.notes[data.noteIndex];
+
+          if (note) {
+            if (note.pitches && Array.isArray(note.pitches)) {
+              if (!note.pitches.includes(data.pitch)) {
+                note.pitches.push(data.pitch);
+                note.pitches.sort();
+              }
+            } else if (note.pitch) {
+              note.pitches = [note.pitch, data.pitch].sort();
+              delete note.pitch;
+            }
+          }
+        }
+      }
+
+      // 2. Update measureManager
+      if (notationComposer.measureManager) {
+        const measure = notationComposer.measureManager.getMeasure(data.measureIndex);
+        if (measure) {
+          const notesArray = data.staff === 'treble' ? 'trebleNotes' : 'bassNotes';
+          const note = measure[notesArray]?.[data.noteIndex];
+
+          if (note) {
+            if (note.pitches && Array.isArray(note.pitches)) {
+              if (!note.pitches.includes(data.pitch)) {
+                note.pitches.push(data.pitch);
+                note.pitches.sort();
+              }
+            } else if (note.pitch) {
+              note.pitches = [note.pitch, data.pitch].sort();
+              delete note.pitch;
+            }
+          }
+        }
+      }
+
+      notationComposer.render();
+
+      // Update note regions
+      if (notationComposer.noteRegions) {
+        noteEditor.setNoteRegions(notationComposer.noteRegions);
       }
     },
   });
 
+  // Connect toolbar to note editor
+  if (notationComposer.toolbar && noteEditor) {
+    // Store original callbacks
+    const originalCallbacks = {
+      onDurationChange: notationComposer.toolbar.onDurationChange,
+      onRestModeChange: notationComposer.toolbar.onRestModeChange,
+      onDottedChange: notationComposer.toolbar.onDottedChange,
+      onAccidentalChange: notationComposer.toolbar.onAccidentalChange,
+    };
+
+    // Enhance callbacks to also update note editor
+    notationComposer.toolbar.onDurationChange = (duration) => {
+      noteEditor.setDuration(duration);
+      originalCallbacks.onDurationChange(duration);
+    };
+
+    notationComposer.toolbar.onRestModeChange = (isRest) => {
+      noteEditor.setRestMode(isRest);
+      originalCallbacks.onRestModeChange(isRest);
+    };
+
+    notationComposer.toolbar.onDottedChange = (isDotted) => {
+      noteEditor.setDotted(isDotted);
+      originalCallbacks.onDottedChange(isDotted);
+    };
+
+    notationComposer.toolbar.onAccidentalChange = (accidental) => {
+      noteEditor.setAccidental(accidental);
+      originalCallbacks.onAccidentalChange(accidental);
+    };
+
+    // Set initial chord context for harmonic coloring
+    if (notationComposer.compositionState) {
+      const key = notationComposer.compositionState.metadata?.key || getCurrentKey();
+      noteEditor.setChordContext(null, key);
+    }
+  }
+
   // Sync from existing progression
   notationComposer.syncFromProgression();
+
+  // Sync note regions after initial render
+  if (notationComposer.noteRegions) {
+    noteEditor.setNoteRegions(notationComposer.noteRegions);
+  }
+
+  // Hook into the composer's render method to always update note regions
+  const originalRender = notationComposer.render.bind(notationComposer);
+  notationComposer.render = function() {
+    originalRender();
+    // Update note regions in editor after each render
+    if (this.noteRegions && noteEditor) {
+      noteEditor.setNoteRegions(this.noteRegions);
+    }
+  };
 
   isInitialized = true;
 

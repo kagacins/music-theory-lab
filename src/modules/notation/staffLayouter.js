@@ -188,8 +188,6 @@ export class StaffLayoutManager {
           y: currentY,
           width: measureWidth,
           height: grandStaffDims.systemHeight,
-          trebleY: currentY + grandStaffDims.trebleY,
-          bassY: currentY + grandStaffDims.bassY,
         });
       }
 
@@ -247,6 +245,12 @@ export class StaffLayoutManager {
     const realX = (x + this.config.scrollX) / this.config.zoom;
     const realY = (y + this.config.scrollY) / this.config.zoom;
 
+    // Debug: log if no bounds exist
+    if (this.measureBounds.size === 0) {
+      console.warn('[StaffLayouter] No measure bounds available for click detection');
+      return null;
+    }
+
     for (const [index, bounds] of this.measureBounds) {
       if (
         realX >= bounds.x &&
@@ -274,27 +278,41 @@ export class StaffLayoutManager {
     // Apply zoom and scroll
     const realY = (y + this.config.scrollY) / this.config.zoom;
 
+    // Calculate staff Y positions from measure bounds
+    // trebleY = measure.y + systemMarginTop (20)
+    // bassY = measure.y + systemMarginTop + staffHeight + staffSpacing (20 + 40 + 80 = 140)
+    const systemMarginTop = 20;
+    const staffHeight = 40;
+    const staffSpacing = 80;
+    const trebleY = measureBounds.y + systemMarginTop;
+    const bassY = measureBounds.y + systemMarginTop + staffHeight + staffSpacing;
+
     // Determine which staff
-    const trebleBottom = measureBounds.trebleY + 80; // Staff height
-    const bassTop = measureBounds.bassY;
+    // Allow ledger lines: extend staff detection beyond the 5-line staff
+    const trebleBottom = trebleY + 80; // Staff height + space for ledger lines
+    const bassTop = bassY - 40; // Allow ledger lines above bass staff
 
     let staff, staffY;
 
-    if (realY <= trebleBottom) {
+    // Middle point between staves to determine which staff the mouse is closer to
+    const middleY = (trebleBottom + bassTop) / 2;
+
+    if (realY <= middleY) {
+      // Closer to treble staff
       staff = 'treble';
-      staffY = measureBounds.trebleY;
-    } else if (realY >= bassTop) {
-      staff = 'bass';
-      staffY = measureBounds.bassY;
+      staffY = trebleY;
     } else {
-      // Between staves
-      return { measure: measureBounds, staff: null, line: null, pitch: null };
+      // Closer to bass staff
+      staff = 'bass';
+      staffY = bassY;
     }
 
     // Calculate staff line (0 = bottom line, 8 = top line for 5-line staff)
+    // staffY is the Y position of the top line of the staff (from VexFlow Stave)
+    // The staff spans from staffY (top line) to staffY + 40 (bottom line)
     const relativeY = realY - staffY;
     const lineSpacing = 10; // Pixels between lines
-    const line = Math.round((80 - relativeY) / (lineSpacing / 2));
+    const line = Math.round((40 - relativeY) / (lineSpacing / 2));
 
     // Convert line to pitch
     const pitch = lineToPitch(line, staff);
@@ -394,20 +412,30 @@ function lineToPitch(line, staff) {
   // For treble clef: bottom line is E4
   // For bass clef: bottom line is G2
 
+  // Extended pitch arrays to support wide ledger line range
   const treblePitches = [
-    'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4',
-    'C5', 'D5', 'E5', 'F5', 'G5', 'A5', 'B5', 'C6',
+    // Below staff ledger lines
+    'A3', 'B3', 'C4', 'D4',
+    // Staff lines (E4 = bottom line)
+    'E4', 'F4', 'G4', 'A4', 'B4',
+    'C5', 'D5', 'E5', 'F5', 'G5', 'A5', 'B5',
+    // Above staff ledger lines
+    'C6', 'D6', 'E6', 'F6', 'G6', 'A6', 'B6', 'C7',
   ];
 
   const bassPitches = [
-    'E2', 'F2', 'G2', 'A2', 'B2',
-    'C3', 'D3', 'E3', 'F3', 'G3', 'A3', 'B3',
-    'C4', 'D4', 'E4',
+    // Below staff ledger lines
+    'C2', 'D2', 'E2', 'F2',
+    // Staff lines (G2 = bottom line)
+    'G2', 'A2', 'B2', 'C3', 'D3', 'E3', 'F3', 'G3', 'A3', 'B3',
+    // Above staff ledger lines
+    'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5',
   ];
 
-  // Adjust for staff lines (bottom line = index 2 in the pitch array)
+  // Adjust for staff lines
+  // Treble: bottom line (E4) = index 4, Bass: bottom line (G2) = index 4
   const pitches = staff === 'treble' ? treblePitches : bassPitches;
-  const adjustedIndex = line + 2; // Bottom line is at index 2
+  const adjustedIndex = line + 4; // Bottom line is at index 4
 
   if (adjustedIndex < 0 || adjustedIndex >= pitches.length) {
     // Ledger line - calculate based on pattern

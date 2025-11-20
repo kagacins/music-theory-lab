@@ -1,0 +1,15 @@
+
+
+
+AI-Suggested:
+Click-to-Play Functionality - Need to add click handlers that play notes/chords when clicked
+
+How can I "select" a note or chord?  May need to be able to add ottava to a note?  Maybe want to add polyphony to a note, or so that I can insert a note between notes, or edit the duration of a note, etc.  
+
+Need to include some descriptive text explaining alt+click or alt+shift+click interaction with the canvas.
+
+Can we playback what is now rendered on the grand staff with the various "Play" buttons and the "Click to Play" capability?
+
+Right now i'm trying to figure out a way to blend the chord progression building blocks we have but also allow the user to modify the bass clef in a sensible way while maintaining a strong sense of the chord that the user selected in the chord progression.  I'm not sure we automatically add chord progression chords to the bass clef.  
+
+If the user tries to add a rest that is longer than the remaining available beats/duration of that measure, can we have the rest default to the maximum amount of beats/duration remaining?

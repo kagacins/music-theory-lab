@@ -86,6 +86,7 @@ export class NoteEditor {
     this.onNoteMove = options.onNoteMove || (() => {});
     this.onNoteSelect = options.onNoteSelect || (() => {});
     this.onNoteDelete = options.onNoteDelete || (() => {});
+    this.onPolyphonyAdd = options.onPolyphonyAdd || (() => {});
 
     // Bind event handlers
     this.handleMouseDown = this.handleMouseDown.bind(this);
@@ -109,6 +110,9 @@ export class NoteEditor {
    */
   attachEventListeners() {
     if (!this.canvas) return;
+
+    // Remove existing listeners first to prevent duplicates
+    this.detachEventListeners();
 
     this.canvas.addEventListener('mousedown', this.handleMouseDown);
     this.canvas.addEventListener('mousemove', this.handleMouseMove);
@@ -147,7 +151,21 @@ export class NoteEditor {
     const position = this.getCanvasPosition(e);
     const staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
 
-    if (!staffPosition || !staffPosition.staff) return;
+    // If Alt key is NOT held, allow ALL clicks to bubble through to measure selection/playback handlers
+    // This allows regular clicks to select/play measures, while Alt+Click adds notes
+    if (!e.altKey) {
+      return; // Don't prevent default, let event bubble to measure handlers
+    }
+
+    // Alt is held - this is note editing mode
+    // Only proceed if clicking on a valid staff position
+    if (!staffPosition || !staffPosition.staff) {
+      return;
+    }
+
+    // Prevent event from bubbling to measure selection handlers (only when Alt+Click for note editing)
+    e.stopPropagation();
+    e.preventDefault();
 
     // Check if clicking on an existing note
     const clickedNote = this.findNoteAtPosition(position.x, position.y);
@@ -166,8 +184,58 @@ export class NoteEditor {
         this.selectNote(clickedNote.id);
       }
     } else if (staffPosition.pitch) {
-      // Add a new note at this position
-      this.addNoteAtPosition(staffPosition);
+      // Check if Shift is held and there's a note at same time position to add pitch to (polyphony)
+      if (e.shiftKey && this.canAddPitchToNearbyNote(staffPosition)) {
+        this.addPitchToNearbyNote(staffPosition);
+      } else {
+        // Add a new note at this position
+        this.addNoteAtPosition(staffPosition);
+      }
+    }
+  }
+
+  /**
+   * Check if we can add a pitch to a nearby note (for polyphony)
+   * @param {Object} staffPosition - Staff position data
+   * @returns {boolean} - True if there's a note at similar position
+   */
+  canAddPitchToNearbyNote(staffPosition) {
+    if (!staffPosition.measure || !this.noteRegions) return false;
+
+    // Look for notes in the same measure and staff
+    const sameStaffNotes = this.noteRegions.filter(
+      region => region.measureIndex === staffPosition.measure.index &&
+                region.staff === staffPosition.staff
+    );
+
+    // Check if there's a note nearby in the same beat
+    return sameStaffNotes.length > 0;
+  }
+
+  /**
+   * Add pitch to nearest note to create chord (polyphony)
+   * @param {Object} staffPosition - Staff position data
+   */
+  addPitchToNearbyNote(staffPosition) {
+    if (!staffPosition.measure || !this.noteRegions) return;
+
+    // Find the last note in the same measure and staff
+    const sameStaffNotes = this.noteRegions.filter(
+      region => region.measureIndex === staffPosition.measure.index &&
+                region.staff === staffPosition.staff
+    );
+
+    if (sameStaffNotes.length > 0) {
+      // Add to the last note
+      const targetNote = sameStaffNotes[sameStaffNotes.length - 1];
+
+      // Emit polyphony add event
+      this.onPolyphonyAdd({
+        measureIndex: targetNote.measureIndex,
+        staff: targetNote.staff,
+        noteIndex: targetNote.noteIndex,
+        pitch: staffPosition.pitch,
+      });
     }
   }
 
@@ -181,6 +249,14 @@ export class NoteEditor {
     const position = this.getCanvasPosition(e);
     const staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
 
+    // Only show ghost note if Alt key is held (note editing mode)
+    if (!e.altKey) {
+      this.hoveredPosition = null;
+      this.ghostNote = null;
+      this.renderOverlay();
+      return;
+    }
+
     if (this.state === EDITOR_STATES.DRAGGING) {
       // Update drag position
       this.dragCurrentPosition = staffPosition;
@@ -188,7 +264,8 @@ export class NoteEditor {
     } else {
       // Update hover position
       this.hoveredPosition = staffPosition;
-      this.updateGhostNote(staffPosition);
+      // Pass the mouse X and Y positions to updateGhostNote for accurate positioning
+      this.updateGhostNote(staffPosition, position.x, position.y);
     }
 
     this.renderOverlay();
@@ -279,14 +356,44 @@ export class NoteEditor {
   }
 
   /**
+   * Set note regions from renderer
+   * @param {Array} regions - Array of note regions with bounding boxes
+   */
+  setNoteRegions(regions) {
+    this.noteRegions = regions || [];
+  }
+
+  /**
    * Find note at a given position
    * @param {number} x - X coordinate
    * @param {number} y - Y coordinate
    * @returns {Object|null} - Note data or null
    */
   findNoteAtPosition(x, y) {
-    // This would need to query the rendered notes
-    // For now, return null - will be implemented when connected to renderer
+    if (!this.noteRegions || this.noteRegions.length === 0) {
+      return null;
+    }
+
+    // Check each note region for intersection
+    for (const region of this.noteRegions) {
+      if (!region.bounds) continue;
+
+      const { x: rx, y: ry, width, height } = region.bounds;
+
+      // Check if point is within bounding box
+      if (x >= rx && x <= rx + width && y >= ry && y <= ry + height) {
+        return {
+          id: this.createNoteId(region.measureIndex, region.staff, region.noteIndex),
+          measureIndex: region.measureIndex,
+          staff: region.staff,
+          noteIndex: region.noteIndex,
+          pitch: region.pitch,
+          pitches: region.pitches,
+          bounds: region.bounds,
+        };
+      }
+    }
+
     return null;
   }
 
@@ -309,6 +416,13 @@ export class NoteEditor {
    */
   addNoteAtPosition(staffPosition) {
     if (!staffPosition.pitch || !staffPosition.measure) return;
+
+    // Check if adding this note would exceed measure capacity
+    if (!this.canAddNoteToBeat(staffPosition.measure.index, staffPosition.staff, this.currentDuration, this.isDotted)) {
+      console.warn('[NoteEditor] Cannot add note - measure is full (4/4 time = 4 beats max)');
+      // TODO: Show visual feedback to user (maybe flash the measure red?)
+      return;
+    }
 
     const noteData = {
       pitch: staffPosition.pitch,
@@ -524,14 +638,136 @@ export class NoteEditor {
   }
 
   // ============================================================================
+  // BEAT CALCULATION & VALIDATION
+  // ============================================================================
+
+  /**
+   * Convert duration string to beats (quarter notes)
+   * @param {string} duration - Duration like "4n", "2n", "8n", etc.
+   * @returns {number} - Number of beats
+   */
+  durationToBeats(duration) {
+    const durationMap = {
+      '1n': 4,    // Whole note = 4 beats
+      '2n': 2,    // Half note = 2 beats
+      '4n': 1,    // Quarter note = 1 beat
+      '8n': 0.5,  // Eighth note = 0.5 beats
+      '16n': 0.25, // Sixteenth note = 0.25 beats
+      '32n': 0.125, // Thirty-second note = 0.125 beats
+    };
+    return durationMap[duration] || 1;
+  }
+
+  /**
+   * Calculate total beats used in a measure from note regions
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @returns {number} - Total beats used
+   */
+  getMeasureBeatsUsed(measureIndex, staff) {
+    if (!this.noteRegions) return 0;
+
+    const notesInMeasure = this.noteRegions.filter(
+      r => r.measureIndex === measureIndex && r.staff === staff
+    );
+
+    // Calculate total beats from note durations
+    // noteRegions should have duration info attached during rendering
+    return notesInMeasure.reduce((total, region) => {
+      const duration = region.duration || '4n'; // Default to quarter note
+      let beats = this.durationToBeats(duration);
+      if (region.dotted) {
+        beats *= 1.5;
+      }
+      return total + beats;
+    }, 0);
+  }
+
+  /**
+   * Check if a note can be added to a measure without exceeding beat limit
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @param {string} duration - Note duration to add
+   * @param {boolean} isDotted - Whether note is dotted
+   * @returns {boolean} - True if note can be added
+   */
+  canAddNoteToBeat(measureIndex, staff, duration, isDotted) {
+    // Get time signature (hardcoded to 4/4 for now)
+    // TODO: Get from compositionState metadata
+    const maxBeats = 4;
+
+    // Calculate current beats used
+    const currentBeats = this.getMeasureBeatsUsed(measureIndex, staff);
+
+    // Calculate new note beats
+    let newBeats = this.durationToBeats(duration);
+    if (isDotted) {
+      newBeats *= 1.5;
+    }
+
+    // Check if adding would exceed limit
+    const totalBeats = currentBeats + newBeats;
+    return totalBeats <= maxBeats;
+  }
+
+  // ============================================================================
   // GHOST NOTE PREVIEW
   // ============================================================================
 
   /**
+   * Convert pitch to staff line number
+   * @param {string} pitch - Pitch like "C4", "D#5", etc.
+   * @param {string} staff - 'treble' or 'bass'
+   * @returns {number} - Line number (0 = bottom line)
+   */
+  pitchToLine(pitch, staff) {
+    // Extended pitch arrays (matches staffLayouter.js lineToPitch)
+    const treblePitches = [
+      // Below staff ledger lines
+      'A3', 'B3', 'C4', 'D4',
+      // Staff lines (E4 = bottom line)
+      'E4', 'F4', 'G4', 'A4', 'B4',
+      'C5', 'D5', 'E5', 'F5', 'G5', 'A5', 'B5',
+      // Above staff ledger lines
+      'C6', 'D6', 'E6', 'F6', 'G6', 'A6', 'B6', 'C7',
+    ];
+
+    const bassPitches = [
+      // Below staff ledger lines
+      'C2', 'D2', 'E2', 'F2',
+      // Staff lines (G2 = bottom line)
+      'G2', 'A2', 'B2', 'C3', 'D3', 'E3', 'F3', 'G3', 'A3', 'B3',
+      // Above staff ledger lines
+      'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5',
+    ];
+
+    const pitches = staff === 'treble' ? treblePitches : bassPitches;
+
+    // Remove accidentals for lookup (C#4 -> C4)
+    const baseNote = pitch.match(/^([A-G])(?:#|b)?(\d+)$/);
+    if (!baseNote) return 0;
+
+    const [, noteName, octave] = baseNote;
+    const searchPitch = noteName + octave;
+
+    // Find in pitch array
+    const index = pitches.indexOf(searchPitch);
+    if (index === -1) {
+      // Not in standard range - estimate based on octave
+      return 0;
+    }
+
+    // Convert index to line number (index 4 = bottom line)
+    return index - 4;
+  }
+
+  /**
    * Update ghost note preview
    * @param {Object} staffPosition - Staff position
+   * @param {number} mouseX - Mouse X coordinate for positioning
+   * @param {number} mouseY - Mouse Y coordinate for positioning
    */
-  updateGhostNote(staffPosition) {
+  updateGhostNote(staffPosition, mouseX, mouseY) {
     if (!staffPosition || !staffPosition.pitch || !staffPosition.staff) {
       this.ghostNote = null;
       return;
@@ -544,6 +780,8 @@ export class NoteEditor {
       measure: staffPosition.measure,
       duration: this.currentDuration,
       isRest: this.isRestMode,
+      mouseX: mouseX, // Store mouse X for accurate positioning
+      mouseY: mouseY, // Store mouse Y for accurate positioning
     };
 
     // Get harmonic coloring if chord context is set
@@ -594,8 +832,33 @@ export class NoteEditor {
    * @param {CanvasRenderingContext2D} ctx - Canvas context
    */
   drawSelectionHighlights(ctx) {
-    // This would draw highlights around selected notes
-    // Implementation depends on knowing note positions from renderer
+    if (!this.noteRegions || this.selectedNotes.size === 0) return;
+
+    ctx.save();
+    ctx.strokeStyle = SELECTION_COLORS.selected;
+    ctx.lineWidth = 2;
+    ctx.fillStyle = SELECTION_COLORS.hover;
+
+    // Draw highlight for each selected note
+    for (const noteId of this.selectedNotes) {
+      // Find the region for this note
+      const region = this.noteRegions.find(r => {
+        const regionId = this.createNoteId(r.measureIndex, r.staff, r.noteIndex);
+        return regionId === noteId;
+      });
+
+      if (region && region.bounds) {
+        const { x, y, width, height } = region.bounds;
+
+        // Draw filled background
+        ctx.fillRect(x - 2, y - 2, width + 4, height + 4);
+
+        // Draw border
+        ctx.strokeRect(x - 2, y - 2, width + 4, height + 4);
+      }
+    }
+
+    ctx.restore();
   }
 
   /**
@@ -606,16 +869,31 @@ export class NoteEditor {
     if (!this.ghostNote || !this.ghostNote.measure) return;
 
     const bounds = this.ghostNote.measure;
-    const staffY = this.ghostNote.staff === 'treble'
-      ? bounds.trebleY
-      : bounds.bassY;
 
-    // Calculate Y position based on pitch
-    const line = pitchToLine(this.ghostNote.pitch, this.ghostNote.staff);
-    const noteY = staffY + 40 - (line * (LINE_SPACING / 2));
+    // Calculate note X position (centered in measure)
+    const noteX = this.ghostNote.mouseX || (bounds.x + (bounds.width / 2));
 
-    // Calculate X position (center of measure for now)
-    const noteX = bounds.x + (bounds.width / 2);
+    // Calculate staff Y positions from measure bounds
+    // trebleY = measure.y + systemMarginTop (20)
+    // bassY = measure.y + systemMarginTop + staffHeight + staffSpacing (20 + 40 + 80 = 140)
+    const systemMarginTop = 20;
+    const staffHeight = 40;
+    const staffSpacing = 80;
+    const trebleY = bounds.y + systemMarginTop;
+    const bassY = bounds.y + systemMarginTop + staffHeight + staffSpacing;
+
+    // Calculate note Y position from pitch and staff line
+    // staffY is the Y position of the TOP LINE of the staff (from VexFlow)
+    // The staff spans from staffY (top line) to staffY + 40 (bottom line)
+    const staffY = this.ghostNote.staff === 'treble' ? trebleY : bassY;
+    const lineSpacing = 10; // Pixels between lines (matches staffLayouter.js)
+
+    // Convert pitch to line number (reverse of lineToPitch calculation)
+    const line = this.pitchToLine(this.ghostNote.pitch, this.ghostNote.staff);
+
+    // Calculate Y position from line (matches staffLayouter.js formula)
+    // line = (40 - relativeY) / 5, so relativeY = 40 - line * 5
+    const noteY = staffY + (40 - line * (lineSpacing / 2));
 
     // Draw ghost note
     ctx.save();

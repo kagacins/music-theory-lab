@@ -199,32 +199,17 @@ export function switchTab(tabId) {
             sharedChordDisplay.classList.add('w-64');
         }
         updateKeyboardLabels();
-        // Render chord progression on staff if in Free mode and progression exists
-        // Skip if new enhanced notation system is active (Phase 4.4)
+        // Refresh notation if in Free mode and progression exists (Phase 4.4+)
         setTimeout(() => {
-            // Check if new notation system is initialized - if so, skip old renderer
-            if (window.isNotationInitialized && window.isNotationInitialized()) {
-                // Enhanced notation system handles rendering
-                return;
-            }
-
             const panel = document.getElementById('melody-controls-panel');
             const freeModeControls = document.getElementById('free-mode-controls');
-            const canvas = document.getElementById('interactive-melody-notation-canvas');
-            // Only render if panel is visible and Free mode is active
+            // Only refresh if panel is visible and Free mode is active
             const panelVisible = !panel || !panel.classList.contains('hidden');
             if (panelVisible && freeModeControls && !freeModeControls.classList.contains('hidden')) {
-                if (canvas && window.renderChordProgressionStaff) {
-                    // Wait a bit to ensure canvas has dimensions
+                if (window.refreshNotationFromProgression) {
+                    // Wait a bit to ensure notation system is ready
                     setTimeout(() => {
-                        if (canvas.width > 0 && canvas.height > 0) {
-                            window.renderChordProgressionStaff(canvas);
-                        } else {
-                            // Canvas not ready, try again
-                            setTimeout(() => {
-                                window.renderChordProgressionStaff(canvas);
-                            }, 300);
-                        }
+                        window.refreshNotationFromProgression();
                     }, 100);
                 }
             }

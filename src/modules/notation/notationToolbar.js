@@ -107,11 +107,11 @@ export class NotationToolbar {
         <div class="toolbar-section duration-section">
           <span class="section-label">Duration</span>
           <div class="button-group duration-buttons">
-            ${DURATIONS.map(d => `
+            ${DURATIONS.map((d, i) => `
               <button
                 class="toolbar-btn duration-btn ${d.id === this.currentDuration ? 'active' : ''}"
                 data-duration="${d.id}"
-                title="${d.label} note"
+                title="${d.label} note (Shift+${i + 1})"
               >
                 ${d.symbol}
               </button>
@@ -461,8 +461,8 @@ export class NotationToolbar {
       return;
     }
 
-    // Duration shortcuts (1-6) - only when no modifiers
-    if (!hasModifier && e.key >= '1' && e.key <= '6') {
+    // Duration shortcuts (Shift+1-6) - Use Shift to avoid conflicts with chord/melody suggestion shortcuts (1-5)
+    if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.key >= '1' && e.key <= '6') {
       const index = parseInt(e.key, 10) - 1;
       if (index < DURATIONS.length) {
         e.preventDefault();

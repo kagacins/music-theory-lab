@@ -240,10 +240,9 @@ function handleNoteSelected(suggestion) {
             notationComposer.render();
         }
     } else {
-        // Fallback to legacy renderer
-        const canvas = document.getElementById('interactive-melody-notation-canvas');
-        if (canvas && window.renderInteractiveMelodyStaff) {
-            window.renderInteractiveMelodyStaff(canvas);
+        // Refresh notation using new system
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
         }
     }
 

@@ -219,6 +219,19 @@
                         </div>
                         </div>
                     </div>
+                    <!-- Chord Tone Highlighting Toggle -->
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="font-medium text-gray-300">Chord Tone Highlighting</span>
+                        <div class="flex items-center gap-2">
+                            <div class="relative group">
+                                <button class="p-1 text-gray-400 hover:text-white transition -mr-1"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
+                                <div class="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">Color-code melody notes in the grand staff based on their relationship to the current chord (root, third, fifth, etc.).</div>
+                            </div>
+                            <span id="chord-tone-off-indicator" class="text-xs font-semibold text-gray-500 w-8 text-center">Off</span>
+                            <label for="chord-tone-highlighting-toggle" class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="chord-tone-highlighting-toggle" class="sr-only" onchange="toggleChordToneHighlighting()"><div class="toggle-bg w-10 h-6 bg-gray-600 rounded-full border border-gray-500"></div></label>
+                            <span id="chord-tone-on-indicator" class="text-xs font-semibold text-indigo-300 w-8 text-center">On</span>
+                        </div>
+                    </div>
 
                     <!-- Recommendation Weights Button -->
                     <div class="mt-4 pt-3 border-t border-gray-700">
@@ -1132,18 +1145,6 @@
                                 </div>
                             </div>
 
-                            <!-- Staff Notation Display -->
-                            <div class="mb-3 p-3 bg-gray-50 rounded border border-gray-200">
-                                <div class="mb-2">
-                                    <label class="text-xs font-semibold text-gray-600">Staff Notation (with Key Signature):</label>
-                                </div>
-                                <div class="overflow-x-auto">
-                                    <canvas id="melody-notation-canvas" width="800" height="150" class="border border-gray-300 bg-white rounded"></canvas>
-                                </div>
-                                <p class="text-xs text-gray-500 mt-2">
-                                    Key: <span id="melody-key-display" class="font-semibold">C Major</span>
-                                </p>
-                            </div>
 
                             <!-- Letter Notes Display -->
                             <div class="mb-3">
@@ -1210,10 +1211,6 @@
                                 <div id="chord-melody-timeline" class="overflow-x-auto">
                                     <!-- Timeline will be rendered here -->
                                 </div>
-                                <!-- Notation View (Initially Hidden) -->
-                                <div id="chord-melody-notation" class="hidden">
-                                    <canvas id="chord-melody-notation-canvas" width="800" height="300"></canvas>
-                                </div>
                             </div>
 
                             <!-- Stats -->
@@ -1248,12 +1245,19 @@
                     <div class="suggestions-banner">
                         <div class="banner-header">
                             <h3 class="banner-title">Suggestions</h3>
-                            <button id="suggestion-weights-btn" class="weights-btn" title="Adjust suggestion weights" onclick="window.openSuggestionWeights && window.openSuggestionWeights()">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                </svg>
-                            </button>
+                            <div class="flex items-center gap-1">
+                                <button id="suggestion-weights-btn" class="weights-btn" title="Adjust suggestion weights" onclick="window.openSuggestionWeights && window.openSuggestionWeights()">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    </svg>
+                                </button>
+                                <button id="suggestions-collapse-btn" class="weights-btn" title="Collapse suggestions sidebar" onclick="window.toggleSuggestionsSidebar && window.toggleSuggestionsSidebar()">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                         <div class="suggestions-toggle" role="tablist">
                             <button id="toggle-chords-btn" class="toggle-btn active" role="tab" aria-selected="true" onclick="window.switchSuggestionMode && window.switchSuggestionMode('chords')">
@@ -1880,7 +1884,7 @@
                                                             document.getElementById('auto-generate-label').textContent = this.checked ? 'ON' : 'OFF';
                                                             document.getElementById('auto-generate-label').className = this.checked ? 'text-xs font-bold text-blue-600' : 'text-xs font-bold text-gray-400';
                                                             this.nextElementSibling.className = this.checked ? 'toggle-bg w-11 h-6 bg-blue-600 rounded-full border-2 border-blue-700' : 'toggle-bg w-11 h-6 bg-gray-300 rounded-full border-2 border-gray-400';
-                                                            window.renderInteractiveMelodyStaff && window.renderInteractiveMelodyStaff(document.getElementById('interactive-melody-notation-canvas'));">
+                                                            window.refreshNotationFromProgression && window.refreshNotationFromProgression();">
                                                         <div class="toggle-bg w-11 h-6 bg-gray-300 rounded-full border-2 border-gray-400"></div>
                                                     </label>
                                                 </div>
@@ -1889,7 +1893,7 @@
                                             <!-- Bass Pattern Selector -->
                                             <div class="flex-1">
                                                 <label class="block text-sm font-semibold text-gray-700 mb-2">Bass Pattern:</label>
-                                                <select id="bass-pattern-select" onchange="window.setBassPattern && window.setBassPattern(this.value); window.renderInteractiveMelodyStaff && window.renderInteractiveMelodyStaff(document.getElementById('interactive-melody-notation-canvas'));" class="w-full p-2 text-sm border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 cursor-pointer transition-colors">
+                                                <select id="bass-pattern-select" onchange="window.setBassPattern && window.setBassPattern(this.value); window.refreshNotationFromProgression && window.refreshNotationFromProgression();" class="w-full p-2 text-sm border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 cursor-pointer transition-colors">
                                                     <option value="whole-note">Whole Note - Single root note</option>
                                                     <option value="root-fifth" selected>Root-Fifth - Alternating root and fifth</option>
                                                     <option value="arpeggio">Arpeggio - Ascending chord tones</option>
@@ -1901,7 +1905,7 @@
 
                                         <p class="text-xs text-gray-500 mt-2">
                                             ℹ️ Bass is auto-generated from chord progression. Edit manually by clicking notes (coming soon).
-                                            <button onclick="window.regenerateAllBass && window.regenerateAllBass(); window.renderInteractiveMelodyStaff && window.renderInteractiveMelodyStaff(document.getElementById('interactive-melody-notation-canvas'));" class="ml-1 text-blue-600 hover:text-blue-800 underline text-xs" title="Force regenerate bass if needed">
+                                            <button onclick="window.regenerateAllBass && window.regenerateAllBass(); window.refreshNotationFromProgression && window.refreshNotationFromProgression();" class="ml-1 text-blue-600 hover:text-blue-800 underline text-xs" title="Force regenerate bass if needed">
                                                 Regenerate
                                             </button>
                                         </p>
@@ -1967,17 +1971,6 @@
                             </div>
 
                             <!-- Staff Notation Display -->
-                            <div class="mb-3 p-3 bg-gray-50 rounded border border-gray-200">
-                                <div class="mb-2">
-                                    <label class="text-sm font-semibold text-gray-700">Staff Notation (with Key Signature):</label>
-                                </div>
-                                <div class="overflow-x-auto">
-                                    <canvas id="melody-notation-canvas-main" width="800" height="150" class="border border-gray-300 bg-white rounded"></canvas>
-                                </div>
-                                <p class="text-xs text-gray-500 mt-2">
-                                    Key: <span id="melody-key-display-main" class="font-semibold">C Major</span>
-                                </p>
-                            </div>
 
                             <!-- Letter Notes Display -->
                             <div class="mb-3">
@@ -2043,10 +2036,6 @@
                                 <!-- Timeline View -->
                                 <div id="chord-melody-timeline-main" class="overflow-x-auto">
                                     <!-- Timeline will be rendered here -->
-                                </div>
-                                <!-- Notation View (Initially Hidden) -->
-                                <div id="chord-melody-notation-main" class="hidden">
-                                    <canvas id="chord-melody-notation-canvas-main" width="800" height="300"></canvas>
                                 </div>
                             </div>
 

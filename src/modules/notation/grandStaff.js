@@ -437,6 +437,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
           pitches: noteData.pitches || (noteData.pitch ? [noteData.pitch] : []),
           beat: noteData.beat || noteIdx,
           duration: noteData.duration || '4n',
+          dotted: noteData.dotted || false,  // Include dotted for beat calculations
           isRest: noteData.isRest || false,
           x: boundingBox.getX() - 10,
           y: boundingBox.getY() - 10,
@@ -463,6 +464,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
           pitches: noteData.pitches || (noteData.pitch ? [noteData.pitch] : []),
           beat: noteData.beat || noteIdx,
           duration: noteData.duration || '4n',
+          dotted: noteData.dotted || false,  // Include dotted for beat calculations
           isRest: noteData.isRest || false,
           x: boundingBox.getX() - 10,
           y: boundingBox.getY() - 10,
@@ -764,8 +766,9 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     drawMeasureHighlight(activeMeasureIndex, 'rgba(255, 200, 0, 0.25)', false);
   }
 
-  // Selected measure (blue border) - only show when not playing
-  if (selectedMeasureIndex >= 0 && selectedMeasureIndex < measures.length && activeMeasureIndex < 0) {
+  // Selected measure (blue border) - always show, even during playback
+  // This helps users see which measure is selected independently of playback state
+  if (selectedMeasureIndex >= 0 && selectedMeasureIndex < measures.length) {
     drawMeasureHighlight(selectedMeasureIndex, 'rgba(59, 130, 246, 0.8)', true);
   }
 
@@ -782,8 +785,6 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     const x = dimensions.braceWidth + (measureInSystem * measureWidth) +
       (isFirstInSystem ? 0 : dimensions.firstMeasureExtra);
     const y = dimensions.trebleY + (systemIndex * dimensions.systemHeight);
-
-    // Adjust width for first measure
     const width = isFirstInSystem
       ? measureWidth + dimensions.firstMeasureExtra
       : measureWidth;

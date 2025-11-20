@@ -3656,9 +3656,9 @@ function attachCardEventListeners(wrapper, index) {
 
                 // Render notation immediately alongside playback
                 const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
-                if (melodyCanvas && window.renderChordProgressionStaff) {
+                if (melodyCanvas && window.refreshNotationFromProgression) {
                     requestAnimationFrame(() => {
-                        window.renderChordProgressionStaff(melodyCanvas);
+                        window.refreshNotationFromProgression();
                     });
                 }
             });
@@ -3694,11 +3694,10 @@ function attachCardEventListeners(wrapper, index) {
                     window.startProgressionChord(index);
                 }
 
-                // Render notation immediately alongside playback
-                const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
-                if (melodyCanvas && window.renderChordProgressionStaff) {
+                // Refresh notation immediately alongside playback
+                if (window.refreshNotationFromProgression) {
                     requestAnimationFrame(() => {
-                        window.renderChordProgressionStaff(melodyCanvas);
+                        window.refreshNotationFromProgression();
                     });
                 }
             }, { passive: true });
@@ -3725,11 +3724,10 @@ function attachCardEventListeners(wrapper, index) {
                 updateSingleCard(index);
                 updateTensionCurveIfVisible();
 
-                // Also update the Melody Composer's main staff notation
-                const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
-                if (melodyCanvas && window.renderChordProgressionStaff) {
+                // Also update the Melody Composer's notation
+                if (window.refreshNotationFromProgression) {
                     requestAnimationFrame(() => {
-                        window.renderChordProgressionStaff(melodyCanvas);
+                        window.refreshNotationFromProgression();
                     });
                 }
             }
@@ -4247,14 +4245,8 @@ function updateChordInversion(index, newInversion, shouldUpdateUI = true) {
     // Always update the grand staff notation (even from tooltip) since the chord notes changed
     requestAnimationFrame(() => {
         // Try enhanced notation system first (returns true if it rendered)
-        const result = window.refreshNotationFromProgression ? window.refreshNotationFromProgression() : false;
-        if (result) {
-            return;
-        }
-        // Fallback for old renderer
-        const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
-        if (melodyCanvas && window.renderChordProgressionStaff) {
-            window.renderChordProgressionStaff(melodyCanvas);
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
         }
     });
 }
@@ -4304,14 +4296,8 @@ function updateChordLHPattern(index, newLHPattern) {
 
     // Also update the grand staff notation
     requestAnimationFrame(() => {
-        // Try enhanced notation system first (returns true if it rendered)
-        if (window.refreshNotationFromProgression && window.refreshNotationFromProgression()) {
-            return;
-        }
-        // Fallback for old renderer
-        const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
-        if (melodyCanvas && window.renderChordProgressionStaff) {
-            window.renderChordProgressionStaff(melodyCanvas);
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
         }
     });
 
@@ -4390,14 +4376,8 @@ function updateRHOctaveShift(index, shift) {
 
     // Also update the grand staff notation
     requestAnimationFrame(() => {
-        // Try enhanced notation system first (returns true if it rendered)
-        if (window.refreshNotationFromProgression && window.refreshNotationFromProgression()) {
-            return;
-        }
-        // Fallback for old renderer
-        const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
-        if (melodyCanvas && window.renderChordProgressionStaff) {
-            window.renderChordProgressionStaff(melodyCanvas);
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
         }
     });
 
@@ -4449,14 +4429,8 @@ function updateLHOctaveShift(index, shift) {
 
     // Also update the grand staff notation
     requestAnimationFrame(() => {
-        // Try enhanced notation system first (returns true if it rendered)
-        if (window.refreshNotationFromProgression && window.refreshNotationFromProgression()) {
-            return;
-        }
-        // Fallback for old renderer
-        const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
-        if (melodyCanvas && window.renderChordProgressionStaff) {
-            window.renderChordProgressionStaff(melodyCanvas);
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
         }
     });
 
@@ -4502,14 +4476,8 @@ function updateLHInversion(index, newInversion) {
 
     // Also update the grand staff notation
     requestAnimationFrame(() => {
-        // Try enhanced notation system first (returns true if it rendered)
-        if (window.refreshNotationFromProgression && window.refreshNotationFromProgression()) {
-            return;
-        }
-        // Fallback for old renderer
-        const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
-        if (melodyCanvas && window.renderChordProgressionStaff) {
-            window.renderChordProgressionStaff(melodyCanvas);
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
         }
     });
 
@@ -5380,12 +5348,11 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             showActionButtons: true
         });
 
-        // Also update the Melody Composer's musical notation staff
-        const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
-        if (melodyCanvas && window.renderChordProgressionStaff) {
-            // Use requestAnimationFrame to ensure DOM is ready
+        // Also update the Melody Composer's notation
+        if (window.refreshNotationFromProgression) {
+            // Use requestAnimationFrame to ensure system is ready
             requestAnimationFrame(() => {
-                window.renderChordProgressionStaff(melodyCanvas);
+                window.refreshNotationFromProgression();
             });
         }
 
@@ -8439,19 +8406,11 @@ function renderMelodyNotationIfNeeded() {
             window.syncProgressionToMelodyComposer();
         }
 
-        // Get the canvas
-        const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
-        if (interactiveCanvas) {
+        // Refresh notation after updates
+        if (window.refreshNotationFromProgression) {
             // Use setTimeout to ensure DOM updates are complete
             setTimeout(() => {
-                // Always use renderInteractiveMelodyStaff for melody tab since it supports bass auto-fill
-                // renderChordProgressionStaff doesn't know about bass, so we avoid it
-                if (window.renderInteractiveMelodyStaff) {
-                    window.renderInteractiveMelodyStaff(interactiveCanvas);
-                } else if (window.renderChordProgressionStaff) {
-                    // Fallback only if renderInteractiveMelodyStaff doesn't exist
-                    window.renderChordProgressionStaff(interactiveCanvas);
-                }
+                window.refreshNotationFromProgression();
             }, 50);
         }
     }

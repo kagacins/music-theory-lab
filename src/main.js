@@ -19,6 +19,7 @@ window.GOOGLE_SEARCH_ENGINE_ID = '6233b4a886ca64ede';
 import { switchTab, refreshAllTabs } from './modules/ui/tabs.js';
 import { initAllSectionDragDrop } from './modules/ui/sectionDragDrop.js';
 import { initAllSectionSidebars, triggerSectionSidebarUpdate } from './modules/ui/sectionSidebar.js';
+import { initSuggestionsSidebarToggle, restoreSuggestionsSidebarState } from './modules/ui/suggestionsSidebarToggle.js';
 import { showModal, hideModal } from './modules/ui/modals.js';
 import { renderKeyboard, updateKeyboardLabels, updateKeyNames, clearHighlights, g_KeyboardKeys } from './modules/ui/keyboard.js';
 import { updateKeySignatureDisplay, setupResponsiveTitle } from './modules/ui/header.js';
@@ -199,8 +200,6 @@ import {
     setNoteDotted,
     getCurrentNoteDuration,
     getCurrentNoteDotted,
-    renderChordProgressionStaff,
-    renderInteractiveMelodyStaff,
     getInteractiveMelody,
     restoreInteractiveMelody,
     toggleInteractiveMode,
@@ -552,6 +551,51 @@ function toggleFretboard() {
     }
 }
 
+function toggleChordToneHighlighting() {
+    const toggle = document.getElementById('chord-tone-highlighting-toggle');
+    const enabled = toggle.checked;
+
+    // Update indicator colors
+    const offIndicator = document.getElementById('chord-tone-off-indicator');
+    const onIndicator = document.getElementById('chord-tone-on-indicator');
+
+    if (enabled) {
+        onIndicator.classList.remove('text-gray-500');
+        onIndicator.classList.add('text-indigo-300');
+        offIndicator.classList.remove('text-indigo-300');
+        offIndicator.classList.add('text-gray-500');
+    } else {
+        offIndicator.classList.remove('text-gray-500');
+        offIndicator.classList.add('text-indigo-300');
+        onIndicator.classList.remove('text-indigo-300');
+        onIndicator.classList.add('text-gray-500');
+    }
+
+    // Update CompositionState
+    try {
+        if (window.getCompositionState) {
+            const compositionState = window.getCompositionState();
+            compositionState.updateSettings({ highlightChordTones: enabled });
+        }
+    } catch (e) {
+        console.warn('Could not update CompositionState:', e);
+    }
+
+    // Save to localStorage
+    localStorage.setItem('chord-tone-highlighting', enabled.toString());
+
+    // Dispatch event for other components
+    document.dispatchEvent(new CustomEvent('chord-tone-highlighting-changed', {
+        detail: { enabled }
+    }));
+
+    // Re-render notation canvas
+    const canvas = document.getElementById('interactive-melody-notation-canvas');
+    if (canvas && window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
+    }
+}
+
 function toggleFloatingControls() {
     const panels = document.querySelectorAll('.floating-panel');
     const expandBtn = document.getElementById('expand-controls-btn');
@@ -899,6 +943,7 @@ window.toggleClassicKeyboard = toggleClassicKeyboard;
 window.toggleCompactControls = toggleCompactControls;
 window.toggleDarkMode = toggleDarkMode;
 window.toggleFretboard = toggleFretboard;
+window.toggleChordToneHighlighting = toggleChordToneHighlighting;
 window.toggleFloatingControls = toggleFloatingControls;
 window.toggleDisplayPanel = toggleDisplayPanel;
 window.handleOctaveRangeChange = handleOctaveRangeChange;
@@ -1726,8 +1771,6 @@ window.setNoteDuration = setNoteDuration;
 window.setNoteDotted = setNoteDotted;
 window.getCurrentNoteDuration = getCurrentNoteDuration;
 window.getCurrentNoteDotted = getCurrentNoteDotted;
-window.renderChordProgressionStaff = renderChordProgressionStaff;
-window.renderInteractiveMelodyStaff = renderInteractiveMelodyStaff;
 window.getInteractiveMelody = getInteractiveMelody;
 window.restoreInteractiveMelody = restoreInteractiveMelody;
 window.toggleInteractiveMode = toggleInteractiveMode;
@@ -1982,10 +2025,9 @@ window.showAutoHarmonize = function() {
                     window.restoreInteractiveMelody(savedMelodyNotes, savedMelodySettings);
                 }
 
-                // Final render - this must be the last render to show melody notes
-                const canvas = document.getElementById('interactive-melody-notation-canvas');
-                if (canvas && window.renderInteractiveMelodyStaff) {
-                    window.renderInteractiveMelodyStaff(canvas);
+                // Final render - refresh notation to show melody notes
+                if (window.refreshNotationFromProgression) {
+                    window.refreshNotationFromProgression();
                 }
             }, 400);
         },
@@ -2027,14 +2069,9 @@ window.setMelodyClef = setMelodyClef;
 window.setChordClef = setChordClef;
 window.toggleMelodyHighlight = function(enabled) {
     setHighlightEnabled(enabled);
-    // Re-render the canvas to show/hide highlighting
-    const canvas = document.getElementById('interactive-melody-notation-canvas');
-    if (canvas) {
-        if (window.isInteractiveMode && window.renderInteractiveMelodyStaff) {
-            window.renderInteractiveMelodyStaff(canvas);
-        } else if (window.renderChordProgressionStaff) {
-            window.renderChordProgressionStaff(canvas);
-        }
+    // Re-render the notation to show/hide highlighting
+    if (window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
     }
 };
 
@@ -2070,28 +2107,16 @@ window.toggleMelodyRecording = function(isRecording) {
                 const result = toggleInteractiveMode();
                 if (result) {
                     window.isInteractiveMode = true;
-                    // Render the staff with chord progression and any existing melody
-                    if (window.renderInteractiveMelodyStaff) {
-                        const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
-                        if (interactiveCanvas) {
-                            window.renderInteractiveMelodyStaff(interactiveCanvas);
-                        }
-                    } else if (window.renderChordProgressionStaff) {
-                        const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
-                        if (interactiveCanvas) {
-                            window.renderChordProgressionStaff(interactiveCanvas);
-                        }
+                    // Refresh notation with chord progression and any existing melody
+                    if (window.refreshNotationFromProgression) {
+                        window.refreshNotationFromProgression();
                     }
                 }
                 // Note: toggleInteractiveMode now always returns true for melody-first workflow
             } else {
-                // Already in interactive mode
-                // Re-render the staff
-                if (window.renderInteractiveMelodyStaff) {
-                    const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
-                    if (interactiveCanvas) {
-                        window.renderInteractiveMelodyStaff(interactiveCanvas);
-                    }
+                // Already in interactive mode - refresh notation
+                if (window.refreshNotationFromProgression) {
+                    window.refreshNotationFromProgression();
                 }
             }
         } catch (e) {
@@ -2109,12 +2134,9 @@ window.toggleMelodyRecording = function(isRecording) {
             toggleInteractiveMode();
             window.isInteractiveMode = false;
         }
-        // Still render the chord progression even when not recording
-        if (window.renderChordProgressionStaff) {
-            const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
-            if (interactiveCanvas) {
-                window.renderChordProgressionStaff(interactiveCanvas);
-            }
+        // Refresh notation to show chord progression
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
         }
     }
 };
@@ -2165,14 +2187,10 @@ window.toggleMelodyMode = function(isAIMode) {
             recordingToggleContainer.classList.remove('hidden');
         }
         // Note: Interactive mode will be enabled when user toggles recording
-        // We don't automatically enable it here
-        // But render the chord progression so user can see it
+        // Refresh notation so user can see chord progression
         setTimeout(() => {
-            if (window.renderChordProgressionStaff) {
-                const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
-                if (interactiveCanvas) {
-                    window.renderChordProgressionStaff(interactiveCanvas);
-                }
+            if (window.refreshNotationFromProgression) {
+                window.refreshNotationFromProgression();
             }
         }, 100);
     }
@@ -2288,6 +2306,50 @@ window.onload = () => {
     document.getElementById('key-names-toggle').checked = false;
     document.getElementById('classic-keyboard-toggle').checked = false;
     document.getElementById('compact-controls-toggle').checked = false;
+    
+    // Initialize chord tone highlighting toggle
+    const chordToneToggle = document.getElementById('chord-tone-highlighting-toggle');
+    if (chordToneToggle) {
+        // Get current setting from localStorage or CompositionState
+        let chordToneEnabled = true;
+        try {
+            if (window.getCompositionState) {
+                const compositionState = window.getCompositionState();
+                const settings = compositionState.getSettings();
+                chordToneEnabled = settings.highlightChordTones !== false;
+            } else {
+                const stored = localStorage.getItem('chord-tone-highlighting');
+                chordToneEnabled = stored !== 'false';
+            }
+        } catch (e) {
+            const stored = localStorage.getItem('chord-tone-highlighting');
+            chordToneEnabled = stored !== 'false';
+        }
+        chordToneToggle.checked = chordToneEnabled;
+        
+        // Update indicator colors
+        const offIndicator = document.getElementById('chord-tone-off-indicator');
+        const onIndicator = document.getElementById('chord-tone-on-indicator');
+        if (chordToneEnabled) {
+            if (onIndicator) {
+                onIndicator.classList.remove('text-gray-500');
+                onIndicator.classList.add('text-indigo-300');
+            }
+            if (offIndicator) {
+                offIndicator.classList.remove('text-indigo-300');
+                offIndicator.classList.add('text-gray-500');
+            }
+        } else {
+            if (offIndicator) {
+                offIndicator.classList.remove('text-gray-500');
+                offIndicator.classList.add('text-indigo-300');
+            }
+            if (onIndicator) {
+                onIndicator.classList.remove('text-indigo-300');
+                onIndicator.classList.add('text-gray-500');
+            }
+        }
+    }
 
     // Initialize melody mode toggle (default to Free mode - unchecked)
     const melodyModeToggle = document.getElementById('melody-mode-toggle');
@@ -2315,17 +2377,14 @@ window.onload = () => {
     const melodyRecordingToggle = document.getElementById('melody-recording-toggle');
     if (melodyRecordingToggle) {
         melodyRecordingToggle.checked = false; // Stop is default (unchecked)
-        // Render chord progression if in Free mode
+        // Refresh notation if in Free mode
         setTimeout(() => {
             const freeModeControls = document.getElementById('free-mode-controls');
             if (freeModeControls && !freeModeControls.classList.contains('hidden')) {
-                // Wait a bit longer to ensure canvas is rendered
+                // Wait a bit longer to ensure notation system is ready
                 setTimeout(() => {
-                    if (window.renderChordProgressionStaff) {
-                        const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
-                        if (interactiveCanvas) {
-                            window.renderChordProgressionStaff(interactiveCanvas);
-                        }
+                    if (window.refreshNotationFromProgression) {
+                        window.refreshNotationFromProgression();
                     }
                 }, 100);
             }
@@ -2510,6 +2569,8 @@ window.onload = () => {
     // This ensures the sidebar sees the restored states, not HTML defaults
     setTimeout(() => {
         initAllSectionSidebars();
+        // Initialize suggestions sidebar toggle after section sidebars are ready
+        initSuggestionsSidebarToggle();
     }, 200);
 
     // Setup responsive title abbreviation
@@ -3024,14 +3085,13 @@ window.toggleMelodyControlsPanel = function() {
             window.savePanelState('melody-controls-panel', !isHidden);
         }
         
-        // When panel is opened, render chord progression if in Free mode
+        // When panel is opened, refresh notation if in Free mode
         if (isHidden) {
             setTimeout(() => {
                 const freeModeControls = document.getElementById('free-mode-controls');
                 if (freeModeControls && !freeModeControls.classList.contains('hidden')) {
-                    const canvas = document.getElementById('interactive-melody-notation-canvas');
-                    if (canvas && window.renderChordProgressionStaff) {
-                        window.renderChordProgressionStaff(canvas);
+                    if (window.refreshNotationFromProgression) {
+                        window.refreshNotationFromProgression();
                     }
                 }
             }, 100);

@@ -12,6 +12,12 @@
     overflow: hidden;
     flex-shrink: 0; /* Prevent sidebar from shrinking in flex container */
     flex-grow: 0; /* Prevent sidebar from growing automatically */
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* Sidebar collapsed state */
+#chord-recommendations-sidebar.collapsed {
+    display: none;
 }
 
 /* ============================================
@@ -1228,4 +1234,24 @@
 
 .note-insert-feedback {
     animation: fadeInOut 1.5s ease forwards;
+}
+
+/* ============================================
+   Suggestions Sidebar Collapse/Expand Styles
+   ============================================ */
+
+/* Lightbulb icon in section sidebar for collapsed suggestions */
+[data-section-id="suggestions-sidebar"] {
+    background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+}
+
+[data-section-id="suggestions-sidebar"]:hover {
+    background: linear-gradient(135deg, #6d28d9 0%, #9333ea 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(124, 58, 237, 0.3);
+}
+
+/* Smooth transitions for melody content when sidebar collapses/expands */
+#tab-melody .flex.gap-4 {
+    transition: all 0.3s ease;
 }
