@@ -44,7 +44,7 @@ export const GRAND_STAFF_DEFAULTS = {
   measureWidth: 220,           // Width of each measure
   staffSpacing: 80,            // Vertical space between staves
   systemMarginTop: 20,         // Top margin for first system
-  systemMarginBottom: 60,      // Bottom margin (increased for 8vb labels below bass clef)
+  systemMarginBottom: 100,     // Bottom margin (increased for deep bass ledger lines below D3)
   braceWidth: 15,              // Width for the brace
   measurePadding: 10,          // Padding within measures
   clefWidth: 30,               // Width for clef
@@ -439,10 +439,12 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
           duration: noteData.duration || '4n',
           dotted: noteData.dotted || false,  // Include dotted for beat calculations
           isRest: noteData.isRest || false,
-          x: boundingBox.getX() - 10,
-          y: boundingBox.getY() - 10,
-          width: boundingBox.getW() + 20,
-          height: boundingBox.getH() + 20,
+          bounds: {
+            x: boundingBox.getX() - 10,
+            y: boundingBox.getY() - 10,
+            width: boundingBox.getW() + 20,
+            height: boundingBox.getH() + 20,
+          },
         });
       }
     } catch (e) {
@@ -466,10 +468,12 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
           duration: noteData.duration || '4n',
           dotted: noteData.dotted || false,  // Include dotted for beat calculations
           isRest: noteData.isRest || false,
-          x: boundingBox.getX() - 10,
-          y: boundingBox.getY() - 10,
-          width: boundingBox.getW() + 20,
-          height: boundingBox.getH() + 20,
+          bounds: {
+            x: boundingBox.getX() - 10,
+            y: boundingBox.getY() - 10,
+            width: boundingBox.getW() + 20,
+            height: boundingBox.getH() + 20,
+          },
         });
       }
     } catch (e) {
@@ -667,7 +671,7 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature) {
 export function renderGrandStaffSystem(container, measures, options = {}) {
   const VF = getVF();
   if (!VF || !measures) {
-    console.error('VexFlow not loaded or no measures provided');
+    console.error('[renderGrandStaffSystem] VexFlow not loaded or no measures provided');
     return null;
   }
 
@@ -1199,27 +1203,51 @@ export function convertToGrandStaffFormat(composerData) {
 
     // Add melody notes to treble
     if (melodyByMeasure[i]) {
-      measureData.trebleNotes = melodyByMeasure[i].map(note => ({
-        pitch: note.pitch || note,
-        duration: note.duration || '4n',
-        isRest: note.isRest || false,
-      }));
+      measureData.trebleNotes = melodyByMeasure[i]
+        .filter(note => {
+          // Keep rests
+          if (note.isRest) return true;
+          // For non-rests, require valid pitch
+          const pitch = note.pitch || note;
+          if (pitch && typeof pitch === 'string' && pitch.match(/^[A-G][#b]?\d+$/)) return true;
+          // Filter out notes with null/undefined pitch
+          return false;
+        })
+        .map(note => ({
+          pitch: note.pitch || note,
+          duration: note.duration || '4n',
+          isRest: note.isRest || false,
+        }));
     }
 
     // Add bass notes or chord voicing to bass
     if (bassNotes[i]) {
       // If we have explicit bass notes
       if (Array.isArray(bassNotes[i])) {
-        measureData.bassNotes = bassNotes[i].map(note => ({
-          pitch: note.pitch || note,
-          duration: note.duration || '1n',
-          isRest: note.isRest || false,
-        }));
+        measureData.bassNotes = bassNotes[i]
+          .filter(note => {
+            // Keep rests
+            if (note.isRest) return true;
+            // For non-rests, require valid pitch
+            const pitch = note.pitch || note;
+            if (pitch && typeof pitch === 'string' && pitch.match(/^[A-G][#b]?\d+$/)) return true;
+            // Filter out notes with null/undefined pitch
+            return false;
+          })
+          .map(note => ({
+            pitch: note.pitch || note,
+            duration: note.duration || '1n',
+            isRest: note.isRest || false,
+          }));
       } else {
-        measureData.bassNotes = [{
-          pitch: bassNotes[i],
-          duration: '1n',
-        }];
+        // Single bass note - validate before adding
+        const pitch = bassNotes[i];
+        if (pitch && typeof pitch === 'string' && pitch.match(/^[A-G][#b]?\d+$/)) {
+          measureData.bassNotes = [{
+            pitch: bassNotes[i],
+            duration: '1n',
+          }];
+        }
       }
     } else if (chords[i]) {
       // Convert chord to bass notes

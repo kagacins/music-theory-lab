@@ -3381,6 +3381,12 @@ function attachCardEventListeners(wrapper, index) {
                 chord.omittedNotes = [];
                 // Update checkboxes
                 noteCheckboxes.forEach(cb => cb.checked = true);
+
+                // Sync progressionData changes to notation display
+                if (window.syncNotationFromProgression) {
+                    window.syncNotationFromProgression();
+                }
+
                 // Play the chord
                 if (window.startProgressionChord && window.stopTrainerChord) {
                     window.startProgressionChord(index);
@@ -3399,6 +3405,11 @@ function attachCardEventListeners(wrapper, index) {
                 chord.omittedNotes = [...chord.notes];
                 // Update checkboxes
                 noteCheckboxes.forEach(cb => cb.checked = false);
+
+                // Sync progressionData changes to notation display
+                if (window.syncNotationFromProgression) {
+                    window.syncNotationFromProgression();
+                }
             }
         });
     }
@@ -3638,13 +3649,13 @@ function attachCardEventListeners(wrapper, index) {
 
         // Tooltip inversion buttons - hold to play
         tooltipInversionBtns.forEach(btn => {
-            // Mousedown - start playing chord and render notation immediately
+            // Mousedown - start playing chord WITHOUT syncing notation (to prevent flicker)
             btn.addEventListener('mousedown', (e) => {
                 e.stopPropagation();
                 const inversion = parseInt(btn.getAttribute('data-inversion'));
 
-                // Update the chord inversion (but don't update UI to prevent tooltip closing)
-                updateChordInversion(index, inversion, false);
+                // Update the chord inversion - skip UI update AND notation sync to prevent flicker
+                updateChordInversion(index, inversion, false, false);
 
                 // Update button highlighting
                 updateInversionButtonHighlight(inversion);
@@ -3653,28 +3664,28 @@ function attachCardEventListeners(wrapper, index) {
                 if (window.startProgressionChord) {
                     window.startProgressionChord(index);
                 }
-
-                // Render notation immediately alongside playback
-                const melodyCanvas = document.getElementById('interactive-melody-notation-canvas');
-                if (melodyCanvas && window.refreshNotationFromProgression) {
-                    requestAnimationFrame(() => {
-                        window.refreshNotationFromProgression();
-                    });
-                }
             });
 
-            // Mouseup - stop playing chord
+            // Mouseup - stop playing chord AND sync notation now
             btn.addEventListener('mouseup', (e) => {
                 e.stopPropagation();
                 if (window.stopTrainerChord) {
                     window.stopTrainerChord();
                 }
+                // Sync notation now that user has released the button
+                if (window.syncNotationFromProgression) {
+                    window.syncNotationFromProgression();
+                }
             });
 
-            // Mouseleave - stop playing if user drags off button
+            // Mouseleave - stop playing if user drags off button AND sync notation
             btn.addEventListener('mouseleave', (e) => {
                 if (window.stopTrainerChord) {
                     window.stopTrainerChord();
+                }
+                // Sync notation when user leaves the button
+                if (window.syncNotationFromProgression) {
+                    window.syncNotationFromProgression();
                 }
             });
 
@@ -3727,6 +3738,11 @@ function attachCardEventListeners(wrapper, index) {
                 // Also update the Melody Composer's notation
                 if (window.refreshNotationFromProgression) {
                     requestAnimationFrame(() => {
+                        // Sync progression to compositionState first
+                        if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
+                            window.syncProgressionToMelodyComposer();
+                        }
+                        // Then refresh the notation rendering
                         window.refreshNotationFromProgression();
                     });
                 }
@@ -3989,6 +4005,26 @@ function getVoicingOptions(currentVoicing) {
 }
 
 /**
+ * Refresh only the chord notation canvas in a detailed card (without rebuilding HTML)
+ * @param {number} index - Chord index
+ * @param {object} chord - Chord data
+ */
+function refreshChordNotationCanvas(index, chord) {
+    const trainerState = getTrainerState();
+    const key = trainerState.currentKey || 'C';
+
+    // Find the canvas in the detailed card for this chord
+    const wrapper = document.querySelector(`.chord-card-wrapper[data-chord-index="${index}"]`);
+    if (!wrapper) return;
+
+    const canvas = wrapper.querySelector('.chord-notation-canvas');
+    if (canvas) {
+        // Re-render the chord notation with updated data
+        renderChordNotation(chord, key, canvas);
+    }
+}
+
+/**
  * Helper: Update a single card without re-rendering everything
  */
 function updateSingleCard(index) {
@@ -4173,6 +4209,15 @@ function updateChordType(index, newType) {
     updateSingleCard(index);
     updateTensionCurveIfVisible();
 
+    // Update the grand staff notation
+    requestAnimationFrame(() => {
+        // Sync progressionData changes to notation display
+        if (window.syncNotationFromProgression) {
+            
+            window.syncNotationFromProgression();
+        }
+    });
+
     // Play the chord with the new type
     const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
     const rhOctaveShift = chord.octaveShift || 0;
@@ -4196,7 +4241,7 @@ function updateChordType(index, newType) {
 /**
  * Update chord inversion from simplified view
  */
-function updateChordInversion(index, newInversion, shouldUpdateUI = true) {
+function updateChordInversion(index, newInversion, shouldUpdateUI = true, shouldSyncNotation = true) {
     const trainerState = getTrainerState();
     const chord = trainerState.progressionData[index];
     chord.inversion = newInversion;
@@ -4242,13 +4287,15 @@ function updateChordInversion(index, newInversion, shouldUpdateUI = true) {
         updateTensionCurveIfVisible();
     }
 
-    // Always update the grand staff notation (even from tooltip) since the chord notes changed
-    requestAnimationFrame(() => {
-        // Try enhanced notation system first (returns true if it rendered)
-        if (window.refreshNotationFromProgression) {
-            window.refreshNotationFromProgression();
-        }
-    });
+    // Update the grand staff notation - skip if called from tooltip buttons (will sync on mouseup)
+    if (shouldSyncNotation) {
+        requestAnimationFrame(() => {
+            // Sync progressionData changes to notation display
+            if (window.syncNotationFromProgression) {
+                window.syncNotationFromProgression();
+            }
+        });
+    }
 }
 
 /**
@@ -4296,8 +4343,10 @@ function updateChordLHPattern(index, newLHPattern) {
 
     // Also update the grand staff notation
     requestAnimationFrame(() => {
-        if (window.refreshNotationFromProgression) {
-            window.refreshNotationFromProgression();
+        // Sync progressionData changes to notation display
+        if (window.syncNotationFromProgression) {
+            
+            window.syncNotationFromProgression();
         }
     });
 
@@ -4376,8 +4425,10 @@ function updateRHOctaveShift(index, shift) {
 
     // Also update the grand staff notation
     requestAnimationFrame(() => {
-        if (window.refreshNotationFromProgression) {
-            window.refreshNotationFromProgression();
+        // Sync progressionData changes to notation display
+        if (window.syncNotationFromProgression) {
+            
+            window.syncNotationFromProgression();
         }
     });
 
@@ -4429,8 +4480,10 @@ function updateLHOctaveShift(index, shift) {
 
     // Also update the grand staff notation
     requestAnimationFrame(() => {
-        if (window.refreshNotationFromProgression) {
-            window.refreshNotationFromProgression();
+        // Sync progressionData changes to notation display
+        if (window.syncNotationFromProgression) {
+            
+            window.syncNotationFromProgression();
         }
     });
 
@@ -4476,8 +4529,10 @@ function updateLHInversion(index, newInversion) {
 
     // Also update the grand staff notation
     requestAnimationFrame(() => {
-        if (window.refreshNotationFromProgression) {
-            window.refreshNotationFromProgression();
+        // Sync progressionData changes to notation display
+        if (window.syncNotationFromProgression) {
+            
+            window.syncNotationFromProgression();
         }
     });
 
@@ -4503,6 +4558,26 @@ function toggleLHNote(index, note) {
 
     // Save state
     saveState({ type: 'chord-update', data: { index, property: 'lhOmittedNotes', value: chord.lhOmittedNotes } });
+
+    // Update the grand staff notation
+    requestAnimationFrame(() => {
+        // Sync progression to compositionState first
+        if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
+            window.syncProgressionToMelodyComposer();
+        }
+        // Then refresh the notation rendering
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
+        }
+    });
+
+    // Play the chord with the new LH voicing
+    const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
+    const lhNotes = (chord.lhNotes || []).filter(n => !chord.lhOmittedNotes.includes(n));
+    const allNotes = voicedNotes.concat(lhNotes);
+    if (allNotes.length > 0) {
+        playTrainerChordOnce(allNotes);
+    }
 }
 
 /**
@@ -4692,6 +4767,20 @@ function initializeSimplifiedSortable(container) {
                 // Re-render both views (this will recalculate shifts properly)
                 renderProgressionDisplay('progression-visualization', true);
                 renderProgressionDisplay('melody-progression-visualization', false);
+
+                // Update grand staff notation (chord order affects rendering)
+                console.log('[ProgressionBuilder-Simplified] Drag/drop completed, refreshing notation...');
+                // Sync progression to compositionState first
+                if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
+                    window.syncProgressionToMelodyComposer();
+                }
+                // Then refresh the notation rendering
+                if (window.refreshNotationFromProgression) {
+                    const result = window.refreshNotationFromProgression();
+                    console.log('[ProgressionBuilder-Simplified] Notation refresh result:', result);
+                } else {
+                    console.warn('[ProgressionBuilder-Simplified] window.refreshNotationFromProgression not available');
+                }
             }
         }
     });
@@ -5352,6 +5441,11 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         if (window.refreshNotationFromProgression) {
             // Use requestAnimationFrame to ensure system is ready
             requestAnimationFrame(() => {
+                // Sync progression to compositionState first
+                if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
+                    window.syncProgressionToMelodyComposer();
+                }
+                // Then refresh the notation rendering
                 window.refreshNotationFromProgression();
             });
         }
@@ -6485,11 +6579,21 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
                     }
                     
                     // Re-render the other tab to keep them in sync
-                    const otherContainerId = containerId === 'progression-visualization' 
-                        ? 'melody-progression-visualization' 
+                    const otherContainerId = containerId === 'progression-visualization'
+                        ? 'melody-progression-visualization'
                         : 'progression-visualization';
                     renderProgressionDisplay(otherContainerId, false);
-                    
+
+                    // Update grand staff notation (chord order affects rendering)
+                    // Always update regardless of active tab so it's ready when user switches
+                    console.log('[ProgressionBuilder] Drag/drop completed, refreshing notation...');
+                    if (window.refreshNotationFromProgression) {
+                        const result = window.refreshNotationFromProgression();
+                        console.log('[ProgressionBuilder] Notation refresh result:', result);
+                    } else {
+                        console.warn('[ProgressionBuilder] window.refreshNotationFromProgression not available');
+                    }
+
                     // Re-render melody notation if needed (chord order affects melody rendering)
                     renderMelodyNotationIfNeeded();
                 }
@@ -8391,6 +8495,10 @@ function renderMelodyNotationIfNeeded() {
     // Only render if on Melody tab or if Free mode is active
     if (isMelodyTab || isFreeModeActive) {
         // Phase 4.4: Use enhanced notation system if available
+        // Sync progression to compositionState first
+        if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
+            window.syncProgressionToMelodyComposer();
+        }
         // refreshNotationFromProgression returns true if it rendered, false otherwise
         if (window.refreshNotationFromProgression) {
             const result = window.refreshNotationFromProgression();
@@ -8543,9 +8651,6 @@ export function toggleProgressionNote(chordIndex, note) {
         chordData.omittedNotes.push(note); // Note was played, so omit it
     }
 
-    // Skip ALL re-rendering to avoid blinking - checkbox state is already correct in DOM
-    // The UI will update when user makes other changes (type, inversion, etc.)
-
     // Play chord with duration after voicing change
     const voicedNotes = chordData.notes.filter(n => !chordData.omittedNotes.includes(n));
     const lhNotes = getLHNotes(
@@ -8558,13 +8663,20 @@ export function toggleProgressionNote(chordIndex, note) {
         getEnharmonicPreference()
     ).filter(n => !(chordData.lhOmittedNotes || []).includes(n));
     const allNotes = voicedNotes.concat(lhNotes);
+
     if (allNotes.length > 0) {
         playTrainerChordOnce(allNotes);
     }
 
-    // Auto-render melody notation if on Melody Composer tab or if Free mode is active
-    // This needs to happen after re-rendering the progression display
-    renderMelodyNotationIfNeeded();
+    // Update the chord notation canvas in the detailed card AND bass clef
+    requestAnimationFrame(() => {
+        refreshChordNotationCanvas(chordIndex, chordData);
+
+        // Sync progressionData changes to notation display
+        if (window.syncNotationFromProgression) {
+            window.syncNotationFromProgression();
+        }
+    });
 }
 
 /**
@@ -8609,10 +8721,16 @@ export function toggleProgressionLHNote(chordIndex, note) {
     if (allNotes.length > 0) {
         playTrainerChordOnce(allNotes);
     }
-    
-    // Auto-render melody notation if on Melody Composer tab or if Free mode is active
-    // This needs to happen after re-rendering the progression display
-    renderMelodyNotationIfNeeded();
+
+    // Update the chord notation canvas in the detailed card AND bass clef
+    requestAnimationFrame(() => {
+        refreshChordNotationCanvas(chordIndex, chordData);
+
+        // Sync progressionData changes to notation display
+        if (window.syncNotationFromProgression) {
+            window.syncNotationFromProgression();
+        }
+    });
 }
 
 /**

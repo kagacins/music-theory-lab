@@ -63,11 +63,17 @@ export class NotationComposer {
     this.selectedMeasure = null;
     this.selectedStaff = null;
     this.selectedNote = null;
+    this.pendingRenderFrame = null;  // requestAnimationFrame ID for debouncing renders
+    this.lastRenderTime = 0;  // Timestamp of last render for debouncing
 
     // Highlighting state
     this.selectedMeasureIndex = -1;   // Blue border for selected measure
     this.activeMeasureIndex = -1;     // Yellow background for playing measure
     this.activeNotes = new Set();     // Note IDs for red highlighting during playback
+
+    // Re-entrancy guards to prevent infinite loops
+    this.isSyncingFromProgression = false;
+    this.isHandlingSync = false;
 
     // Event handlers
     this.onUpdate = options.onUpdate || (() => {});
@@ -109,17 +115,37 @@ export class NotationComposer {
     }
 
     // Subscribe to composition state changes
+    // NOTE: We do NOT listen to chordChanged - it causes cascading sync issues
+    // Instead, chord update functions call window.syncNotationFromProgression() directly
     if (this.compositionState) {
-      this.compositionState.events.on('chordChanged', () => this.render());
       this.compositionState.events.on('noteAdded', () => this.render());
       this.compositionState.events.on('noteRemoved', () => this.render());
       this.compositionState.events.on('measureAdded', () => this.render());
       this.compositionState.events.on('measureRemoved', () => this.render());
-      // When bass is updated, we need to re-sync from compositionState to get the new bass data
-      this.compositionState.events.on('bassUpdated', () => {
-        this.syncFromProgression();
-      });
+      // When bass is updated by compositionState directly, re-render
+      this.compositionState.events.on('bassUpdated', () => this.render());
     }
+
+    // Expose a single sync function that chord updates should call
+    // This replaces the automatic chordChanged event listener
+    window.syncNotationFromProgression = () => {
+      if (this.isHandlingSync) {
+        console.log('[ComposerIntegration] Preventing re-entrant sync');
+        return;
+      }
+      this.isHandlingSync = true;
+      try {
+        console.log('[ComposerIntegration] Syncing notation from progression');
+        // Step 1: Sync progressionData → compositionState
+        if (window.syncProgressionToMelodyComposer) {
+          window.syncProgressionToMelodyComposer();
+        }
+        // Step 2: Sync compositionState → display
+        this.syncFromProgression();
+      } finally {
+        this.isHandlingSync = false;
+      }
+    };
 
     // Listen for chord tone highlighting changes
     document.addEventListener('chord-tone-highlighting-changed', (e) => {
@@ -134,7 +160,6 @@ export class NotationComposer {
       // Debounce resize events
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
-        console.log('[NotationComposer] Window resized, invalidating layout');
         this.layoutManager.invalidate();
         this.render();
       }, 100);
@@ -231,34 +256,32 @@ export class NotationComposer {
       // Convert treble clef notes from notation voices
       const trebleVoices = measure.notation.treble.voices;
       if (trebleVoices && trebleVoices[0] && trebleVoices[0].notes.length > 0) {
-        measureData.trebleNotes = trebleVoices[0].notes.map(note => ({
-          pitch: note.pitch,
-          pitches: note.pitches,
-          duration: note.duration || '4n',
-          isRest: note.isRest || false,
-          dotted: note.dotted || false,
-          accidental: note.accidental || null,
-        }));
-      } else {
-        // Fallback: Check interactiveMelody for melody notes in this measure
-        const interactiveMelody = getInteractiveMelody();
-        if (interactiveMelody && interactiveMelody.melodyNotes) {
-          const melodyNotesInMeasure = interactiveMelody.melodyNotes.filter(
-            note => note.measure === i
-          );
-          if (melodyNotesInMeasure.length > 0) {
-            measureData.trebleNotes = melodyNotesInMeasure.map((note, index) => ({
-              pitch: note.pitch,
-              duration: note.duration || '4n',
-              isRest: note.type === 'rest',
-              dotted: note.dotted || false,
-              accidental: note.accidental || null,
-              // Include beat for note ID matching during red highlighting
-              beat: typeof note.beat === 'number' ? note.beat : index,
-            }));
-          }
-        }
+        measureData.trebleNotes = trebleVoices[0].notes
+          .filter(note => {
+            // Keep rests
+            if (note.isRest) return true;
+            // For non-rests, require valid pitch or pitches array
+            if (note.pitches && Array.isArray(note.pitches) && note.pitches.length > 0) return true;
+            if (note.pitch && typeof note.pitch === 'string' && note.pitch.match(/^[A-G][#b]?\d+$/)) return true;
+            // Filter out notes with null/undefined pitch
+            return false;
+          })
+          .map(note => ({
+            pitch: note.pitch,
+            pitches: note.pitches,
+            duration: note.duration || '4n',
+            isRest: note.isRest || false,
+            dotted: note.dotted || false,
+            accidental: note.accidental || null,
+          }));
       }
+      // NOTE: Fallback to interactiveMelody.melodyNotes REMOVED
+      // This was causing deleted notes to reappear because keyboard recording
+      // adds to both interactiveMelody.melodyNotes (legacy) and compositionState (new).
+      // Now we ONLY read from compositionState to ensure consistent behavior between
+      // Alt+Click and keyboard recording.
+      // The interactiveMelody.melodyNotes array is still used for playback and other
+      // legacy features, but NOT for rendering.
 
       // Convert bass clef notes from notation voices
       const bassVoices = measure.notation.bass.voices;
@@ -342,16 +365,29 @@ export class NotationComposer {
    * Sync from progression data
    */
   syncFromProgression() {
-    console.log('[ComposerIntegration] syncFromProgression called');
-    console.trace('[ComposerIntegration] Call stack:');
-    const progressionData = getProgressionData();
-    const currentKey = getCurrentKey();
-
-    if (!progressionData || progressionData.length === 0) {
-      // Render empty state instead of just returning
-      this.renderEmptyState();
+    // Guard against re-entrant calls to prevent infinite loops
+    if (this.isSyncingFromProgression) {
+      console.log('[ComposerIntegration] Blocking re-entrant syncFromProgression call');
       return;
     }
+
+    // Cancel any pending render since we're doing a full sync
+    if (this.pendingRenderFrame) {
+      cancelAnimationFrame(this.pendingRenderFrame);
+      this.pendingRenderFrame = null;
+    }
+
+    this.isSyncingFromProgression = true;
+
+    try {
+      const progressionData = getProgressionData();
+      const currentKey = getCurrentKey();
+
+      if (!progressionData || progressionData.length === 0) {
+        // Render empty state instead of just returning
+        this.renderEmptyState();
+        return;
+      }
 
     // Check if auto-generate bass is enabled
     const autoGenerateBass = this.compositionState
@@ -362,40 +398,34 @@ export class NotationComposer {
       : 'whole-note';
 
     // Preserve manually added notes before clearing
+    // CRITICAL FIX: Preserve by CHORD ID, not by index, so notes stay with the right chord after drag/drop
     const existingMeasures = this.measureManager.getAllMeasures();
-    console.log('[ComposerIntegration] Existing measures before sync:', existingMeasures.length);
-    existingMeasures.forEach((m, i) => {
-      console.log(`  Measure ${i}: treble=${m.trebleNotes?.length || 0} notes, bass=${m.bassNotes?.length || 0} notes, isAutoGeneratedMelody=${m.isAutoGeneratedMelody}, isAutoGeneratedBass=${m.isAutoGeneratedBass}`);
-    });
 
-    const manualTrebleNotes = existingMeasures.map((measure, index) => {
-      // Preserve treble notes if:
-      // 1. The measure has treble notes, AND
-      // 2. It's NOT explicitly marked as auto-generated (could be false or undefined from manual edits)
+    // Create a Map of chord key -> notes
+    const manualTrebleNotesByChord = new Map();
+    const manualBassNotesByChord = new Map();
+
+    existingMeasures.forEach((measure, index) => {
+      if (!measure.chord) return;
+
+      // Create unique chord key
+      const chordKey = `${measure.chord.root}-${measure.chord.type}`;
+
+      // Preserve treble notes if manually added
       const hasTrebleNotes = measure.trebleNotes && measure.trebleNotes.length > 0;
-      const isNotAutoGenerated = measure.isAutoGeneratedMelody !== true;
+      const isNotAutoGeneratedTreble = measure.isAutoGeneratedMelody !== true;
 
-      console.log(`[ComposerIntegration] Measure ${index}: hasTrebleNotes=${hasTrebleNotes}, isAutoGeneratedMelody=${measure.isAutoGeneratedMelody}, isNotAutoGenerated=${isNotAutoGenerated}`);
-
-      if (hasTrebleNotes && isNotAutoGenerated) {
-        console.log('[ComposerIntegration] Preserving manual treble notes for measure', index, ':', measure.trebleNotes);
-        return [...measure.trebleNotes]; // Clone the array
+      if (hasTrebleNotes && isNotAutoGeneratedTreble) {
+        manualTrebleNotesByChord.set(chordKey, [...measure.trebleNotes]);
       }
-      return null;
-    });
 
-    const manualBassNotes = existingMeasures.map((measure, index) => {
-      // Preserve bass notes if:
-      // 1. The measure has bass notes, AND
-      // 2. It's NOT explicitly marked as auto-generated
+      // Preserve bass notes if manually added
       const hasBassNotes = measure.bassNotes && measure.bassNotes.length > 0;
-      const isNotAutoGenerated = measure.isAutoGeneratedBass !== true;
+      const isNotAutoGeneratedBass = measure.isAutoGeneratedBass !== true;
 
-      if (hasBassNotes && isNotAutoGenerated) {
-        console.log('[ComposerIntegration] Preserving manual bass notes for measure', index, ':', measure.bassNotes);
-        return [...measure.bassNotes]; // Clone the array
+      if (hasBassNotes && isNotAutoGeneratedBass) {
+        manualBassNotesByChord.set(chordKey, [...measure.bassNotes]);
       }
-      return null;
     });
 
     // Clear and rebuild measure manager
@@ -404,6 +434,58 @@ export class NotationComposer {
     for (let i = 0; i < progressionData.length; i++) {
       const chord = progressionData[i];
       const previousChord = i > 0 ? progressionData[i - 1] : null;
+
+      // CRITICAL: Update compositionState chord data so bass regenerates when properties change
+      if (this.compositionState) {
+        // Ensure measure exists in compositionState
+        while (this.compositionState.getMeasureCount() <= i) {
+          this.compositionState.addMeasure({});
+        }
+
+        // Update the chord in compositionState with ALL properties from progression
+        this.compositionState.updateChord(i, {
+          root: chord.root,
+          type: chord.type,
+          notes: chord.notes || [],
+          inversion: chord.inversion || 0,
+          voicing: chord.voicing || 'close',
+          roman: chord.roman || null,
+          name: chord.name || null,
+          // These properties affect bass rendering:
+          octaveShift: chord.octaveShift || 0,
+          lhOctaveShift: chord.lhOctaveShift || 0,
+          omittedNotes: chord.omittedNotes || [],
+          lhOmittedNotes: chord.lhOmittedNotes || [],
+        });
+
+        // Handle bass generation based on toggle setting:
+        const measure = this.compositionState.getMeasure(i);
+        const bassWasAutoGenerated = measure?.notation?.bass?.autoGenerated;
+        const hasManualBass = measure?.notation?.bass?.voices[0]?.notes?.length > 0 && !bassWasAutoGenerated;
+
+        if (autoGenerateBass) {
+          // Auto-generate is ON: generate pattern-based bass
+          this.compositionState.updateBassFromChord(i);
+          console.log('[ComposerIntegration] Generated pattern-based bass for measure', i, '(autoGen ON)');
+        } else if (!hasManualBass) {
+          // Auto-generate is OFF and no manual bass: create simple whole-note chord bass
+          if (measure && measure.notation && measure.notation.bass && chord.notes && chord.notes.length > 0) {
+            const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
+            if (voicedNotes.length > 0) {
+              measure.notation.bass.voices[0].notes = [{
+                type: 'note',
+                pitches: [...voicedNotes],
+                duration: '1n',
+                beat: 0,
+                dotted: false
+              }];
+              measure.notation.bass.autoGenerated = false;
+              console.log('[ComposerIntegration] Created simple chord bass for measure', i, '(autoGen OFF)');
+            }
+          }
+        }
+        // If bass was manual, leave it alone
+      }
 
       const measureData = {
         trebleNotes: [],
@@ -480,24 +562,72 @@ export class NotationComposer {
         }
       }
 
-      // Restore manually added treble notes if they existed before sync
-      if (manualTrebleNotes[i]) {
-        measureData.trebleNotes = manualTrebleNotes[i];
-        measureData.isAutoGeneratedMelody = false;
-        console.log('[ComposerIntegration] Restored manual treble notes for measure', i, ':', manualTrebleNotes[i].length, 'notes');
+      // CRITICAL: Read treble notes from compositionState (where keyboard recording and Alt+Click put them)
+      // This must happen BEFORE restoring from chord key map
+      let hasCompositionStateData = false;
+      if (this.compositionState && this.compositionState.getMeasureCount() > i) {
+        const stateMeasure = this.compositionState.getMeasure(i);
+        if (stateMeasure && stateMeasure.notation && stateMeasure.notation.treble) {
+          const trebleVoices = stateMeasure.notation.treble.voices;
+          if (trebleVoices && trebleVoices[0] && trebleVoices[0].notes) {
+            // CompositionState HAS data for this measure (even if empty array)
+            hasCompositionStateData = true;
+
+            // Use treble notes from compositionState (trust empty array if user deleted all notes)
+            measureData.trebleNotes = trebleVoices[0].notes
+              .filter(note => {
+                // Keep rests
+                if (note.type === 'rest' || note.isRest) return true;
+                // For non-rests, require valid pitch or pitches array
+                if (note.pitches && Array.isArray(note.pitches) && note.pitches.length > 0) return true;
+                if (note.pitch && typeof note.pitch === 'string' && note.pitch.match(/^[A-G][#b]?\d+$/)) return true;
+                // Filter out notes with null/undefined pitch
+                return false;
+              })
+              .map(note => ({
+                pitch: note.pitch,
+                pitches: note.pitches,
+                duration: note.duration || '4n',
+                dotted: note.dotted || false,
+                accidental: note.accidental || null,
+                beat: note.beat || 0,
+              }));
+            measureData.isAutoGeneratedMelody = stateMeasure.notation.treble.autoGenerated || false;
+          }
+        }
       }
 
-      // Restore manually added bass notes if they existed before sync
-      if (manualBassNotes[i]) {
-        measureData.bassNotes = manualBassNotes[i];
-        measureData.isAutoGeneratedBass = false;
-        console.log('[ComposerIntegration] Restored manual bass notes for measure', i, ':', manualBassNotes[i].length, 'notes');
+      // Fallback: Restore manually added notes by CHORD KEY (not index) ONLY if compositionState has no data
+      // This ensures notes stay with the correct chord after drag/drop reordering
+      const chordKey = `${chord.root}-${chord.type}`;
+
+      // Only restore from preserved map if compositionState doesn't have data for this measure
+      // If compositionState has an empty array, trust it (user deleted all notes)
+      if (!hasCompositionStateData) {
+        const preservedTrebleNotes = manualTrebleNotesByChord.get(chordKey);
+        if (preservedTrebleNotes) {
+          measureData.trebleNotes = preservedTrebleNotes;
+          measureData.isAutoGeneratedMelody = false;
+        }
+      }
+
+      // Only restore bass from preserved map if we didn't find bass in compositionState
+      if (!foundBassInState) {
+        const preservedBassNotes = manualBassNotesByChord.get(chordKey);
+        if (preservedBassNotes) {
+          measureData.bassNotes = preservedBassNotes;
+          measureData.isAutoGeneratedBass = false;
+        }
       }
 
       this.measureManager.addMeasure(null, measureData);
     }
 
     this.render();
+    } finally {
+      // Always reset the flag, even if there's an error
+      this.isSyncingFromProgression = false;
+    }
   }
 
   // ============================================================================
@@ -506,23 +636,83 @@ export class NotationComposer {
 
   /**
    * Render the notation
+   * Immediately renders but uses debouncing to prevent excessive renders
    */
   render() {
+    console.log('[ComposerIntegration.render] Called');
+
     if (!this.config.container) {
+      console.log('[ComposerIntegration.render] No container, skipping render');
       return;
     }
 
-    console.log('[ComposerIntegration] render() called');
+    // Debounce rapid renders using a timestamp check
+    const now = Date.now();
+    if (this.lastRenderTime && (now - this.lastRenderTime) < 16) { // ~60fps limit
+      // Too soon since last render, schedule for next frame
+      if (this.pendingRenderFrame) {
+        cancelAnimationFrame(this.pendingRenderFrame);
+      }
+      this.pendingRenderFrame = requestAnimationFrame(() => {
+        this.pendingRenderFrame = null;
+        this.render(); // Recursive call will execute if enough time has passed
+      });
+      return;
+    }
 
-    // Get measures to render
-    // ALWAYS use measureManager for rendering - it has the freshest data from syncFromProgression
-    // compositionState is synced by melodyComposerBridge and may have stale data
-    const measures = this.measureManager.getAllMeasures();
+    this.lastRenderTime = now;
+    this.performRender();
+  }
 
-    console.log('[ComposerIntegration] Measures from measureManager:', measures.length);
-    measures.forEach((m, i) => {
-      console.log(`  Measure ${i}: treble=${m.trebleNotes?.length || 0} notes, bass=${m.bassNotes?.length || 0} notes, isAutoGeneratedMelody=${m.isAutoGeneratedMelody}`);
-    });
+  /**
+   * Actually perform the rendering
+   */
+  performRender() {
+    // Check if container is still in the DOM
+    const isInDOM = document.body.contains(this.config.container);
+
+    if (!isInDOM) {
+      console.warn('[ComposerIntegration] Container not in DOM, re-acquiring...');
+      const newContainer = document.getElementById(this.config.container.id);
+      if (newContainer) {
+        this.config.container = newContainer;
+      } else {
+        console.error('[ComposerIntegration] Could not re-acquire container!');
+        return;
+      }
+    }
+
+    // Get measures to render from compositionState (single source of truth)
+    // Convert from compositionState format to renderGrandStaffSystem format
+    const measures = this.compositionState && this.compositionState.measures.length > 0
+      ? this.compositionState.measures.map(m => ({
+          trebleNotes: m.notation.treble.voices[0].notes
+            .filter(note => note.type !== 'rest')
+            .map(note => ({
+              pitch: note.pitch,
+              pitches: note.pitches,
+              duration: note.duration || '4n',
+              dotted: note.dotted || false,
+              accidental: note.accidental || null,
+              beat: note.beat || 0,
+            })),
+          bassNotes: m.notation.bass.voices[0].notes
+            .filter(note => note.type !== 'rest')
+            .map(note => ({
+              pitch: note.pitch,
+              pitches: note.pitches,
+              duration: note.duration || '4n',
+              beat: note.beat || 0,
+            })),
+          keySignature: m.keySignature || this.compositionState.metadata.key,
+          timeSignature: m.timeSignature
+            ? `${m.timeSignature.num}/${m.timeSignature.denom}`
+            : '4/4',
+          chord: m.chord,
+          isAutoGeneratedMelody: m.notation.treble.autoGenerated || false,
+          isAutoGeneratedBass: m.notation.bass.autoGenerated || false,
+        }))
+      : this.measureManager.getAllMeasures(); // Fallback if compositionState not ready
 
     if (measures.length === 0) {
       // Render empty state
@@ -530,41 +720,13 @@ export class NotationComposer {
       return;
     }
 
-    // Add melody notes from interactiveMelody to treble clef ONLY if:
-    // 1. The measure has no treble notes at all, OR
-    // 2. The measure only has auto-generated content (not manually edited)
-    const interactiveMelody = getInteractiveMelody();
-    if (interactiveMelody && interactiveMelody.melodyNotes) {
-      measures.forEach((measure, i) => {
-        // Skip measures that have manually added notes
-        // Only populate from interactiveMelody if:
-        // - Measure has no treble notes, OR
-        // - Measure only has auto-generated melody (not manually edited)
-        const hasManualNotes = measure.trebleNotes && measure.trebleNotes.length > 0 && !measure.isAutoGeneratedMelody;
-
-        if (hasManualNotes) {
-          console.log('[ComposerIntegration] Measure', i, 'has manual notes, skipping interactiveMelody override');
-        }
-
-        if (!hasManualNotes) {
-          const melodyNotesInMeasure = interactiveMelody.melodyNotes.filter(
-            note => note.measure === i
-          );
-          if (melodyNotesInMeasure.length > 0) {
-            measure.trebleNotes = melodyNotesInMeasure.map((note, index) => ({
-              pitch: note.pitch,
-              duration: note.duration || '4n',
-              isRest: note.type === 'rest',
-              dotted: note.dotted || false,
-              accidental: note.accidental || null,
-              // Include beat for note ID matching during red highlighting
-              beat: typeof note.beat === 'number' ? note.beat : index,
-            }));
-            measure.isAutoGeneratedMelody = true; // Mark as auto-generated
-          }
-        }
-      });
-    }
+    // NOTE: Fallback to populate from interactiveMelody.melodyNotes REMOVED
+    // This was causing deleted notes to reappear because keyboard recording
+    // adds to both interactiveMelody.melodyNotes (legacy) and compositionState (new).
+    // Now we ONLY read from compositionState to ensure consistent behavior between
+    // Alt+Click and keyboard recording.
+    // The interactiveMelody.melodyNotes array is still used for playback and other
+    // legacy features, but NOT for rendering.
 
     // Get key signature
     const key = this.compositionState
@@ -613,6 +775,12 @@ export class NotationComposer {
         this.measureManager.canUndo(),
         this.measureManager.canRedo()
       );
+    }
+
+    // Force browser repaint by triggering a reflow
+    // This ensures the canvas actually displays the new rendering
+    if (this.config.container) {
+      void this.config.container.offsetHeight;
     }
 
     // Notify listeners
@@ -672,7 +840,6 @@ export class NotationComposer {
     container.addEventListener('mousedown', (e) => {
       // Only handle if Alt is NOT held (to avoid conflict with note editor)
       if (e.altKey) {
-        console.log('[NotationComposer] Mousedown with Alt, skipping');
         return;
       }
 
@@ -681,18 +848,13 @@ export class NotationComposer {
       const y = e.clientY - rect.top;
       const position = this.layoutManager.getStaffPositionAtPoint(x, y);
 
-      console.log('[NotationComposer] Mousedown:', { x, y, position: position?.measure?.index });
-
       if (position && position.measure) {
         this.mouseDownTime = Date.now();
         this.mouseDownMeasure = position.measure.index;
 
-        console.log('[NotationComposer] Starting hold timer for measure:', position.measure.index);
-
         // Start a timer - if held for 200ms, start playback
         this.holdTimer = setTimeout(() => {
           if (this.mouseDownMeasure !== null) {
-            console.log('[NotationComposer] Hold timer fired, playing measure:', this.mouseDownMeasure);
             playMeasure(this.mouseDownMeasure);
           }
         }, 200);
@@ -707,11 +869,8 @@ export class NotationComposer {
       // Calculate how long the mouse was held
       const elapsedTime = this.mouseDownTime ? (Date.now() - this.mouseDownTime) : 0;
 
-      console.log('[NotationComposer] Mouseup, elapsed time:', elapsedTime);
-
       // Clear hold timer if it hasn't fired yet
       if (this.holdTimer) {
-        console.log('[NotationComposer] Clearing hold timer (quick click)');
         clearTimeout(this.holdTimer);
         this.holdTimer = null;
       }
@@ -719,10 +878,7 @@ export class NotationComposer {
       // If it was a quick click (< 200ms), handle as measure selection
       // If held >= 200ms, playback already started, don't select
       if (elapsedTime < 200) {
-        console.log('[NotationComposer] Quick click, selecting measure');
         this.handleClick(e);
-      } else {
-        console.log('[NotationComposer] Hold detected, playback already started');
       }
 
       this.mouseDownTime = null;
@@ -765,8 +921,6 @@ export class NotationComposer {
 
       // Update selectedMeasureIndex for highlighting (blue border)
       this.setSelectedMeasure(position.measure.index);
-
-      console.log('[NotationComposer] Measure selected:', position.measure.index);
 
       this.onSelectionChange({
         measure: this.selectedMeasure,
@@ -892,14 +1046,17 @@ export class NotationComposer {
     // Check if mouse is over any note region (uses actual VexFlow bounding boxes)
     let hoveredRegion = null;
     for (const region of this.noteRegions) {
-      if (
-        x >= region.x &&
-        x <= region.x + region.width &&
-        y >= region.y &&
-        y <= region.y + region.height
-      ) {
-        hoveredRegion = region;
-        break;
+      if (region.bounds) {
+        const { x: rx, y: ry, width, height } = region.bounds;
+        if (
+          x >= rx &&
+          x <= rx + width &&
+          y >= ry &&
+          y <= ry + height
+        ) {
+          hoveredRegion = region;
+          break;
+        }
       }
     }
 

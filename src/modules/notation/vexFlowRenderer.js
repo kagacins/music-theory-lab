@@ -365,25 +365,31 @@ export function applyOctaveShift(noteStr, shift) {
  * @returns {Object} - { renderer, context }
  */
 export function createRenderer(container, width, height) {
+  console.log('[createRenderer] Called with container:', container?.tagName, container?.id, 'size:', width, 'x', height);
+
   const VF = getVF();
   if (!VF) {
-    console.error('VexFlow not loaded');
+    console.error('[createRenderer] VexFlow not loaded');
     return null;
   }
 
   // Clear existing content
   if (container.tagName === 'CANVAS') {
+    console.log('[createRenderer] Container is CANVAS, clearing and resizing');
     const ctx = container.getContext('2d');
     ctx.clearRect(0, 0, container.width, container.height);
     container.width = width;
     container.height = height;
   } else {
+    console.log('[createRenderer] Container is not CANVAS, clearing innerHTML');
     container.innerHTML = '';
   }
 
   const renderer = new VF.Renderer(container, VF.Renderer.Backends.CANVAS);
   renderer.resize(width, height);
   const context = renderer.getContext();
+
+  console.log('[createRenderer] Renderer created successfully');
 
   return { renderer, context };
 }

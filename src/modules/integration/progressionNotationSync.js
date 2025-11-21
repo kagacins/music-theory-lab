@@ -85,7 +85,7 @@ export class ProgressionNotationSync {
                 });
             }
 
-            // Update the chord data
+            // Update the chord data - preserve omittedNotes and other user selections
             progressionData[measureIndex] = {
                 ...progressionData[measureIndex],
                 root: chord.root,
@@ -95,8 +95,12 @@ export class ProgressionNotationSync {
                 name: chord.name,
                 notes: chord.notes || [],
                 selectionMode: 'chord',
-                omittedNotes: [],
-                octaveShift: 0
+                omittedNotes: chord.omittedNotes || [],
+                lhOmittedNotes: chord.lhOmittedNotes || [],
+                octaveShift: chord.octaveShift || 0,
+                lhOctaveShift: chord.lhOctaveShift || 0,
+                lhType: chord.lhType || 'auto',
+                lhInversion: chord.lhInversion || 0,
             };
 
             // Update the progression data in state
@@ -106,8 +110,6 @@ export class ProgressionNotationSync {
             if (window.refreshProgressionDisplay) {
                 window.refreshProgressionDisplay();
             }
-
-            console.log(`[Sync] Updated progression at measure ${measureIndex}:`, chord.name);
         } finally {
             this.isUpdating = false;
         }
@@ -133,8 +135,12 @@ export class ProgressionNotationSync {
                 name: measure.chord.name,
                 notes: measure.chord.notes || [],
                 selectionMode: 'chord',
-                omittedNotes: [],
-                octaveShift: 0
+                omittedNotes: measure.chord.omittedNotes || [],
+                lhOmittedNotes: measure.chord.lhOmittedNotes || [],
+                octaveShift: measure.chord.octaveShift || 0,
+                lhOctaveShift: measure.chord.lhOctaveShift || 0,
+                lhType: measure.chord.lhType || 'auto',
+                lhInversion: measure.chord.lhInversion || 0,
             };
 
             // Insert at the correct position
@@ -145,8 +151,6 @@ export class ProgressionNotationSync {
             if (window.refreshProgressionDisplay) {
                 window.refreshProgressionDisplay();
             }
-
-            console.log(`[Sync] Added measure ${measureIndex} to progression`);
         } finally {
             this.isUpdating = false;
         }
@@ -170,8 +174,6 @@ export class ProgressionNotationSync {
                 if (window.refreshProgressionDisplay) {
                     window.refreshProgressionDisplay();
                 }
-
-                console.log(`[Sync] Removed measure ${measureIndex} from progression`);
             }
         } finally {
             this.isUpdating = false;
@@ -194,8 +196,6 @@ export class ProgressionNotationSync {
             this.composition.importFromProgressionData(progressionData, {
                 key: currentKey
             });
-
-            console.log(`[Sync] Imported ${progressionData.length} chords from progression to notation`);
         } finally {
             this.isUpdating = false;
         }
@@ -216,8 +216,6 @@ export class ProgressionNotationSync {
             if (window.refreshProgressionDisplay) {
                 window.refreshProgressionDisplay();
             }
-
-            console.log(`[Sync] Exported ${progressionData.length} chords from notation to progression`);
         } finally {
             this.isUpdating = false;
         }

@@ -359,8 +359,12 @@ export class CompositionState {
             name: measure.chord.name,
             notes: measure.chord.notes,
             selectionMode: 'chord',
-            omittedNotes: [],
-            octaveShift: 0
+            omittedNotes: measure.chord.omittedNotes || [],
+            lhOmittedNotes: measure.chord.lhOmittedNotes || [],
+            octaveShift: measure.chord.octaveShift || 0,
+            lhOctaveShift: measure.chord.lhOctaveShift || 0,
+            lhType: measure.chord.lhType || 'auto',
+            lhInversion: measure.chord.lhInversion || 0
         }));
     }
 
@@ -509,6 +513,179 @@ export class CompositionState {
         if (data.settings) this.settings = { ...data.settings };
 
         this.events.emit('loaded', data);
+    }
+
+    // ========================================================================
+    // Helper Methods for Playback (replaces legacy interactiveMelody.melodyNotes)
+    // ========================================================================
+
+    /**
+     * Get all melody notes across all measures
+     * @returns {Array} All treble clef notes with measure and beat info
+     */
+    getAllMelodyNotes() {
+        const allNotes = [];
+        this.measures.forEach((measure, measureIndex) => {
+            const trebleNotes = measure.notation.treble.voices[0].notes || [];
+            trebleNotes.forEach((note, noteIndex) => {
+                allNotes.push({
+                    ...note,
+                    measure: measureIndex,
+                    noteIndex: noteIndex,
+                    beat: note.beat || 0
+                });
+            });
+        });
+        return allNotes;
+    }
+
+    /**
+     * Get all bass notes across all measures
+     * @returns {Array} All bass clef notes with measure and beat info
+     */
+    getAllBassNotes() {
+        const allNotes = [];
+        this.measures.forEach((measure, measureIndex) => {
+            const bassNotes = measure.notation.bass.voices[0].notes || [];
+            bassNotes.forEach((note, noteIndex) => {
+                allNotes.push({
+                    ...note,
+                    measure: measureIndex,
+                    noteIndex: noteIndex,
+                    beat: note.beat || 0
+                });
+            });
+        });
+        return allNotes;
+    }
+
+    /**
+     * Get melody notes in a specific measure
+     * @param {number} measureIndex - Measure index
+     * @returns {Array} Notes in the measure
+     */
+    getMelodyNotesInMeasure(measureIndex) {
+        const measure = this.getMeasure(measureIndex);
+        if (!measure) return [];
+        return measure.notation.treble.voices[0].notes || [];
+    }
+
+    /**
+     * Get bass notes in a specific measure
+     * @param {number} measureIndex - Measure index
+     * @returns {Array} Notes in the measure
+     */
+    getBassNotesInMeasure(measureIndex) {
+        const measure = this.getMeasure(measureIndex);
+        if (!measure) return [];
+        return measure.notation.bass.voices[0].notes || [];
+    }
+
+    /**
+     * Get notes on a specific beat within a measure
+     * @param {number} measureIndex - Measure index
+     * @param {number} beat - Beat number
+     * @param {string} staff - 'treble' or 'bass' (default: 'treble')
+     * @returns {Array} Notes on that beat
+     */
+    getNotesByBeat(measureIndex, beat, staff = 'treble') {
+        const measure = this.getMeasure(measureIndex);
+        if (!measure) return [];
+
+        const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+        const notes = measure.notation[voiceKey].voices[0].notes || [];
+
+        return notes.filter(note => {
+            const noteBeat = note.beat || 0;
+            return Math.abs(noteBeat - beat) < 0.001; // Float comparison tolerance
+        });
+    }
+
+    /**
+     * Search backward for the last effective dynamic marking
+     * Used for dynamic inheritance (pp, p, mp, mf, f, ff, etc.)
+     * @param {number} measureIndex - Current measure index
+     * @param {number} noteIndexInMeasure - Current note index within measure
+     * @param {string} staff - 'treble' or 'bass' (default: 'treble')
+     * @returns {string|null} Last dynamic marking or null
+     */
+    getEffectiveDynamicUpTo(measureIndex, noteIndexInMeasure, staff = 'treble') {
+        // Search backward in current measure
+        const measure = this.getMeasure(measureIndex);
+        if (measure) {
+            const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+            const notes = measure.notation[voiceKey].voices[0].notes || [];
+
+            for (let i = noteIndexInMeasure; i >= 0; i--) {
+                if (notes[i]?.dynamic) {
+                    return notes[i].dynamic;
+                }
+            }
+        }
+
+        // Search backward through previous measures
+        for (let m = measureIndex - 1; m >= 0; m--) {
+            const prevMeasure = this.getMeasure(m);
+            if (prevMeasure) {
+                const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+                const notes = prevMeasure.notation[voiceKey].voices[0].notes || [];
+
+                for (let i = notes.length - 1; i >= 0; i--) {
+                    if (notes[i]?.dynamic) {
+                        return notes[i].dynamic;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Check if composition has any melody notes
+     * @returns {boolean} True if there are any treble notes
+     */
+    hasMelodyNotes() {
+        return this.getAllMelodyNotes().length > 0;
+    }
+
+    /**
+     * Check if composition has any bass notes
+     * @returns {boolean} True if there are any bass notes
+     */
+    hasBassNotes() {
+        return this.getAllBassNotes().length > 0;
+    }
+
+    /**
+     * Get the last note in the composition (for "delete last note" functionality)
+     * @param {string} staff - 'treble' or 'bass' (default: 'treble')
+     * @returns {Object|null} Last note with measure/noteIndex info, or null
+     */
+    getLastNote(staff = 'treble') {
+        const allNotes = staff === 'treble' ? this.getAllMelodyNotes() : this.getAllBassNotes();
+        return allNotes.length > 0 ? allNotes[allNotes.length - 1] : null;
+    }
+
+    /**
+     * Delete the last note in the composition
+     * @param {string} staff - 'treble' or 'bass' (default: 'treble')
+     * @returns {Object|null} The deleted note, or null if no notes exist
+     */
+    deleteLastNote(staff = 'treble') {
+        const lastNote = this.getLastNote(staff);
+        if (!lastNote) return null;
+
+        const measure = this.getMeasure(lastNote.measure);
+        if (measure) {
+            const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+            const notes = measure.notation[voiceKey].voices[0].notes;
+            const deleted = notes.splice(lastNote.noteIndex, 1)[0];
+            this.events.emit('noteDeleted', { measureIndex: lastNote.measure, staff, noteIndex: lastNote.noteIndex });
+            return deleted;
+        }
+
+        return null;
     }
 }
 

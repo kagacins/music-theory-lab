@@ -96,8 +96,16 @@ function getChordNotesInBassRegister(chord) {
         return [`${chord.root}2`, `${chord.root}3`];
     }
 
+    // Filter out omitted notes before processing
+    const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
+
+    // If all notes are omitted, use root as fallback
+    if (voicedNotes.length === 0) {
+        return [`${chord.root}2`, `${chord.root}3`];
+    }
+
     // Remove octave numbers and add bass octaves
-    const noteNames = chord.notes.map(note => note.replace(/\d+$/, ''));
+    const noteNames = voicedNotes.map(note => note.replace(/\d+$/, ''));
     const uniqueNotes = [...new Set(noteNames)]; // Remove duplicates
 
     // Create bass register versions

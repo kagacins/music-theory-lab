@@ -12,6 +12,7 @@
 import { StaffLayoutManager, pitchToLine } from './staffLayouter.js';
 import { noteToMidi, midiToNote } from './vexFlowRenderer.js';
 import { analyzeChordTone, CHORD_TONE_COLORS } from '../analysis/chordToneAnalyzer.js';
+import { getPiano } from '../audio/audioEngine.js';
 
 // ============================================================================
 // CONSTANTS
@@ -56,6 +57,9 @@ export class NoteEditor {
 
     // Layout manager reference
     this.layoutManager = options.layoutManager || new StaffLayoutManager();
+
+    // Composer integration reference (for selected measure)
+    this.composerIntegration = options.composerIntegration || null;
 
     // State
     this.state = EDITOR_STATES.IDLE;
@@ -151,39 +155,45 @@ export class NoteEditor {
     const position = this.getCanvasPosition(e);
     const staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
 
-    // If Alt key is NOT held, allow ALL clicks to bubble through to measure selection/playback handlers
-    // This allows regular clicks to select/play measures, while Alt+Click adds notes
-    if (!e.altKey) {
-      return; // Don't prevent default, let event bubble to measure handlers
+    // Check if clicking on an existing note FIRST (before checking Alt key)
+    const clickedNote = this.findNoteAtPosition(position.x, position.y);
+
+    if (clickedNote) {
+      // Clicking on a note - handle selection (works with or without Alt)
+      e.stopPropagation();
+      e.preventDefault();
+
+      if (e.shiftKey) {
+        // Shift+Click = add to selection
+        this.toggleNoteSelection(clickedNote.id);
+      } else if (e.altKey && this.selectedNotes.has(clickedNote.id)) {
+        // Alt+Click on selected note(s) = start dragging
+        this.startDrag(position, staffPosition);
+      } else {
+        // Regular click = select this note only
+        this.clearSelection();
+        this.selectNote(clickedNote.id);
+      }
+      return;
     }
 
-    // Alt is held - this is note editing mode
+    // Not clicking on a note - check if we're in note addition mode (Alt held)
+    if (!e.altKey) {
+      // No Alt key, not clicking on note = let event bubble to measure selection/playback
+      return;
+    }
+
+    // Alt is held and not clicking on a note - this is note addition mode
     // Only proceed if clicking on a valid staff position
     if (!staffPosition || !staffPosition.staff) {
       return;
     }
 
-    // Prevent event from bubbling to measure selection handlers (only when Alt+Click for note editing)
+    // Prevent event from bubbling to measure selection handlers
     e.stopPropagation();
     e.preventDefault();
 
-    // Check if clicking on an existing note
-    const clickedNote = this.findNoteAtPosition(position.x, position.y);
-
-    if (clickedNote) {
-      // Start selection or drag
-      if (e.shiftKey) {
-        // Add to selection
-        this.toggleNoteSelection(clickedNote.id);
-      } else if (this.selectedNotes.has(clickedNote.id)) {
-        // Start dragging selected notes
-        this.startDrag(position, staffPosition);
-      } else {
-        // Select this note only
-        this.clearSelection();
-        this.selectNote(clickedNote.id);
-      }
-    } else if (staffPosition.pitch) {
+    if (staffPosition.pitch) {
       // Check if Shift is held and there's a note at same time position to add pitch to (polyphony)
       if (e.shiftKey && this.canAddPitchToNearbyNote(staffPosition)) {
         this.addPitchToNearbyNote(staffPosition);
@@ -314,6 +324,12 @@ export class NoteEditor {
       }
     }
 
+    // Play selected notes (Space or P key)
+    if ((e.key === ' ' || e.key === 'p' || e.key === 'P') && this.selectedNotes.size > 0) {
+      e.preventDefault();
+      this.playSelectedNotes();
+    }
+
     // Select all (Ctrl+A)
     if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
       e.preventDefault();
@@ -415,28 +431,134 @@ export class NoteEditor {
    * @param {Object} staffPosition - Staff position data
    */
   addNoteAtPosition(staffPosition) {
-    if (!staffPosition.pitch || !staffPosition.measure) return;
-
-    // Check if adding this note would exceed measure capacity
-    if (!this.canAddNoteToBeat(staffPosition.measure.index, staffPosition.staff, this.currentDuration, this.isDotted)) {
-      console.warn('[NoteEditor] Cannot add note - measure is full (4/4 time = 4 beats max)');
-      // TODO: Show visual feedback to user (maybe flash the measure red?)
+    if (!staffPosition.pitch) {
       return;
     }
 
-    const noteData = {
-      pitch: staffPosition.pitch,
-      duration: this.currentDuration,
-      isRest: this.isRestMode,
-      dotted: this.isDotted,
-      accidental: this.currentAccidental,
-    };
+    // Get the currently selected measure
+    const selectedMeasureIndex = this.composerIntegration?.getSelectedMeasure() ?? -1;
 
-    this.onNoteAdd({
-      measureIndex: staffPosition.measure.index,
-      staff: staffPosition.staff,
-      note: noteData,
-    });
+    // If no measure is selected, fall back to the clicked measure
+    const targetMeasureIndex = selectedMeasureIndex >= 0
+      ? selectedMeasureIndex
+      : (staffPosition.measure?.index ?? 0);
+
+    // Use the staff from staffPosition
+    const staff = staffPosition.staff;
+
+    console.log('[NoteEditor] Adding note to selected measure:', targetMeasureIndex, 'staff:', staff);
+
+    // Calculate beats for this note
+    const noteBeats = this.durationToBeats(this.currentDuration, this.isDotted);
+    const remainingBeats = this.getRemainingBeats(targetMeasureIndex, staff);
+
+    console.log('[NoteEditor] Note beats:', noteBeats, 'Remaining beats:', remainingBeats);
+
+    // If the note fits completely, add it normally
+    if (noteBeats <= remainingBeats) {
+      const beatPosition = this.getCurrentBeat(targetMeasureIndex, staff);
+
+      const noteData = {
+        type: this.isRestMode ? 'rest' : 'note',
+        pitch: staffPosition.pitch,
+        duration: this.currentDuration,
+        isRest: this.isRestMode,
+        dotted: this.isDotted,
+        accidental: this.currentAccidental,
+        beat: beatPosition,
+      };
+
+      this.onNoteAdd({
+        measureIndex: targetMeasureIndex,
+        staff: staff,
+        note: noteData,
+      });
+
+      // Check if measure is now full
+      const newRemainingBeats = this.getRemainingBeats(targetMeasureIndex, staff);
+      if (newRemainingBeats <= 0.001) {
+        this.autoAdvanceMeasure(targetMeasureIndex);
+      }
+
+      return;
+    }
+
+    // Note doesn't fit - split it across measures with ties
+    console.log('[NoteEditor] Note too long, splitting across measures');
+
+    // Add first part to fill current measure
+    if (remainingBeats > 0) {
+      const beatPosition = this.getCurrentBeat(targetMeasureIndex, staff);
+      const firstPartDuration = this.beatsToDuration(remainingBeats);
+      const firstPartNote = {
+        type: this.isRestMode ? 'rest' : 'note',
+        pitch: staffPosition.pitch,
+        duration: firstPartDuration.duration,
+        isRest: this.isRestMode,
+        dotted: firstPartDuration.dotted,
+        accidental: this.currentAccidental,
+        tie: 'start', // Mark as start of tie
+        beat: beatPosition,
+      };
+
+      this.onNoteAdd({
+        measureIndex: targetMeasureIndex,
+        staff: staff,
+        note: firstPartNote,
+      });
+    }
+
+    // Calculate remaining beats for next measure
+    let remainingNoteBeats = noteBeats - remainingBeats;
+    let currentMeasureIndex = targetMeasureIndex + 1;
+
+    // Add tied notes to subsequent measures
+    while (remainingNoteBeats > 0.001) {
+      const beatsToAdd = Math.min(remainingNoteBeats, 4); // Max 4 beats per measure
+      const tiedDuration = this.beatsToDuration(beatsToAdd);
+      const beatPosition = this.getCurrentBeat(currentMeasureIndex, staff);
+
+      const tiedNote = {
+        type: this.isRestMode ? 'rest' : 'note',
+        pitch: staffPosition.pitch,
+        duration: tiedDuration.duration,
+        isRest: this.isRestMode,
+        dotted: tiedDuration.dotted,
+        accidental: null, // No accidental on tied notes
+        tie: remainingNoteBeats - beatsToAdd > 0.001 ? 'continue' : 'end',
+        beat: beatPosition,
+      };
+
+      this.onNoteAdd({
+        measureIndex: currentMeasureIndex,
+        staff: staff,
+        note: tiedNote,
+      });
+
+      remainingNoteBeats -= beatsToAdd;
+      currentMeasureIndex++;
+    }
+
+    // Auto-advance to the last measure we added to
+    this.autoAdvanceMeasure(currentMeasureIndex - 1);
+  }
+
+  /**
+   * Auto-advance measure selection to next measure
+   * @param {number} currentMeasureIndex - Current measure index
+   */
+  autoAdvanceMeasure(currentMeasureIndex) {
+    if (!this.composerIntegration) return;
+
+    const nextMeasureIndex = currentMeasureIndex + 1;
+
+    // Check if next measure exists
+    const measureCount = this.composerIntegration.compositionState?.getMeasureCount() || 0;
+
+    if (nextMeasureIndex < measureCount) {
+      console.log('[NoteEditor] Auto-advancing to measure:', nextMeasureIndex);
+      this.composerIntegration.setSelectedMeasure(nextMeasureIndex);
+    }
   }
 
   /**
@@ -487,6 +609,60 @@ export class NoteEditor {
     }
 
     this.clearSelection();
+  }
+
+  /**
+   * Play selected notes with audio playback
+   */
+  playSelectedNotes() {
+    const piano = getPiano();
+    if (!piano) {
+      console.warn('[NoteEditor] Piano sampler not loaded');
+      return;
+    }
+
+    // Get note data for all selected notes
+    const notesToPlay = [];
+    for (const noteId of this.selectedNotes) {
+      const region = this.noteRegions.find(r => {
+        const regionId = this.createNoteId(r.measureIndex, r.staff, r.noteIndex);
+        return regionId === noteId;
+      });
+
+      if (region && !region.isRest) {
+        // Handle chords (multiple pitches) or single notes
+        const pitches = region.pitches || (region.pitch ? [region.pitch] : []);
+        const duration = region.duration || '4n';
+
+        notesToPlay.push({
+          pitches,
+          duration,
+          measureIndex: region.measureIndex,
+        });
+      }
+    }
+
+    if (notesToPlay.length === 0) {
+      return;
+    }
+
+    // Sort by measure index to play in order
+    notesToPlay.sort((a, b) => a.measureIndex - b.measureIndex);
+
+    // Play notes sequentially with Tone.js Transport
+    const now = window.Tone.now();
+    let currentTime = now;
+
+    notesToPlay.forEach((note) => {
+      // Play each pitch in the chord simultaneously
+      note.pitches.forEach((pitch) => {
+        piano.triggerAttackRelease(pitch, note.duration, currentTime);
+      });
+
+      // Advance time for next note (convert duration to seconds)
+      const durationSeconds = window.Tone.Time(note.duration).toSeconds();
+      currentTime += durationSeconds;
+    });
   }
 
   /**
@@ -710,6 +886,86 @@ export class NoteEditor {
     return totalBeats <= maxBeats;
   }
 
+  /**
+   * Get remaining beats in a measure
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @returns {number} - Remaining beats
+   */
+  getRemainingBeats(measureIndex, staff) {
+    const maxBeats = 4; // 4/4 time
+    const usedBeats = this.getMeasureBeatsUsed(measureIndex, staff);
+    return maxBeats - usedBeats;
+  }
+
+  /**
+   * Get current beat position in a measure (where next note would be added)
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @returns {number} - Beat position (0-4 for 4/4 time)
+   */
+  getCurrentBeat(measureIndex, staff) {
+    return 4 - this.getRemainingBeats(measureIndex, staff);
+  }
+
+  /**
+   * Convert beats to closest duration string
+   * @param {number} beats - Number of beats
+   * @returns {Object} - {duration, dotted}
+   */
+  beatsToDuration(beats) {
+    // Map beats to durations (with dotted variants)
+    const durationMap = [
+      { beats: 4, duration: '1n', dotted: false },
+      { beats: 3, duration: '2n', dotted: true },
+      { beats: 2, duration: '2n', dotted: false },
+      { beats: 1.5, duration: '4n', dotted: true },
+      { beats: 1, duration: '4n', dotted: false },
+      { beats: 0.75, duration: '8n', dotted: true },
+      { beats: 0.5, duration: '8n', dotted: false },
+      { beats: 0.375, duration: '16n', dotted: true },
+      { beats: 0.25, duration: '16n', dotted: false },
+      { beats: 0.125, duration: '32n', dotted: false },
+    ];
+
+    // Find exact match or closest smaller duration
+    for (const entry of durationMap) {
+      if (Math.abs(entry.beats - beats) < 0.001) {
+        return { duration: entry.duration, dotted: entry.dotted };
+      }
+    }
+
+    // If no exact match, return closest smaller
+    for (const entry of durationMap) {
+      if (entry.beats <= beats) {
+        return { duration: entry.duration, dotted: entry.dotted };
+      }
+    }
+
+    // Fallback
+    return { duration: '4n', dotted: false };
+  }
+
+  /**
+   * Convert duration to beats
+   * @param {string} duration - Duration like '4n', '8n', etc.
+   * @param {boolean} dotted - Whether the note is dotted
+   * @returns {number} - Number of beats
+   */
+  durationToBeats(duration, dotted = false) {
+    const baseDurations = {
+      '1n': 4,
+      '2n': 2,
+      '4n': 1,
+      '8n': 0.5,
+      '16n': 0.25,
+      '32n': 0.125,
+    };
+
+    const baseBeats = baseDurations[duration] || 1;
+    return dotted ? baseBeats * 1.5 : baseBeats;
+  }
+
   // ============================================================================
   // GHOST NOTE PREVIEW
   // ============================================================================
@@ -733,9 +989,11 @@ export class NoteEditor {
     ];
 
     const bassPitches = [
+      // Very low ledger lines below bass staff
+      'C1', 'D1', 'E1', 'F1', 'G1', 'A1', 'B1',
       // Below staff ledger lines
       'C2', 'D2', 'E2', 'F2',
-      // Staff lines (G2 = bottom line)
+      // Staff lines (G2 = bottom line, now at index 11)
       'G2', 'A2', 'B2', 'C3', 'D3', 'E3', 'F3', 'G3', 'A3', 'B3',
       // Above staff ledger lines
       'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5',
@@ -757,8 +1015,9 @@ export class NoteEditor {
       return 0;
     }
 
-    // Convert index to line number (index 4 = bottom line)
-    return index - 4;
+    // Convert index to line number (treble: index 4 = bottom line, bass: index 11 = bottom line)
+    const bottomLineIndex = staff === 'treble' ? 4 : 11;
+    return index - bottomLineIndex;
   }
 
   /**

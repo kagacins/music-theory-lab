@@ -251,12 +251,15 @@ export class StaffLayoutManager {
       return null;
     }
 
+    // Add extra vertical tolerance for deep bass notes below the staff
+    const verticalTolerance = 80; // Allow clicks well below bass staff for C2, D2, etc.
+
     for (const [index, bounds] of this.measureBounds) {
       if (
         realX >= bounds.x &&
         realX <= bounds.x + bounds.width &&
         realY >= bounds.y &&
-        realY <= bounds.y + bounds.height
+        realY <= bounds.y + bounds.height + verticalTolerance
       ) {
         return bounds;
       }
@@ -297,12 +300,18 @@ export class StaffLayoutManager {
     // Middle point between staves to determine which staff the mouse is closer to
     const middleY = (trebleBottom + bassTop) / 2;
 
-    if (realY <= middleY) {
-      // Closer to treble staff
+    // Force bass staff for anything at or below the bass staff position
+    // This ensures deep bass notes (C2, D2, etc.) are always detected as bass
+    if (realY >= bassY) {
+      // At or below bass staff top line - always bass
+      staff = 'bass';
+      staffY = bassY;
+    } else if (realY <= middleY) {
+      // Above middle - treble staff
       staff = 'treble';
       staffY = trebleY;
     } else {
-      // Closer to bass staff
+      // Between middle and bass staff - bass
       staff = 'bass';
       staffY = bassY;
     }
@@ -424,18 +433,21 @@ function lineToPitch(line, staff) {
   ];
 
   const bassPitches = [
+    // Very low ledger lines below bass staff
+    'C1', 'D1', 'E1', 'F1', 'G1', 'A1', 'B1',
     // Below staff ledger lines
     'C2', 'D2', 'E2', 'F2',
-    // Staff lines (G2 = bottom line)
+    // Staff lines (G2 = bottom line, now at index 11)
     'G2', 'A2', 'B2', 'C3', 'D3', 'E3', 'F3', 'G3', 'A3', 'B3',
     // Above staff ledger lines
     'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5',
   ];
 
   // Adjust for staff lines
-  // Treble: bottom line (E4) = index 4, Bass: bottom line (G2) = index 4
+  // Treble: bottom line (E4) = index 4, Bass: bottom line (G2) = index 11
   const pitches = staff === 'treble' ? treblePitches : bassPitches;
-  const adjustedIndex = line + 4; // Bottom line is at index 4
+  const bottomLineIndex = staff === 'treble' ? 4 : 11;
+  const adjustedIndex = line + bottomLineIndex;
 
   if (adjustedIndex < 0 || adjustedIndex >= pitches.length) {
     // Ledger line - calculate based on pattern
@@ -444,7 +456,7 @@ function lineToPitch(line, staff) {
       const steps = -adjustedIndex;
       return staff === 'treble'
         ? calculateLedgerPitch('C4', -steps)
-        : calculateLedgerPitch('E2', -steps);
+        : calculateLedgerPitch('G2', -steps);
     } else {
       // Above staff
       const steps = adjustedIndex - pitches.length + 1;

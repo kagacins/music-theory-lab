@@ -134,6 +134,232 @@ export function addNoteViaBridge(measureIndex, staff, note) {
 }
 
 /**
+ * Helper to convert duration string to beats
+ * @param {string} duration - Duration like '4n', '8n', etc.
+ * @param {boolean} dotted - Whether the note is dotted
+ * @returns {number} - Number of beats
+ */
+function durationToBeats(duration, dotted = false) {
+    const baseDurations = {
+        '1n': 4,
+        '2n': 2,
+        '4n': 1,
+        '8n': 0.5,
+        '16n': 0.25,
+        '32n': 0.125,
+    };
+
+    const baseBeats = baseDurations[duration] || 1;
+    return dotted ? baseBeats * 1.5 : baseBeats;
+}
+
+/**
+ * Helper to convert beats to duration
+ * @param {number} beats - Number of beats
+ * @returns {Object} - {duration, dotted}
+ */
+function beatsToDuration(beats) {
+    const durationMap = [
+        { beats: 4, duration: '1n', dotted: false },
+        { beats: 3, duration: '2n', dotted: true },
+        { beats: 2, duration: '2n', dotted: false },
+        { beats: 1.5, duration: '4n', dotted: true },
+        { beats: 1, duration: '4n', dotted: false },
+        { beats: 0.75, duration: '8n', dotted: true },
+        { beats: 0.5, duration: '8n', dotted: false },
+        { beats: 0.375, duration: '16n', dotted: true },
+        { beats: 0.25, duration: '16n', dotted: false },
+        { beats: 0.125, duration: '32n', dotted: false },
+    ];
+
+    // Find exact match
+    for (const entry of durationMap) {
+        if (Math.abs(entry.beats - beats) < 0.001) {
+            return { duration: entry.duration, dotted: entry.dotted };
+        }
+    }
+
+    // If no exact match, return closest smaller
+    for (const entry of durationMap) {
+        if (entry.beats <= beats) {
+            return { duration: entry.duration, dotted: entry.dotted };
+        }
+    }
+
+    return { duration: '4n', dotted: false };
+}
+
+/**
+ * Get remaining beats in a measure
+ * @param {number} measureIndex - Measure index
+ * @param {string} staff - 'treble' or 'bass'
+ * @returns {number} - Remaining beats
+ */
+function getRemainingBeats(measureIndex, staff) {
+    if (!compositionState || measureIndex >= compositionState.getMeasureCount()) {
+        return 4; // Full measure available
+    }
+
+    const measure = compositionState.getMeasure(measureIndex);
+    if (!measure) return 4;
+
+    const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+    const notes = measure.notation[voiceKey].voices[0].notes;
+
+    let usedBeats = 0;
+    for (const note of notes) {
+        const noteBeats = durationToBeats(note.duration, note.dotted);
+        usedBeats += noteBeats;
+    }
+
+    return 4 - usedBeats; // 4/4 time
+}
+
+/**
+ * Get current beat position in a measure (where next note would be added)
+ * @param {number} measureIndex - Measure index
+ * @param {string} staff - 'treble' or 'bass'
+ * @returns {number} - Beat position (0-4 for 4/4 time)
+ */
+function getCurrentBeat(measureIndex, staff) {
+    return 4 - getRemainingBeats(measureIndex, staff);
+}
+
+/**
+ * Add note intelligently to selected measure with automatic splitting and ties
+ * @param {string} pitch - Note pitch (e.g., 'C4')
+ * @param {string} duration - Duration (e.g., '4n')
+ * @param {boolean} dotted - Whether the note is dotted
+ * @param {string} staff - 'treble' or 'bass'
+ * @param {boolean} isRest - Whether this is a rest
+ * @param {string} accidental - Accidental ('#', 'b', 'n', or null)
+ * @returns {Object} - {success: boolean, measuresFilled: number}
+ */
+export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = false, accidental = null) {
+    if (!useCompositionState) return { success: false, measuresFilled: 0 };
+
+    // Get selected measure from notation composer
+    const notationComposer = window.getNotationComposer && window.getNotationComposer();
+    let selectedMeasureIndex = notationComposer?.getSelectedMeasure() ?? -1;
+
+    // If no measure is selected, use measure 0
+    if (selectedMeasureIndex < 0) {
+        selectedMeasureIndex = 0;
+    }
+
+    console.log('[Bridge] Adding note intelligently to measure:', selectedMeasureIndex, 'staff:', staff);
+
+    // Calculate beats for this note
+    const noteBeats = durationToBeats(duration, dotted);
+    const remainingBeats = getRemainingBeats(selectedMeasureIndex, staff);
+
+    console.log('[Bridge] Note beats:', noteBeats, 'Remaining beats:', remainingBeats);
+
+    // Ensure measure exists
+    while (compositionState.getMeasureCount() <= selectedMeasureIndex) {
+        compositionState.addMeasure({});
+    }
+
+    // If the note fits completely, add it normally
+    if (noteBeats <= remainingBeats) {
+        // Calculate beat position for this note
+        const beatPosition = getCurrentBeat(selectedMeasureIndex, staff);
+
+        const noteData = {
+            type: isRest ? 'rest' : 'note',
+            pitch: pitch,
+            pitches: [pitch],
+            duration: duration,
+            isRest: isRest,
+            dotted: dotted,
+            accidental: accidental,
+            beat: beatPosition,
+        };
+
+        compositionState.addNote(selectedMeasureIndex, staff, 0, noteData);
+
+        // Check if measure is now full and auto-advance
+        const newRemainingBeats = getRemainingBeats(selectedMeasureIndex, staff);
+        if (newRemainingBeats <= 0.001 && notationComposer) {
+            const nextMeasure = selectedMeasureIndex + 1;
+            if (nextMeasure < compositionState.getMeasureCount()) {
+                console.log('[Bridge] Auto-advancing to measure:', nextMeasure);
+                notationComposer.setSelectedMeasure(nextMeasure);
+            }
+        }
+
+        return { success: true, measuresFilled: 1 };
+    }
+
+    // Note doesn't fit - split it across measures with ties
+    console.log('[Bridge] Note too long, splitting across measures');
+
+    let measuresFilled = 0;
+
+    // Add first part to fill current measure
+    if (remainingBeats > 0) {
+        const beatPosition = getCurrentBeat(selectedMeasureIndex, staff);
+        const firstPartDuration = beatsToDuration(remainingBeats);
+        const firstPartNote = {
+            type: isRest ? 'rest' : 'note',
+            pitch: pitch,
+            pitches: [pitch],
+            duration: firstPartDuration.duration,
+            isRest: isRest,
+            dotted: firstPartDuration.dotted,
+            accidental: accidental,
+            tie: 'start',
+            beat: beatPosition,
+        };
+
+        compositionState.addNote(selectedMeasureIndex, staff, 0, firstPartNote);
+        measuresFilled++;
+    }
+
+    // Calculate remaining beats for next measure
+    let remainingNoteBeats = noteBeats - remainingBeats;
+    let currentMeasureIndex = selectedMeasureIndex + 1;
+
+    // Add tied notes to subsequent measures
+    while (remainingNoteBeats > 0.001) {
+        // Ensure measure exists
+        while (compositionState.getMeasureCount() <= currentMeasureIndex) {
+            compositionState.addMeasure({});
+        }
+
+        const beatsToAdd = Math.min(remainingNoteBeats, 4); // Max 4 beats per measure
+        const tiedDuration = beatsToDuration(beatsToAdd);
+        const beatPosition = getCurrentBeat(currentMeasureIndex, staff);
+
+        const tiedNote = {
+            type: isRest ? 'rest' : 'note',
+            pitch: pitch,
+            pitches: [pitch],
+            duration: tiedDuration.duration,
+            isRest: isRest,
+            dotted: tiedDuration.dotted,
+            accidental: null, // No accidental on tied notes
+            tie: remainingNoteBeats - beatsToAdd > 0.001 ? 'continue' : 'end',
+            beat: beatPosition,
+        };
+
+        compositionState.addNote(currentMeasureIndex, staff, 0, tiedNote);
+
+        remainingNoteBeats -= beatsToAdd;
+        currentMeasureIndex++;
+        measuresFilled++;
+    }
+
+    // Auto-advance to the last measure we added to
+    if (notationComposer && currentMeasureIndex - 1 < compositionState.getMeasureCount()) {
+        console.log('[Bridge] Auto-advancing to measure:', currentMeasureIndex - 1);
+        notationComposer.setSelectedMeasure(currentMeasureIndex - 1);
+    }
+
+    return { success: true, measuresFilled };
+}
+
+/**
  * Update bass pattern setting
  * @param {string} pattern - Bass pattern ('whole-note', 'root-fifth', 'arpeggio', etc.)
  */
