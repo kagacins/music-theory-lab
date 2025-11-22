@@ -286,7 +286,8 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
         return { success: true, measuresFilled: 1 };
     }
 
-    // Note doesn't fit - split it across measures with ties
+    // Note/rest doesn't fit - split it across measures
+    // IMPORTANT: Rests don't use ties, only notes do
     let measuresFilled = 0;
 
     // Add first part to fill current measure
@@ -301,7 +302,7 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
             isRest: isRest,
             dotted: firstPartDuration.dotted,
             accidental: accidental,
-            tie: 'start',
+            tie: isRest ? undefined : 'start',  // Only notes get ties, not rests
             beat: beatPosition,
         };
 
@@ -313,7 +314,7 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
     let remainingNoteBeats = noteBeats - remainingBeats;
     let currentMeasureIndex = selectedMeasureIndex + 1;
 
-    // Add tied notes to subsequent measures
+    // Add continuation to subsequent measures
     while (remainingNoteBeats > 0.001) {
         // Ensure measure exists
         while (compositionState.getMeasureCount() <= currentMeasureIndex) {
@@ -324,7 +325,7 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
         const tiedDuration = beatsToDuration(beatsToAdd);
         const beatPosition = getCurrentBeat(currentMeasureIndex, staff);
 
-        const tiedNote = {
+        const continuationNote = {
             type: isRest ? 'rest' : 'note',
             pitch: pitch,
             pitches: [pitch],
@@ -332,11 +333,11 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
             isRest: isRest,
             dotted: tiedDuration.dotted,
             accidental: null, // No accidental on tied notes
-            tie: remainingNoteBeats - beatsToAdd > 0.001 ? 'continue' : 'end',
+            tie: isRest ? undefined : (remainingNoteBeats - beatsToAdd > 0.001 ? 'continue' : 'end'),  // Only notes get ties
             beat: beatPosition,
         };
 
-        compositionState.addNote(currentMeasureIndex, staff, 0, tiedNote);
+        compositionState.addNote(currentMeasureIndex, staff, 0, continuationNote);
 
         remainingNoteBeats -= beatsToAdd;
         currentMeasureIndex++;

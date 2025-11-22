@@ -2824,7 +2824,8 @@ window.initializeRecommendationsSidebar = function() {
         // Initialize style/mood display from saved settings
         initStyleMoodDisplay();
 
-        // Expose updateStyleMoodDisplay globally for settings changes
+        // Expose services globally for undo/redo and other integrations
+        window.recommendationService = recommendationService;
         window.updateStyleMoodDisplay = updateStyleMoodDisplay;
     } catch (error) {
         // Error initializing recommendations sidebar

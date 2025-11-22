@@ -9460,6 +9460,17 @@ export function handleUndo() {
             window.refreshNotationFromProgression();
         }
 
+        // Refresh chord recommendations and analysis (includes borrowed chords)
+        if (window.recommendationService) {
+            window.recommendationService.refreshRecommendations();
+        }
+
+        // Refresh melody suggestions if controller is initialized
+        if (window.melodySuggestionController &&
+            typeof window.melodySuggestionController.refreshSuggestions === 'function') {
+            window.melodySuggestionController.refreshSuggestions();
+        }
+
         // Show feedback
         const display = document.getElementById('progression-chord-notes-display');
         if (display) {
@@ -9500,6 +9511,17 @@ export function handleRedo() {
         }
         if (window.refreshNotationFromProgression) {
             window.refreshNotationFromProgression();
+        }
+
+        // Refresh chord recommendations and analysis (includes borrowed chords)
+        if (window.recommendationService) {
+            window.recommendationService.refreshRecommendations();
+        }
+
+        // Refresh melody suggestions if controller is initialized
+        if (window.melodySuggestionController &&
+            typeof window.melodySuggestionController.refreshSuggestions === 'function') {
+            window.melodySuggestionController.refreshSuggestions();
         }
 
         // Show feedback
