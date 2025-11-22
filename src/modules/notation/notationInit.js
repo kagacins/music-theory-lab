@@ -91,8 +91,6 @@ function getOrCreateOverlayCanvas(baseCanvas) {
     overlay = document.createElement('canvas');
     overlay.id = baseCanvas.id + '-overlay';
     overlay.style.position = 'absolute';
-    overlay.style.left = baseCanvas.offsetLeft + 'px';
-    overlay.style.top = baseCanvas.offsetTop + 'px';
     overlay.style.pointerEvents = 'none'; // Let clicks pass through to base canvas
     overlay.style.zIndex = '10';
 
@@ -103,14 +101,77 @@ function getOrCreateOverlayCanvas(baseCanvas) {
     // Insert after base canvas
     baseCanvas.parentElement.insertBefore(overlay, baseCanvas.nextSibling);
 
+    // Function to update overlay position to match canvas
+    // Accounts for parent scroll to keep overlay aligned with canvas
+    const updateOverlayPosition = () => {
+      const baseStyle = window.getComputedStyle(baseCanvas);
+      const scrollLeft = baseCanvas.parentElement.scrollLeft || 0;
+      const scrollTop = baseCanvas.parentElement.scrollTop || 0;
+
+      if (baseStyle.position !== 'static') {
+        overlay.style.left = baseStyle.left;
+        overlay.style.top = baseStyle.top;
+      } else {
+        // Subtract scroll offset so overlay stays aligned with canvas as it scrolls
+        overlay.style.left = (baseCanvas.offsetLeft - scrollLeft) + 'px';
+        overlay.style.top = (baseCanvas.offsetTop - scrollTop) + 'px';
+      }
+    };
+
+    // Set initial position
+    updateOverlayPosition();
+
     // Update overlay position/size when base canvas changes
     const resizeObserver = new ResizeObserver(() => {
       overlay.width = baseCanvas.width;
       overlay.height = baseCanvas.height;
-      overlay.style.left = baseCanvas.offsetLeft + 'px';
-      overlay.style.top = baseCanvas.offsetTop + 'px';
+      updateOverlayPosition();
     });
     resizeObserver.observe(baseCanvas);
+
+    // CRITICAL: Update overlay position when parent scrolls
+    // This keeps the overlay aligned with the canvas as it scrolls
+    baseCanvas.parentElement.addEventListener('scroll', () => {
+      updateOverlayPosition();
+
+      // CRITICAL: Also update the layoutManager's scroll configuration
+      // This ensures measure hit detection works correctly after scrolling
+      const scrollLeft = baseCanvas.parentElement.scrollLeft || 0;
+      const scrollTop = baseCanvas.parentElement.scrollTop || 0;
+
+      // Get the layoutManager from the global notation composer
+      if (window.getNotationComposer) {
+        const composer = window.getNotationComposer();
+        if (composer && composer.layoutManager) {
+          composer.layoutManager.setScroll(scrollLeft, scrollTop);
+        }
+      }
+    });
+
+    // DEBUG: Log canvas and parent info
+    console.log('=== CANVAS DEBUG INFO ===');
+    console.log('Canvas ID:', baseCanvas.id);
+    console.log('Canvas position:', window.getComputedStyle(baseCanvas).position);
+    console.log('Canvas left:', window.getComputedStyle(baseCanvas).left);
+    console.log('Canvas top:', window.getComputedStyle(baseCanvas).top);
+    console.log('Canvas offsetLeft:', baseCanvas.offsetLeft);
+    console.log('Canvas offsetTop:', baseCanvas.offsetTop);
+    console.log('Canvas width:', baseCanvas.width);
+    console.log('Canvas height:', baseCanvas.height);
+    console.log('---');
+    console.log('Parent element:', baseCanvas.parentElement.tagName);
+    console.log('Parent class:', baseCanvas.parentElement.className);
+    console.log('Parent position:', window.getComputedStyle(baseCanvas.parentElement).position);
+    console.log('Parent overflow:', window.getComputedStyle(baseCanvas.parentElement).overflow);
+    console.log('Parent overflowX:', window.getComputedStyle(baseCanvas.parentElement).overflowX);
+    console.log('Parent overflowY:', window.getComputedStyle(baseCanvas.parentElement).overflowY);
+    console.log('Parent width:', window.getComputedStyle(baseCanvas.parentElement).width);
+    console.log('Parent height:', window.getComputedStyle(baseCanvas.parentElement).height);
+    console.log('---');
+    console.log('Overlay position:', window.getComputedStyle(overlay).position);
+    console.log('Overlay left:', window.getComputedStyle(overlay).left);
+    console.log('Overlay top:', window.getComputedStyle(overlay).top);
+    console.log('========================');
   }
 
   return overlay;

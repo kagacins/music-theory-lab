@@ -274,7 +274,7 @@ export class NoteEditor {
     } else {
       // Update hover position
       this.hoveredPosition = staffPosition;
-      // Pass the mouse X and Y positions to updateGhostNote for accurate positioning
+      // Pass canvas coordinates (includes scroll) to updateGhostNote
       this.updateGhostNote(staffPosition, position.x, position.y);
     }
 
@@ -365,6 +365,10 @@ export class NoteEditor {
    */
   getCanvasPosition(e) {
     const rect = this.canvas.getBoundingClientRect();
+
+    // getBoundingClientRect() is already viewport-relative and accounts for parent scroll
+    // Mouse events (clientX/Y) are also viewport-relative
+    // So we just need the difference to get canvas-local coordinates
     return {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
@@ -390,6 +394,9 @@ export class NoteEditor {
       return null;
     }
 
+    console.log('[NoteEditor] findNoteAtPosition called with:', x, y);
+    console.log('[NoteEditor] Checking', this.noteRegions.length, 'note regions');
+
     // Check each note region for intersection
     for (const region of this.noteRegions) {
       if (!region.bounds) continue;
@@ -398,6 +405,7 @@ export class NoteEditor {
 
       // Check if point is within bounding box
       if (x >= rx && x <= rx + width && y >= ry && y <= ry + height) {
+        console.log('[NoteEditor] Found note at region:', region.bounds);
         return {
           id: this.createNoteId(region.measureIndex, region.staff, region.noteIndex),
           measureIndex: region.measureIndex,
@@ -410,6 +418,8 @@ export class NoteEditor {
       }
     }
 
+    console.log('[NoteEditor] No note found at position');
+    console.log('[NoteEditor] First few region bounds:', this.noteRegions.slice(0, 3).map(r => r.bounds));
     return null;
   }
 
@@ -1109,7 +1119,7 @@ export class NoteEditor {
       if (region && region.bounds) {
         const { x, y, width, height } = region.bounds;
 
-        // Draw filled background
+        // Draw filled background (coordinates are in canvas space, same as overlay)
         ctx.fillRect(x - 2, y - 2, width + 4, height + 4);
 
         // Draw border
@@ -1129,12 +1139,12 @@ export class NoteEditor {
 
     const bounds = this.ghostNote.measure;
 
-    // Calculate note X position (centered in measure)
-    const noteX = this.ghostNote.mouseX || (bounds.x + (bounds.width / 2));
+    // Calculate note X position (mouseX is in canvas coordinates)
+    const noteX = this.ghostNote.mouseX !== undefined
+      ? this.ghostNote.mouseX
+      : (bounds.x + (bounds.width / 2));
 
-    // Calculate staff Y positions from measure bounds
-    // trebleY = measure.y + systemMarginTop (20)
-    // bassY = measure.y + systemMarginTop + staffHeight + staffSpacing (20 + 40 + 80 = 140)
+    // Calculate staff Y positions from measure bounds (canvas coordinates)
     const systemMarginTop = 20;
     const staffHeight = 40;
     const staffSpacing = 80;
@@ -1142,8 +1152,6 @@ export class NoteEditor {
     const bassY = bounds.y + systemMarginTop + staffHeight + staffSpacing;
 
     // Calculate note Y position from pitch and staff line
-    // staffY is the Y position of the TOP LINE of the staff (from VexFlow)
-    // The staff spans from staffY (top line) to staffY + 40 (bottom line)
     const staffY = this.ghostNote.staff === 'treble' ? trebleY : bassY;
     const lineSpacing = 10; // Pixels between lines (matches staffLayouter.js)
 
@@ -1151,10 +1159,9 @@ export class NoteEditor {
     const line = this.pitchToLine(this.ghostNote.pitch, this.ghostNote.staff);
 
     // Calculate Y position from line (matches staffLayouter.js formula)
-    // line = (40 - relativeY) / 5, so relativeY = 40 - line * 5
     const noteY = staffY + (40 - line * (lineSpacing / 2));
 
-    // Draw ghost note
+    // Draw ghost note (coordinates are in canvas space, same as overlay)
     ctx.save();
     ctx.globalAlpha = 0.5;
     ctx.fillStyle = this.ghostNote.color || SELECTION_COLORS.ghost;
