@@ -394,8 +394,13 @@ export class NoteEditor {
       return null;
     }
 
-    console.log('[NoteEditor] findNoteAtPosition called with:', x, y);
-    console.log('[NoteEditor] Checking', this.noteRegions.length, 'note regions');
+    // Convert canvas-local coordinates to layout coordinates
+    // Note regions have bounds in layout coordinates (absolute positions in full canvas)
+    // But x, y are in canvas-local coordinates (viewport-relative)
+    const scrollLeft = this.canvas.parentElement ? this.canvas.parentElement.scrollLeft : 0;
+    const scrollTop = this.canvas.parentElement ? this.canvas.parentElement.scrollTop : 0;
+    const layoutX = x + scrollLeft;
+    const layoutY = y + scrollTop;
 
     // Check each note region for intersection
     for (const region of this.noteRegions) {
@@ -403,9 +408,8 @@ export class NoteEditor {
 
       const { x: rx, y: ry, width, height } = region.bounds;
 
-      // Check if point is within bounding box
-      if (x >= rx && x <= rx + width && y >= ry && y <= ry + height) {
-        console.log('[NoteEditor] Found note at region:', region.bounds);
+      // Check if point is within bounding box (comparing layout coordinates)
+      if (layoutX >= rx && layoutX <= rx + width && layoutY >= ry && layoutY <= ry + height) {
         return {
           id: this.createNoteId(region.measureIndex, region.staff, region.noteIndex),
           measureIndex: region.measureIndex,
@@ -418,8 +422,6 @@ export class NoteEditor {
       }
     }
 
-    console.log('[NoteEditor] No note found at position');
-    console.log('[NoteEditor] First few region bounds:', this.noteRegions.slice(0, 3).map(r => r.bounds));
     return null;
   }
 
@@ -445,24 +447,16 @@ export class NoteEditor {
       return;
     }
 
-    // Get the currently selected measure
-    const selectedMeasureIndex = this.composerIntegration?.getSelectedMeasure() ?? -1;
+    // CRITICAL: Always use the CLICKED/HOVERED measure, not the selected measure
+    // The measure where the mouse is hovering is what the user expects the note to be added to
+    const targetMeasureIndex = staffPosition.measure?.index ?? 0;
 
-    // If no measure is selected, fall back to the clicked measure
-    const targetMeasureIndex = selectedMeasureIndex >= 0
-      ? selectedMeasureIndex
-      : (staffPosition.measure?.index ?? 0);
-
-    // Use the staff from staffPosition
+    // Use the staff from staffPosition (treble or bass from where user clicked)
     const staff = staffPosition.staff;
-
-    console.log('[NoteEditor] Adding note to selected measure:', targetMeasureIndex, 'staff:', staff);
 
     // Calculate beats for this note
     const noteBeats = this.durationToBeats(this.currentDuration, this.isDotted);
     const remainingBeats = this.getRemainingBeats(targetMeasureIndex, staff);
-
-    console.log('[NoteEditor] Note beats:', noteBeats, 'Remaining beats:', remainingBeats);
 
     // If the note fits completely, add it normally
     if (noteBeats <= remainingBeats) {
@@ -494,8 +488,6 @@ export class NoteEditor {
     }
 
     // Note doesn't fit - split it across measures with ties
-    console.log('[NoteEditor] Note too long, splitting across measures');
-
     // Add first part to fill current measure
     if (remainingBeats > 0) {
       const beatPosition = this.getCurrentBeat(targetMeasureIndex, staff);
@@ -566,7 +558,6 @@ export class NoteEditor {
     const measureCount = this.composerIntegration.compositionState?.getMeasureCount() || 0;
 
     if (nextMeasureIndex < measureCount) {
-      console.log('[NoteEditor] Auto-advancing to measure:', nextMeasureIndex);
       this.composerIntegration.setSelectedMeasure(nextMeasureIndex);
     }
   }
@@ -1108,6 +1099,10 @@ export class NoteEditor {
     ctx.lineWidth = 2;
     ctx.fillStyle = SELECTION_COLORS.hover;
 
+    // Get scroll offset to convert layout coordinates → canvas-local coordinates
+    const scrollLeft = this.canvas.parentElement ? this.canvas.parentElement.scrollLeft : 0;
+    const scrollTop = this.canvas.parentElement ? this.canvas.parentElement.scrollTop : 0;
+
     // Draw highlight for each selected note
     for (const noteId of this.selectedNotes) {
       // Find the region for this note
@@ -1117,9 +1112,12 @@ export class NoteEditor {
       });
 
       if (region && region.bounds) {
-        const { x, y, width, height } = region.bounds;
+        // Convert from layout coordinates to canvas-local coordinates for overlay drawing
+        const x = region.bounds.x - scrollLeft;
+        const y = region.bounds.y - scrollTop;
+        const { width, height } = region.bounds;
 
-        // Draw filled background (coordinates are in canvas space, same as overlay)
+        // Draw filled background
         ctx.fillRect(x - 2, y - 2, width + 4, height + 4);
 
         // Draw border
@@ -1135,21 +1133,36 @@ export class NoteEditor {
    * @param {CanvasRenderingContext2D} ctx - Canvas context
    */
   drawGhostNote(ctx) {
-    if (!this.ghostNote || !this.ghostNote.measure) return;
+    if (!this.ghostNote || !this.ghostNote.measure) {
+      return;
+    }
 
     const bounds = this.ghostNote.measure;
 
-    // Calculate note X position (mouseX is in canvas coordinates)
+    // Get scroll offset to convert layout coordinates → canvas-local coordinates
+    const scrollLeft = this.canvas.parentElement ? this.canvas.parentElement.scrollLeft : 0;
+    const scrollTop = this.canvas.parentElement ? this.canvas.parentElement.scrollTop : 0;
+
+    // Convert measure bounds from layout coordinates to canvas-local coordinates
+    const canvasBounds = {
+      x: bounds.x - scrollLeft,
+      y: bounds.y - scrollTop,
+      width: bounds.width,
+      height: bounds.height,
+    };
+
+    // Calculate note X position (mouseX is already in canvas-local coordinates)
     const noteX = this.ghostNote.mouseX !== undefined
       ? this.ghostNote.mouseX
-      : (bounds.x + (bounds.width / 2));
+      : (canvasBounds.x + (canvasBounds.width / 2));
 
-    // Calculate staff Y positions from measure bounds (canvas coordinates)
+    // Calculate staff Y positions from measure bounds (now in canvas-local coordinates)
+    // CRITICAL: These must match GRAND_STAFF_DEFAULTS from grandStaff.js
     const systemMarginTop = 20;
-    const staffHeight = 40;
+    const staffHeight = 80; // Standard 5-line staff height (NOT 40!)
     const staffSpacing = 80;
-    const trebleY = bounds.y + systemMarginTop;
-    const bassY = bounds.y + systemMarginTop + staffHeight + staffSpacing;
+    const trebleY = canvasBounds.y + systemMarginTop;
+    const bassY = canvasBounds.y + systemMarginTop + staffHeight + staffSpacing;
 
     // Calculate note Y position from pitch and staff line
     const staffY = this.ghostNote.staff === 'treble' ? trebleY : bassY;

@@ -121,6 +121,14 @@ function getOrCreateOverlayCanvas(baseCanvas) {
     // Set initial position
     updateOverlayPosition();
 
+    // CRITICAL: Set initial scroll position in layoutManager
+    // This ensures coordinate conversion works even before user scrolls
+    if (window.notationLayoutManager) {
+      const scrollLeft = baseCanvas.parentElement.scrollLeft || 0;
+      const scrollTop = baseCanvas.parentElement.scrollTop || 0;
+      window.notationLayoutManager.setScroll(scrollLeft, scrollTop);
+    }
+
     // Update overlay position/size when base canvas changes
     const resizeObserver = new ResizeObserver(() => {
       overlay.width = baseCanvas.width;
@@ -134,17 +142,14 @@ function getOrCreateOverlayCanvas(baseCanvas) {
     baseCanvas.parentElement.addEventListener('scroll', () => {
       updateOverlayPosition();
 
-      // CRITICAL: Also update the layoutManager's scroll configuration
-      // This ensures measure hit detection works correctly after scrolling
-      const scrollLeft = baseCanvas.parentElement.scrollLeft || 0;
-      const scrollTop = baseCanvas.parentElement.scrollTop || 0;
-
-      // Get the layoutManager from the global notation composer
-      if (window.getNotationComposer) {
-        const composer = window.getNotationComposer();
-        if (composer && composer.layoutManager) {
-          composer.layoutManager.setScroll(scrollLeft, scrollTop);
-        }
+      // Update layoutManager with scroll position so it can convert canvas-local coords to layout coords
+      // Canvas-local coordinates are viewport-relative (from getBoundingClientRect)
+      // Layout coordinates are absolute positions in the full canvas
+      // To compare canvas-local against layout bounds, layoutManager adds scroll offset
+      if (window.notationLayoutManager) {
+        const scrollLeft = baseCanvas.parentElement.scrollLeft || 0;
+        const scrollTop = baseCanvas.parentElement.scrollTop || 0;
+        window.notationLayoutManager.setScroll(scrollLeft, scrollTop);
       }
     });
 

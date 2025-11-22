@@ -282,10 +282,11 @@ export class StaffLayoutManager {
     const realY = (y + this.config.scrollY) / this.config.zoom;
 
     // Calculate staff Y positions from measure bounds
+    // CRITICAL: These must match GRAND_STAFF_DEFAULTS from grandStaff.js
     // trebleY = measure.y + systemMarginTop (20)
-    // bassY = measure.y + systemMarginTop + staffHeight + staffSpacing (20 + 40 + 80 = 140)
+    // bassY = measure.y + systemMarginTop + staffHeight + staffSpacing (20 + 80 + 80 = 180)
     const systemMarginTop = 20;
-    const staffHeight = 40;
+    const staffHeight = 80; // Standard 5-line staff height (NOT 40!)
     const staffSpacing = 80;
     const trebleY = measureBounds.y + systemMarginTop;
     const bassY = measureBounds.y + systemMarginTop + staffHeight + staffSpacing;

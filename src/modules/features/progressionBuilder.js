@@ -3358,21 +3358,8 @@ function attachCardEventListeners(wrapper, index) {
                 window.stopTrainerChord();
             }
 
-            // Sync notation immediately with simple scroll restoration
-            if (window.syncNotationFromProgression) {
-                const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
-                const scrollY = window.pageYOffset || document.documentElement.scrollTop;
-
-                window.syncNotationFromProgression();
-
-                window.scrollTo(scrollX, scrollY);
-                requestAnimationFrame(() => {
-                    window.scrollTo(scrollX, scrollY);
-                    requestAnimationFrame(() => {
-                        window.scrollTo(scrollX, scrollY);
-                    });
-                });
-            }
+            // Update notation preserving treble notes
+            updateChordAndRenderPreservingTrebleNotes(index);
 
             wasPressed = false;
         });
@@ -3496,21 +3483,8 @@ function attachCardEventListeners(wrapper, index) {
                 window.stopTrainerChord();
             }
 
-            // Sync notation immediately with simple scroll restoration
-            if (window.syncNotationFromProgression) {
-                const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
-                const scrollY = window.pageYOffset || document.documentElement.scrollTop;
-
-                window.syncNotationFromProgression();
-
-                window.scrollTo(scrollX, scrollY);
-                requestAnimationFrame(() => {
-                    window.scrollTo(scrollX, scrollY);
-                    requestAnimationFrame(() => {
-                        window.scrollTo(scrollX, scrollY);
-                    });
-                });
-            }
+            // Update notation preserving treble notes
+            updateChordAndRenderPreservingTrebleNotes(index);
 
             wasPressed = false;
         });
@@ -3792,8 +3766,8 @@ function attachCardEventListeners(wrapper, index) {
                 }
 
                 // Sync notation immediately
-                if (inversionWasChanged && window.syncNotationFromProgression) {
-                    window.syncNotationFromProgression();
+                if (inversionWasChanged) {
+                    updateChordAndRenderPreservingTrebleNotes(index);
                     inversionWasChanged = false;
                 }
 
@@ -3807,8 +3781,8 @@ function attachCardEventListeners(wrapper, index) {
                 }
 
                 // Sync notation if button was pressed and user dragged off
-                if (wasPressed && inversionWasChanged && window.syncNotationFromProgression) {
-                    window.syncNotationFromProgression();
+                if (wasPressed && inversionWasChanged) {
+                    updateChordAndRenderPreservingTrebleNotes(index);
                     inversionWasChanged = false;
                 }
 
@@ -3862,16 +3836,7 @@ function attachCardEventListeners(wrapper, index) {
                 updateTensionCurveIfVisible();
 
                 // Also update the Melody Composer's notation
-                if (window.refreshNotationFromProgression) {
-                    requestAnimationFrame(() => {
-                        // Sync progression to compositionState first
-                        if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
-                            window.syncProgressionToMelodyComposer();
-                        }
-                        // Then refresh the notation rendering
-                        window.refreshNotationFromProgression();
-                    });
-                }
+                updateChordAndRenderPreservingTrebleNotes(index);
             }
         });
     }
@@ -4415,12 +4380,8 @@ function updateChordInversion(index, newInversion, shouldUpdateUI = true, should
 
     // Update the grand staff notation - skip if called from tooltip buttons (will sync on mouseup)
     if (shouldSyncNotation) {
-        requestAnimationFrame(() => {
-            // Sync progressionData changes to notation display
-            if (window.syncNotationFromProgression) {
-                window.syncNotationFromProgression();
-            }
-        });
+        // Use new helper function that preserves treble notes
+        updateChordAndRenderPreservingTrebleNotes(index);
     }
 }
 
@@ -4550,13 +4511,7 @@ function updateRHOctaveShift(index, shift) {
     updateSingleCard(index);
 
     // Also update the grand staff notation
-    requestAnimationFrame(() => {
-        // Sync progressionData changes to notation display
-        if (window.syncNotationFromProgression) {
-            
-            window.syncNotationFromProgression();
-        }
-    });
+    updateChordAndRenderPreservingTrebleNotes(index);
 
     // Play the chord with the new octave (LH is relative to RH, so update LH too)
     const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
@@ -4605,13 +4560,7 @@ function updateLHOctaveShift(index, shift) {
     updateSingleCard(index);
 
     // Also update the grand staff notation
-    requestAnimationFrame(() => {
-        // Sync progressionData changes to notation display
-        if (window.syncNotationFromProgression) {
-            
-            window.syncNotationFromProgression();
-        }
-    });
+    updateChordAndRenderPreservingTrebleNotes(index);
 
     // Play the chord with the new LH octave
     const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
@@ -4657,12 +4606,7 @@ function updateLHInversion(index, newInversion, shouldUpdateUI = true, shouldSyn
 
     // Also update the grand staff notation (if requested)
     if (shouldSyncNotation) {
-        requestAnimationFrame(() => {
-            // Sync progressionData changes to notation display
-            if (window.syncNotationFromProgression) {
-                window.syncNotationFromProgression();
-            }
-        });
+        updateChordAndRenderPreservingTrebleNotes(index);
     }
 
     // Note: Playback is handled by the press-and-hold event handler on the button
@@ -4689,16 +4633,7 @@ function toggleLHNote(index, note) {
     saveState({ type: 'chord-update', data: { index, property: 'lhOmittedNotes', value: chord.lhOmittedNotes } });
 
     // Update the grand staff notation
-    requestAnimationFrame(() => {
-        // Sync progression to compositionState first
-        if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
-            window.syncProgressionToMelodyComposer();
-        }
-        // Then refresh the notation rendering
-        if (window.refreshNotationFromProgression) {
-            window.refreshNotationFromProgression();
-        }
-    });
+    updateChordAndRenderPreservingTrebleNotes(index);
 
     // Play the chord with the new LH voicing
     const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
@@ -8482,6 +8417,100 @@ window.showProgressionChordSuggestions = showProgressionChordSuggestions;
  * @param {number} inversion - The inversion
  * @param {number} octaveShift - The octave shift in semitones (default 0, use -12 for one octave down)
  */
+/**
+ * Helper function to update a chord in compositionState and render WITHOUT wiping treble notes
+ * Use this instead of window.syncNotationFromProgression() to preserve user-added treble notes
+ */
+function updateChordAndRenderPreservingTrebleNotes(index) {
+    if (!window.getCompositionState || !window.getNotationComposer) {
+        return;
+    }
+
+    const compositionState = window.getCompositionState();
+    const notationComposer = window.getNotationComposer();
+    const trainerState = getTrainerState();
+    const chord = trainerState.progressionData[index];
+
+    if (!chord) return;
+
+    console.log('[UPDATE CHORD] Updating chord at index', index);
+
+    // Block renders and syncs during update
+    const wasBlockingRenders = notationComposer.isSyncingFromProgression;
+    notationComposer.isSyncingFromProgression = true;
+
+    const syncInstance = window.getProgressionNotationSync && window.getProgressionNotationSync();
+    const wasBlockingSync = syncInstance ? syncInstance.isUpdating : false;
+    if (syncInstance) {
+        syncInstance.isUpdating = true;
+    }
+
+    try {
+        // Ensure measure exists in compositionState
+        while (compositionState.getMeasureCount() <= index) {
+            compositionState.addMeasure({});
+        }
+
+        // Update the chord with ALL properties from progression
+        compositionState.updateChord(index, {
+            root: chord.root,
+            type: chord.type,
+            notes: chord.notes || [],
+            inversion: chord.inversion || 0,
+            voicing: chord.voicing || 'close',
+            roman: chord.roman || null,
+            name: chord.name || null,
+            octaveShift: chord.octaveShift || 0,
+            lhOctaveShift: chord.lhOctaveShift || 0,
+            omittedNotes: chord.omittedNotes || [],
+            lhOmittedNotes: chord.lhOmittedNotes || [],
+        });
+
+        // Regenerate bass for this measure
+        const autoGenerateBass = compositionState.getSettings().autoGenerateBass;
+        const measure = compositionState.getMeasure(index);
+
+        if (autoGenerateBass) {
+            compositionState.updateBassFromChord(index);
+        } else {
+            // Create simple whole-note bass from chord notes
+            if (measure && measure.notation && measure.notation.bass && chord.notes && chord.notes.length > 0) {
+                const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
+                if (voicedNotes.length > 0) {
+                    measure.notation.bass.voices[0].notes = [{
+                        type: 'note',
+                        pitches: [...voicedNotes],
+                        duration: '1n',
+                        beat: 0,
+                        dotted: false
+                    }];
+                    measure.notation.bass.autoGenerated = false;
+                }
+            }
+        }
+    } finally {
+        // Restore previous states
+        notationComposer.isSyncingFromProgression = wasBlockingRenders;
+        if (syncInstance) {
+            syncInstance.isUpdating = wasBlockingSync;
+        }
+    }
+
+    // Update chord cards on melody tab
+    const melodyContainer = document.getElementById('melody-progression-visualization');
+    if (melodyContainer && trainerState.progressionData.length > 0) {
+        melodyContainer.innerHTML = '';
+        renderSimplifiedChordSequence(melodyContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
+            showActionButtons: true
+        });
+    }
+
+    // Render the notation
+    if (notationComposer && typeof notationComposer.render === 'function') {
+        notationComposer.render();
+    }
+}
+
 export function addChordToProgressionByParams(chordType, root, inversion = 0, octaveShift = 0) {
     // Save current state for undo
     const currentState = captureProgressionState();
@@ -8544,18 +8573,124 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
     // Update state
     setProgressionData(updatedProgression);
 
-    // Re-render both progression displays
+    // Re-render progression display
     renderProgressionDisplay('progression-visualization', true);
-    renderProgressionDisplay('melody-progression-visualization', false);
+    // DON'T render melody-progression-visualization here - we manually update compositionState below
 
     // Phase 1B: Sync to melody composer if it's active
     // This ensures bass auto-fill updates when chords are added while on melody tab
-    if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
-        window.syncProgressionToMelodyComposer();
+    if (window.getCompositionState && window.getNotationComposer) {
+        const compositionState = window.getCompositionState();
+        const notationComposer = window.getNotationComposer();
 
-        // Re-render NEW grand staff notation to show the new chord
-        if (window.refreshNotationFromProgression) {
-            window.refreshNotationFromProgression();
+        console.log('[ADD CHORD] Treble notes BEFORE:');
+        for (let i = 0; i < compositionState.getMeasureCount(); i++) {
+            const measure = compositionState.getMeasure(i);
+            const trebleNotes = measure?.notation?.treble?.voices?.[0]?.notes || [];
+            console.log(`  M${i}: ${trebleNotes.length} notes`);
+        }
+
+        // CRITICAL: Block BOTH automatic renders AND bi-directional sync during update
+        // This prevents progressionNotationSync from syncing our changes back to progressionData
+        // and then back to compositionState (which would wipe treble notes)
+        const wasBlockingRenders = notationComposer.isSyncingFromProgression;
+        notationComposer.isSyncingFromProgression = true;
+
+        // Also block the bi-directional sync
+        const syncInstance = window.getProgressionNotationSync && window.getProgressionNotationSync();
+        const wasBlockingSync = syncInstance ? syncInstance.isUpdating : false;
+        if (syncInstance) {
+            syncInstance.isUpdating = true;
+        }
+
+        try {
+            // Instead of full sync (which wipes user's treble notes), just add the new measure
+            // Get the index where the chord was added (last in progression)
+            const measureIndex = updatedProgression.length - 1;
+
+            // Add measure to compositionState if it doesn't exist
+            while (compositionState.getMeasureCount() <= measureIndex) {
+                compositionState.addMeasure({});
+            }
+
+            // Update the chord for this measure
+            const chord = updatedProgression[measureIndex];
+            compositionState.updateChord(measureIndex, {
+                root: chord.root,
+                type: chord.type,
+                notes: chord.notes || [],
+                inversion: chord.inversion || 0,
+                voicing: chord.voicing || 'close',
+                roman: chord.roman || null,
+                name: chord.name || null,
+                octaveShift: chord.octaveShift || 0,
+                lhOctaveShift: chord.lhOctaveShift || 0,
+                omittedNotes: chord.omittedNotes || [],
+                lhOmittedNotes: chord.lhOmittedNotes || [],
+            });
+
+            // Generate bass for this measure
+            const autoGenerateBass = compositionState.getSettings().autoGenerateBass;
+            console.log('[ADD CHORD] autoGenerateBass:', autoGenerateBass, 'for measure', measureIndex);
+
+            const measure = compositionState.getMeasure(measureIndex);
+
+            if (autoGenerateBass) {
+                // Auto-generate is ON: generate pattern-based bass
+                console.log('[ADD CHORD] Calling updateBassFromChord for measure', measureIndex);
+                compositionState.updateBassFromChord(measureIndex);
+            } else {
+                // Auto-generate is OFF: create simple whole-note chord bass
+                console.log('[ADD CHORD] Creating simple whole-note bass for measure', measureIndex);
+                if (measure && measure.notation && measure.notation.bass && chord.notes && chord.notes.length > 0) {
+                    const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
+                    if (voicedNotes.length > 0) {
+                        measure.notation.bass.voices[0].notes = [{
+                            type: 'note',
+                            pitches: [...voicedNotes],
+                            duration: '1n',
+                            beat: 0,
+                            dotted: false
+                        }];
+                        measure.notation.bass.autoGenerated = false;
+                    }
+                }
+            }
+
+            // Verify bass was generated
+            const bassNotes = measure?.notation?.bass?.voices?.[0]?.notes || [];
+            console.log('[ADD CHORD] Measure', measureIndex, 'now has', bassNotes.length, 'bass notes');
+        } finally {
+            // Restore previous render blocking state
+            notationComposer.isSyncingFromProgression = wasBlockingRenders;
+
+            // Restore previous sync blocking state
+            if (syncInstance) {
+                syncInstance.isUpdating = wasBlockingSync;
+            }
+        }
+
+        console.log('[ADD CHORD] Treble notes AFTER:');
+        for (let i = 0; i < compositionState.getMeasureCount(); i++) {
+            const measure = compositionState.getMeasure(i);
+            const trebleNotes = measure?.notation?.treble?.voices?.[0]?.notes || [];
+            console.log(`  M${i}: ${trebleNotes.length} notes`);
+        }
+
+        // First update the chord cards on the melody tab (without wiping compositionState)
+        const melodyContainer = document.getElementById('melody-progression-visualization');
+        if (melodyContainer && updatedProgression.length > 0) {
+            // Render just the simplified chord cards, skip the sync
+            melodyContainer.innerHTML = '';
+            renderSimplifiedChordSequence(melodyContainer, updatedProgression, trainerState.currentKey || 'C', {
+                showActionButtons: true
+            });
+        }
+
+        // CRITICAL: Render canvas AFTER DOM updates
+        // performRender now includes aggressive repaint triggers
+        if (notationComposer && typeof notationComposer.render === 'function') {
+            notationComposer.render();
         }
     }
 
@@ -8798,14 +8933,10 @@ export function toggleProgressionNote(chordIndex, note) {
     }
 
     // Update the chord notation canvas in the detailed card AND bass clef
-    requestAnimationFrame(() => {
-        refreshChordNotationCanvas(chordIndex, chordData);
+    refreshChordNotationCanvas(chordIndex, chordData);
 
-        // Sync progressionData changes to notation display
-        if (window.syncNotationFromProgression) {
-            window.syncNotationFromProgression();
-        }
-    });
+    // Sync progressionData changes to notation display
+    updateChordAndRenderPreservingTrebleNotes(chordIndex);
 }
 
 /**
@@ -8852,14 +8983,10 @@ export function toggleProgressionLHNote(chordIndex, note) {
     }
 
     // Update the chord notation canvas in the detailed card AND bass clef
-    requestAnimationFrame(() => {
-        refreshChordNotationCanvas(chordIndex, chordData);
+    refreshChordNotationCanvas(chordIndex, chordData);
 
-        // Sync progressionData changes to notation display
-        if (window.syncNotationFromProgression) {
-            window.syncNotationFromProgression();
-        }
-    });
+    // Sync progressionData changes to notation display
+    updateChordAndRenderPreservingTrebleNotes(chordIndex);
 }
 
 /**
