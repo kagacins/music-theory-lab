@@ -363,12 +363,14 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   const trebleResult = createNotesForStaff(trebleNotes, keySignature, 'treble', timeSignature);
   const vexTrebleNotes = trebleResult.notes;
   const trebleOttavaBrackets = trebleResult.ottavaBrackets;
+  const trebleTies = trebleResult.ties;
   const trebleBeams = generateBeams(vexTrebleNotes.filter(n => !n.isRest()));
 
   // Render bass notes
   const bassResult = createNotesForStaff(bassNotes, keySignature, 'bass', timeSignature);
   const vexBassNotes = bassResult.notes;
   const bassOttavaBrackets = bassResult.ottavaBrackets;
+  const bassTies = bassResult.ties;
   const bassBeams = generateBeams(vexBassNotes.filter(n => !n.isRest()));
 
   // Apply note coloring
@@ -418,6 +420,32 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   // Draw beams
   drawBeams(context, trebleBeams);
   drawBeams(context, bassBeams);
+
+  // Draw ties (only within same measure for now)
+  // TODO: Cross-measure ties need to be handled at the system level
+  trebleTies.forEach(tieInfo => {
+    if (tieInfo.startIndex < vexTrebleNotes.length - 1) {
+      const staveTie = new VF.StaveTie({
+        first_note: vexTrebleNotes[tieInfo.startIndex],
+        last_note: vexTrebleNotes[tieInfo.startIndex + 1],
+        first_indices: [0],
+        last_indices: [0]
+      });
+      staveTie.setContext(context).draw();
+    }
+  });
+
+  bassTies.forEach(tieInfo => {
+    if (tieInfo.startIndex < vexBassNotes.length - 1) {
+      const staveTie = new VF.StaveTie({
+        first_note: vexBassNotes[tieInfo.startIndex],
+        last_note: vexBassNotes[tieInfo.startIndex + 1],
+        first_indices: [0],
+        last_indices: [0]
+      });
+      staveTie.setContext(context).draw();
+    }
+  });
 
   // Collect note regions for tooltip detection
   // Bounding boxes are available after draw()
@@ -559,11 +587,12 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature) {
 
   if (!notes || notes.length === 0) {
     // Return a whole rest for empty measures
-    return { notes: [createRest('1n', clef)], ottavaBrackets: [] };
+    return { notes: [createRest('1n', clef)], ottavaBrackets: [], ties: [] };
   }
 
   const vexNotes = [];
   const ottavaBrackets = []; // Track brackets: { startIndex, endIndex, label }
+  const ties = []; // Track tie starts for rendering
   let currentBracket = null;
 
   for (let i = 0; i < notes.length; i++) {
@@ -582,7 +611,7 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature) {
     } else if (note.pitches && Array.isArray(note.pitches)) {
       // Chord - apply ottava adjustment
       const { adjustedPitches, ottavaLabel } = applyOttavaAdjustment(note.pitches, clef);
-      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef);
+      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false);
 
       // Track ottava brackets
       if (ottavaLabel) {
@@ -647,6 +676,14 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature) {
 
       vexNotes.push(staveNote);
     }
+
+    // Track ties: if this note has tie='start', mark it for tie rendering
+    if (note.tie === 'start' && vexNotes.length > 0) {
+      ties.push({
+        startIndex: vexNotes.length - 1,
+        // We'll find the end note in the next measure or later in this function
+      });
+    }
   }
 
   // Close any remaining bracket
@@ -654,7 +691,7 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature) {
     ottavaBrackets.push(currentBracket);
   }
 
-  return { notes: vexNotes, ottavaBrackets };
+  return { notes: vexNotes, ottavaBrackets, ties };
 }
 
 // ============================================================================

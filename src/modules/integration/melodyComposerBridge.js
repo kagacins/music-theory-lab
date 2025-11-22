@@ -247,13 +247,9 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
         selectedMeasureIndex = 0;
     }
 
-    console.log('[Bridge] Adding note intelligently to measure:', selectedMeasureIndex, 'staff:', staff);
-
     // Calculate beats for this note
     const noteBeats = durationToBeats(duration, dotted);
     const remainingBeats = getRemainingBeats(selectedMeasureIndex, staff);
-
-    console.log('[Bridge] Note beats:', noteBeats, 'Remaining beats:', remainingBeats);
 
     // Ensure measure exists
     while (compositionState.getMeasureCount() <= selectedMeasureIndex) {
@@ -283,7 +279,6 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
         if (newRemainingBeats <= 0.001 && notationComposer) {
             const nextMeasure = selectedMeasureIndex + 1;
             if (nextMeasure < compositionState.getMeasureCount()) {
-                console.log('[Bridge] Auto-advancing to measure:', nextMeasure);
                 notationComposer.setSelectedMeasure(nextMeasure);
             }
         }
@@ -292,8 +287,6 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
     }
 
     // Note doesn't fit - split it across measures with ties
-    console.log('[Bridge] Note too long, splitting across measures');
-
     let measuresFilled = 0;
 
     // Add first part to fill current measure
@@ -352,7 +345,6 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
 
     // Auto-advance to the last measure we added to
     if (notationComposer && currentMeasureIndex - 1 < compositionState.getMeasureCount()) {
-        console.log('[Bridge] Auto-advancing to measure:', currentMeasureIndex - 1);
         notationComposer.setSelectedMeasure(currentMeasureIndex - 1);
     }
 

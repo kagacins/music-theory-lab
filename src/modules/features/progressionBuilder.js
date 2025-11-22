@@ -3332,11 +3332,17 @@ function attachCardEventListeners(wrapper, index) {
 
     // Inversion buttons
     inversionBtns.forEach(btn => {
-        // Update inversion and start playing on mousedown
+        let wasPressed = false;
+
+        // Update inversion and start playing on mousedown (skip notation sync)
         btn.addEventListener('mousedown', (e) => {
             e.stopPropagation();
+            e.preventDefault();
+            wasPressed = true;
             const inversion = parseInt(btn.getAttribute('data-inversion'));
-            updateChordInversion(index, inversion);
+
+            // Update WITHOUT syncing notation (to prevent flash)
+            updateChordInversion(index, inversion, true, false);
 
             // Start playing the chord with the new inversion
             if (window.startProgressionChord) {
@@ -3344,19 +3350,45 @@ function attachCardEventListeners(wrapper, index) {
             }
         });
 
-        // Stop playing on mouseup
+        // Stop playing on mouseup and sync notation immediately
         btn.addEventListener('mouseup', (e) => {
             e.stopPropagation();
+            e.preventDefault();
             if (window.stopTrainerChord) {
                 window.stopTrainerChord();
             }
+
+            // Sync notation immediately with simple scroll restoration
+            if (window.syncNotationFromProgression) {
+                const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+                const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+
+                window.syncNotationFromProgression();
+
+                window.scrollTo(scrollX, scrollY);
+                requestAnimationFrame(() => {
+                    window.scrollTo(scrollX, scrollY);
+                    requestAnimationFrame(() => {
+                        window.scrollTo(scrollX, scrollY);
+                    });
+                });
+            }
+
+            wasPressed = false;
         });
 
-        // Also stop if mouse leaves button
+        // Also stop if mouse leaves button and sync if was pressed
         btn.addEventListener('mouseleave', (e) => {
             if (window.stopTrainerChord) {
                 window.stopTrainerChord();
             }
+
+            // Sync notation if button was pressed
+            if (wasPressed && window.syncNotationFromProgression) {
+                window.syncNotationFromProgression();
+            }
+
+            wasPressed = false;
         });
     });
 
@@ -3439,10 +3471,16 @@ function attachCardEventListeners(wrapper, index) {
     // LH Inversion buttons
     const lhInversionBtns = wrapper.querySelectorAll('.lh-inversion-btn');
     lhInversionBtns.forEach(btn => {
+        let wasPressed = false;
+
         btn.addEventListener('mousedown', (e) => {
             e.stopPropagation();
+            e.preventDefault();
+            wasPressed = true;
             const inversion = parseInt(btn.getAttribute('data-inversion'));
-            updateLHInversion(index, inversion);
+
+            // Update WITHOUT syncing notation (to prevent flash)
+            updateLHInversion(index, inversion, true, false);
 
             // Start playing the chord with the new LH inversion
             if (window.startProgressionChord) {
@@ -3450,19 +3488,45 @@ function attachCardEventListeners(wrapper, index) {
             }
         });
 
-        // Stop playing on mouseup
+        // Stop playing on mouseup and sync notation immediately
         btn.addEventListener('mouseup', (e) => {
             e.stopPropagation();
+            e.preventDefault();
             if (window.stopTrainerChord) {
                 window.stopTrainerChord();
             }
+
+            // Sync notation immediately with simple scroll restoration
+            if (window.syncNotationFromProgression) {
+                const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+                const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+
+                window.syncNotationFromProgression();
+
+                window.scrollTo(scrollX, scrollY);
+                requestAnimationFrame(() => {
+                    window.scrollTo(scrollX, scrollY);
+                    requestAnimationFrame(() => {
+                        window.scrollTo(scrollX, scrollY);
+                    });
+                });
+            }
+
+            wasPressed = false;
         });
 
-        // Also stop if mouse leaves button
+        // Also stop if mouse leaves button and sync if was pressed
         btn.addEventListener('mouseleave', (e) => {
             if (window.stopTrainerChord) {
                 window.stopTrainerChord();
             }
+
+            // Sync notation if button was pressed
+            if (wasPressed && window.syncNotationFromProgression) {
+                window.syncNotationFromProgression();
+            }
+
+            wasPressed = false;
         });
     });
 
@@ -3540,12 +3604,15 @@ function attachCardEventListeners(wrapper, index) {
         let tooltipTimeout = null;
         let isTooltipPinned = false;
         let hideTimeout = null;
+        let inversionWasChanged = false; // Track if inversion was changed during this tooltip session
 
         const showTooltip = () => {
             if (hideTimeout) {
                 clearTimeout(hideTimeout);
                 hideTimeout = null;
             }
+            // Reset the change flag when tooltip opens
+            inversionWasChanged = false;
             chordTooltip.classList.remove('hidden');
         };
 
@@ -3557,6 +3624,17 @@ function attachCardEventListeners(wrapper, index) {
                     // Update the card UI after tooltip closes to show any inversion changes
                     updateSingleCard(index);
                     updateTensionCurveIfVisible();
+
+                    // Sync notation ONLY if inversion was actually changed
+                    if (inversionWasChanged && window.syncNotationFromProgression) {
+                        // Use requestAnimationFrame to ensure UI updates complete first
+                        requestAnimationFrame(() => {
+                            window.syncNotationFromProgression();
+                        });
+                    }
+
+                    // Reset the flag for next time
+                    inversionWasChanged = false;
                 }, 500);
             }
         };
@@ -3605,6 +3683,16 @@ function attachCardEventListeners(wrapper, index) {
                 // Update the card UI after closing to show any inversion changes
                 updateSingleCard(index);
                 updateTensionCurveIfVisible();
+
+                // Sync notation if inversion was changed
+                if (inversionWasChanged && window.syncNotationFromProgression) {
+                    requestAnimationFrame(() => {
+                        window.syncNotationFromProgression();
+                    });
+                }
+
+                // Reset the flag
+                inversionWasChanged = false;
             });
         }
 
@@ -3619,9 +3707,21 @@ function attachCardEventListeners(wrapper, index) {
                     // Update the card UI after closing to show any inversion changes
                     updateSingleCard(index);
                     updateTensionCurveIfVisible();
+
+                    // Sync notation if inversion was changed
+                    if (inversionWasChanged && window.syncNotationFromProgression) {
+                        requestAnimationFrame(() => {
+                            window.syncNotationFromProgression();
+                        });
+                    }
+
+                    // Reset the flag
+                    inversionWasChanged = false;
                 } else {
                     chordTooltip.classList.remove('hidden');
                     isTooltipPinned = true;
+                    // Reset the flag when opening
+                    inversionWasChanged = false;
                 }
             });
         }
@@ -3649,13 +3749,30 @@ function attachCardEventListeners(wrapper, index) {
 
         // Tooltip inversion buttons - hold to play
         tooltipInversionBtns.forEach(btn => {
+            // Track if button was actually pressed (not just hovered)
+            let wasPressed = false;
+
+            // Mouseenter - prevent any browser auto-scroll behavior
+            btn.addEventListener('mouseenter', (e) => {
+                e.preventDefault();
+                // Prevent button from receiving focus which can trigger scroll
+                if (document.activeElement === btn) {
+                    btn.blur();
+                }
+            });
+
             // Mousedown - start playing chord WITHOUT syncing notation (to prevent flicker)
             btn.addEventListener('mousedown', (e) => {
                 e.stopPropagation();
+                e.preventDefault(); // Prevent any browser default behavior that might cause scrolling
+                wasPressed = true;
                 const inversion = parseInt(btn.getAttribute('data-inversion'));
 
                 // Update the chord inversion - skip UI update AND notation sync to prevent flicker
                 updateChordInversion(index, inversion, false, false);
+
+                // Mark that inversion was changed (so we sync notation when tooltip closes)
+                inversionWasChanged = true;
 
                 // Update button highlighting
                 updateInversionButtonHighlight(inversion);
@@ -3666,27 +3783,36 @@ function attachCardEventListeners(wrapper, index) {
                 }
             });
 
-            // Mouseup - stop playing chord AND sync notation now
+            // Mouseup - stop playing chord and sync notation immediately
             btn.addEventListener('mouseup', (e) => {
                 e.stopPropagation();
+                e.preventDefault();
                 if (window.stopTrainerChord) {
                     window.stopTrainerChord();
                 }
-                // Sync notation now that user has released the button
-                if (window.syncNotationFromProgression) {
+
+                // Sync notation immediately
+                if (inversionWasChanged && window.syncNotationFromProgression) {
                     window.syncNotationFromProgression();
+                    inversionWasChanged = false;
                 }
+
+                wasPressed = false;
             });
 
-            // Mouseleave - stop playing if user drags off button AND sync notation
+            // Mouseleave - stop playing if user drags off button and sync notation
             btn.addEventListener('mouseleave', (e) => {
                 if (window.stopTrainerChord) {
                     window.stopTrainerChord();
                 }
-                // Sync notation when user leaves the button
-                if (window.syncNotationFromProgression) {
+
+                // Sync notation if button was pressed and user dragged off
+                if (wasPressed && inversionWasChanged && window.syncNotationFromProgression) {
                     window.syncNotationFromProgression();
+                    inversionWasChanged = false;
                 }
+
+                wasPressed = false;
             });
 
             // Touch events for mobile
@@ -4499,7 +4625,7 @@ function updateLHOctaveShift(index, shift) {
 /**
  * Update LH inversion
  */
-function updateLHInversion(index, newInversion) {
+function updateLHInversion(index, newInversion, shouldUpdateUI = true, shouldSyncNotation = true) {
     const trainerState = getTrainerState();
     const chord = trainerState.progressionData[index];
     chord.lhInversion = newInversion;
@@ -4524,17 +4650,20 @@ function updateLHInversion(index, newInversion) {
     // Save state
     saveState({ type: 'chord-update', data: { index, property: 'lhInversion', value: newInversion } });
 
-    // Update only this card
-    updateSingleCard(index);
+    // Update only this card (if requested)
+    if (shouldUpdateUI) {
+        updateSingleCard(index);
+    }
 
-    // Also update the grand staff notation
-    requestAnimationFrame(() => {
-        // Sync progressionData changes to notation display
-        if (window.syncNotationFromProgression) {
-            
-            window.syncNotationFromProgression();
-        }
-    });
+    // Also update the grand staff notation (if requested)
+    if (shouldSyncNotation) {
+        requestAnimationFrame(() => {
+            // Sync progressionData changes to notation display
+            if (window.syncNotationFromProgression) {
+                window.syncNotationFromProgression();
+            }
+        });
+    }
 
     // Note: Playback is handled by the press-and-hold event handler on the button
     // Don't call playTrainerChordOnce here as it would conflict with the hold behavior

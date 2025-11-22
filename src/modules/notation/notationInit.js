@@ -471,8 +471,8 @@ export function initEnhancedNotation(options = {}) {
 
   // Hook into the composer's render method to always update note regions
   const originalRender = notationComposer.render.bind(notationComposer);
-  notationComposer.render = function() {
-    originalRender();
+  notationComposer.render = function(...args) {
+    originalRender(...args); // CRITICAL: Forward all arguments including bypassSyncCheck
     // Update note regions in editor after each render
     if (this.noteRegions && noteEditor) {
       noteEditor.setNoteRegions(this.noteRegions);

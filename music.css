@@ -2162,6 +2162,15 @@ body:has(#piano-keyboard.modern-keyboard) #guitar-fretboard-container {
 /* Ensure canvas scrolling container works properly */
 #interactive-melody-notation-canvas {
     min-width: 800px;
+    /* Prevent scroll-into-view behavior during re-renders */
+    scroll-margin: 0;
+    overflow-anchor: none;
+}
+
+/* Prevent all canvas elements from triggering scroll */
+canvas {
+    scroll-margin: 0;
+    overflow-anchor: none;
 }
 
 /* Scrollbar styling for melody notation container */
@@ -2223,6 +2232,9 @@ body:has(#piano-keyboard.modern-keyboard) #guitar-fretboard-container {
 /* Card wrapper with smooth grid transitions */
 .chord-card-wrapper {
     transition: all 0.3s ease-out;
+    /* Prevent scroll-into-view behavior on hover/focus */
+    scroll-margin: 0;
+    overflow-anchor: none;
 }
 
 /* Fade-in animation for card content */
@@ -2252,6 +2264,9 @@ body:has(#piano-keyboard.modern-keyboard) #guitar-fretboard-container {
 /* Simplified chord card styles */
 .simplified-card {
     transition: all 0.2s ease;
+    /* Prevent scroll-into-view behavior */
+    scroll-margin: 0;
+    overflow-anchor: none;
 }
 
 /* Interactive tooltip for simplified cards */
@@ -2259,6 +2274,19 @@ body:has(#piano-keyboard.modern-keyboard) #guitar-fretboard-container {
     pointer-events: auto !important;
     z-index: 1000;
     white-space: normal;
+    /* Prevent scroll-into-view behavior */
+    overflow: visible;
+    /* Ensure stable positioning during hover */
+    contain: layout;
+    /* Aggressively prevent scroll behavior */
+    scroll-margin: 0 !important;
+    overflow-anchor: none !important;
+}
+
+/* Prevent scroll on tooltip and all children */
+.chord-tooltip,
+.chord-tooltip * {
+    scroll-margin: 0 !important;
 }
 
 /* Info button should not be draggable */
@@ -2276,6 +2304,21 @@ body:has(#piano-keyboard.modern-keyboard) #guitar-fretboard-container {
 .tooltip-inversion-btn {
     cursor: pointer;
     user-select: none;
+    /* Prevent scroll-into-view behavior on focus/hover */
+    scroll-margin: 0;
+}
+
+/* Prevent focus-triggered scrolling on tooltip buttons */
+.tooltip-inversion-btn:focus {
+    outline: none;
+    /* Prevent scroll on focus */
+    scroll-behavior: auto;
+}
+
+/* Ensure hover states don't cause layout shifts */
+.tooltip-inversion-btn:hover {
+    /* Force smooth transition without triggering scroll */
+    will-change: background-color;
 }
 
 /* Detailed card styles (expanded view) */

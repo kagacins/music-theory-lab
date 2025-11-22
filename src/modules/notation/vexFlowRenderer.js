@@ -365,31 +365,26 @@ export function applyOctaveShift(noteStr, shift) {
  * @returns {Object} - { renderer, context }
  */
 export function createRenderer(container, width, height) {
-  console.log('[createRenderer] Called with container:', container?.tagName, container?.id, 'size:', width, 'x', height);
-
   const VF = getVF();
   if (!VF) {
-    console.error('[createRenderer] VexFlow not loaded');
     return null;
   }
 
-  // Clear existing content
+  // Clear existing content (but DON'T manually resize - let VexFlow do it in one step)
   if (container.tagName === 'CANVAS') {
-    console.log('[createRenderer] Container is CANVAS, clearing and resizing');
     const ctx = container.getContext('2d');
     ctx.clearRect(0, 0, container.width, container.height);
-    container.width = width;
-    container.height = height;
+    // REMOVED: Manual resize that was causing double-resize and triggering scroll
+    // container.width = width;
+    // container.height = height;
   } else {
-    console.log('[createRenderer] Container is not CANVAS, clearing innerHTML');
     container.innerHTML = '';
   }
 
+  // Let VexFlow handle the resize in ONE operation (not two)
   const renderer = new VF.Renderer(container, VF.Renderer.Backends.CANVAS);
   renderer.resize(width, height);
   const context = renderer.getContext();
-
-  console.log('[createRenderer] Renderer created successfully');
 
   return { renderer, context };
 }
@@ -504,12 +499,15 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
  * @param {string} clef - Clef for the chord
  * @returns {Object} - VexFlow StaveNote with multiple keys
  */
-export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble') {
+export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble', dotted = false) {
   const VF = getVF();
   if (!VF || !pitches || pitches.length === 0) return null;
 
-  // Convert duration
+  // Convert duration and add 'd' suffix if dotted
   let vexDuration = DURATION_MAP[duration] || duration || 'q';
+  if (dotted && !vexDuration.includes('d')) {
+    vexDuration += 'd';
+  }
 
   // Convert all pitches to VexFlow keys
   const keys = pitches.map(pitch => noteToVexKey(pitch));
@@ -528,6 +526,14 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
       staveNote.addModifier(new VF.Accidental(requiredAccidental), index);
     }
   });
+
+  // Add dot modifier for each note in the chord
+  if (dotted) {
+    // Use VexFlow Dot modifier
+    pitches.forEach((_, index) => {
+      staveNote.addModifier(new VF.Dot(), index);
+    });
+  }
 
   return staveNote;
 }

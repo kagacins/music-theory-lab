@@ -20,7 +20,9 @@
       "Bash(tree:*)",
       "Bash(nul)",
       "Bash(python:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(git restore:*)",
+      "Bash(node -c:*)"
     ],
     "deny": [],
     "ask": []

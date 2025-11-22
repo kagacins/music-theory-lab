@@ -208,22 +208,33 @@ function handleNoteSelected(suggestion) {
     const duration = window.getCurrentNoteDuration ? window.getCurrentNoteDuration() : '4n';
     const dotted = window.getCurrentNoteDotted ? window.getCurrentNoteDotted() : false;
 
-    // Create note object
-    const note = {
-        pitch: suggestion.note,
-        duration: duration,
-        dotted: dotted,
-        velocity: 0.8,
-        isChordTone: suggestion.isChordTone
-    };
+    // CRITICAL: Set the notation composer's selected measure to match the controller's current measure
+    // This ensures addNoteIntelligently adds to the correct measure
+    const notationComposer = window.getNotationComposer && window.getNotationComposer();
+    if (notationComposer && typeof notationComposer.setSelectedMeasure === 'function') {
+        notationComposer.setSelectedMeasure(currentMeasureIndex);
+    }
 
-    // Add note to composition state
-    compositionState.addNote(currentMeasureIndex, 'treble', 0, note);
-
-    // Add to interactiveMelody using the proper melodyGenerator function
-    // This ensures notes are added the same way as keyboard notes
-    if (window.addNoteToMeasure) {
-        window.addNoteToMeasure(suggestion.note, currentMeasureIndex, duration, dotted);
+    // Use addNoteIntelligently for proper measure-filling and auto-advance
+    // This adds to compositionState, handles measure overflow, and auto-advances
+    if (window.addNoteIntelligently) {
+        const result = window.addNoteIntelligently(
+            suggestion.note,  // pitch
+            duration,         // duration from toolbar
+            dotted,          // dotted from toolbar
+            'treble',        // staff
+            false,           // isRest
+            null             // accidental (let auto-detection handle it)
+        );
+    } else {
+        // Fallback: add directly to compositionState
+        compositionState.addNote(currentMeasureIndex, 'treble', 0, {
+            pitch: suggestion.note,
+            duration: duration,
+            dotted: dotted,
+            velocity: 0.8,
+            isChordTone: suggestion.isChordTone
+        });
     }
 
     // Play the note for feedback
@@ -233,20 +244,14 @@ function handleNoteSelected(suggestion) {
     showInsertFeedback(suggestion);
 
     // Re-render the notation canvas to show the new note
-    // Use the enhanced notation system if available
-    if (window.isNotationInitialized && window.isNotationInitialized()) {
-        const notationComposer = window.getNotationComposer && window.getNotationComposer();
-        if (notationComposer) {
-            notationComposer.render();
-        }
-    } else {
-        // Refresh notation using new system
-        if (window.refreshNotationFromProgression) {
-            window.refreshNotationFromProgression();
-        }
+    // IMPORTANT: Do NOT call syncNotationFromProgression() here!
+    // That would sync FROM progressionData TO compositionState, overwriting the note we just added
+    // Instead, just render the notation directly
+    if (notationComposer && typeof notationComposer.render === 'function') {
+        notationComposer.render();
     }
 
-    // Refresh suggestions with new context
+    // Refresh suggestions with new context (after a short delay)
     setTimeout(() => refreshSuggestions(), 100);
 }
 
