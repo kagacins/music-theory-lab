@@ -49,6 +49,8 @@ export class StaffLayoutManager {
     this.totalWidth = 0;
     this.measureBounds = new Map(); // Map measure index to bounds
     this.actualMeasurePositions = new Map(); // CRITICAL: Actual VexFlow positions from rendering
+    this.pageLayoutManager = null; // Reference to PageLayoutManager for pagination
+    this.currentPageIndex = 0; // Current page being displayed
   }
 
   /**
@@ -118,6 +120,38 @@ export class StaffLayoutManager {
   }
 
   /**
+   * Set the PageLayoutManager for pagination support
+   * @param {PageLayoutManager} pageLayoutManager - Page layout manager instance
+   */
+  setPageLayoutManager(pageLayoutManager) {
+    this.pageLayoutManager = pageLayoutManager;
+  }
+
+  /**
+   * Set the current page index
+   * @param {number} pageIndex - Page index (0-based)
+   */
+  setCurrentPageIndex(pageIndex) {
+    this.currentPageIndex = pageIndex;
+  }
+
+  /**
+   * Get the current page index
+   * @returns {number} - Current page index
+   */
+  getCurrentPageIndex() {
+    return this.currentPageIndex;
+  }
+
+  /**
+   * Check if pagination is enabled
+   * @returns {boolean} - True if PageLayoutManager is set
+   */
+  isPaginationEnabled() {
+    return this.pageLayoutManager !== null;
+  }
+
+  /**
    * CRITICAL: Set actual measure positions from VexFlow rendering
    * This is the "nuclear" solution - we extract ACTUAL positions from VexFlow
    * instead of calculating them, eliminating coordinate mismatch errors
@@ -126,10 +160,13 @@ export class StaffLayoutManager {
   setActualMeasurePositions(measures) {
     this.actualMeasurePositions.clear();
 
-    measures.forEach((measure, index) => {
+    measures.forEach((measure, loopIndex) => {
       if (measure.actualBounds) {
-        this.actualMeasurePositions.set(index, {
-          index: index,
+        // CRITICAL: Use measure.index if available (for pagination), otherwise use loop index
+        const measureIndex = measure.index !== undefined ? measure.index : loopIndex;
+
+        this.actualMeasurePositions.set(measureIndex, {
+          index: measureIndex,
           x: measure.actualBounds.x,
           trebleY: measure.actualBounds.trebleY,
           bassY: measure.actualBounds.bassY,
@@ -150,6 +187,7 @@ export class StaffLayoutManager {
     const {
       keySignature = 'C',
       timeSignature = '4/4',
+      pageIndex = null, // NEW: Specific page to layout (null = all measures)
     } = options;
 
     const {
@@ -160,6 +198,19 @@ export class StaffLayoutManager {
       marginRight,
       systemSpacing,
     } = this.config;
+
+    // NEW: If pagination is enabled and pageIndex specified, layout only that page
+    let startMeasureIndex = 0;
+    let endMeasureIndex = numMeasures;
+
+    if (this.isPaginationEnabled() && pageIndex !== null) {
+      const currentPage = this.pageLayoutManager.pages[pageIndex];
+      if (currentPage) {
+        startMeasureIndex = currentPage.startMeasure;
+        endMeasureIndex = currentPage.endMeasure + 1;
+        numMeasures = endMeasureIndex - startMeasureIndex;
+      }
+    }
 
     // Calculate number of systems
     const numSystems = Math.ceil(numMeasures / measuresPerLine);
@@ -176,8 +227,8 @@ export class StaffLayoutManager {
     let currentY = marginTop;
 
     for (let systemIndex = 0; systemIndex < numSystems; systemIndex++) {
-      const startMeasure = systemIndex * measuresPerLine;
-      const endMeasure = Math.min(startMeasure + measuresPerLine, numMeasures);
+      const startMeasure = startMeasureIndex + (systemIndex * measuresPerLine);
+      const endMeasure = Math.min(startMeasure + measuresPerLine, endMeasureIndex);
       const measuresInSystem = endMeasure - startMeasure;
 
       const system = {
@@ -270,16 +321,31 @@ export class StaffLayoutManager {
     const useActualPositions = this.actualMeasurePositions.size > 0;
 
     // CRITICAL: x and y are canvas-local coordinates (viewport-relative, from getBoundingClientRect)
-    // VexFlow positions are layout coordinates (absolute positions in full canvas)
-    // To convert canvas-local → layout: ADD scroll, then apply zoom
-    const realX = (x + this.config.scrollX) / this.config.zoom;
-    const realY = (y + this.config.scrollY) / this.config.zoom;
+    // In pagination mode: coordinates are already page-local, no scroll offset needed
+    // In legacy mode: VexFlow positions are layout coordinates, need to ADD scroll
+    let realX, realY;
+    if (this.isPaginationEnabled()) {
+      // Pagination mode: use coordinates directly (they're already page-local)
+      realX = x / this.config.zoom;
+      realY = y / this.config.zoom;
+    } else {
+      // Legacy mode: add scroll offset to convert viewport → layout coordinates
+      realX = (x + this.config.scrollX) / this.config.zoom;
+      realY = (y + this.config.scrollY) / this.config.zoom;
+    }
 
     // If we have actual VexFlow positions, use those
     if (useActualPositions) {
       const verticalTolerance = 80; // Allow clicks well below bass staff
 
       for (const [index, actualPos] of this.actualMeasurePositions) {
+        // NEW: In pagination mode, only check measures on current page
+        if (this.isPaginationEnabled() && this.pageLayoutManager) {
+          if (!this.pageLayoutManager.isMeasureOnCurrentPage(index)) {
+            continue;
+          }
+        }
+
         // Check horizontal bounds
         if (realX >= actualPos.x && realX <= actualPos.x + actualPos.width) {
           // Check vertical bounds - use the full height from trebleY to bassY + tolerance
@@ -338,7 +404,8 @@ export class StaffLayoutManager {
       return null;
     }
 
-    // y is already canvas-local (includes scroll), only apply zoom
+    // y is already canvas-local (page-local in pagination mode), only apply zoom
+    // Note: getMeasureAtPoint already handles scroll offset if needed
     const realY = y / this.config.zoom;
 
     // CRITICAL: Use actual VexFlow staff positions if available

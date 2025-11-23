@@ -105,6 +105,7 @@ export class NoteEditor {
     this.handleMouseUp = this.handleMouseUp.bind(this);
     this.handleMouseLeave = this.handleMouseLeave.bind(this);
     this.handleKeyDown = this.handleKeyDown.bind(this);
+    this.handleKeyUp = this.handleKeyUp.bind(this);
 
     // Initialize
     if (this.pageManager) {
@@ -147,8 +148,9 @@ export class NoteEditor {
     this.canvas.addEventListener('mouseup', this.handleMouseUp);
     this.canvas.addEventListener('mouseleave', this.handleMouseLeave);
 
-    // Global keyboard listener
+    // Global keyboard listeners
     document.addEventListener('keydown', this.handleKeyDown);
+    document.addEventListener('keyup', this.handleKeyUp);
   }
 
   /**
@@ -196,6 +198,7 @@ export class NoteEditor {
     this.canvas.removeEventListener('mouseleave', this.handleMouseLeave);
 
     document.removeEventListener('keydown', this.handleKeyDown);
+    document.removeEventListener('keyup', this.handleKeyUp);
   }
 
   // ============================================================================
@@ -413,6 +416,21 @@ export class NoteEditor {
         e.preventDefault();
         this.moveSelectedNotes(-1); // Down one step
       }
+    }
+  }
+
+  /**
+   * Handle keyboard key up events
+   * @param {KeyboardEvent} e - Keyboard event
+   */
+  handleKeyUp(e) {
+    if (!this.isEnabled) return;
+
+    // Clear ghost note when Alt key is released
+    if (e.key === 'Alt' || e.keyCode === 18) {
+      this.hoveredPosition = null;
+      this.ghostNote = null;
+      this.renderOverlay();
     }
   }
 

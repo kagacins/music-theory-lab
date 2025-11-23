@@ -1817,8 +1817,17 @@
                                         Keyboard Shortcuts
                                     </button>
                                 </div>
-                                <div class="w-full" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-                                    <canvas id="interactive-melody-notation-canvas" class="border border-gray-300 rounded" style="display: block;"></canvas>
+                                <!-- Notation Toolbar -->
+                                <div id="notation-toolbar-container" class="mb-2"></div>
+                                <!-- Page Navigator Controls -->
+                                <div id="notation-page-navigator" class="mb-2"></div>
+                                <div class="w-full" style="overflow-x: visible; -webkit-overflow-scrolling: touch; padding: 0; margin: 0;">
+                                    <!-- Multi-page container -->
+                                    <div id="notation-pages-container" style="display: flex; flex-direction: column; align-items: center; padding: 0; margin: 0;">
+                                        <!-- Page canvases will be created here by PageManager -->
+                                    </div>
+                                    <!-- Legacy single canvas (kept for backward compatibility) -->
+                                    <canvas id="interactive-melody-notation-canvas" class="border border-gray-300 rounded" style="display: none;"></canvas>
                                 </div>
                             </div>
                         </div>

@@ -21,6 +21,20 @@ export const PAGE_CONFIG = {
   systemsPerPage: 2,     // Number of grand staff systems per page
   measuresPerSystem: 4,  // Measures per system
 
+  // Pagination presets
+  paginationPresets: {
+    '8_MEASURES': {
+      measuresPerPage: 8,
+      systemsPerPage: 2,
+      measuresPerSystem: 4,
+    },
+    '16_MEASURES': {
+      measuresPerPage: 16,
+      systemsPerPage: 4,
+      measuresPerSystem: 4,
+    },
+  },
+
   // Visual styling
   pageGap: 20,           // Gap between pages in continuous scroll
   pageShadow: '0 2px 8px rgba(0,0,0,0.15)',
@@ -74,5 +88,62 @@ export function getMeasurePagePosition(measureIndex) {
     systemIndex,
     measureInSystem,
     measureInPage,
+  };
+}
+
+/**
+ * Apply a pagination preset to the page config
+ * @param {string} presetName - Name of preset ('8_MEASURES' or '16_MEASURES')
+ */
+export function applyPaginationPreset(presetName) {
+  const preset = PAGE_CONFIG.paginationPresets[presetName];
+  if (!preset) {
+    console.warn(`Unknown pagination preset: ${presetName}`);
+    return;
+  }
+
+  PAGE_CONFIG.measuresPerPage = preset.measuresPerPage;
+  PAGE_CONFIG.systemsPerPage = preset.systemsPerPage;
+  PAGE_CONFIG.measuresPerSystem = preset.measuresPerSystem;
+}
+
+/**
+ * Get the current pagination preset name
+ * @returns {string} - Preset name or 'CUSTOM'
+ */
+export function getCurrentPreset() {
+  for (const [name, preset] of Object.entries(PAGE_CONFIG.paginationPresets)) {
+    if (
+      preset.measuresPerPage === PAGE_CONFIG.measuresPerPage &&
+      preset.systemsPerPage === PAGE_CONFIG.systemsPerPage &&
+      preset.measuresPerSystem === PAGE_CONFIG.measuresPerSystem
+    ) {
+      return name;
+    }
+  }
+  return 'CUSTOM';
+}
+
+/**
+ * Calculate total number of pages needed for given measure count
+ * @param {number} totalMeasures - Total number of measures
+ * @returns {number} - Number of pages
+ */
+export function getTotalPages(totalMeasures) {
+  return Math.ceil(totalMeasures / PAGE_CONFIG.measuresPerPage);
+}
+
+/**
+ * Get the range of measures for a specific page
+ * @param {number} pageIndex - Page index (0-based)
+ * @returns {Object} - { startMeasure, endMeasure }
+ */
+export function getMeasureRangeForPage(pageIndex) {
+  const startMeasure = pageIndex * PAGE_CONFIG.measuresPerPage;
+  const endMeasure = startMeasure + PAGE_CONFIG.measuresPerPage - 1;
+
+  return {
+    startMeasure,
+    endMeasure,
   };
 }

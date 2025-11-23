@@ -1499,7 +1499,7 @@ export function deleteLastNote() {
 }
 
 /**
- * Clear all notes from interactive melody
+ * Clear all notes from interactive melody (treble clef only)
  */
 export function clearInteractiveMelody() {
     // Stop any active playback immediately
@@ -1510,13 +1510,45 @@ export function clearInteractiveMelody() {
     // Also stop any other melody playback
     stopMelody();
     
+    // Clear treble clef notes from compositionState (new system)
+    if (window.getCompositionState) {
+        const compositionState = getCompositionState();
+        const measureCount = compositionState.getMeasureCount();
+        
+        // Clear all treble clef notes from all measures
+        for (let i = 0; i < measureCount; i++) {
+            const measure = compositionState.getMeasure(i);
+            if (measure && measure.notation && measure.notation.treble) {
+                // Clear all notes from the treble clef (voice 0)
+                if (measure.notation.treble.voices && measure.notation.treble.voices[0]) {
+                    const noteCount = measure.notation.treble.voices[0].notes.length;
+                    measure.notation.treble.voices[0].notes = [];
+                    // Emit events for each note that was removed (in reverse order to maintain indices)
+                    for (let j = noteCount - 1; j >= 0; j--) {
+                        compositionState.events.emit('noteRemoved', i, 'treble', 0, j);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Legacy: Clear old melody arrays for backward compatibility
     interactiveMelody.melodyNotes = [];
     interactiveMelody.chordNotes = [];
     currentMeasure = 0;
     currentBeat = 0;
+    
+    // Re-render the notation
     const interactiveCanvas = document.getElementById('interactive-melody-notation-canvas');
     if (interactiveCanvas) {
-        window.refreshNotationFromProgression();
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
+        } else if (window.getNotationComposer) {
+            const composer = window.getNotationComposer();
+            if (composer && composer.render) {
+                composer.render();
+            }
+        }
     }
 }
 

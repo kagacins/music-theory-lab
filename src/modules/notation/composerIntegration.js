@@ -29,7 +29,9 @@ import { getInteractiveMelody, playMeasure } from '../audio/melodyGenerator.js';
 import { generateBassVoicing } from '../integration/bassAutoFill.js';
 import { showNoteTooltip, hideNoteTooltip } from '../ui/noteHighlighter.js';
 import { PageManager } from './pageManager.js';
-import { PAGE_CONFIG, getMeasurePagePosition } from './pageConfig.js';
+import { PAGE_CONFIG, getMeasurePagePosition, applyPaginationPreset, getTotalPages } from './pageConfig.js';
+import { PageLayoutManager } from './pageLayoutManager.js';
+import { PageNavigator } from './pageNavigator.js';
 
 // ============================================================================
 // NOTATION COMPOSER CLASS
@@ -45,12 +47,14 @@ export class NotationComposer {
       container: options.container || null, // DEPRECATED: Now using PageManager
       pageContainer: options.pageContainer || options.container?.parentElement || null, // Container for pages
       toolbarContainer: options.toolbarContainer || null,
+      pageNavigatorContainer: options.pageNavigatorContainer || null, // NEW: Container for page navigation
       measuresPerLine: options.measuresPerLine || 4,
       showMeasureNumbers: options.showMeasureNumbers !== false,
       showChordSymbols: options.showChordSymbols !== false,
       enableHarmonicColoring: options.enableHarmonicColoring !== false,
       enableMelodySuggestions: options.enableMelodySuggestions !== false,
-      viewMode: options.viewMode || PAGE_CONFIG.defaultViewMode, // single, two-page, continuous
+      viewMode: options.viewMode || PAGE_CONFIG.viewModes.SINGLE, // NEW: Default to single page
+      enablePagination: options.enablePagination !== false, // NEW: Enable pagination by default
     };
 
     // State management
@@ -63,6 +67,8 @@ export class NotationComposer {
     this.measureManager = new MeasureManager();
     this.toolbar = null;
     this.pageManager = null; // Will be initialized in init()
+    this.pageLayoutManager = null; // NEW: Page layout manager for pagination
+    this.pageNavigator = null; // NEW: Page navigation UI
 
     // Rendering state
     this.renderedSystem = null;
@@ -104,11 +110,34 @@ export class NotationComposer {
     // Get composition state
     this.compositionState = getCompositionState();
 
+    // NEW: Initialize PageLayoutManager if pagination is enabled
+    if (this.config.enablePagination) {
+      this.pageLayoutManager = new PageLayoutManager();
+      this.layoutManager.setPageLayoutManager(this.pageLayoutManager);
+    }
+
     // Create PageManager for multi-page rendering
     if (this.config.pageContainer) {
       this.pageManager = new PageManager(this.config.pageContainer, {
         viewMode: this.config.viewMode,
+        onPageChange: (pageIndex) => this.handlePageChange(pageIndex),
       });
+
+      // NEW: Link PageLayoutManager to PageManager
+      if (this.pageLayoutManager) {
+        this.pageManager.setPageLayoutManager(this.pageLayoutManager);
+      }
+    }
+
+    // NEW: Create page navigator if pagination enabled and container provided
+    if (this.config.enablePagination && this.config.pageNavigatorContainer) {
+      this.pageNavigator = new PageNavigator({
+        onPageChange: (pageIndex) => this.render(),
+        onMeasuresPerPageChange: (preset) => this.handleMeasuresPerPageChange(preset),
+      });
+      this.pageNavigator.setPageManager(this.pageManager);
+      this.pageNavigator.setPageLayoutManager(this.pageLayoutManager);
+      this.pageNavigator.create(this.config.pageNavigatorContainer);
     }
 
     // Create toolbar if container provided
@@ -217,6 +246,54 @@ export class NotationComposer {
 
     // Export methods to window for external access
     this.exportToWindow();
+  }
+
+  /**
+   * Handle page change event
+   * @param {number} pageIndex - New page index
+   */
+  handlePageChange(pageIndex) {
+    // Update layout manager's current page
+    if (this.layoutManager) {
+      this.layoutManager.setCurrentPageIndex(pageIndex);
+    }
+
+    // Update page navigator display
+    if (this.pageNavigator) {
+      this.pageNavigator.updateDisplay();
+    }
+
+    // Clear any ghost notes (they may be on the old page)
+    if (this.noteEditor) {
+      this.noteEditor.ghostNote = null;
+    }
+
+    // Re-render to show the new page
+    this.render();
+  }
+
+  /**
+   * Handle measures per page change
+   * @param {string} preset - Preset name ('8_MEASURES' or '16_MEASURES')
+   */
+  handleMeasuresPerPageChange(preset) {
+    // Apply the preset to page config
+    applyPaginationPreset(preset);
+
+    // Recalculate page layout
+    if (this.pageLayoutManager && this.compositionState) {
+      const totalMeasures = this.compositionState.getMeasureCount();
+      this.pageLayoutManager.calculatePageLayout(totalMeasures);
+    }
+
+    // Update page manager to create/remove pages as needed
+    if (this.pageManager) {
+      // Reset to first page when changing layout
+      this.pageManager.goToPage(0);
+    }
+
+    // Re-render with new layout
+    this.render();
   }
 
   /**
@@ -837,6 +914,12 @@ export class NotationComposer {
     // CRITICAL: Update layout manager with ACTUAL VexFlow positions (nuclear solution)
     // This eliminates coordinate mismatch by using real positions instead of calculations
     if (this.renderedSystem && this.renderedSystem.measures) {
+      // In pagination mode, we need to be careful - only the current page's measures have valid positions
+      // Clear old positions first, then set only current page measures
+      if (this.config.enablePagination && this.pageLayoutManager) {
+        // Clear all positions first
+        this.layoutManager.actualMeasurePositions.clear();
+      }
       this.layoutManager.setActualMeasurePositions(this.renderedSystem.measures);
     }
 
@@ -930,6 +1013,12 @@ export class NotationComposer {
    * @returns {Object} - Rendered system data
    */
   renderToPages(measures, key, timeSig) {
+    // NEW: If pagination is enabled, use PageLayoutManager
+    if (this.config.enablePagination && this.pageLayoutManager) {
+      return this.renderWithPagination(measures, key, timeSig);
+    }
+
+    // LEGACY: Original multi-page rendering (renders all pages)
     // Clear all existing pages
     this.pageManager.clearAllPages();
 
@@ -988,6 +1077,147 @@ export class NotationComposer {
         });
       }
     }
+
+    // Return combined rendered system
+    return {
+      measures: allRenderedMeasures,
+      noteRegions: allNoteRegions,
+    };
+  }
+
+  /**
+   * NEW: Render with pagination system (renders only current page)
+   * @param {Array} measures - All measures to render
+   * @param {string} key - Key signature
+   * @param {string} timeSig - Time signature
+   * @returns {Object} - Rendered system data
+   */
+  renderWithPagination(measures, key, timeSig) {
+    // Calculate page layout
+    this.pageLayoutManager.calculatePageLayout(measures.length);
+
+    // Get current page index
+    let currentPageIndex = this.pageManager.getCurrentPage();
+
+    // Ensure we have enough page canvases
+    const totalPages = this.pageLayoutManager.getTotalPages();
+
+    // CRITICAL: If current page is beyond the total pages (e.g., measures were removed),
+    // navigate back to the last valid page
+    if (currentPageIndex >= totalPages) {
+      const newPageIndex = Math.max(0, totalPages - 1);
+      this.pageManager.goToPage(newPageIndex);
+      currentPageIndex = newPageIndex;
+    }
+
+    while (this.pageManager.pages.length < totalPages) {
+      this.pageManager.addPage();
+    }
+
+    // Remove excess pages if we have too many
+    while (this.pageManager.pages.length > totalPages) {
+      const removedPage = this.pageManager.pages.pop();
+      if (removedPage.canvas.parentElement) {
+        removedPage.canvas.parentElement.removeChild(removedPage.canvas);
+      }
+    }
+
+    // Update PageManager layout to show only current page
+    this.pageManager.updateLayout();
+
+    // Get current page data
+    const currentPage = this.pageLayoutManager.getCurrentPage();
+    if (!currentPage) {
+      return { measures: [], noteRegions: [] };
+    }
+
+    const startMeasure = currentPage.startMeasure;
+    const endMeasure = currentPage.endMeasure;
+    const pageMeasures = measures.slice(startMeasure, endMeasure + 1);
+
+    // Get page canvas
+    const page = this.pageManager.getPage(currentPageIndex);
+    if (!page) {
+      return { measures: [], noteRegions: [] };
+    }
+
+    // Clear the current page
+    this.pageManager.clearPage(currentPageIndex);
+
+    // CRITICAL: Convert activeNotes from global measure indices to page-local indices
+    // activeNotes contains IDs like "10-0-D4" (global measure 10)
+    // But VexFlow needs "2-0-D4" (local measure 2 on page with startMeasure=8)
+    const pageLocalActiveNotes = new Set();
+    for (const noteId of this.activeNotes) {
+      const parts = noteId.split('-');
+      if (parts.length >= 3) {
+        const globalMeasureIndex = parseInt(parts[0], 10);
+        if (!isNaN(globalMeasureIndex) && globalMeasureIndex >= startMeasure && globalMeasureIndex <= endMeasure) {
+          // This note is on the current page, convert to page-local index
+          const localMeasureIndex = globalMeasureIndex - startMeasure;
+          const pageLocalNoteId = `${localMeasureIndex}-${parts.slice(1).join('-')}`;
+          pageLocalActiveNotes.add(pageLocalNoteId);
+        }
+      }
+    }
+
+    // Render this page's measures
+    const renderedPage = renderGrandStaffSystem(page.canvas, pageMeasures, {
+      measuresPerLine: this.config.measuresPerLine,
+      keySignature: key,
+      timeSignature: timeSig,
+      showMeasureNumbers: this.config.showMeasureNumbers,
+      startMeasureNumber: startMeasure + 1, // Measure numbers are 1-based
+      // Highlighting options
+      selectedMeasureIndex: this.selectedMeasureIndex - startMeasure, // Adjust for page offset
+      activeMeasureIndex: this.activeMeasureIndex - startMeasure, // Adjust for page offset
+      activeNotes: pageLocalActiveNotes, // CRITICAL: Use page-local note IDs
+      enableHarmonicColoring: this.config.enableHarmonicColoring,
+    });
+
+    const allRenderedMeasures = [];
+    const allNoteRegions = [];
+
+    // Collect rendered measures (adjust indices back to global)
+    if (renderedPage && renderedPage.measures) {
+      renderedPage.measures.forEach((measure, localIndex) => {
+        const globalIndex = startMeasure + localIndex;
+        allRenderedMeasures.push({
+          ...measure,
+          index: globalIndex,
+          pageIndex: currentPageIndex,
+        });
+
+        // Register measure with page manager
+        if (measure.actualBounds) {
+          this.pageManager.registerMeasure(currentPageIndex, globalIndex, measure.actualBounds);
+        }
+      });
+    }
+
+    // Collect note regions (adjust indices to global)
+    if (renderedPage && renderedPage.noteRegions) {
+      renderedPage.noteRegions.forEach(region => {
+        allNoteRegions.push({
+          ...region,
+          measureIndex: startMeasure + region.measureIndex,
+          pageIndex: currentPageIndex,
+        });
+      });
+    }
+
+    // Update page navigator display
+    if (this.pageNavigator) {
+      this.pageNavigator.updateDisplay();
+    }
+
+    // CRITICAL: Re-attach event listeners to new page canvases
+    if (this.noteEditor) {
+      this.noteEditor.attachPageEventListeners();
+    }
+
+    // CRITICAL: Re-attach composer integration event listeners (for measure selection, hold-to-play)
+    this.attachPageCanvasEvents();
 
     // Return combined rendered system
     return {
@@ -1230,6 +1460,17 @@ export class NotationComposer {
     const prevIndex = this.activeMeasureIndex;
     this.activeMeasureIndex = index;
 
+    // PAGINATION: Auto-navigate to the page containing the active measure
+    if (this.config.enablePagination && this.pageLayoutManager && index >= 0) {
+      const pageForMeasure = this.pageLayoutManager.getPageForMeasure(index);
+      if (pageForMeasure && pageForMeasure.pageIndex !== this.pageManager.getCurrentPage()) {
+        // Navigate to the page containing this measure
+        this.pageManager.goToPage(pageForMeasure.pageIndex);
+        // goToPage triggers handlePageChange which calls render(), so no need to render again
+        return;
+      }
+    }
+
     // Re-render to show yellow highlight
     if (prevIndex !== index) {
       this.render();
@@ -1250,6 +1491,22 @@ export class NotationComposer {
    */
   addActiveNote(noteId) {
     this.activeNotes.add(noteId);
+
+    // PAGINATION: Navigate to page containing this note if needed
+    if (this.config.enablePagination && this.pageLayoutManager && noteId) {
+      // Extract measure index from noteId (format: "measureIndex-beat-pitch")
+      const measureIndex = parseInt(noteId.split('-')[0], 10);
+      if (!isNaN(measureIndex)) {
+        const pageForMeasure = this.pageLayoutManager.getPageForMeasure(measureIndex);
+        if (pageForMeasure) {
+          if (pageForMeasure.pageIndex !== this.pageManager.getCurrentPage()) {
+            this.pageManager.goToPage(pageForMeasure.pageIndex);
+            return; // goToPage triggers render via handlePageChange
+          }
+        }
+      }
+    }
+
     this.render();
   }
 

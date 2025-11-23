@@ -209,12 +209,23 @@ function generateFirstChordBass(chord, chordNotes, pattern, timeSignature) {
  * @returns {object} Bass voicing
  */
 function generateVoiceLedBass(chord, chordNotes, previousChord, pattern, timeSignature) {
-    // Get the bass note from previous chord (assume it's the first note)
-    const previousBass = `${previousChord.root}2`;
+    // CRITICAL FIX: Get the ACTUAL bass note from previous chord's generated bass
+    // Don't assume it was the root in octave 2 - use the actual generated note!
+    let previousBass = `${previousChord.root}2`; // Default fallback
+
+    // If previousChord has actual bass notes, use the first one
+    if (previousChord.bass && previousChord.bass.notes && previousChord.bass.notes.length > 0) {
+        previousBass = previousChord.bass.notes[0].pitch || previousBass;
+    }
+
     const previousMidi = noteToMidi(previousBass);
 
-    // Find closest note in current chord to previous bass
-    const closestNote = findClosestNote(chordNotes, previousMidi);
+    // CRITICAL: For bass voice leading, constrain to octave 2 only to prevent 8va markings
+    // Filter chordNotes to only include octave 2 notes
+    const bassOctaveNotes = chordNotes.filter(note => note.endsWith('2'));
+
+    // Find closest note in current chord to previous bass (octave 2 only)
+    const closestNote = findClosestNote(bassOctaveNotes, previousMidi);
 
     // Phase 1C Round 4 Fix: Only use voice leading (closestNote) for whole-note pattern
     // All other patterns (root-fifth, arpeggio, alberti, walking) should use the actual chord root

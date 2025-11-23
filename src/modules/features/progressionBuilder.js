@@ -8666,9 +8666,20 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
                 if (measure && measure.notation && measure.notation.bass && chord.notes && chord.notes.length > 0) {
                     const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
                     if (voicedNotes.length > 0) {
+                        // CRITICAL: Shift chord voicing down one octave for bass clef
+                        // chord.notes are typically in treble range (C4-C5)
+                        // Bass clef needs them in C3-C4 range to avoid ottava markings
+                        const bassVoicing = voicedNotes.map(note => {
+                            const match = note.match(/^([A-G][#b]?)(\d+)$/);
+                            if (!match) return note;
+                            const noteName = match[1];
+                            const octave = parseInt(match[2], 10);
+                            return `${noteName}${octave - 1}`; // Shift down one octave
+                        });
+
                         measure.notation.bass.voices[0].notes = [{
                             type: 'note',
-                            pitches: [...voicedNotes],
+                            pitches: bassVoicing,
                             duration: '1n',
                             beat: 0,
                             dotted: false

@@ -173,20 +173,27 @@ export function initEnhancedNotation(options = {}) {
     return null;
   }
 
-  // Get page container (parent of the canvas)
-  const pageContainer = primaryCanvas.parentElement;
+  // Get page container (use the dedicated multi-page container)
+  const pageContainer = document.getElementById('notation-pages-container') || primaryCanvas.parentElement;
 
   // Hide the old single canvas (PageManager will create new page canvases)
   primaryCanvas.style.display = 'none';
 
-  // Check for existing toolbar container or create one
+  // Check for existing toolbar container
+  // Note: Toolbar creation is disabled for pagination mode as it may already exist in HTML
   toolbarContainer = document.getElementById(toolbarContainerId);
-  if (!toolbarContainer && createToolbar) {
-    // Create toolbar container before the canvas
-    toolbarContainer = document.createElement('div');
-    toolbarContainer.id = toolbarContainerId;
-    toolbarContainer.className = 'notation-toolbar-container mb-4';
-    pageContainer.insertBefore(toolbarContainer, primaryCanvas);
+  if (!toolbarContainer && createToolbar && primaryCanvas.parentElement) {
+    // Only create toolbar if we have a valid parent element
+    // For pagination mode, toolbar should be defined in HTML
+    try {
+      toolbarContainer = document.createElement('div');
+      toolbarContainer.id = toolbarContainerId;
+      toolbarContainer.className = 'notation-toolbar-container mb-4';
+      primaryCanvas.parentElement.insertBefore(toolbarContainer, primaryCanvas);
+    } catch (e) {
+      console.warn('Could not create toolbar container:', e);
+      toolbarContainer = null;
+    }
   }
 
   // Create or reuse the notation composer
@@ -197,16 +204,22 @@ export function initEnhancedNotation(options = {}) {
   }
 
 
-  // Create new notation composer with PageManager
+  // Get page navigator container
+  const pageNavigatorContainer = document.getElementById('notation-page-navigator');
+
+  // Create new notation composer with PageManager and Pagination
   notationComposer = new NotationComposer({
     container: primaryCanvas, // Legacy - kept for backward compat
     pageContainer: pageContainer, // Multi-page container
     toolbarContainer: toolbarContainer,
+    pageNavigatorContainer: pageNavigatorContainer, // NEW: Page navigation controls
     measuresPerLine: 4,
     showMeasureNumbers: true,
     showChordSymbols: true,
     enableHarmonicColoring: true,
     enableMelodySuggestions: true,
+    enablePagination: true, // NEW: Enable pagination
+    viewMode: 'single', // NEW: Single page view
     onUpdate: handleNotationUpdate,
     onSelectionChange: handleSelectionChange,
     onNoteAdded: handleNoteAdded,

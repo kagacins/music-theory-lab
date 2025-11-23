@@ -9,8 +9,10 @@ export class PageManager {
   constructor(container, options = {}) {
     this.container = container;
     this.pages = []; // Array of page objects
-    this.currentViewMode = options.viewMode || PAGE_CONFIG.defaultViewMode;
+    this.currentViewMode = options.viewMode || PAGE_CONFIG.viewModes.SINGLE;
     this.currentPage = 0; // For single page view
+    this.pageLayoutManager = null; // Reference to PageLayoutManager
+    this.onPageChange = options.onPageChange || null; // Callback when page changes
 
     this.init();
   }
@@ -18,6 +20,14 @@ export class PageManager {
   init() {
     // Create initial page
     this.addPage();
+  }
+
+  /**
+   * Set the PageLayoutManager reference
+   * @param {PageLayoutManager} pageLayoutManager - Page layout manager instance
+   */
+  setPageLayoutManager(pageLayoutManager) {
+    this.pageLayoutManager = pageLayoutManager;
   }
 
   /**
@@ -198,30 +208,58 @@ export class PageManager {
   /**
    * Navigate to specific page (for single/two-page view)
    * @param {number} pageIndex - Page index
+   * @returns {boolean} - True if navigation was successful
    */
   goToPage(pageIndex) {
     if (pageIndex < 0 || pageIndex >= this.pages.length) {
-      return;
+      return false;
     }
 
     this.currentPage = pageIndex;
+
+    // Sync with PageLayoutManager if available
+    if (this.pageLayoutManager) {
+      this.pageLayoutManager.setCurrentPage(pageIndex);
+    }
+
     this.updateLayout();
+
+    // Trigger callback
+    if (this.onPageChange) {
+      this.onPageChange(pageIndex);
+    }
+
+    return true;
   }
 
   /**
    * Go to next page
+   * @returns {boolean} - True if navigation was successful
    */
   nextPage() {
     const increment = this.currentViewMode === PAGE_CONFIG.viewModes.TWO_PAGE ? 2 : 1;
-    this.goToPage(this.currentPage + increment);
+    const nextPage = this.currentPage + increment;
+
+    if (nextPage >= this.pages.length) {
+      return false;
+    }
+
+    return this.goToPage(nextPage);
   }
 
   /**
    * Go to previous page
+   * @returns {boolean} - True if navigation was successful
    */
   previousPage() {
     const decrement = this.currentViewMode === PAGE_CONFIG.viewModes.TWO_PAGE ? 2 : 1;
-    this.goToPage(Math.max(0, this.currentPage - decrement));
+    const prevPage = Math.max(0, this.currentPage - decrement);
+
+    if (prevPage === this.currentPage) {
+      return false;
+    }
+
+    return this.goToPage(prevPage);
   }
 
   /**
@@ -230,6 +268,19 @@ export class PageManager {
    */
   getCurrentPage() {
     return this.currentPage;
+  }
+
+  /**
+   * Get page metadata for display
+   * @returns {Object} - { currentPage, totalPages, canGoNext, canGoPrev }
+   */
+  getPageMetadata() {
+    return {
+      currentPage: this.currentPage + 1, // 1-based for display
+      totalPages: this.pages.length,
+      canGoNext: this.currentPage < this.pages.length - 1,
+      canGoPrev: this.currentPage > 0,
+    };
   }
 
   /**
