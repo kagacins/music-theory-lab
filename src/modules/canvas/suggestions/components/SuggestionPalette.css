@@ -1,0 +1,371 @@
+/**
+ * Suggestion Palette Styles
+ * Styling for integrated suggestion UI components
+ */
+
+/* Base Palette Styling */
+.suggestion-palette {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    box-sizing: border-box;
+}
+
+.suggestion-palette * {
+    box-sizing: border-box;
+}
+
+/* Palette Content */
+.suggestion-palette__content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* Header */
+.suggestion-palette__header {
+    flex-shrink: 0;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+}
+
+.suggestion-palette__title {
+    flex: 1;
+    /* Title grows to push close button to the right */
+}
+
+/* Suggestions List */
+.suggestion-palette__list {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.suggestion-palette__list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.suggestion-palette__list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.suggestion-palette__list::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+}
+
+.suggestion-palette__list::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Suggestion Items */
+.suggestion-palette__item {
+    transition: outline 0.15s ease, outline-offset 0.15s ease;
+    outline: 2px solid transparent !important;
+    outline-offset: -2px !important;
+    background-color: transparent !important;
+    min-height: 48px !important;
+    box-sizing: border-box !important;
+    /* Prevent resizing by using outline instead of border and fixed min-height */
+}
+
+.suggestion-palette__item:hover {
+    outline-color: rgba(74, 158, 255, 0.5) !important;
+    background-color: transparent !important;
+    /* Only outline on hover, NO background color */
+}
+
+.suggestion-palette__item:active {
+    outline-color: rgba(74, 158, 255, 0.7) !important;
+    background-color: transparent !important;
+}
+
+.suggestion-palette__item[aria-selected="true"] {
+    outline-color: #4a9eff !important;
+    outline-width: 2px !important;
+    background-color: transparent !important;
+    /* Only outline when selected, NO background color */
+}
+
+.suggestion-palette__number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-color: rgba(74, 158, 255, 0.1);
+}
+
+/* Footer */
+.suggestion-palette__footer {
+    flex-shrink: 0;
+    background-color: #fafafa;
+}
+
+/* Melody Specific Styles */
+.suggestion-palette--melody .melody-suggestion__note {
+    letter-spacing: 0.5px;
+}
+
+.melody-suggestion__category {
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.melody-suggestion__score {
+    padding: 2px;
+}
+
+.suggestion-palette__item-content--melody {
+    min-height: 32px;
+}
+
+/* Chord Specific Styles */
+.suggestion-palette--chord .chord-suggestion__name {
+    letter-spacing: 0.3px;
+}
+
+.chord-suggestion__reason {
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.chord-suggestion__stars {
+    letter-spacing: 1px;
+}
+
+.chord-suggestion__inversion {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* Filter Buttons */
+.melody-suggestion__filters button {
+    transition: all 0.15s ease;
+}
+
+.melody-suggestion__filters button:hover {
+    background-color: #e3f2fd !important;
+    border-color: #4a9eff !important;
+}
+
+.melody-suggestion__filters button:active {
+    transform: scale(0.95);
+}
+
+.melody-suggestion__filters button.active {
+    background-color: #4a9eff !important;
+    color: white !important;
+    border-color: #4a9eff !important;
+}
+
+/* Chord Controls */
+.chord-suggestion__controls select {
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+}
+
+.chord-suggestion__controls select:hover {
+    border-color: #4a9eff !important;
+}
+
+.chord-suggestion__controls select:focus {
+    outline: none;
+    border-color: #4a9eff !important;
+    box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.1);
+}
+
+/* Preview Hint */
+.preview-hint {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-2px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Animations for Palette */
+.suggestion-palette.entering {
+    animation: paletteEnter 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.suggestion-palette.leaving {
+    animation: paletteLeave 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes paletteEnter {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes paletteLeave {
+    from {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.95) translateY(-10px);
+    }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+    .suggestion-palette,
+    .suggestion-palette__item,
+    .melody-suggestion__filters button,
+    .chord-suggestion__controls select {
+        transition: none !important;
+        animation: none !important;
+    }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+    .suggestion-palette {
+        border: 2px solid #000 !important;
+    }
+
+    .suggestion-palette__item[aria-selected="true"] {
+        border-left-width: 4px;
+        background-color: #000 !important;
+        color: #fff !important;
+    }
+
+    .melody-suggestion__category,
+    .chord-suggestion__inversion {
+        border: 1px solid #000;
+    }
+}
+
+/* Focus Styles for Accessibility */
+.suggestion-palette:focus-within {
+    box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.3);
+}
+
+.suggestion-palette__item:focus {
+    outline: 2px solid #4a9eff;
+    outline-offset: -2px;
+}
+
+/* Dark Mode Support (if needed in future) */
+@media (prefers-color-scheme: dark) {
+    .suggestion-palette {
+        background-color: #2d2d2d;
+        border-color: #444;
+        color: #e0e0e0;
+    }
+
+    .suggestion-palette__header {
+        border-bottom-color: #444;
+    }
+
+    .suggestion-palette__footer {
+        background-color: #252525;
+        border-top-color: #444;
+    }
+
+    .suggestion-palette__item:hover {
+        background-color: transparent !important;
+        outline-color: rgba(74, 158, 255, 0.6) !important;
+    }
+
+    .suggestion-palette__item[aria-selected="true"] {
+        background-color: transparent !important;
+        outline-color: #4a9eff !important;
+    }
+
+    .suggestion-palette__list::-webkit-scrollbar-track {
+        background: #353535;
+    }
+
+    .suggestion-palette__list::-webkit-scrollbar-thumb {
+        background: #666;
+    }
+
+    .melody-suggestion__filters button,
+    .chord-suggestion__controls select {
+        background-color: #353535;
+        border-color: #555;
+        color: #e0e0e0;
+    }
+
+    .melody-suggestion__filters button:hover {
+        background-color: #1e3a5f !important;
+    }
+}
+
+/* Touch Device Optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .suggestion-palette__item {
+        padding: 12px !important;
+        min-height: 44px;
+    }
+
+    .suggestion-palette__number {
+        width: 24px;
+        height: 24px;
+        font-size: 14px;
+    }
+
+    .melody-suggestion__filters button,
+    .chord-suggestion__controls select {
+        padding: 8px 12px !important;
+        font-size: 14px !important;
+        min-height: 44px;
+    }
+}
+
+/* Loading State */
+.suggestion-palette.loading {
+    pointer-events: none;
+}
+
+.suggestion-palette.loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: #666;
+}
+
+/* Empty State */
+.suggestion-palette__empty {
+    padding: 24px;
+    text-align: center;
+    color: #999;
+    font-style: italic;
+}
+
+.suggestion-palette__empty-icon {
+    font-size: 32px;
+    margin-bottom: 8px;
+    opacity: 0.5;
+}

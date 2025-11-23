@@ -330,3 +330,92 @@ export function getLHNotes(rootNote, lhType, lhInversion = 0, key, lhOctaveShift
 
     return notes;
 }
+
+// ============================================================================
+// PITCH/PITCHES STANDARDIZATION HELPERS
+// ============================================================================
+// ⚠️ IMPORTANT: Use these functions instead of directly accessing note.pitch or note.pitches
+// See: docs/pitch-pitches-standardization.md for full documentation
+
+/**
+ * Safely get all pitches from a note object
+ * Handles both legacy single-note format (note.pitch) and polyphonic format (note.pitches)
+ *
+ * @param {Object} note - Note object
+ * @returns {Array<string>} Array of pitch strings (e.g., ["C4", "E4", "G4"])
+ *
+ * @example
+ * // Single note (legacy format)
+ * const note1 = { pitch: 'C4', duration: '4n' };
+ * getNotePitches(note1); // ['C4']
+ *
+ * @example
+ * // Chord (polyphonic format)
+ * const note2 = { pitches: ['C4', 'E4', 'G4'], duration: '4n' };
+ * getNotePitches(note2); // ['C4', 'E4', 'G4']
+ */
+export function getNotePitches(note) {
+  if (!note) return [];
+
+  // Prefer note.pitches (polyphonic format - standard going forward)
+  if (note.pitches && Array.isArray(note.pitches) && note.pitches.length > 0) {
+    return note.pitches;
+  }
+
+  // Fallback to note.pitch (legacy single-note format)
+  if (note.pitch && typeof note.pitch === 'string') {
+    return [note.pitch];
+  }
+
+  // No valid pitch data
+  return [];
+}
+
+/**
+ * Check if a note has any pitch data (single or polyphonic)
+ *
+ * @param {Object} note - Note object
+ * @returns {boolean} True if note has pitch or pitches
+ *
+ * @example
+ * hasPitch({ pitch: 'C4' });           // true
+ * hasPitch({ pitches: ['C4', 'E4'] }); // true
+ * hasPitch({ type: 'rest' });          // false
+ */
+export function hasPitch(note) {
+  return getNotePitches(note).length > 0;
+}
+
+/**
+ * Get the primary (first/lowest) pitch from a note
+ * Useful for situations that need a single representative pitch (UI display, analysis, etc.)
+ *
+ * @param {Object} note - Note object
+ * @returns {string|null} Pitch string or null if no pitches
+ *
+ * @example
+ * // Single note
+ * getPrimaryPitch({ pitch: 'C4' }); // 'C4'
+ *
+ * @example
+ * // Chord - returns lowest pitch
+ * getPrimaryPitch({ pitches: ['C4', 'E4', 'G4'] }); // 'C4'
+ */
+export function getPrimaryPitch(note) {
+  const pitches = getNotePitches(note);
+  return pitches.length > 0 ? pitches[0] : null;
+}
+
+/**
+ * Check if a note is polyphonic (has multiple pitches)
+ *
+ * @param {Object} note - Note object
+ * @returns {boolean} True if note has more than one pitch
+ *
+ * @example
+ * isPolyphonic({ pitch: 'C4' });                   // false
+ * isPolyphonic({ pitches: ['C4', 'E4', 'G4'] });   // true
+ */
+export function isPolyphonic(note) {
+  return getNotePitches(note).length > 1;
+}

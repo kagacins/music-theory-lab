@@ -74,6 +74,7 @@ export class NoteEditor {
 
     // Selection
     this.selectedNotes = new Set(); // Set of note IDs
+    this.hideSelectionHighlight = false; // PHASE 1.4: Esc hides visual, keeps selection for polyphony
     this.hoveredPosition = null;
     this.ghostNote = null;
 
@@ -259,14 +260,63 @@ export class NoteEditor {
     e.preventDefault();
 
     if (staffPosition.pitch) {
-      // Check if Shift is held and there's a note at same time position to add pitch to (polyphony)
-      if (e.shiftKey && this.canAddPitchToNearbyNote(staffPosition)) {
+      // PHASE 1.4: Check if there's a selected note in the same measure to add polyphony to
+      // This allows Alt+Click (without Shift) to add pitches to selected notes
+      const selectedNoteInMeasure = this.getSelectedNoteInMeasure(staffPosition);
+
+      if (selectedNoteInMeasure) {
+        // Add this pitch to the selected note (polyphony)
+        console.log('[NoteEditor] Adding polyphony to selected note:', selectedNoteInMeasure);
+        this.onPolyphonyAdd({
+          measureIndex: selectedNoteInMeasure.measureIndex,
+          staff: selectedNoteInMeasure.staff,
+          noteIndex: selectedNoteInMeasure.noteIndex,
+          pitch: staffPosition.pitch,
+        });
+      } else if (e.shiftKey && this.canAddPitchToNearbyNote(staffPosition)) {
+        // Legacy: Shift+Alt+Click adds to last note in measure (kept for compatibility)
+        console.log('[NoteEditor] Using legacy Shift+Alt+Click polyphony');
         this.addPitchToNearbyNote(staffPosition);
       } else {
-        // Add a new note at this position
+        // Add a new note at this position (different measure or no selection)
+        console.log('[NoteEditor] Adding new note at position');
         this.addNoteAtPosition(staffPosition);
       }
     }
+  }
+
+  /**
+   * Get a selected note in the same measure and staff as the given position
+   * PHASE 1.4: Used for polyphony addition via Alt+Click
+   * @param {Object} staffPosition - Staff position data
+   * @returns {Object|null} - Selected note region or null
+   */
+  getSelectedNoteInMeasure(staffPosition) {
+    if (!staffPosition.measure || !this.noteRegions || this.selectedNotes.size === 0) {
+      console.log('[NoteEditor] getSelectedNoteInMeasure: No measure, regions, or selection');
+      return null;
+    }
+
+    console.log('[NoteEditor] Looking for selected note in measure', staffPosition.measure.index, 'staff', staffPosition.staff);
+    console.log('[NoteEditor] Currently selected notes:', Array.from(this.selectedNotes));
+
+    // Find selected notes in the same measure and staff
+    for (const noteId of this.selectedNotes) {
+      const region = this.noteRegions.find(r => {
+        const regionId = this.createNoteId(r.measureIndex, r.staff, r.noteIndex);
+        return regionId === noteId &&
+               r.measureIndex === staffPosition.measure.index &&
+               r.staff === staffPosition.staff;
+      });
+
+      if (region) {
+        console.log('[NoteEditor] Found selected note in same measure:', region);
+        return region;
+      }
+    }
+
+    console.log('[NoteEditor] No selected note found in this measure');
+    return null;
   }
 
   /**
@@ -401,18 +451,24 @@ export class NoteEditor {
       this.selectAll();
     }
 
-    // Escape to clear selection
+    // Escape to hide selection highlight (but keep selection for polyphony)
     if (e.key === 'Escape') {
-      this.clearSelection();
-      this.renderOverlay();
+      if (this.selectedNotes.size > 0) {
+        e.preventDefault();
+        console.log('[NoteEditor] Esc pressed - hiding selection highlight');
+        this.hideSelectionHighlight = true;
+        this.renderOverlay();
+      }
     }
 
     // Arrow keys to move selected notes
     if (this.selectedNotes.size > 0) {
       if (e.key === 'ArrowUp') {
+        console.log('[NoteEditor] ArrowUp pressed, moving notes up');
         e.preventDefault();
         this.moveSelectedNotes(1); // Up one step
       } else if (e.key === 'ArrowDown') {
+        console.log('[NoteEditor] ArrowDown pressed, moving notes down');
         e.preventDefault();
         this.moveSelectedNotes(-1); // Down one step
       }
@@ -665,6 +721,7 @@ export class NoteEditor {
    * @param {number} steps - Number of steps (positive = up, negative = down)
    */
   moveSelectedNotes(steps) {
+    console.log('[NoteEditor] moveSelectedNotes called with steps:', steps, 'selectedNotes:', this.selectedNotes);
     const moves = [];
 
     for (const noteId of this.selectedNotes) {
@@ -683,6 +740,8 @@ export class NoteEditor {
         steps,
       });
     }
+
+    console.log('[NoteEditor] Prepared moves:', moves);
 
     if (moves.length > 0) {
       this.onNoteMove(moves);
@@ -798,6 +857,7 @@ export class NoteEditor {
    */
   selectNote(noteId) {
     this.selectedNotes.add(noteId);
+    this.hideSelectionHighlight = false; // Show highlight when selecting
     this.onNoteSelect(Array.from(this.selectedNotes));
     this.renderOverlay();
   }
@@ -812,6 +872,7 @@ export class NoteEditor {
     } else {
       this.selectedNotes.add(noteId);
     }
+    this.hideSelectionHighlight = false; // Show highlight when toggling
     this.onNoteSelect(Array.from(this.selectedNotes));
     this.renderOverlay();
   }
@@ -1114,16 +1175,24 @@ export class NoteEditor {
    * PHASE 1A: Drawing directly on main canvas - triggers full re-render!
    */
   renderOverlay() {
-    // PHASE 1A: For ghost notes on main canvas, trigger full re-render
+    // PHASE 1A/1.3: For ghost notes and selection on main canvas, trigger full re-render
     // The composer's debouncing (60fps limit) prevents excessive renders
-    if (this.ghostNote && this.composerIntegration) {
-      // Queue a re-render which will redraw VexFlow + call our drawGhostNote
+    // Don't re-render for hidden selection highlights - only for visible selection or ghost notes
+    const hasVisibleSelection = this.selectedNotes.size > 0 && !this.hideSelectionHighlight;
+    if ((this.ghostNote || hasVisibleSelection) && this.composerIntegration) {
+      // Queue a re-render which will redraw VexFlow + call our draw methods
+      this.composerIntegration.render();
+      return;
+    }
+
+    // If selection is hidden, we need to trigger one render to clear the highlights
+    if (this.selectedNotes.size > 0 && this.hideSelectionHighlight && this.composerIntegration) {
       this.composerIntegration.render();
       return;
     }
 
     // Selection highlighting: Only works in legacy single-canvas mode
-    // Multi-page mode: TODO - implement selection rendering on page canvases
+    // Multi-page mode is handled by composerIntegration calling drawSelectionHighlightsMultiPage
     if (this.overlayCanvas && !this.pageManager) {
       const overlayCtx = this.overlayCanvas.getContext('2d');
       overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
@@ -1137,6 +1206,9 @@ export class NoteEditor {
    */
   drawSelectionHighlights(ctx) {
     if (!this.noteRegions || this.selectedNotes.size === 0) return;
+
+    // PHASE 1.4: Don't draw highlights if user pressed Esc to hide them
+    if (this.hideSelectionHighlight) return;
 
     ctx.save();
     ctx.strokeStyle = SELECTION_COLORS.selected;
@@ -1170,6 +1242,69 @@ export class NoteEditor {
     }
 
     ctx.restore();
+  }
+
+  /**
+   * Draw selection highlights on multi-page layout
+   * PHASE 1.3: Note Selection and Editing - Multi-page selection highlighting
+   * @param {PageManager} pageManager - Page manager instance
+   */
+  drawSelectionHighlightsMultiPage(pageManager) {
+    if (!this.noteRegions || this.selectedNotes.size === 0 || !pageManager) return;
+
+    // PHASE 1.4: Don't draw highlights if user pressed Esc to hide them
+    if (this.hideSelectionHighlight) {
+      console.log('[NoteEditor] Skipping highlight rendering (hideSelectionHighlight=true)');
+      return;
+    }
+
+    // Group selected notes by page
+    const notesByPage = new Map();
+
+    for (const noteId of this.selectedNotes) {
+      // Find the region for this note
+      const region = this.noteRegions.find(r => {
+        const regionId = this.createNoteId(r.measureIndex, r.staff, r.noteIndex);
+        return regionId === noteId;
+      });
+
+      if (region && region.bounds) {
+        // Find which page contains this measure
+        const page = pageManager.getPageForMeasure(region.measureIndex);
+        if (page) {
+          if (!notesByPage.has(page)) {
+            notesByPage.set(page, []);
+          }
+          notesByPage.get(page).push(region);
+        }
+      }
+    }
+
+    // Draw highlights on each page
+    for (const [page, regions] of notesByPage) {
+      const ctx = page.canvas.getContext('2d');
+
+      ctx.save();
+      ctx.strokeStyle = SELECTION_COLORS.selected;
+      ctx.lineWidth = 2;
+      ctx.fillStyle = SELECTION_COLORS.hover;
+
+      // Draw highlight for each selected note on this page
+      for (const region of regions) {
+        const { x, y, width, height } = region.bounds;
+
+        // PHASE 1.3: Drawing on page canvas - use layout coordinates directly!
+        // Same coordinate system as VexFlow, same as ghost note rendering
+
+        // Draw filled background
+        ctx.fillRect(x - 2, y - 2, width + 4, height + 4);
+
+        // Draw border
+        ctx.strokeRect(x - 2, y - 2, width + 4, height + 4);
+      }
+
+      ctx.restore();
+    }
   }
 
   /**

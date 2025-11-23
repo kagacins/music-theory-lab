@@ -1,5 +1,8 @@
 /* Modern Visual Overhaul - Glassmorphism & Smooth Animations */
 
+/* Integrated Canvas Suggestions System */
+@import './src/modules/canvas/suggestions/components/SuggestionPalette.css?v=9';
+
 :root {
     --builder-color: #f59e0b; /* Amber */
     --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

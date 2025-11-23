@@ -977,6 +977,18 @@ export class NotationComposer {
       }
     }
 
+    // PHASE 1.3: Draw selection highlights after VexFlow rendering
+    if (this.noteEditor && this.noteEditor.selectedNotes && this.noteEditor.selectedNotes.size > 0) {
+      if (this.pageManager) {
+        // Multi-page: Draw selection highlights on all pages that contain selected notes
+        this.noteEditor.drawSelectionHighlightsMultiPage(this.pageManager);
+      } else {
+        // Legacy single canvas
+        const ctx = this.config.container.getContext('2d');
+        this.noteEditor.drawSelectionHighlights(ctx);
+      }
+    }
+
     // Notify listeners
     this.onUpdate();
   }

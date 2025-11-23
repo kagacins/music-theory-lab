@@ -3207,50 +3207,67 @@ export function playMeasure(measureIndex) {
             const noteDuration = note.duration ? Tone.Time(note.duration).toSeconds() : 0.5;
             const noteStartTime = startTime + delay;
 
-            console.log('[PlayMeasure] Triggering melody note:', note.pitch, 'at time', noteStartTime, 'delay', delay, 'duration', noteDuration);
+            // PHASE 1.4: Handle both single notes (pitch) and chords (pitches)
+            const notesToPlay = note.pitches || (note.pitch ? [note.pitch] : []);
 
-            // Schedule note attack/release at exact time using Tone.js
+            if (notesToPlay.length === 0) {
+                console.warn('[PlayMeasure] Melody note has no pitch or pitches:', note);
+                return;
+            }
+
+            console.log('[PlayMeasure] Triggering melody note(s):', notesToPlay, 'at time', noteStartTime, 'delay', delay, 'duration', noteDuration);
+
+            // Schedule all pitches in the chord at exact time using Tone.js
             if (synth) {
-                synth.triggerAttackRelease(note.pitch, noteDuration, noteStartTime);
+                notesToPlay.forEach(pitch => {
+                    synth.triggerAttackRelease(pitch, noteDuration, noteStartTime);
+                });
             } else {
                 console.error('[PlayMeasure] Cannot play melody note - synth is NULL');
             }
 
             // Use setTimeout for visual feedback since it needs DOM updates
             const melodyTimeoutId = setTimeout(() => {
-                // Add to activeNotes for highlighting (format: "measure-beat-pitch")
                 const noteBeat = typeof note.beat === 'number' ? note.beat : index;
-                const noteId = `${measureIndex}-${noteBeat}-${note.pitch}`;
-                activeNotes.add(noteId);
 
-                // Notify new notation system for red note highlighting
-                if (window.addNotationActiveNote) {
-                    window.addNotationActiveNote(noteId);
-                }
+                // Add to activeNotes for highlighting (each pitch in the chord)
+                notesToPlay.forEach(pitch => {
+                    const noteId = `${measureIndex}-${noteBeat}-${pitch}`;
+                    activeNotes.add(noteId);
+
+                    // Notify new notation system for red note highlighting
+                    if (window.addNotationActiveNote) {
+                        window.addNotationActiveNote(noteId);
+                    }
+
+                    // Visual feedback on keyboard
+                    const keyEl = document.getElementById(getNoteKeyId(pitch));
+                    if (keyEl) {
+                        keyEl.classList.add('active-melody-playback');
+                    }
+                });
 
                 // Update canvas to show note highlighting
                 updateCanvas();
 
-                // Visual feedback on keyboard
-                const keyEl = document.getElementById(getNoteKeyId(note.pitch));
-                if (keyEl) {
-                    keyEl.classList.add('active-melody-playback');
-                }
-
                 // Remove highlights after note duration
                 const melodyCleanupId = setTimeout(() => {
-                    activeNotes.delete(noteId);
+                    notesToPlay.forEach(pitch => {
+                        const noteId = `${measureIndex}-${noteBeat}-${pitch}`;
+                        activeNotes.delete(noteId);
 
-                    // Notify new notation system to remove red highlighting
-                    if (window.removeNotationActiveNote) {
-                        window.removeNotationActiveNote(noteId);
-                    }
+                        // Notify new notation system to remove red highlighting
+                        if (window.removeNotationActiveNote) {
+                            window.removeNotationActiveNote(noteId);
+                        }
+
+                        const keyEl = document.getElementById(getNoteKeyId(pitch));
+                        if (keyEl) {
+                            keyEl.classList.remove('active-melody-playback');
+                        }
+                    });
 
                     updateCanvas();
-
-                    if (keyEl) {
-                        keyEl.classList.remove('active-melody-playback');
-                    }
                 }, noteDuration * 1000);
                 measurePlaybackTimeouts.push(melodyCleanupId);
             }, delay * 1000);
@@ -3696,31 +3713,48 @@ export function playAllMelody() {
         // Get effective dynamic for this note (either stored or inherited)
         const effectiveDynamic = noteData.dynamic || getEffectiveDynamicForNote(noteData.noteIndex);
         const volume = getVolumeFromDynamic(effectiveDynamic);
-        
+
         // Set volume before playing (convert linear volume 0-1 to decibels)
         synth.volume.value = Tone.gainToDb(volume);
-        
+
+        // PHASE 1.4: Handle both single notes (pitch) and chords (pitches)
+        const notesToPlay = noteData.pitches || (noteData.pitch ? [noteData.pitch] : []);
+
+        if (notesToPlay.length === 0) {
+            console.warn('[playAllMelody] Note has no pitch or pitches:', noteData);
+            return;
+        }
+
         // Use the passed-in time parameter directly (Tone.js handles timing)
-        synth.triggerAttackRelease(noteData.pitch, noteData.duration, time);
-        
-        // Create note identifier: "measure-beat-pitch"
+        // Play all pitches in the chord
+        notesToPlay.forEach(pitch => {
+            synth.triggerAttackRelease(pitch, noteData.duration, time);
+        });
+
+        // Create note identifier: "measure-beat-pitch" for each pitch in the chord
         const measureNum = typeof noteData.measure === 'number' ? noteData.measure : parseInt(noteData.measure, 10);
         const beatNum = typeof noteData.beat === 'number' ? noteData.beat : parseInt(noteData.beat, 10);
-        const pitchStr = String(noteData.pitch);
-        const noteId = `${measureNum}-${beatNum}-${pitchStr}`;
-        
-        // Add note to active set when it starts playing
-        activeNotes.add(noteId);
-        // Add to new notation system for red highlighting
-        if (window.addNotationActiveNote) {
-            window.addNotationActiveNote(noteId);
-        }
+
+        // Handle highlighting for each pitch
+        notesToPlay.forEach(pitch => {
+            const pitchStr = String(pitch);
+            const noteId = `${measureNum}-${beatNum}-${pitchStr}`;
+
+            // Add note to active set when it starts playing
+            activeNotes.add(noteId);
+            // Add to new notation system for red highlighting
+            if (window.addNotationActiveNote) {
+                window.addNotationActiveNote(noteId);
+            }
+        });
         updateCanvas();
 
         // Visual feedback on keyboard - add highlight when note starts
         Tone.Draw.schedule(() => {
-            const keyEl = document.getElementById(getNoteKeyId(noteData.pitch));
-            if (keyEl) keyEl.classList.add('active-melody-playback');
+            notesToPlay.forEach(pitch => {
+                const keyEl = document.getElementById(getNoteKeyId(pitch));
+                if (keyEl) keyEl.classList.add('active-melody-playback');
+            });
         }, time);
 
         // Calculate note duration and schedule removal
@@ -3730,16 +3764,21 @@ export function playAllMelody() {
         if (removeTime >= 0) {
             // Remove from active set and keyboard highlight when note ends
             Tone.Draw.schedule(() => {
-                activeNotes.delete(noteId);
-                // Remove from new notation system
-                if (window.removeNotationActiveNote) {
-                    window.removeNotationActiveNote(noteId);
-                }
-                updateCanvas();
+                notesToPlay.forEach(pitch => {
+                    const pitchStr = String(pitch);
+                    const noteId = `${measureNum}-${beatNum}-${pitchStr}`;
 
-                // Remove visual feedback from keyboard
-                const keyEl = document.getElementById(getNoteKeyId(noteData.pitch));
-                if (keyEl) keyEl.classList.remove('active-melody-playback');
+                    activeNotes.delete(noteId);
+                    // Remove from new notation system
+                    if (window.removeNotationActiveNote) {
+                        window.removeNotationActiveNote(noteId);
+                    }
+
+                    // Remove visual feedback from keyboard
+                    const keyEl = document.getElementById(getNoteKeyId(pitch));
+                    if (keyEl) keyEl.classList.remove('active-melody-playback');
+                });
+                updateCanvas();
             }, removeTime);
         }
     }, (() => {
@@ -3749,14 +3788,15 @@ export function playAllMelody() {
             const melodyNotes = compositionState.getAllMelodyNotes();
             console.log(`[playAllMelody] Got ${melodyNotes.length} melody notes from compositionState`);
             return melodyNotes
-                .filter(note => note.type === 'note' && note.pitch) // Skip rests
+                .filter(note => note.type === 'note' && (note.pitch || note.pitches)) // Skip rests, include both single notes and chords
                 .map((note, index) => {
                     const noteTime = (note.measure * measureDuration) + (note.beat * beatDuration);
                     // Ensure time is non-negative
                     const safeTime = Math.max(0, noteTime);
                     return {
                         time: safeTime,
-                        pitch: note.pitch,
+                        pitch: note.pitch, // Single note (may be undefined for chords)
+                        pitches: note.pitches, // Chord pitches (may be undefined for single notes)
                         duration: note.duration,
                         measure: note.measure,
                         beat: note.beat,

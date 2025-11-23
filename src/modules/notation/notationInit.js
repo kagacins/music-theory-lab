@@ -12,6 +12,7 @@ import { NotationComposer } from './composerIntegration.js';
 import { NoteEditor } from './noteEditor.js';
 import { getCurrentKey } from '../state/trainerState.js';
 import { generateBassVoicing } from '../integration/bassAutoFill.js';
+import { initializeIntegratedSuggestions, FeatureFlags } from '../canvas/suggestions/index.js';
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -70,6 +71,7 @@ function transposePitchBySteps(pitch, steps, staff) {
 // Singleton instance of the notation composer
 let notationComposer = null;
 let noteEditor = null;
+let suggestionManager = null;
 let isInitialized = false;
 
 // Canvas element references
@@ -471,6 +473,47 @@ export function initEnhancedNotation(options = {}) {
   // PHASE 1A: Connect noteEditor to composer for ghost note rendering
   notationComposer.noteEditor = noteEditor;
 
+  // Initialize Integrated Canvas Suggestions System
+  try {
+    // Get the first page canvas for initialization
+    const firstPageCanvas = notationComposer.pageManager?.pages?.[0]?.canvas || primaryCanvas;
+    const firstPageContext = firstPageCanvas?.getContext?.('2d');
+
+    if (firstPageCanvas && firstPageContext) {
+      suggestionManager = initializeIntegratedSuggestions({
+        canvas: firstPageCanvas,
+        context: firstPageContext,
+        compositionState: notationComposer.compositionState,
+        notationRenderer: notationComposer.vexRenderer,
+        layoutManager: notationComposer.layoutManager,
+        config: {
+          melody: {
+            defaultStyle: 'any',
+            defaultOctave: 4,
+            maxSuggestions: 5,
+            cacheEnabled: true
+          },
+          chord: {
+            defaultStyle: 'balanced',
+            defaultMood: 'bright',
+            maxSuggestions: 8,
+            cacheEnabled: true
+          }
+        }
+      });
+
+      // Connect to note editor
+      noteEditor.suggestionManager = suggestionManager;
+
+      // Store globally for access
+      window.suggestionManager = suggestionManager;
+
+      console.log('✅ Integrated Suggestions initialized successfully');
+    }
+  } catch (error) {
+    console.warn('Could not initialize integrated suggestions:', error);
+  }
+
   // Connect toolbar to note editor
   if (notationComposer.toolbar && noteEditor) {
     // Store original callbacks
@@ -541,6 +584,12 @@ export function initEnhancedNotation(options = {}) {
 
   isInitialized = true;
 
+  // PHASE 1.3: Expose a function to check if notes are selected
+  // This is used by KeyboardHandler to avoid intercepting arrow keys during note editing
+  window.notationEditorHasSelection = () => {
+    return noteEditor && noteEditor.selectedNotes && noteEditor.selectedNotes.size > 0;
+  };
+
   return notationComposer;
 }
 
@@ -566,6 +615,14 @@ export function getNotationComposer() {
  */
 export function getNoteEditor() {
   return noteEditor;
+}
+
+/**
+ * Get the suggestion manager instance
+ * @returns {CanvasSuggestionManager|null}
+ */
+export function getSuggestionManager() {
+  return suggestionManager;
 }
 
 // ============================================================================
@@ -829,6 +886,11 @@ export function clearPlaybackHighlights() {
  * Destroy the notation system and clean up resources
  */
 export function destroyEnhancedNotation() {
+  if (suggestionManager) {
+    suggestionManager.dispose();
+    suggestionManager = null;
+  }
+
   if (noteEditor) {
     noteEditor.destroy();
     noteEditor = null;
@@ -929,8 +991,12 @@ if (typeof window !== 'undefined') {
   window.highlightPlayingNote = highlightPlayingNote;
   window.clearPlaybackHighlights = clearPlaybackHighlights;
   window.getNotationComposer = getNotationComposer;
+  window.getNoteEditor = getNoteEditor;
+  window.getSuggestionManager = getSuggestionManager;
   window.isNotationInitialized = isNotationInitialized;
   window.showNotationShortcuts = showNotationShortcuts;
+  // Export FeatureFlags for suggestion control
+  window.FeatureFlags = FeatureFlags;
 }
 
 // ============================================================================
@@ -942,6 +1008,7 @@ export default {
   isNotationInitialized,
   getNotationComposer,
   getNoteEditor,
+  getSuggestionManager,
   renderEnhancedNotation,
   refreshNotationFromProgression,
   setNotationDuration,

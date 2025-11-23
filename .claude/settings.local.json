@@ -22,7 +22,10 @@
       "Bash(python:*)",
       "Bash(cat:*)",
       "Bash(git restore:*)",
-      "Bash(node -c:*)"
+      "Bash(node -c:*)",
+      "Bash(echo:*)",
+      "Bash(npm start)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []
