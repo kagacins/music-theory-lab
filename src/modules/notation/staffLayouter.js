@@ -360,8 +360,8 @@ export class StaffLayoutManager {
     }
 
     // Determine which staff
-    const trebleBottom = trebleY + 80;
-    const bassTop = bassY - 40;
+    const trebleBottom = trebleY + 40;
+    const bassTop = bassY - 20;
     const middleY = (trebleBottom + bassTop) / 2;
 
     let staff, staffY;
@@ -377,10 +377,38 @@ export class StaffLayoutManager {
       staffY = bassY;
     }
 
-    // Calculate staff line
+    // Calculate staff line position
     const relativeY = realY - staffY;
-    const lineSpacing = 10;
-    const line = Math.round((40 - relativeY) / (lineSpacing / 2));
+
+    // VexFlow renders staff lines with specific spacing
+    // The 5 staff lines are typically at y positions (relative to staff top):
+    // Line 0 (top): y = 0
+    // Line 1: y = 20
+    // Line 2 (middle): y = 40
+    // Line 3: y = 60
+    // Line 4 (bottom): y = 80
+
+    // But we want to include ledger lines and spaces, so we use:
+    // Each diatonic step (line or space) = 5px vertically
+    // NOTE: Staff lines are 20px apart, but there are 2 diatonic steps between lines
+    // (e.g., E to F to G), so each step is 10px... WAIT, let's recalculate:
+    // Actually, VexFlow spaces things such that each visual position is 5px
+
+    // For ghost notes, we define line numbers relative to the bottom staff line:
+    // Line 0 = bottom staff line (E4 for treble, G2 for bass) at relative y = 80
+    // Line 2 = first space above (F4/A2) at relative y = 70
+    // Line 4 = second line (G4/B2) at relative y = 60
+    // Line 6 = second space (A4/C3) at relative y = 50
+    // Line 8 = middle line (B4/D3) at relative y = 40
+    // etc.
+
+    const pixelsPerStep = 5;  // 5px per diatonic step (line or space)
+
+    // Calculate line number from Y position
+    // Bottom staff line (E4 / G2) is 80px below the top line
+    const bottomLineY = 80;
+    const steps = Math.round((bottomLineY - relativeY) / pixelsPerStep);
+    const line = steps * 2; // Even numbers (0,2,4,...) to match conversion
 
     // Convert line to pitch
     const pitch = lineToPitch(line, staff);
@@ -476,56 +504,13 @@ export class StaffLayoutManager {
  * @returns {string} - Pitch string like "C4"
  */
 function lineToPitch(line, staff) {
-  // Line 0 is the bottom line
-  // For treble clef: bottom line is E4
-  // For bass clef: bottom line is G2
-
-  // Extended pitch arrays to support wide ledger line range
-  const treblePitches = [
-    // Below staff ledger lines
-    'A3', 'B3', 'C4', 'D4',
-    // Staff lines (E4 = bottom line)
-    'E4', 'F4', 'G4', 'A4', 'B4',
-    'C5', 'D5', 'E5', 'F5', 'G5', 'A5', 'B5',
-    // Above staff ledger lines
-    'C6', 'D6', 'E6', 'F6', 'G6', 'A6', 'B6', 'C7',
-  ];
-
-  const bassPitches = [
-    // Very low ledger lines below bass staff
-    'C1', 'D1', 'E1', 'F1', 'G1', 'A1', 'B1',
-    // Below staff ledger lines
-    'C2', 'D2', 'E2', 'F2',
-    // Staff lines (G2 = bottom line, now at index 11)
-    'G2', 'A2', 'B2', 'C3', 'D3', 'E3', 'F3', 'G3', 'A3', 'B3',
-    // Above staff ledger lines
-    'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5',
-  ];
-
-  // Adjust for staff lines
-  // Treble: bottom line (E4) = index 4, Bass: bottom line (G2) = index 11
-  const pitches = staff === 'treble' ? treblePitches : bassPitches;
-  const bottomLineIndex = staff === 'treble' ? 4 : 11;
-  const adjustedIndex = line + bottomLineIndex;
-
-  if (adjustedIndex < 0 || adjustedIndex >= pitches.length) {
-    // Ledger line - calculate based on pattern
-    if (adjustedIndex < 0) {
-      // Below staff
-      const steps = -adjustedIndex;
-      return staff === 'treble'
-        ? calculateLedgerPitch('C4', -steps)
-        : calculateLedgerPitch('G2', -steps);
-    } else {
-      // Above staff
-      const steps = adjustedIndex - pitches.length + 1;
-      return staff === 'treble'
-        ? calculateLedgerPitch('C6', steps)
-        : calculateLedgerPitch('E4', steps);
-    }
-  }
-
-  return pitches[adjustedIndex];
+  // Each increment of 2 represents a diatonic step (line or space)
+  // line = 0   -> bottom staff line (E4 / G2)
+  // line = 2   -> first space above (F4 / A2)
+  // line = -2  -> first space below, etc.
+  const basePitch = staff === 'treble' ? 'E4' : 'G2';
+  const steps = Math.round(line / 2);
+  return calculateLedgerPitch(basePitch, steps);
 }
 
 /**
@@ -584,7 +569,8 @@ export function pitchToLine(pitch, staff) {
     ? (4 * 7) + 2  // E4
     : (2 * 7) + 4; // G2
 
-  return absolutePosition - referencePosition;
+  // Multiply by 2 so that each diatonic step maps to 2 line units
+  return (absolutePosition - referencePosition) * 2;
 }
 
 // ============================================================================

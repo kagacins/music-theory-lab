@@ -9,7 +9,7 @@
  * - Ghost note preview on hover
  */
 
-import { StaffLayoutManager, pitchToLine } from './staffLayouter.js';
+import { StaffLayoutManager, pitchToLine as layoutPitchToLine } from './staffLayouter.js';
 import { noteToMidi, midiToNote } from './vexFlowRenderer.js';
 import { analyzeChordTone, CHORD_TONE_COLORS } from '../analysis/chordToneAnalyzer.js';
 import { getPiano } from '../audio/audioEngine.js';
@@ -210,7 +210,12 @@ export class NoteEditor {
     if (!this.isEnabled) return;
 
     const position = this.getCanvasPosition(e);
-    const staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
+    let staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
+
+    // When Alt is held, prefer the last hovered position (ghost note)
+    if (e.altKey && this.hoveredPosition && this.hoveredPosition.pitch) {
+      staffPosition = this.hoveredPosition;
+    }
 
     // Check if clicking on an existing note FIRST (before checking Alt key)
     const clickedNote = this.findNoteAtPosition(position.x, position.y);
@@ -1046,56 +1051,6 @@ export class NoteEditor {
   // ============================================================================
 
   /**
-   * Convert pitch to staff line number
-   * @param {string} pitch - Pitch like "C4", "D#5", etc.
-   * @param {string} staff - 'treble' or 'bass'
-   * @returns {number} - Line number (0 = bottom line)
-   */
-  pitchToLine(pitch, staff) {
-    // Extended pitch arrays (matches staffLayouter.js lineToPitch)
-    const treblePitches = [
-      // Below staff ledger lines
-      'A3', 'B3', 'C4', 'D4',
-      // Staff lines (E4 = bottom line)
-      'E4', 'F4', 'G4', 'A4', 'B4',
-      'C5', 'D5', 'E5', 'F5', 'G5', 'A5', 'B5',
-      // Above staff ledger lines
-      'C6', 'D6', 'E6', 'F6', 'G6', 'A6', 'B6', 'C7',
-    ];
-
-    const bassPitches = [
-      // Very low ledger lines below bass staff
-      'C1', 'D1', 'E1', 'F1', 'G1', 'A1', 'B1',
-      // Below staff ledger lines
-      'C2', 'D2', 'E2', 'F2',
-      // Staff lines (G2 = bottom line, now at index 11)
-      'G2', 'A2', 'B2', 'C3', 'D3', 'E3', 'F3', 'G3', 'A3', 'B3',
-      // Above staff ledger lines
-      'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5',
-    ];
-
-    const pitches = staff === 'treble' ? treblePitches : bassPitches;
-
-    // Remove accidentals for lookup (C#4 -> C4)
-    const baseNote = pitch.match(/^([A-G])(?:#|b)?(\d+)$/);
-    if (!baseNote) return 0;
-
-    const [, noteName, octave] = baseNote;
-    const searchPitch = noteName + octave;
-
-    // Find in pitch array
-    const index = pitches.indexOf(searchPitch);
-    if (index === -1) {
-      // Not in standard range - estimate based on octave
-      return 0;
-    }
-
-    // Convert index to line number (treble: index 4 = bottom line, bass: index 11 = bottom line)
-    const bottomLineIndex = staff === 'treble' ? 4 : 11;
-    return index - bottomLineIndex;
-  }
-
-  /**
    * Update ghost note preview
    * @param {Object} staffPosition - Staff position
    * @param {number} mouseX - Mouse X coordinate for positioning
@@ -1238,13 +1193,15 @@ export class NoteEditor {
 
     // Calculate note Y position from pitch and staff line
     const staffY = this.ghostNote.staff === 'treble' ? trebleY : bassY;
-    const lineSpacing = 10; // Pixels between lines (matches staffLayouter.js)
+    const pixelsPerStep = 5; // Matches StaffLayouter
 
     // Convert pitch to line number (reverse of lineToPitch calculation)
-    const line = this.pitchToLine(this.ghostNote.pitch, this.ghostNote.staff);
+    const line = layoutPitchToLine(this.ghostNote.pitch, this.ghostNote.staff);
+    const steps = line / 2;
 
-    // Calculate Y position from line (matches staffLayouter.js formula)
-    const noteY = staffY + (40 - line * (lineSpacing / 2));
+    // staffLayouter formula: relativeY = 80 - (steps * 5)
+    const bottomLineY = 80;
+    const noteY = staffY + (bottomLineY - steps * pixelsPerStep);
 
     // Draw ghost note (coordinates are in layout space, same as VexFlow)
     ctx.save();
