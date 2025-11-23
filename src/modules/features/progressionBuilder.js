@@ -3371,8 +3371,8 @@ function attachCardEventListeners(wrapper, index) {
             }
 
             // Sync notation if button was pressed
-            if (wasPressed && window.syncNotationFromProgression) {
-                window.syncNotationFromProgression();
+            if (wasPressed) {
+                updateChordAndRenderPreservingTrebleNotes(index);
             }
 
             wasPressed = false;
@@ -3402,9 +3402,7 @@ function attachCardEventListeners(wrapper, index) {
                 noteCheckboxes.forEach(cb => cb.checked = true);
 
                 // Sync progressionData changes to notation display
-                if (window.syncNotationFromProgression) {
-                    window.syncNotationFromProgression();
-                }
+                updateChordAndRenderPreservingTrebleNotes(index);
 
                 // Play the chord
                 if (window.startProgressionChord && window.stopTrainerChord) {
@@ -3426,9 +3424,7 @@ function attachCardEventListeners(wrapper, index) {
                 noteCheckboxes.forEach(cb => cb.checked = false);
 
                 // Sync progressionData changes to notation display
-                if (window.syncNotationFromProgression) {
-                    window.syncNotationFromProgression();
-                }
+                updateChordAndRenderPreservingTrebleNotes(index);
             }
         });
     }
@@ -3496,8 +3492,8 @@ function attachCardEventListeners(wrapper, index) {
             }
 
             // Sync notation if button was pressed
-            if (wasPressed && window.syncNotationFromProgression) {
-                window.syncNotationFromProgression();
+            if (wasPressed) {
+                updateChordAndRenderPreservingTrebleNotes(index);
             }
 
             wasPressed = false;
@@ -3600,11 +3596,8 @@ function attachCardEventListeners(wrapper, index) {
                     updateTensionCurveIfVisible();
 
                     // Sync notation ONLY if inversion was actually changed
-                    if (inversionWasChanged && window.syncNotationFromProgression) {
-                        // Use requestAnimationFrame to ensure UI updates complete first
-                        requestAnimationFrame(() => {
-                            window.syncNotationFromProgression();
-                        });
+                    if (inversionWasChanged) {
+                        updateChordAndRenderPreservingTrebleNotes(index);
                     }
 
                     // Reset the flag for next time
@@ -3659,10 +3652,8 @@ function attachCardEventListeners(wrapper, index) {
                 updateTensionCurveIfVisible();
 
                 // Sync notation if inversion was changed
-                if (inversionWasChanged && window.syncNotationFromProgression) {
-                    requestAnimationFrame(() => {
-                        window.syncNotationFromProgression();
-                    });
+                if (inversionWasChanged) {
+                    updateChordAndRenderPreservingTrebleNotes(index);
                 }
 
                 // Reset the flag
@@ -3683,10 +3674,8 @@ function attachCardEventListeners(wrapper, index) {
                     updateTensionCurveIfVisible();
 
                     // Sync notation if inversion was changed
-                    if (inversionWasChanged && window.syncNotationFromProgression) {
-                        requestAnimationFrame(() => {
-                            window.syncNotationFromProgression();
-                        });
+                    if (inversionWasChanged) {
+                        updateChordAndRenderPreservingTrebleNotes(index);
                     }
 
                     // Reset the flag
@@ -4301,13 +4290,7 @@ function updateChordType(index, newType) {
     updateTensionCurveIfVisible();
 
     // Update the grand staff notation
-    requestAnimationFrame(() => {
-        // Sync progressionData changes to notation display
-        if (window.syncNotationFromProgression) {
-            
-            window.syncNotationFromProgression();
-        }
-    });
+    updateChordAndRenderPreservingTrebleNotes(index);
 
     // Play the chord with the new type
     const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
@@ -4429,13 +4412,7 @@ function updateChordLHPattern(index, newLHPattern) {
     updateSingleCard(index);
 
     // Also update the grand staff notation
-    requestAnimationFrame(() => {
-        // Sync progressionData changes to notation display
-        if (window.syncNotationFromProgression) {
-            
-            window.syncNotationFromProgression();
-        }
-    });
+    updateChordAndRenderPreservingTrebleNotes(index);
 
     // Play the chord with the new LH pattern
     const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
@@ -8510,6 +8487,50 @@ function updateChordAndRenderPreservingTrebleNotes(index) {
         notationComposer.render();
     }
 }
+
+// ============================================================================
+// PUBLIC API FOR NOTATION UPDATES
+// ============================================================================
+
+/**
+ * Public API: Update a single chord's notation while preserving treble notes
+ * This is the recommended way to sync chord changes from progressionData to notation
+ *
+ * @param {number} index - The measure index to update
+ *
+ * @example
+ * // After modifying a chord in progressionData, update notation:
+ * trainerState.progressionData[2].inversion = 1;
+ * window.updateChordNotation(2);
+ */
+window.updateChordNotation = function(index) {
+    updateChordAndRenderPreservingTrebleNotes(index);
+};
+
+/**
+ * Public API: Full rebuild of notation from progressionData
+ * WARNING: This will wipe all user-added treble notes!
+ * Only use this when:
+ * - Loading a new progression from scratch
+ * - Clearing the entire composition
+ * - User explicitly chooses to reset/reload
+ *
+ * For chord modifications, always prefer window.updateChordNotation(index) instead
+ *
+ * @example
+ * // Only use for full progression loads:
+ * loadProgressionFromFile(data);
+ * window.fullRebuildNotation();
+ */
+window.fullRebuildNotation = function() {
+    if (window.syncProgressionToComposition) {
+        console.warn('[FULL REBUILD] Rebuilding notation - this will wipe user-added treble notes');
+        window.syncProgressionToComposition();
+    } else if (window.syncNotationFromProgression) {
+        console.warn('[FULL REBUILD] Rebuilding notation - this will wipe user-added treble notes');
+        window.syncNotationFromProgression();
+    }
+};
 
 export function addChordToProgressionByParams(chordType, root, inversion = 0, octaveShift = 0) {
     // Save current state for undo

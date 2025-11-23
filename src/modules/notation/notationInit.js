@@ -102,32 +102,16 @@ function getOrCreateOverlayCanvas(baseCanvas) {
     baseCanvas.parentElement.insertBefore(overlay, baseCanvas.nextSibling);
 
     // Function to update overlay position to match canvas
-    // Accounts for parent scroll to keep overlay aligned with canvas
+    // With multi-page system, no container scroll exists - pages use document scroll
     const updateOverlayPosition = () => {
-      const baseStyle = window.getComputedStyle(baseCanvas);
-      const scrollLeft = baseCanvas.parentElement.scrollLeft || 0;
-      const scrollTop = baseCanvas.parentElement.scrollTop || 0;
-
-      if (baseStyle.position !== 'static') {
-        overlay.style.left = baseStyle.left;
-        overlay.style.top = baseStyle.top;
-      } else {
-        // Subtract scroll offset so overlay stays aligned with canvas as it scrolls
-        overlay.style.left = (baseCanvas.offsetLeft - scrollLeft) + 'px';
-        overlay.style.top = (baseCanvas.offsetTop - scrollTop) + 'px';
-      }
+      // Overlay is position:absolute, base canvas is position:static
+      // Simply match the canvas position (no scroll adjustments needed)
+      overlay.style.left = baseCanvas.offsetLeft + 'px';
+      overlay.style.top = baseCanvas.offsetTop + 'px';
     };
 
     // Set initial position
     updateOverlayPosition();
-
-    // CRITICAL: Set initial scroll position in layoutManager
-    // This ensures coordinate conversion works even before user scrolls
-    if (window.notationLayoutManager) {
-      const scrollLeft = baseCanvas.parentElement.scrollLeft || 0;
-      const scrollTop = baseCanvas.parentElement.scrollTop || 0;
-      window.notationLayoutManager.setScroll(scrollLeft, scrollTop);
-    }
 
     // Update overlay position/size when base canvas changes
     const resizeObserver = new ResizeObserver(() => {
@@ -136,22 +120,6 @@ function getOrCreateOverlayCanvas(baseCanvas) {
       updateOverlayPosition();
     });
     resizeObserver.observe(baseCanvas);
-
-    // CRITICAL: Update overlay position when parent scrolls
-    // This keeps the overlay aligned with the canvas as it scrolls
-    baseCanvas.parentElement.addEventListener('scroll', () => {
-      updateOverlayPosition();
-
-      // Update layoutManager with scroll position so it can convert canvas-local coords to layout coords
-      // Canvas-local coordinates are viewport-relative (from getBoundingClientRect)
-      // Layout coordinates are absolute positions in the full canvas
-      // To compare canvas-local against layout bounds, layoutManager adds scroll offset
-      if (window.notationLayoutManager) {
-        const scrollLeft = baseCanvas.parentElement.scrollLeft || 0;
-        const scrollTop = baseCanvas.parentElement.scrollTop || 0;
-        window.notationLayoutManager.setScroll(scrollLeft, scrollTop);
-      }
-    });
 
     // DEBUG: Log canvas and parent info
     console.log('=== CANVAS DEBUG INFO ===');
@@ -199,11 +167,17 @@ export function initEnhancedNotation(options = {}) {
     createToolbar = true,
   } = options;
 
-  // Get canvas element
+  // Get canvas element (will be replaced by multi-page system)
   primaryCanvas = document.getElementById(canvasId);
   if (!primaryCanvas) {
     return null;
   }
+
+  // Get page container (parent of the canvas)
+  const pageContainer = primaryCanvas.parentElement;
+
+  // Hide the old single canvas (PageManager will create new page canvases)
+  primaryCanvas.style.display = 'none';
 
   // Check for existing toolbar container or create one
   toolbarContainer = document.getElementById(toolbarContainerId);
@@ -212,7 +186,7 @@ export function initEnhancedNotation(options = {}) {
     toolbarContainer = document.createElement('div');
     toolbarContainer.id = toolbarContainerId;
     toolbarContainer.className = 'notation-toolbar-container mb-4';
-    primaryCanvas.parentElement.insertBefore(toolbarContainer, primaryCanvas);
+    pageContainer.insertBefore(toolbarContainer, primaryCanvas);
   }
 
   // Create or reuse the notation composer
@@ -223,9 +197,10 @@ export function initEnhancedNotation(options = {}) {
   }
 
 
-  // Create new notation composer
+  // Create new notation composer with PageManager
   notationComposer = new NotationComposer({
-    container: primaryCanvas,
+    container: primaryCanvas, // Legacy - kept for backward compat
+    pageContainer: pageContainer, // Multi-page container
     toolbarContainer: toolbarContainer,
     measuresPerLine: 4,
     showMeasureNumbers: true,
@@ -238,18 +213,20 @@ export function initEnhancedNotation(options = {}) {
     autoInit: false, // We'll init manually after setup
   });
 
-  // Initialize now
+  // Initialize now (creates PageManager)
   notationComposer.init();
 
-  // Create overlay canvas for visual feedback
+  // Create overlay canvas for visual feedback (legacy, for selection highlights)
   overlayCanvas = getOrCreateOverlayCanvas(primaryCanvas);
 
   // Create note editor for interactive editing
+  // For multi-page: Will attach events to page canvases via PageManager
   noteEditor = new NoteEditor({
-    canvas: primaryCanvas,
-    overlayCanvas: overlayCanvas,
+    canvas: primaryCanvas, // Legacy - not used in multi-page mode
+    overlayCanvas: overlayCanvas, // For selection highlights
     layoutManager: notationComposer.layoutManager,
     composerIntegration: notationComposer, // For selected measure access
+    pageManager: notationComposer.pageManager, // Multi-page support
     onNoteAdd: (data) => {
       console.log('[NotationInit] onNoteAdd called:', data);
 
@@ -478,6 +455,9 @@ export function initEnhancedNotation(options = {}) {
     },
   });
 
+  // PHASE 1A: Connect noteEditor to composer for ghost note rendering
+  notationComposer.noteEditor = noteEditor;
+
   // Connect toolbar to note editor
   if (notationComposer.toolbar && noteEditor) {
     // Store original callbacks
@@ -528,9 +508,21 @@ export function initEnhancedNotation(options = {}) {
   const originalRender = notationComposer.render.bind(notationComposer);
   notationComposer.render = function(...args) {
     originalRender(...args); // CRITICAL: Forward all arguments including bypassSyncCheck
+
     // Update note regions in editor after each render
     if (this.noteRegions && noteEditor) {
       noteEditor.setNoteRegions(this.noteRegions);
+    }
+
+    // Multi-page: Reattach event listeners after pages are created/updated
+    if (this.pageManager) {
+      // Reattach composer events (measure selection, playback)
+      this.attachPageCanvasEvents();
+
+      // Reattach note editor events (note editing)
+      if (noteEditor) {
+        noteEditor.attachPageEventListeners();
+      }
     }
   };
 

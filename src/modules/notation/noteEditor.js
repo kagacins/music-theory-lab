@@ -53,13 +53,20 @@ export class NoteEditor {
   constructor(options = {}) {
     // Canvas and context
     this.canvas = options.canvas || null;
-    this.overlayCanvas = options.overlayCanvas || null;
+    this.overlayCanvas = options.overlayCanvas || null; // DEPRECATED: Now using main canvas for ghost notes
 
     // Layout manager reference
     this.layoutManager = options.layoutManager || new StaffLayoutManager();
 
     // Composer integration reference (for selected measure)
     this.composerIntegration = options.composerIntegration || null;
+
+    // PageManager reference (for multi-page support)
+    this.pageManager = options.pageManager || null;
+
+    // Track pages with event listeners to prevent duplicates
+    this.pagesWithListeners = new Set();
+    this.keyboardListenerAttached = false;
 
     // State
     this.state = EDITOR_STATES.IDLE;
@@ -100,7 +107,11 @@ export class NoteEditor {
     this.handleKeyDown = this.handleKeyDown.bind(this);
 
     // Initialize
-    if (this.canvas) {
+    if (this.pageManager) {
+      // Multi-page: Events will be attached when pages are created
+      // We'll do this via a mutation observer or render callback
+    } else if (this.canvas) {
+      // Legacy single canvas
       this.attachEventListeners();
     }
   }
@@ -110,9 +121,22 @@ export class NoteEditor {
   // ============================================================================
 
   /**
-   * Attach event listeners to canvas
+   * Attach event listeners to canvas(es)
    */
   attachEventListeners() {
+    if (this.pageManager) {
+      // Multi-page: Attach to all page canvases
+      this.attachPageEventListeners();
+    } else if (this.canvas) {
+      // Legacy: Attach to single canvas
+      this.attachSingleCanvasListeners();
+    }
+  }
+
+  /**
+   * Attach listeners to single canvas (legacy)
+   */
+  attachSingleCanvasListeners() {
     if (!this.canvas) return;
 
     // Remove existing listeners first to prevent duplicates
@@ -125,6 +149,39 @@ export class NoteEditor {
 
     // Global keyboard listener
     document.addEventListener('keydown', this.handleKeyDown);
+  }
+
+  /**
+   * Attach listeners to all page canvases
+   * CRITICAL: Only attach to pages that don't already have listeners to prevent duplicates
+   */
+  attachPageEventListeners() {
+    if (!this.pageManager) return;
+
+    // Attach to all existing pages
+    const pages = this.pageManager.getAllPages();
+    pages.forEach(page => {
+      // Skip if this page already has listeners attached
+      const pageId = page.canvas.id;
+      if (this.pagesWithListeners.has(pageId)) {
+        return;
+      }
+
+      // Attach listeners
+      page.canvas.addEventListener('mousedown', this.handleMouseDown);
+      page.canvas.addEventListener('mousemove', this.handleMouseMove);
+      page.canvas.addEventListener('mouseup', this.handleMouseUp);
+      page.canvas.addEventListener('mouseleave', this.handleMouseLeave);
+
+      // Mark this page as having listeners
+      this.pagesWithListeners.add(pageId);
+    });
+
+    // Global keyboard listener (only add once)
+    if (!this.keyboardListenerAttached) {
+      document.addEventListener('keydown', this.handleKeyDown);
+      this.keyboardListenerAttached = true;
+    }
   }
 
   /**
@@ -364,15 +421,33 @@ export class NoteEditor {
    * @returns {Object} - { x, y }
    */
   getCanvasPosition(e) {
-    const rect = this.canvas.getBoundingClientRect();
+    // Multi-page mode: Use page-local coordinates (NO SCROLL CONVERSION!)
+    if (this.pageManager) {
+      const pageInfo = this.pageManager.getPageFromEvent(e);
+      if (pageInfo) {
+        return {
+          x: pageInfo.x,
+          y: pageInfo.y,
+          page: pageInfo.page,
+        };
+      }
+      // Mouse not over any page canvas
+      return { x: 0, y: 0, page: null };
+    }
 
-    // getBoundingClientRect() is already viewport-relative and accounts for parent scroll
-    // Mouse events (clientX/Y) are also viewport-relative
-    // So we just need the difference to get canvas-local coordinates
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+    // Legacy single canvas mode
+    const rect = this.canvas.getBoundingClientRect();
+    const scrollLeft = this.canvas.parentElement ? this.canvas.parentElement.scrollLeft : 0;
+    const scrollTop = this.canvas.parentElement ? this.canvas.parentElement.scrollTop : 0;
+
+    // CRITICAL: clientY - rectTop gives viewport-relative position, but we need canvas-local position
+    // Since parent scrolls and canvas is position:static, we must ADD scroll to get full canvas coords
+    const pos = {
+      x: (e.clientX - rect.left) + scrollLeft,
+      y: (e.clientY - rect.top) + scrollTop,
     };
+
+    return pos;
   }
 
   /**
@@ -618,7 +693,6 @@ export class NoteEditor {
   playSelectedNotes() {
     const piano = getPiano();
     if (!piano) {
-      console.warn('[NoteEditor] Piano sampler not loaded');
       return;
     }
 
@@ -1064,26 +1138,23 @@ export class NoteEditor {
 
   /**
    * Render the overlay (selection, ghost notes, etc.)
+   * PHASE 1A: Drawing directly on main canvas - triggers full re-render!
    */
   renderOverlay() {
-    if (!this.overlayCanvas) return;
+    // PHASE 1A: For ghost notes on main canvas, trigger full re-render
+    // The composer's debouncing (60fps limit) prevents excessive renders
+    if (this.ghostNote && this.composerIntegration) {
+      // Queue a re-render which will redraw VexFlow + call our drawGhostNote
+      this.composerIntegration.render();
+      return;
+    }
 
-    const ctx = this.overlayCanvas.getContext('2d');
-    const width = this.overlayCanvas.width;
-    const height = this.overlayCanvas.height;
-
-    // Clear overlay
-    ctx.clearRect(0, 0, width, height);
-
-    // Draw selection highlights
-    this.drawSelectionHighlights(ctx);
-
-    // Draw ghost note
-    this.drawGhostNote(ctx);
-
-    // Draw drag preview
-    if (this.state === EDITOR_STATES.DRAGGING) {
-      this.drawDragPreview(ctx);
+    // Selection highlighting: Only works in legacy single-canvas mode
+    // Multi-page mode: TODO - implement selection rendering on page canvases
+    if (this.overlayCanvas && !this.pageManager) {
+      const overlayCtx = this.overlayCanvas.getContext('2d');
+      overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+      this.drawSelectionHighlights(overlayCtx);
     }
   }
 
@@ -1139,30 +1210,31 @@ export class NoteEditor {
 
     const bounds = this.ghostNote.measure;
 
-    // Get scroll offset to convert layout coordinates → canvas-local coordinates
-    const scrollLeft = this.canvas.parentElement ? this.canvas.parentElement.scrollLeft : 0;
-    const scrollTop = this.canvas.parentElement ? this.canvas.parentElement.scrollTop : 0;
+    // PHASE 1A: Drawing on main canvas now - use layout coordinates directly!
+    // No scroll offset needed since main canvas uses same coordinate system as VexFlow
 
-    // Convert measure bounds from layout coordinates to canvas-local coordinates
-    const canvasBounds = {
-      x: bounds.x - scrollLeft,
-      y: bounds.y - scrollTop,
-      width: bounds.width,
-      height: bounds.height,
-    };
-
-    // Calculate note X position (mouseX is already in canvas-local coordinates)
+    // Calculate note X position (use layout coordinates)
     const noteX = this.ghostNote.mouseX !== undefined
       ? this.ghostNote.mouseX
-      : (canvasBounds.x + (canvasBounds.width / 2));
+      : (bounds.x + (bounds.width / 2));
 
-    // Calculate staff Y positions from measure bounds (now in canvas-local coordinates)
-    // CRITICAL: These must match GRAND_STAFF_DEFAULTS from grandStaff.js
-    const systemMarginTop = 20;
-    const staffHeight = 80; // Standard 5-line staff height (NOT 40!)
-    const staffSpacing = 80;
-    const trebleY = canvasBounds.y + systemMarginTop;
-    const bassY = canvasBounds.y + systemMarginTop + staffHeight + staffSpacing;
+    // CRITICAL: Use actual VexFlow positions if available (nuclear solution)
+    let trebleY, bassY;
+    const useActualPositions = bounds.actualTrebleY !== undefined && bounds.actualBassY !== undefined;
+
+    if (useActualPositions) {
+      // NUCLEAR SOLUTION: Use ACTUAL VexFlow positions directly
+      // Main canvas and VexFlow use same layout coordinate system - perfect alignment!
+      trebleY = bounds.actualTrebleY;
+      bassY = bounds.actualBassY;
+    } else {
+      // Fallback: calculate positions from measure Y in layout coordinates
+      const systemMarginTop = 20;
+      const staffHeight = 80;
+      const staffSpacing = 80;
+      trebleY = bounds.y + systemMarginTop;
+      bassY = bounds.y + systemMarginTop + staffHeight + staffSpacing;
+    }
 
     // Calculate note Y position from pitch and staff line
     const staffY = this.ghostNote.staff === 'treble' ? trebleY : bassY;
@@ -1174,7 +1246,7 @@ export class NoteEditor {
     // Calculate Y position from line (matches staffLayouter.js formula)
     const noteY = staffY + (40 - line * (lineSpacing / 2));
 
-    // Draw ghost note (coordinates are in canvas space, same as overlay)
+    // Draw ghost note (coordinates are in layout space, same as VexFlow)
     ctx.save();
     ctx.globalAlpha = 0.5;
     ctx.fillStyle = this.ghostNote.color || SELECTION_COLORS.ghost;

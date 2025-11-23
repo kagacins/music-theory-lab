@@ -48,6 +48,7 @@ export class StaffLayoutManager {
     this.totalHeight = 0;
     this.totalWidth = 0;
     this.measureBounds = new Map(); // Map measure index to bounds
+    this.actualMeasurePositions = new Map(); // CRITICAL: Actual VexFlow positions from rendering
   }
 
   /**
@@ -113,6 +114,30 @@ export class StaffLayoutManager {
   invalidate() {
     this.systems = [];
     this.measureBounds.clear();
+    // Keep actualMeasurePositions - they're set by VexFlow rendering, not layout calculation
+  }
+
+  /**
+   * CRITICAL: Set actual measure positions from VexFlow rendering
+   * This is the "nuclear" solution - we extract ACTUAL positions from VexFlow
+   * instead of calculating them, eliminating coordinate mismatch errors
+   * @param {Array} measures - Rendered measures with actualBounds from VexFlow
+   */
+  setActualMeasurePositions(measures) {
+    this.actualMeasurePositions.clear();
+
+    measures.forEach((measure, index) => {
+      if (measure.actualBounds) {
+        this.actualMeasurePositions.set(index, {
+          index: index,
+          x: measure.actualBounds.x,
+          trebleY: measure.actualBounds.trebleY,
+          bassY: measure.actualBounds.bassY,
+          width: measure.actualBounds.width,
+          height: measure.actualBounds.height,
+        });
+      }
+    });
   }
 
   /**
@@ -236,24 +261,57 @@ export class StaffLayoutManager {
 
   /**
    * Find measure at a point (for click handling)
-   * @param {number} x - X coordinate
-   * @param {number} y - Y coordinate
+   * @param {number} x - X coordinate (canvas-local)
+   * @param {number} y - Y coordinate (canvas-local)
    * @returns {Object|null} - Measure bounds or null
    */
   getMeasureAtPoint(x, y) {
-    // Apply zoom and scroll transformation
+    // CRITICAL: Use actual VexFlow positions if available (nuclear solution)
+    const useActualPositions = this.actualMeasurePositions.size > 0;
+
+    // CRITICAL: x and y are canvas-local coordinates (viewport-relative, from getBoundingClientRect)
+    // VexFlow positions are layout coordinates (absolute positions in full canvas)
+    // To convert canvas-local → layout: ADD scroll, then apply zoom
     const realX = (x + this.config.scrollX) / this.config.zoom;
     const realY = (y + this.config.scrollY) / this.config.zoom;
 
-    // Debug: log if no bounds exist
-    if (this.measureBounds.size === 0) {
-      console.warn('[StaffLayouter] No measure bounds available for click detection');
+    // If we have actual VexFlow positions, use those
+    if (useActualPositions) {
+      const verticalTolerance = 80; // Allow clicks well below bass staff
+
+      for (const [index, actualPos] of this.actualMeasurePositions) {
+        // Check horizontal bounds
+        if (realX >= actualPos.x && realX <= actualPos.x + actualPos.width) {
+          // Check vertical bounds - use the full height from trebleY to bassY + tolerance
+          const topY = actualPos.trebleY;
+          const bottomY = actualPos.bassY + 100; // bassY + staff height + tolerance
+
+          if (realY >= topY && realY <= bottomY) {
+            // Return in the same format as calculated bounds for compatibility
+            return {
+              index: index,
+              system: Math.floor(index / this.config.measuresPerLine),
+              x: actualPos.x,
+              y: actualPos.trebleY, // Use trebleY as the measure Y
+              width: actualPos.width,
+              height: actualPos.height,
+              // Include actual staff positions
+              actualTrebleY: actualPos.trebleY,
+              actualBassY: actualPos.bassY,
+            };
+          }
+        }
+      }
+
       return null;
     }
 
-    // Add extra vertical tolerance for deep bass notes below the staff
-    const verticalTolerance = 80; // Allow clicks well below bass staff for C2, D2, etc.
+    // Fallback: use calculated bounds if actual positions not available
+    if (this.measureBounds.size === 0) {
+      return null;
+    }
 
+    const verticalTolerance = 80;
     for (const [index, bounds] of this.measureBounds) {
       if (
         realX >= bounds.x &&
@@ -270,58 +328,58 @@ export class StaffLayoutManager {
 
   /**
    * Find the staff (treble or bass) at a point
-   * @param {number} x - X coordinate
-   * @param {number} y - Y coordinate
+   * @param {number} x - X coordinate (canvas-local)
+   * @param {number} y - Y coordinate (canvas-local)
    * @returns {Object|null} - { measure, staff: 'treble'|'bass', line, pitch }
    */
   getStaffPositionAtPoint(x, y) {
     const measureBounds = this.getMeasureAtPoint(x, y);
-    if (!measureBounds) return null;
+    if (!measureBounds) {
+      return null;
+    }
 
-    // Apply zoom and scroll
-    const realY = (y + this.config.scrollY) / this.config.zoom;
+    // y is already canvas-local (includes scroll), only apply zoom
+    const realY = y / this.config.zoom;
 
-    // Calculate staff Y positions from measure bounds
-    // CRITICAL: These must match GRAND_STAFF_DEFAULTS from grandStaff.js
-    // trebleY = measure.y + systemMarginTop (20)
-    // bassY = measure.y + systemMarginTop + staffHeight + staffSpacing (20 + 80 + 80 = 180)
-    const systemMarginTop = 20;
-    const staffHeight = 80; // Standard 5-line staff height (NOT 40!)
-    const staffSpacing = 80;
-    const trebleY = measureBounds.y + systemMarginTop;
-    const bassY = measureBounds.y + systemMarginTop + staffHeight + staffSpacing;
+    // CRITICAL: Use actual VexFlow staff positions if available
+    const useActualPositions = measureBounds.actualTrebleY !== undefined && measureBounds.actualBassY !== undefined;
+
+    let trebleY, bassY;
+
+    if (useActualPositions) {
+      // NUCLEAR SOLUTION: Use ACTUAL VexFlow positions
+      trebleY = measureBounds.actualTrebleY;
+      bassY = measureBounds.actualBassY;
+    } else {
+      // Fallback: calculate positions (old way)
+      const systemMarginTop = 20;
+      const staffHeight = 80;
+      const staffSpacing = 80;
+      trebleY = measureBounds.y + systemMarginTop;
+      bassY = measureBounds.y + systemMarginTop + staffHeight + staffSpacing;
+    }
 
     // Determine which staff
-    // Allow ledger lines: extend staff detection beyond the 5-line staff
-    const trebleBottom = trebleY + 80; // Staff height + space for ledger lines
-    const bassTop = bassY - 40; // Allow ledger lines above bass staff
+    const trebleBottom = trebleY + 80;
+    const bassTop = bassY - 40;
+    const middleY = (trebleBottom + bassTop) / 2;
 
     let staff, staffY;
 
-    // Middle point between staves to determine which staff the mouse is closer to
-    const middleY = (trebleBottom + bassTop) / 2;
-
-    // Force bass staff for anything at or below the bass staff position
-    // This ensures deep bass notes (C2, D2, etc.) are always detected as bass
     if (realY >= bassY) {
-      // At or below bass staff top line - always bass
       staff = 'bass';
       staffY = bassY;
     } else if (realY <= middleY) {
-      // Above middle - treble staff
       staff = 'treble';
       staffY = trebleY;
     } else {
-      // Between middle and bass staff - bass
       staff = 'bass';
       staffY = bassY;
     }
 
-    // Calculate staff line (0 = bottom line, 8 = top line for 5-line staff)
-    // staffY is the Y position of the top line of the staff (from VexFlow Stave)
-    // The staff spans from staffY (top line) to staffY + 40 (bottom line)
+    // Calculate staff line
     const relativeY = realY - staffY;
-    const lineSpacing = 10; // Pixels between lines
+    const lineSpacing = 10;
     const line = Math.round((40 - relativeY) / (lineSpacing / 2));
 
     // Convert line to pitch

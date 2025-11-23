@@ -854,6 +854,13 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     });
 
     if (result) {
+      // CRITICAL: Get ACTUAL positions from VexFlow staves (not calculated positions)
+      // VexFlow may render at different Y positions than we calculated
+      const actualTrebleY = result.trebleStave ? result.trebleStave.getY() : y;
+      const actualBassY = result.bassStave ? result.bassStave.getY() : y + 80 + staffSpacing;
+      const actualX = result.trebleStave ? result.trebleStave.getX() : x;
+      const actualWidth = result.trebleStave ? result.trebleStave.getWidth() : width;
+
       renderedMeasures.push({
         index: i,
         ...result,
@@ -862,6 +869,15 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
           y,
           width,
           height: dimensions.systemHeight - dimensions.systemMarginTop - dimensions.systemMarginBottom,
+        },
+        // ACTUAL positions from VexFlow - use these instead of calculated!
+        actualBounds: {
+          x: actualX,
+          trebleY: actualTrebleY,
+          bassY: actualBassY,
+          width: actualWidth,
+          // System height is from treble top to bass bottom + some margin
+          height: (actualBassY - actualTrebleY) + 100, // 100 = staff height + margin
         },
       });
     }

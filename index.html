@@ -1817,7 +1817,7 @@
                                         Keyboard Shortcuts
                                     </button>
                                 </div>
-                                <div class="w-full" style="overflow-x: auto; overflow-y: auto; max-width: 100%; max-height: 600px; -webkit-overflow-scrolling: touch;">
+                                <div class="w-full" style="max-width: 100%;">
                                     <canvas id="interactive-melody-notation-canvas" class="border border-gray-300 rounded" style="display: block;"></canvas>
                                 </div>
                             </div>
@@ -1976,7 +1976,7 @@
         <!-- Builder Floating Controls -->
         <div id="floating-builder-controls" class="flex flex-col items-stretch gap-2 p-3 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border w-max" style="pointer-events: auto;" title="Chord Builder Controls">
             <div class="flex flex-col gap-2">
-                <button onmousedown="startBuilderChord()" onmouseup="stopBuilderChord()" onmouseleave="stopBuilderChord()" ontouchstart="event.preventDefault(); startBuilderChord();" ontouchend="event.preventDefault(); stopBuilderChord();" ontouchcancel="event.preventDefault(); stopBuilderChord();" class="px-2 py-1 bg-amber-500 text-white font-bold rounded-xl shadow-lg hover:bg-amber-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-1 whitespace-nowrap text-sm" title="Play Chord">
+                <button onmousedown="if(window.startBuilderChord) startBuilderChord()" onmouseup="if(window.stopBuilderChord) stopBuilderChord()" onmouseleave="if(window.stopBuilderChord) stopBuilderChord()" ontouchstart="event.preventDefault(); if(window.startBuilderChord) startBuilderChord();" ontouchend="event.preventDefault(); if(window.stopBuilderChord) stopBuilderChord();" ontouchcancel="event.preventDefault(); if(window.stopBuilderChord) stopBuilderChord();" class="px-2 py-1 bg-amber-500 text-white font-bold rounded-xl shadow-lg hover:bg-amber-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-1 whitespace-nowrap text-sm" title="Play Chord">
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg> 
                     <span class="compact-hide">Play Chord</span><span class="compact-show">Play</span>
                 </button>
@@ -1999,9 +1999,9 @@
                 </div>
                 <div class="flex items-center justify-between gap-1" title="Right-Hand Octave Shift">
                     <span class="text-xs font-medium text-gray-600">RH Octave:</span>
-                    <button id="builder-octave-down" onmousedown="changeBuilderOctave(-1)" onmouseup="stopBuilderChord()" onmouseleave="stopBuilderChord()" ontouchstart="event.preventDefault(); changeBuilderOctave(-1);" ontouchend="event.preventDefault(); stopBuilderChord();" ontouchcancel="event.preventDefault(); stopBuilderChord();" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Decrease Octave">-</button>
+                    <button id="builder-octave-down" onmousedown="if(window.changeBuilderOctave) changeBuilderOctave(-1)" onmouseup="if(window.stopBuilderChord) stopBuilderChord()" onmouseleave="if(window.stopBuilderChord) stopBuilderChord()" ontouchstart="event.preventDefault(); if(window.changeBuilderOctave) changeBuilderOctave(-1);" ontouchend="event.preventDefault(); if(window.stopBuilderChord) stopBuilderChord();" ontouchcancel="event.preventDefault(); if(window.stopBuilderChord) stopBuilderChord();" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Decrease Octave">-</button>
                     <span id="builder-octave-display" class="text-sm font-semibold text-gray-700 w-12 text-center" title="Current Octave Shift">Oct: 0</span>
-                    <button id="builder-octave-up" onmousedown="changeBuilderOctave(1)" onmouseup="stopBuilderChord()" onmouseleave="stopBuilderChord()" ontouchstart="event.preventDefault(); changeBuilderOctave(1);" ontouchend="event.preventDefault(); stopBuilderChord();" ontouchcancel="event.preventDefault(); stopBuilderChord();" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Increase Octave">+</button>
+                    <button id="builder-octave-up" onmousedown="if(window.changeBuilderOctave) changeBuilderOctave(1)" onmouseup="if(window.stopBuilderChord) stopBuilderChord()" onmouseleave="if(window.stopBuilderChord) stopBuilderChord()" ontouchstart="event.preventDefault(); if(window.changeBuilderOctave) changeBuilderOctave(1);" ontouchend="event.preventDefault(); if(window.stopBuilderChord) stopBuilderChord();" ontouchcancel="event.preventDefault(); if(window.stopBuilderChord) stopBuilderChord();" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Increase Octave">+</button>
                 </div>
             </div>
         </div>

@@ -28,6 +28,8 @@ import {
 import { getInteractiveMelody, playMeasure } from '../audio/melodyGenerator.js';
 import { generateBassVoicing } from '../integration/bassAutoFill.js';
 import { showNoteTooltip, hideNoteTooltip } from '../ui/noteHighlighter.js';
+import { PageManager } from './pageManager.js';
+import { PAGE_CONFIG, getMeasurePagePosition } from './pageConfig.js';
 
 // ============================================================================
 // NOTATION COMPOSER CLASS
@@ -40,13 +42,15 @@ export class NotationComposer {
   constructor(options = {}) {
     // Configuration
     this.config = {
-      container: options.container || null,
+      container: options.container || null, // DEPRECATED: Now using PageManager
+      pageContainer: options.pageContainer || options.container?.parentElement || null, // Container for pages
       toolbarContainer: options.toolbarContainer || null,
       measuresPerLine: options.measuresPerLine || 4,
       showMeasureNumbers: options.showMeasureNumbers !== false,
       showChordSymbols: options.showChordSymbols !== false,
       enableHarmonicColoring: options.enableHarmonicColoring !== false,
       enableMelodySuggestions: options.enableMelodySuggestions !== false,
+      viewMode: options.viewMode || PAGE_CONFIG.defaultViewMode, // single, two-page, continuous
     };
 
     // State management
@@ -58,6 +62,7 @@ export class NotationComposer {
     window.notationLayoutManager = this.layoutManager;
     this.measureManager = new MeasureManager();
     this.toolbar = null;
+    this.pageManager = null; // Will be initialized in init()
 
     // Rendering state
     this.renderedSystem = null;
@@ -67,6 +72,7 @@ export class NotationComposer {
     this.selectedNote = null;
     this.pendingRenderFrame = null;  // requestAnimationFrame ID for debouncing renders
     this.lastRenderTime = 0;  // Timestamp of last render for debouncing
+    this.noteEditor = null;  // Reference to NoteEditor for Phase 1A ghost note rendering
 
     // Highlighting state
     this.selectedMeasureIndex = -1;   // Blue border for selected measure
@@ -76,6 +82,9 @@ export class NotationComposer {
     // Re-entrancy guards to prevent infinite loops
     this.isSyncingFromProgression = false;
     this.isHandlingSync = false;
+
+    // Track pages with event listeners to prevent duplicates
+    this.pagesWithListeners = new Set();
 
     // Event handlers
     this.onUpdate = options.onUpdate || (() => {});
@@ -94,6 +103,13 @@ export class NotationComposer {
   init() {
     // Get composition state
     this.compositionState = getCompositionState();
+
+    // Create PageManager for multi-page rendering
+    if (this.config.pageContainer) {
+      this.pageManager = new PageManager(this.config.pageContainer, {
+        viewMode: this.config.viewMode,
+      });
+    }
 
     // Create toolbar if container provided
     if (this.config.toolbarContainer) {
@@ -141,6 +157,16 @@ export class NotationComposer {
     // Expose a single sync function that chord updates should call
     // This replaces the automatic chordChanged event listener
     window.syncNotationFromProgression = () => {
+      // DEPRECATION WARNING: This function rebuilds the entire notation from scratch
+      // and will wipe out user-added treble notes!
+      console.warn(
+        '[DEPRECATED] window.syncNotationFromProgression() is deprecated for chord modifications.\n' +
+        'This function rebuilds ALL notation from scratch and WIPES user-added treble notes.\n' +
+        'For chord updates, use: window.updateChordNotation(measureIndex)\n' +
+        'For full rebuilds only, use: window.fullRebuildNotation()\n' +
+        'Stack trace:', new Error().stack
+      );
+
       if (this.isHandlingSync) {
         return;
       }
@@ -671,7 +697,6 @@ export class NotationComposer {
     // This prevents event-driven renders from catching partial state (e.g., 1 measure instead of 4)
     // Exception: Allow final sync render to bypass this check
     if (this.isSyncingFromProgression && !bypassSyncCheck) {
-      console.log('[RENDER] Blocked by sync flag');
       return;
     }
 
@@ -760,12 +785,6 @@ export class NotationComposer {
         }))
       : this.measureManager.getAllMeasures(); // Fallback if compositionState not ready
 
-    console.log('[RENDER] Rendering from', hasCompositionState ? 'compositionState' : 'measureManager');
-    console.log('[RENDER] Notes to display:');
-    for (let i = 0; i < Math.min(measures.length, 10); i++) {
-      console.log(`  M${i}: treble=${measures[i].trebleNotes?.length || 0}, bass=${measures[i].bassNotes?.length || 0}`);
-    }
-
     if (measures.length === 0) {
       // Render empty state
       this.renderEmptyState();
@@ -796,18 +815,30 @@ export class NotationComposer {
       timeSignature: timeSig,
     });
 
-    // Render the grand staff system with highlighting
-    this.renderedSystem = renderGrandStaffSystem(this.config.container, measures, {
-      measuresPerLine: this.config.measuresPerLine,
-      keySignature: key,
-      timeSignature: timeSig,
-      showMeasureNumbers: this.config.showMeasureNumbers,
-      // Highlighting options
-      selectedMeasureIndex: this.selectedMeasureIndex,
-      activeMeasureIndex: this.activeMeasureIndex,
-      activeNotes: this.activeNotes,
-      enableHarmonicColoring: this.config.enableHarmonicColoring,
-    });
+    // Render using PageManager (multi-page) or legacy single canvas
+    if (this.pageManager) {
+      // MULTI-PAGE RENDERING
+      this.renderedSystem = this.renderToPages(measures, key, timeSig);
+    } else {
+      // LEGACY SINGLE CANVAS RENDERING
+      this.renderedSystem = renderGrandStaffSystem(this.config.container, measures, {
+        measuresPerLine: this.config.measuresPerLine,
+        keySignature: key,
+        timeSignature: timeSig,
+        showMeasureNumbers: this.config.showMeasureNumbers,
+        // Highlighting options
+        selectedMeasureIndex: this.selectedMeasureIndex,
+        activeMeasureIndex: this.activeMeasureIndex,
+        activeNotes: this.activeNotes,
+        enableHarmonicColoring: this.config.enableHarmonicColoring,
+      });
+    }
+
+    // CRITICAL: Update layout manager with ACTUAL VexFlow positions (nuclear solution)
+    // This eliminates coordinate mismatch by using real positions instead of calculations
+    if (this.renderedSystem && this.renderedSystem.measures) {
+      this.layoutManager.setActualMeasurePositions(this.renderedSystem.measures);
+    }
 
     // Store note regions for tooltip detection
     if (this.renderedSystem && this.renderedSystem.noteRegions) {
@@ -844,6 +875,25 @@ export class NotationComposer {
       }, 0);
     }
 
+    // PHASE 1A/1B: Draw ghost note after VexFlow rendering
+    if (this.noteEditor && this.noteEditor.ghostNote) {
+      if (this.pageManager) {
+        // Multi-page: Draw on the page containing the ghost note's measure
+        const measureIndex = this.noteEditor.ghostNote.measure?.index;
+        if (measureIndex !== undefined) {
+          const page = this.pageManager.getPageForMeasure(measureIndex);
+          if (page) {
+            const ctx = page.canvas.getContext('2d');
+            this.noteEditor.drawGhostNote(ctx);
+          }
+        }
+      } else {
+        // Legacy single canvas
+        const ctx = this.config.container.getContext('2d');
+        this.noteEditor.drawGhostNote(ctx);
+      }
+    }
+
     // Notify listeners
     this.onUpdate();
   }
@@ -873,6 +923,80 @@ export class NotationComposer {
   }
 
   /**
+   * Render measures to multiple pages
+   * @param {Array} measures - All measures to render
+   * @param {string} key - Key signature
+   * @param {string} timeSig - Time signature
+   * @returns {Object} - Rendered system data
+   */
+  renderToPages(measures, key, timeSig) {
+    // Clear all existing pages
+    this.pageManager.clearAllPages();
+
+    // Group measures by page (8 measures per page)
+    const measuresPerPage = PAGE_CONFIG.measuresPerPage;
+    const allRenderedMeasures = [];
+    const allNoteRegions = [];
+
+    for (let pageIndex = 0; pageIndex * measuresPerPage < measures.length; pageIndex++) {
+      const startMeasure = pageIndex * measuresPerPage;
+      const endMeasure = Math.min(startMeasure + measuresPerPage, measures.length);
+      const pageMeasures = measures.slice(startMeasure, endMeasure);
+
+      // Get page canvas
+      const page = this.pageManager.getPageForMeasure(startMeasure);
+
+      // Render this page's measures
+      const renderedPage = renderGrandStaffSystem(page.canvas, pageMeasures, {
+        measuresPerLine: this.config.measuresPerLine,
+        keySignature: key,
+        timeSignature: timeSig,
+        showMeasureNumbers: this.config.showMeasureNumbers,
+        startMeasureNumber: startMeasure + 1, // Measure numbers are 1-based
+        // Highlighting options
+        selectedMeasureIndex: this.selectedMeasureIndex - startMeasure, // Adjust for page offset
+        activeMeasureIndex: this.activeMeasureIndex - startMeasure, // Adjust for page offset
+        activeNotes: this.activeNotes,
+        enableHarmonicColoring: this.config.enableHarmonicColoring,
+      });
+
+      // Collect rendered measures (adjust indices back to global)
+      if (renderedPage && renderedPage.measures) {
+        renderedPage.measures.forEach((measure, localIndex) => {
+          const globalIndex = startMeasure + localIndex;
+          allRenderedMeasures.push({
+            ...measure,
+            index: globalIndex,
+            pageIndex: pageIndex,
+          });
+
+          // Register measure with page manager
+          if (measure.actualBounds) {
+            this.pageManager.registerMeasure(pageIndex, globalIndex, measure.actualBounds);
+          }
+        });
+      }
+
+      // Collect note regions (adjust indices to global)
+      if (renderedPage && renderedPage.noteRegions) {
+        renderedPage.noteRegions.forEach(region => {
+          allNoteRegions.push({
+            ...region,
+            measureIndex: startMeasure + region.measureIndex,
+            pageIndex: pageIndex,
+          });
+        });
+      }
+    }
+
+    // Return combined rendered system
+    return {
+      measures: allRenderedMeasures,
+      noteRegions: allNoteRegions,
+    };
+  }
+
+  /**
    * Apply harmonic tone coloring to rendered notes
    */
   applyHarmonicColoring() {
@@ -889,78 +1013,147 @@ export class NotationComposer {
    * Set up canvas event listeners for interaction
    */
   setupCanvasEvents() {
-    const container = this.config.container;
-    if (!container) return;
-
     // Track for click-and-hold playback
     this.mouseDownTime = null;
     this.mouseDownMeasure = null;
     this.holdTimer = null;
 
+    // Multi-page mode: Attach to all page canvases
+    if (this.pageManager) {
+      this.attachPageCanvasEvents();
+      return;
+    }
+
+    // Legacy single canvas mode
+    const container = this.config.container;
+    if (!container) return;
+
     // Mousedown handler - for click-and-hold playback
-    container.addEventListener('mousedown', (e) => {
-      // Only handle if Alt is NOT held (to avoid conflict with note editor)
-      if (e.altKey) {
+    container.addEventListener('mousedown', (e) => this.handleCanvasMouseDown(e));
+
+    // Mouseup handler - for click vs hold detection
+    container.addEventListener('mouseup', (e) => this.handleCanvasMouseUp(e));
+
+    // Mouse move for hover effects
+    container.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+
+    // Mouse leave - cancel any pending hold
+    container.addEventListener('mouseleave', () => this.handleCanvasMouseLeave());
+  }
+
+  /**
+   * Attach event listeners to all page canvases (multi-page mode)
+   * CRITICAL: Only attach to pages that don't already have listeners to prevent duplicates
+   */
+  attachPageCanvasEvents() {
+    if (!this.pageManager) return;
+
+    const pages = this.pageManager.getAllPages();
+    pages.forEach(page => {
+      // Skip if this page already has listeners attached
+      const pageId = page.canvas.id;
+      if (this.pagesWithListeners.has(pageId)) {
         return;
       }
 
-      const rect = container.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const position = this.layoutManager.getStaffPositionAtPoint(x, y);
+      // Attach listeners
+      page.canvas.addEventListener('mousedown', (e) => this.handleCanvasMouseDown(e));
+      page.canvas.addEventListener('mouseup', (e) => this.handleCanvasMouseUp(e));
+      page.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+      page.canvas.addEventListener('mouseleave', () => this.handleCanvasMouseLeave());
 
-      if (position && position.measure) {
-        this.mouseDownTime = Date.now();
-        this.mouseDownMeasure = position.measure.index;
-
-        // Start a timer - if held for 200ms, start playback
-        this.holdTimer = setTimeout(() => {
-          if (this.mouseDownMeasure !== null) {
-            playMeasure(this.mouseDownMeasure);
-          }
-        }, 200);
-      }
+      // Mark this page as having listeners
+      this.pagesWithListeners.add(pageId);
     });
+  }
 
-    // Mouseup handler - for click vs hold detection
-    container.addEventListener('mouseup', (e) => {
-      // Only handle if Alt is NOT held
-      if (e.altKey) return;
+  /**
+   * Handle mousedown on canvas (single or multi-page)
+   */
+  handleCanvasMouseDown(e) {
+    // Only handle if Alt is NOT held (to avoid conflict with note editor)
+    if (e.altKey) return;
 
-      // Calculate how long the mouse was held
-      const elapsedTime = this.mouseDownTime ? (Date.now() - this.mouseDownTime) : 0;
+    // Get position - works for both single and multi-page mode
+    const position = this.getPositionFromEvent(e);
+    if (!position) return;
 
-      // Clear hold timer if it hasn't fired yet
-      if (this.holdTimer) {
-        clearTimeout(this.holdTimer);
-        this.holdTimer = null;
+    const staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
+
+    if (staffPosition && staffPosition.measure) {
+      this.mouseDownTime = Date.now();
+      this.mouseDownMeasure = staffPosition.measure.index;
+
+      // Start a timer - if held for 200ms, start playback
+      this.holdTimer = setTimeout(() => {
+        if (this.mouseDownMeasure !== null && typeof playMeasure !== 'undefined') {
+          playMeasure(this.mouseDownMeasure);
+        }
+      }, 200);
+    }
+  }
+
+  /**
+   * Handle mouseup on canvas (single or multi-page)
+   */
+  handleCanvasMouseUp(e) {
+    // Only handle if Alt is NOT held
+    if (e.altKey) return;
+
+    // Calculate how long the mouse was held
+    const elapsedTime = this.mouseDownTime ? (Date.now() - this.mouseDownTime) : 0;
+
+    // Clear hold timer if it hasn't fired yet
+    if (this.holdTimer) {
+      clearTimeout(this.holdTimer);
+      this.holdTimer = null;
+    }
+
+    // If it was a quick click (< 200ms), handle as measure selection
+    // If held >= 200ms, playback already started, don't select
+    if (elapsedTime < 200) {
+      this.handleClick(e);
+    }
+
+    this.mouseDownTime = null;
+    this.mouseDownMeasure = null;
+  }
+
+  /**
+   * Handle mouse leave from canvas (single or multi-page)
+   */
+  handleCanvasMouseLeave() {
+    if (this.holdTimer) {
+      clearTimeout(this.holdTimer);
+      this.holdTimer = null;
+    }
+    this.mouseDownTime = null;
+    this.mouseDownMeasure = null;
+    this.handleMouseLeave();
+  }
+
+  /**
+   * Get canvas position from event (works for both single and multi-page mode)
+   */
+  getPositionFromEvent(e) {
+    // Multi-page mode
+    if (this.pageManager) {
+      const pageInfo = this.pageManager.getPageFromEvent(e);
+      if (pageInfo) {
+        return { x: pageInfo.x, y: pageInfo.y, page: pageInfo.page };
       }
+      return null;
+    }
 
-      // If it was a quick click (< 200ms), handle as measure selection
-      // If held >= 200ms, playback already started, don't select
-      if (elapsedTime < 200) {
-        this.handleClick(e);
-      }
+    // Legacy single canvas mode
+    const container = this.config.container;
+    if (!container) return null;
 
-      this.mouseDownTime = null;
-      this.mouseDownMeasure = null;
-    });
-
-    // Mouse move for hover effects
-    container.addEventListener('mousemove', (e) => {
-      this.handleMouseMove(e);
-    });
-
-    // Mouse leave - cancel any pending hold
-    container.addEventListener('mouseleave', () => {
-      if (this.holdTimer) {
-        clearTimeout(this.holdTimer);
-        this.holdTimer = null;
-      }
-      this.mouseDownTime = null;
-      this.mouseDownMeasure = null;
-      this.handleMouseLeave();
-    });
+    const rect = container.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
   }
 
   /**
@@ -969,24 +1162,24 @@ export class NotationComposer {
    * @param {MouseEvent} e - Mouse event
    */
   handleClick(e) {
-    const rect = this.config.container.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    // Get position - works for both single and multi-page mode
+    const position = this.getPositionFromEvent(e);
+    if (!position) return;
 
     // Find what was clicked
-    const position = this.layoutManager.getStaffPositionAtPoint(x, y);
+    const staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
 
-    if (position && position.measure) {
-      this.selectedMeasure = position.measure.index;
-      this.selectedStaff = position.staff || null;
+    if (staffPosition && staffPosition.measure) {
+      this.selectedMeasure = staffPosition.measure.index;
+      this.selectedStaff = staffPosition.staff || null;
 
       // Update selectedMeasureIndex for highlighting (blue border)
-      this.setSelectedMeasure(position.measure.index);
+      this.setSelectedMeasure(staffPosition.measure.index);
 
       this.onSelectionChange({
         measure: this.selectedMeasure,
         staff: this.selectedStaff,
-        pitch: position.pitch,
+        pitch: staffPosition.pitch,
       });
     }
   }

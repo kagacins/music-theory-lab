@@ -3144,13 +3144,28 @@ export function playMeasure(measureIndex) {
     // Get common start time for perfect synchronization
     const startTime = Tone.now() + 0.01; // Small buffer to ensure scheduling works
 
+    // Calculate measure duration for cleanup
+    const tempo = interactiveMelody.tempo || 120;
+    const beatDuration = 60.0 / tempo;
+    const measureDuration = beatDuration * 4; // 4/4 time
+
+    // Schedule cleanup of all highlights after measure is done
+    const measureCleanupTimeout = setTimeout(() => {
+        // Clear active measure highlighting (yellow background)
+        activeMeasureIndex = -1;
+
+        // Clear all note highlights and re-render
+        if (window.stopNotationPlaybackHighlighting) {
+            window.stopNotationPlaybackHighlighting();
+        }
+    }, (measureDuration + 0.1) * 1000); // Add 100ms buffer to ensure all notes are done
+    measurePlaybackTimeouts.push(measureCleanupTimeout);
+
     // All bass notes now come from compositionState - no need for fallback chord playback
 
     // Play melody notes with Tone.js scheduling for perfect sync
     if (measureMelodyNotes.length > 0) {
-        const tempo = interactiveMelody.tempo || 120;
-        const beatDuration = 60.0 / tempo; // seconds per beat (based on tempo)
-
+        // tempo and beatDuration already calculated above for cleanup
         console.log('[PlayMeasure] About to play', measureMelodyNotes.length, 'melody notes');
 
         measureMelodyNotes.forEach((note, index) => {
