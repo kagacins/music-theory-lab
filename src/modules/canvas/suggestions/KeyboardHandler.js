@@ -183,6 +183,20 @@ export class KeyboardHandler {
                 return;
             }
 
+            // PHASE 1.5: Don't intercept number keys (1-6), Shift+Arrow, or Shift+S/A/T/M when notes are selected
+            // This allows the note editor to handle duration changes, insertions, and articulations
+            if (window.notationEditorHasSelection && window.notationEditorHasSelection()) {
+                const isNumberKey = /^[1-6]$/.test(event.key);
+                const isShiftArrow = event.shiftKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight');
+                const isArticulationKey = event.shiftKey && /^[satmSATM]$/.test(event.key);
+                const isTieKey = !event.shiftKey && /^[tT]$/.test(event.key);
+
+                if (isNumberKey || isShiftArrow || isArticulationKey || isTieKey) {
+                    // Let the note editor handle these keys when notes are selected
+                    return;
+                }
+            }
+
             // Prevent default behavior for registered shortcuts
             event.preventDefault();
             event.stopPropagation();

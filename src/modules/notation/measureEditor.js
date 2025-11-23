@@ -605,6 +605,398 @@ export class MeasureManager {
   }
 
   // ============================================================================
+  // BEAT CALCULATION AND VALIDATION
+  // ============================================================================
+
+  /**
+   * Calculate total beats used in a staff of a measure
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @returns {number} - Total beats used
+   */
+  getUsedBeats(measureIndex, staff) {
+    const measure = this.measures[measureIndex];
+    if (!measure) return 0;
+
+    const notes = staff === 'treble' ? measure.trebleNotes : measure.bassNotes;
+    let totalBeats = 0;
+
+    for (const note of notes) {
+      const beats = getDurationBeats(note.duration);
+      totalBeats += note.dotted ? beats * 1.5 : beats;
+    }
+
+    return totalBeats;
+  }
+
+  /**
+   * Calculate remaining beats available in a measure
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @returns {number} - Remaining beats
+   */
+  getRemainingBeats(measureIndex, staff) {
+    const measure = this.measures[measureIndex];
+    if (!measure) return 0;
+
+    // Parse time signature (e.g., "4/4" -> 4 beats)
+    const [numerator] = (measure.timeSignature || '4/4').split('/').map(Number);
+    const maxBeats = numerator;
+
+    const usedBeats = this.getUsedBeats(measureIndex, staff);
+    return Math.max(0, maxBeats - usedBeats);
+  }
+
+  /**
+   * Check if a note with given duration can fit in the measure
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @param {string} duration - Tone.js duration
+   * @param {boolean} dotted - Is dotted?
+   * @returns {boolean} - Can fit
+   */
+  canFitNote(measureIndex, staff, duration, dotted = false) {
+    const remainingBeats = this.getRemainingBeats(measureIndex, staff);
+    const beats = getDurationBeats(duration);
+    const requiredBeats = dotted ? beats * 1.5 : beats;
+
+    return requiredBeats <= remainingBeats;
+  }
+
+  /**
+   * Insert a note before another note
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @param {number} noteIndex - Index of note to insert before
+   * @param {Object} noteData - Note data
+   * @returns {boolean} - Success
+   */
+  insertNoteBefore(measureIndex, staff, noteIndex, noteData) {
+    const measure = this.measures[measureIndex];
+    if (!measure) return false;
+
+    // Check if note will fit
+    if (!this.canFitNote(measureIndex, staff, noteData.duration, noteData.dotted)) {
+      console.warn('Note does not fit in measure');
+      return false;
+    }
+
+    this.saveState();
+
+    const notes = staff === 'treble' ? measure.trebleNotes : measure.bassNotes;
+    const normalizedNote = this.normalizeNote(noteData);
+
+    notes.splice(noteIndex, 0, normalizedNote);
+
+    return true;
+  }
+
+  /**
+   * Insert a note after another note
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @param {number} noteIndex - Index of note to insert after
+   * @param {Object} noteData - Note data
+   * @returns {boolean} - Success
+   */
+  insertNoteAfter(measureIndex, staff, noteIndex, noteData) {
+    return this.insertNoteBefore(measureIndex, staff, noteIndex + 1, noteData);
+  }
+
+  /**
+   * Change the duration of an existing note
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @param {number} noteIndex - Note index
+   * @param {string} newDuration - New Tone.js duration
+   * @param {boolean} newDotted - New dotted state
+   * @returns {boolean} - Success
+   */
+  changeNoteDuration(measureIndex, staff, noteIndex, newDuration, newDotted = false) {
+    console.log('[MeasureEditor] changeNoteDuration called:', {
+      measureIndex,
+      staff,
+      noteIndex,
+      newDuration,
+      newDotted
+    });
+
+    const measure = this.measures[measureIndex];
+    if (!measure) {
+      console.warn('[MeasureEditor] Measure not found:', measureIndex);
+      return false;
+    }
+
+    const notes = staff === 'treble' ? measure.trebleNotes : measure.bassNotes;
+    const note = notes[noteIndex];
+    if (!note) {
+      console.warn('[MeasureEditor] Note not found:', { staff, noteIndex });
+      return false;
+    }
+
+    console.log('[MeasureEditor] Current note:', {
+      duration: note.duration,
+      dotted: note.dotted,
+      pitch: note.pitch || note.pitches
+    });
+
+    // Calculate current note's beats
+    const currentBeats = getDurationBeats(note.duration);
+    const currentTotalBeats = note.dotted ? currentBeats * 1.5 : currentBeats;
+
+    // Calculate new note's beats
+    const newBeats = getDurationBeats(newDuration);
+    const newTotalBeats = newDotted ? newBeats * 1.5 : newBeats;
+
+    // Check if change would fit
+    const remainingBeats = this.getRemainingBeats(measureIndex, staff);
+    const beatDifference = newTotalBeats - currentTotalBeats;
+
+    console.log('[MeasureEditor] Beat calculation:', {
+      currentBeats,
+      currentTotalBeats,
+      newBeats,
+      newTotalBeats,
+      remainingBeats,
+      beatDifference
+    });
+
+    if (beatDifference > remainingBeats) {
+      console.warn('[MeasureEditor] New duration does not fit in measure');
+      return false;
+    }
+
+    this.saveState();
+
+    note.duration = newDuration;
+    note.dotted = newDotted;
+
+    console.log('[MeasureEditor] Duration changed successfully. New note:', {
+      duration: note.duration,
+      dotted: note.dotted
+    });
+
+    return true;
+  }
+
+  // ============================================================================
+  // ARTICULATIONS AND EXPRESSIONS
+  // ============================================================================
+
+  /**
+   * Set articulation for a note
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @param {number} noteIndex - Note index
+   * @param {string} articulation - Articulation type ('staccato', 'accent', 'tenuto', 'marcato', null)
+   * @returns {boolean} - Success
+   */
+  setArticulation(measureIndex, staff, noteIndex, articulation) {
+    const measure = this.measures[measureIndex];
+    if (!measure) return false;
+
+    const notes = staff === 'treble' ? measure.trebleNotes : measure.bassNotes;
+    const note = notes[noteIndex];
+    if (!note) return false;
+
+    this.saveState();
+    note.articulation = articulation;
+    return true;
+  }
+
+  /**
+   * Toggle articulation for a note (turn on if off, turn off if on)
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @param {number} noteIndex - Note index
+   * @param {string} articulation - Articulation type
+   * @returns {boolean} - Success
+   */
+  toggleArticulation(measureIndex, staff, noteIndex, articulation) {
+    const measure = this.measures[measureIndex];
+    if (!measure) return false;
+
+    const notes = staff === 'treble' ? measure.trebleNotes : measure.bassNotes;
+    const note = notes[noteIndex];
+    if (!note) return false;
+
+    const newArticulation = note.articulation === articulation ? null : articulation;
+    return this.setArticulation(measureIndex, staff, noteIndex, newArticulation);
+  }
+
+  /**
+   * Set dynamic marking for a note
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @param {number} noteIndex - Note index
+   * @param {string} dynamic - Dynamic marking ('pp', 'p', 'mp', 'mf', 'f', 'ff', 'fff', null)
+   * @returns {boolean} - Success
+   */
+  setDynamic(measureIndex, staff, noteIndex, dynamic) {
+    const measure = this.measures[measureIndex];
+    if (!measure) return false;
+
+    const notes = staff === 'treble' ? measure.trebleNotes : measure.bassNotes;
+    const note = notes[noteIndex];
+    if (!note) return false;
+
+    this.saveState();
+    note.dynamic = dynamic;
+    return true;
+  }
+
+  // ============================================================================
+  // TIES AND SLURS
+  // ============================================================================
+
+  /**
+   * Add a tie to a note (connects to next note of same pitch)
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @param {number} noteIndex - Note index
+   * @returns {boolean} - Success
+   */
+  addTie(measureIndex, staff, noteIndex) {
+    const measure = this.measures[measureIndex];
+    if (!measure) return false;
+
+    const notes = staff === 'treble' ? measure.trebleNotes : measure.bassNotes;
+    const note = notes[noteIndex];
+    if (!note) return false;
+
+    // Can't tie a rest
+    if (note.isRest) return false;
+
+    this.saveState();
+    note.tied = true;
+
+    // Mark next note as tied-to if it exists and has same pitch
+    if (noteIndex + 1 < notes.length) {
+      const nextNote = notes[noteIndex + 1];
+      if (!nextNote.isRest && (nextNote.pitch === note.pitch ||
+          (note.pitches && nextNote.pitches && JSON.stringify(note.pitches) === JSON.stringify(nextNote.pitches)))) {
+        nextNote.tiedTo = true;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Remove a tie from a note
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @param {number} noteIndex - Note index
+   * @returns {boolean} - Success
+   */
+  removeTie(measureIndex, staff, noteIndex) {
+    const measure = this.measures[measureIndex];
+    if (!measure) return false;
+
+    const notes = staff === 'treble' ? measure.trebleNotes : measure.bassNotes;
+    const note = notes[noteIndex];
+    if (!note) return false;
+
+    this.saveState();
+    note.tied = false;
+
+    // Remove tiedTo from next note
+    if (noteIndex + 1 < notes.length) {
+      notes[noteIndex + 1].tiedTo = false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Toggle tie on a note
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @param {number} noteIndex - Note index
+   * @returns {boolean} - Success
+   */
+  toggleTie(measureIndex, staff, noteIndex) {
+    const measure = this.measures[measureIndex];
+    if (!measure) return false;
+
+    const notes = staff === 'treble' ? measure.trebleNotes : measure.bassNotes;
+    const note = notes[noteIndex];
+    if (!note || note.isRest) return false;
+
+    return note.tied ? this.removeTie(measureIndex, staff, noteIndex) : this.addTie(measureIndex, staff, noteIndex);
+  }
+
+  /**
+   * Add a slur between two notes (can be different pitches)
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @param {number} startNoteIndex - Start note index
+   * @param {number} endNoteIndex - End note index
+   * @returns {boolean} - Success
+   */
+  addSlur(measureIndex, staff, startNoteIndex, endNoteIndex) {
+    const measure = this.measures[measureIndex];
+    if (!measure) return false;
+
+    const notes = staff === 'treble' ? measure.trebleNotes : measure.bassNotes;
+    const startNote = notes[startNoteIndex];
+    const endNote = notes[endNoteIndex];
+
+    if (!startNote || !endNote) return false;
+    if (startNote.isRest || endNote.isRest) return false;
+    if (startNoteIndex >= endNoteIndex) return false;
+
+    this.saveState();
+
+    // Initialize slur data if not present
+    if (!startNote.slur) {
+      startNote.slur = { type: 'start', endIndex: endNoteIndex };
+    } else {
+      startNote.slur.type = 'start';
+      startNote.slur.endIndex = endNoteIndex;
+    }
+
+    if (!endNote.slur) {
+      endNote.slur = { type: 'end', startIndex: startNoteIndex };
+    } else {
+      endNote.slur.type = 'end';
+      endNote.slur.startIndex = startNoteIndex;
+    }
+
+    return true;
+  }
+
+  /**
+   * Remove slur from a note
+   * @param {number} measureIndex - Measure index
+   * @param {string} staff - 'treble' or 'bass'
+   * @param {number} noteIndex - Note index
+   * @returns {boolean} - Success
+   */
+  removeSlur(measureIndex, staff, noteIndex) {
+    const measure = this.measures[measureIndex];
+    if (!measure) return false;
+
+    const notes = staff === 'treble' ? measure.trebleNotes : measure.bassNotes;
+    const note = notes[noteIndex];
+    if (!note || !note.slur) return false;
+
+    this.saveState();
+
+    // Remove slur from connected note
+    if (note.slur.type === 'start' && note.slur.endIndex !== undefined) {
+      const endNote = notes[note.slur.endIndex];
+      if (endNote) delete endNote.slur;
+    } else if (note.slur.type === 'end' && note.slur.startIndex !== undefined) {
+      const startNote = notes[note.slur.startIndex];
+      if (startNote) delete startNote.slur;
+    }
+
+    delete note.slur;
+    return true;
+  }
+
+  // ============================================================================
   // UNDO/REDO
   // ============================================================================
 

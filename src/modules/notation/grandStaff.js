@@ -611,7 +611,7 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature) {
     } else if (note.pitches && Array.isArray(note.pitches)) {
       // Chord - apply ottava adjustment
       const { adjustedPitches, ottavaLabel } = applyOttavaAdjustment(note.pitches, clef);
-      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false);
+      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false, note.articulation || null);
 
       // Track ottava brackets
       if (ottavaLabel) {
@@ -677,8 +677,8 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature) {
       vexNotes.push(staveNote);
     }
 
-    // Track ties: if this note has tie='start', mark it for tie rendering
-    if (note.tie === 'start' && vexNotes.length > 0) {
+    // Track ties: if this note has tied=true, mark it for tie rendering
+    if (note.tied && vexNotes.length > 0) {
       ties.push({
         startIndex: vexNotes.length - 1,
         // We'll find the end note in the next measure or later in this function

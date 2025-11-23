@@ -77,6 +77,10 @@ export class NoteEditor {
     this.hideSelectionHighlight = false; // PHASE 1.4: Esc hides visual, keeps selection for polyphony
     this.hoveredPosition = null;
     this.ghostNote = null;
+    this.isShiftHeld = false; // Track if Shift key is held
+    this.hoverToolbar = null; // Toolbar data when Shift+hovering over selection
+    this.hoveredToolbarButton = null; // Currently hovered toolbar button
+    this.pressedToolbarButton = null; // Currently pressed toolbar button
 
     // Drag state
     this.dragStartPosition = null;
@@ -214,6 +218,44 @@ export class NoteEditor {
     if (!this.isEnabled) return;
 
     const position = this.getCanvasPosition(e);
+
+    // Check if clicking anywhere on the toolbar (to prevent clicks from falling through)
+    const isOnToolbar = this.hoverToolbar && this.isPositionInToolbar(position);
+    console.log('[NoteEditor] handleMouseDown:', {
+      position,
+      hasToolbar: !!this.hoverToolbar,
+      toolbarBounds: this.hoverToolbar ? { x: this.hoverToolbar.x, y: this.hoverToolbar.y, width: this.hoverToolbar.width, height: this.hoverToolbar.height } : null,
+      isOnToolbar
+    });
+
+    if (isOnToolbar) {
+      e.stopPropagation();
+      e.preventDefault();
+      console.log('[NoteEditor] Click on toolbar - preventing fallthrough');
+
+      // Check if clicking on a specific button
+      const clickedButton = this.hoverToolbar.buttons.find(btn => {
+        return position.x >= btn.x && position.x <= btn.x + btn.width &&
+               position.y >= btn.y && position.y <= btn.y + btn.height;
+      });
+
+      if (clickedButton && clickedButton.action) {
+        // Show pressed state
+        this.pressedToolbarButton = clickedButton;
+        this.renderOverlay();
+
+        // Execute action after a brief delay to show the press animation
+        setTimeout(() => {
+          console.log('[NoteEditor] Toolbar button clicked:', clickedButton.id);
+          clickedButton.action();
+          this.pressedToolbarButton = null;
+          this.renderOverlay();
+        }, 100);
+      }
+
+      return; // Always return early if clicking on toolbar, even if not on a button
+    }
+
     let staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
 
     // When Alt is held, prefer the last hovered position (ghost note)
@@ -374,6 +416,32 @@ export class NoteEditor {
     const position = this.getCanvasPosition(e);
     const staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
 
+    // Track Shift key state
+    this.isShiftHeld = e.shiftKey;
+
+    // Check if hovering over the toolbar itself (keep it visible)
+    const isHoveringToolbar = this.hoverToolbar && this.isPositionInToolbar(position);
+
+    // Check if Shift+hovering over a selected note OR hovering over existing toolbar
+    if ((e.shiftKey && this.selectedNotes.size > 0) || isHoveringToolbar) {
+      this.updateHoverToolbar(position);
+
+      // Update which button is being hovered
+      if (this.hoverToolbar) {
+        this.hoveredToolbarButton = this.hoverToolbar.buttons.find(btn => {
+          return btn.label !== '|' && // Don't hover separators
+                 position.x >= btn.x && position.x <= btn.x + btn.width &&
+                 position.y >= btn.y && position.y <= btn.y + btn.height;
+        });
+      }
+
+      this.renderOverlay();
+      return; // Don't show ghost note when toolbar is active
+    } else {
+      this.hoverToolbar = null;
+      this.hoveredToolbarButton = null;
+    }
+
     // Only show ghost note if Alt key is held (note editing mode)
     if (!e.altKey) {
       this.hoveredPosition = null;
@@ -402,6 +470,15 @@ export class NoteEditor {
    */
   handleMouseUp(e) {
     if (!this.isEnabled) return;
+
+    const position = this.getCanvasPosition(e);
+
+    // Block mouse up events over toolbar
+    if (this.hoverToolbar && this.isPositionInToolbar(position)) {
+      e.stopPropagation();
+      e.preventDefault();
+      return;
+    }
 
     if (this.state === EDITOR_STATES.DRAGGING) {
       this.endDrag();
@@ -461,9 +538,18 @@ export class NoteEditor {
       }
     }
 
-    // Arrow keys to move selected notes
+    // Arrow keys to move selected notes OR insert notes before/after
     if (this.selectedNotes.size > 0) {
-      if (e.key === 'ArrowUp') {
+      // Insert note before/after (Shift + Arrow Left/Right)
+      if (e.shiftKey && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        this.insertNoteBeforeSelected();
+      } else if (e.shiftKey && e.key === 'ArrowRight') {
+        e.preventDefault();
+        this.insertNoteAfterSelected();
+      }
+      // Move notes up/down (Arrow Up/Down)
+      else if (e.key === 'ArrowUp') {
         console.log('[NoteEditor] ArrowUp pressed, moving notes up');
         e.preventDefault();
         this.moveSelectedNotes(1); // Up one step
@@ -471,6 +557,56 @@ export class NoteEditor {
         console.log('[NoteEditor] ArrowDown pressed, moving notes down');
         e.preventDefault();
         this.moveSelectedNotes(-1); // Down one step
+      }
+    }
+
+    // Change duration of selected notes (Shift + 1-6 for durations, already handled by toolbar)
+    // But we can add direct duration change via number keys when notes are selected
+    if (this.selectedNotes.size > 0 && !e.shiftKey) {
+      const durationMap = {
+        '1': '1n',  // Whole note
+        '2': '2n',  // Half note
+        '3': '4n',  // Quarter note
+        '4': '8n',  // Eighth note
+        '5': '16n', // 16th note
+        '6': '32n'  // 32nd note
+      };
+
+      if (durationMap[e.key]) {
+        e.preventDefault();
+        this.changeDurationOfSelected(durationMap[e.key]);
+      }
+    }
+
+    // Articulations (when notes are selected)
+    if (this.selectedNotes.size > 0) {
+      // Staccato (Shift + S)
+      if (e.shiftKey && (e.key === 'S' || e.key === 's')) {
+        e.preventDefault();
+        this.toggleArticulationOnSelected('staccato');
+      }
+      // Accent (Shift + A)
+      else if (e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        this.toggleArticulationOnSelected('accent');
+      }
+      // Tenuto (Shift + T)
+      else if (e.shiftKey && (e.key === 'T' || e.key === 't')) {
+        e.preventDefault();
+        this.toggleArticulationOnSelected('tenuto');
+      }
+      // Marcato (Shift + M)
+      else if (e.shiftKey && (e.key === 'M' || e.key === 'm')) {
+        e.preventDefault();
+        this.toggleArticulationOnSelected('marcato');
+      }
+    }
+
+    // Tie toggle (T key, when notes are selected)
+    if (this.selectedNotes.size > 0 && !e.shiftKey) {
+      if (e.key === 't' || e.key === 'T') {
+        e.preventDefault();
+        this.toggleTieOnSelected();
       }
     }
   }
@@ -593,6 +729,74 @@ export class NoteEditor {
   // ============================================================================
 
   /**
+   * Find the insertion point for a new note based on X position
+   * Determines if the note should be inserted before/after an existing note
+   * @param {Object} staffPosition - Staff position with x, y coordinates
+   * @param {number} measureIndex - Target measure index
+   * @param {string} staff - Staff name ('treble' or 'bass')
+   * @returns {Object|null} - {action: 'before'|'after', noteIndex: number} or null if should append
+   */
+  findInsertionPoint(staffPosition, measureIndex, staff) {
+    if (!this.noteRegions || this.noteRegions.length === 0) {
+      return null; // No existing notes
+    }
+
+    // Find all notes in the same measure and staff
+    const notesInMeasure = this.noteRegions.filter(r =>
+      r.measureIndex === measureIndex &&
+      r.staff === staff &&
+      r.bounds // Has position info
+    );
+
+    if (notesInMeasure.length === 0) {
+      return null; // No notes in this measure yet
+    }
+
+    const clickX = staffPosition.x;
+
+    // Sort notes by their X position (left to right)
+    notesInMeasure.sort((a, b) => a.bounds.x - b.bounds.x);
+
+    // Check if clicking before the first note
+    const firstNote = notesInMeasure[0];
+    if (clickX < firstNote.bounds.x) {
+      return { action: 'before', noteIndex: firstNote.noteIndex };
+    }
+
+    // Check if clicking after the last note
+    const lastNote = notesInMeasure[notesInMeasure.length - 1];
+    if (clickX > lastNote.bounds.x + lastNote.bounds.width) {
+      return null; // Append to end (use normal behavior)
+    }
+
+    // Check if clicking between two notes
+    for (let i = 0; i < notesInMeasure.length - 1; i++) {
+      const currentNote = notesInMeasure[i];
+      const nextNote = notesInMeasure[i + 1];
+
+      const currentEnd = currentNote.bounds.x + currentNote.bounds.width;
+      const nextStart = nextNote.bounds.x;
+
+      // If click is between this note and the next
+      if (clickX >= currentEnd && clickX <= nextStart) {
+        // Determine if closer to current or next note
+        const distanceToCurrent = clickX - currentEnd;
+        const distanceToNext = nextStart - clickX;
+
+        if (distanceToCurrent < distanceToNext) {
+          // Closer to current note - insert after it
+          return { action: 'after', noteIndex: currentNote.noteIndex };
+        } else {
+          // Closer to next note - insert before it
+          return { action: 'before', noteIndex: nextNote.noteIndex };
+        }
+      }
+    }
+
+    return null; // No specific insertion point found
+  }
+
+  /**
    * Add a note at a staff position
    * @param {Object} staffPosition - Staff position data
    */
@@ -612,6 +816,59 @@ export class NoteEditor {
     const noteBeats = this.durationToBeats(this.currentDuration, this.isDotted);
     const remainingBeats = this.getRemainingBeats(targetMeasureIndex, staff);
 
+    // NEW: Check if we should insert at a specific position (between existing notes)
+    // Look for existing notes at the clicked X position
+    const insertionPoint = this.findInsertionPoint(staffPosition, targetMeasureIndex, staff);
+
+    if (insertionPoint !== null && this.composerIntegration && this.composerIntegration.measureManager) {
+      // We found a specific insertion point - use intelligent insertion
+      console.log(`[NoteEditor] Inserting note at position: ${insertionPoint.action} note index ${insertionPoint.noteIndex}`);
+
+      // Check if note will fit in the measure
+      if (!this.composerIntegration.measureManager.canFitNote(
+        targetMeasureIndex,
+        staff,
+        this.currentDuration,
+        this.isDotted
+      )) {
+        console.warn('[NoteEditor] Cannot insert - measure is full');
+        return;
+      }
+
+      const noteData = {
+        pitch: staffPosition.pitch,
+        pitches: [staffPosition.pitch],
+        duration: this.currentDuration,
+        isRest: this.isRestMode,
+        dotted: this.isDotted,
+        accidental: this.currentAccidental,
+      };
+
+      let success = false;
+      if (insertionPoint.action === 'before') {
+        success = this.composerIntegration.measureManager.insertNoteBefore(
+          targetMeasureIndex,
+          staff,
+          insertionPoint.noteIndex,
+          noteData
+        );
+      } else {
+        success = this.composerIntegration.measureManager.insertNoteAfter(
+          targetMeasureIndex,
+          staff,
+          insertionPoint.noteIndex,
+          noteData
+        );
+      }
+
+      if (success) {
+        this.composerIntegration.render();
+        console.log('[NoteEditor] ✅ Successfully inserted note at position');
+      }
+      return;
+    }
+
+    // No specific insertion point found - use original behavior (append to end)
     // If the note fits completely, add it normally
     if (noteBeats <= remainingBeats) {
       const beatPosition = this.getCurrentBeat(targetMeasureIndex, staff);
@@ -820,6 +1077,263 @@ export class NoteEditor {
       const durationSeconds = window.Tone.Time(note.duration).toSeconds();
       currentTime += durationSeconds;
     });
+  }
+
+  /**
+   * Insert a note before the first selected note
+   */
+  insertNoteBeforeSelected() {
+    console.log('[NoteEditor] insertNoteBeforeSelected called, selectedNotes:', this.selectedNotes.size);
+
+    if (this.selectedNotes.size === 0) {
+      console.warn('[NoteEditor] No notes selected for insert before');
+      return;
+    }
+
+    // Get the first selected note
+    const firstNoteId = Array.from(this.selectedNotes)[0];
+    const [measureIndex, staff, noteIndex] = this.parseNoteId(firstNoteId);
+
+    console.log(`[NoteEditor] Inserting before: measure=${measureIndex}, staff=${staff}, noteIndex=${noteIndex}`);
+
+    // Create new note with current toolbar settings
+    const noteData = {
+      pitch: 'C4', // Default pitch, user can change it
+      pitches: ['C4'],
+      duration: this.currentDuration,
+      dotted: this.isDotted,
+      isRest: this.isRestMode,
+      accidental: this.currentAccidental,
+    };
+
+    console.log('[NoteEditor] Note data to insert:', noteData);
+
+    // Call the insert callback
+    if (!this.composerIntegration) {
+      console.error('[NoteEditor] composerIntegration is null!');
+      return;
+    }
+
+    if (!this.composerIntegration.measureManager) {
+      console.error('[NoteEditor] composerIntegration.measureManager is null!');
+      return;
+    }
+
+    const success = this.composerIntegration.measureManager.insertNoteBefore(
+      measureIndex,
+      staff,
+      noteIndex,
+      noteData
+    );
+
+    if (success) {
+      this.composerIntegration.render();
+      console.log('[NoteEditor] ✅ Successfully inserted note before selected');
+    } else {
+      console.warn('[NoteEditor] ❌ Could not insert note - measure may be full');
+    }
+  }
+
+  /**
+   * Insert a note after the last selected note
+   */
+  insertNoteAfterSelected() {
+    if (this.selectedNotes.size === 0) return;
+
+    // Get the last selected note
+    const noteIds = Array.from(this.selectedNotes);
+    const lastNoteId = noteIds[noteIds.length - 1];
+    const [measureIndex, staff, noteIndex] = this.parseNoteId(lastNoteId);
+
+    // Create new note with current toolbar settings
+    const noteData = {
+      pitch: 'C4', // Default pitch, user can change it
+      pitches: ['C4'],
+      duration: this.currentDuration,
+      dotted: this.isDotted,
+      isRest: this.isRestMode,
+      accidental: this.currentAccidental,
+    };
+
+    // Call the insert callback
+    if (this.composerIntegration && this.composerIntegration.measureManager) {
+      const success = this.composerIntegration.measureManager.insertNoteAfter(
+        measureIndex,
+        staff,
+        noteIndex,
+        noteData
+      );
+
+      if (success) {
+        this.composerIntegration.render();
+        console.log('[NoteEditor] Inserted note after selected');
+      } else {
+        console.warn('[NoteEditor] Could not insert note - measure may be full');
+      }
+    }
+  }
+
+  /**
+   * Change duration of all selected notes
+   * @param {string} newDuration - New Tone.js duration
+   */
+  changeDurationOfSelected(newDuration) {
+    if (this.selectedNotes.size === 0) {
+      console.warn('[NoteEditor] No notes selected');
+      return;
+    }
+
+    console.log('[NoteEditor] changeDurationOfSelected:', {
+      newDuration,
+      isDotted: this.isDotted,
+      selectedNotes: Array.from(this.selectedNotes)
+    });
+
+    let changedCount = 0;
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, noteIndex] = this.parseNoteId(noteId);
+
+      console.log('[NoteEditor] Processing note:', {
+        noteId,
+        measureIndex,
+        staff,
+        noteIndex
+      });
+
+      if (this.composerIntegration && this.composerIntegration.measureManager) {
+        const success = this.composerIntegration.measureManager.changeNoteDuration(
+          measureIndex,
+          staff,
+          noteIndex,
+          newDuration,
+          this.isDotted
+        );
+
+        if (success) {
+          // CRITICAL: Also update compositionState (what gets rendered and played back)
+          if (window.getCompositionState) {
+            const compositionState = window.getCompositionState();
+            if (compositionState && compositionState.measures[measureIndex]) {
+              const measure = compositionState.measures[measureIndex];
+              const voice = staff === 'treble' ? measure.notation.treble.voices[0] : measure.notation.bass.voices[0];
+              if (voice && voice.notes[noteIndex]) {
+                voice.notes[noteIndex].duration = newDuration;
+                voice.notes[noteIndex].dotted = this.isDotted;
+                console.log('[NoteEditor] ✅ Updated compositionState for playback and rendering');
+              }
+            }
+          }
+
+          changedCount++;
+          console.log('[NoteEditor] Note duration changed successfully');
+        } else {
+          console.warn('[NoteEditor] Failed to change note duration');
+        }
+      } else {
+        console.error('[NoteEditor] composerIntegration or measureManager not available');
+      }
+    }
+
+    if (changedCount > 0) {
+      console.log(`[NoteEditor] Calling render(true) after changing ${changedCount} note(s)`);
+      this.composerIntegration.render(true); // Force immediate render, bypass debouncing
+      console.log(`[NoteEditor] ✅ Changed duration of ${changedCount} note(s) to ${newDuration}`);
+    } else {
+      console.warn('[NoteEditor] Could not change duration - would exceed measure capacity');
+    }
+  }
+
+  /**
+   * Toggle articulation on all selected notes
+   * @param {string} articulation - Articulation type ('staccato', 'accent', 'tenuto', 'marcato')
+   */
+  toggleArticulationOnSelected(articulation) {
+    if (this.selectedNotes.size === 0) return;
+
+    let changedCount = 0;
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, noteIndex] = this.parseNoteId(noteId);
+
+      if (this.composerIntegration && this.composerIntegration.measureManager) {
+        const success = this.composerIntegration.measureManager.toggleArticulation(
+          measureIndex,
+          staff,
+          noteIndex,
+          articulation
+        );
+
+        if (success) {
+          // CRITICAL: Also update compositionState
+          if (window.getCompositionState) {
+            const compositionState = window.getCompositionState();
+            if (compositionState && compositionState.measures[measureIndex]) {
+              const measure = compositionState.measures[measureIndex];
+              const voice = staff === 'treble' ? measure.notation.treble.voices[0] : measure.notation.bass.voices[0];
+              if (voice && voice.notes[noteIndex]) {
+                const note = voice.notes[noteIndex];
+                // Toggle: if already has this articulation, remove it; otherwise set it
+                note.articulation = note.articulation === articulation ? null : articulation;
+                console.log('[NoteEditor] ✅ Updated compositionState articulation');
+              }
+            }
+          }
+
+          changedCount++;
+        }
+      }
+    }
+
+    if (changedCount > 0) {
+      this.composerIntegration.render(true); // Force immediate render
+      console.log(`[NoteEditor] Toggled ${articulation} on ${changedCount} note(s)`);
+    }
+  }
+
+  /**
+   * Toggle tie on all selected notes
+   */
+  toggleTieOnSelected() {
+    if (this.selectedNotes.size === 0) return;
+
+    let changedCount = 0;
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, noteIndex] = this.parseNoteId(noteId);
+
+      if (this.composerIntegration && this.composerIntegration.measureManager) {
+        const success = this.composerIntegration.measureManager.toggleTie(
+          measureIndex,
+          staff,
+          noteIndex
+        );
+
+        if (success) {
+          // CRITICAL: Also update compositionState
+          if (window.getCompositionState) {
+            const compositionState = window.getCompositionState();
+            if (compositionState && compositionState.measures[measureIndex]) {
+              const measure = compositionState.measures[measureIndex];
+              const voice = staff === 'treble' ? measure.notation.treble.voices[0] : measure.notation.bass.voices[0];
+              if (voice && voice.notes[noteIndex]) {
+                const note = voice.notes[noteIndex];
+                // Toggle tied state
+                note.tied = !note.tied;
+                console.log('[NoteEditor] ✅ Updated compositionState tie');
+              }
+            }
+          }
+
+          changedCount++;
+        }
+      }
+    }
+
+    if (changedCount > 0) {
+      this.composerIntegration.render(true); // Force immediate render
+      console.log(`[NoteEditor] Toggled tie on ${changedCount} note(s)`);
+    }
   }
 
   /**
@@ -1166,6 +1680,119 @@ export class NoteEditor {
     }
   }
 
+  /**
+   * Check if a position is within the toolbar bounds
+   * @param {Object} position - Canvas position {x, y}
+   * @returns {boolean}
+   */
+  isPositionInToolbar(position) {
+    if (!this.hoverToolbar) return false;
+
+    const { x, y, width, height } = this.hoverToolbar;
+    const padding = 20; // Extra buffer zone to make it easier to reach
+
+    return position.x >= x - padding &&
+           position.x <= x + width + padding &&
+           position.y >= y - padding &&
+           position.y <= y + height + padding;
+  }
+
+  /**
+   * Update hover toolbar when Shift is held over selected notes
+   * @param {Object} position - Canvas position {x, y}
+   */
+  updateHoverToolbar(position) {
+    // If toolbar already exists and we're hovering over it, keep it visible
+    if (this.hoverToolbar && this.isPositionInToolbar(position)) {
+      return; // Don't recreate, just keep showing it
+    }
+
+    if (this.selectedNotes.size === 0) {
+      this.hoverToolbar = null;
+      return;
+    }
+
+    // Find if we're hovering over any selected note
+    let hoveredNote = null;
+    for (const noteId of this.selectedNotes) {
+      const region = this.noteRegions.find(r => {
+        const regionId = this.createNoteId(r.measureIndex, r.staff, r.noteIndex);
+        return regionId === noteId;
+      });
+
+      if (region && region.bounds) {
+        const { x, y, width, height } = region.bounds;
+
+        // Check if mouse is within bounds
+        if (position.x >= x && position.x <= x + width &&
+            position.y >= y && position.y <= y + height) {
+          hoveredNote = { noteId, region };
+          break;
+        }
+      }
+    }
+
+    if (!hoveredNote) {
+      this.hoverToolbar = null;
+      return;
+    }
+
+    // Create toolbar with buttons
+    const buttonSize = 36;
+    const buttonSpacing = 4;
+    const padding = 8;
+
+    // Define toolbar buttons
+    const buttons = [
+      // Duration buttons
+      { id: 'whole', label: '𝅝', tooltip: 'Whole note', action: () => this.changeDurationOfSelected('1n') },
+      { id: 'half', label: '𝅗𝅥', tooltip: 'Half note', action: () => this.changeDurationOfSelected('2n') },
+      { id: 'quarter', label: '♩', tooltip: 'Quarter note', action: () => this.changeDurationOfSelected('4n') },
+      { id: 'eighth', label: '♪', tooltip: 'Eighth note', action: () => this.changeDurationOfSelected('8n') },
+      { id: '16th', label: '♬', tooltip: '16th note', action: () => this.changeDurationOfSelected('16n') },
+      { id: 'separator1', label: '|', tooltip: null, action: null },
+      // Articulation buttons
+      { id: 'staccato', label: '•', tooltip: 'Staccato', action: () => this.toggleArticulationOnSelected('staccato') },
+      { id: 'accent', label: '>', tooltip: 'Accent', action: () => this.toggleArticulationOnSelected('accent') },
+      { id: 'tenuto', label: '−', tooltip: 'Tenuto', action: () => this.toggleArticulationOnSelected('tenuto') },
+      { id: 'marcato', label: '^', tooltip: 'Marcato', action: () => this.toggleArticulationOnSelected('marcato') },
+      { id: 'separator2', label: '|', tooltip: null, action: null },
+      // Tie button
+      { id: 'tie', label: '⌢', tooltip: 'Toggle tie', action: () => this.toggleTieOnSelected() },
+      { id: 'separator3', label: '|', tooltip: null, action: null },
+      // Delete button
+      { id: 'delete', label: '🗑', tooltip: 'Delete', action: () => this.deleteSelectedNotes() },
+    ];
+
+    // Calculate toolbar dimensions
+    const toolbarWidth = buttons.length * (buttonSize + buttonSpacing) - buttonSpacing + padding * 2;
+    const toolbarHeight = buttonSize + padding * 2;
+
+    // Position toolbar above the hovered note
+    const region = hoveredNote.region;
+    let toolbarX = region.bounds.x + region.bounds.width / 2 - toolbarWidth / 2;
+    let toolbarY = region.bounds.y - toolbarHeight - 10;
+
+    // Clamp to canvas bounds (we'll use the canvas context later to check)
+    if (toolbarX < 10) toolbarX = 10;
+    if (toolbarY < 10) toolbarY = region.bounds.y + region.bounds.height + 10;
+
+    // Store toolbar data
+    this.hoverToolbar = {
+      x: toolbarX,
+      y: toolbarY,
+      width: toolbarWidth,
+      height: toolbarHeight,
+      buttons: buttons.map((btn, index) => ({
+        ...btn,
+        x: toolbarX + padding + index * (buttonSize + buttonSpacing),
+        y: toolbarY + padding,
+        width: buttonSize,
+        height: buttonSize,
+      })),
+    };
+  }
+
   // ============================================================================
   // OVERLAY RENDERING
   // ============================================================================
@@ -1384,6 +2011,78 @@ export class NoteEditor {
    */
   drawDragPreview(ctx) {
     // This would draw preview of notes being dragged
+  }
+
+  /**
+   * Draw hover toolbar for editing selected notes (Shift+hover)
+   * @param {CanvasRenderingContext2D} ctx - Canvas context
+   */
+  drawHoverToolbar(ctx) {
+    if (!this.hoverToolbar) return;
+
+    const { x, y, width, height, buttons } = this.hoverToolbar;
+
+    ctx.save();
+
+    // Draw toolbar background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
+    ctx.strokeStyle = '#4a9eff';
+    ctx.lineWidth = 3;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 10;
+    ctx.fillRect(x, y, width, height);
+    ctx.strokeRect(x, y, width, height);
+
+    // Reset shadow for buttons
+    ctx.shadowBlur = 0;
+
+    // Draw buttons
+    buttons.forEach(btn => {
+      if (btn.label === '|') {
+        // Draw separator
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(btn.x + btn.width / 2, btn.y);
+        ctx.lineTo(btn.x + btn.width / 2, btn.y + btn.height);
+        ctx.stroke();
+      } else {
+        // Check if this button is being hovered or pressed
+        const isHovered = this.hoveredToolbarButton && this.hoveredToolbarButton.id === btn.id;
+        const isPressed = this.pressedToolbarButton && this.pressedToolbarButton.id === btn.id;
+
+        // Draw button background with hover/press effect
+        if (isPressed) {
+          ctx.fillStyle = '#1a1a1a'; // Darker background when pressed
+          ctx.strokeStyle = '#4a9eff'; // Blue border when pressed
+          ctx.lineWidth = 3;
+        } else if (isHovered) {
+          ctx.fillStyle = '#555'; // Lighter background on hover
+          ctx.strokeStyle = '#4a9eff'; // Blue border on hover
+          ctx.lineWidth = 2;
+        } else {
+          ctx.fillStyle = '#333';
+          ctx.strokeStyle = '#666';
+          ctx.lineWidth = 1;
+        }
+
+        // Offset button slightly when pressed for visual feedback
+        const offsetX = isPressed ? 1 : 0;
+        const offsetY = isPressed ? 1 : 0;
+
+        ctx.fillRect(btn.x + offsetX, btn.y + offsetY, btn.width, btn.height);
+        ctx.strokeRect(btn.x + offsetX, btn.y + offsetY, btn.width, btn.height);
+
+        // Draw button label with hover/press effect
+        ctx.fillStyle = isPressed || isHovered ? '#fff' : '#ccc';
+        ctx.font = '20px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(btn.label, btn.x + btn.width / 2 + offsetX, btn.y + btn.height / 2 + offsetY);
+      }
+    });
+
+    ctx.restore();
   }
 
   // ============================================================================

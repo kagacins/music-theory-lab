@@ -460,6 +460,7 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
     isRest = false,  // Is this a rest?
     dotted = false,  // Is this dotted?
     accidental = null, // Explicit accidental override
+    articulation = null, // Articulation: 'staccato', 'accent', 'tenuto', 'marcato'
   } = noteData;
 
   // Convert duration if needed
@@ -503,6 +504,21 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
     staveNote.addDot(0);
   }
 
+  // Add articulation if specified
+  if (!isRest && articulation) {
+    const articulationMap = {
+      'staccato': 'a.',
+      'accent': 'a>',
+      'tenuto': 'a-',
+      'marcato': 'a^',
+    };
+
+    const vexArticulation = articulationMap[articulation];
+    if (vexArticulation) {
+      staveNote.addModifier(new VF.Articulation(vexArticulation), 0);
+    }
+  }
+
   return staveNote;
 }
 
@@ -512,9 +528,11 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
  * @param {string} duration - Duration for all notes
  * @param {string} key - Key signature
  * @param {string} clef - Clef for the chord
+ * @param {boolean} dotted - Is the chord dotted
+ * @param {string} articulation - Articulation for the chord
  * @returns {Object} - VexFlow StaveNote with multiple keys
  */
-export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble', dotted = false) {
+export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble', dotted = false, articulation = null) {
   const VF = getVF();
   if (!VF || !pitches || pitches.length === 0) return null;
 
@@ -548,6 +566,22 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
     pitches.forEach((_, index) => {
       staveNote.addModifier(new VF.Dot(), index);
     });
+  }
+
+  // Add articulation if specified (applied to the entire chord)
+  if (articulation) {
+    const articulationMap = {
+      'staccato': 'a.',
+      'accent': 'a>',
+      'tenuto': 'a-',
+      'marcato': 'a^',
+    };
+
+    const vexArticulation = articulationMap[articulation];
+    if (vexArticulation) {
+      // For chords, apply articulation to the top note (last index)
+      staveNote.addModifier(new VF.Articulation(vexArticulation), pitches.length - 1);
+    }
   }
 
   return staveNote;

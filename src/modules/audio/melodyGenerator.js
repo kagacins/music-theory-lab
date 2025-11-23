@@ -6,7 +6,7 @@
 import { getProgressionData, getCurrentKey } from '../state/trainerState.js';
 import { getInstrument, getAudioIsReady, initAudio, getPiano, getPianoReverb } from './audioEngine.js';
 import { getEnharmonicPreference, getNotationPreference } from '../state/globalState.js';
-import { getNoteKeyId, noteToMidi, getLHNotes } from '../utils/noteUtils.js';
+import { getNoteKeyId, noteToMidi, getLHNotes, getNotePitches, hasPitch, getPrimaryPitch } from '../utils/noteUtils.js';
 import { CHORD_DEFINITIONS, ALL_NOTES, MAJOR_SCALE_STEPS } from '../../data/music-data.js';
 import { analyzeChordTone, CHORD_TONE_COLORS, NOTE_RELATIONSHIPS } from '../analysis/chordToneAnalyzer.js';
 import { getCompositionState } from '../state/compositionState.js';
@@ -2032,10 +2032,10 @@ function playNotesInBeat(canvas, measure, beat, clickedType) {
                         if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
                             // Use auto-generated bass notes (blue notes)
                             bassAutoFillActive = true;
-                            // Bass notes from CompositionState have 'pitch' property, not 'keys'
+                            // Bass notes from CompositionState - handle both pitch and pitches
                             lhNotes = bassVoice.notes
                                 .filter(note => note.type !== 'rest') // Exclude rests
-                                .map(note => note.pitch)
+                                .flatMap(note => getNotePitches(note)) // Handle polyphony
                                 .filter(Boolean);
                         }
                     }
@@ -2070,7 +2070,11 @@ function playNotesInBeat(canvas, measure, beat, clickedType) {
             console.log(`[playNotesInBeat] Got ${beat0MelodyNotes.length} melody notes from compositionState for measure ${measure}, beat 0`);
         }
         beat0MelodyNotes.forEach(note => {
-            notesToPlay.push({ note: note.pitch, type: 'melody', instrument: synth, duration: note.duration });
+            // Handle polyphony - push each pitch separately
+            const pitches = getNotePitches(note);
+            pitches.forEach(pitch => {
+                notesToPlay.push({ note: pitch, type: 'melody', instrument: synth, duration: note.duration });
+            });
         });
     } else {
         // Melody note clicked: play all melody notes in the same measure and beat
@@ -2082,7 +2086,11 @@ function playNotesInBeat(canvas, measure, beat, clickedType) {
         }
 
         beatMelodyNotes.forEach(note => {
-            notesToPlay.push({ note: note.pitch, type: 'melody', instrument: synth, duration: note.duration });
+            // Handle polyphony - push each pitch separately
+            const pitches = getNotePitches(note);
+            pitches.forEach(pitch => {
+                notesToPlay.push({ note: pitch, type: 'melody', instrument: synth, duration: note.duration });
+            });
         });
         
         // If beat is 0, also play chord notes (chords start on beat 0)
@@ -2108,10 +2116,10 @@ function playNotesInBeat(canvas, measure, beat, clickedType) {
                             if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
                                 // Use auto-generated bass notes (blue notes)
                                 bassAutoFillActive = true;
-                                // Bass notes from CompositionState have 'pitch' property, not 'keys'
+                                // Bass notes from CompositionState - handle both pitch and pitches
                                 lhNotes = bassVoice.notes
                                     .filter(note => note.type !== 'rest') // Exclude rests
-                                    .map(note => note.pitch)
+                                    .flatMap(note => getNotePitches(note)) // Handle polyphony
                                     .filter(Boolean);
                             }
                         }
@@ -2341,8 +2349,8 @@ function startMeasurePlayback(canvas, measureIndex) {
             state.chordTimeouts.push(timeoutId);
         });
 
-        // Store bass notes for cleanup when playback stops
-        state.activeChordNotes = bassNoteData.map(note => note.pitch);
+        // Store bass notes for cleanup when playback stops - handle polyphony
+        state.activeChordNotes = bassNoteData.flatMap(note => getNotePitches(note));
     } else if (chordNotes.length > 0) {
         // Bass auto-fill is NOT active - play chord notes all at once
         chordNotes.forEach(note => {
@@ -2400,20 +2408,33 @@ function startMeasurePlayback(canvas, measureIndex) {
             const delay = index * beatDuration;
 
             const timeoutId = setTimeout(() => {
-                synth.triggerAttack(note.pitch, Tone.now());
+                // Handle polyphony - play all pitches in the note
+                const pitches = getNotePitches(note);
+                const noteBeat = typeof note.beat === 'number' ? note.beat : index;
 
-                // Add to activeNotes for highlighting (format: "measure-beat-pitch")
-                const noteBeat = typeof note.beat === 'number' ? note.beat : index; // Use note's beat or index as fallback
-                const noteId = `${measureIndex}-${noteBeat}-${note.pitch}`;
-                activeNotes.add(noteId);
+                pitches.forEach(pitch => {
+                    synth.triggerAttack(pitch, Tone.now());
 
-                // DEBUG: Log note ID creation for red highlighting
-                console.log(`[melodyGenerator] playMeasureNotes: Creating noteId="${noteId}" (beat=${noteBeat}, pitch=${note.pitch})`);
+                    // Add to activeNotes for highlighting (format: "measure-beat-pitch")
+                    const noteId = `${measureIndex}-${noteBeat}-${pitch}`;
+                    activeNotes.add(noteId);
 
-                // Notify new notation system for red note highlighting
-                if (window.addNotationActiveNote) {
-                    window.addNotationActiveNote(noteId);
-                }
+                    // DEBUG: Log note ID creation for red highlighting
+                    console.log(`[melodyGenerator] playMeasureNotes: Creating noteId="${noteId}" (beat=${noteBeat}, pitch=${pitch})`);
+
+                    // Notify new notation system for red note highlighting
+                    if (window.addNotationActiveNote) {
+                        window.addNotationActiveNote(noteId);
+                    }
+
+                    // Visual feedback on keyboard
+                    const keyEl = document.getElementById(getNoteKeyId(pitch));
+                    if (keyEl) {
+                        keyEl.classList.add('active-melody-playback');
+                    }
+
+                    state.activeMelodyNotes.push(pitch);
+                });
 
                 // Re-render to show red highlighting on the note
                 if (highlightEnabled && window.refreshNotationFromProgression) {
@@ -2423,26 +2444,21 @@ function startMeasurePlayback(canvas, measureIndex) {
                 // Remove from activeNotes after note duration
                 const noteDuration = note.duration ? Tone.Time(note.duration).toSeconds() : beatDuration;
                 setTimeout(() => {
-                    activeNotes.delete(noteId);
+                    pitches.forEach(pitch => {
+                        const noteId = `${measureIndex}-${noteBeat}-${pitch}`;
+                        activeNotes.delete(noteId);
 
-                    // Notify new notation system to remove red highlighting
-                    if (window.removeNotationActiveNote) {
-                        window.removeNotationActiveNote(noteId);
-                    }
+                        // Notify new notation system to remove red highlighting
+                        if (window.removeNotationActiveNote) {
+                            window.removeNotationActiveNote(noteId);
+                        }
+                    });
 
                     // Re-render to clear red highlighting
                     if (highlightEnabled && window.refreshNotationFromProgression) {
                         window.refreshNotationFromProgression();
                     }
                 }, noteDuration * 1000);
-
-                // Visual feedback on keyboard
-                const keyEl = document.getElementById(getNoteKeyId(note.pitch));
-                if (keyEl) {
-                    keyEl.classList.add('active-melody-playback');
-                }
-
-                state.activeMelodyNotes.push(note.pitch);
             }, delay * 1000);
 
             state.melodyTimeouts.push(timeoutId);
@@ -2859,22 +2875,28 @@ export function playFromSelectedMeasure() {
             console.log(`[playFromSelectedMeasure] Got ${notesFromStart.length} melody notes from compositionState (from measure ${startMeasure})`);
         }
         if (notesFromStart.length > 0) {
-            melodyPart = new Tone.Part((time, note) => {
-                synth.triggerAttackRelease(note.pitch, note.duration, time);
-                
-                // Visual feedback
-                Tone.Draw.schedule(() => {
-                    const keyEl = document.getElementById(getNoteKeyId(note.pitch));
-                    if (keyEl) keyEl.classList.add('active-melody-playback');
-                }, time);
-                
-                Tone.Draw.schedule(() => {
-                    const keyEl = document.getElementById(getNoteKeyId(note.pitch));
-                    if (keyEl) keyEl.classList.remove('active-melody-playback');
-                }, time + 0.4);
+            melodyPart = new Tone.Part((time, noteData) => {
+                // Handle polyphony - play all pitches
+                const pitches = noteData.pitches || (noteData.pitch ? [noteData.pitch] : []);
+
+                pitches.forEach(pitch => {
+                    synth.triggerAttackRelease(pitch, noteData.duration, time);
+
+                    // Visual feedback
+                    Tone.Draw.schedule(() => {
+                        const keyEl = document.getElementById(getNoteKeyId(pitch));
+                        if (keyEl) keyEl.classList.add('active-melody-playback');
+                    }, time);
+
+                    Tone.Draw.schedule(() => {
+                        const keyEl = document.getElementById(getNoteKeyId(pitch));
+                        if (keyEl) keyEl.classList.remove('active-melody-playback');
+                    }, time + 0.4);
+                });
             }, notesFromStart.map(note => ({
                 time: ((note.measure - startMeasure) * measureDuration) + (note.beat * beatDuration),
-                pitch: note.pitch,
+                pitch: note.pitch, // Legacy single pitch
+                pitches: note.pitches, // Polyphonic format
                 duration: note.duration
             })));
         }
@@ -3386,29 +3408,35 @@ export function playInteractiveMelodyWithChords() {
     if (window.getCompositionState) {
         const compositionState = window.getCompositionState();
         melodyNotesToPlay = compositionState.getAllMelodyNotes()
-            .filter(note => note.type === 'note' && note.pitch) // Skip rests
+            .filter(note => note.type === 'note' && (note.pitch || note.pitches)) // Skip rests, include both formats
             .map(note => ({
                 time: (note.measure * measureDuration) + (note.beat * beatDuration),
-                pitch: note.pitch,
+                pitch: note.pitch, // Legacy single pitch
+                pitches: note.pitches, // Polyphonic format
                 duration: note.duration
             }));
         console.log(`[playInteractiveMelodyWithChords] Got ${melodyNotesToPlay.length} melody notes from compositionState`);
     }
 
     // Schedule melody notes
-    const melodyPart = new Tone.Part((time, note) => {
-        synth.triggerAttackRelease(note.pitch, note.duration, time);
+    const melodyPart = new Tone.Part((time, noteData) => {
+        // Handle polyphony - play all pitches
+        const pitches = noteData.pitches || (noteData.pitch ? [noteData.pitch] : []);
 
-        // Visual feedback
-        Tone.Draw.schedule(() => {
-            const keyEl = document.getElementById(getNoteKeyId(note.pitch));
-            if (keyEl) keyEl.classList.add('active-melody-playback');
-        }, time);
+        pitches.forEach(pitch => {
+            synth.triggerAttackRelease(pitch, noteData.duration, time);
 
-        Tone.Draw.schedule(() => {
-            const keyEl = document.getElementById(getNoteKeyId(note.pitch));
-            if (keyEl) keyEl.classList.remove('active-melody-playback');
-        }, time + 0.4);
+            // Visual feedback
+            Tone.Draw.schedule(() => {
+                const keyEl = document.getElementById(getNoteKeyId(pitch));
+                if (keyEl) keyEl.classList.add('active-melody-playback');
+            }, time);
+
+            Tone.Draw.schedule(() => {
+                const keyEl = document.getElementById(getNoteKeyId(pitch));
+                if (keyEl) keyEl.classList.remove('active-melody-playback');
+            }, time + 0.4);
+        });
     }, melodyNotesToPlay);
 
     // Schedule chord whole notes
@@ -4427,8 +4455,11 @@ function renderBassFromCompositionState(context, chordStaves, numMeasures, chord
                 continue;
             }
 
-            // Debug: Log bass notes for this measure
-            console.log(`[Phase 1C DEBUG] Measure ${measureIndex} bass notes:`, bassVoice.notes.map(n => `${n.pitch}(${n.duration})`).join(', '));
+            // Debug: Log bass notes for this measure - handle polyphony
+            console.log(`[Phase 1C DEBUG] Measure ${measureIndex} bass notes:`, bassVoice.notes.map(n => {
+                const pitches = getNotePitches(n);
+                return pitches.length > 1 ? `[${pitches.join(',')}](${n.duration})` : `${pitches[0] || 'rest'}(${n.duration})`;
+            }).join(', '));
 
             // Convert bass notes to VexFlow format
             const vexBassNotes = [];
@@ -4448,10 +4479,17 @@ function renderBassFromCompositionState(context, chordStaves, numMeasures, chord
                         return;
                     }
 
-                    // Convert pitch to VexFlow format (e.g., 'C2' -> 'c/2')
-                    const vexFlowKey = convertToVexFlowKey(note.pitch);
-                    if (!vexFlowKey) {
-                        console.warn('Invalid bass note pitch:', note.pitch);
+                    // Handle polyphony - get all pitches for this note
+                    const pitches = getNotePitches(note);
+                    if (pitches.length === 0) {
+                        console.warn('Bass note has no valid pitches:', note);
+                        return;
+                    }
+
+                    // Convert all pitches to VexFlow format
+                    const vexFlowKeys = pitches.map(pitch => convertToVexFlowKey(pitch)).filter(Boolean);
+                    if (vexFlowKeys.length === 0) {
+                        console.warn('Invalid bass note pitches:', pitches);
                         return;
                     }
 
@@ -4459,21 +4497,24 @@ function renderBassFromCompositionState(context, chordStaves, numMeasures, chord
 
                     const staveNote = new StaveNote({
                         clef: chordClef,
-                        keys: [vexFlowKey],
+                        keys: vexFlowKeys, // Can be multiple keys for polyphonic notes
                         duration: vexFlowDuration
                     });
 
-                    // Add accidentals
-                    if (note.pitch && (note.pitch.includes('#') || note.pitch.includes('b'))) {
-                        const accidental = note.pitch.includes('#') ? '#' : 'b';
-                        staveNote.addModifier(new Accidental(accidental), 0);
-                    }
+                    // Add accidentals for each pitch
+                    pitches.forEach((pitch, pitchIndex) => {
+                        if (pitch && (pitch.includes('#') || pitch.includes('b'))) {
+                            const accidental = pitch.includes('#') ? '#' : 'b';
+                            staveNote.addModifier(new Accidental(accidental), pitchIndex);
+                        }
+                    });
 
-                    // Check if this bass note is currently playing (for red highlighting)
-                    // Use the note's actual beat value, not just 0
+                    // Check if any pitch in this note is currently playing (for red highlighting)
                     const noteBeat = note.beat || 0;
-                    const noteId = `${measureIndex}-${noteBeat}-${note.pitch}`;
-                    const isActive = highlightEnabled && activeNotes.has(noteId);
+                    const isActive = highlightEnabled && pitches.some(pitch => {
+                        const noteId = `${measureIndex}-${noteBeat}-${pitch}`;
+                        return activeNotes.has(noteId);
+                    });
 
                     // Add styling for auto-generated bass
                     if (measure.notation.bass.autoGenerated) {

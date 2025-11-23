@@ -834,6 +834,8 @@ export class NotationComposer {
                 accidental: note.accidental || null,
                 beat: note.beat || 0,
                 tie: note.tie,  // CRITICAL: Preserve tie property for cross-measure notes
+                tied: note.tied,  // CRITICAL: For same-measure ties
+                articulation: note.articulation || null,  // CRITICAL: Articulations (staccato, accent, etc.)
                 velocity: note.velocity,
                 isChordTone: note.isChordTone,
                 isRest: note.isRest || note.type === 'rest'  // CRITICAL: Include rests
@@ -848,6 +850,8 @@ export class NotationComposer {
               accidental: note.accidental || null,
               beat: note.beat || 0,
               tie: note.tie,
+              tied: note.tied,  // CRITICAL: For same-measure ties
+              articulation: note.articulation || null,  // CRITICAL: Articulations
               velocity: note.velocity,
               isChordTone: note.isChordTone,
               isRest: note.isRest || note.type === 'rest'  // CRITICAL: Include rests
@@ -986,6 +990,26 @@ export class NotationComposer {
         // Legacy single canvas
         const ctx = this.config.container.getContext('2d');
         this.noteEditor.drawSelectionHighlights(ctx);
+      }
+    }
+
+    // PHASE 1.6: Draw hover toolbar (Shift+hover over selected notes)
+    if (this.noteEditor && this.noteEditor.hoverToolbar) {
+      if (this.pageManager) {
+        // Multi-page: Draw toolbar on the first selected note's page
+        if (this.noteEditor.selectedNotes.size > 0) {
+          const firstNoteId = Array.from(this.noteEditor.selectedNotes)[0];
+          const [measureIndex] = this.noteEditor.parseNoteId(firstNoteId);
+          const page = this.pageManager.getPageForMeasure(measureIndex);
+          if (page) {
+            const ctx = page.canvas.getContext('2d');
+            this.noteEditor.drawHoverToolbar(ctx);
+          }
+        }
+      } else {
+        // Legacy single canvas
+        const ctx = this.config.container.getContext('2d');
+        this.noteEditor.drawHoverToolbar(ctx);
       }
     }
 
