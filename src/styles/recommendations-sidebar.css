@@ -506,7 +506,7 @@
     border-radius: 8px;
     padding: 16px;
     box-shadow: 0 10px 25px rgba(139, 92, 246, 0.3);
-    z-index: 10000;
+    z-index: 10001;
     max-width: 320px;
     min-width: 280px;
     pointer-events: none;
@@ -1130,7 +1130,7 @@
 /* Tooltip for melody suggestions */
 .melody-suggestion-tooltip {
     position: fixed;
-    z-index: 1000;
+    z-index: 10001;
     background: white;
     border: 1px solid #e5e7eb;
     border-radius: 8px;

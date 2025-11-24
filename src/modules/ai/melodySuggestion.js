@@ -74,6 +74,30 @@ const NOTE_CATEGORIES = {
 const CHROMATIC_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const FLAT_NOTES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
+/**
+ * Convert note name to MIDI number for pitch distance calculations
+ * @param {string} noteName - Note name like 'C4', 'F#5', 'Bb3'
+ * @returns {number} MIDI number (C4 = 60)
+ */
+function getMIDINumber(noteName) {
+    const match = noteName.match(/^([A-G][#b]?)(\d+)$/);
+    if (!match) return 60; // Default to middle C if invalid
+
+    const pitchClass = match[1];
+    const octaveNum = parseInt(match[2]);
+
+    // Find pitch class index (normalize sharps/flats)
+    let pitchIndex = CHROMATIC_NOTES.indexOf(pitchClass);
+    if (pitchIndex === -1) {
+        pitchIndex = FLAT_NOTES.indexOf(pitchClass);
+    }
+    if (pitchIndex === -1) return 60; // Default if not found
+
+    // MIDI number = (octave + 1) * 12 + pitch class
+    // C4 = 60, so octave 4 starts at 48
+    return (octaveNum + 1) * 12 + pitchIndex;
+}
+
 const SCALES = {
     major: [0, 2, 4, 5, 7, 9, 11],
     minor: [0, 2, 3, 5, 7, 8, 10],
@@ -573,17 +597,54 @@ export function generateMelodySuggestions({
             // Apply contour preference
             const contourBonus = scoreContour(noteName, previousNote, contourId);
 
-            // Calculate total score
-            let totalScore = 0;
+            // Apply pitch proximity bonus - favor notes closer to previous note or target range
+            let proximityBonus = 0;
+
+            if (previousNote) {
+                // Calculate pitch distance in semitones
+                const prevMIDI = getMIDINumber(previousNote);
+                const currentMIDI = getMIDINumber(noteName);
+                const semitoneDist = Math.abs(currentMIDI - prevMIDI);
+
+                // Favor notes close to the previous note (smooth melodic motion)
+                if (semitoneDist <= 2) {
+                    proximityBonus += 15; // Stepwise motion (1-2 semitones)
+                } else if (semitoneDist <= 5) {
+                    proximityBonus += 10; // Small leaps (3-5 semitones)
+                } else if (semitoneDist <= 7) {
+                    proximityBonus += 5; // Medium leaps (6-7 semitones, like perfect 5th)
+                } else if (semitoneDist <= 12) {
+                    proximityBonus += 2; // Larger leaps (octave or less)
+                }
+                // No bonus for leaps larger than an octave
+            } else {
+                // No previous note - favor notes in the target octave range
+                // Calculate distance from center of target octave (e.g., C4 for octave 4)
+                const targetCenterMIDI = 60 + (octave - 4) * 12; // C4 = MIDI 60
+                const currentMIDI = getMIDINumber(noteName);
+                const distanceFromCenter = Math.abs(currentMIDI - targetCenterMIDI);
+
+                // Favor notes within the target octave
+                if (distanceFromCenter <= 6) {
+                    proximityBonus += 20; // Within target octave (±6 semitones from center)
+                } else if (distanceFromCenter <= 12) {
+                    proximityBonus += 8; // Within adjacent octaves
+                } else if (distanceFromCenter <= 18) {
+                    proximityBonus += 3; // Within 1.5 octaves
+                }
+                // Penalty for notes too far from target range
+            }
+
+            // Calculate base harmonic score (without proximity)
+            let harmonicScore = 0;
             if (scores.length > 0) {
                 // Use highest score as base, add bonuses from others
                 scores.sort((a, b) => b - a);
-                totalScore = scores[0] + scores.slice(1).reduce((sum, s) => sum + s * 0.2, 0);
+                harmonicScore = scores[0] + scores.slice(1).reduce((sum, s) => sum + s * 0.2, 0);
             }
-            totalScore += contourBonus;
+            harmonicScore += contourBonus;
 
-            // Apply recency/frequency penalty
-            // Recent notes get a penalty based on how recently/frequently they were used
+            // Apply recency/frequency penalty to harmonic score
             if (recentNotes && recentNotes.length > 0) {
                 // Get pitch class without octave for matching (e.g., 'C4' -> 'C')
                 const pitchClass = CHROMATIC_NOTES[pc];
@@ -615,7 +676,7 @@ export function generateMelodySuggestions({
 
                     // Apply user's recency penalty multiplier
                     const totalPenalty = (frequencyPenalty + recencyPenalty) * recencyPenaltyMultiplier;
-                    totalScore -= totalPenalty;
+                    harmonicScore -= totalPenalty;
 
                     if (frequencyPenalty + recencyPenalty > 0) {
                         reasons.push(`Recently used (${occurrenceCount}×)`);
@@ -623,7 +684,9 @@ export function generateMelodySuggestions({
                 }
             }
 
-            totalScore = clamp(totalScore);
+            // Calculate total score naturally without clamping
+            // We'll normalize all scores to 0-100 range at the end
+            const totalScore = harmonicScore + proximityBonus;
 
             // Only include notes with reasonable scores
             if (totalScore > 20) {
@@ -652,6 +715,25 @@ export function generateMelodySuggestions({
     const sortedCandidates = candidates
         .sort((a, b) => b.totalScore - a.totalScore)
         .slice(0, 15);
+
+    // Normalize scores to 0-100 range to preserve relative differences
+    if (sortedCandidates.length > 0) {
+        const scores = sortedCandidates.map(c => c.totalScore);
+        const minScore = Math.min(...scores);
+        const maxScore = Math.max(...scores);
+        const range = maxScore - minScore;
+
+        if (range > 0) {
+            sortedCandidates.forEach(candidate => {
+                candidate.totalScore = Math.round(((candidate.totalScore - minScore) / range) * 100);
+            });
+        } else {
+            // All scores are the same, set all to 100
+            sortedCandidates.forEach(candidate => {
+                candidate.totalScore = 100;
+            });
+        }
+    }
 
     // Group by category for UI display
     const byCategory = {

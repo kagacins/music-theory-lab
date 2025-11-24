@@ -537,6 +537,16 @@ export function initEnhancedNotation(options = {}) {
 
       // Store globally for access
       window.suggestionManager = suggestionManager;
+
+      // Disable old palette system - we now use the floating suggestions panel
+      // Unregister Tab/Shift+Tab from palette keyboard handler
+      if (suggestionManager?.keyboardHandler) {
+        suggestionManager.keyboardHandler.unregisterShortcut('Tab');
+        suggestionManager.keyboardHandler.unregisterShortcut('Shift+Tab');
+        suggestionManager.keyboardHandler.disable();
+        console.log('✅ Old palette keyboard handler disabled');
+        console.log('✅ Tab/Shift+Tab now use floating suggestions panel');
+      }
     }
   } catch (error) {
     console.warn('Could not initialize integrated suggestions:', error);
@@ -1032,12 +1042,26 @@ export function showNotationShortcuts() {
             </div>
 
             <div>
-              <h4 class="font-semibold text-violet-700 mb-2">Keyboard Controls</h4>
+              <h4 class="font-semibold text-indigo-700 mb-2">💡 Suggestions Panel</h4>
+              <div class="space-y-2 text-sm">
+                <div class="flex justify-between"><span class="font-medium">Tab</span><span class="text-gray-600">Toggle Chord Suggestions panel</span></div>
+                <div class="flex justify-between"><span class="font-medium">Shift + Tab</span><span class="text-gray-600">Toggle Melody Suggestions panel</span></div>
+                <div class="flex justify-between"><span class="font-medium">1-5</span><span class="text-gray-600">Quick select suggestion from panel</span></div>
+                <div class="flex justify-between"><span class="font-medium">R</span><span class="text-gray-600">Refresh suggestions</span></div>
+                <div class="flex justify-between"><span class="font-medium">Escape</span><span class="text-gray-600">Close suggestions panel</span></div>
+              </div>
+              <div class="mt-2 p-2 bg-indigo-50 rounded">
+                <p class="text-xs text-indigo-900">The floating panel appears near your cursor with chord recommendations, melody suggestions, and harmonic analysis. Click the gear icon to adjust suggestion weights.</p>
+              </div>
+            </div>
+
+            <div>
+              <h4 class="font-semibold text-violet-700 mb-2">Note Editor Controls</h4>
               <div class="space-y-2 text-sm">
                 <div class="flex justify-between"><span class="font-medium">Space or P</span><span class="text-gray-600">Play selected notes</span></div>
                 <div class="flex justify-between"><span class="font-medium">Delete / Backspace</span><span class="text-gray-600">Delete selected notes</span></div>
                 <div class="flex justify-between"><span class="font-medium">Arrow Up / Down</span><span class="text-gray-600">Transpose selected notes</span></div>
-                <div class="flex justify-between"><span class="font-medium">Escape</span><span class="text-gray-600">Clear selection</span></div>
+                <div class="flex justify-between"><span class="font-medium">Escape</span><span class="text-gray-600">Clear note selection</span></div>
                 <div class="flex justify-between"><span class="font-medium">Ctrl + A</span><span class="text-gray-600">Select all notes</span></div>
               </div>
             </div>

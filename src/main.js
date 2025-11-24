@@ -19,7 +19,7 @@ window.GOOGLE_SEARCH_ENGINE_ID = '6233b4a886ca64ede';
 import { switchTab, refreshAllTabs } from './modules/ui/tabs.js';
 import { initAllSectionDragDrop } from './modules/ui/sectionDragDrop.js';
 import { initAllSectionSidebars, triggerSectionSidebarUpdate } from './modules/ui/sectionSidebar.js';
-import { initSuggestionsSidebarToggle, restoreSuggestionsSidebarState } from './modules/ui/suggestionsSidebarToggle.js';
+import { initFloatingSuggestionsPanel } from './modules/ui/floatingSuggestionsPanel.js';
 import { showModal, hideModal } from './modules/ui/modals.js';
 import { renderKeyboard, updateKeyboardLabels, updateKeyNames, clearHighlights, g_KeyboardKeys } from './modules/ui/keyboard.js';
 import { updateKeySignatureDisplay, setupResponsiveTitle } from './modules/ui/header.js';
@@ -2618,8 +2618,8 @@ window.onload = () => {
     // This ensures the sidebar sees the restored states, not HTML defaults
     setTimeout(() => {
         initAllSectionSidebars();
-        // Initialize suggestions sidebar toggle after section sidebars are ready
-        initSuggestionsSidebarToggle();
+        // Initialize floating suggestions panel
+        initFloatingSuggestionsPanel();
     }, 200);
 
     // Setup responsive title abbreviation
@@ -2896,21 +2896,8 @@ window.initMelodySuggestionController = function(options = {}) {
         initMelodySuggestionController(options);
         melodySuggestionControllerInitialized = true;
 
-        // Set up style selector event listener
-        const styleSelect = document.getElementById('melody-style-select');
-        if (styleSelect) {
-            styleSelect.addEventListener('change', (e) => {
-                setMelodySuggestionStyle(e.target.value);
-            });
-        }
-
-        // Set up refresh button
-        const refreshBtn = document.getElementById('refresh-melody-suggestions-btn');
-        if (refreshBtn) {
-            refreshBtn.addEventListener('click', () => {
-                refreshMelodySuggestions();
-            });
-        }
+        // Set up style selector event listener - auto-refreshes on change
+        // This is set up in the controller's setupEventListeners() function
 
         // Set up panel toggle
         window.toggleMelodySuggestionsPanel = function() {
@@ -2921,9 +2908,8 @@ window.initMelodySuggestionController = function(options = {}) {
                 const listEl = document.getElementById('melody-suggestions-list');
                 const contextEl = document.getElementById('melody-suggestion-context');
                 const styleEl = panel.querySelector('.style-selector');
-                const btnEl = document.getElementById('refresh-melody-suggestions-btn');
 
-                [listEl, contextEl, styleEl, btnEl].forEach(el => {
+                [listEl, contextEl, styleEl].forEach(el => {
                     if (el) el.classList.toggle('hidden');
                 });
 
@@ -2960,15 +2946,13 @@ window.switchSuggestionMode = function(mode) {
 
     currentSuggestionMode = mode;
 
-    // Update toggle buttons
-    const chordsBtn = document.getElementById('toggle-chords-btn');
-    const melodyBtn = document.getElementById('toggle-melody-btn');
+    // Update floating panel toggle buttons
+    const chordsBtn = document.getElementById('suggestions-mode-chords');
+    const melodyBtn = document.getElementById('suggestions-mode-melody');
 
     if (chordsBtn && melodyBtn) {
         chordsBtn.classList.toggle('active', mode === 'chords');
         melodyBtn.classList.toggle('active', mode === 'melody');
-        chordsBtn.setAttribute('aria-selected', mode === 'chords');
-        melodyBtn.setAttribute('aria-selected', mode === 'melody');
     }
 
     // Show/hide sections

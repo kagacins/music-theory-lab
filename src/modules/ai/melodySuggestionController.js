@@ -125,6 +125,30 @@ function setupEventListeners() {
     compositionState.events.on('progressionImported', () => {
         refreshSuggestions();
     });
+
+    // Listen for style changes from the floating panel dropdown
+    // Use a small delay to ensure the floating panel DOM is ready
+    const setupStyleListener = () => {
+        const styleSelect = document.getElementById('floating-melody-style-select');
+        if (styleSelect) {
+            console.log('✅ Floating melody style dropdown found, attaching event listener');
+            styleSelect.addEventListener('change', (e) => {
+                setStyle(e.target.value);
+            });
+            return true;
+        }
+        return false;
+    };
+
+    // Try immediately
+    if (!setupStyleListener()) {
+        // If not found, try again after a delay (for floating panel initialization)
+        setTimeout(() => {
+            if (!setupStyleListener()) {
+                console.warn('⚠️ Floating melody style dropdown not found after delay');
+            }
+        }, 500);
+    }
 }
 
 
@@ -328,6 +352,7 @@ export function setCurrentMeasure(measureIndex) {
  * @param {string} styleId - Style preset ID
  */
 export function setStyle(styleId) {
+    console.log('🎵 Melody Style Changed:', styleId);
     currentStyleId = styleId;
     refreshSuggestions();
 }

@@ -1,0 +1,478 @@
+/**
+ * Floating Suggestions Panel Styles
+ */
+
+#floating-suggestions-panel {
+    position: fixed;
+    width: 400px;
+    max-height: 600px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 2px solid rgba(100, 200, 255, 0.3);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5),
+                0 0 20px rgba(100, 200, 255, 0.2);
+    z-index: 10000;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    backdrop-filter: blur(10px);
+    transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+#floating-suggestions-panel.hidden {
+    opacity: 0;
+    transform: scale(0.95);
+    pointer-events: none;
+}
+
+#floating-suggestions-panel.visible {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: all;
+}
+
+#floating-suggestions-panel.dragging {
+    cursor: move;
+    user-select: none;
+}
+
+#floating-suggestions-panel.dragging .panel-content {
+    pointer-events: none;
+}
+
+/* Panel Header */
+#floating-suggestions-panel .suggestions-banner {
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(100, 200, 255, 0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+#floating-suggestions-panel .banner-header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+#floating-suggestions-panel .suggestions-banner h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #64c8ff;
+}
+
+#floating-suggestions-panel .header-buttons {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+#floating-suggestions-panel .settings-btn,
+#floating-suggestions-panel .close-btn {
+    padding: 6px;
+    background: rgba(100, 200, 255, 0.1);
+    color: #64c8ff;
+    border: 1px solid rgba(100, 200, 255, 0.3);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#floating-suggestions-panel .settings-btn:hover,
+#floating-suggestions-panel .close-btn:hover {
+    background: rgba(100, 200, 255, 0.2);
+    border-color: rgba(100, 200, 255, 0.5);
+}
+
+#floating-suggestions-panel .close-btn:hover {
+    background: rgba(255, 100, 100, 0.2);
+    border-color: rgba(255, 100, 100, 0.5);
+    color: #ff6464;
+}
+
+#floating-suggestions-panel .settings-btn svg,
+#floating-suggestions-panel .close-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Mode Toggle Buttons */
+#floating-suggestions-panel .suggestions-mode-toggle {
+    display: flex;
+    gap: 8px;
+}
+
+#floating-suggestions-panel .suggestions-mode-toggle button {
+    padding: 6px 12px;
+    background: rgba(100, 200, 255, 0.1);
+    color: #64c8ff;
+    border: 1px solid rgba(100, 200, 255, 0.3);
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+#floating-suggestions-panel .suggestions-mode-toggle button:hover {
+    background: rgba(100, 200, 255, 0.2);
+    border-color: rgba(100, 200, 255, 0.5);
+}
+
+#floating-suggestions-panel .suggestions-mode-toggle button.active {
+    background: rgba(100, 200, 255, 0.3);
+    border-color: #64c8ff;
+    font-weight: 600;
+}
+
+/* Panel Content Area */
+#floating-suggestions-panel .panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+/* Custom scrollbar for floating panel */
+#floating-suggestions-panel .panel-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+#floating-suggestions-panel .panel-content::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+#floating-suggestions-panel .panel-content::-webkit-scrollbar-thumb {
+    background: rgba(100, 200, 255, 0.3);
+    border-radius: 4px;
+}
+
+#floating-suggestions-panel .panel-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 200, 255, 0.5);
+}
+
+/* Keyboard Shortcuts Hint */
+#floating-suggestions-panel .keyboard-shortcuts-hint {
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-top: 1px solid rgba(100, 200, 255, 0.2);
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    text-align: center;
+    flex-shrink: 0;
+}
+
+#floating-suggestions-panel .keyboard-shortcuts-hint kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    background: rgba(100, 200, 255, 0.2);
+    border: 1px solid rgba(100, 200, 255, 0.3);
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 11px;
+    margin: 0 2px;
+}
+
+/* Sections */
+#floating-suggestions-panel #chord-suggestions-section,
+#floating-suggestions-panel #melody-suggestions-section {
+    display: block;
+}
+
+#floating-suggestions-panel #chord-suggestions-section.hidden,
+#floating-suggestions-panel #melody-suggestions-section.hidden {
+    display: none;
+}
+
+/* Context Display */
+#floating-suggestions-panel .context-display {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+#floating-suggestions-panel .context-display h4 {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
+}
+
+#floating-suggestions-panel .context-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+#floating-suggestions-panel .context-item {
+    padding: 4px 10px;
+    background: rgba(100, 200, 255, 0.15);
+    border: 1px solid rgba(100, 200, 255, 0.3);
+    border-radius: 4px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.95);
+}
+
+#floating-suggestions-panel .context-item strong {
+    color: #64c8ff;
+    font-weight: 600;
+    margin-right: 4px;
+}
+
+/* Melody Context Overrides - ALL text WHITE on dark background */
+#floating-suggestions-panel .context-display {
+    background: rgba(0, 0, 0, 0.2);
+    color: rgba(255, 255, 255, 0.95) !important;
+}
+
+#floating-suggestions-panel .context-display * {
+    color: rgba(255, 255, 255, 0.95) !important;
+}
+
+#floating-suggestions-panel .context-display .context-label {
+    color: rgba(255, 255, 255, 0.95) !important;
+    font-weight: 600;
+}
+
+#floating-suggestions-panel .context-display .context-value {
+    color: rgba(255, 255, 255, 0.95) !important;
+    font-weight: 500;
+}
+
+#floating-suggestions-panel .context-display .context-item {
+    color: rgba(255, 255, 255, 0.95) !important;
+}
+
+/* Style selector label WHITE on dark background */
+#floating-suggestions-panel .style-selector {
+    color: rgba(255, 255, 255, 0.95);
+    background: rgba(100, 200, 255, 0.1);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    border: 1px solid rgba(100, 200, 255, 0.3);
+}
+
+#floating-suggestions-panel .style-selector label {
+    color: rgba(255, 255, 255, 0.95);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: block;
+    margin-bottom: 6px;
+}
+
+/* Style dropdown - BLACK text on white background */
+#floating-suggestions-panel .style-selector select,
+#floating-suggestions-panel #floating-melody-style-select {
+    background: white;
+    color: #1f2937;
+    border: 2px solid rgba(100, 200, 255, 0.4);
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+#floating-suggestions-panel .style-selector select:hover,
+#floating-suggestions-panel #floating-melody-style-select:hover {
+    border-color: rgba(100, 200, 255, 0.7);
+    box-shadow: 0 0 8px rgba(100, 200, 255, 0.3);
+}
+
+#floating-suggestions-panel .style-selector select:focus,
+#floating-suggestions-panel #floating-melody-style-select:focus {
+    outline: none;
+    border-color: #64c8ff;
+    box-shadow: 0 0 12px rgba(100, 200, 255, 0.5);
+}
+
+/* Fix white-on-white play button */
+#floating-suggestions-panel .preview-note-btn {
+    color: #64c8ff;
+    background: rgba(100, 200, 255, 0.1);
+    border: 1px solid rgba(100, 200, 255, 0.3);
+    padding: 4px;
+    border-radius: 4px;
+}
+
+#floating-suggestions-panel .preview-note-btn:hover {
+    background: rgba(100, 200, 255, 0.2);
+    border-color: rgba(100, 200, 255, 0.5);
+    color: #64c8ff;
+}
+
+/* Darken reason text (e.g., "Root of F Major") */
+#floating-suggestions-panel .suggestion-reason {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 10px;
+}
+
+/* Fix all suggestion item text to be BLACK on light background */
+#floating-suggestions-panel .melody-suggestion-item {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(100, 200, 255, 0.3);
+    color: #1f2937 !important;
+}
+
+#floating-suggestions-panel .melody-suggestion-item * {
+    color: #1f2937 !important;
+}
+
+#floating-suggestions-panel .melody-suggestion-item:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: rgba(100, 200, 255, 0.5);
+}
+
+#floating-suggestions-panel .chord-recommendation-item {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(100, 200, 255, 0.3);
+    color: #1f2937 !important;
+}
+
+#floating-suggestions-panel .chord-recommendation-item * {
+    color: #1f2937 !important;
+}
+
+#floating-suggestions-panel .chord-recommendation-item:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: rgba(100, 200, 255, 0.5);
+}
+
+/* Exception for badges which may need different colors */
+#floating-suggestions-panel .melody-suggestion-item .score-badge,
+#floating-suggestions-panel .chord-recommendation-item .score-badge,
+#floating-suggestions-panel .melody-suggestion-item .category-badge,
+#floating-suggestions-panel .chord-recommendation-item .inversion-badge,
+#floating-suggestions-panel .chord-recommendation-item .function-badge {
+    color: inherit !important;
+}
+
+/* Make play button triangle BLACK on light background */
+#floating-suggestions-panel .chord-play-btn,
+#floating-suggestions-panel .context-play-btn {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(100, 200, 255, 0.3);
+    color: #1f2937;
+}
+
+#floating-suggestions-panel .chord-play-btn:hover,
+#floating-suggestions-panel .context-play-btn:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: rgba(100, 200, 255, 0.5);
+    color: #3b82f6;
+}
+
+#floating-suggestions-panel .chord-play-btn svg,
+#floating-suggestions-panel .context-play-btn svg {
+    fill: #1f2937;
+}
+
+/* Hide shortcut number badges (not used in floating panel workflow) */
+#floating-suggestions-panel .shortcut-badge {
+    display: none;
+}
+
+/* Recommendations List */
+#floating-suggestions-panel #recommendations-list,
+#floating-suggestions-panel #melody-suggestions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Refresh Button */
+#floating-suggestions-panel .refresh-btn {
+    width: 100%;
+    padding: 10px;
+    background: rgba(100, 200, 255, 0.1);
+    color: #64c8ff;
+    border: 1px solid rgba(100, 200, 255, 0.3);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    margin-top: 12px;
+    transition: all 0.2s;
+}
+
+#floating-suggestions-panel .refresh-btn:hover {
+    background: rgba(100, 200, 255, 0.2);
+    border-color: rgba(100, 200, 255, 0.5);
+}
+
+/* Harmonic Analysis Panel */
+#floating-suggestions-panel .analysis-panel {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 12px;
+    border-radius: 8px;
+    margin-top: 16px;
+}
+
+#floating-suggestions-panel .analysis-header {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#floating-suggestions-panel .analysis-section {
+    margin-bottom: 10px;
+}
+
+#floating-suggestions-panel .analysis-section:last-child {
+    margin-bottom: 0;
+}
+
+#floating-suggestions-panel .analysis-label {
+    display: block;
+    font-size: 11px;
+    color: #64c8ff;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 4px;
+}
+
+#floating-suggestions-panel .functions-list,
+#floating-suggestions-panel .pattern-info,
+#floating-suggestions-panel .borrowed-list,
+#floating-suggestions-panel .complexity-stars {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.85);
+    line-height: 1.5;
+}
+
+/* Responsive sizing for smaller screens */
+@media (max-width: 768px) {
+    #floating-suggestions-panel {
+        width: 90vw;
+        max-width: 400px;
+        max-height: 70vh;
+    }
+}
+
+/* Animation for panel appearance */
+@keyframes floatingPanelAppear {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+#floating-suggestions-panel.visible {
+    animation: floatingPanelAppear 0.2s ease-out;
+}

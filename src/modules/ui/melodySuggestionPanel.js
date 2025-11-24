@@ -299,6 +299,8 @@ export function updateSuggestionContext(chord, key, previousNote) {
 export function updateSuggestions({ chord, key, previousNote, styleId = 'any', contourId = 'any', octave = 4, recentNotes = [] }) {
     showLoadingState();
 
+    console.log('🎼 Generating melody suggestions with styleId:', styleId);
+
     // Generate suggestions
     const result = generateMelodySuggestions({
         chord,
