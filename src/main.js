@@ -1962,76 +1962,123 @@ window.playFromSelectedMeasure = playFromSelectedMeasure;
  * Show the Auto-Harmonize modal to suggest chords for the melody
  */
 window.showAutoHarmonize = function() {
-    // Get the current melody notes
-    const melodyData = getInteractiveMelody();
-    if (!melodyData || !melodyData.melodyNotes || melodyData.melodyNotes.length === 0) {
+    // Get melody notes from compositionState (from notation editor)
+    const compositionState = getCompositionState();
+    let melodyNotes = compositionState.getAllMelodyNotes();
+
+    // Fallback to interactiveMelody if no notes in composition state (keyboard composition mode)
+    if (!melodyNotes || melodyNotes.length === 0) {
+        const melodyData = getInteractiveMelody();
+        melodyNotes = melodyData && melodyData.melodyNotes ? melodyData.melodyNotes : [];
+    }
+
+    if (!melodyNotes || melodyNotes.length === 0) {
         alert('No melody notes found. Please record or enter some melody notes first.');
         return;
     }
 
     // Get the current key
-    const currentKey = melodyData.key || getCurrentKey();
+    const currentKey = getCurrentKey();
 
     // Get current progression to use as defaults for suggestions
     const currentProgression = window.getTrainerState ? window.getTrainerState().progressionData : [];
 
+    // Get settings for tempo and other melody settings
+    const settings = compositionState.getSettings();
+    const tempo = settings.tempo || 120;
+
     // Show the modal
     showAutoHarmonizeModal(
-        melodyData.melodyNotes,
+        melodyNotes,
         currentKey,
         // onApply callback - apply the harmonization
         (chordProgression) => {
-            // Save the melody notes before clearing (they're stored in interactiveMelody)
-            // Use deep copy to prevent any modifications during chord operations
-            const savedMelodyNotes = JSON.parse(JSON.stringify(melodyData.melodyNotes));
-            const savedMelodySettings = {
-                timeSignature: melodyData.timeSignature,
-                beatsPerMeasure: melodyData.beatsPerMeasure,
-                beatDuration: melodyData.beatDuration,
-                tempo: melodyData.tempo,
-                key: melodyData.key,
-                numMeasures: Math.max(melodyData.numMeasures, chordProgression.length)
-            };
+            // CRITICAL: Use the new syncWithProgressionData method to ensure proper bass generation and state sync
+            // This replaces the manual update logic which was missing bass generation for new chords
 
-            // Clear existing progression and add the new chords
-            if (window.clearProgression) {
-                window.clearProgression();
-            }
+            // Ensure all measures have metadata property
+            compositionState.ensureAllMeasuresHaveMetadata();
 
-            // Add each chord to the progression using the proper function
-            // addChordToProgressionByParams(chordType, root, inversion, octaveShift) - note: type first, then root
-            // Use -12 semitones to center chords around C3 (one octave below default C4)
+            // Get current progressionData or initialize if empty
+            const trainerState = window.getTrainerState ? window.getTrainerState() : null;
+            let progressionData = trainerState ? [...trainerState.progressionData] : [];
+            
+            // Update progressionData with the new chords from harmonization
             chordProgression.forEach(chord => {
-                if (window.addChordToProgressionByParams) {
-                    // Pass -12 for octaveShift to get chords centered around C3
-                    window.addChordToProgressionByParams(chord.type, chord.root, 0, -12);
+                // Ensure progressionData has enough elements
+                while (progressionData.length <= chord.measureIndex) {
+                    progressionData.push({
+                        root: null,
+                        type: null,
+                        inversion: 0,
+                        roman: null, 
+                        name: '',
+                        notes: [],
+                        selectionMode: 'chord',
+                        omittedNotes: [],
+                        octaveShift: 0
+                    });
+                }
+
+                // Update the specific measure in progressionData
+                if (progressionData[chord.measureIndex]) {
+                    progressionData[chord.measureIndex] = {
+                        ...progressionData[chord.measureIndex],
+                        root: chord.root,
+                        type: chord.type,
+                        // CRITICAL: Clear notes so they are regenerated for the new chord
+                        // properly in syncWithProgressionData. Otherwise old notes persist
+                        // causing bass generation to use the wrong pitches.
+                        notes: [], 
+                        omittedNotes: [],
+                        lhOmittedNotes: [],
+                    };
                 }
             });
 
-            // Regenerate bass
-            if (window.regenerateAllBass) {
-                window.regenerateAllBass();
+            // Sync composition state with the updated progression data
+            // This will:
+            // 1. Update chord data
+            // 2. Auto-generate bass (since we added that call in syncWithProgressionData)
+            // 3. Preserve existing melody notes
+            if (typeof compositionState.syncWithProgressionData === 'function') {
+                compositionState.syncWithProgressionData(progressionData);
+            } else {
+                console.warn('syncWithProgressionData not available, falling back to manual update');
+                // Fallback manual update logic (same as before)
+                chordProgression.forEach((chord) => {
+                    const measure = compositionState.getMeasure(chord.measureIndex);
+                    if (!measure) return;
+
+                    measure.chord.root = chord.root;
+                    measure.chord.type = chord.type;
+                    
+                    // Manually trigger bass update if needed
+                    if (compositionState.settings.autoGenerateBass) {
+                        compositionState.updateBassFromChord(chord.measureIndex);
+                    }
+                    
+                    compositionState.events.emit('chordChanged', chord.measureIndex, measure.chord, {});
+                });
+            }
+
+            // Update the trainer state with the modified progression data
+            if (window.setProgressionData) {
+                window.setProgressionData(progressionData);
+            }
+
+            // Force immediate render without delay
+            if (window.getNotationComposer) {
+                const notationComposer = window.getNotationComposer();
+                if (notationComposer && typeof notationComposer.render === 'function') {
+                    notationComposer.render(true);
+                }
             }
 
             // Make sure we stay on the Melody Composer tab
             if (window.switchTab) {
                 window.switchTab('melody');
             }
-
-            // Restore melody notes and re-render in a single setTimeout
-            // Use a longer delay (400ms) to ensure ALL intermediate renders have completed
-            // Each addChordToProgressionByParams triggers a render, plus clearProgression has a 50ms delayed render
-            setTimeout(() => {
-                // Restore melody notes
-                if (window.restoreInteractiveMelody) {
-                    window.restoreInteractiveMelody(savedMelodyNotes, savedMelodySettings);
-                }
-
-                // Final render - refresh notation to show melody notes
-                if (window.refreshNotationFromProgression) {
-                    window.refreshNotationFromProgression();
-                }
-            }, 400);
         },
         // onPlayChord callback - preview chord (continuous while pressed)
         (root, type, inversion) => {
@@ -2054,7 +2101,7 @@ window.showAutoHarmonize = function() {
             }
         },
         // Pass tempo for playback
-        melodyData.tempo || 120
+        tempo
     );
 };
 // Wrap setSelectedMeasureIndex to also update melody suggestions

@@ -509,6 +509,26 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     }
   });
 
+  // Draw chord symbol if present in measure data
+  if (measureData.metadata && measureData.metadata.chordSymbol) {
+    const chordSymbol = measureData.metadata.chordSymbol;
+    // Position at beginning of measure (with small left padding)
+    const chordX = x + 5;
+    // Position 30px above treble staff, but never go below y=15 to stay on canvas
+    const chordY = Math.max(15, trebleY - 30);
+
+    // Use VexFlow's CanvasContext methods for text rendering
+    // Standard notation style: black, serif font, moderate size
+    const VF = getVF();
+    if (VF && context) {
+      context.save();
+      context.setFont('Times New Roman, serif', 14, 'normal');
+      context.setFillStyle('#000000'); // Black (standard for chord symbols)
+      context.fillText(chordSymbol, chordX, chordY);
+      context.restore();
+    }
+  }
+
   return {
     trebleStave,
     bassStave,
@@ -611,7 +631,7 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature) {
     } else if (note.pitches && Array.isArray(note.pitches)) {
       // Chord - apply ottava adjustment
       const { adjustedPitches, ottavaLabel } = applyOttavaAdjustment(note.pitches, clef);
-      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false, note.articulation || null);
+      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false, note.articulation || null, note.accidental || null);
 
       // Track ottava brackets
       if (ottavaLabel) {

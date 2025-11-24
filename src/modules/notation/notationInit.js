@@ -260,7 +260,8 @@ export function initEnhancedNotation(options = {}) {
           data.note.dotted || false,
           data.staff,
           data.note.isRest || false,  // isRest flag
-          data.note.accidental
+          data.note.accidental,
+          data.note.articulation  // Pass articulation from toolbar
         );
 
         console.log('[NotationInit] addNoteIntelligently result:', result);
@@ -363,6 +364,35 @@ export function initEnhancedNotation(options = {}) {
       // Handle note selection changes
       noteEditor.selectedNotes = new Set(noteIds);
       noteEditor.renderOverlay();
+
+      // Update toolbar with selection state for contextual editing
+      if (notationComposer && notationComposer.toolbar) {
+        // Get full note objects from composition state
+        const selectedNoteObjects = [];
+
+        if (notationComposer.compositionState) {
+          noteIds.forEach(noteId => {
+            // Parse note ID: "measureIndex-staff-noteIndex"
+            const [measureIndex, staff, noteIndex] = noteId.split('-');
+            const measure = notationComposer.compositionState.getMeasure(parseInt(measureIndex));
+
+            if (measure) {
+              const voiceKey = staff;
+              const note = measure.notation[voiceKey]?.voices[0]?.notes[parseInt(noteIndex)];
+              if (note) {
+                selectedNoteObjects.push({
+                  ...note,
+                  measureIndex: parseInt(measureIndex),
+                  staff,
+                  noteIndex: parseInt(noteIndex)
+                });
+              }
+            }
+          });
+        }
+
+        notationComposer.toolbar.updateSelectionState(selectedNoteObjects);
+      }
     },
     onNoteDelete: (deletion) => {
       console.log('[NotationInit] onNoteDelete called:', deletion);
@@ -507,8 +537,6 @@ export function initEnhancedNotation(options = {}) {
 
       // Store globally for access
       window.suggestionManager = suggestionManager;
-
-      console.log('✅ Integrated Suggestions initialized successfully');
     }
   } catch (error) {
     console.warn('Could not initialize integrated suggestions:', error);
@@ -522,27 +550,95 @@ export function initEnhancedNotation(options = {}) {
       onRestModeChange: notationComposer.toolbar.onRestModeChange,
       onDottedChange: notationComposer.toolbar.onDottedChange,
       onAccidentalChange: notationComposer.toolbar.onAccidentalChange,
+      onArticulationChange: notationComposer.toolbar.onArticulationChange,
     };
 
-    // Enhance callbacks to also update note editor
+    // Enhance callbacks to support both mode: setting defaults OR editing selected notes
     notationComposer.toolbar.onDurationChange = (duration) => {
-      noteEditor.setDuration(duration);
-      originalCallbacks.onDurationChange(duration);
+      if (noteEditor.selectedNotes.size > 0) {
+        // Contextual mode: Change duration of selected notes
+        noteEditor.changeDurationOfSelected(duration);
+      } else {
+        // Default mode: Set duration for new notes
+        noteEditor.setDuration(duration);
+        originalCallbacks.onDurationChange(duration);
+      }
     };
 
     notationComposer.toolbar.onRestModeChange = (isRest) => {
-      noteEditor.setRestMode(isRest);
-      originalCallbacks.onRestModeChange(isRest);
+      if (noteEditor.selectedNotes.size > 0) {
+        // Contextual mode: Toggle rest mode on selected notes
+        noteEditor.toggleRestOnSelected();
+      } else {
+        // Default mode: Set rest mode for new notes
+        noteEditor.setRestMode(isRest);
+        originalCallbacks.onRestModeChange(isRest);
+      }
     };
 
     notationComposer.toolbar.onDottedChange = (isDotted) => {
-      noteEditor.setDotted(isDotted);
-      originalCallbacks.onDottedChange(isDotted);
+      if (noteEditor.selectedNotes.size > 0) {
+        // Contextual mode: Toggle dotted on selected notes
+        noteEditor.toggleDottedOnSelected();
+      } else {
+        // Default mode: Set dotted for new notes
+        noteEditor.setDotted(isDotted);
+        originalCallbacks.onDottedChange(isDotted);
+      }
     };
 
     notationComposer.toolbar.onAccidentalChange = (accidental) => {
-      noteEditor.setAccidental(accidental);
-      originalCallbacks.onAccidentalChange(accidental);
+      if (noteEditor.selectedNotes.size > 0) {
+        // Contextual mode: Change accidental on selected notes
+        noteEditor.changeAccidentalOnSelected(accidental);
+      } else {
+        // Default mode: Set accidental for new notes
+        noteEditor.setAccidental(accidental);
+        originalCallbacks.onAccidentalChange(accidental);
+      }
+    };
+
+    notationComposer.toolbar.onArticulationChange = (articulation) => {
+      if (noteEditor.selectedNotes.size > 0) {
+        // Contextual mode: Toggle articulation on selected notes
+        noteEditor.toggleArticulationOnSelected(articulation);
+      } else {
+        // Default mode: Set articulation for new notes
+        noteEditor.setArticulation(articulation);
+        originalCallbacks.onArticulationChange(articulation);
+      }
+    };
+
+    // Handle chord symbol application
+    notationComposer.toolbar.onChordSymbolApply = (chordSymbol) => {
+      console.log('[NotationInit] Applying chord symbol:', chordSymbol);
+
+      // Find measure containing selected notes, or first measure if no selection
+      let targetMeasureIndex = 0;
+
+      if (noteEditor.selectedNotes.size > 0) {
+        // Get first selected note's measure
+        const firstNoteId = [...noteEditor.selectedNotes][0];
+        const [measureIndex] = firstNoteId.split('-');
+        targetMeasureIndex = parseInt(measureIndex);
+      }
+
+      // Apply chord symbol to measure
+      if (notationComposer.compositionState) {
+        const measure = notationComposer.compositionState.getMeasure(targetMeasureIndex);
+        if (measure) {
+          // Initialize metadata if needed
+          if (!measure.metadata) {
+            measure.metadata = {};
+          }
+          measure.metadata.chordSymbol = chordSymbol;
+
+          console.log('[NotationInit] Chord symbol applied to measure', targetMeasureIndex, ':', chordSymbol);
+
+          // Re-render to show chord symbol (force render to ensure it appears)
+          notationComposer.render(true);
+        }
+      }
     };
 
     // Set initial chord context for harmonic coloring

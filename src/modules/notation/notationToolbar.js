@@ -70,6 +70,12 @@ export class NotationToolbar {
     this.measuresPerLine = 4;
     this.voiceNumber = 1;
 
+    // Selection state for contextual editing
+    this.selectedNotesCount = 0;
+    this.selectionDuration = null;  // null = no selection, 'mixed' = multiple durations, '4n' = all same
+    this.selectionArticulation = null;  // null = none, 'mixed' = multiple, 'staccato' = all same
+    this.selectionDotted = null;  // null = no selection, 'mixed' = multiple, true/false = all same
+
     // Callbacks
     this.onDurationChange = options.onDurationChange || (() => {});
     this.onRestModeChange = options.onRestModeChange || (() => {});
@@ -83,6 +89,7 @@ export class NotationToolbar {
     this.onRedo = options.onRedo || (() => {});
     this.onDelete = options.onDelete || (() => {});
     this.onTie = options.onTie || (() => {});
+    this.onChordSymbolApply = options.onChordSymbolApply || (() => {});
   }
 
   /**
@@ -103,6 +110,11 @@ export class NotationToolbar {
 
     this.container.innerHTML = `
       <div class="notation-toolbar">
+        <!-- Selection Indicator (shown when notes selected) -->
+        <div class="toolbar-section selection-indicator" style="display: ${this.selectedNotesCount > 0 ? 'flex' : 'none'};">
+          <span class="selection-badge">✓ ${this.selectedNotesCount} note${this.selectedNotesCount !== 1 ? 's' : ''} selected</span>
+        </div>
+
         <!-- Duration Section -->
         <div class="toolbar-section duration-section">
           <span class="section-label">Duration</span>
@@ -201,6 +213,21 @@ export class NotationToolbar {
           </button>
         </div>
 
+        <!-- Chord Symbol Section -->
+        <div class="toolbar-section chord-symbol-section">
+          <span class="section-label">Chord Symbol</span>
+          <input
+            type="text"
+            class="chord-symbol-input"
+            placeholder="Cmaj7"
+            title="Chord symbol (appears above measure)"
+            maxlength="12"
+          >
+          <button class="toolbar-btn apply-chord-btn" title="Apply chord symbol to measure">
+            Apply
+          </button>
+        </div>
+
         <!-- Voice Section -->
         <div class="toolbar-section voice-section">
           <span class="section-label">Voice</span>
@@ -294,6 +321,26 @@ export class NotationToolbar {
         color: white;
       }
 
+      .toolbar-btn.mixed {
+        background: linear-gradient(135deg, var(--accent-color, #4a9eff) 50%, var(--bg-tertiary, #333) 50%);
+        position: relative;
+      }
+
+      .toolbar-btn.mixed::after {
+        content: '?';
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        font-size: 10px;
+        background: rgba(255,255,255,0.3);
+        border-radius: 50%;
+        width: 14px;
+        height: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
       .toolbar-btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
@@ -328,6 +375,48 @@ export class NotationToolbar {
 
       .zoom-select, .measures-select, .voice-select {
         min-width: 70px;
+      }
+
+      .selection-indicator {
+        background: var(--accent-color, #4a9eff);
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-weight: bold;
+      }
+
+      .selection-badge {
+        color: white;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      .chord-symbol-input {
+        padding: 6px 10px;
+        border-radius: 4px;
+        border: 1px solid var(--bg-tertiary, #333);
+        background: var(--bg-input, #222);
+        color: var(--text-primary, #fff);
+        font-size: 13px;
+        font-family: 'Courier New', monospace;
+        width: 100px;
+        text-align: center;
+      }
+
+      .chord-symbol-input:focus {
+        outline: 2px solid var(--accent-color, #4a9eff);
+        border-color: var(--accent-color, #4a9eff);
+      }
+
+      .chord-symbol-input::placeholder {
+        color: var(--text-muted, #666);
+        font-style: italic;
+      }
+
+      .apply-chord-btn {
+        width: auto;
+        padding: 0 12px;
+        font-size: 12px;
+        font-weight: 600;
       }
 
       @media (max-width: 768px) {
@@ -421,6 +510,27 @@ export class NotationToolbar {
     this.container.querySelector('.measures-select')?.addEventListener('change', (e) => {
       this.measuresPerLine = parseInt(e.target.value, 10);
       this.onMeasuresPerLineChange(this.measuresPerLine);
+    });
+
+    // Chord symbol apply button
+    this.container.querySelector('.apply-chord-btn')?.addEventListener('click', () => {
+      const input = this.container.querySelector('.chord-symbol-input');
+      const chordSymbol = input?.value.trim();
+      if (chordSymbol) {
+        this.onChordSymbolApply(chordSymbol);
+        input.value = ''; // Clear after applying
+      }
+    });
+
+    // Chord symbol input - apply on Enter key
+    this.container.querySelector('.chord-symbol-input')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const chordSymbol = e.target.value.trim();
+        if (chordSymbol) {
+          this.onChordSymbolApply(chordSymbol);
+          e.target.value = ''; // Clear after applying
+        }
+      }
     });
 
     // Keyboard shortcuts
@@ -666,6 +776,135 @@ export class NotationToolbar {
     this.currentArticulation = null;
     this.render();
     this.attachEventListeners();
+  }
+
+  /**
+   * Update toolbar based on selected notes (contextual editing)
+   * @param {Array} selectedNotes - Array of selected note objects
+   */
+  updateSelectionState(selectedNotes = []) {
+    this.selectedNotesCount = selectedNotes.length;
+
+    if (selectedNotes.length === 0) {
+      // No selection - toolbar controls new note defaults
+      this.selectionDuration = null;
+      this.selectionArticulation = null;
+      this.selectionDotted = null;
+
+      // Hide selection indicator
+      const indicator = this.container?.querySelector('.selection-indicator');
+      if (indicator) indicator.style.display = 'none';
+
+      return;
+    }
+
+    // Analyze selected notes to find common properties
+    const durations = new Set();
+    const articulations = new Set();
+    const dottedStates = new Set();
+
+    selectedNotes.forEach(note => {
+      if (note.duration) durations.add(note.duration);
+      articulations.add(note.articulation || 'none');
+      dottedStates.add(note.dotted || false);
+    });
+
+    // Set selection state
+    this.selectionDuration = durations.size === 1 ? [...durations][0] : 'mixed';
+    this.selectionArticulation = articulations.size === 1 ? ([...articulations][0] === 'none' ? null : [...articulations][0]) : 'mixed';
+    this.selectionDotted = dottedStates.size === 1 ? [...dottedStates][0] : 'mixed';
+
+    console.log('[NotationToolbar] Selection state:', {
+      count: this.selectedNotesCount,
+      duration: this.selectionDuration,
+      articulation: this.selectionArticulation,
+      dotted: this.selectionDotted
+    });
+
+    // Update selection indicator
+    const indicator = this.container?.querySelector('.selection-indicator');
+    if (indicator) {
+      indicator.style.display = 'flex';
+      const badge = indicator.querySelector('.selection-badge');
+      if (badge) {
+        badge.textContent = `✓ ${this.selectedNotesCount} note${this.selectedNotesCount !== 1 ? 's' : ''} selected`;
+      }
+    }
+
+    // Update button states to reflect selection
+    this.updateDurationButtonsForSelection();
+    this.updateArticulationButtonsForSelection();
+    this.updateDotButtonForSelection();
+  }
+
+  /**
+   * Update duration buttons to show selection state
+   */
+  updateDurationButtonsForSelection() {
+    if (!this.container) return;
+
+    this.container.querySelectorAll('.duration-btn').forEach(btn => {
+      const isActive = this.selectionDuration && this.selectionDuration === btn.dataset.duration;
+      const isMixed = this.selectionDuration === 'mixed';
+
+      btn.classList.toggle('active', isActive);
+      btn.classList.toggle('mixed', isMixed);
+
+      // Update title to show mode
+      const durationName = DURATIONS.find(d => d.id === btn.dataset.duration)?.label || '';
+      if (this.selectedNotesCount > 0) {
+        btn.title = `Change selected notes to ${durationName}`;
+      } else {
+        const index = DURATIONS.findIndex(d => d.id === btn.dataset.duration);
+        btn.title = `${durationName} note (Shift+${index + 1})`;
+      }
+    });
+  }
+
+  /**
+   * Update articulation buttons to show selection state
+   */
+  updateArticulationButtonsForSelection() {
+    if (!this.container) return;
+
+    this.container.querySelectorAll('.articulation-btn').forEach(btn => {
+      const isActive = this.selectionArticulation && this.selectionArticulation === btn.dataset.articulation;
+      const isMixed = this.selectionArticulation === 'mixed';
+
+      btn.classList.toggle('active', isActive);
+      btn.classList.toggle('mixed', isMixed);
+
+      // Update title
+      const artName = ARTICULATIONS.find(a => a.id === btn.dataset.articulation)?.label || '';
+      if (this.selectedNotesCount > 0) {
+        btn.title = `Toggle ${artName} on selected notes`;
+      } else {
+        btn.title = artName;
+      }
+    });
+  }
+
+  /**
+   * Update dot button to show selection state
+   */
+  updateDotButtonForSelection() {
+    if (!this.container) return;
+
+    const btn = this.container.querySelector('.dot-btn');
+    if (!btn) return;
+
+    const isActive = this.selectionDotted === true;
+    const isMixed = this.selectionDotted === 'mixed';
+
+    btn.classList.toggle('active', isActive);
+    btn.classList.toggle('mixed', isMixed);
+
+    // Update title
+    if (this.selectedNotesCount > 0) {
+      btn.title = 'Toggle dotted on selected notes';
+    } else {
+      btn.title = 'Dotted';
+    }
   }
 
   /**

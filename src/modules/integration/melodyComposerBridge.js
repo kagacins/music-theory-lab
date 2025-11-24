@@ -63,10 +63,18 @@ export function syncProgressionToMelodyComposer() {
     }
 
     try {
-        // Import progression into composition state
-        compositionState.importFromProgressionData(progressionData, {
-            key: currentKey
-        });
+        // Import progression into composition state - USE NON-DESTRUCTIVE SYNC
+        // This ensures we don't wipe the melody when switching tabs
+        if (typeof compositionState.syncWithProgressionData === 'function') {
+            compositionState.syncWithProgressionData(progressionData, {
+                key: currentKey
+            });
+        } else {
+            // Fallback for older CompositionState versions
+            compositionState.importFromProgressionData(progressionData, {
+                key: currentKey
+            });
+        }
 
         // Failsafe: Ensure bass is generated if auto-generate is ON
         // This handles cases where import might not generate bass correctly
@@ -235,7 +243,7 @@ function getCurrentBeat(measureIndex, staff) {
  * @param {string} accidental - Accidental ('#', 'b', 'n', or null)
  * @returns {Object} - {success: boolean, measuresFilled: number}
  */
-export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = false, accidental = null) {
+export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = false, accidental = null, articulation = null) {
     if (!useCompositionState) return { success: false, measuresFilled: 0 };
 
     // Get selected measure from notation composer
@@ -269,6 +277,7 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
             isRest: isRest,
             dotted: dotted,
             accidental: accidental,
+            articulation: articulation, // Include articulation from toolbar
             beat: beatPosition,
         };
 
@@ -302,6 +311,7 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
             isRest: isRest,
             dotted: firstPartDuration.dotted,
             accidental: accidental,
+            articulation: articulation, // Include articulation from toolbar
             tie: isRest ? undefined : 'start',  // Only notes get ties, not rests
             beat: beatPosition,
         };

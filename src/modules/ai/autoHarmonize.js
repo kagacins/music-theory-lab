@@ -538,10 +538,15 @@ export function applyHarmonizeSuggestions(suggestions, selections) {
         const chord = measure.suggestions[selectedIndex] || measure.suggestions[0];
 
         if (!chord) {
-            return { root: 'C', type: 'Major' }; // Fallback
+            return {
+                measureIndex: measure.measureIndex,
+                root: 'C',
+                type: 'Major'
+            }; // Fallback
         }
 
         return {
+            measureIndex: measure.measureIndex,
             root: chord.root,
             type: chord.type,
             score: chord.score,

@@ -507,7 +507,7 @@ export function analyzeProgression(progression, key) {
     // Calculate complexity (0-5 stars)
     let complexity = 1;
     if (progression.length > 4) complexity++;
-    if (progression.some(c => c.type.includes('7'))) complexity++;
+    if (progression.some(c => c.type && c.type.includes('7'))) complexity++;
     if (progression.some(c => c.inversion > 0)) complexity++;
     if (voiceLeadingQuality < 60) complexity++;
     complexity = Math.min(5, complexity);

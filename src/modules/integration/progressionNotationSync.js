@@ -192,10 +192,16 @@ export class ProgressionNotationSync {
             const progressionData = getProgressionData();
             const currentKey = getCurrentKey();
 
-            // Import progression into composition state
-            this.composition.importFromProgressionData(progressionData, {
-                key: currentKey
-            });
+            // Import progression into composition state - USE NON-DESTRUCTIVE SYNC
+            if (typeof this.composition.syncWithProgressionData === 'function') {
+                this.composition.syncWithProgressionData(progressionData, {
+                    key: currentKey
+                });
+            } else {
+                this.composition.importFromProgressionData(progressionData, {
+                    key: currentKey
+                });
+            }
         } finally {
             this.isUpdating = false;
         }

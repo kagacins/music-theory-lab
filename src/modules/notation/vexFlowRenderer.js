@@ -495,7 +495,13 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
   if (!isRest) {
     const requiredAccidental = accidental || getRequiredAccidental(pitch, key);
     if (requiredAccidental) {
-      staveNote.addModifier(new VF.Accidental(requiredAccidental));
+      try {
+        // Always pass index 0 for single notes (required by VexFlow)
+        staveNote.addModifier(new VF.Accidental(requiredAccidental), 0);
+      } catch (error) {
+        console.warn('[VexFlowRenderer] Error adding accidental modifier:', error.message);
+        // Don't crash - the accidental will be missing but note will still render
+      }
     }
   }
 
@@ -530,9 +536,10 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
  * @param {string} clef - Clef for the chord
  * @param {boolean} dotted - Is the chord dotted
  * @param {string} articulation - Articulation for the chord
+ * @param {string|null} accidental - Explicit accidental override (for single-note chords)
  * @returns {Object} - VexFlow StaveNote with multiple keys
  */
-export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble', dotted = false, articulation = null) {
+export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble', dotted = false, articulation = null, accidental = null) {
   const VF = getVF();
   if (!VF || !pitches || pitches.length === 0) return null;
 
@@ -553,10 +560,17 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
   });
 
   // Add accidentals for each pitch
+  // For single-note chords (pitches.length === 1), use explicit accidental if provided
   pitches.forEach((pitch, index) => {
-    const requiredAccidental = getRequiredAccidental(pitch, key);
+    const requiredAccidental = (pitches.length === 1 && accidental)
+      ? accidental
+      : getRequiredAccidental(pitch, key);
     if (requiredAccidental) {
-      staveNote.addModifier(new VF.Accidental(requiredAccidental), index);
+      try {
+        staveNote.addModifier(new VF.Accidental(requiredAccidental), index);
+      } catch (error) {
+        console.warn('[VexFlowRenderer] Error adding accidental to chord note:', error.message);
+      }
     }
   });
 

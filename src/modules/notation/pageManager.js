@@ -73,8 +73,6 @@ export class PageManager {
 
     this.pages.push(page);
 
-    console.log(`[PageManager] Created page ${pageIndex}`);
-
     return page;
   }
 

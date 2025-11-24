@@ -163,6 +163,9 @@ export class KeyboardHandler {
     handleKeyDown(event) {
         if (!this.enabled) return;
 
+        // Don't process shortcuts if user is typing in an input field
+        if (!this.shouldProcessEvent()) return;
+
         const keyString = this.getKeyString(event);
         const shortcut = this.shortcuts.get(keyString);
 

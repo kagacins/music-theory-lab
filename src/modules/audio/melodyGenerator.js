@@ -3226,6 +3226,7 @@ export function playMeasure(measureIndex) {
             if (note.type === 'rest') return; // Skip rests
 
             const delay = note.beat * beatDuration; // Use actual beat position for timing
+            console.log(`[PlayMeasure] Note ${index} raw duration from compositionState:`, note.duration);
             const noteDuration = note.duration ? Tone.Time(note.duration).toSeconds() : 0.5;
             const noteStartTime = startTime + delay;
 
