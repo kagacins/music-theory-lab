@@ -2633,29 +2633,34 @@ function createSimplifiedCardStructure(chord, index, key) {
         </button>
     `;
 
-    // Create card element
+    // Create card element - the HTML now includes the card wrapper and duration controls
     const cardContainer = document.createElement('div');
     cardContainer.innerHTML = createSimplifiedCardHTML(chord, index, key);
-    const cardElement = cardContainer.querySelector('.simplified-card');
 
-    // Create tooltip wrapper for the card
-    const cardWrapper = document.createElement('div');
-    cardWrapper.className = 'relative'; // Position relative for tooltip positioning
-    cardWrapper.style.position = 'relative';
+    // Get the entire card structure (wrapper with card + duration controls)
+    const cardStructure = cardContainer.firstElementChild; // This is the <div class="relative inline-block">
 
-    // Add card to wrapper
+    // Find the simplified-card inside the structure for tooltip insertion
+    const cardElement = cardStructure ? cardStructure.querySelector('.simplified-card') : null;
+
     if (cardElement) {
-        cardWrapper.appendChild(cardElement);
-    }
-
-    // Create and add tooltip outside the card but inside the wrapper
-    const tooltipElement = createTooltipElement(chord, index, key);
-    if (tooltipElement) {
-        cardWrapper.appendChild(tooltipElement);
+        // Create and add tooltip to the card's parent (which is the wrapper)
+        const tooltipElement = createTooltipElement(chord, index, key);
+        if (tooltipElement) {
+            // Insert tooltip after the simplified-card but before duration controls
+            const durationControls = cardStructure.querySelector('.flex.items-center.justify-center.gap-1.mt-1');
+            if (durationControls) {
+                cardStructure.insertBefore(tooltipElement, durationControls);
+            } else {
+                cardStructure.appendChild(tooltipElement);
+            }
+        }
     }
 
     fragment.appendChild(controlBar);
-    fragment.appendChild(cardWrapper);
+    if (cardStructure) {
+        fragment.appendChild(cardStructure);
+    }
 
     return fragment;
 }
@@ -2761,47 +2766,72 @@ function createSimplifiedCardHTML(chord, index, key) {
     else if (chord.inversion === 2) { inversionText = '²'; }
     else if (chord.inversion === 3) { inversionText = '³'; }
 
+    // Parse beats into whole and fractional parts
+    const totalBeats = chord.beats !== undefined ? chord.beats : 4;
+    const wholeBeats = Math.floor(totalBeats);
+    const fractionalBeats = totalBeats - wholeBeats;
+
     return `
-        <div class="simplified-card bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-700 rounded-xl overflow-hidden hover:border-indigo-500 transition-all shadow-lg relative" style="min-height: 80px;">
-            <!-- Inversion indicator (top-left corner) -->
-            ${inversionText ? `<div class="absolute top-1 left-1 text-xl text-red-400 font-bold">${inversionText}</div>` : ''}
+        <div class="relative inline-block">
+            <div class="simplified-card bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-700 rounded-xl overflow-hidden hover:border-indigo-500 transition-all shadow-lg relative" style="min-height: 80px;">
+                <!-- Inversion indicator (top-left corner) -->
+                ${inversionText ? `<div class="absolute top-1 left-1 text-xl text-red-400 font-bold">${inversionText}</div>` : ''}
 
-            <!-- Info icon (bottom-left corner) for touchscreen devices -->
-            <button class="info-tooltip-btn absolute bottom-1 left-1 w-5 h-5 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold transition" title="Show chord info">
-                i
-            </button>
+                <!-- Info icon (bottom-left corner) for touchscreen devices -->
+                <button class="info-tooltip-btn absolute bottom-1 left-1 w-5 h-5 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold transition" title="Show chord info">
+                    i
+                </button>
 
-            <!-- Main content: horizontal layout with chord info on left, buttons on right -->
-            <div class="chord-info-view flex items-center justify-between h-full p-2 pt-2.5 drag-handle cursor-grab active:cursor-grabbing">
-                <!-- Left: Chord info -->
-                <div class="flex flex-col items-center flex-1">
-                    <!-- Chord Symbol -->
-                    <div class="text-base font-bold text-white mb-0.5">${chordSymbol}</div>
-                    <!-- Roman Numeral -->
-                    <div class="text-xs ${colors.romanColor} font-bold">${roman}</div>
-                    <!-- Position Label -->
-                    <div class="text-[9px] text-gray-400 mt-0.5">Pos: ${index + 1}</div>
+                <!-- Main content: horizontal layout with chord info on left, buttons on right -->
+                <div class="chord-info-view flex items-center justify-between h-full p-2 pt-2.5 drag-handle cursor-grab active:cursor-grabbing">
+                    <!-- Left: Chord info -->
+                    <div class="flex flex-col items-center flex-1">
+                        <!-- Chord Symbol -->
+                        <div class="text-base font-bold text-white mb-0.5">${chordSymbol}</div>
+                        <!-- Roman Numeral -->
+                        <div class="text-xs ${colors.romanColor} font-bold">${roman}</div>
+                        <!-- Position Label -->
+                        <div class="text-[9px] text-gray-400 mt-0.5">Pos: ${index + 1}</div>
+                    </div>
+
+                    <!-- Right: Vertically stacked compact buttons -->
+                    <div class="flex flex-col gap-0.5 ml-1">
+                        <button class="play-btn px-1 py-0.5 bg-white hover:bg-gray-100 rounded transition shadow-sm flex items-center justify-center" title="Play">
+                            <svg class="w-2.5 h-2.5" fill="#1f2937" viewBox="0 0 20 20">
+                                <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.841z"></path>
+                            </svg>
+                        </button>
+                        <button class="delete-btn px-1 py-0.5 bg-red-600/80 hover:bg-red-600 text-white text-[8px] rounded transition" title="Delete">
+                            ✕
+                        </button>
+                        <button class="expand-btn px-1 py-0.5 bg-gray-600/80 hover:bg-gray-600 text-white text-[8px] rounded transition" title="Expand">
+                            ⋯
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Right: Vertically stacked compact buttons -->
-                <div class="flex flex-col gap-0.5 ml-1">
-                    <button class="play-btn px-1 py-0.5 bg-white hover:bg-gray-100 rounded transition shadow-sm flex items-center justify-center" title="Play">
-                        <svg class="w-2.5 h-2.5" fill="#1f2937" viewBox="0 0 20 20">
-                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.841z"></path>
-                        </svg>
-                    </button>
-                    <button class="delete-btn px-1 py-0.5 bg-red-600/80 hover:bg-red-600 text-white text-[8px] rounded transition" title="Delete">
-                        ✕
-                    </button>
-                    <button class="expand-btn px-1 py-0.5 bg-gray-600/80 hover:bg-gray-600 text-white text-[8px] rounded transition" title="Expand">
-                        ⋯
-                    </button>
+                <!-- Notation view (hidden by default, light background) -->
+                <div class="notation-view hidden flex items-center justify-center h-full p-2 bg-gray-50" style="min-height: 80px;">
+                    <canvas class="simplified-notation-canvas"></canvas>
                 </div>
             </div>
 
-            <!-- Notation view (hidden by default, light background) -->
-            <div class="notation-view hidden flex items-center justify-center h-full p-2 bg-gray-50" style="min-height: 80px;">
-                <canvas class="simplified-notation-canvas"></canvas>
+            <!-- Duration controls (dangling below card) -->
+            <div class="flex items-center justify-center gap-1 mt-1 px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-xs">
+                <span class="text-gray-300 text-[10px]">Dur:</span>
+                <select class="duration-whole-select bg-gray-800 text-white border border-gray-600 rounded px-1 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" title="Whole beats" data-card-index="${index}">
+                    ${[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].map(n =>
+                        `<option value="${n}" ${n === wholeBeats ? 'selected' : ''}>${n}</option>`
+                    ).join('')}
+                </select>
+                <span class="text-gray-400 text-[10px]">+</span>
+                <select class="duration-frac-select bg-gray-800 text-white border border-gray-600 rounded px-1 py-0.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500" title="Fractional beats" data-card-index="${index}">
+                    <option value="0" ${fractionalBeats === 0 ? 'selected' : ''}>0</option>
+                    <option value="0.25" ${fractionalBeats === 0.25 ? 'selected' : ''}>¼</option>
+                    <option value="0.5" ${fractionalBeats === 0.5 ? 'selected' : ''}>½</option>
+                    <option value="0.75" ${fractionalBeats === 0.75 ? 'selected' : ''}>¾</option>
+                </select>
+                <span class="text-gray-400 text-[10px]">♩</span>
             </div>
         </div>
     `;
@@ -3608,7 +3638,11 @@ function attachCardEventListeners(wrapper, index) {
         };
 
         // Show tooltip on hover (desktop) - use cardWrapper since tooltip is sibling to card
-        cardWrapper.addEventListener('mouseenter', () => {
+        cardWrapper.addEventListener('mouseenter', (e) => {
+            // Don't show tooltip if hovering over duration controls
+            if (e.target.closest('.duration-whole-select') || e.target.closest('.duration-frac-select')) {
+                return;
+            }
             if (!isTooltipPinned) {
                 tooltipTimeout = setTimeout(() => {
                     showTooltip();
@@ -3640,6 +3674,20 @@ function attachCardEventListeners(wrapper, index) {
         chordTooltip.addEventListener('mouseleave', () => {
             hideTooltip();
         });
+
+        // Hide tooltip when hovering over duration controls
+        const durationControls = wrapper.querySelector('.flex.items-center.justify-center.gap-1.mt-1');
+        if (durationControls) {
+            durationControls.addEventListener('mouseenter', () => {
+                if (tooltipTimeout) {
+                    clearTimeout(tooltipTimeout);
+                    tooltipTimeout = null;
+                }
+                if (!isTooltipPinned) {
+                    chordTooltip.classList.add('hidden');
+                }
+            });
+        }
 
         // Close button click - close tooltip
         const tooltipCloseBtn = chordTooltip.querySelector('.tooltip-close-btn');
@@ -3828,6 +3876,24 @@ function attachCardEventListeners(wrapper, index) {
                 // Also update the Melody Composer's notation
                 updateChordAndRenderPreservingTrebleNotes(index);
             }
+        });
+    }
+
+    // === DURATION SELECTORS ===
+    const durationWholeSelect = wrapper.querySelector('.duration-whole-select');
+    const durationFracSelect = wrapper.querySelector('.duration-frac-select');
+
+    if (durationWholeSelect) {
+        durationWholeSelect.addEventListener('change', (e) => {
+            e.stopPropagation();
+            updateChordDuration(index, e.target);
+        });
+    }
+
+    if (durationFracSelect) {
+        durationFracSelect.addEventListener('change', (e) => {
+            e.stopPropagation();
+            updateChordDuration(index, e.target);
         });
     }
 }
@@ -4310,6 +4376,104 @@ function updateChordType(index, newType) {
     const allNotes = voicedNotes.concat(lhNotes);
     if (allNotes.length > 0) {
         playTrainerChordOnce(allNotes);
+    }
+}
+
+/**
+ * Update chord duration from simplified view
+ */
+function updateChordDuration(index, sourceElement) {
+    const trainerState = getTrainerState();
+    const chord = trainerState.progressionData[index];
+
+    if (!chord) return;
+
+    // Find the duration selectors - they could be in either the event source's wrapper
+    // or we need to search for them
+    let durationWholeSelect, durationFracSelect;
+
+    if (sourceElement) {
+        // Find the closest wrapper containing the duration controls
+        const wrapper = sourceElement.closest('.chord-card-wrapper') ||
+                       sourceElement.closest('[data-chord-index]');
+        if (wrapper) {
+            durationWholeSelect = wrapper.querySelector('.duration-whole-select');
+            durationFracSelect = wrapper.querySelector('.duration-frac-select');
+        }
+    }
+
+    // If not found via sourceElement, search in all containers
+    if (!durationWholeSelect || !durationFracSelect) {
+        const wrappers = document.querySelectorAll(`[data-chord-index="${index}"]`);
+        for (const wrapper of wrappers) {
+            const wholeSelect = wrapper.querySelector('.duration-whole-select');
+            const fracSelect = wrapper.querySelector('.duration-frac-select');
+            if (wholeSelect && fracSelect) {
+                durationWholeSelect = wholeSelect;
+                durationFracSelect = fracSelect;
+                break;
+            }
+        }
+    }
+
+    if (!durationWholeSelect || !durationFracSelect) {
+        console.warn('Duration selectors not found for chord', index);
+        return;
+    }
+
+    // Parse the selected values
+    const wholeBeats = parseInt(durationWholeSelect.value) || 0;
+    const fracBeats = parseFloat(durationFracSelect.value) || 0;
+    const totalBeats = wholeBeats + fracBeats;
+
+    // Validation: minimum 0.25 beats (16th note)
+    if (totalBeats < 0.25) {
+        alert('Chord duration must be at least 0.25 beats (16th note)');
+        // Reset to previous value
+        const prevBeats = chord.beats || 4;
+        const prevWhole = Math.floor(prevBeats);
+        const prevFrac = prevBeats - prevWhole;
+        durationWholeSelect.value = prevWhole;
+        durationFracSelect.value = prevFrac;
+        return;
+    }
+
+    // Update the chord's beats property
+    chord.beats = totalBeats;
+
+    // Save state for undo
+    saveState({ type: 'chord-update', data: { index, property: 'beats', value: totalBeats } });
+
+    // Update all card displays (both tabs)
+    updateSingleCard(index);
+
+    // Trigger full sync since chord durations affect measure splitting
+    if (window.getCompositionState && window.getNotationComposer) {
+        const compositionState = window.getCompositionState();
+        const notationComposer = window.getNotationComposer();
+
+        if (compositionState && notationComposer) {
+            // Sync the entire progression with the new durations
+            compositionState.syncWithProgressionData(trainerState.progressionData, {
+                key: trainerState.currentKey,
+                timeSignature: { num: 4, denom: 4 }
+            });
+
+            // Trigger re-render of the notation
+            notationComposer.render();
+
+            console.log('[updateChordDuration] Re-synced composition after duration change');
+        }
+    }
+
+    // Dispatch event for other components that may need to know
+    window.dispatchEvent(new CustomEvent('chordDurationChanged', {
+        detail: { index, beats: totalBeats }
+    }));
+
+    // Update unified suggestions if available
+    if (window.updateUnifiedSuggestions) {
+        window.updateUnifiedSuggestions();
     }
 }
 
@@ -7377,8 +7541,7 @@ export function handleAutoPlayback() {
     Tone.Transport.cancel();
 
     const speedValue = parseFloat(document.getElementById('trainer-speed-select').value);
-    const measureDuration = `${speedValue}m`;
-    
+
     // Set Transport BPM based on speed to ensure correct timing
     // Convert measure duration to BPM: 1 measure = 4 beats at 120 BPM = 2 seconds
     // For speedValue of 1.5m, 1m, 0.6m, we want the measure to take that many seconds
@@ -7388,8 +7551,9 @@ export function handleAutoPlayback() {
     Tone.Transport.bpm.value = bpm;
 
     let allEvents = [];
+    let cumulativeBeats = 0; // Track cumulative beat position for chord timing
+
     trainerState.progressionData.forEach((chord, index) => {
-        const measure = index;
         const allLhNotes = getLHNotes(
             chord.root,
             chord.lhType,
@@ -7402,13 +7566,17 @@ export function handleAutoPlayback() {
         const lhNotes = allLhNotes.filter(note => !(chord.lhOmittedNotes || []).includes(note));
         const rhNotes = chord.notes.filter(note => !(chord.omittedNotes || []).includes(note));
 
-        // Generate events with measure duration to prevent overlap
-        allEvents.push(...generateRhythmicEvents(rhNotes, lhNotes, measure, chord.rhythmPattern || 'block', measureDuration));
+        // Get chord duration in beats (default to 4 beats if not specified)
+        const chordBeats = chord.beats !== undefined ? chord.beats : 4;
+        const chordDurationBeats = `${chordBeats}n`; // Convert to Tone.js notation (e.g., "4n" for 4 beats)
 
-        // Schedule visual updates per measure
+        // Generate events at the current cumulative beat position
+        allEvents.push(...generateRhythmicEvents(rhNotes, lhNotes, cumulativeBeats / 4, chord.rhythmPattern || 'block', chordDurationBeats));
+
+        // Schedule visual updates at the cumulative beat position
         // Store the callback ID so we can cancel it if needed
         const callbackId = Tone.Transport.scheduleOnce(time => {
-            // Stop previous chord IMMEDIATELY at the start of the new measure to prevent overlap
+            // Stop previous chord IMMEDIATELY at the start of the new chord to prevent overlap
             Tone.Draw.schedule(() => {
                 stopTrainerChord();
                 // Also release all notes to ensure clean stop
@@ -7421,7 +7589,7 @@ export function handleAutoPlayback() {
                     }
                 }
             }, time);
-            
+
             Tone.Draw.schedule(() => {
                 document.getElementById('progression-chord-notes-display').textContent = `${chord.roman} (${chord.name})`;
                 highlightTrainer(trainerState.scaleNotes, rhNotes.concat(lhNotes));
@@ -7430,7 +7598,10 @@ export function handleAutoPlayback() {
                 highlightTensionPoint(index);
                 highlightChordCard(index);
             }, time);
-        }, `${measure}m`);
+        }, `${cumulativeBeats / 4}m`); // Convert beats to measures for scheduling
+
+        // Increment cumulative beats for next chord
+        cumulativeBeats += chordBeats;
         
         // Store callback IDs for potential cancellation (if needed)
         if (!trainerState.scheduledCallbacks) {
@@ -7496,10 +7667,11 @@ export function handleAutoPlayback() {
     // Check if loop is enabled
     const loopToggle = document.getElementById('trainer-loop-toggle');
     const shouldLoop = loopToggle && loopToggle.checked;
-    
+
     if (shouldLoop) {
         // Schedule loop: when progression ends, restart from beginning
-        const totalMeasures = trainerState.progressionData.length;
+        // cumulativeBeats now holds the total beat count for the entire progression
+        const totalBeatsInMeasures = cumulativeBeats / 4; // Convert beats to measures for scheduling
         Tone.Transport.scheduleOnce(() => {
             // Restart the progression
             if (getIsPlaying()) {
@@ -7512,7 +7684,7 @@ export function handleAutoPlayback() {
                     }, 100);
                 }, Tone.now());
             }
-        }, `${totalMeasures}m`);
+        }, `${totalBeatsInMeasures}m`);
     }
     
     // Schedule the cleanup at the end of the entire sequence
@@ -8153,11 +8325,20 @@ function playProgressionChord(index, advance = true) {
         // Use triggerAttackRelease with a duration so notes play and stop automatically
         if (instrument && getAudioIsReady()) {
             try {
-                // Get speed from selector to match Auto Play duration
+                // Get speed from selector (seconds per measure = 4 beats at this tempo)
                 const speedValue = parseFloat(document.getElementById('trainer-speed-select')?.value || '1');
-                const chordDuration = `${speedValue * 0.9}s`; // 90% of measure duration to prevent overlap
-                
-                // Play the chord with duration based on speed selector
+
+                // Calculate actual duration based on chord's beats property
+                // speedValue is seconds per 4 beats, so seconds per beat = speedValue / 4
+                const chordBeats = chord.beats !== undefined ? chord.beats : 4;
+                const secondsPerBeat = speedValue / 4;
+                const chordDurationSeconds = chordBeats * secondsPerBeat;
+                const chordDuration = `${chordDurationSeconds * 0.9}s`; // 90% to prevent overlap
+
+                console.log(`[Playback] Chord ${index}: ${chordBeats} beats, speedValue: ${speedValue}s/measure, duration: ${chordDurationSeconds}s`);
+
+
+                // Play the chord with duration based on beats and tempo
                 // For PluckSynth (guitar), trigger each note individually with slight time offset
                 // For Sampler (piano), we can pass the array
                 const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
@@ -8172,13 +8353,13 @@ function playProgressionChord(index, advance = true) {
                 } else {
                     instrument.triggerAttackRelease(allNotes, chordDuration, Tone.now());
                 }
-                
+
                 // Store notes for potential manual release if needed
                 setTrainerChordNotes(allNotes);
-                
+
                 // Use setTimeout instead of Transport.scheduleOnce for step mode
                 // (doesn't require Transport to be running)
-                const durationMs = speedValue * 900; // 90% of speed value in milliseconds
+                const durationMs = chordDurationSeconds * 900; // 90% of duration in milliseconds
                 const timeoutId = setTimeout(() => {
                     setTrainerChordNotes([]);
                     highlightTrainer(trainerState.scaleNotes, null);
@@ -8420,7 +8601,7 @@ function updateChordAndRenderPreservingTrebleNotes(index) {
     const trainerState = getTrainerState();
     const chord = trainerState.progressionData[index];
 
-    if (!chord) return;
+    if (!chord || !compositionState || !notationComposer) return;
 
     console.log('[UPDATE CHORD] Updating chord at index', index);
 
@@ -8453,6 +8634,7 @@ function updateChordAndRenderPreservingTrebleNotes(index) {
             lhOctaveShift: chord.lhOctaveShift || 0,
             omittedNotes: chord.omittedNotes || [],
             lhOmittedNotes: chord.lhOmittedNotes || [],
+            beats: chord.beats !== undefined ? chord.beats : 4 // Add beats property
         });
 
         // Regenerate bass for this measure
@@ -8597,7 +8779,8 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
         lhOctaveShift: defaultLHRelativeShift,
         lhNotes: lhNotes,
         lhOmittedNotes: [],
-        roman: roman
+        roman: roman,
+        beats: 4 // Default: 4 beats (whole note in 4/4 time)
     };
 
     // Add to the end of the progression

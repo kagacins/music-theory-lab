@@ -2231,22 +2231,43 @@ function startMeasurePlayback(canvas, measureIndex) {
     
     // Stop any existing playback first
     stopMeasurePlayback(canvas);
-    
+
     const progressionData = getProgressionData();
     if (!progressionData || progressionData.length === 0) return;
-    
-    if (measureIndex < 0 || measureIndex >= progressionData.length) return;
-    
+
+    // Check against actual measure count from compositionState
+    let maxMeasureIndex = progressionData.length - 1;
+    if (window.getCompositionState) {
+        const compositionState = window.getCompositionState();
+        maxMeasureIndex = compositionState.getMeasureCount() - 1;
+    }
+
+    if (measureIndex < 0 || measureIndex > maxMeasureIndex) return;
+
     initAudio();
     if (!getAudioIsReady()) {
         return;
     }
-    
+
     const piano = getPiano();
     const synth = getInstrument();
-    
-    // Get chord for this measure
-    const chord = progressionData[measureIndex];
+
+    // Get chord for this measure from compositionState
+    let chord = null;
+    if (window.getCompositionState) {
+        const compositionState = window.getCompositionState();
+        const measureData = compositionState.getMeasure(measureIndex);
+        if (measureData && measureData.chord) {
+            chord = measureData.chord;
+        }
+    }
+
+    // Fallback to progressionData if available
+    if (!chord && measureIndex < progressionData.length) {
+        chord = progressionData[measureIndex];
+    }
+
+    if (!chord) return;
     const rhNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
 
     // Phase 2: Use auto-generated bass notes if available
@@ -3930,16 +3951,42 @@ export function playAllMelody() {
                 }, bassTime + bassDuration);
             });
         }
-    }, progressionData.map((chord, index) => {
-        const chordTime = index * measureDuration;
-        // Ensure time is non-negative
-        const safeTime = Math.max(0, chordTime);
-        return {
-            time: safeTime,
-        chord: chord,
-        measureIndex: index
-        };
-    }));
+    }, (() => {
+        // Get measures from compositionState instead of progressionData
+        // This handles variable chord durations where 1 chord can span multiple measures
+        if (window.getCompositionState) {
+            const compositionState = window.getCompositionState();
+            const measureCount = compositionState.getMeasureCount();
+            const events = [];
+
+            for (let measureIndex = 0; measureIndex < measureCount; measureIndex++) {
+                const measureData = compositionState.getMeasure(measureIndex);
+                if (measureData && measureData.chord) {
+                    const chordTime = measureIndex * measureDuration;
+                    const safeTime = Math.max(0, chordTime);
+                    events.push({
+                        time: safeTime,
+                        chord: measureData.chord,
+                        measureIndex: measureIndex
+                    });
+                }
+            }
+
+            console.log(`[playAllMelody] Scheduled ${events.length} chord events for ${measureCount} measures`);
+            return events;
+        }
+
+        // Fallback to progressionData if compositionState not available
+        return progressionData.map((chord, index) => {
+            const chordTime = index * measureDuration;
+            const safeTime = Math.max(0, chordTime);
+            return {
+                time: safeTime,
+                chord: chord,
+                measureIndex: index
+            };
+        });
+    })());
     
     // Store parts for stopping
     playAllParts.melodyPart = melodyPart;
@@ -3991,18 +4038,22 @@ export function playAllMelody() {
     // Start transport
     Tone.Transport.start();
     
-    // Calculate total duration - ensure we play all chords
-    // If there are melody notes, use the maximum of melody measures and chord measures
-    // Otherwise, just use the number of chords
-    let maxMeasure = progressionData.length - 1; // Always at least as many measures as chords
-    if (hasMelodyNotes && window.getCompositionState) {
+    // Calculate total duration - use actual measure count from compositionState
+    let maxMeasure = progressionData.length - 1; // Fallback
+    if (window.getCompositionState) {
         const compositionState = window.getCompositionState();
-        const allMelodyNotes = compositionState.getAllMelodyNotes();
-        if (allMelodyNotes.length > 0) {
-            const maxMelodyMeasure = Math.max(...allMelodyNotes.map(n => n.measure));
-            maxMeasure = Math.max(maxMeasure, maxMelodyMeasure);
+        maxMeasure = compositionState.getMeasureCount() - 1;
+
+        // If there are melody notes, ensure we play long enough for them too
+        if (hasMelodyNotes) {
+            const allMelodyNotes = compositionState.getAllMelodyNotes();
+            if (allMelodyNotes.length > 0) {
+                const maxMelodyMeasure = Math.max(...allMelodyNotes.map(n => n.measure));
+                maxMeasure = Math.max(maxMeasure, maxMelodyMeasure);
+            }
         }
     }
+    console.log(`[playAllMelody] Total duration will cover ${maxMeasure + 1} measures`);
     // Add small buffer to ensure last chord finishes (reverb will decay naturally)
     // No need for large buffer since we're releasing notes at exact measure boundaries
     const totalDuration = (maxMeasure + 1) * measureDuration + 0.5;

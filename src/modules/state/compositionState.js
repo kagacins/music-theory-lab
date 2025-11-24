@@ -212,11 +212,17 @@ export class CompositionState {
         const previousMeasure = this.getMeasure(measureIndex - 1);
         const previousChord = previousMeasure ? previousMeasure.chord : null;
 
+        // Determine how many beats this chord occupies in this measure
+        const beatsInMeasure = chord.beatsInMeasure || 4;
+        const isChordContinuation = chord.isChordContinuation || false;
+
         // Generate bass voicing using the bassAutoFill module
         const bassVoicing = generateBassVoicing(chord, previousChord, {
             voiceLeadingStrict: this.settings.voiceLeadingStrict,
             bassPattern: this.settings.bassPattern,
-            timeSignature: measure.timeSignature || this.metadata.timeSignature
+            timeSignature: measure.timeSignature || this.metadata.timeSignature,
+            beatsInMeasure: beatsInMeasure, // Pass the beats for this measure
+            isChordContinuation: isChordContinuation // Indicate if this is a tied continuation
         });
 
         // Update bass clef notes
@@ -349,23 +355,43 @@ export class CompositionState {
         if (options.tempo) this.metadata.tempo = options.tempo;
         if (options.timeSignature) this.metadata.timeSignature = options.timeSignature;
 
-        // Create one measure per chord
-        progressionData.forEach(chordData => {
-            const measureIndex = this.addMeasure({
-                chord: {
-                    root: chordData.root,
-                    type: chordData.type,
-                    inversion: chordData.inversion || 0,
-                    voicing: "close",
-                    roman: chordData.roman,
-                    name: chordData.name || chordData.simpleName,
-                    notes: chordData.notes || []
-                }
-            });
+        // Get time signature to determine beats per measure
+        const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
+        const beatsPerMeasure = timeSignature.num || timeSignature.numerator || 4;
 
-            // Auto-generate bass if enabled
-            if (this.settings.autoGenerateBass) {
-                this.updateBassFromChord(measureIndex);
+        // Process each chord, potentially splitting across multiple measures
+        progressionData.forEach((chordData, chordIndex) => {
+            const chordBeats = chordData.beats !== undefined ? chordData.beats : 4;
+            let remainingBeats = chordBeats;
+            let measureStartBeat = 0;
+
+            // Split chord across measures if it spans more than one measure
+            while (remainingBeats > 0) {
+                const beatsInThisMeasure = Math.min(remainingBeats, beatsPerMeasure - measureStartBeat);
+
+                const measureIndex = this.addMeasure({
+                    chord: {
+                        root: chordData.root,
+                        type: chordData.type,
+                        inversion: chordData.inversion || 0,
+                        voicing: "close",
+                        roman: chordData.roman,
+                        name: chordData.name || chordData.simpleName,
+                        notes: chordData.notes || [],
+                        beats: chordBeats, // Store total beats for the chord
+                        beatsInMeasure: beatsInThisMeasure, // Beats used in this specific measure
+                        chordIndex: chordIndex, // Track which chord this belongs to
+                        isChordContinuation: measureStartBeat > 0 || remainingBeats !== chordBeats // Is this a continuation?
+                    }
+                });
+
+                // Auto-generate bass if enabled
+                if (this.settings.autoGenerateBass) {
+                    this.updateBassFromChord(measureIndex);
+                }
+
+                remainingBeats -= beatsInThisMeasure;
+                measureStartBeat = (measureStartBeat + beatsInThisMeasure) % beatsPerMeasure;
             }
         });
 
@@ -384,89 +410,163 @@ export class CompositionState {
         if (options.tempo) this.metadata.tempo = options.tempo;
         if (options.timeSignature) this.metadata.timeSignature = options.timeSignature;
 
-        // Ensure enough measures exist
-        while (this.measures.length < progressionData.length) {
-             this.addMeasure({});
-        }
+        // Get time signature to determine beats per measure
+        const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
+        const beatsPerMeasure = timeSignature.num || timeSignature.numerator || 4;
 
-        // Update chords for existing measures
-        progressionData.forEach((chordData, index) => {
-             let notes = chordData.notes || [];
-             
-             // If notes are missing, generate them so bass voicing works better
-             if (notes.length === 0 && chordData.root && chordData.type) {
-                 const chordNotesObj = getChordNotes(chordData.root, chordData.type, this.metadata.key);
-                 if (chordNotesObj && chordNotesObj.specificNotes) {
-                     notes = chordNotesObj.specificNotes;
-                 }
-             }
+        // Calculate how many measures we need based on chord durations
+        let requiredMeasures = 0;
+        let currentBeat = 0;
 
-             // We reconstruct the chord object from progressionData to match expected format
-             const chordUpdate = {
-                root: chordData.root,
-                type: chordData.type,
-                inversion: chordData.inversion || 0,
-                voicing: "close",
-                roman: chordData.roman,
-                name: chordData.name || chordData.simpleName,
-                notes: notes
-             };
-             
-             // Get previous chord to detect changes
-             const measure = this.getMeasure(index);
-             const previousChord = measure ? { ...measure.chord } : null;
-             const chordChanged = previousChord && (
-                 previousChord.root !== chordUpdate.root || 
-                 previousChord.type !== chordUpdate.type
-             );
+        console.log(`[syncWithProgressionData] beatsPerMeasure: ${beatsPerMeasure}, timeSignature:`, timeSignature);
 
-             this.updateChord(index, chordUpdate);
-
-             // Explicitly trigger bass generation for auto-generated or empty measures
-             // IGNORE the global autoGenerateBass setting here because we are syncing from a source
-             // that implies harmonic updates.
-             // Also force update if the chord changed significantly (root/type),
-             // as the old bass notes would likely be invalid.
-             const shouldUpdateBass = measure && (
-                 measure.notation.bass.autoGenerated || 
-                 !measure.notation.bass.voices[0].notes.length ||
-                 chordChanged
-             );
-
-             if (shouldUpdateBass) {
-                this.updateBassFromChord(index);
-             }
+        progressionData.forEach((chordData, idx) => {
+            const chordBeats = chordData.beats !== undefined ? chordData.beats : 4;
+            console.log(`[syncWithProgressionData] Chord ${idx}: beats=${chordBeats}, chord.beats=${chordData.beats}, chordData:`, chordData);
+            currentBeat += chordBeats;
+            requiredMeasures = Math.ceil(currentBeat / beatsPerMeasure);
         });
-        
-        // Trim measures if progressionData is shorter
-        // This ensures the measure structure matches the progression
-        while (this.measures.length > progressionData.length) {
-             this.removeMeasure(this.measures.length - 1);
-        }
-        
+
+        console.log(`[syncWithProgressionData] Processing ${progressionData.length} chords, will create ${requiredMeasures} measures, currentBeat=${currentBeat}`);
+
+        // Store existing melody notes before restructuring
+        const melodyBackup = this.measures.map((measure, idx) => ({
+            index: idx,
+            notes: measure.notation.treble.voices[0].notes || []
+        }));
+
+        // Clear measures and rebuild with new structure
+        this.measures = [];
+
+        // Process each chord, potentially splitting across multiple measures
+        let currentMeasureIndex = -1; // Will increment to 0 on first measure creation
+        let currentBeatInMeasure = 0; // Track which beat we're at in the current measure
+
+        progressionData.forEach((chordData, chordIndex) => {
+            const chordBeats = chordData.beats !== undefined ? chordData.beats : 4;
+            let remainingBeats = chordBeats;
+            let isFirstSegmentOfChord = true;
+
+            // Get chord notes
+            let notes = chordData.notes || [];
+            if (notes.length === 0 && chordData.root && chordData.type) {
+                const chordNotesObj = getChordNotes(chordData.root, chordData.type, this.metadata.key);
+                if (chordNotesObj && chordNotesObj.specificNotes) {
+                    notes = chordNotesObj.specificNotes;
+                }
+            }
+
+            // Split chord across measures if necessary
+            while (remainingBeats > 0) {
+                // Create new measure if we need one (either first measure or current is full)
+                if (currentBeatInMeasure === 0) {
+                    currentMeasureIndex++;
+                    this.addMeasure({
+                        chord: {
+                            root: chordData.root,
+                            type: chordData.type,
+                            inversion: chordData.inversion || 0,
+                            voicing: "close",
+                            roman: chordData.roman,
+                            name: chordData.name || chordData.simpleName,
+                            notes: notes,
+                            beats: chordBeats,
+                            beatsInMeasure: 0, // Will calculate this as we add notes
+                            chordIndex: chordIndex,
+                            isChordContinuation: false
+                        }
+                    });
+                    console.log(`[syncWithProgressionData] Created measure ${currentMeasureIndex}`);
+                }
+
+                const beatsInThisMeasure = Math.min(remainingBeats, beatsPerMeasure - currentBeatInMeasure);
+                const measure = this.getMeasure(currentMeasureIndex);
+
+                if (measure && notes.length > 0) {
+                    // Determine the appropriate duration for this chord segment
+                    const duration = beatsInThisMeasure === 4 ? '1n' :
+                                   beatsInThisMeasure === 2 ? '2n' :
+                                   beatsInThisMeasure === 1 ? '4n' :
+                                   beatsInThisMeasure === 3 ? '2n.' :
+                                   beatsInThisMeasure === 1.5 ? '4n.' :
+                                   beatsInThisMeasure === 0.5 ? '8n' :
+                                   '1n'; // fallback
+
+                    const chordNote = {
+                        type: 'note',
+                        pitches: [...notes],
+                        duration: duration,
+                        beat: currentBeatInMeasure,
+                        dotted: duration.includes('.'),
+                        isTied: !isFirstSegmentOfChord // Tied if not the first segment
+                    };
+
+                    // Add this note to the bass clef
+                    measure.notation.bass.voices[0].notes.push(chordNote);
+                    measure.notation.bass.autoGenerated = false;
+
+                    console.log(`[syncWithProgressionData]   → Added bass note to measure ${currentMeasureIndex}: chord=${chordIndex}, duration=${duration}, beat=${currentBeatInMeasure}, tied=${chordNote.isTied}, pitches=${notes.length}`);
+                }
+
+                remainingBeats -= beatsInThisMeasure;
+                currentBeatInMeasure += beatsInThisMeasure;
+                isFirstSegmentOfChord = false;
+
+                // If we've filled the measure, reset for next measure
+                if (currentBeatInMeasure >= beatsPerMeasure) {
+                    currentBeatInMeasure = 0;
+                }
+            }
+        });
+
+        // Restore melody notes where possible
+        melodyBackup.forEach(backup => {
+            if (backup.index < this.measures.length && backup.notes.length > 0) {
+                this.measures[backup.index].notation.treble.voices[0].notes = backup.notes;
+            }
+        });
+
         this.events.emit('progressionSynced', progressionData);
     }
 
     /**
      * Export to progressionData format (for compatibility with existing code)
+     * IMPORTANT: Only exports unique chords (not measure continuations from splitting)
      * @returns {array} Array of chord objects
      */
     exportToProgressionData() {
-        return this.measures.map(measure => ({
-            root: measure.chord.root,
-            type: measure.chord.type,
-            inversion: measure.chord.inversion,
-            roman: measure.chord.roman,
-            name: measure.chord.name,
-            notes: measure.chord.notes,
-            selectionMode: 'chord',
-            omittedNotes: measure.chord.omittedNotes || [],
-            lhOmittedNotes: measure.chord.lhOmittedNotes || [],
-            octaveShift: measure.chord.octaveShift || 0,
-            lhOctaveShift: measure.chord.lhOctaveShift || 0,
-            lhType: measure.chord.lhType || 'auto',
-            lhInversion: measure.chord.lhInversion || 0
-        }));
+        const uniqueChords = [];
+        const seenChordIndices = new Set();
+
+        this.measures.forEach(measure => {
+            const chordIndex = measure.chord.chordIndex;
+
+            // Only export the first measure for each chord (skip continuations)
+            if (chordIndex !== undefined && !seenChordIndices.has(chordIndex)) {
+                seenChordIndices.add(chordIndex);
+
+                uniqueChords.push({
+                    root: measure.chord.root,
+                    type: measure.chord.type,
+                    inversion: measure.chord.inversion,
+                    roman: measure.chord.roman,
+                    name: measure.chord.name,
+                    notes: measure.chord.notes,
+                    beats: measure.chord.beats, // Include the original beats value
+                    selectionMode: 'chord',
+                    omittedNotes: measure.chord.omittedNotes || [],
+                    lhOmittedNotes: measure.chord.lhOmittedNotes || [],
+                    octaveShift: measure.chord.octaveShift || 0,
+                    lhOctaveShift: measure.chord.lhOctaveShift || 0,
+                    lhType: measure.chord.lhType || 'auto',
+                    lhInversion: measure.chord.lhInversion || 0
+                });
+            }
+        });
+
+        console.log(`[exportToProgressionData] Exported ${uniqueChords.length} unique chords from ${this.measures.length} measures`);
+        console.log('[exportToProgressionData] Stack trace:', new Error().stack);
+        return uniqueChords;
     }
 
     /**

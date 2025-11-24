@@ -274,6 +274,58 @@ export function getDurationBeats(duration) {
   return DURATION_BEATS[duration] || TONE_DURATION_BEATS[duration] || 1;
 }
 
+/**
+ * Calculate optimal note+tie combination to fill a given number of beats
+ * Uses the fewest number of notes+ties possible
+ * Examples:
+ *   7 beats = whole note (4) + dotted half (3)
+ *   5 beats = whole note (4) + quarter (1)
+ *   1.5 beats = dotted quarter (1.5)
+ *   2.25 beats = half (2) + sixteenth (0.25)
+ *
+ * @param {number} beats - Number of beats to fill
+ * @returns {Array<{duration: string, beats: number, dotted: boolean}>} - Array of note durations in VexFlow format
+ */
+export function calculateNoteTieCombination(beats) {
+  // Available note durations in descending order (including dotted notes)
+  // Format: [vexflow_duration, beats, is_dotted]
+  const durations = [
+    { duration: 'w', beats: 6, dotted: true },    // dotted whole (rarely used, but possible)
+    { duration: 'w', beats: 4, dotted: false },   // whole
+    { duration: 'h', beats: 3, dotted: true },    // dotted half
+    { duration: 'h', beats: 2, dotted: false },   // half
+    { duration: 'q', beats: 1.5, dotted: true },  // dotted quarter
+    { duration: 'q', beats: 1, dotted: false },   // quarter
+    { duration: '8', beats: 0.75, dotted: true }, // dotted eighth
+    { duration: '8', beats: 0.5, dotted: false }, // eighth
+    { duration: '16', beats: 0.375, dotted: true }, // dotted sixteenth
+    { duration: '16', beats: 0.25, dotted: false }, // sixteenth
+    { duration: '32', beats: 0.1875, dotted: true }, // dotted thirty-second
+    { duration: '32', beats: 0.125, dotted: false } // thirty-second
+  ];
+
+  const result = [];
+  let remaining = beats;
+
+  // Greedy algorithm: use largest possible durations first
+  for (const { duration, beats: durationBeats, dotted } of durations) {
+    while (remaining >= durationBeats - 0.0001) { // Small epsilon for floating point comparison
+      result.push({ duration, beats: durationBeats, dotted });
+      remaining -= durationBeats;
+      // Round to avoid floating point errors
+      remaining = Math.round(remaining * 10000) / 10000;
+    }
+    if (remaining < 0.001) break; // Done
+  }
+
+  // If there's still a tiny remainder (floating point error), ignore it
+  if (remaining > 0.001) {
+    console.warn(`Could not perfectly fill ${beats} beats. Remaining: ${remaining}`);
+  }
+
+  return result;
+}
+
 // ============================================================================
 // ACCIDENTAL HANDLING
 // ============================================================================

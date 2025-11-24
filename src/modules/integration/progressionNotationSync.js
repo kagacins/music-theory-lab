@@ -212,6 +212,12 @@ export class ProgressionNotationSync {
      * Call this when exporting or switching back to progression builder
      */
     syncNotationToProgression() {
+        // TEMPORARILY DISABLED: This causes sync loops with variable chord durations
+        // The issue: measures get exported as "chords", creating duplicates
+        // TODO: Re-enable once we migrate to compositionState as single source of truth
+        console.log('[syncNotationToProgression] DISABLED - sync loop prevention');
+        return;
+
         if (this.isUpdating) return;
         this.isUpdating = true;
 

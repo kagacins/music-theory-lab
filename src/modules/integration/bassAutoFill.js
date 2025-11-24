@@ -61,7 +61,9 @@ export function generateBassVoicing(chord, previousChord = null, options = {}) {
         voiceLeadingStrict = true,
         bassPattern = 'root-fifth',
         timeSignature = { num: 4, denom: 4 },
-        style = 'classical'
+        style = 'classical',
+        beatsInMeasure = 4, // New: how many beats this chord occupies in this measure
+        isChordContinuation = false // New: is this a tied continuation from previous measure?
     } = options;
 
     if (!chord || !chord.root) {
@@ -71,18 +73,24 @@ export function generateBassVoicing(chord, previousChord = null, options = {}) {
     // Get chord notes in bass register
     const chordNotes = getChordNotesInBassRegister(chord);
 
+    // If this is a chord continuation (tied from previous measure),
+    // generate a simple tied whole note (or fill the available beats)
+    if (isChordContinuation) {
+        return generateTiedBass(chord, chordNotes, beatsInMeasure);
+    }
+
     // First chord: use root position
     if (!previousChord || !previousChord.root) {
-        return generateFirstChordBass(chord, chordNotes, bassPattern, timeSignature);
+        return generateFirstChordBass(chord, chordNotes, bassPattern, timeSignature, beatsInMeasure);
     }
 
     // Subsequent chords: use voice leading
     if (voiceLeadingStrict) {
-        return generateVoiceLedBass(chord, chordNotes, previousChord, bassPattern, timeSignature);
+        return generateVoiceLedBass(chord, chordNotes, previousChord, bassPattern, timeSignature, beatsInMeasure);
     }
 
     // Fallback: simple root note
-    return generateSimpleBass(chord, chordNotes, bassPattern, timeSignature);
+    return generateSimpleBass(chord, chordNotes, bassPattern, timeSignature, beatsInMeasure);
 }
 
 /**
@@ -284,23 +292,64 @@ function generateVoiceLedBass(chord, chordNotes, previousChord, pattern, timeSig
 }
 
 /**
- * Generate simple bass (root note)
+ * Generate tied bass for chord continuations
+ * When a chord spans multiple measures, this creates the tied notes for subsequent measures
  * @param {object} chord - Chord data
  * @param {array} chordNotes - Available bass notes
- * @param {string} pattern - Bass pattern
- * @param {object} timeSignature - Time signature
- * @returns {object} Bass voicing
+ * @param {number} beatsInMeasure - Number of beats to fill in this measure
+ * @returns {object} Bass voicing with tied notes
  */
-function generateSimpleBass(chord, chordNotes, pattern, timeSignature) {
+function generateTiedBass(chord, chordNotes, beatsInMeasure) {
     const root = `${chord.root}2`;
+
+    // Import the note+tie algorithm from vexFlowRenderer
+    // For now, use a simple whole note if beatsInMeasure === 4, otherwise use the appropriate duration
+    const duration = beatsInMeasure === 4 ? '1n' :
+                    beatsInMeasure === 2 ? '2n' :
+                    beatsInMeasure === 1 ? '4n' :
+                    beatsInMeasure === 3 ? '2n.' :
+                    beatsInMeasure === 1.5 ? '4n.' :
+                    '1n'; // fallback
 
     return {
         notes: [{
             type: 'note',
             pitch: root,
-            duration: '1n',
+            duration: duration,
             beat: 0,
-            dotted: false
+            dotted: duration.includes('.'),
+            isTied: true // Mark as tied from previous measure
+        }]
+    };
+}
+
+/**
+ * Generate simple bass (root note)
+ * @param {object} chord - Chord data
+ * @param {array} chordNotes - Available bass notes
+ * @param {string} pattern - Bass pattern
+ * @param {object} timeSignature - Time signature
+ * @param {number} beatsInMeasure - Number of beats to fill (default: 4)
+ * @returns {object} Bass voicing
+ */
+function generateSimpleBass(chord, chordNotes, pattern, timeSignature, beatsInMeasure = 4) {
+    const root = `${chord.root}2`;
+
+    // Use appropriate duration based on beatsInMeasure
+    const duration = beatsInMeasure === 4 ? '1n' :
+                    beatsInMeasure === 2 ? '2n' :
+                    beatsInMeasure === 1 ? '4n' :
+                    beatsInMeasure === 3 ? '2n.' :
+                    beatsInMeasure === 1.5 ? '4n.' :
+                    '1n'; // fallback
+
+    return {
+        notes: [{
+            type: 'note',
+            pitch: root,
+            duration: duration,
+            beat: 0,
+            dotted: duration.includes('.')
         }]
     };
 }
