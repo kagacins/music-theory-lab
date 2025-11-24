@@ -50,6 +50,220 @@ import { generateComprehensiveRecommendations } from './comprehensiveChordRecomm
 import { showChordExplorerModal } from '../ui/chordExplorerModal.js';
 
 // =========================================================================
+// Helper Function: Generate Context-Aware Chord Description
+// =========================================================================
+
+/**
+ * Generates a context-aware chord description based on the selected root note
+ * @param {string} chordType - The chord type (e.g., 'Dominant 7th')
+ * @param {string} rootNote - The selected root note (e.g., 'C')
+ * @param {string} baseDescription - The base description from CHORD_DEFINITIONS
+ * @returns {string} Enhanced description with context-specific resolution information
+ */
+function getContextAwareChordDescription(chordType, rootNote, baseDescription) {
+    let contextInfo = '';
+
+    // Add context-specific information for dominant 7th chords
+    if (chordType === 'Dominant 7th') {
+        // A dominant 7th chord built on a root wants to resolve to a target a perfect 4th up (or perfect 5th down)
+        // For example: C7 → F, G7 → C, D7 → G
+        const targetNote = getTargetResolution(rootNote);
+        if (targetNote) {
+            contextInfo = `\n\nWith the currently selected root of ${rootNote}, this ${rootNote}7 chord naturally wants to resolve to ${targetNote} (${targetNote} major or ${targetNote} minor). This is because a dominant seventh chord is built on the fifth scale degree (the dominant) of its tonic key.`;
+        }
+    }
+
+    // Dominant 9th - similar resolution to dominant 7th
+    else if (chordType === 'Dominant 9th') {
+        const targetNote = getTargetResolution(rootNote);
+        if (targetNote) {
+            contextInfo = `\n\nWith ${rootNote} as the root, this ${rootNote}9 chord resolves to ${targetNote} (${targetNote} major or ${targetNote} minor), functioning as a V9 chord. The added 9th creates a richer, jazzier sound while maintaining the strong dominant function.`;
+        }
+    }
+
+    // Altered dominant chords (7b5, 7#5, 7b9, 7#9)
+    else if (chordType === '7b5' || chordType === '7#5' || chordType === '7b9' || chordType === '7#9') {
+        const targetNote = getTargetResolution(rootNote);
+        if (targetNote) {
+            const alteration = chordType.includes('b5') ? 'flatted 5th' : chordType.includes('#5') ? 'sharped 5th' : chordType.includes('b9') ? 'flatted 9th' : 'sharped 9th';
+            contextInfo = `\n\nWith ${rootNote} as the root, this ${rootNote}${chordType.replace('Dominant ', '').replace('th', '')} chord creates heightened tension through the ${alteration}, making the resolution to ${targetNote} even stronger. Commonly used in jazz and blues for dramatic effect.`;
+        }
+    }
+
+    // Augmented 7th
+    else if (chordType === 'Augmented 7th') {
+        const targetNote = getTargetResolution(rootNote);
+        if (targetNote) {
+            contextInfo = `\n\nWith ${rootNote} as the root, this ${rootNote}aug7 chord has an augmented 5th that creates ambiguity and tension, resolving strongly to ${targetNote}. The raised 5th can move up or down, providing flexible voice leading options.`;
+        }
+    }
+
+    // Diminished 7th
+    else if (chordType === 'Diminished 7th') {
+        const targetNote = getNearestHalfStepUp(rootNote);
+        if (targetNote) {
+            contextInfo = `\n\nWith ${rootNote} as the root, this ${rootNote}dim7 chord typically resolves up by a half step to ${targetNote} (${targetNote} major or ${targetNote} minor). Due to its symmetrical structure, diminished 7th chords can resolve to any chord whose root is a half step above any of its notes.`;
+        }
+    }
+
+    // Half-Diminished 7th
+    else if (chordType === 'Half-Diminished 7th') {
+        const dominantNote = getNearestHalfStepDown(rootNote);
+        const targetNote = getTargetResolution(dominantNote);
+        if (dominantNote && targetNote) {
+            contextInfo = `\n\nWith ${rootNote} as the root, this ${rootNote}m7♭5 chord commonly functions as a ii° chord in minor keys, typically resolving to ${dominantNote}7 (the dominant) which then resolves to ${targetNote} (the tonic). It's essential in minor key ii-V-i progressions.`;
+        }
+    }
+
+    // Minor 7th
+    else if (chordType === 'Minor 7th') {
+        const targetNote = getTargetResolution(rootNote);
+        if (targetNote) {
+            contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}m7 often functions as a ii chord in jazz progressions, leading to ${targetNote}7 (the V chord). This creates the classic ii-V progression that's fundamental to jazz harmony.`;
+        }
+    }
+
+    // Major 7th
+    else if (chordType === 'Major 7th') {
+        contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}maj7 creates a stable, restful quality. It's commonly used as a I chord (tonic) or IV chord (subdominant) in major keys, and doesn't require resolution like dominant chords do.`;
+    }
+
+    // Minor-Major 7th
+    else if (chordType === 'Minor-Major 7th') {
+        contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}m(maj7) combines the darkness of a minor triad with the tension of a major 7th. Often used as a passing chord in minor keys when the melody moves from the root to the major 7th, creating a cinematic, mysterious sound.`;
+    }
+
+    // Suspended chords (sus2, sus4)
+    else if (chordType === 'Suspended 2nd' || chordType === 'Suspended 4th') {
+        const interval = chordType.includes('2nd') ? '2nd' : '4th';
+        const resolveInterval = chordType.includes('2nd') ? '3rd' : '3rd';
+        contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}sus${interval === '2nd' ? '2' : '4'} creates an unresolved, floating quality. It typically resolves when the ${interval} moves to the ${resolveInterval}, creating either ${rootNote} major or ${rootNote} minor. This creates a satisfying sense of arrival.`;
+    }
+
+    // Diminished triad
+    else if (chordType === 'Diminished') {
+        const targetNote = getNearestHalfStepUp(rootNote);
+        if (targetNote) {
+            contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}dim often functions as a passing chord or as vii° in a key, creating strong tension that typically resolves up by a half step to ${targetNote}. Its unstable sound demands resolution.`;
+        }
+    }
+
+    // Augmented triad
+    else if (chordType === 'Augmented') {
+        const targetNote = getNearestHalfStepUp(rootNote);
+        if (targetNote) {
+            contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}aug has a symmetrical structure where each note is 4 semitones apart. The raised 5th creates tension and ambiguity, often resolving when the augmented 5th moves up by half step or the root moves to another chord.`;
+        }
+    }
+
+    // Extended chords (9th, 11th, 13th)
+    else if (chordType === 'Major 9th') {
+        contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}maj9 stacks lush harmony by combining a major 7th with a 9th. Commonly used in jazz as a more colorful alternative to a simple major chord, creating a sophisticated, open sound.`;
+    }
+
+    else if (chordType === 'Minor 9th') {
+        const targetNote = getTargetResolution(rootNote);
+        if (targetNote) {
+            contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}m9 is often used as a ii9 chord leading to ${targetNote}7 in jazz. The added 9th enriches the minor 7th chord with more color and warmth, perfect for creating smooth, soulful progressions.`;
+        }
+    }
+
+    else if (chordType === 'Dominant 11th') {
+        const targetNote = getTargetResolution(rootNote);
+        if (targetNote) {
+            contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}11 adds a suspended quality to the dominant 7th with the 11th (which is a 4th plus an octave). Often resolves to ${targetNote}, with the 11th creating additional tension that wants to resolve downward.`;
+        }
+    }
+
+    else if (chordType === 'Minor 11th') {
+        contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}m11 creates a rich, complex minor sonority. The 11th (perfect 4th plus an octave) blends naturally with the minor quality, often used in modal jazz or as a colorful ii chord.`;
+    }
+
+    else if (chordType === 'Dominant 13th') {
+        const targetNote = getTargetResolution(rootNote);
+        if (targetNote) {
+            contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}13 is one of the richest dominant chords, stacking notes up to the 13th (a 6th plus an octave). Typically resolves to ${targetNote}, used in big band jazz and sophisticated harmony.`;
+        }
+    }
+
+    // 6th chords
+    else if (chordType === 'Major 6th') {
+        contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}6 adds a sweet, vintage quality. Often used instead of maj7 in jazz standards, particularly as a stable tonic chord. The 6th provides color without the strong pull of a 7th.`;
+    }
+
+    else if (chordType === 'Minor 6th') {
+        contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}m6 creates a bittersweet, sophisticated sound. Common in Latin and Brazilian music, and often used as a i6 chord in minor keys, providing a stable yet colorful tonic sound.`;
+    }
+
+    else if (chordType === '6/9') {
+        contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}6/9 combines the 6th and 9th for a lush, static sound. Popular in jazz as an ending chord (I6/9), it's colorful but stable, not requiring resolution. Often used in place of major 7th chords for a brighter sound.`;
+    }
+
+    // Add9
+    else if (chordType === 'Add9') {
+        contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}add9 adds the 9th directly to a major triad without adding a 7th. Common in pop and rock music, it adds color and openness while maintaining the straightforward quality of a major chord.`;
+    }
+
+    return baseDescription + contextInfo;
+}
+
+/**
+ * Get the target resolution for a dominant chord (perfect 4th up from root)
+ * @param {string} rootNote - The root note (e.g., 'C', 'G#')
+ * @returns {string} The target resolution note
+ */
+function getTargetResolution(rootNote) {
+    // Map each note to its target (perfect 4th up, or perfect 5th down)
+    const resolutionMap = {
+        'C': 'F', 'C#': 'F#', 'Db': 'Gb',
+        'D': 'G', 'D#': 'G#', 'Eb': 'Ab',
+        'E': 'A',
+        'F': 'Bb', 'F#': 'B', 'Gb': 'Cb',
+        'G': 'C', 'G#': 'C#', 'Ab': 'Db',
+        'A': 'D', 'A#': 'D#', 'Bb': 'Eb',
+        'B': 'E', 'Cb': 'Fb'
+    };
+
+    return resolutionMap[rootNote] || null;
+}
+
+/**
+ * Get the note a half step up from the given root
+ * @param {string} rootNote - The root note
+ * @returns {string} The note a half step up
+ */
+function getNearestHalfStepUp(rootNote) {
+    const noteIndex = ALL_NOTES.indexOf(rootNote);
+    if (noteIndex === -1) {
+        // Try flat notes
+        const flatIndex = FLAT_NOTES.indexOf(rootNote);
+        if (flatIndex === -1) return null;
+        const nextIndex = (flatIndex + 1) % 12;
+        return FLAT_NOTES[nextIndex];
+    }
+    const nextIndex = (noteIndex + 1) % 12;
+    return ALL_NOTES[nextIndex];
+}
+
+/**
+ * Get the note a half step down from the given root
+ * @param {string} rootNote - The root note
+ * @returns {string} The note a half step down
+ */
+function getNearestHalfStepDown(rootNote) {
+    const noteIndex = ALL_NOTES.indexOf(rootNote);
+    if (noteIndex === -1) {
+        // Try flat notes
+        const flatIndex = FLAT_NOTES.indexOf(rootNote);
+        if (flatIndex === -1) return null;
+        const prevIndex = (flatIndex - 1 + 12) % 12;
+        return FLAT_NOTES[prevIndex];
+    }
+    const prevIndex = (noteIndex - 1 + 12) % 12;
+    return ALL_NOTES[prevIndex];
+}
+
+// =========================================================================
 // Helper Function: Create Tooltip for Button
 // =========================================================================
 
@@ -179,21 +393,59 @@ function createButtonTooltip(button, tooltipText, chordType = null) {
     
     document.body.appendChild(tooltip);
     
+    // Smart positioning function that prefers above but falls back to below
+    const positionTooltip = () => {
+        const rect = button.getBoundingClientRect();
+        const estimatedHeight = chordType ? 250 : 100; // Estimate with extra padding
+        const spaceAbove = rect.top;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const gap = 12; // Gap between button and tooltip
+
+        // Make tooltip temporarily visible to measure actual height
+        tooltip.style.visibility = 'hidden';
+        tooltip.style.opacity = '0';
+        tooltip.style.display = 'block';
+        const actualHeight = tooltip.offsetHeight;
+
+        // Prefer showing above if there's enough space
+        if (spaceAbove >= actualHeight + gap) {
+            // Show above
+            tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+            tooltip.style.top = (rect.top - actualHeight - gap) + 'px';
+            tooltip.style.transform = 'translateX(-50%)';
+        } else if (spaceBelow >= actualHeight + gap) {
+            // Show below if not enough space above
+            tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+            tooltip.style.top = (rect.bottom + gap) + 'px';
+            tooltip.style.transform = 'translateX(-50%)';
+        } else {
+            // Show above anyway if neither has enough space, but adjust to fit
+            const topPosition = Math.max(gap, rect.top - actualHeight - gap);
+            tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+            tooltip.style.top = topPosition + 'px';
+            tooltip.style.transform = 'translateX(-50%)';
+        }
+
+        // Now make it visible with animation
+        tooltip.style.visibility = 'visible';
+        tooltip.style.opacity = '1';
+    };
+
     // Add tap-outside-to-close functionality for touch devices
     const isTouchDeviceForTooltip = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     if (isTouchDeviceForTooltip) {
         const handleOutsideTap = (e) => {
             // Check if the tap is outside the tooltip
-            if (tooltip.style.visibility === 'visible' && 
+            if (tooltip.style.visibility === 'visible' &&
                 tooltip.style.opacity === '1' &&
-                !tooltip.contains(e.target) && 
+                !tooltip.contains(e.target) &&
                 !button.contains(e.target)) {
                 hideTooltip();
                 document.removeEventListener('touchend', handleOutsideTap);
                 document.removeEventListener('click', handleOutsideTap);
             }
         };
-        
+
         // Store reference to hide function for cleanup
         const originalHide = hideTooltip;
         tooltip.hideTooltip = () => {
@@ -201,33 +453,30 @@ function createButtonTooltip(button, tooltipText, chordType = null) {
             document.removeEventListener('touchend', handleOutsideTap);
             document.removeEventListener('click', handleOutsideTap);
         };
-        
+
         // Override hideTooltip to also remove listeners
         hideTooltip = () => {
             originalHide();
             document.removeEventListener('touchend', handleOutsideTap);
             document.removeEventListener('click', handleOutsideTap);
         };
-        
+
         // Add listeners when tooltip is shown
         const originalShow = () => {
-            const rect = button.getBoundingClientRect();
-            const tooltipHeight = chordType ? 200 : 80;
-            tooltip.style.left = (rect.left + rect.width / 2) + 'px';
-            tooltip.style.top = (rect.top - tooltipHeight - 12) + 'px';
-            tooltip.style.transform = 'translateX(-50%)';
-            tooltip.style.opacity = '1';
-            tooltip.style.visibility = 'visible';
-            
+            positionTooltip();
+
             // Add outside tap listeners after a short delay to avoid immediate close
             setTimeout(() => {
                 document.addEventListener('touchend', handleOutsideTap, { passive: true });
                 document.addEventListener('click', handleOutsideTap, { passive: true });
             }, 100);
         };
-        
+
         // Store original show function
         tooltip.showTooltip = originalShow;
+    } else {
+        // For non-touch devices, store the positioning function
+        tooltip.positionTooltip = positionTooltip;
     }
     
     // Setup close button after hideTooltip is potentially overridden
@@ -371,8 +620,11 @@ function createButtonTooltip(button, tooltipText, chordType = null) {
                 // Use the stored showTooltip function if available (for touch devices with tap-outside-to-close)
                 if (tooltip.showTooltip) {
                     tooltip.showTooltip();
+                } else if (tooltip.positionTooltip) {
+                    // Use smart positioning for non-touch devices
+                    tooltip.positionTooltip();
                 } else {
-                    // Fallback for desktop
+                    // Fallback (shouldn't normally reach here)
                     const rect = button.getBoundingClientRect();
                     const tooltipHeight = chordType ? 200 : 80;
                     tooltip.style.left = (rect.left + rect.width / 2) + 'px';
@@ -1998,6 +2250,7 @@ export function selectBuilderRootNote(index, playAudio = true) {
     }
 
     updateChordTypeButtonCaptions();
+    updateChordTypeButtonTooltips(); // Update tooltips with new root context
     updateIntervalButtonCaptions();
     if (playAudio) startBuilderChord();
 }
@@ -2210,6 +2463,50 @@ export function updateChordTypeButtonCaptions() {
 }
 
 /**
+ * Update chord type button tooltips to reflect the currently selected root note
+ */
+export function updateChordTypeButtonTooltips() {
+    const currentNotes = getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+    const rootNoteName = currentNotes[getBuilderRootIndex()];
+
+    document.querySelectorAll('#builder-chord-type-selector .key-button-wrapper').forEach(container => {
+        const mainButton = container.querySelector('button');
+        if (!mainButton) return;
+
+        const chordType = mainButton.dataset.chordType;
+        if (!CHORD_DEFINITIONS[chordType]) return;
+
+        const baseDescription = CHORD_DEFINITIONS[chordType].description;
+        const contextAwareDescription = getContextAwareChordDescription(chordType, rootNoteName, baseDescription);
+
+        // Update the title attribute (browser's native tooltip)
+        mainButton.title = contextAwareDescription;
+
+        // Find and update the custom tooltip if it exists
+        const tooltipElements = document.querySelectorAll('.chord-button-tooltip');
+        tooltipElements.forEach(tooltip => {
+            if (tooltip.getAttribute('data-chord-type') === chordType) {
+                // Update the tooltip content
+                const tooltipText = `${chordType}\n\n${contextAwareDescription}`;
+                const lines = tooltipText.split('\n');
+                if (lines.length > 1) {
+                    const nameLine = lines[0];
+                    const descriptionLines = lines.slice(1).join('\n').trim();
+                    const contentDiv = tooltip.querySelector('div:not([style*="margin-top"])');
+                    if (contentDiv) {
+                        // Find the description div (second div child)
+                        const descDiv = contentDiv.nextElementSibling;
+                        if (descDiv) {
+                            descDiv.innerHTML = descriptionLines.replace(/\n/g, '<br>');
+                        }
+                    }
+                }
+            }
+        });
+    });
+}
+
+/**
  * Update interval button captions
  */
 export function updateIntervalButtonCaptions() {
@@ -2383,8 +2680,10 @@ export function renderBuilderSelectors() {
                     }, { passive: false });
                     buttonContainer.appendChild(infoIcon);
                     
-                    // Create tooltip for chord button with name and inversion options
-                    const tooltipText = `${chordType}\n\n${chordDescription}`;
+                    // Create tooltip for chord button with name and context-aware description
+                    const rootNoteName = currentNotes[getBuilderRootIndex()];
+                    const contextAwareDescription = getContextAwareChordDescription(chordType, rootNoteName, chordDescription);
+                    const tooltipText = `${chordType}\n\n${contextAwareDescription}`;
                     const tooltipElement = createButtonTooltip(mainButton, tooltipText, chordType);
                     
                     // Make info icon trigger tooltip on click/tap
