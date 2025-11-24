@@ -2243,17 +2243,25 @@ function highlightBuilderNotes(specificNotes) {
 // Selection Functions
 // ============================================================================
 
+// Flag to prevent infinite loop when re-rendering in diatonic mode
+let isRenderingDiatonicChords = false;
+
 /**
  * Select a root note for the chord builder
  * @param {number} index - Index in the SHARP_NOTES/FLAT_NOTES array
  * @param {boolean} playAudio - Whether to play audio on selection
  */
 export function selectBuilderRootNote(index, playAudio = true) {
+    // Prevent infinite loop - if we're already rendering, don't trigger another render
+    if (isRenderingDiatonicChords) {
+        return;
+    }
+
     // Stop any existing playback before changing root note
     if (playAudio) {
         stopBuilderChord();
     }
-    
+
     setBuilderRootIndex(index);
     // Update window.builderRootIndex for modules that access it
     if (typeof window !== 'undefined') {
@@ -2280,8 +2288,35 @@ export function selectBuilderRootNote(index, playAudio = true) {
         window.updateKeyboardLabels();
     }
 
-    updateChordTypeButtonCaptions();
-    updateChordTypeButtonTooltips(); // Update tooltips with new root context
+    // In diatonic mode, re-render the chord selector to show new diatonic chords
+    const chordLibraryMode = getChordLibraryMode();
+    if (chordLibraryMode === 'diatonic') {
+        // Remember the last selected chord type so we can highlight it in the new key
+        const lastDiatonic = getLastDiatonicChord();
+        const lastChordType = lastDiatonic ? lastDiatonic.type : null;
+
+        // Update lastDiatonicChord to the equivalent chord in the new key
+        if (lastChordType) {
+            const currentNotes = getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+            const newRootNote = currentNotes[index];
+            setLastDiatonicChord({ root: newRootNote, type: lastChordType });
+        } else {
+            setLastDiatonicChord(null);
+        }
+
+        // Set flag to prevent infinite loop, then re-render
+        isRenderingDiatonicChords = true;
+        renderBuilderSelectors();
+        isRenderingDiatonicChords = false;
+
+        // Restore root note button highlighting after render
+        updateButtonSelection('#builder-note-selector', 'index', index.toString(), 'bg-amber-600', 'text-white');
+    } else {
+        // In chromatic mode, just update captions
+        updateChordTypeButtonCaptions();
+        updateChordTypeButtonTooltips(); // Update tooltips with new root context
+    }
+
     updateIntervalButtonCaptions();
     if (playAudio) startBuilderChord();
 }
