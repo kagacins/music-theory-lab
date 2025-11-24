@@ -31,7 +31,11 @@ import {
     getBuilderOmittedNotes,
     setBuilderOmittedNotes,
     getBuilderLHOmittedNotes,
-    setBuilderLHOmittedNotes
+    setBuilderLHOmittedNotes,
+    getChordLibraryMode,
+    setChordLibraryMode,
+    getLastDiatonicChord,
+    setLastDiatonicChord
 } from '../state/builderState.js';
 
 import {
@@ -1637,11 +1641,22 @@ export function toggleChordLibraryPanel() {
         panel.classList.add('hidden');
         chevron.classList.remove('rotate-180');
     }
-    
+
     // Save panel state
     if (window.savePanelState) {
         window.savePanelState('chord-library-panel', !isHidden);
     }
+}
+
+export function toggleChordLibraryMode(isDiatonic) {
+    const mode = isDiatonic ? 'diatonic' : 'chromatic';
+    setChordLibraryMode(mode);
+    // Clear diatonic chord tracking when switching to chromatic
+    if (!isDiatonic) {
+        setLastDiatonicChord(null);
+    }
+    renderBuilderSelectors();
+    updateBuilderDisplay();
 }
 
 export function toggleChordIntervalsPanel() {
@@ -1703,7 +1718,8 @@ import {
     INTERVAL_GROUPS,
     MAJOR_SCALE_STEPS,
     ENHARMONIC_MAP,
-    ROMAN_MAP_BASE
+    ROMAN_MAP_BASE,
+    generateDiatonicChords
 } from '../../data/music-data.js';
 
 // Import UI utilities (to be defined when needed)
@@ -1998,14 +2014,29 @@ export function playBuilderChordWithDuration() {
  * Shows chord/interval name, notes, and highlights on keyboard
  */
 export function updateBuilderDisplay() {
-    const rootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[getBuilderRootIndex()];
+    const currentNotes = getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+
+    // In diatonic mode, use the last played diatonic chord's root; otherwise use builder root
+    const chordLibraryMode = getChordLibraryMode();
+    const lastDiatonic = getLastDiatonicChord();
+    let rootNote;
+    let chordType;
+
+    if (chordLibraryMode === 'diatonic' && lastDiatonic) {
+        rootNote = lastDiatonic.root;
+        chordType = lastDiatonic.type;
+    } else {
+        rootNote = currentNotes[getBuilderRootIndex()];
+        chordType = getBuilderChordType();
+    }
+
     let result;
     let notesForHighlight;
 
     if (getBuilderSelectionMode() === 'chord') {
         result = getInvertedChordNotes(
             rootNote,
-            getBuilderChordType(),
+            chordType,
             getBuilderInversion(),
             rootNote,
             getBuilderOctaveShift(),
@@ -2447,6 +2478,9 @@ export function updateChordTypeButtonCaptions() {
         const mainButton = container.querySelector('button');
         if (!mainButton) return;
 
+        // Skip diatonic mode buttons - they have their own labels
+        if (mainButton.dataset.diatonicMode === 'true') return;
+
         const chordType = mainButton.dataset.chordType;
         const chordDef = CHORD_DEFINITIONS[chordType] || {};
         const symbolNotation = rootNoteName + (chordDef.symbol || '');
@@ -2473,14 +2507,14 @@ export function updateChordTypeButtonTooltips() {
         const mainButton = container.querySelector('button');
         if (!mainButton) return;
 
+        // Skip diatonic mode buttons - they have their own tooltips
+        if (mainButton.dataset.diatonicMode === 'true') return;
+
         const chordType = mainButton.dataset.chordType;
         if (!CHORD_DEFINITIONS[chordType]) return;
 
         const baseDescription = CHORD_DEFINITIONS[chordType].description;
         const contextAwareDescription = getContextAwareChordDescription(chordType, rootNoteName, baseDescription);
-
-        // Update the title attribute (browser's native tooltip)
-        mainButton.title = contextAwareDescription;
 
         // Find and update the custom tooltip if it exists
         const tooltipElements = document.querySelectorAll('.chord-button-tooltip');
@@ -2529,6 +2563,44 @@ export function updateIntervalButtonCaptions() {
 // ============================================================================
 
 /**
+ * Update diatonic button highlighting without re-rendering
+ */
+function updateDiatonicButtonHighlighting() {
+    const lastDiatonic = getLastDiatonicChord();
+    const currentType = getBuilderChordType();
+
+    if (!lastDiatonic) return;
+
+    // Update all diatonic mode buttons
+    document.querySelectorAll('#builder-chord-type-selector .key-button-wrapper').forEach(container => {
+        const mainButton = container.querySelector('button');
+        if (!mainButton || mainButton.dataset.diatonicMode !== 'true') return;
+
+        const chordRoot = mainButton.dataset.chordRoot;
+        const chordType = mainButton.dataset.chordType;
+        const roman = mainButton.dataset.roman || '';
+
+        const isExactMatch = (chordRoot === lastDiatonic.root && chordType === lastDiatonic.type);
+        const isTypeMatch = (chordType === currentType && !isExactMatch);
+
+        // Update button classes
+        if (isExactMatch) {
+            mainButton.className = 'flex-grow px-1.5 py-1.5 text-center text-sm font-medium bg-teal-600 text-white hover:bg-teal-700';
+        } else if (isTypeMatch) {
+            mainButton.className = 'flex-grow px-1.5 py-1.5 text-center text-sm font-medium bg-teal-200 text-gray-800 hover:bg-teal-300';
+        } else {
+            mainButton.className = 'flex-grow px-1.5 py-1.5 text-center text-sm font-medium text-gray-800 hover:bg-amber-100';
+        }
+
+        // Update text colors
+        const chordSymbol = CHORD_DEFINITIONS[chordType]?.symbol || '';
+        const textColor = isExactMatch ? 'text-white' : 'text-gray-800';
+        const secondaryColor = isExactMatch ? 'text-white' : 'text-gray-500';
+        mainButton.innerHTML = `<span class="block text-xs font-bold leading-tight pointer-events-none ${textColor}">${chordType}</span><span class="block ${secondaryColor} pointer-events-none" style="font-size: 0.65rem; line-height: 0.9;">${chordRoot}${chordSymbol} - ${roman}</span>`;
+    });
+}
+
+/**
  * Render all chord builder selectors (root, type, inversion, intervals)
  */
 export function renderBuilderSelectors() {
@@ -2565,8 +2637,227 @@ export function renderBuilderSelectors() {
         rootSelector.appendChild(button);
     });
 
-    if (typeSelector.children.length === 0) {
-        typeSelector.innerHTML = '';
+    // Always re-render chord type selector to handle mode changes
+    typeSelector.innerHTML = '';
+
+    const chordLibraryMode = getChordLibraryMode();
+    const rootNoteName = currentNotes[getBuilderRootIndex()];
+
+    // Update header based on mode
+    const headerElement = document.getElementById('chord-library-header');
+    if (headerElement) {
+        if (chordLibraryMode === 'diatonic') {
+            headerElement.textContent = `Browse Chord Families - Diatonic to ${rootNoteName}`;
+        } else {
+            headerElement.textContent = 'Browse Chord Families';
+        }
+    }
+
+    if (chordLibraryMode === 'diatonic') {
+        // Render diatonic chords based on the selected root note
+        const diatonicChords = window.generateDiatonicChords ? window.generateDiatonicChords(rootNoteName, currentNotes) : [];
+
+        diatonicChords.forEach(group => {
+            const groupContainer = document.createElement('div');
+            groupContainer.className = 'border border-gray-200 rounded-lg p-2 flex flex-col';
+            const title = document.createElement('h4');
+            title.className = 'text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 text-center';
+            title.textContent = group.title;
+            groupContainer.appendChild(title);
+
+            const buttonGrid = document.createElement('div');
+            buttonGrid.className = 'grid grid-cols-1 gap-1.5';
+
+            group.chords.forEach(chord => {
+                if (CHORD_DEFINITIONS[chord.type]) {
+                    const buttonContainer = document.createElement('div');
+                    buttonContainer.className = 'key-button-wrapper flex items-stretch rounded-lg shadow-sm overflow-hidden bg-gray-200 transition duration-150 transform hover:scale-105';
+                    buttonContainer.style.position = 'relative';
+
+                    // Main button with chord info
+                    const mainButton = document.createElement('button');
+                    mainButton.dataset.chordType = chord.type;
+                    mainButton.dataset.chordRoot = chord.root;
+                    mainButton.dataset.roman = chord.roman;
+                    mainButton.dataset.diatonicMode = 'true'; // Mark as diatonic mode button
+
+                    const chordRootIndex = currentNotes.indexOf(chord.root);
+
+                    // Check if this exact chord (root + type) is currently selected in diatonic mode
+                    const lastDiatonic = getLastDiatonicChord();
+                    const currentType = getBuilderChordType();
+                    const isExactMatch = lastDiatonic && (chord.root === lastDiatonic.root && chord.type === lastDiatonic.type);
+                    const isTypeMatch = (chord.type === currentType && !isExactMatch);
+
+                    // Apply different styling for exact match vs type match
+                    if (isExactMatch) {
+                        // Exact match: teal background (primary selection)
+                        mainButton.className = 'flex-grow px-1.5 py-1.5 text-center text-sm font-medium bg-teal-600 text-white hover:bg-teal-700';
+                    } else if (isTypeMatch) {
+                        // Same type but different root: lighter teal (secondary highlight)
+                        mainButton.className = 'flex-grow px-1.5 py-1.5 text-center text-sm font-medium bg-teal-200 text-gray-800 hover:bg-teal-300';
+                    } else {
+                        // Not selected: default styling
+                        mainButton.className = 'flex-grow px-1.5 py-1.5 text-center text-sm font-medium text-gray-800 hover:bg-amber-100';
+                    }
+
+                    // Display to match chromatic mode: chord type on top (bold), root+symbol and roman below
+                    const chordSymbol = CHORD_DEFINITIONS[chord.type].symbol || '';
+                    const textColor = isExactMatch ? 'text-white' : 'text-gray-800';
+                    const secondaryColor = isExactMatch ? 'text-white' : 'text-gray-500';
+                    mainButton.innerHTML = `<span class="block text-xs font-bold leading-tight pointer-events-none ${textColor}">${chord.type}</span><span class="block ${secondaryColor} pointer-events-none" style="font-size: 0.65rem; line-height: 0.9;">${chord.root}${chordSymbol} - ${chord.roman}</span>`;
+
+                    // Mouse events for desktop - play the specific diatonic chord without changing root
+                    mainButton.onmousedown = () => {
+                        // Save this as the last played diatonic chord for highlighting
+                        setLastDiatonicChord({ root: chord.root, type: chord.type });
+                        // Temporarily set root to this chord's root, play, then restore
+                        const originalRoot = getBuilderRootIndex();
+                        setBuilderRootIndex(chordRootIndex);
+                        selectBuilderChordType(chord.type, true);
+                        setBuilderRootIndex(originalRoot); // Restore original root immediately
+                        // Update highlighting after a brief delay
+                        setTimeout(() => updateDiatonicButtonHighlighting(), 50);
+                    };
+                    mainButton.onmouseup = () => stopBuilderChord();
+                    mainButton.onmouseleave = () => stopBuilderChord();
+
+                    // Touch events for mobile/tablet
+                    let touchStartTime = 0;
+                    let touchHolding = false;
+                    mainButton.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        touchStartTime = Date.now();
+                        touchHolding = true;
+                        mainButton.dataset.held = 'true';
+                        // Save this as the last played diatonic chord for highlighting
+                        setLastDiatonicChord({ root: chord.root, type: chord.type });
+                        // Temporarily set root to this chord's root, play, then restore
+                        const originalRoot = getBuilderRootIndex();
+                        setBuilderRootIndex(chordRootIndex);
+                        selectBuilderChordType(chord.type, true);
+                        setBuilderRootIndex(originalRoot); // Restore original root immediately
+                        // Update highlighting after a brief delay
+                        setTimeout(() => updateDiatonicButtonHighlighting(), 50);
+                    }, { passive: false });
+
+                    mainButton.addEventListener('touchend', (e) => {
+                        e.preventDefault();
+                        touchHolding = false;
+                        stopBuilderChord();
+                        mainButton.dataset.held = 'false';
+                        if (Date.now() - touchStartTime < 300) {
+                            setTimeout(() => {
+                                if (!touchHolding && mainButton.dataset.held !== 'true') {
+                                    const event = new MouseEvent('mouseenter', {
+                                        bubbles: true,
+                                        cancelable: true,
+                                        view: window
+                                    });
+                                    mainButton.dispatchEvent(event);
+                                }
+                            }, 100);
+                        }
+                    }, { passive: false });
+
+                    mainButton.addEventListener('touchcancel', (e) => {
+                        e.preventDefault();
+                        touchHolding = false;
+                        mainButton.dataset.held = 'false';
+                        stopBuilderChord();
+                    }, { passive: false });
+
+                    buttonContainer.appendChild(mainButton);
+
+                    // Info icon
+                    const infoIcon = document.createElement('button');
+                    infoIcon.innerHTML = 'ℹ';
+                    infoIcon.className = 'chord-info-icon';
+                    infoIcon.style.cssText = 'position:absolute;bottom:1px;left:1px;width:12px;height:12px;border-radius:50%;background-color:rgba(107,114,128,0.5);color:rgba(255,255,255,0.8);font-size:8px;font-weight:600;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;z-index:10;padding:0;line-height:1;transition:all 0.2s';
+                    infoIcon.addEventListener('mouseenter', () => {
+                        infoIcon.style.backgroundColor = 'rgba(83,122,187,0.6)';
+                        infoIcon.style.color = 'white';
+                        infoIcon.style.transform = 'scale(1.15)';
+                    });
+                    infoIcon.addEventListener('mouseleave', () => {
+                        infoIcon.style.backgroundColor = 'rgba(107,114,128,0.5)';
+                        infoIcon.style.color = 'rgba(255,255,255,0.8)';
+                        infoIcon.style.transform = 'scale(1)';
+                    });
+                    infoIcon.addEventListener('mousedown', (e) => e.stopPropagation());
+                    infoIcon.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
+                    buttonContainer.appendChild(infoIcon);
+
+                    // Create tooltip
+                    const chordDescription = CHORD_DEFINITIONS[chord.type].description || '';
+                    const contextAwareDescription = getContextAwareChordDescription(chord.type, chord.root, chordDescription);
+                    const tooltipText = `${chord.root}${chordSymbol} - ${chord.type} (${chord.roman})\n\n${contextAwareDescription}`;
+                    const tooltipElement = createButtonTooltip(mainButton, tooltipText, chord.type);
+
+                    const showTooltip = () => {
+                        if (!tooltipElement) return;
+                        if (tooltipElement.showTooltip) {
+                            tooltipElement.showTooltip();
+                        } else {
+                            const rect = mainButton.getBoundingClientRect();
+                            const tooltipHeight = 200;
+                            tooltipElement.style.left = (rect.left + rect.width / 2) + 'px';
+                            tooltipElement.style.top = (rect.top - tooltipHeight - 12) + 'px';
+                            tooltipElement.style.transform = 'translateX(-50%)';
+                            tooltipElement.style.opacity = '1';
+                            tooltipElement.style.visibility = 'visible';
+                        }
+                    };
+                    infoIcon.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        showTooltip();
+                    });
+                    infoIcon.addEventListener('touchend', (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        showTooltip();
+                    }, { passive: false });
+
+                    // Arpeggio buttons
+                    const arpContainer = document.createElement('div');
+                    arpContainer.className = 'flex flex-col w-8 border-l border-gray-300';
+
+                    const arpUp = document.createElement('button');
+                    arpUp.className = 'flex-1 flex items-center justify-center text-gray-500 hover:bg-gray-300 hover:text-gray-800 border-b border-gray-300';
+                    arpUp.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd"></path></svg>';
+                    arpUp.onclick = (e) => {
+                        e.stopPropagation();
+                        // Temporarily set root to this chord's root for arpeggio, then restore
+                        const originalRoot = getBuilderRootIndex();
+                        setBuilderRootIndex(chordRootIndex);
+                        if (window.playArpeggio) window.playArpeggio('chord', chord.type, 'up');
+                        setBuilderRootIndex(originalRoot);
+                    };
+                    arpContainer.appendChild(arpUp);
+
+                    const arpDown = document.createElement('button');
+                    arpDown.className = 'flex-1 flex items-center justify-center text-gray-500 hover:bg-gray-300 hover:text-gray-800';
+                    arpDown.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>';
+                    arpDown.onclick = (e) => {
+                        e.stopPropagation();
+                        // Temporarily set root to this chord's root for arpeggio, then restore
+                        const originalRoot = getBuilderRootIndex();
+                        setBuilderRootIndex(chordRootIndex);
+                        if (window.playArpeggio) window.playArpeggio('chord', chord.type, 'down');
+                        setBuilderRootIndex(originalRoot);
+                    };
+                    arpContainer.appendChild(arpDown);
+
+                    buttonContainer.appendChild(arpContainer);
+                    buttonGrid.appendChild(buttonContainer);
+                }
+            });
+            groupContainer.appendChild(buttonGrid);
+            typeSelector.appendChild(groupContainer);
+        });
+    } else {
+        // Chromatic mode - show all chords
         CHORD_GROUPS.forEach(group => {
             const groupContainer = document.createElement('div');
             groupContainer.className = 'border border-gray-200 rounded-lg p-2 flex flex-col';
@@ -2588,7 +2879,6 @@ export function renderBuilderSelectors() {
                     mainButton.className = 'flex-grow px-1.5 py-1.5 text-center text-sm font-medium text-gray-800 hover:bg-amber-100';
                     mainButton.dataset.chordType = chordType;
                     const chordDescription = CHORD_DEFINITIONS[chordType].description || '';
-                    mainButton.title = chordDescription;
                     // Mouse events for desktop
                     mainButton.onmousedown = () => selectBuilderChordType(chordType, true);
                     mainButton.onmouseup = () => stopBuilderChord();
@@ -2660,7 +2950,6 @@ export function renderBuilderSelectors() {
                     infoIcon.style.padding = '0';
                     infoIcon.style.lineHeight = '1';
                     infoIcon.style.transition = 'all 0.2s';
-                    infoIcon.title = 'Show chord details';
                     infoIcon.addEventListener('mouseenter', () => {
                         infoIcon.style.backgroundColor = 'rgba(83, 122, 187, 0.6)';
                         infoIcon.style.color = 'white';
@@ -2722,7 +3011,6 @@ export function renderBuilderSelectors() {
                     const arpUp = document.createElement('button');
                     arpUp.className = 'flex-1 flex items-center justify-center text-gray-500 hover:bg-gray-300 hover:text-gray-800 border-b border-gray-300';
                     arpUp.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd"></path></svg>';
-                    arpUp.title = 'Play Ascending Arpeggio';
                     arpUp.onclick = (e) => {
                         e.stopPropagation();
                         if (window.playArpeggio) window.playArpeggio('chord', chordType, 'up');
@@ -2733,7 +3021,6 @@ export function renderBuilderSelectors() {
                     const arpDown = document.createElement('button');
                     arpDown.className = 'flex-1 flex items-center justify-center text-gray-500 hover:bg-gray-300 hover:text-gray-800';
                     arpDown.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>';
-                    arpDown.title = 'Play Descending Arpeggio';
                     arpDown.onclick = (e) => {
                         e.stopPropagation();
                         if (window.playArpeggio) window.playArpeggio('chord', chordType, 'down');
@@ -2798,7 +3085,6 @@ export function renderBuilderSelectors() {
                     mainButton.className = 'flex-grow px-2 py-2 text-center font-medium text-gray-800 hover:bg-amber-100';
                     mainButton.dataset.intervalType = intervalType;
                     const intervalDescription = INTERVAL_DEFINITIONS[intervalType].description || '';
-                    mainButton.title = intervalDescription;
                     mainButton.onmousedown = () => selectBuilderInterval(intervalType, true);
                     mainButton.onmouseup = () => stopBuilderChord();
                     mainButton.onmouseleave = () => stopBuilderChord();
@@ -2829,7 +3115,6 @@ export function renderBuilderSelectors() {
                     const arpUp = document.createElement('button');
                     arpUp.className = 'flex-1 flex items-center justify-center text-gray-500 hover:bg-gray-300 hover:text-gray-800 border-b border-gray-300';
                     arpUp.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd"></path></svg>';
-                    arpUp.title = 'Play Ascending Arpeggio';
                     arpUp.onclick = (e) => {
                         e.stopPropagation();
                         if (window.playArpeggio) window.playArpeggio('interval', intervalType, 'up');
@@ -2840,7 +3125,6 @@ export function renderBuilderSelectors() {
                     const arpDown = document.createElement('button');
                     arpDown.className = 'flex-1 flex items-center justify-center text-gray-500 hover:bg-gray-300 hover:text-gray-800';
                     arpDown.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>';
-                    arpDown.title = 'Play Descending Arpeggio';
                     arpDown.onclick = (e) => {
                         e.stopPropagation();
                         if (window.playArpeggio) window.playArpeggio('interval', intervalType, 'down');

@@ -146,6 +146,85 @@ const RELATIVE_MINOR_MAP = {
     'D#': 'C minor', 'G#': 'F minor', 'A#': 'G minor'
 };
 
+// Diatonic chord groups for major scale
+// Pattern: I=Major, ii=Minor, iii=Minor, IV=Major, V=Major, vi=Minor, vii°=Diminished
+const DIATONIC_CHORD_GROUPS = [
+    {
+        title: 'Triads',
+        chords: [
+            { degree: 1, type: 'Major', roman: 'I' },
+            { degree: 2, type: 'Minor', roman: 'ii' },
+            { degree: 3, type: 'Minor', roman: 'iii' },
+            { degree: 4, type: 'Major', roman: 'IV' },
+            { degree: 5, type: 'Major', roman: 'V' },
+            { degree: 6, type: 'Minor', roman: 'vi' },
+            { degree: 7, type: 'Diminished', roman: 'vii°' }
+        ]
+    },
+    {
+        title: 'Sevenths',
+        chords: [
+            { degree: 1, type: 'Major 7th', roman: 'Imaj7' },
+            { degree: 2, type: 'Minor 7th', roman: 'ii7' },
+            { degree: 3, type: 'Minor 7th', roman: 'iii7' },
+            { degree: 4, type: 'Major 7th', roman: 'IVmaj7' },
+            { degree: 5, type: 'Dominant 7th', roman: 'V7' },
+            { degree: 6, type: 'Minor 7th', roman: 'vi7' },
+            { degree: 7, type: 'Half-Diminished 7th', roman: 'viiø7' }
+        ]
+    },
+    {
+        title: 'Ninths',
+        chords: [
+            { degree: 1, type: 'Major 9th', roman: 'Imaj9' },
+            { degree: 2, type: 'Minor 9th', roman: 'ii9' },
+            { degree: 3, type: 'Minor 9th', roman: 'iii9' },
+            { degree: 4, type: 'Major 9th', roman: 'IVmaj9' },
+            { degree: 5, type: 'Dominant 9th', roman: 'V9' },
+            { degree: 6, type: 'Minor 9th', roman: 'vi9' }
+        ]
+    },
+    {
+        title: 'Extensions',
+        chords: [
+            { degree: 1, type: 'Add9', roman: 'Iadd9' },
+            { degree: 2, type: 'Add9', roman: 'iiadd9' },
+            { degree: 4, type: 'Add9', roman: 'IVadd9' },
+            { degree: 5, type: 'Add9', roman: 'Vadd9' },
+            { degree: 6, type: 'Add9', roman: 'viadd9' }
+        ]
+    }
+];
+
+/**
+ * Generates diatonic chords for a given root note
+ * @param {string} rootNote - The tonic note (e.g., 'C', 'D', 'F#')
+ * @param {Array} noteArray - The note array to use (SHARP_NOTES or FLAT_NOTES)
+ * @returns {Array} Array of chord groups with notes and types
+ */
+function generateDiatonicChords(rootNote, noteArray) {
+    const rootIndex = noteArray.indexOf(rootNote);
+    if (rootIndex === -1) return [];
+
+    return DIATONIC_CHORD_GROUPS.map(group => {
+        const chords = group.chords.map(chord => {
+            const scaleIndex = MAJOR_SCALE_STEPS[chord.degree - 1];
+            const chordRoot = noteArray[(rootIndex + scaleIndex) % 12];
+            return {
+                root: chordRoot,
+                type: chord.type,
+                roman: chord.roman,
+                degree: chord.degree
+            };
+        });
+
+        return {
+            title: group.title,
+            chords: chords
+        };
+    });
+}
+
 // Export all constants for ES6 module usage
 export {
     ALL_NOTES,
@@ -163,5 +242,7 @@ export {
     ENHARMONIC_MAP,
     KEY_SIGNATURE_TEXT,
     KEY_SIGNATURE_IMAGES,
-    RELATIVE_MINOR_MAP
+    RELATIVE_MINOR_MAP,
+    DIATONIC_CHORD_GROUPS,
+    generateDiatonicChords
 };

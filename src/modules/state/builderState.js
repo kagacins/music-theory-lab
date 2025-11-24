@@ -13,6 +13,8 @@ let builderSelectionMode = 'chord'; // 'chord' or 'interval'
 let builderIntervalType = 'Major 3rd';
 let builderOmittedNotes = []; // For voicing editor
 let builderLHOmittedNotes = [];
+let chordLibraryMode = 'chromatic'; // 'chromatic' or 'diatonic'
+let lastDiatonicChord = null; // Stores {root: 'D', type: 'Minor'} for diatonic mode highlighting
 
 // Getters and Setters for builderRootIndex
 export function getBuilderRootIndex() {
@@ -103,6 +105,26 @@ export function setBuilderLHOmittedNotes(value) {
     if (window) window.builderLHOmittedNotes = value;
 }
 
+// Getters and Setters for chordLibraryMode
+export function getChordLibraryMode() {
+    return chordLibraryMode;
+}
+
+export function setChordLibraryMode(value) {
+    chordLibraryMode = value;
+    if (window) window.chordLibraryMode = value;
+}
+
+// Getters and Setters for lastDiatonicChord
+export function getLastDiatonicChord() {
+    return lastDiatonicChord;
+}
+
+export function setLastDiatonicChord(value) {
+    lastDiatonicChord = value;
+    if (window) window.lastDiatonicChord = value;
+}
+
 // Get all builder state
 export function getBuilderState() {
     return {
@@ -114,7 +136,8 @@ export function getBuilderState() {
         builderSelectionMode,
         builderIntervalType,
         builderOmittedNotes,
-        builderLHOmittedNotes
+        builderLHOmittedNotes,
+        chordLibraryMode
     };
 }
 
@@ -129,6 +152,8 @@ export function initializeBuilderState() {
     builderIntervalType = 'Major 3rd';
     builderOmittedNotes = [];
     builderLHOmittedNotes = [];
+    chordLibraryMode = 'chromatic';
+    lastDiatonicChord = null;
 }
 
 // Reset builder state to defaults

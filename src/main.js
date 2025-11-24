@@ -84,6 +84,7 @@ import {
     updateButtonSelection,
     toggleChordSetupPanel,
     toggleChordLibraryPanel,
+    toggleChordLibraryMode,
     toggleChordIntervalsPanel
 } from './modules/features/chordBuilder.js';
 import {
@@ -300,7 +301,8 @@ import {
     KEY_SIGNATURE_TEXT,
     KEY_SIGNATURE_IMAGES,
     RELATIVE_MINOR_MAP,
-    MAJOR_SCALE_STEPS
+    MAJOR_SCALE_STEPS,
+    generateDiatonicChords
 } from './data/music-data.js';
 
 // Global Settings Functions
@@ -1026,6 +1028,7 @@ window.updateChordTypeButtonCaptions = updateChordTypeButtonCaptions;
 window.updateIntervalButtonCaptions = updateIntervalButtonCaptions;
 window.toggleChordSetupPanel = toggleChordSetupPanel;
 window.toggleChordLibraryPanel = toggleChordLibraryPanel;
+window.toggleChordLibraryMode = toggleChordLibraryMode;
 window.toggleChordIntervalsPanel = toggleChordIntervalsPanel;
 
 // Expose data constants for modules that need them
@@ -1037,6 +1040,7 @@ window.KEY_SIGNATURE_TEXT = KEY_SIGNATURE_TEXT;
 window.KEY_SIGNATURE_IMAGES = KEY_SIGNATURE_IMAGES;
 window.RELATIVE_MINOR_MAP = RELATIVE_MINOR_MAP;
 window.MAJOR_SCALE_STEPS = MAJOR_SCALE_STEPS;
+window.generateDiatonicChords = generateDiatonicChords;
 
 // Trainer functions
 window.handleAutoPlayback = handleAutoPlayback;

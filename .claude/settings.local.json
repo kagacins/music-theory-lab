@@ -25,7 +25,8 @@
       "Bash(node -c:*)",
       "Bash(echo:*)",
       "Bash(npm start)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(npx http-server -p 8000)"
     ],
     "deny": [],
     "ask": []

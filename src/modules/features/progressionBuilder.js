@@ -10181,6 +10181,7 @@ function loadTemplateToProgression(template, action = 'load') {
             const finalType = finalQuality;
 
             // LH defaults to 'off' for template-loaded chords (no left hand playing by default)
+            // Template chords load one octave lower (-12 semitones)
             const chordData = {
                 root: chordInfo.root,
                 type: finalType,
@@ -10196,7 +10197,7 @@ function loadTemplateToProgression(template, action = 'load') {
                 lhNotes: [],
                 lhOmittedNotes: [],
                 omittedNotes: [],
-                octaveShift: 0,
+                octaveShift: -12,
                 key: currentKey
             };
 
