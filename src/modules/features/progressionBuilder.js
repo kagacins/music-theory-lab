@@ -49,6 +49,7 @@ import {
 import {
     getCurrentTab,
     getEnharmonicPreference,
+    setEnharmonicPreference,
     getNotationPreference
 } from '../state/globalState.js';
 
@@ -6724,10 +6725,21 @@ export function loadProgression() {
     }
 
     setCurrentKey(keySelect.value);
+
+    // Automatically set enharmonic preference based on key signature
+    // Keys with flats in their signature should display flats
+    const selectedKey = keySelect.value.replace('m', ''); // Remove minor indicator
+    const flatKeys = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'];
+    if (flatKeys.includes(selectedKey)) {
+        setEnharmonicPreference('flat');
+    } else {
+        setEnharmonicPreference('sharp');
+    }
+
     setProgressionRomans(progressionSelect.value.split(','));
     setCurrentIndex(0);
     setIsPlaying(false);
-    
+
     // Set isReady using the setter function
     setIsReady(true);
     

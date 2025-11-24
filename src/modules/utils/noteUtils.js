@@ -120,48 +120,108 @@ export function getChordNotes(rootNoteName, chordType, key, octave = 4, enharmon
         console.warn(`Invalid root note for chord: ${rootNoteName}${octave}`);
         return { baseNotes: [], specificNotes: [] };
     }
-    
+
     const noteNameArray = (enharmonicPreference === 'sharp' ? SHARP_NOTES : FLAT_NOTES);
 
-    const specificNotes = chordDef.intervals.map(interval => {
-    const noteMidi = rootMidi + interval;
-    // Validate noteMidi before converting
-    if (isNaN(noteMidi) || noteMidi === null || noteMidi === undefined) {
-        console.warn(`Invalid MIDI value: ${rootMidi} + ${interval} = ${noteMidi}`);
-        return null;
-    }
-    
-    const rawNote = Tone.Midi(noteMidi).toNote();
-    if (!rawNote || typeof rawNote !== 'string') {
-        console.warn(`Invalid note from MIDI ${noteMidi}: ${rawNote}`);
-        return null;
-    }
-    
-    let [noteName, noteOctave] = [rawNote.slice(0, -1), parseInt(rawNote.slice(-1))];
-    
-    // Validate noteOctave
-    if (isNaN(noteOctave) || noteOctave === null || noteOctave === undefined) {
-        console.warn(`Invalid octave parsed from note ${rawNote}`);
-        return null;
-    }
+    // Helper function to spell intervals correctly
+    const spellInterval = (rootNote, intervalSemitones, enharmonicPref) => {
+        // Define expected interval letter distances for common intervals
+        const intervalLetterMap = {
+            0: 0,   // Root - same letter
+            1: 1,   // m2 - one letter up
+            2: 1,   // M2 - one letter up
+            3: 2,   // m3 - two letters up
+            4: 2,   // M3 - two letters up
+            5: 3,   // P4 - three letters up
+            6: 4,   // d5/A4 - four letters up (tritone)
+            7: 4,   // P5 - four letters up
+            8: 5,   // m6 - five letters up
+            9: 5,   // M6 - five letters up
+            10: 6,  // m7 - six letters up
+            11: 6,  // M7 - six letters up
+            12: 0   // Octave - same letter (next octave)
+        };
 
-    // Fix enharmonic spellings (Cb, Fb, B#, E#)
-    if (noteName === "Cb") {
-        noteName = "Cb";
-        noteOctave += 1;
-    } else if (noteName === "Fb") {
-        noteName = "Fb";
-        noteOctave += 1;
-    } else if (noteName === "B#") {
-        noteName = "B#";
-        noteOctave -= 1;
-    } else if (noteName === "E#") {
-        noteName = "E#";
-        noteOctave -= 1;
-    }
+        const noteLetters = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+        const rootLetter = rootNote.replace(/[#b]/g, '').charAt(0);
+        const rootIndex = noteLetters.indexOf(rootLetter);
 
-    // Final return — this single string is what's used for both playback and highlighting
-    return `${noteName}${noteOctave}`;
+        if (rootIndex === -1) return null;
+
+        const expectedLetterDistance = intervalLetterMap[intervalSemitones % 12];
+        if (expectedLetterDistance === undefined) return null;
+
+        const targetLetterIndex = (rootIndex + expectedLetterDistance) % 7;
+        const targetLetter = noteLetters[targetLetterIndex];
+
+        return targetLetter;
+    };
+
+    const specificNotes = chordDef.intervals.map((interval, index) => {
+        const noteMidi = rootMidi + interval;
+        // Validate noteMidi before converting
+        if (isNaN(noteMidi) || noteMidi === null || noteMidi === undefined) {
+            console.warn(`Invalid MIDI value: ${rootMidi} + ${interval} = ${noteMidi}`);
+            return null;
+        }
+
+        // Get the expected letter for this interval
+        const expectedLetter = spellInterval(rootNoteName, interval, enharmonicPreference);
+
+        // Get raw note from Tone.js (may have wrong enharmonic spelling)
+        const rawNote = Tone.Midi(noteMidi).toNote();
+        if (!rawNote || typeof rawNote !== 'string') {
+            console.warn(`Invalid note from MIDI ${noteMidi}: ${rawNote}`);
+            return null;
+        }
+
+        let [rawNoteName, noteOctave] = [rawNote.slice(0, -1), parseInt(rawNote.slice(-1))];
+
+        // Validate noteOctave
+        if (isNaN(noteOctave) || noteOctave === null || noteOctave === undefined) {
+            console.warn(`Invalid octave parsed from note ${rawNote}`);
+            return null;
+        }
+
+        // If we have an expected letter and it doesn't match, find the correct enharmonic
+        let noteName = rawNoteName;
+        if (expectedLetter) {
+            const rawLetter = rawNoteName.replace(/[#b]/g, '');
+
+            if (rawLetter !== expectedLetter) {
+                // Need to find enharmonic equivalent with correct letter
+                // Check if we need a sharp or flat
+                const pitchClass = noteMidi % 12;
+
+                // Find which note in our preference array matches this pitch class
+                const noteInSharpArray = SHARP_NOTES[pitchClass];
+                const noteInFlatArray = FLAT_NOTES[pitchClass];
+
+                // Choose the one that starts with the expected letter
+                if (noteInSharpArray && noteInSharpArray.charAt(0) === expectedLetter) {
+                    noteName = noteInSharpArray;
+                } else if (noteInFlatArray && noteInFlatArray.charAt(0) === expectedLetter) {
+                    noteName = noteInFlatArray;
+                } else {
+                    // Fallback: use enharmonic preference
+                    noteName = (enharmonicPreference === 'sharp' ? noteInSharpArray : noteInFlatArray) || rawNoteName;
+                }
+            }
+        }
+
+        // Handle octave adjustments for edge cases (Cb, Fb, B#, E#)
+        if (noteName === "Cb" && rawNoteName !== "Cb") {
+            noteOctave = noteOctave + 1;
+        } else if (noteName === "Fb" && rawNoteName !== "Fb") {
+            noteOctave = noteOctave + 1;
+        } else if (noteName === "B#" && rawNoteName !== "B#") {
+            noteOctave = noteOctave - 1;
+        } else if (noteName === "E#" && rawNoteName !== "E#") {
+            noteOctave = noteOctave - 1;
+        }
+
+        // Final return — this single string is what's used for both playback and highlighting
+        return `${noteName}${noteOctave}`;
 
     }).filter(note => note != null); // Filter out any null values from invalid notes
 
