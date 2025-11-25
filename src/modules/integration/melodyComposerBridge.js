@@ -41,7 +41,9 @@ export function initMelodyComposerBridge() {
  * Called when user switches to melody tab or loads a progression
  */
 export function syncProgressionToMelodyComposer() {
-    if (!useCompositionState) return;
+    if (!useCompositionState) {
+        return;
+    }
 
     const progressionData = getProgressionData();
     const currentKey = getCurrentKey();
@@ -50,9 +52,16 @@ export function syncProgressionToMelodyComposer() {
         return;
     }
 
-    // Check if compositionState has been initialized (user must be on melody tab)
-    if (!compositionState) {
+    // Get compositionState - either from cached reference or directly from singleton
+    // This allows syncing to work even before initMelodyComposerBridge() is called
+    const state = compositionState || getCompositionState();
+    if (!state) {
         return;
+    }
+
+    // Update local reference if we got it from the singleton
+    if (!compositionState && state) {
+        compositionState = state;
     }
 
     // IMPORTANT: Disable bi-directional sync during import to prevent circular updates
@@ -65,25 +74,25 @@ export function syncProgressionToMelodyComposer() {
     try {
         // Import progression into composition state - USE NON-DESTRUCTIVE SYNC
         // This ensures we don't wipe the melody when switching tabs
-        if (typeof compositionState.syncWithProgressionData === 'function') {
-            compositionState.syncWithProgressionData(progressionData, {
+        if (typeof state.syncWithProgressionData === 'function') {
+            state.syncWithProgressionData(progressionData, {
                 key: currentKey
             });
         } else {
             // Fallback for older CompositionState versions
-            compositionState.importFromProgressionData(progressionData, {
+            state.importFromProgressionData(progressionData, {
                 key: currentKey
             });
         }
 
         // Failsafe: Ensure bass is generated if auto-generate is ON
         // This handles cases where import might not generate bass correctly
-        const autoGenSetting = compositionState.getSettings().autoGenerateBass;
+        const autoGenSetting = state.getSettings().autoGenerateBass;
 
         if (autoGenSetting) {
             // Force regenerate bass for all measures to ensure it's there
-            for (let i = 0; i < compositionState.getMeasureCount(); i++) {
-                compositionState.updateBassFromChord(i);
+            for (let i = 0; i < state.getMeasureCount(); i++) {
+                state.updateBassFromChord(i);
             }
         }
     } finally {

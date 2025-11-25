@@ -4445,6 +4445,7 @@ function updateChordType(index, newType) {
 
 /**
  * Update chord duration from simplified view
+ * Now supports confirmation dialog when truncation is needed
  */
 function updateChordDuration(index, sourceElement) {
     // Get compositionState directly - the single source of truth
@@ -4520,9 +4521,34 @@ function updateChordDuration(index, sourceElement) {
     saveState({ type: 'chord-update', data: { index, property: 'beats', value: totalBeats } });
 
     // Update the chord duration using compositionState's dedicated method
-    // This preserves chord order while rebuilding measures with new duration
-    compositionState.updateChordDuration(index, totalBeats);
+    // This now returns confirmation info if truncation is needed
+    const result = compositionState.updateChordDuration(index, totalBeats);
 
+    // Check if we need user confirmation for truncation
+    if (result && result.needsConfirmation) {
+        showTruncationWarningDialog(result.truncationInfo, () => {
+            // User confirmed - force apply the change
+            compositionState.forceApplyChordDuration(index, totalBeats);
+            finalizeDurationChange(index, totalBeats);
+        }, () => {
+            // User cancelled - revert the selectors
+            const prevBeats = chord.beats || 4;
+            const prevWhole = Math.floor(prevBeats);
+            const prevFrac = prevBeats - prevWhole;
+            durationWholeSelect.value = prevWhole;
+            durationFracSelect.value = prevFrac;
+        });
+        return;
+    }
+
+    // No confirmation needed - finalize the change
+    finalizeDurationChange(index, totalBeats);
+}
+
+/**
+ * Finalize duration change after update (or after user confirmation)
+ */
+function finalizeDurationChange(index, totalBeats) {
     // Update all card displays (both tabs)
     updateSingleCard(index);
 
@@ -4543,6 +4569,104 @@ function updateChordDuration(index, sourceElement) {
     if (window.updateUnifiedSuggestions) {
         window.updateUnifiedSuggestions();
     }
+}
+
+/**
+ * Show warning dialog when reducing duration would truncate notes
+ * @param {Object} truncationInfo - Info about what will be truncated
+ * @param {Function} onConfirm - Callback when user confirms
+ * @param {Function} onCancel - Callback when user cancels
+ */
+function showTruncationWarningDialog(truncationInfo, onConfirm, onCancel) {
+    // Build description of what will be affected
+    let affectedDescription = '';
+
+    if (truncationInfo.truncatedNotes.length > 0) {
+        affectedDescription += `<li><strong>${truncationInfo.truncatedNotes.length} note(s)</strong> will be removed entirely</li>`;
+    }
+
+    if (truncationInfo.adjustedNote) {
+        const adj = truncationInfo.adjustedNote;
+        affectedDescription += `<li>The last note will be shortened from <strong>${adj.original.duration}</strong> to <strong>${adj.adjusted.duration}</strong></li>`;
+    }
+
+    const modalHTML = `
+        <div id="truncation-warning-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden">
+                <div class="bg-amber-500 px-6 py-4">
+                    <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                        Note Truncation Warning
+                    </h3>
+                </div>
+                <div class="p-6">
+                    <p class="text-gray-700 mb-4">
+                        Reducing the duration of <strong>${truncationInfo.chordName}</strong> from
+                        <strong>${truncationInfo.oldDuration}</strong> to <strong>${truncationInfo.newDuration}</strong> beats
+                        will affect edited bass notes:
+                    </p>
+                    <ul class="list-disc list-inside text-gray-600 mb-4 space-y-1">
+                        ${affectedDescription}
+                    </ul>
+                    <p class="text-gray-600 text-sm">
+                        This action cannot be undone. Do you want to continue?
+                    </p>
+                </div>
+                <div class="bg-gray-50 px-6 py-4 flex justify-end gap-3">
+                    <button id="truncation-cancel-btn" class="px-4 py-2 text-gray-700 bg-gray-200 rounded hover:bg-gray-300 transition-colors">
+                        Cancel
+                    </button>
+                    <button id="truncation-confirm-btn" class="px-4 py-2 text-white bg-amber-500 rounded hover:bg-amber-600 transition-colors">
+                        Truncate Notes
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal if any
+    const existing = document.getElementById('truncation-warning-modal');
+    if (existing) existing.remove();
+
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // Get modal and buttons
+    const modal = document.getElementById('truncation-warning-modal');
+    const cancelBtn = document.getElementById('truncation-cancel-btn');
+    const confirmBtn = document.getElementById('truncation-confirm-btn');
+
+    // Handle cancel
+    const handleCancel = () => {
+        modal.remove();
+        if (onCancel) onCancel();
+    };
+
+    // Handle confirm
+    const handleConfirm = () => {
+        modal.remove();
+        if (onConfirm) onConfirm();
+    };
+
+    // Attach event listeners
+    cancelBtn.addEventListener('click', handleCancel);
+    confirmBtn.addEventListener('click', handleConfirm);
+
+    // Close on backdrop click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) handleCancel();
+    });
+
+    // Close on Escape key
+    const handleKeydown = (e) => {
+        if (e.key === 'Escape') {
+            handleCancel();
+            document.removeEventListener('keydown', handleKeydown);
+        }
+    };
+    document.addEventListener('keydown', handleKeydown);
 }
 
 /**
@@ -5101,44 +5225,62 @@ function initializeSimplifiedSortable(container) {
 
                 if (actualOldIndex < 0 || actualNewIndex < 0) return; // Shouldn't happen, but safety check
 
-                // Reorder progression data
-                const trainerState = getTrainerState();
-                const progressionData = [...trainerState.progressionData];
-                const progressionRomans = [...trainerState.progressionRomans];
-
-                // Move items
-                const [movedChord] = progressionData.splice(actualOldIndex, 1);
-                progressionData.splice(actualNewIndex, 0, movedChord);
-
-                const [movedRoman] = progressionRomans.splice(actualOldIndex, 1);
-                progressionRomans.splice(actualNewIndex, 0, movedRoman);
-
-                // Update state
-                setProgressionData(progressionData);
-                setProgressionRomans(progressionRomans);
-
-                // Save state for undo/redo
+                // Save state for undo/redo BEFORE making changes
                 saveState({
                     type: 'reorder',
                     data: { fromIndex: actualOldIndex, toIndex: actualNewIndex }
                 });
 
+                // Use CompositionState's reorderChord which preserves edited bass notes
+                const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+                if (compositionState && typeof compositionState.reorderChord === 'function') {
+                    console.log('[ProgressionBuilder-Simplified] Using segment-aware reorderChord');
+                    compositionState.reorderChord(actualOldIndex, actualNewIndex);
+                } else {
+                    // Fallback to old behavior if compositionState not available
+                    console.log('[ProgressionBuilder-Simplified] Fallback: manual reorder');
+                    const trainerState = getTrainerState();
+                    const progressionData = [...trainerState.progressionData];
+                    const progressionRomans = [...trainerState.progressionRomans];
+
+                    // Move items
+                    const [movedChord] = progressionData.splice(actualOldIndex, 1);
+                    progressionData.splice(actualNewIndex, 0, movedChord);
+
+                    const [movedRoman] = progressionRomans.splice(actualOldIndex, 1);
+                    progressionRomans.splice(actualNewIndex, 0, movedRoman);
+
+                    // Update state
+                    setProgressionData(progressionData);
+                    setProgressionRomans(progressionRomans);
+
+                    // Sync progression to compositionState
+                    if (window.syncProgressionToMelodyComposer) {
+                        window.syncProgressionToMelodyComposer();
+                    }
+                }
+
+                // Also update trainerState's progressionRomans to stay in sync
+                const trainerState = getTrainerState();
+                const progressionRomans = [...trainerState.progressionRomans];
+                const [movedRoman] = progressionRomans.splice(actualOldIndex, 1);
+                progressionRomans.splice(actualNewIndex, 0, movedRoman);
+                setProgressionRomans(progressionRomans);
+
                 // Re-render both views (this will recalculate shifts properly)
                 renderProgressionDisplay('progression-visualization', true);
                 renderProgressionDisplay('melody-progression-visualization', false);
 
-                // Update grand staff notation (chord order affects rendering)
+                // Update grand staff notation
                 console.log('[ProgressionBuilder-Simplified] Drag/drop completed, refreshing notation...');
-                // Sync progression to compositionState first
-                if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
-                    window.syncProgressionToMelodyComposer();
-                }
-                // Then refresh the notation rendering
                 if (window.refreshNotationFromProgression) {
                     const result = window.refreshNotationFromProgression();
                     console.log('[ProgressionBuilder-Simplified] Notation refresh result:', result);
-                } else {
-                    console.warn('[ProgressionBuilder-Simplified] window.refreshNotationFromProgression not available');
+                } else if (window.getNotationComposer) {
+                    const notationComposer = window.getNotationComposer();
+                    if (notationComposer) {
+                        notationComposer.render();
+                    }
                 }
             }
         }

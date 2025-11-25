@@ -66,6 +66,195 @@ function getConnectorTypes() {
 }
 
 // ============================================================================
+// MANUAL TIE CURVE RENDERING
+// ============================================================================
+
+/**
+ * Draw tie curves manually using canvas API
+ * This bypasses VexFlow's StaveTie which fails for cross-measure ties
+ * @param {Object} context - VexFlow/Canvas context
+ * @param {Array} renderedMeasures - Array of rendered measure objects
+ * @param {Array} measures - Original measure data
+ */
+function drawManualTies(context, renderedMeasures, measures) {
+  if (!renderedMeasures || renderedMeasures.length === 0) return;
+
+  // VexFlow 5.x context structure: context.vexFlowCanvasContext is the raw 2D context
+  // But we need to try multiple approaches since VexFlow context varies
+  let ctx = null;
+
+  // Try different ways to get the raw canvas context
+  if (context.vexFlowCanvasContext && typeof context.vexFlowCanvasContext.beginPath === 'function') {
+    ctx = context.vexFlowCanvasContext;
+  } else if (context.context && typeof context.context.beginPath === 'function') {
+    ctx = context.context;
+  } else if (context.canvas && context.canvas.getContext) {
+    // VexFlow context has a canvas property
+    ctx = context.canvas.getContext('2d');
+  } else if (typeof context.beginPath === 'function') {
+    // context IS the raw canvas context
+    ctx = context;
+  } else if (context.getCanvasContext && typeof context.getCanvasContext === 'function') {
+    // Some VexFlow versions expose this method
+    ctx = context.getCanvasContext();
+  }
+
+  // Last resort: try to find the canvas element and get its context
+  if (!ctx) {
+    // Try to get from the backend
+    try {
+      if (context.backend && context.backend.ctx) {
+        ctx = context.backend.ctx;
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  if (!ctx || typeof ctx.beginPath !== 'function') {
+    console.debug('[drawManualTies] Could not get canvas context. Context structure:', Object.keys(context || {}));
+    return;
+  }
+
+  drawManualTiesOnContext(ctx, renderedMeasures, measures);
+}
+
+/**
+ * Draw ties on a canvas 2D context
+ * @param {CanvasRenderingContext2D} ctx - Canvas 2D context
+ * @param {Array} renderedMeasures - Rendered measures with VexFlow notes
+ * @param {Array} measures - Original measure data
+ */
+function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
+  // Look for tied notes across measure boundaries
+  for (let i = 0; i < renderedMeasures.length - 1; i++) {
+    const currentMeasure = renderedMeasures[i];
+    const nextMeasure = renderedMeasures[i + 1];
+
+    // Get bass notes from rendered measures
+    const currentBassNotes = currentMeasure.bassNotes;
+    const nextBassNotes = nextMeasure.bassNotes;
+
+    if (!currentBassNotes || !nextBassNotes || currentBassNotes.length === 0 || nextBassNotes.length === 0) {
+      continue;
+    }
+
+    // Check if first note of next measure has isTied flag
+    const firstNextNote = nextBassNotes[0];
+    const measureData = measures[nextMeasure.index];
+    const bassNoteData = measureData?.notation?.bass?.voices?.[0]?.notes;
+
+    if (!bassNoteData || bassNoteData.length === 0) continue;
+
+    const firstNoteData = bassNoteData[0];
+
+    // Check if this note is tied to the previous measure
+    if (firstNoteData && firstNoteData.isTied === true) {
+      const lastCurrentNote = currentBassNotes[currentBassNotes.length - 1];
+
+      // Get bounding boxes for positioning
+      try {
+        const startBox = lastCurrentNote.getBoundingBox();
+        const endBox = firstNextNote.getBoundingBox();
+
+        if (startBox && endBox) {
+          // Calculate tie endpoints
+          // Start at right side of first note, end at left side of second note
+          const startX = startBox.getX() + startBox.getW();
+          const endX = endBox.getX();
+
+          // Y position: tie goes below notes in bass clef
+          const startY = startBox.getY() + startBox.getH() + 5;
+          const endY = endBox.getY() + endBox.getH() + 5;
+
+          // Draw the tie curve
+          drawTieCurve(ctx, startX, startY, endX, endY, 'below');
+        }
+      } catch (e) {
+        // Skip if bounding box not available
+        console.debug('[drawManualTies] Could not get bounding box:', e.message);
+      }
+    }
+  }
+
+  // Also check for ties within measures (for split notes)
+  for (const renderedMeasure of renderedMeasures) {
+    const bassNotes = renderedMeasure.bassNotes;
+    if (!bassNotes || bassNotes.length < 2) continue;
+
+    const measureData = measures[renderedMeasure.index];
+    const bassNoteData = measureData?.notation?.bass?.voices?.[0]?.notes;
+
+    if (!bassNoteData) continue;
+
+    // Check each note after the first for isTied flag
+    for (let j = 1; j < bassNotes.length && j < bassNoteData.length; j++) {
+      const noteData = bassNoteData[j];
+
+      if (noteData && noteData.isTied === true) {
+        const prevNote = bassNotes[j - 1];
+        const currNote = bassNotes[j];
+
+        try {
+          const startBox = prevNote.getBoundingBox();
+          const endBox = currNote.getBoundingBox();
+
+          if (startBox && endBox) {
+            const startX = startBox.getX() + startBox.getW();
+            const endX = endBox.getX();
+            const startY = startBox.getY() + startBox.getH() + 5;
+            const endY = endBox.getY() + endBox.getH() + 5;
+
+            drawTieCurve(ctx, startX, startY, endX, endY, 'below');
+          }
+        } catch (e) {
+          console.debug('[drawManualTies] Could not get bounding box for intra-measure tie:', e.message);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Draw a tie curve using quadratic Bezier
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} startX - Start X position
+ * @param {number} startY - Start Y position
+ * @param {number} endX - End X position
+ * @param {number} endY - End Y position
+ * @param {string} direction - 'above' or 'below' the notes
+ */
+function drawTieCurve(ctx, startX, startY, endX, endY, direction = 'below') {
+  const controlPointOffset = direction === 'below' ? 15 : -15;
+
+  // Control point is at the midpoint horizontally, offset vertically
+  const controlX = (startX + endX) / 2;
+  const controlY = Math.max(startY, endY) + controlPointOffset;
+
+  // Draw outer curve (gives tie thickness)
+  ctx.save();
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.quadraticCurveTo(controlX, controlY, endX, endY);
+  ctx.stroke();
+
+  // Draw inner curve (slightly different control point) to give thickness effect
+  const innerControlY = controlY - (direction === 'below' ? 3 : -3);
+  ctx.lineWidth = 1;
+
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.quadraticCurveTo(controlX, innerControlY, endX, endY);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// ============================================================================
 // NOTE COLORING
 // ============================================================================
 
@@ -1129,27 +1318,41 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     ];
 
     // Get chord information from compositionState to calculate beat positions
+    // Use chordSegments if available (Phase 5 of Bass Clef Refactoring) for more accurate positioning
     if (window.getCompositionState) {
       const compositionState = window.getCompositionState();
-      const chords = compositionState.getChords();
 
-      if (chords && chords.length > 0) {
-        let beatOffset = 0;
-        chords.forEach((chord, index) => {
-          const chordBeats = chord.beats !== undefined ? chord.beats : 4;
-          const startBeat = beatOffset;
-          const endBeat = beatOffset + chordBeats;
+      // Try to use chord segments first (more accurate, includes edited bass tracking)
+      const segments = compositionState.getChordSegments ? compositionState.getChordSegments() : null;
+
+      if (segments && segments.length > 0) {
+        // Use segment data for accurate beat positions
+        console.log('[grandStaff] Drawing chord spans using', segments.length, 'segments');
+
+        segments.forEach((segment, index) => {
+          const startBeat = segment.startBeat;
+          const endBeat = segment.startBeat + segment.durationBeats;
+          const chord = segment.chord || {};
+
+          console.log(`[grandStaff] Segment ${index}: ${chord.name || chord.root}, startBeat=${startBeat}, endBeat=${endBeat}, isEdited=${segment.isEdited}`);
 
           // Draw the background shading for this chord
+          // Use slightly different color if bass has been edited
+          let bgColor = chordSpanColors[index % chordSpanColors.length];
+          if (segment.isEdited) {
+            // Add subtle indicator that this segment has edited bass
+            bgColor = bgColor.replace('0.15', '0.2'); // Slightly more opaque
+          }
+
           drawChordSpanHighlight(
             startBeat,
             endBeat,
-            chordSpanColors[index % chordSpanColors.length]
+            bgColor
           );
 
           // Draw the bracket with chord name beneath bass clef
           // Format chord name with inversion
-          let chordName = chord.name || chord.simpleName || `${chord.root}${chord.type || ''}`;
+          let chordName = chord.name || chord.simpleName || `${chord.root || ''}${chord.type || ''}`;
 
           // Add inversion indicator
           const inversion = chord.inversion || 0;
@@ -1161,15 +1364,64 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
             chordName += ' (3rd)';
           }
 
+          // Add edited indicator
+          if (segment.isEdited) {
+            chordName += ' ✎';
+          }
+
           drawChordBracket(
             startBeat,
             endBeat,
             chordName,
             chordBracketColors[index % chordBracketColors.length]
           );
-
-          beatOffset += chordBeats;
         });
+      } else {
+        // Fallback to original chord-based approach
+        const chords = compositionState.getChords();
+
+        console.log('[grandStaff] Drawing chord spans for', chords?.length || 0, 'chords (fallback)');
+
+        if (chords && chords.length > 0) {
+          let beatOffset = 0;
+          chords.forEach((chord, index) => {
+            const chordBeats = chord.beats !== undefined ? chord.beats : 4;
+            const startBeat = beatOffset;
+            const endBeat = beatOffset + chordBeats;
+
+            console.log(`[grandStaff] Chord ${index}: ${chord.name}, beats=${chordBeats}, startBeat=${startBeat}, endBeat=${endBeat}`);
+
+            // Draw the background shading for this chord
+            drawChordSpanHighlight(
+              startBeat,
+              endBeat,
+              chordSpanColors[index % chordSpanColors.length]
+            );
+
+            // Draw the bracket with chord name beneath bass clef
+            // Format chord name with inversion
+            let chordName = chord.name || chord.simpleName || `${chord.root}${chord.type || ''}`;
+
+            // Add inversion indicator
+            const inversion = chord.inversion || 0;
+            if (inversion === 1) {
+              chordName += ' (1st)';
+            } else if (inversion === 2) {
+              chordName += ' (2nd)';
+            } else if (inversion === 3) {
+              chordName += ' (3rd)';
+            }
+
+            drawChordBracket(
+              startBeat,
+              endBeat,
+              chordName,
+              chordBracketColors[index % chordBracketColors.length]
+            );
+
+            beatOffset += chordBeats;
+          });
+        }
       }
     }
   }
@@ -1578,6 +1830,14 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     }
   }
   */
+
+  // ==========================================================================
+  // MANUAL TIE CURVE RENDERING (Phase 3 of Bass Clef Refactoring)
+  // ==========================================================================
+  // Draw tie curves manually using canvas API to bypass VexFlow's StaveTie limitations
+  // This works for cross-measure ties within the same system
+
+  drawManualTies(context, renderedMeasures, measures);
 
   // Collect all note regions and add chord tone analysis
   const allNoteRegions = [];
