@@ -809,6 +809,25 @@ button:active:not(:disabled),
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Ensure proper spacing between grid items in progression visualization */
+#progression-visualization {
+    gap: 0.5rem !important; /* Force 8px gap between cards */
+}
+
+#progression-visualization > .chord-card-wrapper {
+    margin: 0 !important; /* Remove any margins that might cause overlap */
+    box-sizing: border-box !important; /* Ensure padding is included in width */
+    min-width: 0 !important; /* Allow grid to shrink items properly */
+}
+
+/* Fix for simplified cards in progression visualization - prevent overflow */
+#progression-visualization > .chord-card-wrapper > div {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important; /* Prevent content from extending beyond card */
+}
+
 /* Sortable ghost styling */
 .sortable-ghost {
     opacity: 0.5;
@@ -896,12 +915,12 @@ button:active:not(:disabled),
 /* Shift cards to the right when they come after an expanded card */
 .chord-card-wrapper.shift-right {
     position: relative;
-    /* transform is set dynamically via JavaScript to preserve card width */
-    /* Using transform instead of margin prevents cards from shrinking */
-    /* Cards maintain their full width and are just visually shifted */
-    /* Use CSS custom property to persist transform even when inline style is reset */
+    /* TEMPORARILY DISABLED - testing if this causes overlap
     transform: translateX(var(--card-shift, 0px));
-    will-change: transform; /* Hint to browser to optimize transform */
+    will-change: transform;
+    */
+    /* Force no transform for now */
+    transform: none !important;
 }
 
 @keyframes card-pulse {
@@ -2367,4 +2386,15 @@ canvas {
 .simplified-chord-card.sortable-drag {
     opacity: 0.9;
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+}
+
+/* Sidebar tooltip positioning fix - allow tooltips to escape overflow container */
+/* Only allow horizontal overflow to be visible on the scrollable section within sidebar */
+#sidebar > .flex-1.overflow-y-auto {
+    overflow-x: visible !important;
+}
+
+/* Ensure sidebar tooltips appear above everything else */
+#sidebar .group > div.absolute.left-full {
+    z-index: 9999;
 }

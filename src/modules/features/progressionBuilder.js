@@ -9227,7 +9227,38 @@ export function removeChordFromProgression(index) {
     // Save state before removing
     saveStateBeforeChange();
 
-    trainerState.progressionData.splice(index, 1);
+    // IMPORTANT: progressionData is now delegated to compositionState
+    // We need to remove from compositionState properly
+    if (window.getCompositionState) {
+        const compositionState = window.getCompositionState();
+        const progressionData = [...trainerState.progressionData]; // Get current data
+        console.log('[removeChordFromProgression] BEFORE delete - progressionData:', progressionData.map((c, i) => `[${i}] ${c.root}${c.type}`).join(', '));
+        console.log('[removeChordFromProgression] BEFORE delete - progressionData length:', progressionData.length);
+        console.log('[removeChordFromProgression] BEFORE delete - compositionState measures:', compositionState.getMeasureCount());
+
+        progressionData.splice(index, 1); // Remove the chord
+
+        console.log('[removeChordFromProgression] AFTER splice - progressionData:', progressionData.map((c, i) => `[${i}] ${c.root}${c.type}`).join(', '));
+        console.log('[removeChordFromProgression] AFTER splice - progressionData length:', progressionData.length);
+
+        // Sync back to compositionState
+        compositionState.syncWithProgressionData(progressionData, {
+            key: trainerState.currentKey,
+            timeSignature: { num: 4, denom: 4 }
+        });
+
+        console.log('[removeChordFromProgression] AFTER sync - compositionState measures:', compositionState.getMeasureCount());
+
+        // Verify the deletion worked by exporting again
+        const verifyData = compositionState.exportToProgressionData();
+        console.log('[removeChordFromProgression] VERIFY - exportToProgressionData():', verifyData.map((c, i) => `[${i}] ${c.root}${c.type}`).join(', '));
+        console.log('[removeChordFromProgression] VERIFY - exportToProgressionData() length:', verifyData.length);
+    } else {
+        // Fallback for legacy code
+        trainerState.progressionData.splice(index, 1);
+    }
+
+    // Still update Romans (this is in trainerState, not compositionState)
     trainerState.progressionRomans.splice(index, 1);
 
     // Handle selection state after deletion

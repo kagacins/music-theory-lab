@@ -762,6 +762,7 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     activeMeasureIndex = -1,     // Yellow background for playing measure
     activeNotes = null,          // Set of note IDs for red highlighting
     enableHarmonicColoring = false, // Enable chord tone coloring
+    showChordSpans = true,       // Show chord span shading and brackets
   } = options;
 
   // Calculate dimensions
@@ -884,8 +885,15 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
         // If endBeatInMeasure is 0, it means the chord ends exactly at the start of this measure,
         // so we shouldn't draw anything in this measure (the previous measure was the last)
         const endFraction = endBeatInMeasure === 0 ? 0 : endBeatInMeasure / beatsPerMeasure;
-        x = measureX;
-        w = fullWidth * endFraction;
+        // For first measure in system, beats start after the clef/key/time signature
+        // So we need to offset x and adjust the width calculation
+        if (isFirstInSystem) {
+          x = measureX + dimensions.firstMeasureExtra;
+          w = measureWidth * endFraction;
+        } else {
+          x = measureX;
+          w = fullWidth * endFraction;
+        }
       } else {
         // Middle measure - full width
         x = measureX;
@@ -956,8 +964,14 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       } else if (m === endMeasure) {
         // If endBeatInMeasure is 0, chord ends exactly at start of this measure
         const endFraction = endBeatInMeasure === 0 ? 0 : endBeatInMeasure / beatsPerMeasure;
-        segmentX = measureX;
-        segmentW = fullWidth * endFraction;
+        // For first measure in system, beats start after the clef/key/time signature
+        if (isFirstInSystem) {
+          segmentX = measureX + dimensions.firstMeasureExtra;
+          segmentW = measureWidth * endFraction;
+        } else {
+          segmentX = measureX;
+          segmentW = fullWidth * endFraction;
+        }
       } else {
         segmentX = measureX;
         segmentW = fullWidth;
@@ -1095,54 +1109,68 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     drawMeasureHighlight(selectedMeasureIndex, 'rgba(59, 130, 246, 0.8)', true);
   }
 
-  // Draw chord span shading - alternating colors for consecutive chords
+  // Draw chord span shading and brackets - alternating colors for consecutive chords
   // Uses beat-based positioning to show exact horizontal spans, even within measures
-  const chordSpanColors = [
-    'rgba(200, 220, 255, 0.15)',  // Light blue
-    'rgba(220, 255, 220, 0.15)',  // Light green
-    'rgba(255, 240, 200, 0.15)',  // Light yellow
-    'rgba(255, 220, 220, 0.15)',  // Light red
-    'rgba(240, 220, 255, 0.15)',  // Light purple
-  ];
+  if (showChordSpans) {
+    const chordSpanColors = [
+      'rgba(200, 220, 255, 0.15)',  // Light blue
+      'rgba(220, 255, 220, 0.15)',  // Light green
+      'rgba(255, 240, 200, 0.15)',  // Light yellow
+      'rgba(255, 220, 220, 0.15)',  // Light red
+      'rgba(240, 220, 255, 0.15)',  // Light purple
+    ];
 
-  const chordBracketColors = [
-    '#4080E0',  // Blue
-    '#40B060',  // Green
-    '#D0A040',  // Yellow/Gold
-    '#D06060',  // Red
-    '#9060C0',  // Purple
-  ];
+    const chordBracketColors = [
+      '#4080E0',  // Blue
+      '#40B060',  // Green
+      '#D0A040',  // Yellow/Gold
+      '#D06060',  // Red
+      '#9060C0',  // Purple
+    ];
 
-  // Get chord information from compositionState to calculate beat positions
-  if (window.getCompositionState) {
-    const compositionState = window.getCompositionState();
-    const chords = compositionState.getChords();
+    // Get chord information from compositionState to calculate beat positions
+    if (window.getCompositionState) {
+      const compositionState = window.getCompositionState();
+      const chords = compositionState.getChords();
 
-    if (chords && chords.length > 0) {
-      let beatOffset = 0;
-      chords.forEach((chord, index) => {
-        const chordBeats = chord.beats !== undefined ? chord.beats : 4;
-        const startBeat = beatOffset;
-        const endBeat = beatOffset + chordBeats;
+      if (chords && chords.length > 0) {
+        let beatOffset = 0;
+        chords.forEach((chord, index) => {
+          const chordBeats = chord.beats !== undefined ? chord.beats : 4;
+          const startBeat = beatOffset;
+          const endBeat = beatOffset + chordBeats;
 
-        // Draw the background shading for this chord
-        drawChordSpanHighlight(
-          startBeat,
-          endBeat,
-          chordSpanColors[index % chordSpanColors.length]
-        );
+          // Draw the background shading for this chord
+          drawChordSpanHighlight(
+            startBeat,
+            endBeat,
+            chordSpanColors[index % chordSpanColors.length]
+          );
 
-        // Draw the bracket with chord name beneath bass clef
-        const chordName = chord.name || chord.simpleName || `${chord.root}${chord.type || ''}`;
-        drawChordBracket(
-          startBeat,
-          endBeat,
-          chordName,
-          chordBracketColors[index % chordBracketColors.length]
-        );
+          // Draw the bracket with chord name beneath bass clef
+          // Format chord name with inversion
+          let chordName = chord.name || chord.simpleName || `${chord.root}${chord.type || ''}`;
 
-        beatOffset += chordBeats;
-      });
+          // Add inversion indicator
+          const inversion = chord.inversion || 0;
+          if (inversion === 1) {
+            chordName += ' (1st)';
+          } else if (inversion === 2) {
+            chordName += ' (2nd)';
+          } else if (inversion === 3) {
+            chordName += ' (3rd)';
+          }
+
+          drawChordBracket(
+            startBeat,
+            endBeat,
+            chordName,
+            chordBracketColors[index % chordBracketColors.length]
+          );
+
+          beatOffset += chordBeats;
+        });
+      }
     }
   }
 

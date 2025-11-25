@@ -600,6 +600,51 @@ function toggleChordToneHighlighting() {
     }
 }
 
+function toggleChordSpans() {
+    const toggle = document.getElementById('chord-spans-toggle');
+    const enabled = toggle.checked;
+
+    // Update indicator colors
+    const offIndicator = document.getElementById('chord-spans-off-indicator');
+    const onIndicator = document.getElementById('chord-spans-on-indicator');
+
+    if (enabled) {
+        onIndicator.classList.remove('text-gray-500');
+        onIndicator.classList.add('text-indigo-300');
+        offIndicator.classList.remove('text-indigo-300');
+        offIndicator.classList.add('text-gray-500');
+    } else {
+        offIndicator.classList.remove('text-gray-500');
+        offIndicator.classList.add('text-indigo-300');
+        onIndicator.classList.remove('text-indigo-300');
+        onIndicator.classList.add('text-gray-500');
+    }
+
+    // Update CompositionState
+    try {
+        if (window.getCompositionState) {
+            const compositionState = window.getCompositionState();
+            compositionState.updateSettings({ showChordSpans: enabled });
+        }
+    } catch (e) {
+        console.warn('Could not update CompositionState:', e);
+    }
+
+    // Save to localStorage
+    localStorage.setItem('chord-spans', enabled.toString());
+
+    // Dispatch event for other components
+    document.dispatchEvent(new CustomEvent('chord-spans-changed', {
+        detail: { enabled }
+    }));
+
+    // Re-render notation canvas
+    const canvas = document.getElementById('interactive-melody-notation-canvas');
+    if (canvas && window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
+    }
+}
+
 function toggleFloatingControls() {
     const panels = document.querySelectorAll('.floating-panel');
     const expandBtn = document.getElementById('expand-controls-btn');
@@ -948,6 +993,7 @@ window.toggleCompactControls = toggleCompactControls;
 window.toggleDarkMode = toggleDarkMode;
 window.toggleFretboard = toggleFretboard;
 window.toggleChordToneHighlighting = toggleChordToneHighlighting;
+window.toggleChordSpans = toggleChordSpans;
 window.toggleFloatingControls = toggleFloatingControls;
 window.toggleDisplayPanel = toggleDisplayPanel;
 window.handleOctaveRangeChange = handleOctaveRangeChange;
@@ -2384,6 +2430,50 @@ window.onload = () => {
         const offIndicator = document.getElementById('chord-tone-off-indicator');
         const onIndicator = document.getElementById('chord-tone-on-indicator');
         if (chordToneEnabled) {
+            if (onIndicator) {
+                onIndicator.classList.remove('text-gray-500');
+                onIndicator.classList.add('text-indigo-300');
+            }
+            if (offIndicator) {
+                offIndicator.classList.remove('text-indigo-300');
+                offIndicator.classList.add('text-gray-500');
+            }
+        } else {
+            if (offIndicator) {
+                offIndicator.classList.remove('text-gray-500');
+                offIndicator.classList.add('text-indigo-300');
+            }
+            if (onIndicator) {
+                onIndicator.classList.remove('text-indigo-300');
+                onIndicator.classList.add('text-gray-500');
+            }
+        }
+    }
+
+    // Initialize chord spans toggle
+    const chordSpansToggle = document.getElementById('chord-spans-toggle');
+    if (chordSpansToggle) {
+        // Get current setting from localStorage or CompositionState
+        let chordSpansEnabled = true; // Default to true (checked)
+        try {
+            if (window.getCompositionState) {
+                const compositionState = window.getCompositionState();
+                const settings = compositionState.getSettings();
+                chordSpansEnabled = settings.showChordSpans !== false;
+            } else {
+                const stored = localStorage.getItem('chord-spans');
+                chordSpansEnabled = stored !== 'false';
+            }
+        } catch (e) {
+            const stored = localStorage.getItem('chord-spans');
+            chordSpansEnabled = stored !== 'false';
+        }
+        chordSpansToggle.checked = chordSpansEnabled;
+
+        // Update indicator colors
+        const offIndicator = document.getElementById('chord-spans-off-indicator');
+        const onIndicator = document.getElementById('chord-spans-on-indicator');
+        if (chordSpansEnabled) {
             if (onIndicator) {
                 onIndicator.classList.remove('text-gray-500');
                 onIndicator.classList.add('text-indigo-300');

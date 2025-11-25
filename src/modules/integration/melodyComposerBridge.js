@@ -246,6 +246,14 @@ function getCurrentBeat(measureIndex, staff) {
 export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = false, accidental = null, articulation = null) {
     if (!useCompositionState) return { success: false, measuresFilled: 0 };
 
+    // DEBUG: Track progressionData state at start of note addition
+    if (compositionState) {
+        const progressionData = compositionState.exportToProgressionData();
+        console.log('[addNoteIntelligently] START - progressionData:', progressionData.map((c, i) => `[${i}] ${c.root}${c.type}`).join(', '));
+        console.log('[addNoteIntelligently] START - progressionData length:', progressionData.length);
+        console.log('[addNoteIntelligently] START - compositionState measures:', compositionState.getMeasureCount());
+    }
+
     // Get selected measure from notation composer
     const notationComposer = window.getNotationComposer && window.getNotationComposer();
     let selectedMeasureIndex = notationComposer?.getSelectedMeasure() ?? -1;

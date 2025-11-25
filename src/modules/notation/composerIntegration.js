@@ -869,6 +869,10 @@ export class NotationComposer {
       this.renderedSystem = this.renderToPages(measures, key, timeSig);
     } else {
       // LEGACY SINGLE CANVAS RENDERING
+      const compositionState = getCompositionState();
+      const settings = compositionState ? compositionState.getSettings() : {};
+      const showChordSpans = settings.showChordSpans !== false; // Default to true
+
       this.renderedSystem = renderGrandStaffSystem(this.config.container, measures, {
         measuresPerLine: this.config.measuresPerLine,
         keySignature: key,
@@ -879,6 +883,8 @@ export class NotationComposer {
         activeMeasureIndex: this.activeMeasureIndex,
         activeNotes: this.activeNotes,
         enableHarmonicColoring: this.config.enableHarmonicColoring,
+        // Chord span settings
+        showChordSpans: showChordSpans,
       });
     }
 
@@ -1025,6 +1031,10 @@ export class NotationComposer {
     // Clear all existing pages
     this.pageManager.clearAllPages();
 
+    // Get settings for chord spans
+    const compositionState = getCompositionState();
+    const settings = compositionState ? compositionState.getSettings() : {};
+
     // Group measures by page (8 measures per page)
     const measuresPerPage = PAGE_CONFIG.measuresPerPage;
     const allRenderedMeasures = [];
@@ -1050,6 +1060,8 @@ export class NotationComposer {
         activeMeasureIndex: this.activeMeasureIndex - startMeasure, // Adjust for page offset
         activeNotes: this.activeNotes,
         enableHarmonicColoring: this.config.enableHarmonicColoring,
+        // Chord span settings
+        showChordSpans: settings.showChordSpans !== false, // Default to true
       });
 
       // Collect rendered measures (adjust indices back to global)
@@ -1164,6 +1176,10 @@ export class NotationComposer {
       }
     }
 
+    // Get settings for chord spans
+    const compositionState = getCompositionState();
+    const settings = compositionState ? compositionState.getSettings() : {};
+
     // Render this page's measures
     const renderedPage = renderGrandStaffSystem(page.canvas, pageMeasures, {
       measuresPerLine: this.config.measuresPerLine,
@@ -1176,6 +1192,8 @@ export class NotationComposer {
       activeMeasureIndex: this.activeMeasureIndex - startMeasure, // Adjust for page offset
       activeNotes: pageLocalActiveNotes, // CRITICAL: Use page-local note IDs
       enableHarmonicColoring: this.config.enableHarmonicColoring,
+      // Chord span settings
+      showChordSpans: settings.showChordSpans !== false, // Default to true
     });
 
     const allRenderedMeasures = [];

@@ -749,6 +749,15 @@ export class NoteEditor {
       return;
     }
 
+    // DEBUG: Track progressionData state at start of note addition
+    if (window.getCompositionState) {
+      const compositionState = window.getCompositionState();
+      const progressionData = compositionState.exportToProgressionData();
+      console.log('[addNoteAtPosition] START - progressionData:', progressionData.map((c, i) => `[${i}] ${c.root}${c.type}`).join(', '));
+      console.log('[addNoteAtPosition] START - progressionData length:', progressionData.length);
+      console.log('[addNoteAtPosition] START - compositionState measures:', compositionState.getMeasureCount());
+    }
+
     // CRITICAL: Always use the CLICKED/HOVERED measure, not the selected measure
     // The measure where the mouse is hovering is what the user expects the note to be added to
     const targetMeasureIndex = staffPosition.measure?.index ?? 0;
