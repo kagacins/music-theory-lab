@@ -810,22 +810,28 @@ button:active:not(:disabled),
 }
 
 /* Ensure proper spacing between grid items in progression visualization */
-#progression-visualization {
-    gap: 0.5rem !important; /* Force 8px gap between cards */
+#progression-visualization,
+#melody-progression-visualization {
+    gap: 0.75rem !important; /* Force 12px gap between cards for clear separation */
 }
 
-#progression-visualization > .chord-card-wrapper {
+#progression-visualization > .chord-card-wrapper,
+#melody-progression-visualization > .chord-card-wrapper {
     margin: 0 !important; /* Remove any margins that might cause overlap */
     box-sizing: border-box !important; /* Ensure padding is included in width */
-    min-width: 0 !important; /* Allow grid to shrink items properly */
+    flex-shrink: 0; /* Prevent cards from shrinking and overlapping */
+    padding: 4px; /* Add padding to show selection ring highlight */
+    overflow: visible; /* Allow ring highlight to show */
 }
 
 /* Fix for simplified cards in progression visualization - prevent overflow */
-#progression-visualization > .chord-card-wrapper > div {
+/* Only apply to non-expanded cards */
+#progression-visualization > .chord-card-wrapper:not(.expanded-card-wrapper) > div,
+#melody-progression-visualization > .chord-card-wrapper:not(.expanded-card-wrapper) > div {
     box-sizing: border-box !important;
     width: 100% !important;
     max-width: 100% !important;
-    overflow: hidden !important; /* Prevent content from extending beyond card */
+    overflow: visible !important; /* Allow ring highlight to show */
 }
 
 /* Sortable ghost styling */
@@ -855,8 +861,17 @@ button:active:not(:disabled),
     opacity: 0.9;
 }
 
-#progression-visualization > div:hover {
+/* Hover effect for simplified cards - translateY combined with any existing translateX */
+#progression-visualization > .chord-card-wrapper:not(.shift-right):hover,
+#melody-progression-visualization > .chord-card-wrapper:not(.shift-right):hover {
     transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* For shifted cards, combine both transforms */
+#progression-visualization > .chord-card-wrapper.shift-right:hover,
+#melody-progression-visualization > .chord-card-wrapper.shift-right:hover {
+    transform: translateX(var(--card-shift, 0px)) translateY(-4px);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
 }
 
@@ -904,23 +919,17 @@ button:active:not(:disabled),
     box-sizing: border-box;
 }
 
-/* Ensure simplified cards maintain their width (except when showing notation) */
+/* Ensure simplified cards maintain their width in their grid cell */
 .chord-card-wrapper:not(.expanded-card-wrapper):not(.has-notation) {
-    min-width: 100% !important;
-    width: 100% !important;
-    max-width: 100% !important;
     box-sizing: border-box;
 }
 
 /* Shift cards to the right when they come after an expanded card */
 .chord-card-wrapper.shift-right {
     position: relative;
-    /* TEMPORARILY DISABLED - testing if this causes overlap
     transform: translateX(var(--card-shift, 0px));
     will-change: transform;
-    */
-    /* Force no transform for now */
-    transform: none !important;
+    transition: transform 0.3s ease-out;
 }
 
 @keyframes card-pulse {

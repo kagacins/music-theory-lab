@@ -16,6 +16,7 @@
 import { EventEmitter } from '../utils/eventEmitter.js';
 import { generateBassVoicing } from '../integration/bassAutoFill.js';
 import { getChordNotes } from '../utils/noteUtils.js';
+import { BuildingBlockSequence, durationToUnits, UNITS_PER_BEAT } from './buildingBlock.js';
 
 // ============================================================================
 // BASS NOTE STORE - Single Source of Truth for Bass Notes
@@ -328,11 +329,19 @@ export class CompositionState {
         this.chordSegments = [];
 
         // ====================================================================
-        // BASS NOTE STORE - Single Source of Truth
+        // BASS NOTE STORE - Single Source of Truth (LEGACY - being replaced)
         // ====================================================================
         // The BassNoteStore is the authoritative record of bass notes.
         // It survives measure restructuring and chord reordering.
         this.bassNoteStore = new BassNoteStore();
+
+        // ====================================================================
+        // BUILDING BLOCK SEQUENCE - New Single Source of Truth for Bass
+        // ====================================================================
+        // Each chord card becomes a BuildingBlock with 48 units per beat.
+        // This enables precise duration changes, reordering, and tie handling.
+        // The sequence renders to measures for display.
+        this.bassBlockSequence = new BuildingBlockSequence();
     }
 
     // ========================================================================
@@ -361,8 +370,6 @@ export class CompositionState {
      * Called after syncWithProgressionData to populate segment model
      */
     buildChordSegments() {
-        console.log('%c[buildChordSegments] === START ===', 'color: #ff00ff; font-weight: bold');
-
         const progressionData = this.exportToProgressionData();
         this.chordSegments = [];
 
@@ -374,23 +381,10 @@ export class CompositionState {
             // Gather bass notes for this chord from measures
             let bassNotes = this.gatherBassNotesForChord(chordIndex);
 
-            console.log(`[buildChordSegments] Chord ${chordIndex} (${chordData.root}${chordData.type}): durationBeats=${durationBeats}, gathered ${bassNotes.length} notes`);
-            bassNotes.forEach((n, i) => {
-                console.log(`  [${i}] duration=${n.duration}, isTied=${n.isTied}, pitches=${JSON.stringify(n.pitches)}`);
-            });
-
             // CRITICAL: Recombine tied notes if chord now fits in a single measure
             // This handles the case where a chord was split across measures but after
             // reordering now fits in one measure - tied notes should become one note
-            const beforeRecombine = bassNotes.length;
             bassNotes = this.recombineTiedNotes(bassNotes, durationBeats);
-
-            if (beforeRecombine !== bassNotes.length) {
-                console.log(`[buildChordSegments] After recombine: ${bassNotes.length} notes (was ${beforeRecombine})`);
-                bassNotes.forEach((n, i) => {
-                    console.log(`  [${i}] duration=${n.duration}, isTied=${n.isTied}, pitches=${JSON.stringify(n.pitches)}`);
-                });
-            }
 
             // Check if bass has been edited (compare with what auto-generation would produce)
             const isEdited = this.checkIfBassIsEdited(chordIndex);
@@ -408,8 +402,6 @@ export class CompositionState {
             this.chordSegments.push(segment);
             currentBeat += durationBeats;
         });
-
-        console.log(`%c[buildChordSegments] === END: ${this.chordSegments.length} segments ===`, 'color: #ff00ff; font-weight: bold');
     }
 
     /**
@@ -603,29 +595,18 @@ export class CompositionState {
      * @returns {Array} - Recombined bass notes
      */
     recombineTiedNotes(bassNotes, newDurationBeats) {
-        console.log(`[recombineTiedNotes] Input: ${bassNotes?.length || 0} notes, newDurationBeats=${newDurationBeats}`);
-
         if (!bassNotes || bassNotes.length < 2) {
-            console.log('[recombineTiedNotes] Skipping (< 2 notes)');
             return bassNotes;
         }
 
         const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
         const beatsPerMeasure = timeSignature.num || 4;
 
-        console.log(`[recombineTiedNotes] beatsPerMeasure=${beatsPerMeasure}, newDurationBeats=${newDurationBeats}`);
-
         // If the new duration fits in one measure, we may need to recombine
         if (newDurationBeats > beatsPerMeasure) {
             // Still spans measures, no recombination needed
-            console.log('[recombineTiedNotes] Skipping (spans measures)');
             return bassNotes;
         }
-
-        console.log('[recombineTiedNotes] Attempting recombination...');
-        bassNotes.forEach((n, idx) => {
-            console.log(`  Input note ${idx}: duration=${n.duration}, isTied=${n.isTied}, pitches=${JSON.stringify(n.pitches)}`);
-        });
 
         const recombined = [];
         let i = 0;
@@ -637,12 +618,8 @@ export class CompositionState {
             let combinedBeats = getDurationInBeats(currentNote.duration);
             let j = i + 1;
 
-            console.log(`  Starting at note ${i}: duration=${currentNote.duration} (${combinedBeats} beats)`);
-
             while (j < bassNotes.length) {
                 const nextNote = bassNotes[j];
-
-                console.log(`    Checking note ${j}: duration=${nextNote.duration}, isTied=${nextNote.isTied}, samePitches=${this.notesHaveSamePitches(currentNote, nextNote)}`);
 
                 // Check if next note is tied and has the same pitches
                 if (nextNote.isTied && this.notesHaveSamePitches(currentNote, nextNote)) {
@@ -653,21 +630,16 @@ export class CompositionState {
                     const potentialDuration = beatsToDuration(potentialCombinedBeats);
                     const actualCombinedBeats = getDurationInBeats(potentialDuration);
 
-                    console.log(`    Potential combine: ${combinedBeats} + ${nextBeats} = ${potentialCombinedBeats}, canRepresent=${Math.abs(actualCombinedBeats - potentialCombinedBeats) < 0.01} (potentialDuration=${potentialDuration})`);
-
                     // Only combine if we can represent it accurately with a single note
                     if (Math.abs(actualCombinedBeats - potentialCombinedBeats) < 0.01) {
                         combinedBeats = potentialCombinedBeats;
                         j++; // Continue to next note
-                        console.log(`    -> Combined! New total: ${combinedBeats} beats`);
                     } else {
                         // Can't combine further, break out
-                        console.log(`    -> Cannot combine (duration not representable)`);
                         break;
                     }
                 } else {
                     // Not tied or different pitches, break out
-                    console.log(`    -> Cannot combine (not tied or different pitches)`);
                     break;
                 }
             }
@@ -680,8 +652,6 @@ export class CompositionState {
                 dotted: combinedDuration.includes('.'),
                 isTied: false, // No longer tied since combined
             });
-
-            console.log(`  Output note: duration=${combinedDuration}, combined ${j - i} notes`);
 
             // Move past all notes we combined
             i = j;
@@ -718,8 +688,6 @@ export class CompositionState {
      * This captures the actual bass-register pitches, not treble-clef chord notes
      */
     initializeBassNoteStoreFromMeasures() {
-        console.log('%c[initializeBassNoteStoreFromMeasures] === START ===', 'color: #9900ff; font-weight: bold');
-
         this.bassNoteStore.clear();
 
         // Group notes by their chordIndex and combine tied notes
@@ -752,7 +720,7 @@ export class CompositionState {
             const combinedNotes = this.combineRenderedNotes(notes);
 
             for (const note of combinedNotes) {
-                const noteId = this.bassNoteStore.setNote(chordIndex, {
+                this.bassNoteStore.setNote(chordIndex, {
                     pitches: note.pitches || [],
                     duration: note.duration,
                     beat: note.beat || 0,
@@ -760,12 +728,277 @@ export class CompositionState {
                     isRest: note.isRest,
                     type: note.type || 'note',
                 });
-                console.log(`[initializeBassNoteStoreFromMeasures] Chord ${chordIndex}: noteId=${noteId}, duration=${note.duration}, pitches=${note.pitches?.length || 0}`);
+            }
+        }
+    }
+
+    // ========================================================================
+    // BUILDING BLOCK SEQUENCE METHODS (New Bass Note System)
+    // ========================================================================
+
+    /**
+     * Initialize the BuildingBlockSequence from progression data
+     * Creates a building block for each chord with the chord's pitches
+     * @param {Array} progressionData - Array of chord objects
+     */
+    initializeBassBlockSequence(progressionData) {
+        // Set time signature on the sequence
+        const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
+        this.bassBlockSequence.setTimeSignature(timeSignature.num, timeSignature.denom);
+
+        // Clear existing blocks
+        this.bassBlockSequence.blocks = [];
+
+        // Create a building block for each chord
+        progressionData.forEach((chordData, index) => {
+            // Get the pitches for this chord
+            let pitches = chordData.notes || [];
+
+            // If no notes, generate from chord root/type
+            if (pitches.length === 0 && chordData.root && chordData.type) {
+                const chordNotesObj = getChordNotes(chordData.root, chordData.type, this.metadata.key);
+                if (chordNotesObj && chordNotesObj.specificNotes) {
+                    pitches = chordNotesObj.specificNotes;
+                }
+            }
+
+            // Apply omittedNotes filter
+            const omittedNotes = chordData.omittedNotes || [];
+            if (omittedNotes.length > 0) {
+                pitches = pitches.filter(n => !omittedNotes.includes(n));
+            }
+
+            // Add the block with chord data
+            this.bassBlockSequence.addBlock({
+                ...chordData,
+                notes: pitches,
+                beats: chordData.beats || 4,
+            }, index);
+        });
+    }
+
+    /**
+     * Render bass notes from BuildingBlockSequence to measures
+     * This is the new method that will eventually replace renderBassNotesToMeasures
+     */
+    renderBassBlocksToMeasures() {
+        if (this.bassBlockSequence.blocks.length === 0) {
+            return;
+        }
+
+        // Get rendered measures from the sequence
+        const renderedMeasures = this.bassBlockSequence.renderToMeasures();
+
+        // Ensure we have enough measures
+        while (this.measures.length < renderedMeasures.length) {
+            this.addMeasure({});
+        }
+
+        // Copy bass notes from rendered measures to our measures
+        renderedMeasures.forEach((renderedMeasure, measureIndex) => {
+            if (measureIndex < this.measures.length) {
+                const measure = this.measures[measureIndex];
+
+                // Convert rendered notes to our measure format
+                measure.notation.bass.voices[0].notes = renderedMeasure.bassNotes.map(note => ({
+                    type: note.isRest ? 'rest' : 'note',
+                    pitches: note.pitches,
+                    duration: note.duration,
+                    beat: note.beat,
+                    dotted: note.duration?.includes('.') || false,
+                    isTied: note.isTied,
+                    isRest: note.isRest,
+                    chordIndex: note.chordIndex,
+                    blockId: note.blockId,
+                    // Musical attributes
+                    dynamic: note.dynamic,
+                    velocity: note.velocity,
+                    articulation: note.articulation,
+                    fermata: note.fermata,
+                    ornament: note.ornament,
+                    graceNotes: note.graceNotes,
+                    tremolo: note.tremolo,
+                    accidental: note.accidental,
+                    slur: note.slur,
+                    glissando: note.glissando,
+                    arpeggio: note.arpeggio,
+                    tuplet: note.tuplet,
+                    fingering: note.fingering,
+                    pedal: note.pedal,
+                    text: note.text,
+                    breath: note.breath,
+                    voice: note.voice,
+                    stemDirection: note.stemDirection,
+                    lyric: note.lyric,
+                }));
+
+                // Mark as not auto-generated (these are chord card notes)
+                measure.notation.bass.autoGenerated = false;
+            }
+        });
+    }
+
+    /**
+     * Update a chord's duration using the BuildingBlockSequence
+     * @param {number} chordIndex - The chord index
+     * @param {number} newBeats - New duration in beats
+     */
+    updateBassBlockDuration(chordIndex, newBeats) {
+        const block = this.bassBlockSequence.getBlock(chordIndex);
+        if (!block) {
+            return;
+        }
+
+        // Update the block's duration
+        block.setDuration(newBeats);
+    }
+
+    /**
+     * Reorder a block in the BuildingBlockSequence
+     * @param {number} fromIndex - Original index
+     * @param {number} toIndex - New index
+     */
+    reorderBassBlock(fromIndex, toIndex) {
+        this.bassBlockSequence.reorderBlock(fromIndex, toIndex);
+    }
+
+    /**
+     * Sync measure bass notes back into BuildingBlockSequence
+     * This captures any edits made directly to measures so they persist across reorders
+     *
+     * IMPORTANT: Call this BEFORE reordering blocks to capture current edits
+     */
+    syncMeasuresToBuildingBlocks() {
+        if (this.bassBlockSequence.blocks.length === 0) {
+            return;
+        }
+
+        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+
+        // Calculate where each chord starts in absolute beats
+        const chordStartBeats = [];
+        let absoluteBeat = 0;
+        for (const block of this.bassBlockSequence.blocks) {
+            chordStartBeats.push(absoluteBeat);
+            absoluteBeat += block.beats;
+        }
+
+        // Collect all bass notes across all measures, grouped by their note.chordIndex
+        // This is the correct approach because a single measure can contain notes from
+        // multiple chords when chords don't align to measure boundaries
+        const chordNotes = new Map(); // chordIndex -> array of notes with absolute beat positions
+
+        for (let measureIndex = 0; measureIndex < this.measures.length; measureIndex++) {
+            const measure = this.measures[measureIndex];
+            const bassNotes = measure.notation?.bass?.voices?.[0]?.notes || [];
+            const measureStartBeat = measureIndex * beatsPerMeasure;
+
+            for (const note of bassNotes) {
+                // Skip tied notes - they're continuations, not new notes
+                if (note.isTied) {
+                    continue;
+                }
+
+                // Use the note's own chordIndex (set by renderBassBlocksToMeasures)
+                // Fall back to measure's chordIndex if note doesn't have one
+                const noteChordIndex = note.chordIndex !== undefined ? note.chordIndex : measure.chord?.chordIndex;
+                if (noteChordIndex === undefined) continue;
+
+                if (!chordNotes.has(noteChordIndex)) {
+                    chordNotes.set(noteChordIndex, []);
+                }
+
+                // Calculate beat position within the chord
+                // note.beat is relative to measure start
+                // measureStartBeat is absolute
+                // chordStartBeats[noteChordIndex] is where this chord starts in absolute beats
+                const absoluteNoteBeat = measureStartBeat + (note.beat || 0);
+                const chordStart = chordStartBeats[noteChordIndex] || 0;
+                const beatInChord = absoluteNoteBeat - chordStart;
+
+                console.log(`[syncMeasuresToBuildingBlocks] Measure ${measureIndex}, note at beat ${note.beat}: chordIndex=${noteChordIndex}, absoluteBeat=${absoluteNoteBeat}, chordStart=${chordStart}, beatInChord=${beatInChord}`);
+
+                chordNotes.get(noteChordIndex).push({
+                    pitches: note.pitches || (note.pitch ? [note.pitch] : []),
+                    duration: note.duration || '4n',
+                    beat: beatInChord,
+                    isRest: note.isRest || note.type === 'rest',
+                    // Carry forward all musical attributes
+                    dynamic: note.dynamic,
+                    velocity: note.velocity,
+                    articulation: note.articulation,
+                    fermata: note.fermata,
+                    ornament: note.ornament,
+                    graceNotes: note.graceNotes,
+                    tremolo: note.tremolo,
+                    accidental: note.accidental,
+                    slur: note.slur,
+                    glissando: note.glissando,
+                    arpeggio: note.arpeggio,
+                    tuplet: note.tuplet,
+                    fingering: note.fingering,
+                    pedal: note.pedal,
+                    text: note.text,
+                    breath: note.breath,
+                    voice: note.voice,
+                    stemDirection: note.stemDirection,
+                    lyric: note.lyric,
+                });
             }
         }
 
-        this.bassNoteStore.debugLog('[initializeBassNoteStoreFromMeasures] ');
-        console.log('%c[initializeBassNoteStoreFromMeasures] === END ===', 'color: #9900ff; font-weight: bold');
+        console.log(`[syncMeasuresToBuildingBlocks] Found ${chordNotes.size} chords with notes`);
+
+        // For each chord, reconstruct the block's units from collected notes
+        for (const [chordIndex, allNotes] of chordNotes) {
+            const block = this.bassBlockSequence.getBlock(chordIndex);
+            if (!block) {
+                console.warn(`[syncMeasuresToBuildingBlocks] No block for chord ${chordIndex}`);
+                continue;
+            }
+
+            console.log(`[syncMeasuresToBuildingBlocks] Chord ${chordIndex}: ${allNotes.length} notes`);
+
+            // Rebuild the block's units from these notes
+            // First, clear the block by reinitializing with empty pitches
+            const totalUnits = block.beats * UNITS_PER_BEAT;
+
+            // Reset all units
+            for (let i = 0; i < block.units.length; i++) {
+                block.units[i].pitches = [];
+                block.units[i].parentIndex = i === 0 ? null : 0;
+            }
+
+            // Now set each note in the block
+            for (const note of allNotes) {
+                const startUnit = Math.round(note.beat * UNITS_PER_BEAT);
+                const durationUnits = durationToUnits(note.duration);
+
+                if (startUnit >= 0 && startUnit < totalUnits) {
+                    block.setNote(startUnit, durationUnits, note.pitches, {
+                        dynamic: note.dynamic,
+                        velocity: note.velocity,
+                        articulation: note.articulation,
+                        fermata: note.fermata,
+                        ornament: note.ornament,
+                        graceNotes: note.graceNotes,
+                        tremolo: note.tremolo,
+                        accidental: note.accidental,
+                        slur: note.slur,
+                        glissando: note.glissando,
+                        arpeggio: note.arpeggio,
+                        tuplet: note.tuplet,
+                        fingering: note.fingering,
+                        pedal: note.pedal,
+                        text: note.text,
+                        breath: note.breath,
+                        voice: note.voice,
+                        stemDirection: note.stemDirection,
+                        lyric: note.lyric,
+                    });
+                }
+            }
+        }
     }
 
     /**
@@ -774,11 +1007,8 @@ export class CompositionState {
      * @param {number} newBeats - New duration in beats
      */
     updateBassNoteStoreDuration(chordIndex, newBeats) {
-        console.log(`[updateBassNoteStoreDuration] Chord ${chordIndex}: newBeats=${newBeats}`);
-
         const notes = this.bassNoteStore.getNotesForChord(chordIndex);
         if (notes.length === 0) {
-            console.log(`[updateBassNoteStoreDuration] No notes found for chord ${chordIndex}`);
             return;
         }
 
@@ -814,13 +1044,7 @@ export class CompositionState {
      * and setting up ties properly.
      */
     renderBassNotesToMeasures() {
-        console.log('%c[renderBassNotesToMeasures] === START ===', 'color: #00cc00; font-weight: bold');
-
-        // DEBUG: Log store contents
-        this.bassNoteStore.debugLog('[renderBassNotesToMeasures] Store state: ');
-
         if (!this.bassNoteStore.hasNotes()) {
-            console.warn('[renderBassNotesToMeasures] BassNoteStore is EMPTY! Cannot render.');
             return;
         }
 
@@ -838,8 +1062,6 @@ export class CompositionState {
             chordIndices.add(entry.chordIndex);
         }
         const sortedChordIndices = Array.from(chordIndices).sort((a, b) => a - b);
-
-        console.log(`[renderBassNotesToMeasures] Rendering ${sortedChordIndices.length} chords, beatsPerMeasure=${beatsPerMeasure}`);
 
         // Calculate each chord's start beat
         let currentBeat = 0;
@@ -949,18 +1171,6 @@ export class CompositionState {
                 m.notation.bass.autoGenerated = false;
             }
         });
-
-        // Log final state
-        console.log('[renderBassNotesToMeasures] Final measure bass notes:');
-        this.measures.forEach((m, i) => {
-            const notes = m.notation.bass.voices[0].notes;
-            if (notes.length > 0) {
-                console.log(`  Measure ${i}: ${notes.length} notes - ${notes.map(n => `${n.duration}(tied=${n.isTied}, pitches=${n.pitches?.length || 0})`).join(', ')}`);
-            }
-        });
-
-        this.bassNoteStore.debugLog('[renderBassNotesToMeasures] Final store: ');
-        console.log('%c[renderBassNotesToMeasures] === END ===', 'color: #00cc00; font-weight: bold');
     }
 
     /**
@@ -968,7 +1178,6 @@ export class CompositionState {
      * Used when measures have been edited directly and need to update the store
      */
     syncBassNoteStoreFromMeasures() {
-        console.log('%c[syncBassNoteStoreFromMeasures] === START ===', 'color: #cc9900; font-weight: bold');
 
         // Group measure notes by their bassNoteId or chordIndex
         const notesByChord = new Map();
@@ -1007,9 +1216,6 @@ export class CompositionState {
                 });
             }
         }
-
-        this.bassNoteStore.debugLog('[syncBassNoteStoreFromMeasures] ');
-        console.log('%c[syncBassNoteStoreFromMeasures] === END ===', 'color: #cc9900; font-weight: bold');
     }
 
     /**
@@ -1066,12 +1272,8 @@ export class CompositionState {
      * This rebuilds measure bass notes from segment data
      */
     applySegmentsToMeasures() {
-        console.log('%c[applySegmentsToMeasures] === START ===', 'color: #00aa00; font-weight: bold');
-
         const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
         const beatsPerMeasure = timeSignature.num || 4;
-
-        console.log(`[applySegmentsToMeasures] beatsPerMeasure=${beatsPerMeasure}, ${this.chordSegments.length} segments, ${this.measures.length} measures`);
 
         // First, clear all bass notes
         this.measures.forEach(measure => {
@@ -1080,10 +1282,8 @@ export class CompositionState {
 
         // For each segment, distribute its bass notes across measures
         for (const segment of this.chordSegments) {
-            const startMeasure = Math.floor(segment.startBeat / beatsPerMeasure);
             let currentBeat = segment.startBeat;
-
-            console.log(`[applySegmentsToMeasures] Segment ${segment.chordIndex}: startBeat=${segment.startBeat}, durationBeats=${segment.durationBeats}, ${segment.bassNotes.length} notes`);
+            const startMeasure = Math.floor(segment.startBeat / beatsPerMeasure);
 
             for (const note of segment.bassNotes) {
                 const noteDuration = getDurationInBeats(note.duration);
@@ -1100,8 +1300,6 @@ export class CompositionState {
                 // Check if note needs to be split across measure boundary
                 const remainingInMeasure = beatsPerMeasure - beatInMeasure;
 
-                console.log(`  Note: duration=${note.duration} (${noteDuration} beats), currentBeat=${currentBeat}, measureIndex=${measureIndex}, beatInMeasure=${beatInMeasure}, remainingInMeasure=${remainingInMeasure}`);
-
                 if (noteDuration <= remainingInMeasure) {
                     // Note fits in current measure
                     const noteToAdd = {
@@ -1110,7 +1308,6 @@ export class CompositionState {
                         isTied: note.isTied || false,
                     };
                     measure.notation.bass.voices[0].notes.push(noteToAdd);
-                    console.log(`    -> Added to measure ${measureIndex} (fits): duration=${noteToAdd.duration}, isTied=${noteToAdd.isTied}`);
                 } else {
                     // Note needs to be split (tie across measure)
                     // First part in current measure
@@ -1122,7 +1319,6 @@ export class CompositionState {
                         isTied: false, // First part is not tied (it's the start)
                     };
                     measure.notation.bass.voices[0].notes.push(firstNote);
-                    console.log(`    -> SPLIT: First part in measure ${measureIndex}: duration=${firstPartDuration}, isTied=false`);
 
                     // Second part in next measure
                     const secondPartBeats = noteDuration - remainingInMeasure;
@@ -1141,7 +1337,6 @@ export class CompositionState {
                         isTied: true, // Second part is tied to first
                     };
                     nextMeasure.notation.bass.voices[0].notes.push(secondNote);
-                    console.log(`    -> SPLIT: Second part in measure ${nextMeasureIndex}: duration=${secondPartDuration}, isTied=true`);
                 }
 
                 currentBeat += noteDuration;
@@ -1155,15 +1350,6 @@ export class CompositionState {
                 }
             }
         }
-
-        // Log final state
-        console.log('[applySegmentsToMeasures] Final measure bass notes:');
-        this.measures.forEach((m, i) => {
-            const notes = m.notation.bass.voices[0].notes;
-            console.log(`  Measure ${i}: ${notes.length} notes - ${notes.map(n => `${n.duration}(tied=${n.isTied})`).join(', ')}`);
-        });
-
-        console.log('%c[applySegmentsToMeasures] === END ===', 'color: #00aa00; font-weight: bold');
     }
 
     // ========================================================================
@@ -1617,12 +1803,6 @@ export class CompositionState {
             metadata: measure.metadata || {}
         }));
 
-        console.log('[syncWithProgressionData] Backing up', melodyBackup.length, 'measures');
-        console.log('[syncWithProgressionData] Manually edited bass measures:', melodyBackup
-            .map((b, i) => ({ index: i, autoGenerated: b.bassAutoGenerated, noteCount: b.bassNotes.length }))
-            .filter(m => m.bassAutoGenerated === false)
-        );
-
         // Clear measures and rebuild with new structure
         this.measures = [];
 
@@ -1630,9 +1810,7 @@ export class CompositionState {
         let currentMeasureIndex = -1; // Will increment to 0 on first measure creation
         let currentBeatInMeasure = 0; // Track which beat we're at in the current measure
 
-        console.log('[syncWithProgressionData] Starting measure rebuild...');
         progressionData.forEach((chordData, chordIndex) => {
-            console.log(`[syncWithProgressionData] Processing chord ${chordIndex}: ${chordData.root}${chordData.type}, beats=${chordData.beats}`);
             const chordBeats = chordData.beats !== undefined ? chordData.beats : 4;
             let remainingBeats = chordBeats;
             let isFirstSegmentOfChord = true;
@@ -1662,7 +1840,6 @@ export class CompositionState {
                 if (needsNewMeasure) {
                     currentMeasureIndex++;
                     currentBeatInMeasure = 0; // Reset beat counter when creating new measure
-                    console.log(`[syncWithProgressionData]   Creating measure ${currentMeasureIndex} for chord ${chordIndex}`);
                     this.addMeasure({
                         chord: {
                             // Copy ALL properties from chordData to preserve omittedNotes, octaveShift, etc.
@@ -1683,8 +1860,6 @@ export class CompositionState {
 
                 const beatsInThisMeasure = Math.min(remainingBeats, beatsPerMeasure - currentBeatInMeasure);
                 const measure = this.getMeasure(currentMeasureIndex);
-
-                console.log(`[syncWithProgressionData]   Measure ${currentMeasureIndex}: chord ${chordIndex}, beatsInThisMeasure=${beatsInThisMeasure}, remainingBeats=${remainingBeats}, currentBeatInMeasure=${currentBeatInMeasure}`);
 
                 if (measure) {
                     // Update measure chord info with beats in this measure
@@ -1717,27 +1892,14 @@ export class CompositionState {
         // Restore melody notes, manually-edited bass notes, and metadata where possible
         melodyBackup.forEach(backup => {
             if (backup.index < this.measures.length) {
-                // Restore treble notes
+                // Restore treble notes (melody)
                 if (backup.trebleNotes.length > 0) {
                     this.measures[backup.index].notation.treble.voices[0].notes = backup.trebleNotes;
                 }
 
-                // Restore bass notes ONLY if they were manually edited AND we're not skipping bass restore
-                // Skip bass restore when chord durations change to allow new splitting to take effect
-                if (!options.skipBassRestore) {
-                    if (backup.bassAutoGenerated === false && backup.bassNotes.length > 0) {
-                        console.log(`[syncWithProgressionData] Restoring manually edited bass for measure ${backup.index}`);
-                        this.measures[backup.index].notation.bass.voices[0].notes = backup.bassNotes;
-                        this.measures[backup.index].notation.bass.autoGenerated = false;
-                    } else if (backup.bassAutoGenerated === false && backup.bassNotes.length === 0) {
-                        // Bass was manually cleared - keep it empty
-                        console.log(`[syncWithProgressionData] Keeping manually cleared bass for measure ${backup.index}`);
-                        this.measures[backup.index].notation.bass.voices[0].notes = [];
-                        this.measures[backup.index].notation.bass.autoGenerated = false;
-                    }
-                } else {
-                    console.log(`[syncWithProgressionData] Skipping bass restore for measure ${backup.index} (chord duration change)`);
-                }
+                // NOTE: Bass notes are NOT restored from backup anymore
+                // BuildingBlockSequence is the single source of truth for bass
+                // renderBassBlocksToMeasures() will fill in bass notes below
 
                 // Restore metadata
                 if (backup.metadata && Object.keys(backup.metadata).length > 0) {
@@ -1746,53 +1908,21 @@ export class CompositionState {
             }
         });
 
-        console.log('[syncWithProgressionData] Final measures:', this.measures.map((m, i) => `[${i}] chordIdx=${m.chord.chordIndex} ${m.chord.root}${m.chord.type}`).join(', '));
-
-        // Place bass notes from BassNoteStore or use legacy placeChordVoicingInBass
-        // IMPORTANT: Skip this when skipBassRestore is true, because in that case
-        // the caller (reorderChord, updateChordDuration) will call renderBassNotesToMeasures
-        if (!options.skipBassRestore) {
-            if (this.bassNoteStore.hasNotes()) {
-                // Use BassNoteStore as the source of truth
-                console.log('[syncWithProgressionData] Rendering bass notes from BassNoteStore');
-                this.renderBassNotesToMeasures();
-            } else {
-                // First time: place simple chord voicings for measures that don't have bass notes
-                for (let i = 0; i < this.measures.length; i++) {
-                    const measure = this.measures[i];
-                    const hasBassNotes = measure.notation.bass.voices[0].notes.length > 0;
-
-                    if (!hasBassNotes && measure.chord && measure.chord.root) {
-                        console.log(`[syncWithProgressionData] Placing chord voicing for measure ${i}`);
-                        this.placeChordVoicingInBass(i);
-                    }
-                }
-                // NOW initialize BassNoteStore from the bass notes we just placed
-                // This captures the actual bass-register pitches for future reordering/duration changes
-                console.log('[syncWithProgressionData] Initializing BassNoteStore from placed bass notes');
-                this.initializeBassNoteStoreFromMeasures();
-            }
-        } else {
-            console.log('[syncWithProgressionData] Skipping bass placement (skipBassRestore=true, caller will handle)');
+        // ================================================================
+        // BUILDING BLOCK SEQUENCE - SINGLE SOURCE OF TRUTH FOR BASS
+        // ================================================================
+        if (this.bassBlockSequence.blocks.length === 0) {
+            // First time: initialize BuildingBlockSequence from progression
+            this.initializeBassBlockSequence(progressionData);
         }
 
-            // Build chord segments from the newly synced data
-            this.buildChordSegments();
+        // Always render bass from BuildingBlocks to measures
+        this.renderBassBlocksToMeasures();
 
-            // Handle preserveEditedSegments option - restore edited bass notes to segments
-            if (options.preserveEditedSegments && options.preserveEditedSegments.size > 0) {
-                console.log('[syncWithProgressionData] Restoring edited segments:', options.preserveEditedSegments.size);
-                for (const [segChordIndex, bassNotes] of options.preserveEditedSegments) {
-                    const segment = this.getChordSegment(segChordIndex);
-                    if (segment && bassNotes.length > 0) {
-                        segment.bassNotes = bassNotes;
-                        segment.isEdited = true;
-                        console.log(`[syncWithProgressionData]   Restored ${bassNotes.length} bass notes for chord ${segChordIndex}`);
-                    }
-                }
-            }
+        // Build chord segments from the newly synced data
+        this.buildChordSegments();
 
-            this.events.emit('progressionSynced', progressionData);
+        this.events.emit('progressionSynced', progressionData);
         } finally {
             this._isSyncing = false;
         }
@@ -2037,90 +2167,41 @@ export class CompositionState {
 
     /**
      * Update chord duration - handles measure rebuilding while preserving chord order
-     * NOW USES BassNoteStore for proper bass note handling
+     * Uses BuildingBlockSequence as the single source of truth
      * @param {number} chordIndex - The chord index to update
      * @param {number} newBeats - New duration in beats
-     * @param {Object} options - Options { skipWarning: boolean, forceApply: boolean }
-     * @returns {Object|boolean} - { needsConfirmation, truncationInfo } or true/false
+     * @returns {boolean} - Success
      */
-    updateChordDuration(chordIndex, newBeats, options = {}) {
-        const { skipWarning = false, forceApply = false } = options;
-
-        console.log('%c[updateChordDuration] === START (using BassNoteStore) ===', 'color: #0066ff; font-weight: bold');
-        console.log(`[updateChordDuration] Chord ${chordIndex}: newBeats=${newBeats}`);
-
+    updateChordDuration(chordIndex, newBeats) {
         // Get current progression data
         const progressionData = this.exportToProgressionData();
 
         if (chordIndex < 0 || chordIndex >= progressionData.length) {
-            console.warn(`[updateChordDuration] Invalid chordIndex: ${chordIndex}`);
             return false;
         }
 
-        const oldBeats = progressionData[chordIndex].beats || 4;
-        const beatDelta = newBeats - oldBeats;
-
-        console.log(`[updateChordDuration] oldBeats=${oldBeats}, beatDelta=${beatDelta}`);
-
-        // CRITICAL: Ensure BassNoteStore is initialized from current measure data
-        // This handles the case where the store wasn't populated on initial load
-        if (!this.bassNoteStore.hasNotes()) {
-            console.log('[updateChordDuration] BassNoteStore empty, initializing from measures');
-            this.initializeBassNoteStoreFromMeasures();
+        // Initialize BuildingBlocks if needed
+        if (this.bassBlockSequence.blocks.length === 0) {
+            this.initializeBassBlockSequence(progressionData);
+        } else {
+            // Sync any edits from measures back to blocks before changing duration
+            this.syncMeasuresToBuildingBlocks();
         }
 
-        // Log BassNoteStore state before
-        this.bassNoteStore.debugLog('[updateChordDuration] BEFORE: ');
+        // Update the block's duration
+        this.updateBassBlockDuration(chordIndex, newBeats);
 
-        // Update the BassNoteStore with the new duration
-        this.updateBassNoteStoreDuration(chordIndex, newBeats);
-
-        // Update the progression data
+        // Update progression data to match
         progressionData[chordIndex].beats = newBeats;
 
-        // Resync with updated progression - this rebuilds measures
-        console.log('[updateChordDuration] Calling syncWithProgressionData with skipBassRestore=true');
+        // Rebuild measures from the updated progression
         this.syncWithProgressionData(progressionData, {
             key: this.metadata.key,
             timeSignature: this.metadata.timeSignature || { num: 4, denom: 4 },
-            skipBassRestore: true, // Skip old restore, BassNoteStore has the data
         });
-
-        console.log(`[updateChordDuration] After sync, measures count=${this.measures.length}`);
-        this.measures.forEach((m, i) => {
-            const bassNotes = m.notation?.bass?.voices?.[0]?.notes || [];
-            console.log(`  Measure ${i}: chordIndex=${m.chord?.chordIndex}, bassNotes=${bassNotes.length}`);
-        });
-
-        // Render bass notes from the store to the new measure structure
-        console.log('[updateChordDuration] Calling renderBassNotesToMeasures');
-        this.renderBassNotesToMeasures();
-
-        console.log('[updateChordDuration] After render, checking measures:');
-        this.measures.forEach((m, i) => {
-            const bassNotes = m.notation?.bass?.voices?.[0]?.notes || [];
-            console.log(`  Measure ${i}: bassNotes=${bassNotes.length}, pitches=${bassNotes.map(n => n.pitches?.length || 0).join(',')}`);
-        });
-
-        // Rebuild chord segments from the new measure structure
-        this.buildChordSegments();
-
-        // Log final state
-        this.bassNoteStore.debugLog('[updateChordDuration] FINAL: ');
-        console.log('%c[updateChordDuration] === END ===', 'color: #0066ff; font-weight: bold');
 
         this.events.emit('chordDurationChanged', chordIndex, newBeats);
         return true;
-    }
-
-    /**
-     * Apply chord duration change after confirmation (or when no confirmation needed)
-     * @private
-     * @deprecated - Now handled directly in updateChordDuration using BassNoteStore
-     */
-    _applyChordDurationChange(chordIndex, newBeats, oldBeats, beatDelta) {
-        // This method is now deprecated - using BassNoteStore approach instead
-        return this.updateChordDuration(chordIndex, newBeats, { forceApply: true });
     }
 
     /**
@@ -2129,25 +2210,21 @@ export class CompositionState {
      * @param {number} newBeats - New duration
      */
     forceApplyChordDuration(chordIndex, newBeats) {
-        return this.updateChordDuration(chordIndex, newBeats, { forceApply: true });
+        return this.updateChordDuration(chordIndex, newBeats);
     }
 
     // ========================================================================
-    // CHORD REORDERING (Phase 4 of Bass Clef Refactoring)
+    // CHORD REORDERING - BuildingBlocks Only
     // ========================================================================
 
     /**
      * Reorder chords in the progression
-     * Moves a chord (with its bass notes) from one position to another
-     * NOW USES BassNoteStore for proper note preservation
+     * Simply reorders the BuildingBlocks and re-renders
      * @param {number} fromIndex - Current index of the chord
      * @param {number} toIndex - New index for the chord
-     * @param {Object} options - { includeTreble: boolean } - whether to move treble notes too
      * @returns {boolean} - Success
      */
-    reorderChord(fromIndex, toIndex, options = {}) {
-        const { includeTreble = false } = options;
-
+    reorderChord(fromIndex, toIndex) {
         // Get the current progression
         const progressionData = this.exportToProgressionData();
 
@@ -2155,66 +2232,29 @@ export class CompositionState {
         if (fromIndex < 0 || fromIndex >= progressionData.length ||
             toIndex < 0 || toIndex >= progressionData.length ||
             fromIndex === toIndex) {
-            console.warn('[reorderChord] Invalid indices:', { fromIndex, toIndex, chordCount: progressionData.length });
             return false;
         }
 
-        console.log('%c[reorderChord] === START (using BassNoteStore) ===', 'color: #ff6600; font-weight: bold');
-        console.log(`[reorderChord] Moving chord ${fromIndex} to position ${toIndex}`);
-
-        // CRITICAL: Ensure BassNoteStore is initialized from current measure data
-        // This handles the case where the store wasn't populated on initial load
-        if (!this.bassNoteStore.hasNotes()) {
-            console.log('[reorderChord] BassNoteStore empty, initializing from measures');
-            this.initializeBassNoteStoreFromMeasures();
+        // Initialize BuildingBlocks if needed
+        if (this.bassBlockSequence.blocks.length === 0) {
+            this.initializeBassBlockSequence(progressionData);
+        } else {
+            // Sync any edits from measures back to blocks before reordering
+            this.syncMeasuresToBuildingBlocks();
         }
 
-        // Log BassNoteStore state before reordering
-        this.bassNoteStore.debugLog('[reorderChord] BEFORE: ');
+        // Reorder the blocks
+        this.reorderBassBlock(fromIndex, toIndex);
 
-        // Store treble notes for the moved segment if needed
-        let trebleNotesForSegment = [];
-        if (includeTreble) {
-            trebleNotesForSegment = this.gatherTrebleNotesForChord(fromIndex);
-        }
-
-        // Update the BassNoteStore chord indices BEFORE reordering progression
-        // This is the key advantage: the store keeps the notes safe while we restructure
-        this.bassNoteStore.updateChordIndicesAfterReorder(fromIndex, toIndex);
-
-        // Log BassNoteStore state after index update
-        this.bassNoteStore.debugLog('[reorderChord] AFTER index update: ');
-
-        // Reorder the progression array
+        // Reorder the progression array to match
         const [movedChord] = progressionData.splice(fromIndex, 1);
         progressionData.splice(toIndex, 0, movedChord);
 
-        // Sync with reordered progression - rebuild measure structure
-        // We skip bass restore because the BassNoteStore has the authoritative data
+        // Rebuild measures from the reordered progression
         this.syncWithProgressionData(progressionData, {
             key: this.metadata.key,
             timeSignature: this.metadata.timeSignature || { num: 4, denom: 4 },
-            skipBassRestore: true,
         });
-
-        // Render bass notes from the store to the new measure structure
-        // This handles splitting across measure boundaries with proper ties
-        this.renderBassNotesToMeasures();
-
-        // Rebuild chord segments from the new measure structure
-        this.buildChordSegments();
-
-        // Log final state
-        console.log('[reorderChord] AFTER - Final segments:');
-        this.chordSegments.forEach((seg, i) => {
-            console.log(`  Segment ${i}: chord=${seg.chord?.root}${seg.chord?.type}, startBeat=${seg.startBeat}, duration=${seg.durationBeats}, notes=${seg.bassNotes.length}`);
-            seg.bassNotes.forEach((n, j) => {
-                console.log(`    [${j}] duration=${n.duration}, isTied=${n.isTied}, pitches=${JSON.stringify(n.pitches)}`);
-            });
-        });
-
-        this.bassNoteStore.debugLog('[reorderChord] FINAL: ');
-        console.log('%c[reorderChord] === END ===', 'color: #ff6600; font-weight: bold');
 
         this.events.emit('chordReordered', fromIndex, toIndex);
         return true;

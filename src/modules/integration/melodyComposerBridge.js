@@ -85,16 +85,9 @@ export function syncProgressionToMelodyComposer() {
             });
         }
 
-        // Failsafe: Ensure bass is generated if auto-generate is ON
-        // This handles cases where import might not generate bass correctly
-        const autoGenSetting = state.getSettings().autoGenerateBass;
-
-        if (autoGenSetting) {
-            // Force regenerate bass for all measures to ensure it's there
-            for (let i = 0; i < state.getMeasureCount(); i++) {
-                state.updateBassFromChord(i);
-            }
-        }
+        // NOTE: Bass is now managed entirely by BuildingBlockSequence
+        // syncWithProgressionData() calls renderBassBlocksToMeasures() to render bass
+        // DO NOT call updateBassFromChord() here - it would overwrite BuildingBlocks
     } finally {
         // Re-enable bi-directional sync after import
         if (syncInstance && syncInstance.isUpdating !== undefined) {

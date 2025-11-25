@@ -823,15 +823,8 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature) {
       const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false, note.articulation || null, note.accidental || null);
 
       // Preserve isTied property for cross-measure tie rendering
-      console.log('[createBassVoice] Processing note:', {
-        noteIsTied: note.isTied,
-        noteHasIsTied: 'isTied' in note,
-        noteKeys: Object.keys(note),
-        beat: note.beat
-      });
       if (note.isTied !== undefined) {
         chordNote.isTied = note.isTied;
-        console.log('[createBassVoice] Attached isTied to VexFlow note:', chordNote.isTied);
       }
 
       // Track ottava brackets
@@ -1327,14 +1320,10 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
 
       if (segments && segments.length > 0) {
         // Use segment data for accurate beat positions
-        console.log('[grandStaff] Drawing chord spans using', segments.length, 'segments');
-
         segments.forEach((segment, index) => {
           const startBeat = segment.startBeat;
           const endBeat = segment.startBeat + segment.durationBeats;
           const chord = segment.chord || {};
-
-          console.log(`[grandStaff] Segment ${index}: ${chord.name || chord.root}, startBeat=${startBeat}, endBeat=${endBeat}, isEdited=${segment.isEdited}`);
 
           // Draw the background shading for this chord
           // Use slightly different color if bass has been edited
@@ -1380,16 +1369,12 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
         // Fallback to original chord-based approach
         const chords = compositionState.getChords();
 
-        console.log('[grandStaff] Drawing chord spans for', chords?.length || 0, 'chords (fallback)');
-
         if (chords && chords.length > 0) {
           let beatOffset = 0;
           chords.forEach((chord, index) => {
             const chordBeats = chord.beats !== undefined ? chord.beats : 4;
             const startBeat = beatOffset;
             const endBeat = beatOffset + chordBeats;
-
-            console.log(`[grandStaff] Chord ${index}: ${chord.name}, beats=${chordBeats}, startBeat=${startBeat}, endBeat=${endBeat}`);
 
             // Draw the background shading for this chord
             drawChordSpanHighlight(

@@ -4019,8 +4019,8 @@ function updateContainerShifts(container) {
                     // If previous card is wider than baseline, shift this card
                     if (prevWidth > baselineWidth + 10) { // 10px tolerance
                         const extraWidth = prevWidth - baselineWidth;
-                        const shiftAmount = extraWidth + 10;
-                        accumulatedShift += shiftAmount; // Full extra width + 10px gap
+                        const shiftAmount = extraWidth + 16; // Full extra width + 16px gap for clear separation
+                        accumulatedShift += shiftAmount;
                     }
                 }
 
@@ -5181,9 +5181,15 @@ function toggleSimplifiedCardNotation(wrapper, index) {
  * @param {HTMLElement} container - Container with simplified cards
  */
 function initializeSimplifiedSortable(container) {
-    if (typeof Sortable === 'undefined') return;
+    if (typeof Sortable === 'undefined') {
+        console.warn('[initializeSimplifiedSortable] Sortable library not loaded!');
+        return;
+    }
+
+    console.log('%c[initializeSimplifiedSortable] Initializing for container:', 'color: #00ccff; font-weight: bold', container.id);
 
     if (container.sortableInstance) {
+        console.log('[initializeSimplifiedSortable] Destroying existing instance');
         container.sortableInstance.destroy();
     }
 
@@ -5196,6 +5202,7 @@ function initializeSimplifiedSortable(container) {
         filter: '.chord-card-wrapper:first-child', // Exclude Add/Clear buttons (first child)
         swapThreshold: 0.65, // More tolerant swapping for transformed elements
         onStart: function(evt) {
+            console.log('%c[Sortable onStart] === DRAG START ===', 'color: #ffcc00; font-weight: bold');
             // Clear all transforms during drag so Sortable can calculate positions correctly
             const allWrappers = container.querySelectorAll('.chord-card-wrapper[data-chord-index]');
             allWrappers.forEach(wrapper => {
@@ -5217,11 +5224,26 @@ function initializeSimplifiedSortable(container) {
                 wrapper.removeAttribute('data-stored-transform');
             });
 
-            if (evt.oldIndex !== evt.newIndex) {
-                // Account for button container at index 0
-                // Subtract 1 from both indices since buttons take up position 0
-                const actualOldIndex = evt.oldIndex - 1;
-                const actualNewIndex = evt.newIndex - 1;
+            // Use data-chord-index attributes directly instead of Sortable's indices
+            // This is more reliable when there are non-draggable elements in the container
+            const draggedItem = evt.item;
+            const oldChordIndex = parseInt(draggedItem.getAttribute('data-chord-index'), 10);
+
+            // After the drag, find the new position by looking at sibling order
+            const chordWrappers = Array.from(container.querySelectorAll('.chord-card-wrapper[data-chord-index]'));
+            const newPosition = chordWrappers.indexOf(draggedItem);
+
+            console.log('%c[Sortable onEnd] === DRAG END ===', 'color: #ff00ff; font-weight: bold');
+            console.log('[Sortable onEnd] draggedItem data-chord-index:', oldChordIndex);
+            console.log('[Sortable onEnd] newPosition in DOM:', newPosition);
+            console.log('[Sortable onEnd] Current DOM order:', chordWrappers.map(w => w.getAttribute('data-chord-index')).join(', '));
+            console.log('[Sortable onEnd] Sortable evt.oldIndex:', evt.oldIndex, 'evt.newIndex:', evt.newIndex);
+
+            if (oldChordIndex !== newPosition && newPosition >= 0) {
+                const actualOldIndex = oldChordIndex;
+                const actualNewIndex = newPosition;
+
+                console.log('%c[Sortable onEnd] Will reorder:', 'color: #00ff00', `from ${actualOldIndex} to ${actualNewIndex}`);
 
                 if (actualOldIndex < 0 || actualNewIndex < 0) return; // Shouldn't happen, but safety check
 
@@ -5235,7 +5257,14 @@ function initializeSimplifiedSortable(container) {
                 const compositionState = window.getCompositionState ? window.getCompositionState() : null;
                 if (compositionState && typeof compositionState.reorderChord === 'function') {
                     console.log('[ProgressionBuilder-Simplified] Using segment-aware reorderChord');
+
+                    // Call reorderChord FIRST - it handles everything internally
                     compositionState.reorderChord(actualOldIndex, actualNewIndex);
+
+                    // AFTER reorderChord completes, sync trainerState from compositionState
+                    // This ensures progressionData matches the reordered state
+                    const updatedProgression = compositionState.exportToProgressionData();
+                    setProgressionData(updatedProgression);
                 } else {
                     // Fallback to old behavior if compositionState not available
                     console.log('[ProgressionBuilder-Simplified] Fallback: manual reorder');
@@ -5616,6 +5645,11 @@ function renderTensionCurve(container, progressionData, key) {
             unhighlightAllChordCards();
         });
 
+        // Click to select chord card (bi-directional sync)
+        circle.addEventListener('click', () => {
+            selectChordCard(index);
+        });
+
         // Create detailed tooltip on hover (but not if it interferes with playback)
         circle.addEventListener('mouseenter', (e) => {
             showTensionTooltip(e, chord, tension, index, key);
@@ -5648,6 +5682,26 @@ function highlightTensionPoint(index) {
             point.setAttribute('stroke', '#3b82f6');
             point.setAttribute('stroke-width', '4');
             point.classList.add('highlighted-tension-point');
+        }
+    });
+}
+
+/**
+ * Highlight tension curve point for selection (purple to match card selection)
+ * This is different from playback highlighting (blue)
+ * @param {number} index - Chord index to highlight
+ */
+function highlightTensionPointForSelection(index) {
+    const container = document.getElementById('tension-curve-container');
+    if (!container) return;
+
+    const points = container.querySelectorAll('.tension-curve-point');
+    points.forEach((point, i) => {
+        if (i === index) {
+            point.setAttribute('r', '7');
+            point.setAttribute('stroke', '#a855f7'); // Purple to match card selection
+            point.setAttribute('stroke-width', '3');
+            point.classList.add('selected-tension-point');
         }
     });
 }
@@ -5720,6 +5774,10 @@ export function selectChordCard(index) {
     // Ensure shifts are maintained after selection
     updateCardShifts();
 
+    // Bi-directional sync: highlight tension curve point when chord card is selected
+    unhighlightAllTensionPoints();
+    highlightTensionPointForSelection(index);
+
     // Sync measure selection with chord card selection (legacy system)
     if (window.setSelectedMeasureIndex) {
         window.setSelectedMeasureIndex(index);
@@ -5753,11 +5811,11 @@ function unhighlightAllTensionPoints() {
 
     const points = container.querySelectorAll('.tension-curve-point');
     points.forEach(point => {
-        if (point.classList.contains('highlighted-tension-point')) {
+        if (point.classList.contains('highlighted-tension-point') || point.classList.contains('selected-tension-point')) {
             point.setAttribute('r', '5');
             point.setAttribute('stroke', '#1f2937');
             point.setAttribute('stroke-width', '2');
-            point.classList.remove('highlighted-tension-point');
+            point.classList.remove('highlighted-tension-point', 'selected-tension-point');
         }
     });
 }

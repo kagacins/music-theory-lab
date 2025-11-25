@@ -783,14 +783,21 @@ export class BuildingBlockSequence {
         const unitsPerMeasure = this.getUnitsPerMeasure();
         const beatsPerMeasure = this.getBeatsPerMeasure();
 
+        console.log(`%c[renderToMeasures] === START ===`, 'color: #9900cc; font-weight: bold');
+        console.log(`[renderToMeasures] ${this.blocks.length} blocks, ${unitsPerMeasure} units/measure`);
+
         let currentMeasure = this._createEmptyMeasure(0);
         let measureUnitOffset = 0; // Current position within the measure
         let absoluteUnit = 0; // Position in the entire sequence
 
-        for (const block of this.blocks) {
+        for (let blockIdx = 0; blockIdx < this.blocks.length; blockIdx++) {
+            const block = this.blocks[blockIdx];
             const notes = block.getNotes();
+            console.log(`[renderToMeasures] Block ${blockIdx}: ${block.beats} beats, ${notes.length} notes`);
 
-            for (const note of notes) {
+            for (let noteIdx = 0; noteIdx < notes.length; noteIdx++) {
+                const note = notes[noteIdx];
+                console.log(`[renderToMeasures]   Note ${noteIdx}: ${note.durationUnits} units, isRest=${note.isRest}, pitches=${note.pitches?.length || 0}`);
                 let remainingUnits = note.durationUnits;
                 let isFirstPart = true;
 
@@ -884,6 +891,15 @@ export class BuildingBlockSequence {
         if (currentMeasure.bassNotes.length > 0) {
             measures.push(currentMeasure);
         }
+
+        console.log(`[renderToMeasures] Generated ${measures.length} measures:`);
+        measures.forEach((m, i) => {
+            const notesSummary = m.bassNotes.map(n =>
+                `${n.isRest ? 'REST' : n.pitches?.length + 'p'}@${n.beat?.toFixed(2)}(${n.duration})${n.isTied ? 'T' : ''}`
+            ).join(', ');
+            console.log(`[renderToMeasures]   Measure ${i}: ${m.bassNotes.length} notes - ${notesSummary}`);
+        });
+        console.log(`%c[renderToMeasures] === END ===`, 'color: #9900cc; font-weight: bold');
 
         return measures;
     }
