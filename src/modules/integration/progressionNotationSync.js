@@ -29,33 +29,21 @@ export class ProgressionNotationSync {
 
     /**
      * Setup bi-directional sync between progression and notation
+     * DISABLED: compositionState is now the single source of truth
+     * All updates go through compositionState, no bidirectional sync needed
      */
     setupBidirectionalSync() {
-        // Listen for chord changes in CompositionState → update progressionData
-        const chordChangedListener = this.composition.events.on('chordChanged',
-            (measureIndex, newChord, previousChord) => {
-                this.updateProgressionFromNotation(measureIndex, newChord);
-            }
-        );
+        // DISABLED - compositionState is single source of truth
+        console.log('[ProgressionNotationSync] Bidirectional sync DISABLED - compositionState is single source of truth');
 
-        // Listen for measure additions → update progressionData
-        const measureAddedListener = this.composition.events.on('measureAdded',
-            (measureIndex, measure) => {
-                this.syncMeasureToProgression(measureIndex, measure);
-            }
-        );
-
-        // Listen for measure removals → update progressionData
-        const measureRemovedListener = this.composition.events.on('measureRemoved',
-            (measureIndex, removed) => {
-                this.removeMeasureFromProgression(measureIndex);
-            }
-        );
-
-        // Store listeners for cleanup
-        this.listeners.push(chordChangedListener);
-        this.listeners.push(measureAddedListener);
-        this.listeners.push(measureRemovedListener);
+        // Previously listened to:
+        // - 'chordChanged' → updateProgressionFromNotation
+        // - 'measureAdded' → syncMeasureToProgression
+        // - 'measureRemoved' → removeMeasureFromProgression
+        //
+        // These are no longer needed because:
+        // - Changes flow: UI → compositionState.updateChordDuration() → syncWithProgressionData → measures rebuilt
+        // - No need to sync back to progressionData (it's derived via exportToProgressionData())
     }
 
     /**
@@ -212,10 +200,10 @@ export class ProgressionNotationSync {
      * Call this when exporting or switching back to progression builder
      */
     syncNotationToProgression() {
-        // TEMPORARILY DISABLED: This causes sync loops with variable chord durations
-        // The issue: measures get exported as "chords", creating duplicates
-        // TODO: Re-enable once we migrate to compositionState as single source of truth
-        console.log('[syncNotationToProgression] DISABLED - sync loop prevention');
+        // PERMANENTLY DISABLED: compositionState is now the single source of truth
+        // This function is no longer needed - progressionData reads from compositionState
+        // via wrapper functions in trainerState.js
+        console.log('[syncNotationToProgression] DISABLED - compositionState is single source of truth');
         return;
 
         if (this.isUpdating) return;

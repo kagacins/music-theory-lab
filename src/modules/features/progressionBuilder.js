@@ -3425,10 +3425,21 @@ function attachCardEventListeners(wrapper, index) {
     if (notesAllBtn) {
         notesAllBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const trainerState = getTrainerState();
-            const chord = trainerState.progressionData[index];
+
+            // Get compositionState directly - the single source of truth
+            const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+            if (!compositionState) {
+                console.warn('CompositionState not available');
+                return;
+            }
+
+            const chord = compositionState.getChord(index);
             if (chord) {
-                chord.omittedNotes = [];
+                // Update chord in compositionState
+                compositionState.updateChordByIndex(index, {
+                    omittedNotes: []
+                });
+
                 // Update checkboxes
                 noteCheckboxes.forEach(cb => cb.checked = true);
 
@@ -3447,10 +3458,21 @@ function attachCardEventListeners(wrapper, index) {
     if (notesNoneBtn) {
         notesNoneBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const trainerState = getTrainerState();
-            const chord = trainerState.progressionData[index];
+
+            // Get compositionState directly - the single source of truth
+            const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+            if (!compositionState) {
+                console.warn('CompositionState not available');
+                return;
+            }
+
+            const chord = compositionState.getChord(index);
             if (chord && chord.notes) {
-                chord.omittedNotes = [...chord.notes];
+                // Update chord in compositionState
+                compositionState.updateChordByIndex(index, {
+                    omittedNotes: [...chord.notes]
+                });
+
                 // Update checkboxes
                 noteCheckboxes.forEach(cb => cb.checked = false);
 
@@ -3551,10 +3573,21 @@ function attachCardEventListeners(wrapper, index) {
     if (lhAllBtn) {
         lhAllBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const trainerState = getTrainerState();
-            const chord = trainerState.progressionData[index];
+
+            // Get compositionState directly - the single source of truth
+            const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+            if (!compositionState) {
+                console.warn('CompositionState not available');
+                return;
+            }
+
+            const chord = compositionState.getChord(index);
             if (chord) {
-                chord.lhOmittedNotes = [];
+                // Update chord in compositionState
+                compositionState.updateChordByIndex(index, {
+                    lhOmittedNotes: []
+                });
+
                 // Update checkboxes
                 lhNoteCheckboxes.forEach(cb => cb.checked = true);
                 // Play the chord
@@ -3569,10 +3602,21 @@ function attachCardEventListeners(wrapper, index) {
     if (lhNoneBtn) {
         lhNoneBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const trainerState = getTrainerState();
-            const chord = trainerState.progressionData[index];
+
+            // Get compositionState directly - the single source of truth
+            const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+            if (!compositionState) {
+                console.warn('CompositionState not available');
+                return;
+            }
+
+            const chord = compositionState.getChord(index);
             if (chord && chord.lhNotes) {
-                chord.lhOmittedNotes = [...chord.lhNotes];
+                // Update chord in compositionState
+                compositionState.updateChordByIndex(index, {
+                    lhOmittedNotes: [...chord.lhNotes]
+                });
+
                 // Update checkboxes
                 lhNoteCheckboxes.forEach(cb => cb.checked = false);
             }
@@ -4316,9 +4360,19 @@ function updateTensionCurveIfVisible() {
  * Update chord type from simplified view
  */
 function updateChordType(index, newType) {
+    // Get compositionState directly - the single source of truth
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) {
+        console.warn('CompositionState not available');
+        return;
+    }
+
     const trainerState = getTrainerState();
-    const chord = trainerState.progressionData[index];
-    chord.type = newType;
+    const chord = compositionState.getChord(index);
+    if (!chord) {
+        console.warn('Chord not found at index', index);
+        return;
+    }
 
     // Regenerate chord notes with new type
     const chordInfo = getProgressionChordNotes(
@@ -4328,26 +4382,36 @@ function updateChordType(index, newType) {
         chord.inversion
     );
 
-    if (chordInfo) {
-        chord.notes = chordInfo.notes;
-        chord.lhNotes = chordInfo.lhNotes;
-        chord.name = chordInfo.name;
-        chord.simpleName = chordInfo.simpleName;
-
-        // Reapply octave shift if it was previously set
-        if (chord.octaveShift && chord.octaveShift !== 0) {
-            chord.notes = chord.notes.map(note => {
-                const match = note.match(/^([A-G][#b]?)(\d+)$/);
-                if (!match) return note;
-                const noteName = match[1];
-                const octave = parseInt(match[2]);
-                const newOctave = octave + Math.floor(chord.octaveShift / 12);
-                // Clamp octave to valid MIDI range (0-8)
-                const clampedOctave = Math.max(0, Math.min(8, newOctave));
-                return `${noteName}${clampedOctave}`;
-            });
-        }
+    if (!chordInfo) {
+        console.warn('Failed to generate chord info');
+        return;
     }
+
+    // Prepare updates object
+    const updates = {
+        type: newType,
+        notes: chordInfo.notes,
+        lhNotes: chordInfo.lhNotes,
+        name: chordInfo.name,
+        simpleName: chordInfo.simpleName
+    };
+
+    // Reapply octave shift if it was previously set
+    if (chord.octaveShift && chord.octaveShift !== 0) {
+        updates.notes = updates.notes.map(note => {
+            const match = note.match(/^([A-G][#b]?)(\d+)$/);
+            if (!match) return note;
+            const noteName = match[1];
+            const octave = parseInt(match[2]);
+            const newOctave = octave + Math.floor(chord.octaveShift / 12);
+            // Clamp octave to valid MIDI range (0-8)
+            const clampedOctave = Math.max(0, Math.min(8, newOctave));
+            return `${noteName}${clampedOctave}`;
+        });
+    }
+
+    // Update chord in compositionState
+    compositionState.updateChordByIndex(index, updates);
 
     // Save state
     saveState({ type: 'chord-update', data: { index, property: 'type', value: newType } });
@@ -4360,7 +4424,7 @@ function updateChordType(index, newType) {
     updateChordAndRenderPreservingTrebleNotes(index);
 
     // Play the chord with the new type
-    const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
+    const voicedNotes = updates.notes.filter(n => !(chord.omittedNotes || []).includes(n));
     const rhOctaveShift = chord.octaveShift || 0;
     const lhRelativeShift = chord.lhOctaveShift || -12;
     const absoluteLHOctaveShift = rhOctaveShift + lhRelativeShift;
@@ -4370,7 +4434,7 @@ function updateChordType(index, newType) {
         chord.lhInversion,
         trainerState.currentKey,
         absoluteLHOctaveShift,
-        chord.type,
+        newType,
         getEnharmonicPreference()
     ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
     const allNotes = voicedNotes.concat(lhNotes);
@@ -4383,10 +4447,19 @@ function updateChordType(index, newType) {
  * Update chord duration from simplified view
  */
 function updateChordDuration(index, sourceElement) {
-    const trainerState = getTrainerState();
-    const chord = trainerState.progressionData[index];
+    // Get compositionState directly - the single source of truth
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) {
+        console.warn('CompositionState not available');
+        return;
+    }
 
-    if (!chord) return;
+    // Get the chord from compositionState
+    const chord = compositionState.getChord(index);
+    if (!chord) {
+        console.warn('Chord not found at index', index);
+        return;
+    }
 
     // Find the duration selectors - they could be in either the event source's wrapper
     // or we need to search for them
@@ -4438,31 +4511,26 @@ function updateChordDuration(index, sourceElement) {
         return;
     }
 
-    // Update the chord's beats property
-    chord.beats = totalBeats;
+    // Check if the value actually changed
+    if (chord.beats === totalBeats) {
+        return; // No change needed
+    }
 
     // Save state for undo
     saveState({ type: 'chord-update', data: { index, property: 'beats', value: totalBeats } });
 
+    // Update the chord duration using compositionState's dedicated method
+    // This preserves chord order while rebuilding measures with new duration
+    compositionState.updateChordDuration(index, totalBeats);
+
     // Update all card displays (both tabs)
     updateSingleCard(index);
 
-    // Trigger full sync since chord durations affect measure splitting
-    if (window.getCompositionState && window.getNotationComposer) {
-        const compositionState = window.getCompositionState();
+    // Trigger re-render of the notation
+    if (window.getNotationComposer) {
         const notationComposer = window.getNotationComposer();
-
-        if (compositionState && notationComposer) {
-            // Sync the entire progression with the new durations
-            compositionState.syncWithProgressionData(trainerState.progressionData, {
-                key: trainerState.currentKey,
-                timeSignature: { num: 4, denom: 4 }
-            });
-
-            // Trigger re-render of the notation
+        if (notationComposer) {
             notationComposer.render();
-
-            console.log('[updateChordDuration] Re-synced composition after duration change');
         }
     }
 
@@ -4481,9 +4549,19 @@ function updateChordDuration(index, sourceElement) {
  * Update chord inversion from simplified view
  */
 function updateChordInversion(index, newInversion, shouldUpdateUI = true, shouldSyncNotation = true) {
+    // Get compositionState directly - the single source of truth
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) {
+        console.warn('CompositionState not available');
+        return;
+    }
+
     const trainerState = getTrainerState();
-    const chord = trainerState.progressionData[index];
-    chord.inversion = newInversion;
+    const chord = compositionState.getChord(index);
+    if (!chord) {
+        console.warn('Chord not found at index', index);
+        return;
+    }
 
     // Regenerate chord notes with new inversion
     const chordInfo = getProgressionChordNotes(
@@ -4493,28 +4571,35 @@ function updateChordInversion(index, newInversion, shouldUpdateUI = true, should
         newInversion
     );
 
-    if (chordInfo) {
-        chord.notes = chordInfo.notes;
-        chord.lhNotes = chordInfo.lhNotes;
-
-        // Clear omittedNotes since note names change with inversion (e.g., C4 becomes C5)
-        // This ensures all notes are played and checkboxes show correct state
-        chord.omittedNotes = [];
-
-        // Reapply octave shift if it was previously set
-        if (chord.octaveShift && chord.octaveShift !== 0) {
-            chord.notes = chord.notes.map(note => {
-                const match = note.match(/^([A-G][#b]?)(\d+)$/);
-                if (!match) return note;
-                const noteName = match[1];
-                const octave = parseInt(match[2]);
-                const newOctave = octave + Math.floor(chord.octaveShift / 12);
-                // Clamp octave to valid MIDI range (0-8)
-                const clampedOctave = Math.max(0, Math.min(8, newOctave));
-                return `${noteName}${clampedOctave}`;
-            });
-        }
+    if (!chordInfo) {
+        console.warn('Failed to generate chord info');
+        return;
     }
+
+    // Prepare updates object
+    const updates = {
+        inversion: newInversion,
+        notes: chordInfo.notes,
+        lhNotes: chordInfo.lhNotes,
+        omittedNotes: [] // Clear omittedNotes since note names change with inversion
+    };
+
+    // Reapply octave shift if it was previously set
+    if (chord.octaveShift && chord.octaveShift !== 0) {
+        updates.notes = updates.notes.map(note => {
+            const match = note.match(/^([A-G][#b]?)(\d+)$/);
+            if (!match) return note;
+            const noteName = match[1];
+            const octave = parseInt(match[2]);
+            const newOctave = octave + Math.floor(chord.octaveShift / 12);
+            // Clamp octave to valid MIDI range (0-8)
+            const clampedOctave = Math.max(0, Math.min(8, newOctave));
+            return `${noteName}${clampedOctave}`;
+        });
+    }
+
+    // Update chord in compositionState
+    compositionState.updateChordByIndex(index, updates);
 
     // Save state
     saveState({ type: 'chord-update', data: { index, property: 'inversion', value: newInversion } });
@@ -4620,9 +4705,19 @@ function getScaleNotesForKey(key) {
  * Update RH octave shift
  */
 function updateRHOctaveShift(index, shift) {
+    // Get compositionState directly - the single source of truth
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) {
+        console.warn('CompositionState not available');
+        return;
+    }
+
     const trainerState = getTrainerState();
-    const chord = trainerState.progressionData[index];
-    chord.octaveShift = shift;
+    const chord = compositionState.getChord(index);
+    if (!chord) {
+        console.warn('Chord not found at index', index);
+        return;
+    }
 
     // Regenerate notes with new octave
     const chordInfo = getProgressionChordNotes(
@@ -4632,19 +4727,28 @@ function updateRHOctaveShift(index, shift) {
         chord.inversion
     );
 
-    if (chordInfo && chordInfo.notes) {
-        // Apply octave shift
-        chord.notes = chordInfo.notes.map(note => {
-            const match = note.match(/^([A-G][#b]?)(\d+)$/);
-            if (!match) return note;
-            const noteName = match[1];
-            const octave = parseInt(match[2]);
-            const newOctave = octave + Math.floor(shift / 12);
-            // Clamp octave to valid MIDI range (0-8)
-            const clampedOctave = Math.max(0, Math.min(8, newOctave));
-            return `${noteName}${clampedOctave}`;
-        });
+    if (!chordInfo || !chordInfo.notes) {
+        console.warn('Failed to generate chord info');
+        return;
     }
+
+    // Apply octave shift
+    const shiftedNotes = chordInfo.notes.map(note => {
+        const match = note.match(/^([A-G][#b]?)(\d+)$/);
+        if (!match) return note;
+        const noteName = match[1];
+        const octave = parseInt(match[2]);
+        const newOctave = octave + Math.floor(shift / 12);
+        // Clamp octave to valid MIDI range (0-8)
+        const clampedOctave = Math.max(0, Math.min(8, newOctave));
+        return `${noteName}${clampedOctave}`;
+    });
+
+    // Update chord in compositionState
+    compositionState.updateChordByIndex(index, {
+        octaveShift: shift,
+        notes: shiftedNotes
+    });
 
     // Save state
     saveState({ type: 'chord-update', data: { index, property: 'octaveShift', value: shift } });
@@ -4656,18 +4760,19 @@ function updateRHOctaveShift(index, shift) {
     updateChordAndRenderPreservingTrebleNotes(index);
 
     // Play the chord with the new octave (LH is relative to RH, so update LH too)
-    const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
-    const lhRelativeShift = chord.lhOctaveShift || -12;
+    const updatedChord = compositionState.getChord(index);
+    const voicedNotes = updatedChord.notes.filter(n => !(updatedChord.omittedNotes || []).includes(n));
+    const lhRelativeShift = updatedChord.lhOctaveShift || -12;
     const absoluteLHOctaveShift = shift + lhRelativeShift;
     const lhNotes = getLHNotes(
-        chord.root,
-        chord.lhType,
-        chord.lhInversion,
+        updatedChord.root,
+        updatedChord.lhType,
+        updatedChord.lhInversion,
         trainerState.currentKey,
         absoluteLHOctaveShift,
-        chord.type,
+        updatedChord.type,
         getEnharmonicPreference()
-    ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
+    ).filter(n => !(updatedChord.lhOmittedNotes || []).includes(n));
     const allNotes = voicedNotes.concat(lhNotes);
     if (allNotes.length > 0) {
         playTrainerChordOnce(allNotes);
@@ -4678,14 +4783,24 @@ function updateRHOctaveShift(index, shift) {
  * Update LH octave shift (relative to RH)
  */
 function updateLHOctaveShift(index, shift) {
+    // Get compositionState directly - the single source of truth
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) {
+        console.warn('CompositionState not available');
+        return;
+    }
+
     const trainerState = getTrainerState();
-    const chord = trainerState.progressionData[index];
-    chord.lhOctaveShift = shift;
+    const chord = compositionState.getChord(index);
+    if (!chord) {
+        console.warn('Chord not found at index', index);
+        return;
+    }
 
     // Regenerate LH notes with new relative octave shift
     const rhOctaveShift = chord.octaveShift || 0;
     const absoluteLHOctaveShift = rhOctaveShift + shift;
-    chord.lhNotes = getLHNotes(
+    const newLhNotes = getLHNotes(
         chord.root,
         chord.lhType || 'off',
         chord.lhInversion || 0,
@@ -4694,6 +4809,12 @@ function updateLHOctaveShift(index, shift) {
         chord.type,
         getEnharmonicPreference()
     );
+
+    // Update chord in compositionState
+    compositionState.updateChordByIndex(index, {
+        lhOctaveShift: shift,
+        lhNotes: newLhNotes
+    });
 
     // Save state
     saveState({ type: 'chord-update', data: { index, property: 'lhOctaveShift', value: shift } });
@@ -4705,8 +4826,9 @@ function updateLHOctaveShift(index, shift) {
     updateChordAndRenderPreservingTrebleNotes(index);
 
     // Play the chord with the new LH octave
-    const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
-    const lhNotes = (chord.lhNotes || []).filter(n => !(chord.lhOmittedNotes || []).includes(n));
+    const updatedChord = compositionState.getChord(index);
+    const voicedNotes = updatedChord.notes.filter(n => !(updatedChord.omittedNotes || []).includes(n));
+    const lhNotes = (updatedChord.lhNotes || []).filter(n => !(updatedChord.lhOmittedNotes || []).includes(n));
     const allNotes = voicedNotes.concat(lhNotes);
     if (allNotes.length > 0) {
         playTrainerChordOnce(allNotes);
@@ -4717,15 +4839,25 @@ function updateLHOctaveShift(index, shift) {
  * Update LH inversion
  */
 function updateLHInversion(index, newInversion, shouldUpdateUI = true, shouldSyncNotation = true) {
+    // Get compositionState directly - the single source of truth
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) {
+        console.warn('CompositionState not available');
+        return;
+    }
+
     const trainerState = getTrainerState();
-    const chord = trainerState.progressionData[index];
-    chord.lhInversion = newInversion;
+    const chord = compositionState.getChord(index);
+    if (!chord) {
+        console.warn('Chord not found at index', index);
+        return;
+    }
 
     // Regenerate LH notes with new inversion (using relative LH octave shift)
     const rhOctaveShift = chord.octaveShift || 0;
     const lhRelativeShift = chord.lhOctaveShift || -12;
     const absoluteLHOctaveShift = rhOctaveShift + lhRelativeShift;
-    chord.lhNotes = getLHNotes(
+    const newLhNotes = getLHNotes(
         chord.root,
         chord.lhType || 'off',
         newInversion,
@@ -4735,8 +4867,12 @@ function updateLHInversion(index, newInversion, shouldUpdateUI = true, shouldSyn
         getEnharmonicPreference()
     );
 
-    // Clear lhOmittedNotes since note names change with inversion
-    chord.lhOmittedNotes = [];
+    // Update chord in compositionState
+    compositionState.updateChordByIndex(index, {
+        lhInversion: newInversion,
+        lhNotes: newLhNotes,
+        lhOmittedNotes: [] // Clear since note names change with inversion
+    });
 
     // Save state
     saveState({ type: 'chord-update', data: { index, property: 'lhInversion', value: newInversion } });
@@ -4759,27 +4895,44 @@ function updateLHInversion(index, newInversion, shouldUpdateUI = true, shouldSyn
  * Toggle LH note on/off
  */
 function toggleLHNote(index, note) {
-    const trainerState = getTrainerState();
-    const chord = trainerState.progressionData[index];
-
-    if (!chord.lhOmittedNotes) chord.lhOmittedNotes = [];
-
-    const idx = chord.lhOmittedNotes.indexOf(note);
-    if (idx > -1) {
-        chord.lhOmittedNotes.splice(idx, 1);
-    } else {
-        chord.lhOmittedNotes.push(note);
+    // Get compositionState directly - the single source of truth
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) {
+        console.warn('CompositionState not available');
+        return;
     }
 
+    const trainerState = getTrainerState();
+    const chord = compositionState.getChord(index);
+    if (!chord) {
+        console.warn('Chord not found at index', index);
+        return;
+    }
+
+    const lhOmittedNotes = chord.lhOmittedNotes || [];
+
+    const idx = lhOmittedNotes.indexOf(note);
+    if (idx > -1) {
+        lhOmittedNotes.splice(idx, 1);
+    } else {
+        lhOmittedNotes.push(note);
+    }
+
+    // Update chord in compositionState
+    compositionState.updateChordByIndex(index, {
+        lhOmittedNotes: lhOmittedNotes
+    });
+
     // Save state
-    saveState({ type: 'chord-update', data: { index, property: 'lhOmittedNotes', value: chord.lhOmittedNotes } });
+    saveState({ type: 'chord-update', data: { index, property: 'lhOmittedNotes', value: lhOmittedNotes } });
 
     // Update the grand staff notation
     updateChordAndRenderPreservingTrebleNotes(index);
 
     // Play the chord with the new LH voicing
-    const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
-    const lhNotes = (chord.lhNotes || []).filter(n => !chord.lhOmittedNotes.includes(n));
+    const updatedChord = compositionState.getChord(index);
+    const voicedNotes = updatedChord.notes.filter(n => !(updatedChord.omittedNotes || []).includes(n));
+    const lhNotes = (updatedChord.lhNotes || []).filter(n => !updatedChord.lhOmittedNotes.includes(n));
     const allNotes = voicedNotes.concat(lhNotes);
     if (allNotes.length > 0) {
         playTrainerChordOnce(allNotes);
@@ -9123,36 +9276,54 @@ export function removeChordFromProgression(index) {
  * @param {string} note - Note to toggle
  */
 export function toggleProgressionNote(chordIndex, note) {
+    // Get compositionState directly - the single source of truth
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) {
+        console.warn('CompositionState not available');
+        return;
+    }
+
     const trainerState = getTrainerState();
-    const chordData = trainerState.progressionData[chordIndex];
+    const chordData = compositionState.getChord(chordIndex);
     if (!chordData) return;
 
     // Save state before toggling
     saveStateBeforeChange();
 
     // Ensure omittedNotes array exists
-    if (!chordData.omittedNotes) {
-        chordData.omittedNotes = [];
+    const omittedNotes = chordData.omittedNotes || [];
+
+    const noteOmitIndex = omittedNotes.indexOf(note);
+    if (noteOmitIndex > -1) {
+        omittedNotes.splice(noteOmitIndex, 1); // Note was omitted, so un-omit it
+    } else {
+        omittedNotes.push(note); // Note was played, so omit it
     }
 
-    const noteOmitIndex = chordData.omittedNotes.indexOf(note);
-    if (noteOmitIndex > -1) {
-        chordData.omittedNotes.splice(noteOmitIndex, 1); // Note was omitted, so un-omit it
-    } else {
-        chordData.omittedNotes.push(note); // Note was played, so omit it
+    // Update chord in compositionState
+    compositionState.updateChordByIndex(chordIndex, {
+        omittedNotes: omittedNotes
+    });
+
+    // Get updated chord for playback
+    const updatedChord = compositionState.getChord(chordIndex);
+
+    if (!updatedChord) {
+        console.warn('Could not get updated chord after toggle');
+        return;
     }
 
     // Play chord with duration after voicing change
-    const voicedNotes = chordData.notes.filter(n => !chordData.omittedNotes.includes(n));
+    const voicedNotes = (updatedChord.notes || []).filter(n => !(updatedChord.omittedNotes || []).includes(n));
     const lhNotes = getLHNotes(
-        chordData.root,
-        chordData.lhType,
-        chordData.lhInversion,
+        updatedChord.root,
+        updatedChord.lhType,
+        updatedChord.lhInversion,
         trainerState.currentKey,
-        chordData.lhOctaveShift,
-        chordData.type,
+        updatedChord.lhOctaveShift,
+        updatedChord.type,
         getEnharmonicPreference()
-    ).filter(n => !(chordData.lhOmittedNotes || []).includes(n));
+    ).filter(n => !(updatedChord.lhOmittedNotes || []).includes(n));
     const allNotes = voicedNotes.concat(lhNotes);
 
     if (allNotes.length > 0) {
@@ -9160,7 +9331,7 @@ export function toggleProgressionNote(chordIndex, note) {
     }
 
     // Update the chord notation canvas in the detailed card AND bass clef
-    refreshChordNotationCanvas(chordIndex, chordData);
+    refreshChordNotationCanvas(chordIndex, updatedChord);
 
     // Sync progressionData changes to notation display
     updateChordAndRenderPreservingTrebleNotes(chordIndex);
@@ -9690,8 +9861,8 @@ export function renderProgressionControls() {
     // refreshStyleMoodInsights(true);
     
     // If progression data is empty, load default progression
-    const trainerState = getTrainerState();
-    if (trainerState.progressionData.length === 0) {
+    const progressionData = getProgressionData();
+    if (progressionData.length === 0) {
         loadProgression();
     } else {
         // Render progression display

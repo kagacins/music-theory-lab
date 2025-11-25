@@ -49,6 +49,9 @@ export class CompositionState {
             staff: 'treble',               // 'treble' or 'bass'
             voice: 0                       // Voice index (for polyphony)
         };
+
+        // Guard flag to prevent recursive syncing
+        this._isSyncing = false;
     }
 
     // ========================================================================
@@ -405,10 +408,19 @@ export class CompositionState {
      * @param {object} options - Sync options
      */
     syncWithProgressionData(progressionData, options = {}) {
-        // Update metadata if provided
-        if (options.key) this.metadata.key = options.key;
-        if (options.tempo) this.metadata.tempo = options.tempo;
-        if (options.timeSignature) this.metadata.timeSignature = options.timeSignature;
+        // Prevent recursive calls
+        if (this._isSyncing) {
+            console.warn('[syncWithProgressionData] Blocked recursive call');
+            return;
+        }
+
+        this._isSyncing = true;
+
+        try {
+            // Update metadata if provided
+            if (options.key) this.metadata.key = options.key;
+            if (options.tempo) this.metadata.tempo = options.tempo;
+            if (options.timeSignature) this.metadata.timeSignature = options.timeSignature;
 
         // Get time signature to determine beats per measure
         const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
@@ -418,16 +430,11 @@ export class CompositionState {
         let requiredMeasures = 0;
         let currentBeat = 0;
 
-        console.log(`[syncWithProgressionData] beatsPerMeasure: ${beatsPerMeasure}, timeSignature:`, timeSignature);
-
         progressionData.forEach((chordData, idx) => {
             const chordBeats = chordData.beats !== undefined ? chordData.beats : 4;
-            console.log(`[syncWithProgressionData] Chord ${idx}: beats=${chordBeats}, chord.beats=${chordData.beats}, chordData:`, chordData);
             currentBeat += chordBeats;
             requiredMeasures = Math.ceil(currentBeat / beatsPerMeasure);
         });
-
-        console.log(`[syncWithProgressionData] Processing ${progressionData.length} chords, will create ${requiredMeasures} measures, currentBeat=${currentBeat}`);
 
         // Store existing melody notes before restructuring
         const melodyBackup = this.measures.map((measure, idx) => ({
@@ -442,12 +449,14 @@ export class CompositionState {
         let currentMeasureIndex = -1; // Will increment to 0 on first measure creation
         let currentBeatInMeasure = 0; // Track which beat we're at in the current measure
 
+        console.log('[syncWithProgressionData] Starting measure rebuild...');
         progressionData.forEach((chordData, chordIndex) => {
+            console.log(`[syncWithProgressionData] Processing chord ${chordIndex}: ${chordData.root}${chordData.type}, beats=${chordData.beats}`);
             const chordBeats = chordData.beats !== undefined ? chordData.beats : 4;
             let remainingBeats = chordBeats;
             let isFirstSegmentOfChord = true;
 
-            // Get chord notes
+            // Get chord notes (keep original for chord object)
             let notes = chordData.notes || [];
             if (notes.length === 0 && chordData.root && chordData.type) {
                 const chordNotesObj = getChordNotes(chordData.root, chordData.type, this.metadata.key);
@@ -456,33 +465,39 @@ export class CompositionState {
                 }
             }
 
+            // Apply omittedNotes filter to get the actual notes to play/render
+            // Keep original notes array intact for chord object (UI needs it)
+            const omittedNotes = chordData.omittedNotes || [];
+            const voicedNotes = notes.filter(n => !omittedNotes.includes(n));
+
             // Split chord across measures if necessary
             while (remainingBeats > 0) {
                 // Create new measure if we need one (either first measure or current is full)
                 if (currentBeatInMeasure === 0) {
                     currentMeasureIndex++;
+                    console.log(`[syncWithProgressionData]   Creating measure ${currentMeasureIndex} for chord ${chordIndex}`);
                     this.addMeasure({
                         chord: {
-                            root: chordData.root,
-                            type: chordData.type,
-                            inversion: chordData.inversion || 0,
-                            voicing: "close",
-                            roman: chordData.roman,
-                            name: chordData.name || chordData.simpleName,
+                            // Copy ALL properties from chordData to preserve omittedNotes, octaveShift, etc.
+                            ...chordData,
+                            // Override specific properties
                             notes: notes,
                             beats: chordBeats,
                             beatsInMeasure: 0, // Will calculate this as we add notes
                             chordIndex: chordIndex,
-                            isChordContinuation: false
+                            isChordContinuation: false,
+                            // Ensure required fields have defaults
+                            inversion: chordData.inversion || 0,
+                            voicing: chordData.voicing || "close",
+                            name: chordData.name || chordData.simpleName
                         }
                     });
-                    console.log(`[syncWithProgressionData] Created measure ${currentMeasureIndex}`);
                 }
 
                 const beatsInThisMeasure = Math.min(remainingBeats, beatsPerMeasure - currentBeatInMeasure);
                 const measure = this.getMeasure(currentMeasureIndex);
 
-                if (measure && notes.length > 0) {
+                if (measure && voicedNotes.length > 0) {
                     // Determine the appropriate duration for this chord segment
                     const duration = beatsInThisMeasure === 4 ? '1n' :
                                    beatsInThisMeasure === 2 ? '2n' :
@@ -494,18 +509,17 @@ export class CompositionState {
 
                     const chordNote = {
                         type: 'note',
-                        pitches: [...notes],
+                        pitches: [...voicedNotes], // Use voicedNotes (filtered by omittedNotes)
                         duration: duration,
                         beat: currentBeatInMeasure,
                         dotted: duration.includes('.'),
-                        isTied: !isFirstSegmentOfChord // Tied if not the first segment
+                        isTied: !isFirstSegmentOfChord, // Tied if not the first segment
+                        chordIndex: chordIndex // Track which chord this note belongs to
                     };
 
                     // Add this note to the bass clef
                     measure.notation.bass.voices[0].notes.push(chordNote);
                     measure.notation.bass.autoGenerated = false;
-
-                    console.log(`[syncWithProgressionData]   → Added bass note to measure ${currentMeasureIndex}: chord=${chordIndex}, duration=${duration}, beat=${currentBeatInMeasure}, tied=${chordNote.isTied}, pitches=${notes.length}`);
                 }
 
                 remainingBeats -= beatsInThisMeasure;
@@ -526,7 +540,12 @@ export class CompositionState {
             }
         });
 
-        this.events.emit('progressionSynced', progressionData);
+        console.log('[syncWithProgressionData] Final measures:', this.measures.map((m, i) => `[${i}] chordIdx=${m.chord.chordIndex} ${m.chord.root}${m.chord.type}`).join(', '));
+
+            this.events.emit('progressionSynced', progressionData);
+        } finally {
+            this._isSyncing = false;
+        }
     }
 
     /**
@@ -564,8 +583,7 @@ export class CompositionState {
             }
         });
 
-        console.log(`[exportToProgressionData] Exported ${uniqueChords.length} unique chords from ${this.measures.length} measures`);
-        console.log('[exportToProgressionData] Stack trace:', new Error().stack);
+        // Silent export - compositionState is now single source of truth
         return uniqueChords;
     }
 
@@ -690,6 +708,105 @@ export class CompositionState {
         this.measures = [];
         this.cursor = { measure: 0, beat: 0, staff: 'treble', voice: 0 };
         this.events.emit('cleared');
+    }
+
+    /**
+     * Get unique chords (not measures) - NEW single source of truth method
+     * Use this instead of progressionData for reading chord progression
+     * @returns {Array} Array of unique chord objects
+     */
+    getChords() {
+        const chords = [];
+        const seenChordIndices = new Set();
+
+        this.measures.forEach(measure => {
+            const chordIndex = measure.chord.chordIndex;
+
+            // Only include first occurrence of each chord (skip continuations)
+            if (chordIndex !== undefined && !seenChordIndices.has(chordIndex)) {
+                seenChordIndices.add(chordIndex);
+                chords.push(measure.chord);
+            }
+        });
+
+        return chords;
+    }
+
+    /**
+     * Get a specific chord by its chordIndex
+     * @param {number} chordIndex - The chord index to get
+     * @returns {object|null} The chord object or null if not found
+     */
+    getChord(chordIndex) {
+        for (const measure of this.measures) {
+            if (measure.chord && measure.chord.chordIndex === chordIndex) {
+                return measure.chord;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Update a chord by its chordIndex (updates all measures for that chord)
+     * @param {number} chordIndex - The chord index to update
+     * @param {object} updates - Properties to update
+     */
+    updateChordByIndex(chordIndex, updates) {
+        // For chord property changes (type, inversion, notes, etc.),
+        // we need to export, update, and re-sync to ensure all tied measures are updated
+        const progressionData = this.exportToProgressionData();
+
+        if (chordIndex < 0 || chordIndex >= progressionData.length) {
+            console.warn(`[updateChordByIndex] Invalid chordIndex: ${chordIndex}`);
+            return false;
+        }
+
+        // Update the chord in progressionData
+        Object.assign(progressionData[chordIndex], updates);
+
+        // Re-sync to rebuild measures and notation with updated chord data
+        // This ensures tied notes across measures all get the updated chord properties
+        this.syncWithProgressionData(progressionData, {
+            key: this.key,
+            timeSignature: this.timeSignature
+        });
+
+        this.events.emit('chordChanged', chordIndex);
+        return true;
+    }
+
+    /**
+     * Update chord duration - handles measure rebuilding while preserving chord order
+     * @param {number} chordIndex - The chord index to update
+     * @param {number} newBeats - New duration in beats
+     */
+    updateChordDuration(chordIndex, newBeats) {
+        // Export current progression maintaining chord order
+        const progressionData = this.exportToProgressionData();
+
+        console.log(`[updateChordDuration] BEFORE - Chord ${chordIndex}: ${progressionData[chordIndex]?.root}${progressionData[chordIndex]?.type}, beats: ${progressionData[chordIndex]?.beats} -> ${newBeats}`);
+        console.log(`[updateChordDuration] BEFORE - Full progression:`, progressionData.map((c, i) => `[${i}] ${c.root}${c.type} (${c.beats}b)`).join(', '));
+
+        if (chordIndex < 0 || chordIndex >= progressionData.length) {
+            console.warn(`[updateChordDuration] Invalid chordIndex: ${chordIndex}`);
+            return false;
+        }
+
+        // Update the specific chord's beats
+        progressionData[chordIndex].beats = newBeats;
+
+        console.log(`[updateChordDuration] AFTER UPDATE - Full progression:`, progressionData.map((c, i) => `[${i}] ${c.root}${c.type} (${c.beats}b)`).join(', '));
+
+        // Resync with updated progression - this rebuilds measures with new splitting
+        this.syncWithProgressionData(progressionData, {
+            key: this.metadata.key,
+            timeSignature: this.metadata.timeSignature || { num: 4, denom: 4 }
+        });
+
+        console.log(`[updateChordDuration] AFTER SYNC - Full progression:`, this.exportToProgressionData().map((c, i) => `[${i}] ${c.root}${c.type} (${c.beats}b)`).join(', '));
+
+        this.events.emit('chordDurationChanged', chordIndex, newBeats);
+        return true;
     }
 
     /**

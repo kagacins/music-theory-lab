@@ -3837,49 +3837,142 @@ export function playAllMelody() {
             const compositionState = window.getCompositionState();
             const melodyNotes = compositionState.getAllMelodyNotes();
             console.log(`[playAllMelody] Got ${melodyNotes.length} melody notes from compositionState`);
-            return melodyNotes
-                .filter(note => note.type === 'note' && (note.pitch || note.pitches)) // Skip rests, include both single notes and chords
-                .map((note, index) => {
-                    const noteTime = (note.measure * measureDuration) + (note.beat * beatDuration);
-                    // Ensure time is non-negative
-                    const safeTime = Math.max(0, noteTime);
-                    return {
-                        time: safeTime,
-                        pitch: note.pitch, // Single note (may be undefined for chords)
-                        pitches: note.pitches, // Chord pitches (may be undefined for single notes)
-                        duration: note.duration,
-                        measure: note.measure,
-                        beat: note.beat,
-                        dynamic: note.dynamic, // Include stored dynamic (may be null if inherited)
-                        noteIndex: index // Include index for finding effective dynamic
-                    };
+
+            // Helper to compare pitches (handles both single notes and chords)
+            const samePitches = (a, b) => {
+                if (!a || !b) return false;
+                if (a.pitches && b.pitches) {
+                    if (a.pitches.length !== b.pitches.length) return false;
+                    for (let i = 0; i < a.pitches.length; i++) {
+                        if (a.pitches[i] !== b.pitches[i]) return false;
+                    }
+                    return true;
+                }
+                return !!a.pitch && !!b.pitch && a.pitch === b.pitch;
+            };
+
+            const events = [];
+            let exportedIndex = 0;
+
+            for (let i = 0; i < melodyNotes.length; i++) {
+                const note = melodyNotes[i];
+
+                // Only schedule playable notes (skip rests)
+                if (note.type !== 'note' || (!note.pitch && !note.pitches)) {
+                    continue;
+                }
+
+                const prev = i > 0 ? melodyNotes[i - 1] : null;
+
+                // Determine if this note is a continuation of a tie group
+                const isContinuation =
+                    // New-style ties: this note is marked as a continuation or end
+                    ((note.tie === 'continue' || note.tie === 'end') && prev && samePitches(note, prev)) ||
+                    // Legacy ties: previous note has tied=true and same pitch
+                    (prev && prev.tied && samePitches(note, prev));
+
+                // Skip pure continuation notes – their duration will be merged into the start note
+                if (isContinuation) {
+                    continue;
+                }
+
+                // Base time for this note
+                const baseTime = (note.measure * measureDuration) + (note.beat * beatDuration);
+                const safeTime = Math.max(0, baseTime);
+
+                // Start with this note's duration
+                let totalDurationSeconds = Tone.Time(note.duration).toSeconds();
+
+                // Look ahead to merge durations of tied continuation notes
+                let j = i + 1;
+                while (j < melodyNotes.length) {
+                    const next = melodyNotes[j];
+                    if (!next || next.type !== 'note') break;
+
+                    const prevInChain = melodyNotes[j - 1];
+
+                    const nextIsContinuation =
+                        // New-style ties: continue/end and same pitch
+                        ((next.tie === 'continue' || next.tie === 'end') && samePitches(next, prevInChain)) ||
+                        // Legacy ties: previous note in chain has tied=true and same pitch
+                        (prevInChain && prevInChain.tied && samePitches(next, prevInChain));
+
+                    if (!nextIsContinuation) {
+                        break;
+                    }
+
+                    // Merge this continuation note's duration into the total
+                    totalDurationSeconds += Tone.Time(next.duration).toSeconds();
+
+                    // Advance chain
+                    j++;
+                }
+
+                events.push({
+                    time: safeTime,
+                    pitch: note.pitch,          // Single note (may be undefined for chords)
+                    pitches: note.pitches,      // Chord pitches (may be undefined for single notes)
+                    duration: totalDurationSeconds, // Use merged duration in seconds
+                    measure: note.measure,
+                    beat: note.beat,
+                    dynamic: note.dynamic,      // Include stored dynamic (may be null if inherited)
+                    noteIndex: exportedIndex    // Index into this filtered/merged list
                 });
+
+                exportedIndex++;
+            }
+
+            return events;
         }
         return [];
     })());
     
+    // Track the current chord to detect chord changes
+    let lastChordIndex = -1;
+
     // Schedule chord whole notes
     const chordPart = new Tone.Part((time, chordData) => {
         // Use the passed-in time parameter directly (Tone.js handles timing)
         const chord = chordData.chord;
         const measureIndex = chordData.measureIndex;
-        
-        // Release previous chord notes before playing new chord
-        // This ensures reverb from previous chord stops when next chord starts
-        if (currentlyPlayingChordNotes.length > 0) {
+        const specificNote = chordData.specificNote;
+
+        // Get chordIndex from the specific note if available (more accurate for measures with multiple chords)
+        // Otherwise fall back to the measure's chord
+        const chordIndex = specificNote?.chordIndex ?? chord.chordIndex;
+
+        // Detect if this is a new chord (before updating lastChordIndex)
+        const isNewChord = chordIndex !== lastChordIndex;
+
+        // Only release previous chord if we're starting a DIFFERENT chord
+        // (not just another bass note in the same chord)
+        if (currentlyPlayingChordNotes.length > 0 && isNewChord) {
             try {
-                piano.triggerRelease(currentlyPlayingChordNotes, time);
+                // Force immediate release of all notes from previous chord
+                // Use releaseAll for immediate cutoff (bypasses the 1-second envelope)
+                piano.releaseAll(time);
+                console.log(`[Release] Released previous chord ${lastChordIndex} at time=${time}s (measure ${measureIndex}), starting chord ${chordIndex}`);
             } catch (e) {
                 // Ignore errors
             }
             currentlyPlayingChordNotes = [];
+        } else {
+            console.log(`[PlayAll] Playing chord ${chordIndex} at measure ${measureIndex}, beat ${specificNote?.beat || 0}, isNewChord=${isNewChord}, lastChordIndex=${lastChordIndex}`);
         }
+
+        // Update last chord index
+        lastChordIndex = chordIndex;
 
         // Read bass notes from compositionState (single source of truth)
         // compositionState always has bass now (either pattern-based or simple chord)
         let bassNoteData = [];
 
-        if (window.getCompositionState) {
+        // If a specific note was provided in the event, only play that note
+        if (chordData.specificNote) {
+            bassNoteData = [chordData.specificNote];
+            console.log(`[PlayAll] Playing specific bass note at beat ${chordData.specificNote.beat} for measure ${measureIndex}`);
+        } else if (window.getCompositionState) {
+            // Fallback: play all bass notes in the measure (old behavior)
             const compositionState = window.getCompositionState();
 
             if (compositionState.getMeasureCount() > measureIndex) {
@@ -3905,9 +3998,11 @@ export function playAllMelody() {
                 }
             }, time);
 
-            bassNoteData.forEach(bassNote => {
+            // Track total chord duration for fallback release scheduling
+            let chordTotalDuration = 0;
+
+            bassNoteData.forEach((bassNote, bassNoteIndex) => {
                 const bassTime = time + (bassNote.beat * beatDuration);
-                const bassDuration = Tone.Time(bassNote.duration).toSeconds();
 
                 // Handle both single notes (pitch) and chords (pitches)
                 const notesToPlay = bassNote.pitches || (bassNote.pitch ? [bassNote.pitch] : []);
@@ -3917,11 +4012,55 @@ export function playAllMelody() {
                     return;
                 }
 
-                // Play the bass note(s)
-                piano.triggerAttackRelease(notesToPlay, bassNote.duration, bassTime);
+                // Calculate full duration including tied notes (only for first bass note)
+                let totalDuration = Tone.Time(bassNote.duration).toSeconds();
+
+                if (bassNoteIndex === 0 && !bassNote.isTied && window.getCompositionState) {
+                    const compositionState = window.getCompositionState();
+                    console.log(`[Duration] Chord ${chordIndex} at measure ${measureIndex}: calculating total duration, starting with ${totalDuration}s`);
+                    // Look ahead to find tied continuations of this chord
+                    let nextMeasureIndex = measureIndex + 1;
+                    while (nextMeasureIndex < compositionState.getMeasureCount()) {
+                        const nextMeasure = compositionState.getMeasure(nextMeasureIndex);
+                        const nextBassVoice = nextMeasure?.notation?.bass?.voices?.[0];
+                        const nextNote = nextBassVoice?.notes?.[0];
+
+                        // Check if the next measure starts with a tied note (continuation of THIS chord)
+                        // Must verify chordIndex matches to avoid adding tied notes from other chords
+                        if (nextNote && nextNote.isTied && nextNote.beat === 0 && nextNote.chordIndex === chordIndex) {
+                            const addedDuration = Tone.Time(nextNote.duration).toSeconds();
+                            console.log(`[Duration]   Found tied continuation at measure ${nextMeasureIndex} (chordIndex=${nextNote.chordIndex}), adding ${addedDuration}s`);
+                            totalDuration += addedDuration;
+                            nextMeasureIndex++;
+                        } else {
+                            const reason = !nextNote ? 'no note' :
+                                          !nextNote.isTied ? 'not tied' :
+                                          nextNote.beat !== 0 ? 'not at beat 0' :
+                                          nextNote.chordIndex !== chordIndex ? `different chord (${nextNote.chordIndex} vs ${chordIndex})` :
+                                          'unknown';
+                            console.log(`[Duration]   No more tied continuations at measure ${nextMeasureIndex} (${reason})`);
+                            break; // No more tied continuations
+                        }
+                    }
+                    chordTotalDuration = totalDuration;
+                    console.log(`[Duration] Chord ${chordIndex} total duration: ${chordTotalDuration}s`);
+                }
+
+                // Play the bass note(s) with the exact calculated duration
+                // Use the totalDuration which includes tied notes for the first bass note
+                // For continuation notes (isTied), just use the single note duration
+                piano.triggerAttackRelease(notesToPlay, totalDuration, bassTime);
 
                 // Add to activeNotes when bass note starts (each pitch in the chord)
                 Tone.Draw.schedule(() => {
+                    // Only track notes for chord release on the first bass note of a new chord
+                    if (bassNoteIndex === 0 && isNewChord) {
+                        currentlyPlayingChordNotes.push(...notesToPlay);
+                        console.log(`[Track] Added notes to tracking for chord ${chordIndex}:`, notesToPlay, `total tracked: ${currentlyPlayingChordNotes.length}`);
+                    } else {
+                        console.log(`[Track] NOT tracking notes: bassNoteIndex=${bassNoteIndex}, isNewChord=${isNewChord}`);
+                    }
+
                     notesToPlay.forEach(pitch => {
                         const noteId = `${measureIndex}-${bassNote.beat}-${pitch}`;
                         activeNotes.add(noteId);
@@ -3948,35 +4087,77 @@ export function playAllMelody() {
                         if (keyEl) keyEl.classList.remove('active-progression');
                     });
                     updateCanvas();
-                }, bassTime + bassDuration);
+                }, bassTime + totalDuration);
             });
+
+            // No fallback release needed - the next chord will release this one via releaseAll
         }
     }, (() => {
-        // Get measures from compositionState instead of progressionData
-        // This handles variable chord durations where 1 chord can span multiple measures
+        // Prefer compositionState for variable chord durations (beats per chord),
+        // falling back to progressionData if not available.
         if (window.getCompositionState) {
             const compositionState = window.getCompositionState();
-            const measureCount = compositionState.getMeasureCount();
+
+            // Get unique chords in order, each with a `beats` property
+            const chords = compositionState.getChords();
+            const timeSignature = compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
+            const beatsPerMeasure = timeSignature.num || timeSignature.numerator || 4;
+
             const events = [];
+            let beatOffset = 0; // Cumulative beats from start of piece
 
-            for (let measureIndex = 0; measureIndex < measureCount; measureIndex++) {
-                const measureData = compositionState.getMeasure(measureIndex);
-                if (measureData && measureData.chord) {
-                    const chordTime = measureIndex * measureDuration;
-                    const safeTime = Math.max(0, chordTime);
-                    events.push({
-                        time: safeTime,
-                        chord: measureData.chord,
-                        measureIndex: measureIndex
-                    });
+            chords.forEach((chord, chordIndex) => {
+                const chordBeats = chord.beats !== undefined ? chord.beats : 4;
+
+                // Start time in beats → convert to seconds
+                const startBeat = beatOffset;
+                const chordTime = startBeat * beatDuration;
+                const safeTime = Math.max(0, chordTime);
+
+                // Approximate measure index for logging/highlighting
+                const measureIndex = Math.floor(startBeat / beatsPerMeasure);
+
+                // Find a representative bass note for this chord (non-tied, matching chordIndex)
+                let specificNote = null;
+                const measureCount = compositionState.getMeasureCount();
+                for (let m = 0; m < measureCount; m++) {
+                    const measureData = compositionState.getMeasure(m);
+                    const bassVoice = measureData?.notation?.bass?.voices?.[0];
+                    if (!bassVoice || !bassVoice.notes) continue;
+
+                    const candidate = bassVoice.notes.find(
+                        (note) =>
+                            !note.isTied &&
+                            note.pitches &&
+                            note.pitches.length > 0 &&
+                            note.chordIndex === chord.chordIndex
+                    );
+
+                    if (candidate) {
+                        // Clone and normalize beat to 0 so we don't double-apply offsets;
+                        // the event time already includes the correct absolute position.
+                        specificNote = { ...candidate, beat: 0 };
+                        break;
+                    }
                 }
-            }
 
-            console.log(`[playAllMelody] Scheduled ${events.length} chord events for ${measureCount} measures`);
+                events.push({
+                    time: safeTime,
+                    chord,
+                    measureIndex,
+                    specificNote
+                });
+
+                beatOffset += chordBeats;
+            });
+
+            console.log(
+                `[playAllMelody] Scheduled ${events.length} chord events using chord beats (compositionState.getChords)`,
+            );
             return events;
         }
 
-        // Fallback to progressionData if compositionState not available
+        // Fallback: use progressionData with fixed 1-measure-per-chord timing
         return progressionData.map((chord, index) => {
             const chordTime = index * measureDuration;
             const safeTime = Math.max(0, chordTime);

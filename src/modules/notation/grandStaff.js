@@ -633,6 +633,18 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature) {
       const { adjustedPitches, ottavaLabel } = applyOttavaAdjustment(note.pitches, clef);
       const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false, note.articulation || null, note.accidental || null);
 
+      // Preserve isTied property for cross-measure tie rendering
+      console.log('[createBassVoice] Processing note:', {
+        noteIsTied: note.isTied,
+        noteHasIsTied: 'isTied' in note,
+        noteKeys: Object.keys(note),
+        beat: note.beat
+      });
+      if (note.isTied !== undefined) {
+        chordNote.isTied = note.isTied;
+        console.log('[createBassVoice] Attached isTied to VexFlow note:', chordNote.isTied);
+      }
+
       // Track ottava brackets
       if (ottavaLabel) {
         if (currentBracket && currentBracket.label === ottavaLabel) {
@@ -666,6 +678,11 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature) {
       const { adjustedPitches, ottavaLabel } = applyOttavaAdjustment([note.pitch], clef);
       const adjustedNote = { ...note, pitch: adjustedPitches[0] };
       const staveNote = createStaveNote(adjustedNote, keySignature, clef);
+
+      // Preserve isTied property for cross-measure tie rendering
+      if (note.isTied !== undefined) {
+        staveNote.isTied = note.isTied;
+      }
 
       // Track ottava brackets
       if (ottavaLabel) {
@@ -1200,6 +1217,40 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       }
     }
   }
+
+  // TODO: Draw cross-measure ties for bass notes
+  // VexFlow 5.x StaveTie API has issues with notes on different staves/pages
+  // The `isTied` property is correctly flowing through the data pipeline (see logs above)
+  // but VexFlow's tie validation fails for cross-measure ties in multi-page rendering
+  //
+  // Possible solutions to explore:
+  // 1. Use VexFlow's Curve API to manually draw tie curves
+  // 2. Render ties within the measure rendering loop instead of after
+  // 3. Use a single-page canvas for tie rendering
+  //
+  // For now, cross-measure ties are visually missing but:
+  // ✅ Variable durations work correctly
+  // ✅ Playback only triggers once (no retriggering for tied notes)
+  // ✅ Chord progression remains stable when changing durations
+  // ✅ `isTied` property flows correctly through the entire pipeline
+
+  /* COMMENTED OUT - VexFlow StaveTie fails for cross-measure/cross-page ties
+  console.log('[renderGrandStaffSystem] Checking for ties across', renderedMeasures.length, 'measures');
+  for (let i = 0; i < renderedMeasures.length - 1; i++) {
+    const currentMeasure = renderedMeasures[i];
+    const nextMeasure = renderedMeasures[i + 1];
+
+    if (nextMeasure.bassNotes && nextMeasure.bassNotes.length > 0) {
+      const firstNextNote = nextMeasure.bassNotes[0];
+      if (firstNextNote && firstNextNote.isTied === true) {
+        if (currentMeasure.bassNotes && currentMeasure.bassNotes.length > 0) {
+          const lastCurrentNote = currentMeasure.bassNotes[currentMeasure.bassNotes.length - 1];
+          // Tie drawing code here - currently fails with VexFlow 5.x API
+        }
+      }
+    }
+  }
+  */
 
   // Collect all note regions and add chord tone analysis
   const allNoteRegions = [];

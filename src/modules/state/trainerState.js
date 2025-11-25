@@ -1,16 +1,17 @@
 /**
  * Trainer Tab State Management Module
- * Manages all state related to the chord progression trainer functionality
+ * Manages UI state for the chord progression trainer
+ * NOTE: Chord data now lives in compositionState (single source of truth)
  */
 
-// Trainer state object
+// Trainer state object - UI state only
 let trainerState = {
-    progressionData: [],
+    // progressionData REMOVED - now in compositionState
     currentIndex: 0,
     isPlaying: false,
     isReady: false,
     currentKey: 'C',
-    progressionRomans: [],
+    progressionRomans: [], // TODO: Can be derived from compositionState
     playbackDuration: 800, // ms for auto-play
     transportId: null,
     scaleNotes: [],
@@ -28,13 +29,28 @@ let trainerState = {
     selectedChordIndex: 0    // Currently selected chord card index (for persistent purple ring)
 };
 
-// Getters and Setters for progressionData
+// DEPRECATED: progressionData now in compositionState
+// These functions remain for backwards compatibility but delegate to compositionState
 export function getProgressionData() {
-    return trainerState.progressionData;
+    // Silent delegation to compositionState (single source of truth)
+    if (window.getCompositionState) {
+        const compositionState = window.getCompositionState();
+        return compositionState ? compositionState.exportToProgressionData() : [];
+    }
+    return [];
 }
 
 export function setProgressionData(value) {
-    trainerState.progressionData = value;
+    // Silent delegation to compositionState (single source of truth)
+    if (window.getCompositionState && Array.isArray(value)) {
+        const compositionState = window.getCompositionState();
+        if (compositionState) {
+            compositionState.syncWithProgressionData(value, {
+                key: trainerState.currentKey,
+                timeSignature: { num: 4, denom: 4 }
+            });
+        }
+    }
 }
 
 // Getters and Setters for currentIndex
@@ -220,7 +236,8 @@ export function setSelectedChordIndex(value) {
 // Get complete trainer state
 export function getTrainerState() {
     return {
-        progressionData: trainerState.progressionData,
+        // progressionData delegated to compositionState (for backwards compatibility)
+        progressionData: getProgressionData(),
         currentIndex: trainerState.currentIndex,
         isPlaying: trainerState.isPlaying,
         isReady: trainerState.isReady,
@@ -247,7 +264,7 @@ export function getTrainerState() {
 // Initialize trainer state with default values
 export function initializeTrainerState() {
     trainerState = {
-        progressionData: [],
+        // progressionData REMOVED - now in compositionState
         currentIndex: 0,
         isPlaying: false,
         isReady: false,
