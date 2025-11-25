@@ -436,10 +436,11 @@ export class CompositionState {
             requiredMeasures = Math.ceil(currentBeat / beatsPerMeasure);
         });
 
-        // Store existing melody notes before restructuring
+        // Store existing melody notes and metadata before restructuring
         const melodyBackup = this.measures.map((measure, idx) => ({
             index: idx,
-            notes: measure.notation.treble.voices[0].notes || []
+            notes: measure.notation.treble.voices[0].notes || [],
+            metadata: measure.metadata || {}
         }));
 
         // Clear measures and rebuild with new structure
@@ -533,10 +534,15 @@ export class CompositionState {
             }
         });
 
-        // Restore melody notes where possible
+        // Restore melody notes and metadata where possible
         melodyBackup.forEach(backup => {
-            if (backup.index < this.measures.length && backup.notes.length > 0) {
-                this.measures[backup.index].notation.treble.voices[0].notes = backup.notes;
+            if (backup.index < this.measures.length) {
+                if (backup.notes.length > 0) {
+                    this.measures[backup.index].notation.treble.voices[0].notes = backup.notes;
+                }
+                if (backup.metadata && Object.keys(backup.metadata).length > 0) {
+                    this.measures[backup.index].metadata = backup.metadata;
+                }
             }
         });
 

@@ -44,7 +44,7 @@ export const GRAND_STAFF_DEFAULTS = {
   measureWidth: 220,           // Width of each measure
   staffSpacing: 80,            // Vertical space between staves
   systemMarginTop: 20,         // Top margin for first system
-  systemMarginBottom: 100,     // Bottom margin (increased for deep bass ledger lines below D3)
+  systemMarginBottom: 160,     // Bottom margin (increased for chord brackets + deep bass ledger lines)
   braceWidth: 15,              // Width for the brace
   measurePadding: 10,          // Padding within measures
   clefWidth: 30,               // Width for clef
@@ -838,6 +838,251 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     }
   }
 
+  // Draw partial measure highlight for chord spans that don't align with measure boundaries
+  // startBeat and endBeat are absolute beat positions from the beginning of the piece
+  function drawChordSpanHighlight(startBeat, endBeat, color) {
+    const beatsPerMeasure = timeSignature.num || timeSignature.numerator || 4;
+
+    // Convert absolute beats to measure + beat positions
+    const startMeasure = Math.floor(startBeat / beatsPerMeasure);
+    const startBeatInMeasure = startBeat % beatsPerMeasure;
+    const endMeasure = Math.floor(endBeat / beatsPerMeasure);
+    const endBeatInMeasure = endBeat % beatsPerMeasure;
+
+    // Draw the span across measures
+    for (let m = startMeasure; m <= endMeasure; m++) {
+      if (m >= measures.length) break;
+
+      const systemIndex = Math.floor(m / measuresPerLine);
+      const measureInSystem = m % measuresPerLine;
+      const isFirstInSystem = measureInSystem === 0;
+
+      const measureX = dimensions.braceWidth + (measureInSystem * measureWidth) +
+        (isFirstInSystem ? 0 : dimensions.firstMeasureExtra);
+      const y = dimensions.trebleY + (systemIndex * dimensions.systemHeight);
+      const fullWidth = isFirstInSystem
+        ? measureWidth + dimensions.firstMeasureExtra
+        : measureWidth;
+      const h = dimensions.systemHeight - GRAND_STAFF_DEFAULTS.systemMarginTop - GRAND_STAFF_DEFAULTS.systemMarginBottom;
+
+      // Calculate horizontal position and width within this measure
+      let x, w;
+
+      if (m === startMeasure && m === endMeasure) {
+        // Chord starts and ends in same measure
+        const startFraction = startBeatInMeasure / beatsPerMeasure;
+        const endFraction = endBeatInMeasure / beatsPerMeasure;
+        x = measureX + (fullWidth * startFraction);
+        w = fullWidth * (endFraction - startFraction);
+      } else if (m === startMeasure) {
+        // First measure of span - from startBeat to end of measure
+        const startFraction = startBeatInMeasure / beatsPerMeasure;
+        x = measureX + (fullWidth * startFraction);
+        w = fullWidth * (1 - startFraction);
+      } else if (m === endMeasure) {
+        // Last measure of span - from start of measure to endBeat
+        // If endBeatInMeasure is 0, it means the chord ends exactly at the start of this measure,
+        // so we shouldn't draw anything in this measure (the previous measure was the last)
+        const endFraction = endBeatInMeasure === 0 ? 0 : endBeatInMeasure / beatsPerMeasure;
+        x = measureX;
+        w = fullWidth * endFraction;
+      } else {
+        // Middle measure - full width
+        x = measureX;
+        w = fullWidth;
+      }
+
+      // Draw the highlight
+      if (context.svg) {
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', x);
+        rect.setAttribute('y', y);
+        rect.setAttribute('width', w);
+        rect.setAttribute('height', h);
+        rect.setAttribute('fill', color);
+        rect.setAttribute('stroke', 'none');
+        context.svg.insertBefore(rect, context.svg.firstChild);
+      } else if (context.context2D || context.vexFlowCanvasContext) {
+        const ctx = context.context2D || context.vexFlowCanvasContext;
+        if (ctx) {
+          ctx.save();
+          ctx.fillStyle = color;
+          ctx.fillRect(x, y, w, h);
+          ctx.restore();
+        }
+      }
+    }
+  }
+
+  // Draw chord bracket beneath bass clef with chord name
+  // Returns the total width of the bracket span across all systems
+  function drawChordBracket(startBeat, endBeat, chordName, color) {
+    const beatsPerMeasure = timeSignature.num || timeSignature.numerator || 4;
+    const startMeasure = Math.floor(startBeat / beatsPerMeasure);
+    const startBeatInMeasure = startBeat % beatsPerMeasure;
+    const endMeasure = Math.floor(endBeat / beatsPerMeasure);
+    const endBeatInMeasure = endBeat % beatsPerMeasure;
+
+    // Group consecutive measures by system
+    const systemSpans = [];
+    let currentSystem = -1;
+    let currentSpan = null;
+
+    for (let m = startMeasure; m <= endMeasure; m++) {
+      if (m >= measures.length) break;
+
+      const systemIndex = Math.floor(m / measuresPerLine);
+      const measureInSystem = m % measuresPerLine;
+      const isFirstInSystem = measureInSystem === 0;
+
+      const measureX = dimensions.braceWidth + (measureInSystem * measureWidth) +
+        (isFirstInSystem ? 0 : dimensions.firstMeasureExtra);
+      const fullWidth = isFirstInSystem
+        ? measureWidth + dimensions.firstMeasureExtra
+        : measureWidth;
+
+      // Calculate x position and width for this measure segment
+      let segmentX, segmentW;
+
+      if (m === startMeasure && m === endMeasure) {
+        const startFraction = startBeatInMeasure / beatsPerMeasure;
+        const endFraction = endBeatInMeasure / beatsPerMeasure;
+        segmentX = measureX + (fullWidth * startFraction);
+        segmentW = fullWidth * (endFraction - startFraction);
+      } else if (m === startMeasure) {
+        const startFraction = startBeatInMeasure / beatsPerMeasure;
+        segmentX = measureX + (fullWidth * startFraction);
+        segmentW = fullWidth * (1 - startFraction);
+      } else if (m === endMeasure) {
+        // If endBeatInMeasure is 0, chord ends exactly at start of this measure
+        const endFraction = endBeatInMeasure === 0 ? 0 : endBeatInMeasure / beatsPerMeasure;
+        segmentX = measureX;
+        segmentW = fullWidth * endFraction;
+      } else {
+        segmentX = measureX;
+        segmentW = fullWidth;
+      }
+
+      // Start new span if we're on a new system
+      if (systemIndex !== currentSystem) {
+        if (currentSpan) {
+          systemSpans.push(currentSpan);
+        }
+        currentSystem = systemIndex;
+        currentSpan = {
+          systemIndex,
+          startX: segmentX,
+          endX: segmentX + segmentW,
+          width: segmentW
+        };
+      } else {
+        // Extend current span
+        currentSpan.endX = segmentX + segmentW;
+        currentSpan.width = currentSpan.endX - currentSpan.startX;
+      }
+    }
+
+    // Add final span
+    if (currentSpan) {
+      systemSpans.push(currentSpan);
+    }
+
+    // Draw bracket for each system span
+    systemSpans.forEach((span, index) => {
+      const bassY = dimensions.trebleY + (span.systemIndex * dimensions.systemHeight) +
+                    80 + staffSpacing; // Position of bass staff
+      const bracketY = bassY + 120; // Well below the bass staff to accommodate low notes
+      const bracketHeight = 15;
+
+      const ctx = context.context2D || context.vexFlowCanvasContext;
+
+      if (context.svg) {
+        // SVG rendering
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+        // Horizontal line
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', span.startX);
+        line.setAttribute('y1', bracketY);
+        line.setAttribute('x2', span.endX);
+        line.setAttribute('y2', bracketY);
+        line.setAttribute('stroke', color);
+        line.setAttribute('stroke-width', '2');
+        group.appendChild(line);
+
+        // Left vertical tick
+        const leftTick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        leftTick.setAttribute('x1', span.startX);
+        leftTick.setAttribute('y1', bracketY - bracketHeight / 2);
+        leftTick.setAttribute('x2', span.startX);
+        leftTick.setAttribute('y2', bracketY + bracketHeight / 2);
+        leftTick.setAttribute('stroke', color);
+        leftTick.setAttribute('stroke-width', '2');
+        group.appendChild(leftTick);
+
+        // Right vertical tick
+        const rightTick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        rightTick.setAttribute('x1', span.endX);
+        rightTick.setAttribute('y1', bracketY - bracketHeight / 2);
+        rightTick.setAttribute('x2', span.endX);
+        rightTick.setAttribute('y2', bracketY + bracketHeight / 2);
+        rightTick.setAttribute('stroke', color);
+        rightTick.setAttribute('stroke-width', '2');
+        group.appendChild(rightTick);
+
+        // Chord name text (only on the first span or if it's the only span)
+        if (index === 0) {
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', span.startX + (span.width / 2));
+          text.setAttribute('y', bracketY + 25);
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('font-family', 'Arial, sans-serif');
+          text.setAttribute('font-size', '13');
+          text.setAttribute('font-weight', 'bold');
+          text.setAttribute('fill', '#333');
+          text.textContent = chordName;
+          group.appendChild(text);
+        }
+
+        context.svg.appendChild(group);
+      } else if (ctx) {
+        // Canvas rendering
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+
+        // Horizontal line
+        ctx.beginPath();
+        ctx.moveTo(span.startX, bracketY);
+        ctx.lineTo(span.endX, bracketY);
+        ctx.stroke();
+
+        // Left vertical tick
+        ctx.beginPath();
+        ctx.moveTo(span.startX, bracketY - bracketHeight / 2);
+        ctx.lineTo(span.startX, bracketY + bracketHeight / 2);
+        ctx.stroke();
+
+        // Right vertical tick
+        ctx.beginPath();
+        ctx.moveTo(span.endX, bracketY - bracketHeight / 2);
+        ctx.lineTo(span.endX, bracketY + bracketHeight / 2);
+        ctx.stroke();
+
+        // Chord name text (only on the first span or if it's the only span)
+        if (index === 0) {
+          ctx.font = 'bold 13px Arial, sans-serif';
+          ctx.fillStyle = '#333';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.fillText(chordName, span.startX + (span.width / 2), bracketY + 5);
+        }
+
+        ctx.restore();
+      }
+    });
+  }
+
   // Draw measure highlights before rendering measures
   // Active measure (yellow background for playback) - draw first so it's behind
   if (activeMeasureIndex >= 0 && activeMeasureIndex < measures.length) {
@@ -848,6 +1093,57 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
   // This helps users see which measure is selected independently of playback state
   if (selectedMeasureIndex >= 0 && selectedMeasureIndex < measures.length) {
     drawMeasureHighlight(selectedMeasureIndex, 'rgba(59, 130, 246, 0.8)', true);
+  }
+
+  // Draw chord span shading - alternating colors for consecutive chords
+  // Uses beat-based positioning to show exact horizontal spans, even within measures
+  const chordSpanColors = [
+    'rgba(200, 220, 255, 0.15)',  // Light blue
+    'rgba(220, 255, 220, 0.15)',  // Light green
+    'rgba(255, 240, 200, 0.15)',  // Light yellow
+    'rgba(255, 220, 220, 0.15)',  // Light red
+    'rgba(240, 220, 255, 0.15)',  // Light purple
+  ];
+
+  const chordBracketColors = [
+    '#4080E0',  // Blue
+    '#40B060',  // Green
+    '#D0A040',  // Yellow/Gold
+    '#D06060',  // Red
+    '#9060C0',  // Purple
+  ];
+
+  // Get chord information from compositionState to calculate beat positions
+  if (window.getCompositionState) {
+    const compositionState = window.getCompositionState();
+    const chords = compositionState.getChords();
+
+    if (chords && chords.length > 0) {
+      let beatOffset = 0;
+      chords.forEach((chord, index) => {
+        const chordBeats = chord.beats !== undefined ? chord.beats : 4;
+        const startBeat = beatOffset;
+        const endBeat = beatOffset + chordBeats;
+
+        // Draw the background shading for this chord
+        drawChordSpanHighlight(
+          startBeat,
+          endBeat,
+          chordSpanColors[index % chordSpanColors.length]
+        );
+
+        // Draw the bracket with chord name beneath bass clef
+        const chordName = chord.name || chord.simpleName || `${chord.root}${chord.type || ''}`;
+        drawChordBracket(
+          startBeat,
+          endBeat,
+          chordName,
+          chordBracketColors[index % chordBracketColors.length]
+        );
+
+        beatOffset += chordBeats;
+      });
+    }
   }
 
   // Render each measure
@@ -1217,6 +1513,9 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       }
     }
   }
+
+  // NOTE: Experimental chord-duration brackets and labels under the bass staff
+  // have been disabled for now. The core staff rendering remains unchanged.
 
   // TODO: Draw cross-measure ties for bass notes
   // VexFlow 5.x StaveTie API has issues with notes on different staves/pages
