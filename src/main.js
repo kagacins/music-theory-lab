@@ -142,6 +142,13 @@ import { initAudio, getPiano, getGuitar, getInstrument, getAudioIsReady, getCame
 import { updateUndoRedoButtons } from './modules/utils/undoRedo.js';
 import { savePanelState, restoreAllPanelStates, restoreTabPanelStates } from './modules/storage/panelState.js';
 import {
+    saveProjectToFile,
+    loadProjectFromFile,
+    applyProjectToState,
+    validateProjectData,
+    PROJECT_FORMAT_VERSION
+} from './modules/storage/projectManager.js';
+import {
     getCurrentTab,
     getEnharmonicPreference,
     setEnharmonicPreference,
@@ -239,6 +246,14 @@ import {
     getCompositionState,
     resetCompositionState
 } from './modules/state/compositionState.js';
+import {
+    BuildingBlock,
+    BuildingBlockSequence,
+    Unit,
+    UNITS_PER_BEAT,
+    unitsToDuration,
+    durationToUnits
+} from './modules/state/buildingBlock.js';
 import {
     ProgressionNotationSync,
     getProgressionNotationSync,
@@ -2909,6 +2924,16 @@ window.getCompositionState = getCompositionState;
 window.resetCompositionState = resetCompositionState;
 window.CompositionState = CompositionState;
 
+// BuildingBlock Module (for project save/load)
+window.buildingBlockModule = {
+    BuildingBlock,
+    BuildingBlockSequence,
+    Unit,
+    UNITS_PER_BEAT,
+    unitsToDuration,
+    durationToUnits
+};
+
 // Progression-Notation Sync
 window.getProgressionNotationSync = getProgressionNotationSync;
 window.initProgressionNotationSync = initProgressionNotationSync;
@@ -2930,6 +2955,172 @@ window.needsMigration = needsMigration;
 window.validateMigration = validateMigration;
 window.backupOldData = backupOldData;
 window.restoreFromBackup = restoreFromBackup;
+
+// ===========================
+// PROJECT SAVE/LOAD (OS File System)
+// ===========================
+
+/**
+ * Save current project to a file (OS file picker)
+ * Saves the complete composition including:
+ * - Chord progression (chord cards)
+ * - Bass BuildingBlockSequence (all bass notes)
+ * - Treble BuildingBlockSequence (all melody notes)
+ * - Metadata (title, tempo, key, time signature)
+ */
+window.saveProject = async function() {
+    try {
+        const compositionState = getCompositionState();
+        if (!compositionState) {
+            alert('No composition data available to save.');
+            return;
+        }
+
+        // Check if there's any content to save
+        const progressionData = compositionState.exportToProgressionData();
+        if (!progressionData || progressionData.length === 0) {
+            alert('No chord progression to save. Add some chords first!');
+            return;
+        }
+
+        // Show a brief "saving" indicator
+        const result = await saveProjectToFile(compositionState);
+
+        if (result.success) {
+            // Show success message
+            showToast(`Project saved as "${result.filename}"`, 'success');
+        } else if (result.error !== 'Save cancelled') {
+            alert(`Failed to save project: ${result.error}`);
+        }
+    } catch (error) {
+        console.error('[saveProject] Error:', error);
+        alert('An unexpected error occurred while saving the project.');
+    }
+};
+
+/**
+ * Load a project from a file (OS file picker)
+ * Restores the complete composition state including chord cards and notation
+ */
+window.loadProject = async function() {
+    try {
+        // Confirm if there's existing content
+        const compositionState = getCompositionState();
+        const trainerState = getTrainerState();
+
+        if (compositionState && trainerState?.progressionData?.length > 0) {
+            const confirmLoad = confirm(
+                'Loading a project will replace your current work. ' +
+                'Any unsaved changes will be lost.\n\n' +
+                'Do you want to continue?'
+            );
+            if (!confirmLoad) {
+                return;
+            }
+        }
+
+        // Open file picker and load
+        const result = await loadProjectFromFile();
+
+        if (!result.success) {
+            if (result.error !== 'Load cancelled') {
+                alert(`Failed to load project: ${result.error}`);
+            }
+            return;
+        }
+
+        // Apply project to state
+        const applyResult = applyProjectToState(
+            result.project,
+            compositionState,
+            trainerState,
+            {
+                // Callback to update chord cards UI
+                onProgressionLoaded: (progressionData) => {
+                    // Update trainerState
+                    if (trainerState) {
+                        trainerState.progressionData = [...progressionData];
+                    }
+
+                    // Refresh all progression visualizations
+                    if (typeof window.updateProgressionVisualization === 'function') {
+                        window.updateProgressionVisualization();
+                    }
+                    if (typeof window.renderBuilderProgressionCards === 'function') {
+                        window.renderBuilderProgressionCards();
+                    }
+                },
+                // Callback to refresh notation display
+                onNotationRefresh: () => {
+                    if (typeof window.refreshNotationFromProgression === 'function') {
+                        window.refreshNotationFromProgression();
+                    }
+                },
+                // Callback for metadata updates
+                onMetadataUpdated: (metadata) => {
+                    // Update tempo display if exists
+                    const tempoDisplay = document.getElementById('tempo-display');
+                    if (tempoDisplay && metadata.tempo) {
+                        tempoDisplay.textContent = metadata.tempo;
+                    }
+                    // Update key display if exists
+                    if (metadata.key && typeof window.updateKeySignatureDisplay === 'function') {
+                        window.updateKeySignatureDisplay(metadata.key);
+                    }
+                }
+            }
+        );
+
+        if (applyResult.success) {
+            showToast(`Project "${result.project.metadata?.title || result.filename}" loaded successfully!`, 'success');
+
+            // Switch to Melody Composer tab to see the loaded content
+            if (typeof switchTab === 'function') {
+                switchTab('melody');
+            }
+        } else {
+            alert(`Failed to apply project data: ${applyResult.error}`);
+        }
+    } catch (error) {
+        console.error('[loadProject] Error:', error);
+        alert('An unexpected error occurred while loading the project.');
+    }
+};
+
+/**
+ * Simple toast notification helper
+ */
+function showToast(message, type = 'info') {
+    // Check if a toast container exists, create one if not
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toast-container';
+        toastContainer.className = 'fixed bottom-4 right-4 z-50 flex flex-col gap-2';
+        document.body.appendChild(toastContainer);
+    }
+
+    // Create toast element
+    const toast = document.createElement('div');
+    const bgColor = type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-blue-600';
+    toast.className = `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in-up`;
+
+    // Add icon based on type
+    const icon = type === 'success'
+        ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>'
+        : type === 'error'
+        ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
+        : '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+
+    toast.innerHTML = `${icon}<span>${message}</span>`;
+    toastContainer.appendChild(toast);
+
+    // Auto-remove after 4 seconds
+    setTimeout(() => {
+        toast.classList.add('animate-fade-out');
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
 
 // ===========================
 // PHASE 2.2: CHORD RECOMMENDATIONS SIDEBAR

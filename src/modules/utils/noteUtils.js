@@ -294,7 +294,9 @@ export function getInvertedChordNotes(rootNote, chordType, inversion, key, octav
         finalChordName = simpleName;
     } else {
         // Only show chordType name if it was a string lookup
-        finalChordName = `${rootNote} ${isStringLookup ? chordType : ''} (${INVERSION_NAMES[inversion]})`;
+        // Only show inversion label for non-root inversions (inversion > 0)
+        const inversionLabel = inversion > 0 ? ` (${INVERSION_NAMES[inversion]})` : '';
+        finalChordName = `${rootNote} ${isStringLookup ? chordType : ''}${inversionLabel}`;
     }
 
     return { name: finalChordName, simpleName: simpleName, specificNotes: invertedNotes };

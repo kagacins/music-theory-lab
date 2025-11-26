@@ -1241,16 +1241,20 @@ export class NotationComposer {
 
   /**
    * Attach event listeners to all page canvases (multi-page mode)
-   * CRITICAL: Only attach to pages that don't already have listeners to prevent duplicates
+   * CRITICAL: Track actual canvas elements with WeakSet, not IDs, since canvases can be recreated
    */
   attachPageCanvasEvents() {
     if (!this.pageManager) return;
 
+    // Initialize canvas-based tracking if not exists
+    if (!this.pagesWithCanvasListeners) {
+      this.pagesWithCanvasListeners = new WeakSet();
+    }
+
     const pages = this.pageManager.getAllPages();
     pages.forEach(page => {
-      // Skip if this page already has listeners attached
-      const pageId = page.canvas.id;
-      if (this.pagesWithListeners.has(pageId)) {
+      // Skip if this ACTUAL CANVAS ELEMENT already has listeners attached
+      if (this.pagesWithCanvasListeners.has(page.canvas)) {
         return;
       }
 
@@ -1260,8 +1264,10 @@ export class NotationComposer {
       page.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
       page.canvas.addEventListener('mouseleave', () => this.handleCanvasMouseLeave());
 
-      // Mark this page as having listeners
-      this.pagesWithListeners.add(pageId);
+      // Mark this canvas element as having listeners
+      this.pagesWithCanvasListeners.add(page.canvas);
+      // Keep old Set for backwards compatibility
+      this.pagesWithListeners.add(page.canvas.id);
     });
   }
 

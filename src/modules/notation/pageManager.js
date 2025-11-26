@@ -209,7 +209,13 @@ export class PageManager {
    * @returns {boolean} - True if navigation was successful
    */
   goToPage(pageIndex) {
-    if (pageIndex < 0 || pageIndex >= this.pages.length) {
+    // CRITICAL: Use logical page count from PageLayoutManager for validation
+    // Canvas pages are created lazily during renderWithPagination()
+    const totalPages = this.pageLayoutManager
+      ? this.pageLayoutManager.getTotalPages()
+      : this.pages.length;
+
+    if (pageIndex < 0 || pageIndex >= totalPages) {
       return false;
     }
 
@@ -220,7 +226,10 @@ export class PageManager {
       this.pageLayoutManager.setCurrentPage(pageIndex);
     }
 
-    this.updateLayout();
+    // Only update layout if the canvas exists (it will be created by render)
+    if (pageIndex < this.pages.length) {
+      this.updateLayout();
+    }
 
     // Trigger callback
     if (this.onPageChange) {
@@ -238,7 +247,14 @@ export class PageManager {
     const increment = this.currentViewMode === PAGE_CONFIG.viewModes.TWO_PAGE ? 2 : 1;
     const nextPage = this.currentPage + increment;
 
-    if (nextPage >= this.pages.length) {
+    // CRITICAL: Use logical page count from PageLayoutManager, not physical canvas count
+    // Canvas pages are created lazily during renderWithPagination(), but navigation
+    // needs to know the total logical pages based on measure count
+    const totalPages = this.pageLayoutManager
+      ? this.pageLayoutManager.getTotalPages()
+      : this.pages.length;
+
+    if (nextPage >= totalPages) {
       return false;
     }
 
@@ -273,10 +289,16 @@ export class PageManager {
    * @returns {Object} - { currentPage, totalPages, canGoNext, canGoPrev }
    */
   getPageMetadata() {
+    // CRITICAL: Use logical page count from PageLayoutManager for accurate navigation state
+    // Canvas pages are created lazily, so this.pages.length may not reflect true total
+    const totalPages = this.pageLayoutManager
+      ? this.pageLayoutManager.getTotalPages()
+      : this.pages.length;
+
     return {
       currentPage: this.currentPage + 1, // 1-based for display
-      totalPages: this.pages.length,
-      canGoNext: this.currentPage < this.pages.length - 1,
+      totalPages: totalPages,
+      canGoNext: this.currentPage < totalPages - 1,
       canGoPrev: this.currentPage > 0,
     };
   }

@@ -75,6 +75,7 @@ function setupQuickSaveButton() {
 
 /**
  * Helper function to setup save and load buttons in a container
+ * Now uses OS-based project save/load instead of localStorage presets
  */
 function setupButtonsInContainer(container) {
     // Check if buttons already exist
@@ -82,30 +83,39 @@ function setupButtonsInContainer(container) {
         return; // Already exists
     }
 
-    // Create quick save button (only visible on Progression Builder)
+    // Create quick save button - saves project to file
     const saveButton = document.createElement('button');
     saveButton.id = 'quick-save-btn';
-    saveButton.className = 'quick-save-btn px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-md hover:shadow-lg flex items-center gap-1';
+    saveButton.className = 'quick-save-btn px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-md hover:shadow-lg flex items-center gap-1';
     saveButton.style.height = 'auto';
     saveButton.style.pointerEvents = 'auto';
     saveButton.innerHTML = '<span>💾</span><span>Save</span>';
     saveButton.onclick = () => {
-        const category = getCategoryFromCurrentTab();
-        quickSave(category);
+        // Use OS-based project save
+        if (window.saveProject) {
+            window.saveProject();
+        } else {
+            console.error('saveProject function not available');
+        }
     };
-    saveButton.title = 'Save current progression as preset';
+    saveButton.title = 'Save project to file';
 
-    // Create load button (always visible)
+    // Create load button - loads project from file
     const loadButton = document.createElement('button');
     loadButton.id = 'quick-load-btn';
-    loadButton.className = 'quick-load-btn px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-md hover:shadow-lg flex items-center gap-1';
+    loadButton.className = 'quick-load-btn px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-md hover:shadow-lg flex items-center gap-1';
     loadButton.style.height = 'auto';
     loadButton.style.pointerEvents = 'auto';
     loadButton.innerHTML = '<span>📂</span><span>Load</span>';
     loadButton.onclick = () => {
-        openPresetPanel();
+        // Use OS-based project load
+        if (window.loadProject) {
+            window.loadProject();
+        } else {
+            console.error('loadProject function not available');
+        }
     };
-    loadButton.title = 'Open preset library to load a preset';
+    loadButton.title = 'Load project from file';
 
     // Insert at the beginning of the floating container (above all floating controls)
     container.insertBefore(loadButton, container.firstChild);
@@ -121,15 +131,19 @@ function setupButtonsInContainer(container) {
  */
 export function updateButtonVisibility() {
     const saveButton = document.getElementById('quick-save-btn');
+    const loadButton = document.getElementById('quick-load-btn');
     if (!saveButton) return;
 
     const currentTab = window.currentTab || 'builder';
 
-    // Only show save button on Progression Builder tab
-    if (currentTab === 'trainer') {
+    // Show save/load buttons on Progression Builder and Composition Studio tabs
+    // These are the tabs where projects can be saved/loaded
+    if (currentTab === 'trainer' || currentTab === 'melody') {
         saveButton.style.display = 'flex';
+        if (loadButton) loadButton.style.display = 'flex';
     } else {
         saveButton.style.display = 'none';
+        if (loadButton) loadButton.style.display = 'none';
     }
 }
 
@@ -158,50 +172,63 @@ function setupPresetButtonInSidebar() {
         return;
     }
 
-    // Check if library section already exists
-    const existingLibrarySection = document.getElementById('library-section');
-    if (existingLibrarySection) {
+    // Check if projects section already exists
+    const existingProjectsSection = document.getElementById('projects-section');
+    if (existingProjectsSection) {
         // Check if it's in the correct position (after nav)
         const nav = sidebarContent.querySelector('nav');
-        if (nav && nav.compareDocumentPosition(existingLibrarySection) === Node.DOCUMENT_POSITION_FOLLOWING) {
-            // Library is already after nav, we're good
+        if (nav && nav.compareDocumentPosition(existingProjectsSection) === Node.DOCUMENT_POSITION_FOLLOWING) {
+            // Projects section is already after nav, we're good
             return;
         } else {
-            // Library exists but is in wrong position, remove it so we can reinsert
-            existingLibrarySection.remove();
+            // Projects section exists but is in wrong position, remove it so we can reinsert
+            existingProjectsSection.remove();
         }
     }
 
-    // Create Library section
-    const librarySection = document.createElement('div');
-    librarySection.id = 'library-section';
-    librarySection.className = 'mt-6 border-t border-gray-700 pt-4';
-    
+    // Also remove old library-section if it exists (from previous version)
+    const oldLibrarySection = document.getElementById('library-section');
+    if (oldLibrarySection) {
+        oldLibrarySection.remove();
+    }
+
+    // Create Projects section
+    const projectsSection = document.createElement('div');
+    projectsSection.id = 'projects-section';
+    projectsSection.className = 'mt-6 border-t border-gray-700 pt-4';
+
     // Create section heading
     const heading = document.createElement('h2');
-    heading.className = 'text-xl font-bold text-indigo-300 mb-3';
-    heading.textContent = 'Library';
-    
-    // Create preset button
-    const presetButton = document.createElement('button');
-    presetButton.id = 'preset-library-btn';
-    presetButton.className = 'sidebar-btn text-left p-3 rounded-lg font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white flex items-center gap-2 w-full';
-    presetButton.innerHTML = '<span>💾</span><span>Preset Library</span>';
-    presetButton.onclick = togglePresetPanel;
-    presetButton.title = 'Open Preset Library';
+    heading.className = 'text-xl font-bold text-emerald-300 mb-3';
+    heading.textContent = 'Projects';
+
+    // Create Load Projects button - triggers OS file picker
+    const loadProjectButton = document.createElement('button');
+    loadProjectButton.id = 'load-project-btn';
+    loadProjectButton.className = 'sidebar-btn text-left p-3 rounded-lg font-semibold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white flex items-center gap-2 w-full';
+    loadProjectButton.innerHTML = '<span>📂</span><span>Load Project</span>';
+    loadProjectButton.onclick = () => {
+        // Use OS-based project load
+        if (window.loadProject) {
+            window.loadProject();
+        } else {
+            console.error('loadProject function not available');
+        }
+    };
+    loadProjectButton.title = 'Load a project from file';
 
     // Assemble the section
-    librarySection.appendChild(heading);
-    librarySection.appendChild(presetButton);
+    projectsSection.appendChild(heading);
+    projectsSection.appendChild(loadProjectButton);
 
     // Insert right after the nav element (tab names)
     const nav = sidebarContent.querySelector('nav');
     if (nav && nav.parentNode) {
         // Insert right after the nav element
         if (nav.nextSibling) {
-            nav.parentNode.insertBefore(librarySection, nav.nextSibling);
+            nav.parentNode.insertBefore(projectsSection, nav.nextSibling);
         } else {
-            nav.parentNode.appendChild(librarySection);
+            nav.parentNode.appendChild(projectsSection);
         }
     } else {
         // Fallback: find the Settings section and insert before it
@@ -209,16 +236,16 @@ function setupPresetButtonInSidebar() {
         const h2 = div.querySelector('h2');
         return h2 && h2.textContent === 'Settings';
     });
-    
+
     if (settingsSection && settingsSection.parentNode) {
-        settingsSection.parentNode.insertBefore(librarySection, settingsSection);
+        settingsSection.parentNode.insertBefore(projectsSection, settingsSection);
     } else {
             // Final fallback: find by border-t class and insert before the first one
         const firstBorderTSection = sidebarContent.querySelector('div.border-t');
         if (firstBorderTSection && firstBorderTSection.parentNode) {
-            firstBorderTSection.parentNode.insertBefore(librarySection, firstBorderTSection);
+            firstBorderTSection.parentNode.insertBefore(projectsSection, firstBorderTSection);
             } else {
-                sidebarContent.appendChild(librarySection);
+                sidebarContent.appendChild(projectsSection);
             }
         }
     }

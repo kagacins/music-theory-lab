@@ -319,12 +319,13 @@ export class StaffLayoutManager {
   getMeasureAtPoint(x, y) {
     // CRITICAL: Use actual VexFlow positions if available (nuclear solution)
     const useActualPositions = this.actualMeasurePositions.size > 0;
+    const isPaginated = this.isPaginationEnabled();
 
     // CRITICAL: x and y are canvas-local coordinates (viewport-relative, from getBoundingClientRect)
     // In pagination mode: coordinates are already page-local, no scroll offset needed
     // In legacy mode: VexFlow positions are layout coordinates, need to ADD scroll
     let realX, realY;
-    if (this.isPaginationEnabled()) {
+    if (isPaginated) {
       // Pagination mode: use coordinates directly (they're already page-local)
       realX = x / this.config.zoom;
       realY = y / this.config.zoom;
@@ -340,7 +341,7 @@ export class StaffLayoutManager {
 
       for (const [index, actualPos] of this.actualMeasurePositions) {
         // NEW: In pagination mode, only check measures on current page
-        if (this.isPaginationEnabled() && this.pageLayoutManager) {
+        if (isPaginated && this.pageLayoutManager) {
           if (!this.pageLayoutManager.isMeasureOnCurrentPage(index)) {
             continue;
           }

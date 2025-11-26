@@ -1858,7 +1858,10 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
           // Format chord name with inversion
           let chordName = chord.name || chord.simpleName || `${chord.root || ''}${chord.type || ''}`;
 
-          // Add inversion indicator
+          // Strip any existing inversion labels from the name (including "(Root)")
+          chordName = chordName.replace(/\s*\((Root|1st|2nd|3rd|4th|5th)\)$/i, '').trim();
+
+          // Add inversion indicator only for non-root inversions
           const inversion = chord.inversion || 0;
           if (inversion === 1) {
             chordName += ' (1st)';
@@ -1904,7 +1907,10 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
             // Format chord name with inversion
             let chordName = chord.name || chord.simpleName || `${chord.root}${chord.type || ''}`;
 
-            // Add inversion indicator
+            // Strip any existing inversion labels from the name (including "(Root)")
+            chordName = chordName.replace(/\s*\((Root|1st|2nd|3rd|4th|5th)\)$/i, '').trim();
+
+            // Add inversion indicator only for non-root inversions
             const inversion = chord.inversion || 0;
             if (inversion === 1) {
               chordName += ' (1st)';

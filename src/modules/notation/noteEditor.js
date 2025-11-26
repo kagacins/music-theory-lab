@@ -160,17 +160,23 @@ export class NoteEditor {
 
   /**
    * Attach listeners to all page canvases
-   * CRITICAL: Only attach to pages that don't already have listeners to prevent duplicates
+   * CRITICAL: Track actual canvas elements, not just IDs, since canvases can be recreated
    */
   attachPageEventListeners() {
     if (!this.pageManager) return;
 
     // Attach to all existing pages
     const pages = this.pageManager.getAllPages();
+
+    // Initialize canvas-based tracking if not exists
+    if (!this.pagesWithCanvasListeners) {
+      this.pagesWithCanvasListeners = new WeakSet();
+    }
+
     pages.forEach(page => {
-      // Skip if this page already has listeners attached
-      const pageId = page.canvas.id;
-      if (this.pagesWithListeners.has(pageId)) {
+      // Skip if this ACTUAL CANVAS ELEMENT already has listeners attached
+      // Using WeakSet with canvas reference instead of ID string
+      if (this.pagesWithCanvasListeners.has(page.canvas)) {
         return;
       }
 
@@ -180,8 +186,10 @@ export class NoteEditor {
       page.canvas.addEventListener('mouseup', this.handleMouseUp);
       page.canvas.addEventListener('mouseleave', this.handleMouseLeave);
 
-      // Mark this page as having listeners
-      this.pagesWithListeners.add(pageId);
+      // Mark this canvas element as having listeners
+      this.pagesWithCanvasListeners.add(page.canvas);
+      // Keep old Set for backwards compatibility
+      this.pagesWithListeners.add(page.canvas.id);
     });
 
     // Global keyboard listener (only add once)

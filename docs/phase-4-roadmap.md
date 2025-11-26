@@ -656,7 +656,7 @@ const FUNCTION_EXPLANATIONS = {
 
 **Progression Explanations:**
 - "V → I is called an **authentic cadence** - the strongest resolution"
-- "IV → I is a **plagal cadence** - sometimes called the 'Amen' cadence"
+- "IV → I is a **plagal cadence** - sometimes called the 'Amen' cadence"6
 - "ii → V → I is the **most common jazz progression**"
 
 **Modal Interchange Explanations:**

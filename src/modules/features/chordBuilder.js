@@ -137,10 +137,10 @@ function getContextAwareChordDescription(chordType, rootNote, baseDescription) {
         contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}m(maj7) combines the darkness of a minor triad with the tension of a major 7th. Often used as a passing chord in minor keys when the melody moves from the root to the major 7th, creating a cinematic, mysterious sound.`;
     }
 
-    // Suspended chords (sus2, sus4)
-    else if (chordType === 'Suspended 2nd' || chordType === 'Suspended 4th') {
-        const interval = chordType.includes('2nd') ? '2nd' : '4th';
-        const resolveInterval = chordType.includes('2nd') ? '3rd' : '3rd';
+    // Suspended chords (sus2, sus4) - handle both full names and aliases
+    else if (chordType === 'Suspended 2nd' || chordType === 'Sus2' || chordType === 'Suspended 4th' || chordType === 'Sus4') {
+        const interval = (chordType.includes('2nd') || chordType === 'Sus2') ? '2nd' : '4th';
+        const resolveInterval = '3rd';
         contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}sus${interval === '2nd' ? '2' : '4'} creates an unresolved, floating quality. It typically resolves when the ${interval} moves to the ${resolveInterval}, creating either ${rootNote} major or ${rootNote} minor. This creates a satisfying sense of arrival.`;
     }
 
@@ -3438,7 +3438,18 @@ export function renderVoicingEditor(notes, editorId, containerId, omittedNotes, 
  * @param {boolean} fromRecommendation - Whether adding from recommendations (sets LH to 'off')
  */
 export function addChordToProgression(switchToTrainer = false, playShutterSound = true, fromRecommendation = false) {
-    const rootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[getBuilderRootIndex()];
+    // Determine the root note - in diatonic mode, use the selected diatonic chord's root
+    const chordLibraryMode = getChordLibraryMode();
+    const lastDiatonic = getLastDiatonicChord();
+    let rootNote;
+
+    if (chordLibraryMode === 'diatonic' && lastDiatonic && lastDiatonic.root) {
+        // In diatonic mode, use the diatonic chord's actual root (e.g., D for Dm)
+        rootNote = lastDiatonic.root;
+    } else {
+        // In chromatic mode or no diatonic selection, use the builder root index
+        rootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[getBuilderRootIndex()];
+    }
 
     // Play camera shutter sound effect (only if requested)
     if (playShutterSound && getAudioIsReady() && getCameraShutter()) {
@@ -3472,7 +3483,10 @@ export function addChordToProgression(switchToTrainer = false, playShutterSound 
             lhOmittedNotes: lhOmittedNotes
         };
     } else { // It's a chord
-        const chordType = getBuilderChordType();
+        // In diatonic mode, also use the diatonic chord's type
+        const chordType = (chordLibraryMode === 'diatonic' && lastDiatonic && lastDiatonic.type)
+            ? lastDiatonic.type
+            : getBuilderChordType();
         const inversion = getBuilderInversion();
         const trainerState = getTrainerState();
         const result = getInvertedChordNotes(

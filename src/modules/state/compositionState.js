@@ -799,14 +799,26 @@ export class CompositionState {
 
         // Create a building block for each chord
         progressionData.forEach((chordData, index) => {
-            // Get the pitches for this chord
-            let pitches = chordData.notes || [];
+            // Get the pitches for this chord - use lhNotes (left hand/bass clef) if available
+            // lhNotes are already at octave 3, while notes are at octave 4
+            let pitches = chordData.lhNotes || chordData.notes || [];
 
-            // If no notes, generate from chord root/type
+            // If no notes, generate from chord root/type at bass register (octave 3)
             if (pitches.length === 0 && chordData.root && chordData.type) {
                 const chordNotesObj = getChordNotes(chordData.root, chordData.type, this.metadata.key);
                 if (chordNotesObj && chordNotesObj.specificNotes) {
-                    pitches = chordNotesObj.specificNotes;
+                    // Transpose notes down one octave for bass clef (octave 4 -> octave 3)
+                    pitches = chordNotesObj.specificNotes.map(note => {
+                        // Parse the note to extract pitch and octave
+                        const match = note.match(/^([A-Ga-g][#b]?)(\d+)$/);
+                        if (match) {
+                            const pitch = match[1];
+                            const octave = parseInt(match[2], 10);
+                            // Transpose down one octave for bass clef
+                            return `${pitch}${octave - 1}`;
+                        }
+                        return note;
+                    });
                 }
             }
 

@@ -51,21 +51,21 @@
             <div class="p-4 pt-0">
             <nav class="flex flex-col gap-1">
                 <div class="flex items-center gap-2">
-                    <button id="sidebar-btn-builder" onclick="switchTab('builder')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold bg-indigo-500 flex-grow">1. Chord Builder</button>
+                    <button id="sidebar-btn-builder" onclick="switchTab('builder')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold bg-indigo-500 flex-grow">1. Chord Lab</button>
                     <div class="relative group">
                         <button class="p-2 text-gray-400 hover:text-white transition"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
                                 <div class="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">Build custom chords, intervals, and voicings from scratch. This is your creative canvas.</div>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button id="sidebar-btn-trainer" onclick="switchTab('trainer')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">2. Progression Builder</button>
+                    <button id="sidebar-btn-trainer" onclick="switchTab('trainer')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">2. Progression Workshop</button>
                     <div class="relative group">
                         <button class="p-2 text-gray-400 hover:text-white transition"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
                                 <div class="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">Practice pre-made chord progressions or create your own. Use the record button to capture ideas from the keyboard.</div>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button id="sidebar-btn-melody" onclick="switchTab('melody')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">3. Melody Composer</button>
+                    <button id="sidebar-btn-melody" onclick="switchTab('melody')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">3. Composition Studio</button>
                     <div class="relative group">
                         <button class="p-2 text-gray-400 hover:text-white transition"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
                                 <div class="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">Build melodies over chord progressions or create standalone melodic ideas. Craft and explore musical phrases with powerful generation tools.</div>
@@ -332,9 +332,9 @@
                 </div>
                 <!-- Header Tab buttons - 2x2 grid layout -->
                 <div class="hidden md:grid grid-cols-2 gap-0.5">
-                    <button id="header-tab-btn-builder" onclick="switchTab('builder')" class="px-2 py-0.5 text-xs font-semibold rounded-tl-md">Chord Builder</button>
-                    <button id="header-tab-btn-trainer" onclick="switchTab('trainer')" class="px-2 py-0.5 text-xs font-semibold rounded-tr-md">Progression Builder</button>
-                    <button id="header-tab-btn-melody" onclick="switchTab('melody')" class="px-2 py-0.5 text-xs font-semibold rounded-bl-md">Melody Composer</button>
+                    <button id="header-tab-btn-builder" onclick="switchTab('builder')" class="px-2 py-0.5 text-xs font-semibold rounded-tl-md">Chord Lab</button>
+                    <button id="header-tab-btn-trainer" onclick="switchTab('trainer')" class="px-2 py-0.5 text-xs font-semibold rounded-tr-md">Progression Workshop</button>
+                    <button id="header-tab-btn-melody" onclick="switchTab('melody')" class="px-2 py-0.5 text-xs font-semibold rounded-bl-md">Composition Studio</button>
                     <button id="header-tab-btn-scales" onclick="switchTab('scales')" class="px-2 py-0.5 text-xs font-semibold rounded-br-md">Scale Explorer</button>
                 </div>
             </div>
@@ -509,30 +509,21 @@
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v1a2 2 0 01-2 2h-5v1h3a2 2 0 012 2v1a2 2 0 01-2 2h-3v1h5a2 2 0 012 2v1a2 2 0 01-2 2H4a2 2 0 01-2-2v-1a2 2 0 012-2h5v-1H6a2 2 0 01-2-2v-1a2 2 0 012-2h3V8H4a2 2 0 01-2-2V5z" clip-rule="evenodd"></path></svg>
                             Current Chord Progression
                             <span id="builder-progression-count" class="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-xs font-bold">0</span>
-                            <!-- Inline Toggle Switch: Simplified / Detailed -->
-                            <div class="flex items-center gap-1.5 ml-1" onclick="event.stopPropagation()" title="Toggle view: Simplified ↔ Detailed">
-                                <span class="text-[10px] font-bold text-white/70">Simple</span>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" id="builder-card-view-toggle" class="sr-only" onchange="window.toggleBuilderCardView && window.toggleBuilderCardView(this.checked)">
-                                    <div class="toggle-bg w-9 h-5 bg-white/30 rounded-full border border-white/50"></div>
-                                </label>
-                                <span class="text-[10px] font-bold text-white/70">Detail</span>
-                            </div>
                         </span>
                         <svg id="builder-progression-chevron" class="w-5 h-5 transform transition-transform" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                     </button>
 
-                    <div id="builder-progression-panel" class="mt-2 hidden bg-gradient-to-br from-purple-400/5 to-pink-400/5 rounded-lg p-3">
+                    <div id="builder-progression-panel" class="mt-2 hidden bg-gradient-to-br from-purple-400/5 to-pink-400/5 rounded-lg p-3 relative z-20">
                         <!-- Empty state message -->
                         <div id="builder-progression-empty" class="text-center py-6 text-gray-500">
                             <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
                             </svg>
                             <p class="text-sm font-medium">No chords in progression</p>
-                            <p class="text-xs mt-1">Add chords from the library or switch to the Progression Builder tab.</p>
+                            <p class="text-xs mt-1">Add chords from the library or switch to the Progression Workshop tab.</p>
                         </div>
 
-                        <!-- Chord cards container (grid layout matching Progression Builder) -->
+                        <!-- Chord cards container (grid layout matching Progression Workshop) -->
                         <div id="builder-progression-visualization" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 p-2 bg-white rounded-lg border border-gray-200">
                             <!-- Chord cards will be rendered by JS -->
                         </div>
@@ -687,7 +678,7 @@
                         <svg id="progression-visualization-chevron" class="w-5 h-5 transform rotate-180 transition-transform" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                     </button>
 
-                    <div id="progression-visualization-panel" class="mt-2 bg-gradient-to-br from-purple-400/5 to-pink-400/5 rounded-lg p-3">
+                    <div id="progression-visualization-panel" class="mt-2 bg-gradient-to-br from-purple-400/5 to-pink-400/5 rounded-lg p-3 relative z-20">
                         <!-- Quick Analysis Bar (will be repositioned by JS above tension curve) -->
                         <div id="quick-analysis-bar-container" class="mb-3 flex items-center justify-between p-2 bg-white rounded-lg border border-purple-200 shadow-sm">
                             <div class="flex items-center gap-3 flex-wrap text-xs">
@@ -1302,7 +1293,7 @@
             <!-- Main Content Area (full width now) -->
             <div class="bg-white p-4 rounded-xl shadow-2xl border border-violet-100 mb-4">
                 <div id="melody-sections-container" class="space-y-3">
-                <!-- Progression Timeline Display (Mirrored from Progression Builder) -->
+                <!-- Progression Timeline Display (Mirrored from Progression Workshop) -->
                 <div class="mb-3 melody-section-item">
                     <button id="melody-progression-toggle" onclick="window.toggleMelodyProgressionPanel && window.toggleMelodyProgressionPanel()" class="w-full px-4 py-2 bg-gradient-to-r from-purple-400 to-pink-400 hover:from-purple-500 hover:to-pink-500 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
                         <span class="flex items-center gap-3">
@@ -1324,7 +1315,7 @@
                         <svg id="melody-progression-chevron" class="w-5 h-5 transform rotate-180 transition-transform" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                     </button>
 
-                    <div id="melody-progression-panel" class="mt-2 bg-gradient-to-br from-purple-400/5 to-pink-400/5 rounded-lg p-3">
+                    <div id="melody-progression-panel" class="mt-2 bg-gradient-to-br from-purple-400/5 to-pink-400/5 rounded-lg p-3 relative z-20">
                         <!-- Key Display -->
                         <div class="mb-3 flex items-center" style="position: relative; z-index: 100;">
                             <div class="flex items-center gap-2">
@@ -1444,9 +1435,9 @@
                             </div>
                         </div>
 
-                        <!-- Progression cards container (same as Progression Builder) -->
+                        <!-- Progression cards container (same as Progression Workshop) -->
                         <div id="melody-progression-visualization" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 p-2 bg-white rounded-lg border border-gray-200">
-                            <div class="text-sm text-gray-500 italic p-4 col-span-full">No progression loaded. Switch to Progression Builder to create one.</div>
+                            <div class="text-sm text-gray-500 italic p-4 col-span-full">No progression loaded. Switch to Progression Workshop to create one.</div>
                         </div>
                     </div>
                 </div>
@@ -1708,12 +1699,6 @@
                                 </div>
                                 <!-- Helper Buttons -->
                                 <div class="flex items-center justify-start gap-3 mb-3 flex-wrap">
-                                    <button id="notation-shortcuts-btn" onclick="showNotationShortcuts()" class="flex items-center gap-2 px-4 py-2 text-base font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-lg shadow-md hover:shadow-lg transition-all transform hover:scale-105">
-                                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-                                        </svg>
-                                        ⌨️ Keyboard Shortcuts
-                                    </button>
                                     <button id="toggle-chord-suggestions-btn" onclick="window.togglePanel && window.togglePanel('chords')" class="flex items-center gap-2 px-4 py-2 text-base font-semibold text-white bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 rounded-lg shadow-md hover:shadow-lg transition-all transform hover:scale-105">
                                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                                             <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"></path>
@@ -1726,6 +1711,12 @@
                                             <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path>
                                         </svg>
                                         🎶 Melody Suggestions
+                                    </button>
+                                    <button id="notation-shortcuts-btn" onclick="showNotationShortcuts()" class="flex items-center gap-2 px-4 py-2 text-base font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-lg shadow-md hover:shadow-lg transition-all transform hover:scale-105">
+                                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                                        </svg>
+                                        ⌨️ Keyboard Shortcuts
                                     </button>
                                 </div>
                                 <!-- Notation Toolbar -->
@@ -1894,7 +1885,7 @@
     <div class="fixed bottom-6 right-4 z-20 flex flex-col items-end gap-1" style="pointer-events: none;">
 
         <!-- Builder Floating Controls -->
-        <div id="floating-builder-controls" class="flex flex-col items-stretch gap-2 p-3 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border w-max" style="pointer-events: auto;" title="Chord Builder Controls">
+        <div id="floating-builder-controls" class="flex flex-col items-stretch gap-2 p-3 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border w-max" style="pointer-events: auto;" title="Chord Lab Controls">
             <div class="flex flex-col gap-2">
                 <button onmousedown="if(window.startBuilderChord) startBuilderChord()" onmouseup="if(window.stopBuilderChord) stopBuilderChord()" onmouseleave="if(window.stopBuilderChord) stopBuilderChord()" ontouchstart="event.preventDefault(); if(window.startBuilderChord) startBuilderChord();" ontouchend="event.preventDefault(); if(window.stopBuilderChord) stopBuilderChord();" ontouchcancel="event.preventDefault(); if(window.stopBuilderChord) stopBuilderChord();" class="px-2 py-1 bg-amber-500 text-white font-bold rounded-xl shadow-lg hover:bg-amber-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-1 whitespace-nowrap text-sm" title="Play Chord">
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg> 
@@ -1904,7 +1895,7 @@
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"></path></svg> 
                     <span class="compact-hide">Add Chord</span><span class="compact-show">Add</span>
                 </button>
-                <button onclick="addChordToProgression(true)" class="px-2 py-1 bg-teal-500 text-white font-bold rounded-xl shadow-lg hover:bg-teal-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-1 whitespace-nowrap text-sm" title="Add Chord and Switch to Progression Builder">
+                <button onclick="addChordToProgression(true)" class="px-2 py-1 bg-teal-500 text-white font-bold rounded-xl shadow-lg hover:bg-teal-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-1 whitespace-nowrap text-sm" title="Add Chord and Switch to Progression Workshop">
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"></path></svg> 
                     <span class="compact-hide">Add & Go</span><span class="compact-show">Add/Go</span>
                 </button>
@@ -1927,7 +1918,7 @@
         </div>
 
         <!-- Trainer Floating Controls -->
-        <div id="floating-trainer-controls" class="hidden flex-col items-stretch gap-2 p-3 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border w-max" style="pointer-events: auto;" title="Progression Builder Controls">
+        <div id="floating-trainer-controls" class="hidden flex-col items-stretch gap-2 p-3 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border w-max" style="pointer-events: auto;" title="Progression Workshop Controls">
             <div class="flex flex-col gap-2 w-full">
                 <button id="play-progression-btn" onclick="handleAutoPlayback()" class="w-full px-2 py-1 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 flex items-center justify-center whitespace-nowrap text-sm" title="Toggle Auto Play"><span id="play-text">Auto Play</span></button>
                 <button id="step-chord-btn" onmousedown="startStepChord()" onmouseup="stopStepChord()" ontouchstart="startStepChord()" ontouchend="stopStepChord()" ontouchcancel="stopStepChord()" disabled class="w-full px-2 py-1 bg-indigo-500 hover:bg-indigo-600 active:scale-95 transition text-white font-bold rounded-xl shadow-lg disabled:opacity-50 cursor-pointer whitespace-nowrap text-sm" title="Hold to play chord">Step ►</button>
@@ -1972,7 +1963,7 @@
         </div>
 
         <!-- Floating Melody Controls -->
-        <div id="floating-melody-controls" class="hidden flex-col items-stretch gap-2 p-3 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border w-max" style="pointer-events: auto;" title="Melody Composer Controls">
+        <div id="floating-melody-controls" class="hidden flex-col items-stretch gap-2 p-3 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border w-max" style="pointer-events: auto;" title="Composition Studio Controls">
             <div class="flex flex-col gap-2 w-full">
                 <button id="play-melody-btn" onclick="window.playAllMelody && window.playAllMelody()" class="w-full px-2 py-1 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 flex items-center justify-center whitespace-nowrap text-sm" title="Play All Melody"><span>Auto Play</span></button>
                 <button id="step-measure-btn" onmousedown="window.startStepMeasureMelody && window.startStepMeasureMelody()" onmouseup="window.stopStepMeasureMelody && window.stopStepMeasureMelody()" ontouchstart="window.startStepMeasureMelody && window.startStepMeasureMelody()" ontouchend="window.stopStepMeasureMelody && window.stopStepMeasureMelody()" ontouchcancel="window.stopStepMeasureMelody && window.stopStepMeasureMelody()" class="w-full px-2 py-1 bg-indigo-500 hover:bg-indigo-600 active:scale-95 transition text-white font-bold rounded-xl shadow-lg whitespace-nowrap text-sm" title="Hold to play measure">Step ►</button>

@@ -165,7 +165,16 @@ export class PageLayoutManager {
    * @returns {number} - Total page count
    */
   getTotalPages() {
-    return this.pages.length;
+    // If pages have been calculated, use that count
+    if (this.pages.length > 0) {
+      return this.pages.length;
+    }
+    // Fallback: calculate from totalMeasures if set
+    if (this.totalMeasures > 0) {
+      return getTotalPages(this.totalMeasures);
+    }
+    // Default: at least 1 page
+    return 1;
   }
 
   /**

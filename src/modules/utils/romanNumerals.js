@@ -148,8 +148,8 @@ export function noteToRomanNumeral(noteName, key, chordType) {
  * @returns {string} Quality suffix (e.g., "maj7", "7", "°7")
  */
 function getChordQualitySuffix(chordType, baseRoman) {
-    // Basic triads - no suffix needed
-    if (['Major', 'Minor', 'Augmented', 'Suspended 2nd', 'Suspended 4th', 'Power Chord'].includes(chordType)) {
+    // Basic triads - no suffix needed (include aliases Sus2/Sus4)
+    if (['Major', 'Minor', 'Augmented', 'Suspended 2nd', 'Sus2', 'Suspended 4th', 'Sus4', 'Power Chord'].includes(chordType)) {
         return '';
     }
 

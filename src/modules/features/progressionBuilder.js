@@ -2737,8 +2737,9 @@ function createTooltipElement(chord, index, key) {
     }
 
     const tooltip = document.createElement('div');
-    tooltip.className = 'chord-tooltip hidden absolute z-50 bg-gray-800 border-2 border-indigo-500 rounded-lg shadow-xl p-4 pointer-events-auto';
-    tooltip.style.cssText = 'bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 8px; min-width: 250px; max-width: 350px;';
+    tooltip.className = 'chord-tooltip hidden absolute bg-gray-800 border-2 border-indigo-500 rounded-lg shadow-xl p-4 pointer-events-auto';
+    // Default to above; will be repositioned based on container when shown
+    tooltip.style.cssText = 'z-index: 99999; left: 50%; transform: translateX(-50%); min-width: 250px; max-width: 350px;';
     tooltip.innerHTML = `
         <!-- Close button for touch devices -->
         <button class="tooltip-close-btn absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center text-white text-sm font-bold transition bg-gray-700 hover:bg-gray-600" title="Close">×</button>
@@ -2754,8 +2755,8 @@ function createTooltipElement(chord, index, key) {
                 ${tooltipInversionButtons.join('')}
             </div>
         </div>
-        <!-- Tooltip arrow -->
-        <div class="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-8 border-r-8 border-t-8 border-transparent border-t-indigo-500"></div>
+        <!-- Tooltip arrow - will be repositioned based on tooltip position -->
+        <div class="tooltip-arrow absolute left-1/2 -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-transparent"></div>
     `;
 
     return tooltip;
@@ -2785,8 +2786,8 @@ function createSimplifiedCardHTML(chord, index, key) {
         else if (chord.type === 'Diminished 7th') chordSymbol += 'dim7';
         else if (chord.type === 'Half-Diminished 7th') chordSymbol += 'ø7';
         else if (chord.type === 'Augmented') chordSymbol += '+';
-        else if (chord.type === 'Suspended 4th') chordSymbol += 'sus4';
-        else if (chord.type === 'Suspended 2nd') chordSymbol += 'sus2';
+        else if (chord.type === 'Suspended 4th' || chord.type === 'Sus4') chordSymbol += 'sus4';
+        else if (chord.type === 'Suspended 2nd' || chord.type === 'Sus2') chordSymbol += 'sus2';
         else if (chord.type === 'Add9') chordSymbol += 'add9';
         else if (chord.type === 'Major 6th') chordSymbol += '6';
         else if (chord.type === 'Minor 6th') chordSymbol += 'm6';
@@ -3689,6 +3690,39 @@ function attachCardEventListeners(wrapper, index) {
             }
             // Reset the change flag when tooltip opens
             inversionWasChanged = false;
+
+            // Detect which container we're in to position tooltip appropriately
+            const isBuilderTab = wrapper.closest('#builder-progression-panel') !== null;
+            const arrow = chordTooltip.querySelector('.tooltip-arrow');
+
+            if (isBuilderTab) {
+                // Position tooltip BELOW the card on Builder tab (to avoid keyboard)
+                chordTooltip.style.top = '100%';
+                chordTooltip.style.bottom = 'auto';
+                chordTooltip.style.marginTop = '8px';
+                chordTooltip.style.marginBottom = '0';
+                // Arrow points UP (at top of tooltip)
+                if (arrow) {
+                    arrow.style.top = '-8px';
+                    arrow.style.bottom = 'auto';
+                    arrow.style.borderBottom = '8px solid #6366f1'; // indigo-500
+                    arrow.style.borderTop = 'none';
+                }
+            } else {
+                // Position tooltip ABOVE the card on other tabs
+                chordTooltip.style.bottom = '100%';
+                chordTooltip.style.top = 'auto';
+                chordTooltip.style.marginBottom = '8px';
+                chordTooltip.style.marginTop = '0';
+                // Arrow points DOWN (at bottom of tooltip)
+                if (arrow) {
+                    arrow.style.bottom = '-8px';
+                    arrow.style.top = 'auto';
+                    arrow.style.borderTop = '8px solid #6366f1'; // indigo-500
+                    arrow.style.borderBottom = 'none';
+                }
+            }
+
             chordTooltip.classList.remove('hidden');
         };
 
