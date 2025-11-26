@@ -790,6 +790,7 @@ export class NotationToolbar {
       this.selectionDuration = null;
       this.selectionArticulation = null;
       this.selectionDotted = null;
+      this.selectionIsRest = null;
 
       // Hide selection indicator
       const indicator = this.container?.querySelector('.selection-indicator');
@@ -802,23 +803,27 @@ export class NotationToolbar {
     const durations = new Set();
     const articulations = new Set();
     const dottedStates = new Set();
+    const restStates = new Set();
 
     selectedNotes.forEach(note => {
       if (note.duration) durations.add(note.duration);
       articulations.add(note.articulation || 'none');
       dottedStates.add(note.dotted || false);
+      restStates.add(note.isRest || note.type === 'rest' || false);
     });
 
     // Set selection state
     this.selectionDuration = durations.size === 1 ? [...durations][0] : 'mixed';
     this.selectionArticulation = articulations.size === 1 ? ([...articulations][0] === 'none' ? null : [...articulations][0]) : 'mixed';
     this.selectionDotted = dottedStates.size === 1 ? [...dottedStates][0] : 'mixed';
+    this.selectionIsRest = restStates.size === 1 ? [...restStates][0] : 'mixed';
 
     console.log('[NotationToolbar] Selection state:', {
       count: this.selectedNotesCount,
       duration: this.selectionDuration,
       articulation: this.selectionArticulation,
-      dotted: this.selectionDotted
+      dotted: this.selectionDotted,
+      isRest: this.selectionIsRest
     });
 
     // Update selection indicator
@@ -827,7 +832,10 @@ export class NotationToolbar {
       indicator.style.display = 'flex';
       const badge = indicator.querySelector('.selection-badge');
       if (badge) {
-        badge.textContent = `✓ ${this.selectedNotesCount} note${this.selectedNotesCount !== 1 ? 's' : ''} selected`;
+        // Show "rest(s)" or "note(s)" based on selection
+        const itemType = this.selectionIsRest === true ? 'rest' :
+                        this.selectionIsRest === false ? 'note' : 'item';
+        badge.textContent = `✓ ${this.selectedNotesCount} ${itemType}${this.selectedNotesCount !== 1 ? 's' : ''} selected`;
       }
     }
 
@@ -835,6 +843,7 @@ export class NotationToolbar {
     this.updateDurationButtonsForSelection();
     this.updateArticulationButtonsForSelection();
     this.updateDotButtonForSelection();
+    this.updateRestButtonForSelection();
   }
 
   /**
@@ -904,6 +913,29 @@ export class NotationToolbar {
       btn.title = 'Toggle dotted on selected notes';
     } else {
       btn.title = 'Dotted';
+    }
+  }
+
+  /**
+   * Update rest button to show selection state
+   */
+  updateRestButtonForSelection() {
+    if (!this.container) return;
+
+    const btn = this.container.querySelector('.rest-btn');
+    if (!btn) return;
+
+    const isActive = this.selectionIsRest === true;
+    const isMixed = this.selectionIsRest === 'mixed';
+
+    btn.classList.toggle('active', isActive);
+    btn.classList.toggle('mixed', isMixed);
+
+    // Update title
+    if (this.selectedNotesCount > 0) {
+      btn.title = isActive ? 'Convert rest(s) to note(s)' : 'Convert note(s) to rest(s)';
+    } else {
+      btn.title = 'Rest mode';
     }
   }
 

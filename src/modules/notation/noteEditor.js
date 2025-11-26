@@ -783,18 +783,49 @@ export class NoteEditor {
         return;
       }
 
+      // Check if the note fits in the measure (duration validation)
+      // Calculate current beats used from compositionState (more accurate than noteRegions)
+      const measure = compositionState.measures[targetMeasureIndex];
+      const voice = staff === 'treble' ? measure.notation.treble.voices[0] : measure.notation.bass.voices[0];
+
+      let usedBeats = 0;
+      for (const note of voice.notes) {
+        let beats = this.durationToBeats(note.duration || '4n');
+        if (note.dotted) beats *= 1.5;
+        usedBeats += beats;
+      }
+
+      const maxBeats = 4; // 4/4 time
+      const availableBeats = maxBeats - usedBeats;
+
+      // If no room at all, don't add the note
+      if (availableBeats <= 0) {
+        console.warn('[NoteEditor] Measure is full, cannot insert note');
+        return;
+      }
+
+      // Calculate the duration to use (cap at available beats if needed)
+      let durationToUse = this.currentDuration;
+      let dottedToUse = this.isDotted;
+      const requestedBeats = this.durationToBeats(this.currentDuration, this.isDotted);
+
+      if (requestedBeats > availableBeats) {
+        // Reduce duration to fit available space
+        const fitDuration = this.beatsToDuration(availableBeats);
+        durationToUse = fitDuration.duration;
+        dottedToUse = fitDuration.dotted;
+        console.log(`[NoteEditor] Reducing note duration from ${this.currentDuration} to ${durationToUse} to fit measure`);
+      }
+
       const noteData = {
         pitch: staffPosition.pitch,
         pitches: [staffPosition.pitch],
-        duration: this.currentDuration,
+        duration: durationToUse,
         isRest: this.isRestMode,
-        dotted: this.isDotted,
+        dotted: dottedToUse,
         accidental: this.currentAccidental,
         articulation: this.currentArticulation, // Include articulation from toolbar
       };
-
-      const measure = compositionState.measures[targetMeasureIndex];
-      const voice = staff === 'treble' ? measure.notation.treble.voices[0] : measure.notation.bass.voices[0];
 
       // Insert note at the specified position
       const targetIndex = insertionPoint.action === 'before' ? insertionPoint.noteIndex : insertionPoint.noteIndex + 1;
@@ -1367,8 +1398,17 @@ export class NoteEditor {
             // Toggle between rest and note
             note.isRest = !note.isRest;
             note.type = note.isRest ? 'rest' : 'note';
+
+            // When converting rest to note, ensure it has a pitch
+            if (!note.isRest && (!note.pitch && (!note.pitches || note.pitches.length === 0))) {
+              // Default pitch based on staff
+              const defaultPitch = staff === 'treble' ? 'B4' : 'D3';
+              note.pitch = defaultPitch;
+              note.pitches = [defaultPitch];
+            }
+
             changedCount++;
-            console.log('[NoteEditor] ✅ Toggled rest mode in compositionState');
+            console.log('[NoteEditor] ✅ Toggled rest mode in compositionState, isRest:', note.isRest);
           }
         }
       }
@@ -1592,12 +1632,35 @@ export class NoteEditor {
   }
 
   /**
-   * Calculate total beats used in a measure from note regions
+   * Calculate total beats used in a measure
+   * Uses compositionState as the source of truth (more accurate than noteRegions)
    * @param {number} measureIndex - Measure index
    * @param {string} staff - 'treble' or 'bass'
    * @returns {number} - Total beats used
    */
   getMeasureBeatsUsed(measureIndex, staff) {
+    // Try to get accurate data from compositionState first
+    if (window.getCompositionState) {
+      const compositionState = window.getCompositionState();
+      if (compositionState && compositionState.measures && compositionState.measures[measureIndex]) {
+        const measure = compositionState.measures[measureIndex];
+        const voice = staff === 'treble'
+          ? measure.notation?.treble?.voices?.[0]
+          : measure.notation?.bass?.voices?.[0];
+
+        if (voice && voice.notes) {
+          let usedBeats = 0;
+          for (const note of voice.notes) {
+            let beats = this.durationToBeats(note.duration || '4n');
+            if (note.dotted) beats *= 1.5;
+            usedBeats += beats;
+          }
+          return usedBeats;
+        }
+      }
+    }
+
+    // Fallback to noteRegions if compositionState not available
     if (!this.noteRegions) return 0;
 
     const notesInMeasure = this.noteRegions.filter(

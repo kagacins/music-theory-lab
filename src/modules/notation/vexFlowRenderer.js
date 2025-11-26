@@ -518,11 +518,16 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
   // Convert duration if needed
   let vexDuration = DURATION_MAP[duration] || duration || 'q';
 
+  // Check if the duration is dotted (either from dotted flag OR from duration string like '2n.')
+  const isDotted = dotted || (duration && duration.endsWith('.')) || vexDuration.endsWith('d');
+
   // Add 'r' suffix for rests
   if (isRest) {
+    // Remove the 'd' (dotted) suffix temporarily, add 'r' for rest
     vexDuration = vexDuration.replace(/d$/, '') + 'r';
-    if (dotted) vexDuration = vexDuration.replace('r', 'dr');
-  } else if (dotted && !vexDuration.includes('d')) {
+    // Re-add 'd' if it was dotted
+    if (isDotted) vexDuration = vexDuration.replace('r', 'dr');
+  } else if (isDotted && !vexDuration.includes('d')) {
     vexDuration += 'd';
   }
 
@@ -557,8 +562,9 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
     }
   }
 
-  // Add dot if needed
-  if (dotted) {
+  // Add dot if needed (use isDotted which checks both dotted flag and duration string)
+  // Note: Rests don't use addDot() - the dot is already encoded in the duration string (e.g., 'hdr')
+  if (isDotted && !isRest) {
     staveNote.addDot(0);
   }
 

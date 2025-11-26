@@ -154,8 +154,16 @@ export class NotationComposer {
         },
         onUndo: () => this.undo(),
         onRedo: () => this.redo(),
-        onDelete: () => this.deleteSelected(),
-        onTie: () => this.addTie(),
+        onDelete: () => {
+          if (this.noteEditor) {
+            this.noteEditor.deleteSelectedNotes();
+          }
+        },
+        onTie: () => {
+          if (this.noteEditor) {
+            this.noteEditor.toggleTieOnSelected();
+          }
+        },
       });
       this.toolbar.create(this.config.toolbarContainer);
     }

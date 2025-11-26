@@ -77,26 +77,34 @@ function getConnectorTypes() {
  * @param {Array} measures - Original measure data
  */
 function drawManualTies(context, renderedMeasures, measures) {
-  if (!renderedMeasures || renderedMeasures.length === 0) return;
+  if (!renderedMeasures || renderedMeasures.length === 0) {
+    return;
+  }
 
   // VexFlow 5.x context structure: context.vexFlowCanvasContext is the raw 2D context
   // But we need to try multiple approaches since VexFlow context varies
   let ctx = null;
+  let contextSource = 'unknown';
 
   // Try different ways to get the raw canvas context
   if (context.vexFlowCanvasContext && typeof context.vexFlowCanvasContext.beginPath === 'function') {
     ctx = context.vexFlowCanvasContext;
+    contextSource = 'vexFlowCanvasContext';
   } else if (context.context && typeof context.context.beginPath === 'function') {
     ctx = context.context;
+    contextSource = 'context.context';
   } else if (context.canvas && context.canvas.getContext) {
     // VexFlow context has a canvas property
     ctx = context.canvas.getContext('2d');
+    contextSource = 'context.canvas.getContext';
   } else if (typeof context.beginPath === 'function') {
     // context IS the raw canvas context
     ctx = context;
+    contextSource = 'context directly';
   } else if (context.getCanvasContext && typeof context.getCanvasContext === 'function') {
     // Some VexFlow versions expose this method
     ctx = context.getCanvasContext();
+    contextSource = 'getCanvasContext()';
   }
 
   // Last resort: try to find the canvas element and get its context
@@ -105,6 +113,7 @@ function drawManualTies(context, renderedMeasures, measures) {
     try {
       if (context.backend && context.backend.ctx) {
         ctx = context.backend.ctx;
+        contextSource = 'backend.ctx';
       }
     } catch (e) {
       // Ignore
@@ -112,7 +121,6 @@ function drawManualTies(context, renderedMeasures, measures) {
   }
 
   if (!ctx || typeof ctx.beginPath !== 'function') {
-    console.debug('[drawManualTies] Could not get canvas context. Context structure:', Object.keys(context || {}));
     return;
   }
 
@@ -126,12 +134,63 @@ function drawManualTies(context, renderedMeasures, measures) {
  * @param {Array} measures - Original measure data
  */
 function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
+
+  // Helper to determine if two measures are on the same row (system)
+  // We check if the Y positions are similar (within tolerance)
+  function areMeasuresOnSameRow(measure1, measure2) {
+    if (!measure1 || !measure2) return false;
+
+    // Get Y positions from the actual bounds or stave positions
+    const y1 = measure1.actualBounds?.bassY || measure1.bounds?.y || 0;
+    const y2 = measure2.actualBounds?.bassY || measure2.bounds?.y || 0;
+
+    // If Y positions differ by more than 50px, they're on different rows
+    return Math.abs(y1 - y2) < 50;
+  }
+
+  // Helper to determine tie direction based on note stem direction
+  // In bass clef: tie curves AWAY from note heads
+  // - If stem is up (note is low), tie goes below
+  // - If stem is down (note is high), tie goes above
+  function getTieDirection(vexNote) {
+    if (!vexNote) return 'above'; // Default for bass clef
+
+    try {
+      // VexFlow notes have getStemDirection() method
+      // 1 = up, -1 = down
+      const stemDir = vexNote.getStemDirection ? vexNote.getStemDirection() : null;
+
+      if (stemDir === 1) {
+        // Stem up = note is low, tie goes below
+        return 'below';
+      } else if (stemDir === -1) {
+        // Stem down = note is high, tie goes above
+        return 'above';
+      }
+
+      // For whole notes (no stem), check the note's Y position
+      // Higher on staff (lower Y) = tie above, lower on staff (higher Y) = tie below
+      const box = vexNote.getBoundingBox();
+      if (box) {
+        // Middle line of bass clef is around D3
+        // Notes above middle line get ties above, below get ties below
+        const noteY = box.getY() + box.getH() / 2;
+        // Approximate middle of bass staff - adjust based on your layout
+        return noteY < 150 ? 'above' : 'below';
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+
+    return 'above'; // Default for bass clef (most bass notes are low)
+  }
+
   // Look for tied notes across measure boundaries
   for (let i = 0; i < renderedMeasures.length - 1; i++) {
     const currentMeasure = renderedMeasures[i];
     const nextMeasure = renderedMeasures[i + 1];
 
-    // Get bass notes from rendered measures
+    // Get bass notes from rendered measures (VexFlow note objects)
     const currentBassNotes = currentMeasure.bassNotes;
     const nextBassNotes = nextMeasure.bassNotes;
 
@@ -139,40 +198,113 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
       continue;
     }
 
-    // Check if first note of next measure has isTied flag
-    const firstNextNote = nextBassNotes[0];
+    // Get measure data - the structure depends on where it came from
     const measureData = measures[nextMeasure.index];
-    const bassNoteData = measureData?.notation?.bass?.voices?.[0]?.notes;
 
-    if (!bassNoteData || bassNoteData.length === 0) continue;
+    // Try both paths to get the bass note data
+    let bassNoteData = measureData?.notation?.bass?.voices?.[0]?.notes;
+    if (!bassNoteData || bassNoteData.length === 0) {
+      bassNoteData = measureData?.bassNotes;
+    }
+
+    if (!bassNoteData || bassNoteData.length === 0) {
+      continue;
+    }
 
     const firstNoteData = bassNoteData[0];
 
     // Check if this note is tied to the previous measure
-    if (firstNoteData && firstNoteData.isTied === true) {
+    // Skip ties for rests - rests don't need tie markings
+    if (firstNoteData && (firstNoteData.isTied === true || firstNoteData.tied === true) && !firstNoteData.isRest) {
       const lastCurrentNote = currentBassNotes[currentBassNotes.length - 1];
+      const firstNextNote = nextBassNotes[0];
 
-      // Get bounding boxes for positioning
+      // Also check if the previous note is a rest - skip tie if so
+      const prevMeasureData = measures[currentMeasure.index];
+      let prevBassNoteData = prevMeasureData?.notation?.bass?.voices?.[0]?.notes;
+      if (!prevBassNoteData || prevBassNoteData.length === 0) {
+        prevBassNoteData = prevMeasureData?.bassNotes;
+      }
+      const lastNoteData = prevBassNoteData?.[prevBassNoteData.length - 1];
+      if (lastNoteData?.isRest) {
+        continue; // Skip tie if previous note is a rest
+      }
+
+      // Check if measures are on the same row
+      if (!areMeasuresOnSameRow(currentMeasure, nextMeasure)) {
+        // Cross-row tie: draw two partial ties
+        // 1. "Tie to nowhere" - from last note to right edge of current row
+        // 2. "Tie from nowhere" - from left edge of next row to first note
+        try {
+          const startBox = lastCurrentNote.getBoundingBox();
+          const endBox = firstNextNote.getBoundingBox();
+
+          if (startBox) {
+            const direction = getTieDirection(lastCurrentNote);
+            const startX = startBox.getX() + startBox.getW();
+            // End at right edge of measure (about 30px past the note)
+            const endX = startX + 30;
+
+            let startY;
+            if (direction === 'above') {
+              startY = startBox.getY() - 5;
+            } else {
+              startY = startBox.getY() + startBox.getH() + 5;
+            }
+
+            // Draw partial tie going to the right (tie to nowhere)
+            drawPartialTieCurve(ctx, startX, startY, endX, startY, direction, 'end');
+          }
+
+          if (endBox) {
+            const direction = getTieDirection(firstNextNote);
+            const endX = endBox.getX();
+            // Start from left edge of measure (about 30px before the note)
+            const startX = endX - 30;
+
+            let endY;
+            if (direction === 'above') {
+              endY = endBox.getY() - 5;
+            } else {
+              endY = endBox.getY() + endBox.getH() + 5;
+            }
+
+            // Draw partial tie coming from the left (tie from nowhere)
+            drawPartialTieCurve(ctx, startX, endY, endX, endY, direction, 'start');
+          }
+        } catch (e) {
+          // Could not get bounding box - skip this tie
+        }
+        continue;
+      }
+
+      // Same-row tie: draw full tie between notes
       try {
         const startBox = lastCurrentNote.getBoundingBox();
         const endBox = firstNextNote.getBoundingBox();
 
         if (startBox && endBox) {
-          // Calculate tie endpoints
-          // Start at right side of first note, end at left side of second note
+          // Determine tie direction based on the notes
+          const direction = getTieDirection(lastCurrentNote);
+
           const startX = startBox.getX() + startBox.getW();
           const endX = endBox.getX();
 
-          // Y position: tie goes below notes in bass clef
-          const startY = startBox.getY() + startBox.getH() + 5;
-          const endY = endBox.getY() + endBox.getH() + 5;
+          let startY, endY;
+          if (direction === 'above') {
+            // Tie above the notes
+            startY = startBox.getY() - 5;
+            endY = endBox.getY() - 5;
+          } else {
+            // Tie below the notes
+            startY = startBox.getY() + startBox.getH() + 5;
+            endY = endBox.getY() + endBox.getH() + 5;
+          }
 
-          // Draw the tie curve
-          drawTieCurve(ctx, startX, startY, endX, endY, 'below');
+          drawTieCurve(ctx, startX, startY, endX, endY, direction);
         }
       } catch (e) {
-        // Skip if bounding box not available
-        console.debug('[drawManualTies] Could not get bounding box:', e.message);
+        // Could not get bounding box - skip this tie
       }
     }
   }
@@ -183,15 +315,21 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
     if (!bassNotes || bassNotes.length < 2) continue;
 
     const measureData = measures[renderedMeasure.index];
-    const bassNoteData = measureData?.notation?.bass?.voices?.[0]?.notes;
 
-    if (!bassNoteData) continue;
+    let bassNoteData = measureData?.notation?.bass?.voices?.[0]?.notes;
+    if (!bassNoteData) {
+      bassNoteData = measureData?.bassNotes;
+    }
+
+    if (!bassNoteData || bassNoteData.length < 2) continue;
 
     // Check each note after the first for isTied flag
     for (let j = 1; j < bassNotes.length && j < bassNoteData.length; j++) {
       const noteData = bassNoteData[j];
+      const prevNoteData = bassNoteData[j - 1];
 
-      if (noteData && noteData.isTied === true) {
+      // Skip ties for rests - rests don't need tie markings
+      if (noteData && (noteData.isTied === true || noteData.tied === true) && !noteData.isRest && !prevNoteData?.isRest) {
         const prevNote = bassNotes[j - 1];
         const currNote = bassNotes[j];
 
@@ -200,15 +338,24 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
           const endBox = currNote.getBoundingBox();
 
           if (startBox && endBox) {
+            const direction = getTieDirection(prevNote);
+
             const startX = startBox.getX() + startBox.getW();
             const endX = endBox.getX();
-            const startY = startBox.getY() + startBox.getH() + 5;
-            const endY = endBox.getY() + endBox.getH() + 5;
 
-            drawTieCurve(ctx, startX, startY, endX, endY, 'below');
+            let startY, endY;
+            if (direction === 'above') {
+              startY = startBox.getY() - 5;
+              endY = endBox.getY() - 5;
+            } else {
+              startY = startBox.getY() + startBox.getH() + 5;
+              endY = endBox.getY() + endBox.getH() + 5;
+            }
+
+            drawTieCurve(ctx, startX, startY, endX, endY, direction);
           }
         } catch (e) {
-          console.debug('[drawManualTies] Could not get bounding box for intra-measure tie:', e.message);
+          // Could not get bounding box for intra-measure tie - skip
         }
       }
     }
@@ -225,31 +372,90 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
  * @param {string} direction - 'above' or 'below' the notes
  */
 function drawTieCurve(ctx, startX, startY, endX, endY, direction = 'below') {
-  const controlPointOffset = direction === 'below' ? 15 : -15;
+  // Control point offset determines the curve's height
+  const controlPointOffset = direction === 'below' ? 12 : -12;
 
   // Control point is at the midpoint horizontally, offset vertically
   const controlX = (startX + endX) / 2;
-  const controlY = Math.max(startY, endY) + controlPointOffset;
 
-  // Draw outer curve (gives tie thickness)
+  // For 'below', curve dips down (positive Y offset from max Y)
+  // For 'above', curve rises up (negative Y offset from min Y)
+  let controlY;
+  if (direction === 'below') {
+    controlY = Math.max(startY, endY) + controlPointOffset;
+  } else {
+    controlY = Math.min(startY, endY) + controlPointOffset;
+  }
+
+  // Draw the tie as a filled shape for better appearance
   ctx.save();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2;
-  ctx.lineCap = 'round';
+  ctx.fillStyle = '#000000';
 
+  // Outer curve
   ctx.beginPath();
   ctx.moveTo(startX, startY);
   ctx.quadraticCurveTo(controlX, controlY, endX, endY);
-  ctx.stroke();
 
-  // Draw inner curve (slightly different control point) to give thickness effect
-  const innerControlY = controlY - (direction === 'below' ? 3 : -3);
-  ctx.lineWidth = 1;
+  // Inner curve (creates thickness)
+  const innerOffset = direction === 'below' ? -4 : 4;
+  ctx.quadraticCurveTo(controlX, controlY + innerOffset, startX, startY);
+  ctx.closePath();
+  ctx.fill();
 
+  ctx.restore();
+}
+
+/**
+ * Draw a partial tie curve for cross-row ties
+ * These are "tie to nowhere" (going off right edge) or "tie from nowhere" (coming from left edge)
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} startX - Start X position
+ * @param {number} startY - Start Y position
+ * @param {number} endX - End X position
+ * @param {number} endY - End Y position
+ * @param {string} direction - 'above' or 'below' the notes
+ * @param {string} openEnd - 'start' (tie from nowhere) or 'end' (tie to nowhere)
+ */
+function drawPartialTieCurve(ctx, startX, startY, endX, endY, direction = 'below', openEnd = 'end') {
+  // Control point offset determines the curve's height (smaller for partial ties)
+  const controlPointOffset = direction === 'below' ? 8 : -8;
+
+  // Control point is at the midpoint horizontally, offset vertically
+  const controlX = (startX + endX) / 2;
+
+  let controlY;
+  if (direction === 'below') {
+    controlY = Math.max(startY, endY) + controlPointOffset;
+  } else {
+    controlY = Math.min(startY, endY) + controlPointOffset;
+  }
+
+  ctx.save();
+  ctx.fillStyle = '#000000';
+
+  // Draw the tie as a filled shape
   ctx.beginPath();
-  ctx.moveTo(startX, startY);
-  ctx.quadraticCurveTo(controlX, innerControlY, endX, endY);
-  ctx.stroke();
+
+  if (openEnd === 'end') {
+    // Tie to nowhere: starts thick at note, tapers to thin at right edge
+    ctx.moveTo(startX, startY);
+    ctx.quadraticCurveTo(controlX, controlY, endX, endY);
+    // Inner curve - taper to almost nothing at the end
+    const innerOffset = direction === 'below' ? -3 : 3;
+    const taperOffset = direction === 'below' ? -1 : 1;
+    ctx.quadraticCurveTo(controlX, controlY + innerOffset, startX, startY + taperOffset);
+  } else {
+    // Tie from nowhere: starts thin at left edge, thickens to note
+    ctx.moveTo(startX, startY);
+    ctx.quadraticCurveTo(controlX, controlY, endX, endY);
+    // Inner curve - starts thin, ends thick
+    const innerOffset = direction === 'below' ? -3 : 3;
+    const taperOffset = direction === 'below' ? -1 : 1;
+    ctx.quadraticCurveTo(controlX, controlY + innerOffset, startX, startY + taperOffset);
+  }
+
+  ctx.closePath();
+  ctx.fill();
 
   ctx.restore();
 }
