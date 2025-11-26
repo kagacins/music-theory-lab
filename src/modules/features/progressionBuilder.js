@@ -7421,6 +7421,14 @@ export function loadProgression() {
 
     // Update "Current Key" display text
     updateCurrentKeyDisplay();
+
+    // Sync progression to compositionState first, then refresh notation
+    if (window.syncProgressionToMelodyComposer) {
+        window.syncProgressionToMelodyComposer();
+    }
+    if (window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
+    }
 }
 
 /**
@@ -9449,6 +9457,14 @@ export function clearProgression() {
             key: trainerState.currentKey
         }
     }));
+
+    // Sync cleared progression to compositionState, then refresh notation
+    if (window.syncProgressionToMelodyComposer) {
+        window.syncProgressionToMelodyComposer();
+    }
+    if (window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
+    }
 }
 
 export function removeChordFromProgression(index) {
@@ -9531,6 +9547,11 @@ export function removeChordFromProgression(index) {
             key: trainerState.currentKey
         }
     }));
+
+    // Refresh notation to reflect the deleted chord
+    if (window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
+    }
 }
 
 /**
@@ -10044,9 +10065,17 @@ export function addToProgressionData(chordData) {
     // Render both progression displays to keep them in sync
     renderProgressionDisplay('progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
-    
+
     // Auto-render melody notation if on Melody Composer tab or if Free mode is active
     renderMelodyNotationIfNeeded();
+
+    // Sync added chord to compositionState, then refresh notation
+    if (window.syncProgressionToMelodyComposer) {
+        window.syncProgressionToMelodyComposer();
+    }
+    if (window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
+    }
 }
 
 /**

@@ -2634,8 +2634,19 @@ export class CompositionState {
         // ================================================================
         // BUILDING BLOCK SEQUENCE - SINGLE SOURCE OF TRUTH FOR BASS
         // ================================================================
-        if (this.bassBlockSequence.blocks.length === 0) {
-            // First time: initialize BuildingBlockSequence from progression
+        // Detect if this is a completely new progression (different chord count or different roots)
+        // In that case, we need to reinitialize the bass blocks from scratch
+        const needsReinitialize = this.bassBlockSequence.blocks.length === 0 ||
+            this.bassBlockSequence.blocks.length !== progressionData.length ||
+            progressionData.some((chord, i) => {
+                const block = this.bassBlockSequence.blocks[i];
+                // If roots don't match, it's a new progression
+                return block && block.chord && chord.root !== block.chord.root;
+            });
+
+        if (needsReinitialize) {
+            // Clear existing blocks and reinitialize from progression
+            this.bassBlockSequence.blocks = [];
             this.initializeBassBlockSequence(progressionData);
         }
 
@@ -2647,6 +2658,11 @@ export class CompositionState {
         // ================================================================
         // Initialize treble block sequence from existing measure notes
         // This happens AFTER measures are set up with their restored treble notes
+        // If bass was reinitialized, treble should be too (completely new progression)
+        if (needsReinitialize) {
+            // Clear existing treble blocks for new progression
+            this.trebleBlockSequence.blocks = [];
+        }
         if (this.trebleBlockSequence.blocks.length === 0 && this.measures.length > 0) {
             this.initializeTrebleBlockSequence();
         } else if (this.trebleBlockSequence.blocks.length > 0) {
