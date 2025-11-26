@@ -498,6 +498,46 @@
                 </section>
                     </div>
                 </div>
+
+                <!-- Current Chord Progression Panel (collapsible) -->
+                <div class="mb-3 builder-section-item">
+                    <button id="builder-progression-toggle" onclick="window.toggleBuilderProgressionPanel && window.toggleBuilderProgressionPanel()" class="w-full px-4 py-2 bg-gradient-to-r from-purple-400 to-pink-400 hover:from-purple-500 hover:to-pink-500 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
+                        <span class="flex items-center gap-3">
+                            <svg class="w-4 h-4 text-white/70 cursor-move drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Drag to reorder">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
+                            </svg>
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v1a2 2 0 01-2 2h-5v1h3a2 2 0 012 2v1a2 2 0 01-2 2h-3v1h5a2 2 0 012 2v1a2 2 0 01-2 2H4a2 2 0 01-2-2v-1a2 2 0 012-2h5v-1H6a2 2 0 01-2-2v-1a2 2 0 012-2h3V8H4a2 2 0 01-2-2V5z" clip-rule="evenodd"></path></svg>
+                            Current Chord Progression
+                            <span id="builder-progression-count" class="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-xs font-bold">0</span>
+                            <!-- Inline Toggle Switch: Simplified / Detailed -->
+                            <div class="flex items-center gap-1.5 ml-1" onclick="event.stopPropagation()" title="Toggle view: Simplified ↔ Detailed">
+                                <span class="text-[10px] font-bold text-white/70">Simple</span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="builder-card-view-toggle" class="sr-only" onchange="window.toggleBuilderCardView && window.toggleBuilderCardView(this.checked)">
+                                    <div class="toggle-bg w-9 h-5 bg-white/30 rounded-full border border-white/50"></div>
+                                </label>
+                                <span class="text-[10px] font-bold text-white/70">Detail</span>
+                            </div>
+                        </span>
+                        <svg id="builder-progression-chevron" class="w-5 h-5 transform transition-transform" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                    </button>
+
+                    <div id="builder-progression-panel" class="mt-2 hidden bg-gradient-to-br from-purple-400/5 to-pink-400/5 rounded-lg p-3">
+                        <!-- Empty state message -->
+                        <div id="builder-progression-empty" class="text-center py-6 text-gray-500">
+                            <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                            </svg>
+                            <p class="text-sm font-medium">No chords in progression</p>
+                            <p class="text-xs mt-1">Add chords from the library or switch to the Progression Builder tab.</p>
+                        </div>
+
+                        <!-- Chord cards container (grid layout matching Progression Builder) -->
+                        <div id="builder-progression-visualization" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 p-2 bg-white rounded-lg border border-gray-200">
+                            <!-- Chord cards will be rendered by JS -->
+                        </div>
+                    </div>
+                </div>
                 </div>
             </div>
         </div>

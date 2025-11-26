@@ -277,14 +277,18 @@ function getNearestHalfStepDown(rootNote) {
  * @param {HTMLElement} button - The button element to attach tooltip to
  * @param {string} tooltipText - The text to display in the tooltip
  * @param {string} chordType - (Optional) The chord type, used to show inversion options
+ * @param {string} chordRoot - (Optional) The chord root for diatonic mode, used to play the correct chord
  */
-function createButtonTooltip(button, tooltipText, chordType = null) {
+function createButtonTooltip(button, tooltipText, chordType = null, chordRoot = null) {
     if (!tooltipText || tooltipText.length === 0) return null;
-    
+
     const tooltip = document.createElement('div');
     tooltip.className = 'chord-button-tooltip';
     if (chordType) {
         tooltip.setAttribute('data-chord-type', chordType);
+    }
+    if (chordRoot) {
+        tooltip.setAttribute('data-chord-root', chordRoot);
     }
     
     // Style it for fixed positioning (to avoid overflow clipping)
@@ -510,57 +514,88 @@ function createButtonTooltip(button, tooltipText, chordType = null) {
             });
         };
         
+        // Get the note array for index lookup
+        const currentNotes = getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+        // Get chord root index if specified (for diatonic mode)
+        const chordRootIndex = chordRoot ? currentNotes.indexOf(chordRoot) : -1;
+
         inversionButtons.forEach(btn => {
             // Play while button is pressed/held
             btn.addEventListener('mousedown', (e) => {
                 e.stopPropagation();
                 const inversionIndex = parseInt(btn.dataset.inversion, 10);
+
+                // If we have a specific chord root (diatonic mode), temporarily set it
+                const originalRoot = getBuilderRootIndex();
+                if (chordRootIndex !== -1) {
+                    setBuilderRootIndex(chordRootIndex);
+                }
+
                 // First ensure the correct chord type is selected (without playing)
                 selectBuilderChordType(chordType, false);
                 // Then select the inversion and start playing
                 selectBuilderInversion(inversionIndex, false);
                 startBuilderChord();
-                // Store the selected chord+inversion for suggestion generation
-                window.lastTooltipChordSelection = { chordType, inversion: inversionIndex };
+
+                // Restore original root if we changed it (for diatonic mode)
+                if (chordRootIndex !== -1) {
+                    setBuilderRootIndex(originalRoot);
+                }
+
+                // Store the selected chord+inversion+root for suggestion generation and adding
+                window.lastTooltipChordSelection = { chordType, inversion: inversionIndex, chordRoot: chordRoot || null };
                 // Update button highlighting
                 updateButtonHighlight(inversionIndex);
                 // Keep tooltip open for trying other inversions
             });
-            
+
             // Stop playing when button is released
             btn.addEventListener('mouseup', (e) => {
                 e.stopPropagation();
                 stopBuilderChord();
             });
-            
+
             // Stop playing if mouse leaves button while pressed
             btn.addEventListener('mouseleave', (e) => {
                 e.stopPropagation();
                 stopBuilderChord();
             });
-            
+
             // Touch events for mobile/tablet
             btn.addEventListener('touchstart', (e) => {
                 e.stopPropagation();
                 e.preventDefault();
                 const inversionIndex = parseInt(btn.dataset.inversion, 10);
+
+                // If we have a specific chord root (diatonic mode), temporarily set it
+                const originalRoot = getBuilderRootIndex();
+                if (chordRootIndex !== -1) {
+                    setBuilderRootIndex(chordRootIndex);
+                }
+
                 // First ensure the correct chord type is selected (without playing)
                 selectBuilderChordType(chordType, false);
                 // Then select the inversion and start playing
                 selectBuilderInversion(inversionIndex, false);
                 startBuilderChord();
-                // Store the selected chord+inversion for suggestion generation
-                window.lastTooltipChordSelection = { chordType, inversion: inversionIndex };
+
+                // Restore original root if we changed it (for diatonic mode)
+                if (chordRootIndex !== -1) {
+                    setBuilderRootIndex(originalRoot);
+                }
+
+                // Store the selected chord+inversion+root for suggestion generation and adding
+                window.lastTooltipChordSelection = { chordType, inversion: inversionIndex, chordRoot: chordRoot || null };
                 // Update button highlighting
                 updateButtonHighlight(inversionIndex);
             }, { passive: false });
-            
+
             btn.addEventListener('touchend', (e) => {
                 e.stopPropagation();
                 e.preventDefault();
                 stopBuilderChord();
             }, { passive: false });
-            
+
             btn.addEventListener('touchcancel', (e) => {
                 e.stopPropagation();
                 e.preventDefault();
@@ -1672,10 +1707,156 @@ export function toggleChordIntervalsPanel() {
         panel.classList.add('hidden');
         chevron.classList.remove('rotate-180');
     }
-    
+
     // Save panel state
     if (window.savePanelState) {
         window.savePanelState('chord-intervals-panel', !isHidden);
+    }
+}
+
+// =========================================================================
+// Current Chord Progression Panel (Chord Builder)
+// =========================================================================
+
+// Track whether to show detailed or simplified cards in Chord Builder
+let builderDetailedView = false;
+
+/**
+ * Toggle the Current Chord Progression panel in Chord Builder
+ */
+export function toggleBuilderProgressionPanel() {
+    const panel = document.getElementById('builder-progression-panel');
+    const chevron = document.getElementById('builder-progression-chevron');
+    if (!panel || !chevron) return;
+
+    const isHidden = panel.classList.contains('hidden');
+    if (isHidden) {
+        panel.classList.remove('hidden');
+        chevron.classList.add('rotate-180');
+        // Render the chord cards when opening
+        renderBuilderProgressionCards();
+    } else {
+        panel.classList.add('hidden');
+        chevron.classList.remove('rotate-180');
+    }
+
+    // Save panel state
+    if (window.savePanelState) {
+        window.savePanelState('builder-progression-panel', !isHidden);
+    }
+}
+
+/**
+ * Toggle between simplified and detailed card views
+ */
+export function toggleBuilderCardView(detailed) {
+    builderDetailedView = detailed;
+    renderBuilderProgressionCards();
+}
+
+/**
+ * Render chord cards in the Chord Builder's Current Chord Progression panel
+ * Uses the same cards as Progression Builder for consistency
+ */
+export function renderBuilderProgressionCards() {
+    const container = document.getElementById('builder-progression-visualization');
+    const emptyState = document.getElementById('builder-progression-empty');
+    const countBadge = document.getElementById('builder-progression-count');
+
+    if (!container) return;
+
+    // Get progression data from trainer state
+    const trainerState = getTrainerState();
+    const progressionData = trainerState?.progressionData || [];
+    const key = trainerState?.currentKey || 'C';
+
+    // Update count badge
+    if (countBadge) {
+        countBadge.textContent = progressionData.length;
+    }
+
+    // Show empty state or cards
+    if (progressionData.length === 0) {
+        if (emptyState) emptyState.classList.remove('hidden');
+        container.classList.add('hidden');
+        container.innerHTML = '';
+        return;
+    }
+
+    // Hide empty state, show cards
+    if (emptyState) emptyState.classList.add('hidden');
+    container.classList.remove('hidden');
+
+    // Clear existing cards
+    container.innerHTML = '';
+
+    // Use progressionBuilder's renderProgressionDisplay function
+    // by delegating to the same function that renders for trainer and melody tabs
+    if (window.renderProgressionDisplayForBuilder) {
+        window.renderProgressionDisplayForBuilder(container, progressionData, key, {
+            showActionButtons: false, // No add/clear buttons - those are in the chord library
+            isBuilderTab: true,
+            detailed: builderDetailedView
+        });
+    } else {
+        // Fallback: render simple cards manually
+        progressionData.forEach((chord, index) => {
+            const card = createSimpleBuilderChordCard(chord, index, key);
+            container.appendChild(card);
+        });
+    }
+}
+
+/**
+ * Create a simple chord card for the Builder tab (fallback)
+ */
+function createSimpleBuilderChordCard(chord, index, key) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'chord-card-wrapper';
+    wrapper.setAttribute('data-chord-index', index);
+
+    const chordSymbol = chord.simpleName || chord.root || 'C';
+    const roman = chord.roman || '';
+
+    wrapper.innerHTML = `
+        <div class="simplified-card bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-700 rounded-xl overflow-hidden hover:border-indigo-500 transition-all shadow-lg p-2" style="min-height: 70px;">
+            <div class="flex flex-col items-center justify-center h-full">
+                <div class="text-base font-bold text-white">${chordSymbol}</div>
+                <div class="text-xs text-purple-400 font-bold">${roman}</div>
+                <div class="text-[9px] text-gray-400 mt-0.5">Pos: ${index + 1}</div>
+            </div>
+        </div>
+    `;
+
+    // Add click to play functionality
+    wrapper.addEventListener('click', () => {
+        if (window.startProgressionChord) {
+            window.startProgressionChord(index);
+        }
+    });
+
+    return wrapper;
+}
+
+/**
+ * Update the Chord Builder progression panel when progression changes
+ * Called from progressionBuilder when chords are added/removed/modified
+ */
+export function updateBuilderProgressionPanel() {
+    const panel = document.getElementById('builder-progression-panel');
+    const countBadge = document.getElementById('builder-progression-count');
+
+    // Update count badge even if panel is hidden
+    const trainerState = getTrainerState();
+    const progressionData = trainerState?.progressionData || [];
+
+    if (countBadge) {
+        countBadge.textContent = progressionData.length;
+    }
+
+    // Only re-render if panel is visible
+    if (panel && !panel.classList.contains('hidden')) {
+        renderBuilderProgressionCards();
     }
 }
 
@@ -2823,11 +3004,11 @@ export function renderBuilderSelectors() {
                     infoIcon.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
                     buttonContainer.appendChild(infoIcon);
 
-                    // Create tooltip
+                    // Create tooltip (pass chord.root for diatonic mode to use correct root when playing)
                     const chordDescription = CHORD_DEFINITIONS[chord.type].description || '';
                     const contextAwareDescription = getContextAwareChordDescription(chord.type, chord.root, chordDescription);
                     const tooltipText = `${chord.root}${chordSymbol} - ${chord.type} (${chord.roman})\n\n${contextAwareDescription}`;
-                    const tooltipElement = createButtonTooltip(mainButton, tooltipText, chord.type);
+                    const tooltipElement = createButtonTooltip(mainButton, tooltipText, chord.type, chord.root);
 
                     const showTooltip = () => {
                         if (!tooltipElement) return;
@@ -3404,9 +3585,19 @@ export function addChordToProgression(switchToTrainer = false, playShutterSound 
  * @param {string} chordType - The chord type to add
  * @param {number} inversion - The inversion to use
  * @param {boolean} playShutterSound - Whether to play the camera shutter sound (default: true)
+ * @param {string} overrideRoot - (Optional) Override root note for diatonic mode
  */
-export function addSpecificChordToProgression(chordType, inversion, playShutterSound = true) {
-    const rootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[getBuilderRootIndex()];
+export function addSpecificChordToProgression(chordType, inversion, playShutterSound = true, overrideRoot = null) {
+    // Use override root if provided, otherwise check tooltip selection, then fall back to builder root
+    let rootNote;
+    if (overrideRoot) {
+        rootNote = overrideRoot;
+    } else if (window.lastTooltipChordSelection?.chordRoot && window.lastTooltipChordSelection?.chordType === chordType) {
+        // Use the stored diatonic chord root if it matches the chord type being added
+        rootNote = window.lastTooltipChordSelection.chordRoot;
+    } else {
+        rootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[getBuilderRootIndex()];
+    }
     
     // Play camera shutter sound effect (only if requested)
     if (playShutterSound && getAudioIsReady() && getCameraShutter()) {

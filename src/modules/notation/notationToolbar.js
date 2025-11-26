@@ -791,10 +791,14 @@ export class NotationToolbar {
       this.selectionArticulation = null;
       this.selectionDotted = null;
       this.selectionIsRest = null;
+      this.selectionAccidental = null;
 
       // Hide selection indicator
       const indicator = this.container?.querySelector('.selection-indicator');
       if (indicator) indicator.style.display = 'none';
+
+      // Reset accidental buttons to show current toolbar state
+      this.updateAccidentalButtons();
 
       return;
     }
@@ -804,12 +808,14 @@ export class NotationToolbar {
     const articulations = new Set();
     const dottedStates = new Set();
     const restStates = new Set();
+    const accidentals = new Set();
 
     selectedNotes.forEach(note => {
       if (note.duration) durations.add(note.duration);
       articulations.add(note.articulation || 'none');
       dottedStates.add(note.dotted || false);
       restStates.add(note.isRest || note.type === 'rest' || false);
+      accidentals.add(note.accidental || 'none');
     });
 
     // Set selection state
@@ -817,13 +823,15 @@ export class NotationToolbar {
     this.selectionArticulation = articulations.size === 1 ? ([...articulations][0] === 'none' ? null : [...articulations][0]) : 'mixed';
     this.selectionDotted = dottedStates.size === 1 ? [...dottedStates][0] : 'mixed';
     this.selectionIsRest = restStates.size === 1 ? [...restStates][0] : 'mixed';
+    this.selectionAccidental = accidentals.size === 1 ? ([...accidentals][0] === 'none' ? null : [...accidentals][0]) : 'mixed';
 
     console.log('[NotationToolbar] Selection state:', {
       count: this.selectedNotesCount,
       duration: this.selectionDuration,
       articulation: this.selectionArticulation,
       dotted: this.selectionDotted,
-      isRest: this.selectionIsRest
+      isRest: this.selectionIsRest,
+      accidental: this.selectionAccidental
     });
 
     // Update selection indicator
@@ -844,6 +852,7 @@ export class NotationToolbar {
     this.updateArticulationButtonsForSelection();
     this.updateDotButtonForSelection();
     this.updateRestButtonForSelection();
+    this.updateAccidentalButtonsForSelection();
   }
 
   /**
@@ -937,6 +946,30 @@ export class NotationToolbar {
     } else {
       btn.title = 'Rest mode';
     }
+  }
+
+  /**
+   * Update accidental buttons to show selection state
+   */
+  updateAccidentalButtonsForSelection() {
+    if (!this.container) return;
+
+    this.container.querySelectorAll('.accidental-btn').forEach(btn => {
+      const accId = btn.dataset.accidental;
+      const isActive = this.selectionAccidental && this.selectionAccidental === accId;
+      const isMixed = this.selectionAccidental === 'mixed';
+
+      btn.classList.toggle('active', isActive);
+      btn.classList.toggle('mixed', isMixed);
+
+      // Update title
+      const accName = ACCIDENTALS.find(a => a.id === accId)?.label || '';
+      if (this.selectedNotesCount > 0) {
+        btn.title = `Set ${accName} on selected notes`;
+      } else {
+        btn.title = accName;
+      }
+    });
   }
 
   /**

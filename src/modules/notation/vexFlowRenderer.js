@@ -594,7 +594,7 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
  * @param {string} clef - Clef for the chord
  * @param {boolean} dotted - Is the chord dotted
  * @param {string} articulation - Articulation for the chord
- * @param {string|null} accidental - Explicit accidental override (for single-note chords)
+ * @param {string|Array|null} accidental - Explicit accidental override (string for all pitches, array for per-pitch)
  * @returns {Object} - VexFlow StaveNote with multiple keys
  */
 export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble', dotted = false, articulation = null, accidental = null) {
@@ -618,11 +618,21 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
   });
 
   // Add accidentals for each pitch
-  // For single-note chords (pitches.length === 1), use explicit accidental if provided
+  // Supports: string (applies to all), array (per-pitch), or null (auto-detect from key)
   pitches.forEach((pitch, index) => {
-    const requiredAccidental = (pitches.length === 1 && accidental)
-      ? accidental
-      : getRequiredAccidental(pitch, key);
+    let requiredAccidental;
+
+    if (Array.isArray(accidental)) {
+      // Per-pitch accidentals array
+      requiredAccidental = accidental[index] || getRequiredAccidental(pitch, key);
+    } else if (typeof accidental === 'string' && pitches.length === 1) {
+      // Single accidental for single-note chord
+      requiredAccidental = accidental;
+    } else {
+      // Auto-detect from key signature
+      requiredAccidental = getRequiredAccidental(pitch, key);
+    }
+
     if (requiredAccidental) {
       try {
         staveNote.addModifier(new VF.Accidental(requiredAccidental), index);

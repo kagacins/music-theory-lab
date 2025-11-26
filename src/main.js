@@ -85,7 +85,11 @@ import {
     toggleChordSetupPanel,
     toggleChordLibraryPanel,
     toggleChordLibraryMode,
-    toggleChordIntervalsPanel
+    toggleChordIntervalsPanel,
+    toggleBuilderProgressionPanel,
+    toggleBuilderCardView,
+    renderBuilderProgressionCards,
+    updateBuilderProgressionPanel
 } from './modules/features/chordBuilder.js';
 import {
     playArpeggio,
@@ -120,7 +124,8 @@ import {
     openTemplateBrowser,
     toggleSimplifiedView,
     toggleTensionCurve,
-    selectChordCard
+    selectChordCard,
+    renderProgressionDisplayForBuilder
 } from './modules/features/progressionBuilder.js';
 import {
     renderScaleSelectors,
@@ -1076,6 +1081,10 @@ window.toggleChordSetupPanel = toggleChordSetupPanel;
 window.toggleChordLibraryPanel = toggleChordLibraryPanel;
 window.toggleChordLibraryMode = toggleChordLibraryMode;
 window.toggleChordIntervalsPanel = toggleChordIntervalsPanel;
+window.toggleBuilderProgressionPanel = toggleBuilderProgressionPanel;
+window.toggleBuilderCardView = toggleBuilderCardView;
+window.renderBuilderProgressionCards = renderBuilderProgressionCards;
+window.updateBuilderProgressionPanel = updateBuilderProgressionPanel;
 
 // Expose data constants for modules that need them
 window.ENHARMONIC_MAP = ENHARMONIC_MAP;
@@ -1118,6 +1127,7 @@ window.importChordList = importChordList;
 window.openTemplateBrowser = openTemplateBrowser;
 window.toggleSimplifiedView = toggleSimplifiedView;
 window.toggleTensionCurve = toggleTensionCurve;
+window.renderProgressionDisplayForBuilder = renderProgressionDisplayForBuilder;
 
 // Debug: Verify function is available
 if (typeof window.importChordList !== 'function') {
@@ -2703,6 +2713,10 @@ window.onload = () => {
     // Use a small delay to ensure DOM is ready
     setTimeout(() => {
         restoreAllPanelStates();
+        // If Chord Builder progression panel is expanded, render the cards
+        if (window.updateBuilderProgressionPanel) {
+            window.updateBuilderProgressionPanel();
+        }
     }, 100);
 
     // Initialize section drag-and-drop (this also restores section ordering)

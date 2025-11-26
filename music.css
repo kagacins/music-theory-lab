@@ -2314,6 +2314,20 @@ canvas {
     overflow-anchor: none !important;
 }
 
+/* Ensure tooltip can appear above sticky keyboard (z-10) */
+.chord-card-wrapper:has(.chord-tooltip:not(.hidden)) {
+    z-index: 20;
+    position: relative;
+}
+
+/* Give progression visualization containers a z-index to compete with keyboard */
+#progression-visualization,
+#melody-progression-visualization,
+#builder-progression-visualization {
+    position: relative;
+    z-index: 11; /* Higher than keyboard's z-10 */
+}
+
 /* Prevent scroll on tooltip and all children */
 .chord-tooltip,
 .chord-tooltip * {

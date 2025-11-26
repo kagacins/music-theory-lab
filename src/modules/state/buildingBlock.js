@@ -151,8 +151,11 @@ export class Unit {
         // =====================================================================
 
         // Applied accidental: 'sharp', 'flat', 'natural', 'doubleSharp', 'doubleFlat'
-        // Can also be an object mapping pitch to accidental for chords
+        // Single accidental for simple notes
         this.accidental = options.accidental || null;
+
+        // Per-pitch accidentals array for chords: ['#', null, 'b'] indexed by pitch
+        this.accidentals = options.accidentals || null;
 
         // =====================================================================
         // PHRASING & CONNECTIONS
@@ -280,6 +283,7 @@ export class Unit {
             tremolo: this.tremolo ? { ...this.tremolo } : null,
             // Accidentals
             accidental: this.accidental,
+            accidentals: this.accidentals ? [...this.accidentals] : null,
             // Phrasing
             slur: this.slur ? { ...this.slur } : null,
             glissando: this.glissando ? { ...this.glissando } : null,
@@ -324,6 +328,7 @@ export class Unit {
             this.graceNotes ||
             this.tremolo ||
             this.accidental ||
+            this.accidentals ||
             this.slur ||
             this.glissando ||
             this.arpeggio ||
@@ -365,6 +370,7 @@ export class Unit {
         if (this.graceNotes) json.graceNotes = this.graceNotes;
         if (this.tremolo) json.tremolo = this.tremolo;
         if (this.accidental) json.accidental = this.accidental;
+        if (this.accidentals) json.accidentals = this.accidentals;
         if (this.slur) json.slur = this.slur;
         if (this.glissando) json.glissando = this.glissando;
         if (this.arpeggio) json.arpeggio = this.arpeggio;
@@ -571,6 +577,7 @@ export class BuildingBlock {
                     tremolo: unit.tremolo,
                     // Accidentals
                     accidental: unit.accidental,
+                    accidentals: unit.accidentals,
                     // Phrasing
                     slur: unit.slur,
                     glissando: unit.glissando,
@@ -641,6 +648,7 @@ export class BuildingBlock {
                 articulation: u.articulation,
                 dynamic: u.dynamic,
                 accidental: u.accidental,
+                accidentals: u.accidentals,
                 tuplet: u.tuplet,
             })),
         };

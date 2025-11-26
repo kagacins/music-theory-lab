@@ -22,6 +22,7 @@ import {
   getOctaveShift,
   applyOctaveShift,
   CLEF_RANGES,
+  getDurationBeats,
 } from './vexFlowRenderer.js';
 
 import { analyzeChordTone, CHORD_TONE_COLORS } from '../analysis/chordToneAnalyzer.js';
@@ -360,6 +361,202 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
       }
     }
   }
+
+  // =====================================================================
+  // TREBLE TIES - Cross-measure and intra-measure
+  // =====================================================================
+
+  // Helper to determine tie direction for treble notes
+  function getTrebleTieDirection(vexNote) {
+    if (!vexNote) return 'below'; // Default for treble clef
+
+    try {
+      const stemDir = vexNote.getStemDirection ? vexNote.getStemDirection() : null;
+
+      if (stemDir === 1) {
+        // Stem up = tie goes below
+        return 'below';
+      } else if (stemDir === -1) {
+        // Stem down = tie goes above
+        return 'above';
+      }
+
+      // For whole notes (no stem), check the note's Y position
+      const box = vexNote.getBoundingBox();
+      if (box) {
+        const noteY = box.getY() + box.getH() / 2;
+        return noteY < 100 ? 'above' : 'below';
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+
+    return 'below'; // Default for treble clef
+  }
+
+  // Look for tied treble notes across measure boundaries
+  for (let i = 0; i < renderedMeasures.length - 1; i++) {
+    const currentMeasure = renderedMeasures[i];
+    const nextMeasure = renderedMeasures[i + 1];
+
+    // Get treble notes from rendered measures (VexFlow note objects)
+    const currentTrebleNotes = currentMeasure.trebleNotes;
+    const nextTrebleNotes = nextMeasure.trebleNotes;
+
+    if (!currentTrebleNotes || !nextTrebleNotes || currentTrebleNotes.length === 0 || nextTrebleNotes.length === 0) {
+      continue;
+    }
+
+    // Get measure data
+    const measureData = measures[nextMeasure.index];
+
+    // Try both paths to get the treble note data
+    let trebleNoteData = measureData?.notation?.treble?.voices?.[0]?.notes;
+    if (!trebleNoteData || trebleNoteData.length === 0) {
+      trebleNoteData = measureData?.trebleNotes;
+    }
+
+    if (!trebleNoteData || trebleNoteData.length === 0) {
+      continue;
+    }
+
+    const firstNoteData = trebleNoteData[0];
+
+    // Check if this note is tied to the previous measure
+    if (firstNoteData && (firstNoteData.isTied === true || firstNoteData.tied === true) && !firstNoteData.isRest) {
+      const lastCurrentNote = currentTrebleNotes[currentTrebleNotes.length - 1];
+      const firstNextNote = nextTrebleNotes[0];
+
+      // Check if previous note is a rest
+      const prevMeasureData = measures[currentMeasure.index];
+      let prevTrebleNoteData = prevMeasureData?.notation?.treble?.voices?.[0]?.notes;
+      if (!prevTrebleNoteData || prevTrebleNoteData.length === 0) {
+        prevTrebleNoteData = prevMeasureData?.trebleNotes;
+      }
+      const lastNoteData = prevTrebleNoteData?.[prevTrebleNoteData.length - 1];
+      if (lastNoteData?.isRest) {
+        continue; // Skip tie if previous note is a rest
+      }
+
+      // Check if measures are on the same row
+      if (!areMeasuresOnSameRow(currentMeasure, nextMeasure)) {
+        // Cross-row tie: draw two partial ties
+        try {
+          const startBox = lastCurrentNote.getBoundingBox();
+          const endBox = firstNextNote.getBoundingBox();
+
+          if (startBox) {
+            const direction = getTrebleTieDirection(lastCurrentNote);
+            const startX = startBox.getX() + startBox.getW();
+            const endX = startX + 30;
+
+            let startY;
+            if (direction === 'above') {
+              startY = startBox.getY() - 5;
+            } else {
+              startY = startBox.getY() + startBox.getH() + 5;
+            }
+
+            drawPartialTieCurve(ctx, startX, startY, endX, startY, direction, 'end');
+          }
+
+          if (endBox) {
+            const direction = getTrebleTieDirection(firstNextNote);
+            const endX = endBox.getX();
+            const startX = endX - 30;
+
+            let endY;
+            if (direction === 'above') {
+              endY = endBox.getY() - 5;
+            } else {
+              endY = endBox.getY() + endBox.getH() + 5;
+            }
+
+            drawPartialTieCurve(ctx, startX, endY, endX, endY, direction, 'start');
+          }
+        } catch (e) {
+          // Could not draw cross-row treble tie
+        }
+      } else {
+        // Same row - draw normal tie
+        try {
+          const startBox = lastCurrentNote.getBoundingBox();
+          const endBox = firstNextNote.getBoundingBox();
+
+          if (startBox && endBox) {
+            const direction = getTrebleTieDirection(lastCurrentNote);
+
+            const startX = startBox.getX() + startBox.getW();
+            const endX = endBox.getX();
+
+            let startY, endY;
+            if (direction === 'above') {
+              startY = startBox.getY() - 5;
+              endY = endBox.getY() - 5;
+            } else {
+              startY = startBox.getY() + startBox.getH() + 5;
+              endY = endBox.getY() + endBox.getH() + 5;
+            }
+
+            drawTieCurve(ctx, startX, startY, endX, endY, direction);
+          }
+        } catch (e) {
+          // Could not draw treble tie
+        }
+      }
+    }
+  }
+
+  // Also check for treble ties within measures (for split notes)
+  for (const renderedMeasure of renderedMeasures) {
+    const trebleNotes = renderedMeasure.trebleNotes;
+    if (!trebleNotes || trebleNotes.length < 2) continue;
+
+    const measureData = measures[renderedMeasure.index];
+
+    let trebleNoteData = measureData?.notation?.treble?.voices?.[0]?.notes;
+    if (!trebleNoteData) {
+      trebleNoteData = measureData?.trebleNotes;
+    }
+
+    if (!trebleNoteData || trebleNoteData.length < 2) continue;
+
+    // Check each note after the first for isTied flag
+    for (let j = 1; j < trebleNotes.length && j < trebleNoteData.length; j++) {
+      const noteData = trebleNoteData[j];
+      const prevNoteData = trebleNoteData[j - 1];
+
+      if (noteData && (noteData.isTied === true || noteData.tied === true) && !noteData.isRest && !prevNoteData?.isRest) {
+        const prevNote = trebleNotes[j - 1];
+        const currNote = trebleNotes[j];
+
+        try {
+          const startBox = prevNote.getBoundingBox();
+          const endBox = currNote.getBoundingBox();
+
+          if (startBox && endBox) {
+            const direction = getTrebleTieDirection(prevNote);
+
+            const startX = startBox.getX() + startBox.getW();
+            const endX = endBox.getX();
+
+            let startY, endY;
+            if (direction === 'above') {
+              startY = startBox.getY() - 5;
+              endY = endBox.getY() - 5;
+            } else {
+              startY = startBox.getY() + startBox.getH() + 5;
+              endY = endBox.getY() + endBox.getH() + 5;
+            }
+
+            drawTieCurve(ctx, startX, startY, endX, endY, direction);
+          }
+        } catch (e) {
+          // Could not get bounding box for intra-measure treble tie - skip
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -672,6 +869,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     activeNotes = null,     // Set of active note IDs for red highlighting
     enableHarmonicColoring = false,
     isAutoGeneratedBass = false,  // Only color bass notes blue if auto-generated
+    isBlockStart = true,    // Whether this measure is the start of a building block (for chord symbol display)
   } = options;
 
   const {
@@ -904,8 +1102,9 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     }
   });
 
-  // Draw chord symbol if present in measure data
-  if (measureData.metadata && measureData.metadata.chordSymbol) {
+  // Draw chord symbol if present in measure data AND this is the start of a building block
+  // Chord symbols should only appear at the beginning of each building block (chord segment)
+  if (measureData.metadata && measureData.metadata.chordSymbol && isBlockStart) {
     const chordSymbol = measureData.metadata.chordSymbol;
     // Position at beginning of measure (with small left padding)
     const chordX = x + 5;
@@ -920,6 +1119,61 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
       context.setFont('Times New Roman, serif', 14, 'normal');
       context.setFillStyle('#000000'); // Black (standard for chord symbols)
       context.fillText(chordSymbol, chordX, chordY);
+      context.restore();
+    }
+  }
+
+  // Draw incomplete measure indicator if beats don't add up
+  // Parse time signature to get expected beats per measure
+  const [timeSigNum] = timeSignature.split('/').map(Number);
+  const beatsPerMeasure = timeSigNum || 4;
+
+  // Calculate total beats for treble and bass
+  const calcTotalBeats = (notes) => {
+    if (!notes || notes.length === 0) return 0;
+    let total = 0;
+    for (const note of notes) {
+      let dur = note.duration || '4n';
+      // Handle both VexFlow format (q, h, w) and Tone.js format (4n, 2n, 1n)
+      let beats = getDurationBeats(dur);
+      if (note.dotted || dur.includes('.')) {
+        beats *= 1.5;
+      }
+      total += beats;
+    }
+    return total;
+  };
+
+  const trebleBeats = calcTotalBeats(trebleNotes);
+  const bassBeats = calcTotalBeats(bassNotes);
+
+  // Check if either voice is incomplete (but has at least one note/rest)
+  const trebleIncomplete = trebleNotes.length > 0 && Math.abs(trebleBeats - beatsPerMeasure) > 0.01;
+  const bassIncomplete = bassNotes.length > 0 && Math.abs(bassBeats - beatsPerMeasure) > 0.01;
+
+  if (trebleIncomplete || bassIncomplete) {
+    const VF = getVF();
+    if (VF && context) {
+      context.save();
+
+      // Draw a subtle warning indicator - orange/amber triangle with exclamation
+      const indicatorX = x + width - 15;
+      const indicatorY = trebleY + 5;
+
+      // Draw small warning triangle
+      context.beginPath();
+      context.moveTo(indicatorX, indicatorY);
+      context.lineTo(indicatorX + 10, indicatorY);
+      context.lineTo(indicatorX + 5, indicatorY - 10);
+      context.closePath();
+      context.setFillStyle('rgba(245, 158, 11, 0.8)'); // Amber/warning color
+      context.fill();
+
+      // Draw exclamation mark
+      context.setFillStyle('#FFFFFF');
+      context.setFont('Arial', 7, 'bold');
+      context.fillText('!', indicatorX + 3.5, indicatorY - 2);
+
       context.restore();
     }
   }
@@ -1026,7 +1280,9 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature) {
     } else if (note.pitches && Array.isArray(note.pitches)) {
       // Chord - apply ottava adjustment
       const { adjustedPitches, ottavaLabel } = applyOttavaAdjustment(note.pitches, clef);
-      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false, note.articulation || null, note.accidental || null);
+      // Support per-pitch accidentals (note.accidentals array) or single accidental for all (note.accidental)
+      const accidentalArg = note.accidentals || note.accidental || null;
+      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false, note.articulation || null, accidentalArg);
 
       // Preserve isTied property for cross-measure tie rendering
       if (note.isTied !== undefined) {
@@ -1175,6 +1431,9 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
   // Get the SVG or canvas context for direct drawing
   const svgContext = context.svg || context;
 
+  // Collection for chord bracket click regions
+  const chordBracketRegions = [];
+
   // Helper function to draw measure highlights
   function drawMeasureHighlight(measureIndex, color, isBorder = false) {
     const systemIndex = Math.floor(measureIndex / measuresPerLine);
@@ -1311,8 +1570,14 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
   }
 
   // Draw chord bracket beneath bass clef with chord name
-  // Returns the total width of the bracket span across all systems
-  function drawChordBracket(startBeat, endBeat, chordName, color) {
+  // Also registers click regions for bracket label interaction
+  // @param {number} startBeat - Start beat position
+  // @param {number} endBeat - End beat position
+  // @param {string} chordName - Display name for the chord
+  // @param {string} color - Bracket color
+  // @param {Object} chordData - Full chord data for click handling
+  // @param {number} chordIndex - Index of this chord in the progression
+  function drawChordBracket(startBeat, endBeat, chordName, color, chordData = null, chordIndex = -1) {
     const beatsPerMeasure = timeSignature.num || timeSignature.numerator || 4;
     const startMeasure = Math.floor(startBeat / beatsPerMeasure);
     const startBeatInMeasure = startBeat % beatsPerMeasure;
@@ -1435,8 +1700,10 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
         // Chord name text (only on the first span or if it's the only span)
         if (index === 0) {
           const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-          text.setAttribute('x', span.startX + (span.width / 2));
-          text.setAttribute('y', bracketY + 25);
+          const textX = span.startX + (span.width / 2);
+          const textY = bracketY + 25;
+          text.setAttribute('x', textX);
+          text.setAttribute('y', textY);
           text.setAttribute('text-anchor', 'middle');
           text.setAttribute('font-family', 'Arial, sans-serif');
           text.setAttribute('font-size', '13');
@@ -1444,6 +1711,26 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
           text.setAttribute('fill', '#333');
           text.textContent = chordName;
           group.appendChild(text);
+
+          // Register click region for the chord bracket label
+          if (chordData && chordIndex >= 0) {
+            // Estimate text width based on character count (approximate)
+            const estimatedTextWidth = chordName.length * 8;
+            chordBracketRegions.push({
+              type: 'chordBracket',
+              x: textX - estimatedTextWidth / 2 - 5,
+              y: textY - 15,
+              width: estimatedTextWidth + 10,
+              height: 25,
+              chordIndex,
+              chordData,
+              chordName,
+              startBeat,
+              endBeat,
+              durationBeats: endBeat - startBeat,
+              systemIndex: span.systemIndex,
+            });
+          }
         }
 
         context.svg.appendChild(group);
@@ -1477,7 +1764,29 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
           ctx.fillStyle = '#333';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'top';
-          ctx.fillText(chordName, span.startX + (span.width / 2), bracketY + 5);
+          const textX = span.startX + (span.width / 2);
+          const textY = bracketY + 5;
+          ctx.fillText(chordName, textX, textY);
+
+          // Register click region for the chord bracket label
+          if (chordData && chordIndex >= 0) {
+            // Estimate text width based on character count (approximate)
+            const estimatedTextWidth = chordName.length * 8;
+            chordBracketRegions.push({
+              type: 'chordBracket',
+              x: textX - estimatedTextWidth / 2 - 5,
+              y: textY - 5,
+              width: estimatedTextWidth + 10,
+              height: 25,
+              chordIndex,
+              chordData,
+              chordName,
+              startBeat,
+              endBeat,
+              durationBeats: endBeat - startBeat,
+              systemIndex: span.systemIndex,
+            });
+          }
         }
 
         ctx.restore();
@@ -1568,7 +1877,9 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
             startBeat,
             endBeat,
             chordName,
-            chordBracketColors[index % chordBracketColors.length]
+            chordBracketColors[index % chordBracketColors.length],
+            chord,  // Pass full chord data for click handling
+            index   // Pass chord index
           );
         });
       } else {
@@ -1607,7 +1918,9 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
               startBeat,
               endBeat,
               chordName,
-              chordBracketColors[index % chordBracketColors.length]
+              chordBracketColors[index % chordBracketColors.length],
+              chord,  // Pass full chord data for click handling
+              index   // Pass chord index
             );
 
             beatOffset += chordBeats;
@@ -1616,6 +1929,25 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       }
     }
   }
+
+  // Build set of building block start measures for chord symbol placement
+  // Chord symbols should only appear at the START of each building block (chord segment)
+  const buildingBlockStartMeasures = new Set();
+  const beatsPerMeasure = parseInt(timeSignature.split('/')[0]) || 4;
+
+  if (window.getCompositionState) {
+    const compositionState = window.getCompositionState();
+    const segments = compositionState?.getChordSegments?.() || [];
+
+    segments.forEach(segment => {
+      // Calculate the measure index where this building block starts
+      const startMeasure = Math.floor(segment.startBeat / beatsPerMeasure);
+      buildingBlockStartMeasures.add(startMeasure);
+    });
+  }
+
+  // If no segments found, fall back to showing chord symbol on every measure
+  const hasSegments = buildingBlockStartMeasures.size > 0;
 
   // Render each measure
   const renderedMeasures = [];
@@ -1638,6 +1970,11 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     const measureChord = measures[i].chord || null;
     const isAutoGeneratedBass = measures[i].isAutoGeneratedBass || false;
 
+    // Determine if this measure is the start of a building block
+    // If we have segment data, only show chord symbol at block starts
+    // Otherwise (fallback), show on every measure
+    const isBlockStart = hasSegments ? buildingBlockStartMeasures.has(i) : true;
+
     // Render the measure
     const result = renderGrandStaffMeasure(context, measures[i], {
       x,
@@ -1655,6 +1992,7 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       activeNotes,
       enableHarmonicColoring,
       isAutoGeneratedBass,
+      isBlockStart, // NEW: Flag to control chord symbol display
     });
 
     if (result) {
@@ -2063,6 +2401,7 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     dimensions,
     measures: renderedMeasures,
     noteRegions: allNoteRegions,
+    chordBracketRegions,  // Click regions for chord bracket labels
   };
 }
 

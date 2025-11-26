@@ -292,6 +292,11 @@ export function initEnhancedNotation(options = {}) {
         }
       }
 
+      // Sync treble changes to block sequence (if using treble block sequence)
+      if (data.staff === 'treble' && notationComposer.compositionState?.trebleBlockSequence?.blocks?.length > 0) {
+        notationComposer.compositionState.syncMeasuresToTrebleBlock();
+      }
+
       // Trigger re-render
       notationComposer.render();
 
@@ -310,6 +315,8 @@ export function initEnhancedNotation(options = {}) {
 
       // Handle note pitch changes (drag operations) - update both data sources
       moves.forEach(move => {
+        const isPitchSpecific = move.pitchIndex !== null && move.pitchIndex !== undefined;
+
         // 1. Update compositionState
         if (notationComposer.compositionState) {
           const measure = notationComposer.compositionState.getMeasure(move.measureIndex);
@@ -318,40 +325,78 @@ export function initEnhancedNotation(options = {}) {
             const note = measure.notation[voiceKey]?.voices[0]?.notes[move.noteIndex];
 
             if (note && move.steps !== 0) {
-              const currentPitch = note.pitch || note.pitches?.[0] || 'C4';
-              const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff);
+              if (isPitchSpecific && note.pitches && note.pitches.length > 1) {
+                // Pitch-specific transposition: only transpose the selected pitch within the chord
+                const currentPitch = note.pitches[move.pitchIndex];
+                const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff);
+                console.log('[NotationInit] Transposing single pitch in chord from', currentPitch, 'to', newPitch, 'at index', move.pitchIndex);
+                note.pitches[move.pitchIndex] = newPitch;
+                // Update pitch property to the transposed pitch (for playback highlighting)
+                note.pitch = note.pitches[0];
+              } else {
+                // Whole note/chord transposition: transpose all pitches
+                const currentPitch = note.pitch || note.pitches?.[0] || 'C4';
+                const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff);
+                console.log('[NotationInit] Transposing whole note/chord from', currentPitch, 'to', newPitch);
 
-              console.log('[NotationInit] Transposing note from', currentPitch, 'to', newPitch);
-
-              if (note.pitches) {
-                note.pitches = note.pitches.map(p => transposePitchBySteps(p, move.steps, move.staff));
+                if (note.pitches) {
+                  note.pitches = note.pitches.map(p => transposePitchBySteps(p, move.steps, move.staff));
+                }
+                // CRITICAL: Always update pitch property for playback
+                note.pitch = newPitch;
               }
-              // CRITICAL: Always update pitch property for playback
-              note.pitch = newPitch;
             }
           }
         }
 
         // 2. Update measureManager
-        if (notationComposer.measureManager) {
-          const measure = notationComposer.measureManager.getMeasure(move.measureIndex);
+        if (notationComposer.measureManager?.measures) {
+          const measure = notationComposer.measureManager.measures[move.measureIndex];
           if (measure) {
             const notesArray = move.staff === 'treble' ? 'trebleNotes' : 'bassNotes';
             const note = measure[notesArray]?.[move.noteIndex];
 
             if (note && move.steps !== 0) {
-              const currentPitch = note.pitch || note.pitches?.[0] || 'C4';
-              const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff);
+              if (isPitchSpecific && note.pitches && note.pitches.length > 1) {
+                // Pitch-specific transposition
+                const currentPitch = note.pitches[move.pitchIndex];
+                const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff);
+                note.pitches[move.pitchIndex] = newPitch;
+                note.pitch = note.pitches[0];
+              } else {
+                // Whole note/chord transposition
+                const currentPitch = note.pitch || note.pitches?.[0] || 'C4';
+                const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff);
 
-              if (note.pitches) {
-                note.pitches = note.pitches.map(p => transposePitchBySteps(p, move.steps, move.staff));
+                if (note.pitches) {
+                  note.pitches = note.pitches.map(p => transposePitchBySteps(p, move.steps, move.staff));
+                }
+                // CRITICAL: Always update pitch property for playback
+                note.pitch = newPitch;
               }
-              // CRITICAL: Always update pitch property for playback
-              note.pitch = newPitch;
             }
           }
         }
       });
+
+      // For pitch-only changes (arrow up/down), use lightweight pitch sync
+      // instead of full block rebuild - much faster for simple transpositions
+      const hasTrebleMoves = moves.some(m => m.staff === 'treble');
+      if (hasTrebleMoves && notationComposer.compositionState?.trebleBlockSequence?.blocks?.length > 0) {
+        // Use lightweight pitch-only sync for each treble move
+        moves.forEach(move => {
+          if (move.staff === 'treble') {
+            const measure = notationComposer.compositionState.getMeasure(move.measureIndex);
+            if (measure) {
+              const note = measure.notation.treble?.voices[0]?.notes[move.noteIndex];
+              if (note) {
+                const pitches = note.pitches || (note.pitch ? [note.pitch] : []);
+                notationComposer.compositionState.syncTreblePitchOnly(move.measureIndex, move.noteIndex, pitches);
+              }
+            }
+          }
+        });
+      }
 
       notationComposer.render();
 
@@ -372,20 +417,39 @@ export function initEnhancedNotation(options = {}) {
 
         if (notationComposer.compositionState) {
           noteIds.forEach(noteId => {
-            // Parse note ID: "measureIndex-staff-noteIndex"
-            const [measureIndex, staff, noteIndex] = noteId.split('-');
-            const measure = notationComposer.compositionState.getMeasure(parseInt(measureIndex));
+            // Parse note ID: "measureIndex-staff-noteIndex" or "measureIndex-staff-noteIndex-pitchIndex"
+            const parts = noteId.split('-');
+            const measureIndex = parseInt(parts[0]);
+            const staff = parts[1];
+            const noteIndex = parseInt(parts[2]);
+            const pitchIndex = parts.length > 3 ? parseInt(parts[3]) : null;
+
+            const measure = notationComposer.compositionState.getMeasure(measureIndex);
 
             if (measure) {
               const voiceKey = staff;
-              const note = measure.notation[voiceKey]?.voices[0]?.notes[parseInt(noteIndex)];
+              const note = measure.notation[voiceKey]?.voices[0]?.notes[noteIndex];
               if (note) {
-                selectedNoteObjects.push({
+                // Create note object for toolbar
+                const noteObj = {
                   ...note,
-                  measureIndex: parseInt(measureIndex),
+                  measureIndex,
                   staff,
-                  noteIndex: parseInt(noteIndex)
-                });
+                  noteIndex,
+                  pitchIndex
+                };
+
+                // For pitch-specific selections, get the accidental for that specific pitch
+                if (pitchIndex !== null && note.accidentals && note.accidentals[pitchIndex]) {
+                  noteObj.accidental = note.accidentals[pitchIndex];
+                }
+
+                // For pitch-specific selections, set the selected pitch
+                if (pitchIndex !== null && note.pitches && note.pitches[pitchIndex]) {
+                  noteObj.selectedPitch = note.pitches[pitchIndex];
+                }
+
+                selectedNoteObjects.push(noteObj);
               }
             }
           });
@@ -566,6 +630,11 @@ export function initEnhancedNotation(options = {}) {
       // interactiveMelody.melodyNotes is no longer used for note storage
       // All notes now live in compositionState only
 
+      // Sync treble changes to block sequence (if using treble block sequence)
+      if (deletion.staff === 'treble' && notationComposer.compositionState?.trebleBlockSequence?.blocks?.length > 0) {
+        notationComposer.compositionState.syncMeasuresToTrebleBlock();
+      }
+
       notationComposer.render();
 
       // Update note regions after delete
@@ -597,8 +666,8 @@ export function initEnhancedNotation(options = {}) {
       }
 
       // 2. Update measureManager
-      if (notationComposer.measureManager) {
-        const measure = notationComposer.measureManager.getMeasure(data.measureIndex);
+      if (notationComposer.measureManager?.measures) {
+        const measure = notationComposer.measureManager.measures[data.measureIndex];
         if (measure) {
           const notesArray = data.staff === 'treble' ? 'trebleNotes' : 'bassNotes';
           const note = measure[notesArray]?.[data.noteIndex];
@@ -615,6 +684,11 @@ export function initEnhancedNotation(options = {}) {
             }
           }
         }
+      }
+
+      // Sync treble changes to block sequence (if polyphony added to treble staff)
+      if (data.staff === 'treble' && notationComposer.compositionState?.trebleBlockSequence?.blocks?.length > 0) {
+        notationComposer.compositionState.syncMeasuresToTrebleBlock();
       }
 
       notationComposer.render();

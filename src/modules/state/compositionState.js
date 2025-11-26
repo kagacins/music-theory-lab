@@ -16,7 +16,7 @@
 import { EventEmitter } from '../utils/eventEmitter.js';
 import { generateBassVoicing } from '../integration/bassAutoFill.js';
 import { getChordNotes } from '../utils/noteUtils.js';
-import { BuildingBlockSequence, durationToUnits, UNITS_PER_BEAT } from './buildingBlock.js';
+import { BuildingBlockSequence, BuildingBlock, durationToUnits, unitsToDuration, UNITS_PER_BEAT } from './buildingBlock.js';
 
 // ============================================================================
 // BASS NOTE STORE - Single Source of Truth for Bass Notes
@@ -329,6 +329,13 @@ export class CompositionState {
         this.chordSegments = [];
 
         // ====================================================================
+        // BASS NOTES BACKUP - For auto-generate bass toggle
+        // ====================================================================
+        // Stores manual bass notes before auto-generate is turned ON
+        // Allows restoring the original bass when toggled OFF
+        this.bassNotesBackup = null; // Will be an object: { measures: [...], timestamp }
+
+        // ====================================================================
         // BASS NOTE STORE - Single Source of Truth (LEGACY - being replaced)
         // ====================================================================
         // The BassNoteStore is the authoritative record of bass notes.
@@ -342,6 +349,18 @@ export class CompositionState {
         // This enables precise duration changes, reordering, and tie handling.
         // The sequence renders to measures for display.
         this.bassBlockSequence = new BuildingBlockSequence();
+
+        // ====================================================================
+        // TREBLE BLOCK SEQUENCE - Single Source of Truth for Treble/Melody
+        // ====================================================================
+        // Unlike bass (which is tied to chord cards), treble notes are free-form.
+        // The treble sequence is a single continuous timeline of notes.
+        // This enables:
+        // - Insert-with-shift: Insert a note and push all downstream notes
+        // - Delete-with-shift: Delete a note and optionally pull downstream notes
+        // - Cross-measure ties (notes spanning measure boundaries)
+        // - Triplets and complex rhythms via unit-based timing
+        this.trebleBlockSequence = new BuildingBlockSequence();
     }
 
     // ========================================================================
@@ -363,6 +382,35 @@ export class CompositionState {
      */
     getChordSegment(chordIndex) {
         return this.chordSegments.find(s => s.chordIndex === chordIndex) || null;
+    }
+
+    /**
+     * Get the chord segment that contains a specific beat position
+     * @param {number} beat - The absolute beat position
+     * @returns {Object|null} - ChordSegment containing the beat, or null
+     */
+    getChordSegmentForBeat(beat) {
+        for (const segment of this.chordSegments) {
+            const segmentEndBeat = segment.startBeat + segment.durationBeats;
+            if (beat >= segment.startBeat && beat < segmentEndBeat) {
+                return segment;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Get remaining beats in a building block (chord segment) from a given beat position
+     * @param {number} beat - The absolute beat position
+     * @returns {number} - Remaining beats until end of building block
+     */
+    getRemainingBeatsInBuildingBlock(beat) {
+        const segment = this.getChordSegmentForBeat(beat);
+        if (!segment) {
+            return 0;
+        }
+        const segmentEndBeat = segment.startBeat + segment.durationBeats;
+        return segmentEndBeat - beat;
     }
 
     /**
@@ -1353,6 +1401,681 @@ export class CompositionState {
     }
 
     // ========================================================================
+    // TREBLE BLOCK SEQUENCE METHODS (Melody/Treble Note System)
+    // ========================================================================
+
+    /**
+     * Initialize the treble BuildingBlockSequence from existing measure data
+     * Unlike bass (which uses chord cards), treble is a continuous timeline.
+     * We create a single "block" that spans all beats of the composition.
+     */
+    initializeTrebleBlockSequence() {
+        // Set time signature on the sequence
+        const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
+        this.trebleBlockSequence.setTimeSignature(timeSignature.num, timeSignature.denom);
+
+        // Clear existing blocks
+        this.trebleBlockSequence.blocks = [];
+
+        // Calculate total beats from all measures
+        const beatsPerMeasure = timeSignature.num || 4;
+        const totalBeats = this.measures.length * beatsPerMeasure;
+
+        if (totalBeats === 0) {
+            return;
+        }
+
+        // Create a single building block for the entire treble staff
+        // This is different from bass where each chord card is a separate block
+        const trebleBlock = new BuildingBlock({
+            id: 'treble_main',
+            chordIndex: -1, // Not tied to a chord
+            chord: {},
+            beats: totalBeats,
+            initialPitches: [], // Start empty (rests)
+        });
+
+        this.trebleBlockSequence.blocks.push(trebleBlock);
+
+        // Now populate the block from existing measure treble notes
+        this.syncMeasuresToTrebleBlock();
+    }
+
+    /**
+     * Sync existing measure treble notes into the trebleBlockSequence
+     * This reads notes from measures and writes them into the unit-based timeline
+     * IMPORTANT: Handles tied notes by combining them into single notes with full duration
+     */
+    syncMeasuresToTrebleBlock() {
+        if (this.trebleBlockSequence.blocks.length === 0) {
+            return;
+        }
+
+        const block = this.trebleBlockSequence.blocks[0]; // Single treble block
+        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+
+        // Clear the block - reinitialize all units as rests
+        const totalUnits = block.beats * UNITS_PER_BEAT;
+        for (let i = 0; i < block.units.length; i++) {
+            block.units[i].pitches = [];
+            block.units[i].parentIndex = i === 0 ? null : 0;
+        }
+
+        // First, collect all notes with their absolute positions and combine tied notes
+        const allNotes = [];
+
+        for (let measureIndex = 0; measureIndex < this.measures.length; measureIndex++) {
+            const measure = this.measures[measureIndex];
+            const trebleNotes = measure.notation?.treble?.voices?.[0]?.notes || [];
+            const measureStartBeat = measureIndex * beatsPerMeasure;
+
+            for (const note of trebleNotes) {
+                const absoluteBeat = measureStartBeat + (note.beat || 0);
+                const startUnit = Math.round(absoluteBeat * UNITS_PER_BEAT);
+                const durationUnits = durationToUnits(note.duration || '4n');
+                const pitches = note.pitches || (note.pitch ? [note.pitch] : []);
+
+                allNotes.push({
+                    startUnit,
+                    durationUnits,
+                    pitches,
+                    isTied: note.isTied || false,
+                    isRest: note.isRest || note.type === 'rest' || pitches.length === 0,
+                    attributes: {
+                        dynamic: note.dynamic,
+                        velocity: note.velocity,
+                        articulation: note.articulation,
+                        fermata: note.fermata,
+                        ornament: note.ornament,
+                        graceNotes: note.graceNotes,
+                        tremolo: note.tremolo,
+                        accidental: note.accidental,
+                        accidentals: note.accidentals,  // Per-pitch accidentals for chords
+                        slur: note.slur,
+                        glissando: note.glissando,
+                        arpeggio: note.arpeggio,
+                        tuplet: note.tuplet,
+                        fingering: note.fingering,
+                        pedal: note.pedal,
+                        text: note.text,
+                        breath: note.breath,
+                        voice: note.voice || 1,
+                        stemDirection: note.stemDirection,
+                        lyric: note.lyric,
+                    },
+                });
+            }
+        }
+
+        // Sort by start position
+        allNotes.sort((a, b) => a.startUnit - b.startUnit);
+
+        // Combine tied notes: when we find a note that isTied, merge it with the previous note
+        // if they have the same pitches
+        const combinedNotes = [];
+
+        for (let i = 0; i < allNotes.length; i++) {
+            const note = allNotes[i];
+
+            if (note.isTied && combinedNotes.length > 0) {
+                // This is a tied continuation - try to merge with the last combined note
+                const lastNote = combinedNotes[combinedNotes.length - 1];
+
+                // Check if pitches match (same note being continued)
+                const pitchesMatch = this.pitchArraysMatch(lastNote.pitches, note.pitches);
+
+                // Check if this note continues from where the last note ended
+                const expectedStart = lastNote.startUnit + lastNote.durationUnits;
+                const continuationMatches = Math.abs(note.startUnit - expectedStart) <= 1; // Allow 1 unit tolerance
+
+                if (pitchesMatch && continuationMatches) {
+                    // Extend the last note's duration
+                    lastNote.durationUnits += note.durationUnits;
+                    console.log(`[syncMeasuresToTrebleBlock] Combined tied note at unit ${note.startUnit}, new duration: ${lastNote.durationUnits} units`);
+                    continue;
+                }
+            }
+
+            // Not a continuation or doesn't match - add as new note
+            combinedNotes.push({
+                startUnit: note.startUnit,
+                durationUnits: note.durationUnits,
+                pitches: note.pitches,
+                isRest: note.isRest,
+                attributes: note.attributes,
+            });
+        }
+
+        // Now write the combined notes to the block
+        for (const note of combinedNotes) {
+            if (note.startUnit >= 0 && note.startUnit < totalUnits) {
+                block.setNote(note.startUnit, note.durationUnits, note.isRest ? [] : note.pitches, note.attributes);
+            }
+        }
+    }
+
+    /**
+     * Check if two pitch arrays contain the same pitches
+     * @param {Array} pitches1 - First pitch array
+     * @param {Array} pitches2 - Second pitch array
+     * @returns {boolean} - True if arrays have same pitches
+     */
+    pitchArraysMatch(pitches1, pitches2) {
+        if (!pitches1 || !pitches2) return false;
+        if (pitches1.length !== pitches2.length) return false;
+        const sorted1 = [...pitches1].sort();
+        const sorted2 = [...pitches2].sort();
+        return sorted1.every((p, i) => p === sorted2[i]);
+    }
+
+    /**
+     * Lightweight sync for pitch-only changes
+     * Updates pitches in the treble block sequence without rebuilding the entire structure
+     * This is much faster than full syncMeasuresToTrebleBlock() for simple pitch transpositions
+     * @param {number} measureIndex - Measure index
+     * @param {number} noteIndex - Note index within the measure
+     * @param {Array} newPitches - New pitches array
+     */
+    syncTreblePitchOnly(measureIndex, noteIndex, newPitches) {
+        if (this.trebleBlockSequence.blocks.length === 0) {
+            return;
+        }
+
+        const block = this.trebleBlockSequence.blocks[0];
+        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+
+        // Calculate the absolute beat position of this note
+        const measure = this.measures[measureIndex];
+        if (!measure) return;
+
+        const trebleNotes = measure.notation?.treble?.voices?.[0]?.notes || [];
+        if (noteIndex >= trebleNotes.length) return;
+
+        const note = trebleNotes[noteIndex];
+        const absoluteBeat = (measureIndex * beatsPerMeasure) + (note.beat || 0);
+        const startUnit = Math.round(absoluteBeat * UNITS_PER_BEAT);
+
+        // Find the unit in the block and update its pitches
+        if (startUnit >= 0 && startUnit < block.units.length) {
+            const unit = block.units[startUnit];
+            if (unit && unit.parentIndex === null) {
+                // This is a note start - update pitches
+                unit.pitches = [...newPitches];
+            }
+        }
+    }
+
+    /**
+     * Render treble notes from trebleBlockSequence to measures
+     * This is similar to renderBassBlocksToMeasures but for treble
+     */
+    renderTrebleBlocksToMeasures() {
+        if (this.trebleBlockSequence.blocks.length === 0) {
+            return;
+        }
+
+        const block = this.trebleBlockSequence.blocks[0]; // Single treble block
+        const notes = block.getNotes();
+        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const unitsPerMeasure = beatsPerMeasure * UNITS_PER_BEAT;
+
+        // First, clear all treble notes from measures
+        this.measures.forEach(measure => {
+            measure.notation.treble.voices[0].notes = [];
+        });
+
+        // Walk through notes and place them in measures
+        // Handle cross-measure splitting with ties
+        for (const note of notes) {
+            let remainingUnits = note.durationUnits;
+            let currentUnit = note.startUnit;
+            let isFirstPart = true;
+
+            while (remainingUnits > 0) {
+                const measureIndex = Math.floor(currentUnit / unitsPerMeasure);
+                const unitInMeasure = currentUnit % unitsPerMeasure;
+                const unitsAvailableInMeasure = unitsPerMeasure - unitInMeasure;
+                const unitsToPlace = Math.min(remainingUnits, unitsAvailableInMeasure);
+                const isLastPart = remainingUnits <= unitsAvailableInMeasure;
+
+                // Ensure measure exists
+                while (this.measures.length <= measureIndex) {
+                    this.addMeasure({});
+                }
+
+                const measure = this.measures[measureIndex];
+                const duration = unitsToDuration(unitsToPlace);
+                const beat = unitInMeasure / UNITS_PER_BEAT;
+
+                // Create note for this measure
+                const measureNote = {
+                    type: note.isRest ? 'rest' : 'note',
+                    pitches: note.pitches,
+                    pitch: note.pitches[0] || null, // Legacy single pitch
+                    duration: duration,
+                    beat: beat,
+                    dotted: duration.includes('.'),
+                    isTied: !isFirstPart, // Tied if continuation from previous measure
+                    isRest: note.isRest,
+                    // Musical attributes - only on first part
+                    dynamic: isFirstPart ? note.dynamic : null,
+                    velocity: note.velocity,
+                    articulation: isFirstPart ? note.articulation : null,
+                    fermata: isLastPart ? note.fermata : null,
+                    ornament: isFirstPart ? note.ornament : null,
+                    graceNotes: isFirstPart ? note.graceNotes : null,
+                    tremolo: note.tremolo,
+                    accidental: isFirstPart ? note.accidental : null,
+                    accidentals: isFirstPart ? note.accidentals : null,  // Per-pitch accidentals for chords
+                    slur: note.slur,
+                    glissando: isLastPart ? note.glissando : null,
+                    arpeggio: isFirstPart ? note.arpeggio : null,
+                    tuplet: note.tuplet,
+                    fingering: isFirstPart ? note.fingering : null,
+                    pedal: isFirstPart ? note.pedal : null,
+                    text: isFirstPart ? note.text : null,
+                    breath: isLastPart ? note.breath : null,
+                    voice: note.voice || 1,
+                    stemDirection: note.stemDirection,
+                    lyric: isFirstPart ? note.lyric : null,
+                };
+
+                measure.notation.treble.voices[0].notes.push(measureNote);
+
+                currentUnit += unitsToPlace;
+                remainingUnits -= unitsToPlace;
+                isFirstPart = false;
+            }
+        }
+    }
+
+    /**
+     * Add a treble note at a specific position (in units from start)
+     * @param {number} startUnit - Position in units from beginning
+     * @param {number} durationUnits - Duration in units
+     * @param {Array} pitches - Array of pitches
+     * @param {Object} attributes - Musical attributes
+     */
+    addTrebleNoteAtUnit(startUnit, durationUnits, pitches, attributes = {}) {
+        if (this.trebleBlockSequence.blocks.length === 0) {
+            this.initializeTrebleBlockSequence();
+        }
+
+        const block = this.trebleBlockSequence.blocks[0];
+
+        // Ensure block is long enough
+        const requiredUnits = startUnit + durationUnits;
+        const currentUnits = block.units.length;
+
+        if (requiredUnits > currentUnits) {
+            // Extend the block
+            const requiredBeats = Math.ceil(requiredUnits / UNITS_PER_BEAT);
+            block.setDuration(requiredBeats);
+
+            // Also ensure we have enough measures
+            const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+            const requiredMeasures = Math.ceil(requiredBeats / beatsPerMeasure);
+            while (this.measures.length < requiredMeasures) {
+                this.addMeasure({});
+            }
+        }
+
+        // Add the note
+        block.setNote(startUnit, durationUnits, pitches, attributes);
+    }
+
+    /**
+     * Insert a treble note with shift - pushes all downstream notes
+     * This is the key feature for the user's requested "insert with shift" behavior
+     * @param {number} insertUnit - Position to insert at (in units)
+     * @param {number} durationUnits - Duration of the new note
+     * @param {Array} pitches - Pitches for the new note
+     * @param {Object} attributes - Musical attributes
+     */
+    insertTrebleNoteWithShift(insertUnit, durationUnits, pitches, attributes = {}) {
+        if (this.trebleBlockSequence.blocks.length === 0) {
+            this.initializeTrebleBlockSequence();
+        }
+
+        const block = this.trebleBlockSequence.blocks[0];
+        const totalUnits = block.units.length;
+
+        // Step 1: Extend the block by the duration of the new note
+        const newTotalUnits = totalUnits + durationUnits;
+        const newTotalBeats = Math.ceil(newTotalUnits / UNITS_PER_BEAT);
+        block.setDuration(newTotalBeats);
+
+        // Step 2: Shift all units at and after insertUnit forward by durationUnits
+        // Work backwards to avoid overwriting
+        for (let i = block.units.length - 1; i >= insertUnit + durationUnits; i--) {
+            const sourceIndex = i - durationUnits;
+            if (sourceIndex >= insertUnit && sourceIndex < totalUnits) {
+                const sourceUnit = block.units[sourceIndex];
+                block.units[i] = sourceUnit.clone();
+
+                // Adjust parentIndex if it pointed to something in the shifted region
+                if (block.units[i].parentIndex !== null && block.units[i].parentIndex >= insertUnit) {
+                    block.units[i].parentIndex += durationUnits;
+                }
+            }
+        }
+
+        // Step 3: Insert the new note at insertUnit
+        block.setNote(insertUnit, durationUnits, pitches, attributes);
+
+        // Step 4: Ensure we have enough measures
+        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const requiredMeasures = Math.ceil(newTotalBeats / beatsPerMeasure);
+        while (this.measures.length < requiredMeasures) {
+            this.addMeasure({});
+        }
+
+        // Step 5: Re-render to measures
+        this.renderTrebleBlocksToMeasures();
+    }
+
+    /**
+     * Delete a treble note with optional shift - can pull downstream notes back
+     * @param {number} noteStartUnit - Start unit of the note to delete
+     * @param {boolean} shiftBack - If true, shift downstream notes back to fill the gap
+     */
+    deleteTrebleNoteWithShift(noteStartUnit, shiftBack = false) {
+        if (this.trebleBlockSequence.blocks.length === 0) {
+            return;
+        }
+
+        const block = this.trebleBlockSequence.blocks[0];
+        const notes = block.getNotes();
+
+        // Find the note at this position
+        const noteToDelete = notes.find(n => n.startUnit === noteStartUnit);
+        if (!noteToDelete) {
+            console.warn(`[deleteTrebleNoteWithShift] No note found at unit ${noteStartUnit}`);
+            return;
+        }
+
+        const deleteDurationUnits = noteToDelete.durationUnits;
+
+        if (shiftBack) {
+            // Shift downstream notes back to fill the gap
+
+            // Step 1: Shift all units after the deleted note back by deleteDurationUnits
+            const shiftStart = noteStartUnit + deleteDurationUnits;
+            for (let i = noteStartUnit; i < block.units.length - deleteDurationUnits; i++) {
+                const sourceIndex = i + deleteDurationUnits;
+                if (sourceIndex < block.units.length) {
+                    const sourceUnit = block.units[sourceIndex];
+                    block.units[i] = sourceUnit.clone();
+
+                    // Adjust parentIndex
+                    if (block.units[i].parentIndex !== null && block.units[i].parentIndex >= shiftStart) {
+                        block.units[i].parentIndex -= deleteDurationUnits;
+                    }
+                }
+            }
+
+            // Step 2: Truncate the block
+            const newTotalUnits = block.units.length - deleteDurationUnits;
+            const newTotalBeats = Math.ceil(newTotalUnits / UNITS_PER_BEAT);
+            block.setDuration(Math.max(1, newTotalBeats)); // At least 1 beat
+        } else {
+            // Replace the note with a rest (no shift)
+            block.setRest(noteStartUnit, deleteDurationUnits);
+        }
+
+        // Re-render to measures
+        this.renderTrebleBlocksToMeasures();
+    }
+
+    /**
+     * Get the treble note at a specific measure and note index
+     * Returns the unit position for use with insert/delete operations
+     * @param {number} measureIndex - Measure index
+     * @param {number} noteIndex - Note index within measure
+     * @returns {Object|null} - { startUnit, durationUnits, note, isTiedContinuation } or null
+     */
+    getTrebleNoteUnit(measureIndex, noteIndex) {
+        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const measureStartUnit = measureIndex * beatsPerMeasure * UNITS_PER_BEAT;
+
+        const measure = this.measures[measureIndex];
+        if (!measure) return null;
+
+        const notes = measure.notation?.treble?.voices?.[0]?.notes || [];
+        if (noteIndex >= notes.length) return null;
+
+        const note = notes[noteIndex];
+
+        // If this is a tied continuation, the actual note in the block sequence
+        // is in a previous measure. We need to find the original note's position.
+        if (note.isTied) {
+            // Find the original note by looking backwards through measures
+            // The original note will be at the end of the previous measure(s)
+            let origMeasureIndex = measureIndex - 1;
+            while (origMeasureIndex >= 0) {
+                const prevMeasure = this.measures[origMeasureIndex];
+                const prevNotes = prevMeasure?.notation?.treble?.voices?.[0]?.notes || [];
+                if (prevNotes.length > 0) {
+                    const lastNote = prevNotes[prevNotes.length - 1];
+                    if (!lastNote.isTied) {
+                        // Found the original note
+                        const origMeasureStartUnit = origMeasureIndex * beatsPerMeasure * UNITS_PER_BEAT;
+                        let origUnit = origMeasureStartUnit;
+                        for (let i = 0; i < prevNotes.length - 1; i++) {
+                            origUnit += durationToUnits(prevNotes[i].duration || '4n');
+                        }
+                        // Return info about the original note, not the tied continuation
+                        return {
+                            startUnit: origUnit,
+                            durationUnits: durationToUnits(lastNote.duration || '4n'),
+                            note: lastNote,
+                            isTiedContinuation: true,
+                            originalMeasureIndex: origMeasureIndex,
+                            originalNoteIndex: prevNotes.length - 1,
+                        };
+                    }
+                }
+                origMeasureIndex--;
+            }
+            // Couldn't find original - return position within this measure
+            return {
+                startUnit: measureStartUnit,
+                durationUnits: durationToUnits(note.duration || '4n'),
+                note,
+                isTiedContinuation: true,
+            };
+        }
+
+        // Normal (non-tied) note - calculate position within measure
+        let currentUnit = measureStartUnit;
+        for (let i = 0; i < noteIndex; i++) {
+            const prevNote = notes[i];
+            // Tied notes at the start of a measure DO take up space visually,
+            // but they don't represent new notes in the block sequence.
+            // We still need to add their duration to find the position of later notes.
+            currentUnit += durationToUnits(prevNote.duration || '4n');
+        }
+
+        const durationUnits = durationToUnits(note.duration || '4n');
+
+        return {
+            startUnit: currentUnit,
+            durationUnits,
+            note,
+            isTiedContinuation: false,
+        };
+    }
+
+    /**
+     * Expand the treble block sequence to accommodate more measures
+     * @param {number} totalBeats - Total beats needed
+     */
+    expandTrebleBlockSequence(totalBeats) {
+        if (this.trebleBlockSequence.blocks.length === 0) {
+            this.initializeTrebleBlockSequence();
+        }
+
+        const block = this.trebleBlockSequence.blocks[0];
+        if (block.beats < totalBeats) {
+            block.setDuration(totalBeats);
+        }
+    }
+
+    /**
+     * Add a treble note at a specific measure and beat position
+     * This is the main entry point for adding notes to the treble clef
+     * @param {number} measureIndex - Measure index
+     * @param {number} beat - Beat position within measure (0-based)
+     * @param {Object} noteData - Note data { pitch, pitches, duration, isRest, dotted, accidental, articulation, etc. }
+     * @param {Object} options - Options { useBlockSequence: boolean, insertWithShift: boolean }
+     * @returns {boolean} - Success
+     */
+    addTrebleNote(measureIndex, beat, noteData, options = {}) {
+        const { useBlockSequence = true, insertWithShift = false } = options;
+        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+
+        // Ensure measure exists
+        while (this.measures.length <= measureIndex) {
+            this.addMeasure({});
+        }
+
+        // Calculate unit position
+        const absoluteBeat = measureIndex * beatsPerMeasure + beat;
+        const insertUnit = Math.round(absoluteBeat * UNITS_PER_BEAT);
+        const durationUnits = durationToUnits(noteData.duration || '4n');
+        const pitches = noteData.pitches || (noteData.pitch ? [noteData.pitch] : []);
+        const isRest = noteData.isRest || noteData.type === 'rest' || pitches.length === 0;
+
+        if (useBlockSequence) {
+            // Ensure treble block sequence is initialized
+            if (this.trebleBlockSequence.blocks.length === 0) {
+                this.initializeTrebleBlockSequence();
+            }
+
+            const attributes = {
+                dynamic: noteData.dynamic,
+                velocity: noteData.velocity,
+                articulation: noteData.articulation,
+                accidental: noteData.accidental,
+                fermata: noteData.fermata,
+                ornament: noteData.ornament,
+                tuplet: noteData.tuplet,
+                voice: noteData.voice || 1,
+                stemDirection: noteData.stemDirection,
+            };
+
+            if (insertWithShift) {
+                // Insert note and push all downstream notes forward
+                this.insertTrebleNoteWithShift(insertUnit, durationUnits, isRest ? [] : pitches, attributes);
+            } else {
+                // Add note at position (overwrites what's there)
+                this.addTrebleNoteAtUnit(insertUnit, durationUnits, isRest ? [] : pitches, attributes);
+                // Re-render to measures
+                this.renderTrebleBlocksToMeasures();
+            }
+
+            return true;
+        } else {
+            // Legacy: directly add to measure (for backwards compatibility)
+            const measure = this.measures[measureIndex];
+            if (!measure) return false;
+
+            const voice = measure.notation.treble.voices[0];
+            if (!voice) return false;
+
+            voice.notes.push({
+                type: isRest ? 'rest' : 'note',
+                pitch: pitches[0] || null,
+                pitches: pitches,
+                duration: noteData.duration || '4n',
+                isRest: isRest,
+                dotted: noteData.dotted || false,
+                accidental: noteData.accidental,
+                articulation: noteData.articulation,
+                beat: beat,
+            });
+
+            // Sync to block sequence if it exists
+            if (this.trebleBlockSequence.blocks.length > 0) {
+                this.syncMeasuresToTrebleBlock();
+            }
+
+            return true;
+        }
+    }
+
+    /**
+     * Delete a treble note at a specific measure and note index
+     * @param {number} measureIndex - Measure index
+     * @param {number} noteIndex - Note index within measure
+     * @param {Object} options - Options { useBlockSequence: boolean, shiftBack: boolean, replaceWithRest: boolean }
+     * @returns {boolean} - Success
+     */
+    deleteTrebleNote(measureIndex, noteIndex, options = {}) {
+        const { useBlockSequence = true, shiftBack = false, replaceWithRest = true } = options;
+
+        const measure = this.measures[measureIndex];
+        if (!measure) return false;
+
+        const notes = measure.notation?.treble?.voices?.[0]?.notes;
+        if (!notes || noteIndex >= notes.length) return false;
+
+        const noteToDelete = notes[noteIndex];
+        const isAlreadyRest = noteToDelete.isRest || noteToDelete.type === 'rest';
+
+        if (useBlockSequence && this.trebleBlockSequence.blocks.length > 0) {
+            // Get the unit position of this note
+            const noteUnit = this.getTrebleNoteUnit(measureIndex, noteIndex);
+            if (!noteUnit) {
+                console.warn('[deleteTrebleNote] Could not find unit for note');
+                return false;
+            }
+
+            if (isAlreadyRest && !shiftBack) {
+                // Deleting a rest without shift - just remove it from measures
+                notes.splice(noteIndex, 1);
+                // Sync back to block sequence
+                this.syncMeasuresToTrebleBlock();
+            } else if (shiftBack) {
+                // Delete and shift downstream notes back
+                this.deleteTrebleNoteWithShift(noteUnit.startUnit, true);
+            } else if (replaceWithRest) {
+                // Replace with rest
+                this.deleteTrebleNoteWithShift(noteUnit.startUnit, false);
+            } else {
+                // Just remove (no rest replacement)
+                notes.splice(noteIndex, 1);
+                this.syncMeasuresToTrebleBlock();
+            }
+
+            return true;
+        } else {
+            // Legacy: directly modify measure
+            if (isAlreadyRest) {
+                notes.splice(noteIndex, 1);
+            } else if (replaceWithRest) {
+                // Replace with rest
+                const duration = noteToDelete.duration || '4n';
+                notes.splice(noteIndex, 1, {
+                    type: 'rest',
+                    isRest: true,
+                    duration: duration,
+                    beat: noteToDelete.beat || 0,
+                });
+            } else {
+                notes.splice(noteIndex, 1);
+            }
+
+            // Sync to block sequence if it exists
+            if (this.trebleBlockSequence.blocks.length > 0) {
+                this.syncMeasuresToTrebleBlock();
+            }
+
+            return true;
+        }
+    }
+
+    // ========================================================================
     // Measure Management
     // ========================================================================
 
@@ -1918,6 +2641,18 @@ export class CompositionState {
 
         // Always render bass from BuildingBlocks to measures
         this.renderBassBlocksToMeasures();
+
+        // ================================================================
+        // TREBLE BLOCK SEQUENCE - SINGLE SOURCE OF TRUTH FOR TREBLE/MELODY
+        // ================================================================
+        // Initialize treble block sequence from existing measure notes
+        // This happens AFTER measures are set up with their restored treble notes
+        if (this.trebleBlockSequence.blocks.length === 0 && this.measures.length > 0) {
+            this.initializeTrebleBlockSequence();
+        } else if (this.trebleBlockSequence.blocks.length > 0) {
+            // Already initialized - sync any changes from measures back to the block
+            this.syncMeasuresToTrebleBlock();
+        }
 
         // Build chord segments from the newly synced data
         this.buildChordSegments();
@@ -2499,6 +3234,350 @@ export class CompositionState {
         }
 
         return null;
+    }
+
+    // ========================================================================
+    // CHORD BRACKET BASS REPLACEMENT
+    // ========================================================================
+
+    /**
+     * Replace bass notes in a building block with the foundational chord voicing
+     * Called when user clicks on a chord bracket label under the bass clef
+     *
+     * @param {number} chordIndex - Index of the chord in the progression
+     * @param {number} startBeat - Starting beat of the building block (absolute)
+     * @param {number} durationBeats - Total duration in beats
+     * @param {Object} chordData - Chord data { root, type, notes, inversion, etc. }
+     */
+    replaceBassWithFoundationalChord(chordIndex, startBeat, durationBeats, chordData) {
+        console.log('[CompositionState] replaceBassWithFoundationalChord:', {
+            chordIndex,
+            startBeat,
+            durationBeats,
+            chordData,
+        });
+
+        if (!chordData || !chordData.root) {
+            console.warn('[CompositionState] Cannot replace - invalid chord data');
+            return;
+        }
+
+        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+
+        // Get foundational chord pitches - exact pitches from chord card
+        const bassPitches = this.getFoundationalBassPitches(chordData);
+        if (bassPitches.length === 0) {
+            console.warn('[CompositionState] No bass pitches generated for chord');
+            return;
+        }
+
+        console.log('[CompositionState] Using exact pitches from chord card:', bassPitches);
+
+        // Calculate which measures are affected
+        const startMeasure = Math.floor(startBeat / beatsPerMeasure);
+        const endBeat = startBeat + durationBeats;
+        const endMeasure = Math.ceil(endBeat / beatsPerMeasure) - 1;
+
+        console.log(`[CompositionState] Affecting measures ${startMeasure} to ${endMeasure}, beats ${startBeat} to ${endBeat}`);
+
+        // Generate bass notes for the entire duration, handling ties across measures
+        // The chord starts at beat 0 of the building block (which is startBeat)
+        const bassNotes = this.generateBassNotesWithTies(
+            bassPitches,
+            startBeat,
+            durationBeats,
+            beatsPerMeasure,
+            chordIndex
+        );
+
+        // Clear ALL existing bass notes/rests in the building block's beat range
+        // This removes everything, not just notes with matching chordIndex
+        for (let m = startMeasure; m <= endMeasure && m < this.measures.length; m++) {
+            const measure = this.measures[m];
+            if (measure && measure.notation?.bass?.voices?.[0]) {
+                const measureStartBeat = m * beatsPerMeasure;
+
+                // Calculate the beat range within this measure that belongs to this building block
+                const blockStartInMeasure = Math.max(0, startBeat - measureStartBeat);
+                const blockEndInMeasure = Math.min(beatsPerMeasure, endBeat - measureStartBeat);
+
+                // Filter out notes whose beat position falls within the building block range
+                measure.notation.bass.voices[0].notes = measure.notation.bass.voices[0].notes.filter(note => {
+                    const noteBeat = note.beat || 0;
+                    // Keep notes that are OUTSIDE the building block's beat range in this measure
+                    return noteBeat < blockStartInMeasure || noteBeat >= blockEndInMeasure;
+                });
+            }
+        }
+
+        // Place the new bass notes into measures
+        for (const note of bassNotes) {
+            const measureIndex = note.measureIndex;
+            if (measureIndex >= 0 && measureIndex < this.measures.length) {
+                const measure = this.measures[measureIndex];
+                if (measure && measure.notation?.bass?.voices?.[0]) {
+                    // Add the note (remove measureIndex from the note itself)
+                    const noteToAdd = { ...note };
+                    delete noteToAdd.measureIndex;
+                    measure.notation.bass.voices[0].notes.push(noteToAdd);
+
+                    // Sort notes by beat position
+                    measure.notation.bass.voices[0].notes.sort((a, b) => (a.beat || 0) - (b.beat || 0));
+
+                    // Mark as manually edited
+                    measure.notation.bass.autoGenerated = false;
+                }
+            }
+        }
+
+        // Update BassNoteStore if it exists
+        if (this.bassNoteStore) {
+            this.syncBassNoteStoreFromMeasures();
+        }
+
+        // Emit change event
+        this.events.emit('bassNotesChanged', { chordIndex, startBeat, durationBeats });
+
+        console.log('[CompositionState] Bass replacement complete');
+    }
+
+    /**
+     * Get foundational bass pitches from chord data
+     * Returns the EXACT pitches from the chord card (not transposed)
+     *
+     * @param {Object} chordData - Chord data { root, type, notes, omittedNotes }
+     * @returns {Array} Array of pitch strings exactly as stored in chord card
+     */
+    getFoundationalBassPitches(chordData) {
+        let pitches = [];
+
+        // Use chord.notes if available - use EXACT pitches from chord card
+        if (chordData.notes && chordData.notes.length > 0) {
+            pitches = [...chordData.notes];
+        } else if (chordData.root) {
+            // Generate from root and type
+            const chordNotes = getChordNotes(chordData.root, chordData.type || '', this.metadata.key);
+            if (chordNotes && chordNotes.specificNotes) {
+                pitches = chordNotes.specificNotes;
+            } else {
+                // Fallback to just root in octave 3 (typical bass range)
+                pitches = [`${chordData.root}3`];
+            }
+        }
+
+        // Apply omittedNotes filter
+        const omittedNotes = chordData.omittedNotes || [];
+        if (omittedNotes.length > 0) {
+            pitches = pitches.filter(n => !omittedNotes.includes(n));
+        }
+
+        // Return exact pitches - no transposition
+        return pitches;
+    }
+
+    /**
+     * Generate bass notes with proper ties for notes spanning multiple measures
+     *
+     * @param {Array} pitches - Array of pitches for the chord (e.g., ['C2', 'E2', 'G2'])
+     * @param {number} startBeat - Starting beat position (absolute)
+     * @param {number} durationBeats - Total duration in beats
+     * @param {number} beatsPerMeasure - Beats per measure (e.g., 4)
+     * @param {number} chordIndex - Index of the chord
+     * @returns {Array} Array of note objects with measureIndex, beat, duration, pitches, isTied, etc.
+     */
+    generateBassNotesWithTies(pitches, startBeat, durationBeats, beatsPerMeasure, chordIndex) {
+        const notes = [];
+        let currentBeat = startBeat;
+        let remainingBeats = durationBeats;
+        let isFirstNote = true;
+
+        while (remainingBeats > 0) {
+            const measureIndex = Math.floor(currentBeat / beatsPerMeasure);
+            const beatInMeasure = currentBeat % beatsPerMeasure;
+            const beatsUntilMeasureEnd = beatsPerMeasure - beatInMeasure;
+            const beatsToPlace = Math.min(remainingBeats, beatsUntilMeasureEnd);
+
+            // Convert beats to duration string
+            const duration = this.beatsToDurationString(beatsToPlace);
+
+            // Create the note
+            const note = {
+                type: 'note',
+                pitches: [...pitches],
+                pitch: pitches[0], // First pitch for legacy compatibility
+                duration: duration,
+                beat: beatInMeasure,
+                measureIndex: measureIndex,
+                chordIndex: chordIndex,
+                isTied: !isFirstNote, // Tied if not the first note
+            };
+
+            notes.push(note);
+
+            currentBeat += beatsToPlace;
+            remainingBeats -= beatsToPlace;
+            isFirstNote = false;
+        }
+
+        return notes;
+    }
+
+    /**
+     * Convert beats to Tone.js duration string
+     * Uses exact matching where possible, otherwise returns closest smaller duration
+     * @param {number} beats - Number of beats
+     * @returns {string} Duration string (e.g., '4n', '2n', '1n')
+     */
+    beatsToDurationString(beats) {
+        // Use small epsilon for floating point comparison
+        const eps = 0.001;
+
+        // Handle exact common durations first
+        if (Math.abs(beats - 4) < eps) return '1n';       // Whole note (4 beats)
+        if (Math.abs(beats - 3) < eps) return '2n.';      // Dotted half note (3 beats)
+        if (Math.abs(beats - 2) < eps) return '2n';       // Half note (2 beats)
+        if (Math.abs(beats - 1.5) < eps) return '4n.';    // Dotted quarter note (1.5 beats)
+        if (Math.abs(beats - 1) < eps) return '4n';       // Quarter note (1 beat)
+        if (Math.abs(beats - 0.75) < eps) return '8n.';   // Dotted eighth note (0.75 beats)
+        if (Math.abs(beats - 0.5) < eps) return '8n';     // Eighth note (0.5 beats)
+        if (Math.abs(beats - 0.25) < eps) return '16n';   // Sixteenth note (0.25 beats)
+
+        // For non-exact values, return the largest duration that fits
+        if (beats >= 4) return '1n';
+        if (beats >= 3) return '2n.';
+        if (beats >= 2) return '2n';
+        if (beats >= 1.5) return '4n.';
+        if (beats >= 1) return '4n';
+        if (beats >= 0.75) return '8n.';
+        if (beats >= 0.5) return '8n';
+        if (beats >= 0.25) return '16n';
+        return '16n';
+    }
+
+    // ========================================================================
+    // AUTO-GENERATE BASS - Building Block Aware
+    // ========================================================================
+
+    /**
+     * Back up current bass notes before auto-generate is turned ON
+     * Stores a deep copy of all measure bass notes
+     */
+    backupBassNotes() {
+        const backup = {
+            measures: [],
+            timestamp: Date.now()
+        };
+
+        for (let i = 0; i < this.measures.length; i++) {
+            const measure = this.measures[i];
+            if (measure && measure.notation?.bass?.voices?.[0]) {
+                // Deep copy of bass notes
+                backup.measures.push({
+                    measureIndex: i,
+                    notes: JSON.parse(JSON.stringify(measure.notation.bass.voices[0].notes)),
+                    autoGenerated: measure.notation.bass.autoGenerated || false
+                });
+            } else {
+                backup.measures.push({
+                    measureIndex: i,
+                    notes: [],
+                    autoGenerated: false
+                });
+            }
+        }
+
+        this.bassNotesBackup = backup;
+        console.log('[CompositionState] Bass notes backed up:', backup.measures.length, 'measures');
+    }
+
+    /**
+     * Restore bass notes from backup when auto-generate is turned OFF
+     */
+    restoreBassNotes() {
+        if (!this.bassNotesBackup) {
+            console.warn('[CompositionState] No bass notes backup to restore');
+            return false;
+        }
+
+        console.log('[CompositionState] Restoring bass notes from backup');
+
+        for (const backupMeasure of this.bassNotesBackup.measures) {
+            const measureIndex = backupMeasure.measureIndex;
+            if (measureIndex < this.measures.length) {
+                const measure = this.measures[measureIndex];
+                if (measure && measure.notation?.bass?.voices?.[0]) {
+                    // Restore the notes
+                    measure.notation.bass.voices[0].notes = JSON.parse(JSON.stringify(backupMeasure.notes));
+                    measure.notation.bass.autoGenerated = backupMeasure.autoGenerated;
+                }
+            }
+        }
+
+        // Clear the backup after restoring
+        this.bassNotesBackup = null;
+
+        // Emit event to trigger re-render
+        this.events.emit('bassUpdated', -1);
+        console.log('[CompositionState] Bass notes restored');
+        return true;
+    }
+
+    /**
+     * Fill all building blocks with chord card bass
+     * Uses the exact pitches from each chord card to fill its building block duration
+     */
+    fillBuildingBlocksWithChordBass() {
+        console.log('[CompositionState] Filling building blocks with chord card bass');
+
+        // Get chord segments (building blocks)
+        const segments = this.getChordSegments();
+        if (!segments || segments.length === 0) {
+            // Rebuild segments if needed
+            this.buildChordSegments();
+        }
+
+        const chordSegments = this.getChordSegments();
+        console.log('[CompositionState] Found', chordSegments.length, 'building blocks');
+
+        for (const segment of chordSegments) {
+            const { chordIndex, startBeat, durationBeats, chord } = segment;
+
+            if (!chord || !chord.root) {
+                console.warn(`[CompositionState] Skipping segment ${chordIndex} - no chord data`);
+                continue;
+            }
+
+            console.log(`[CompositionState] Filling building block ${chordIndex}: ${chord.root}${chord.type || ''} at beat ${startBeat}, duration ${durationBeats}`);
+
+            // Use replaceBassWithFoundationalChord to fill this building block
+            // This handles ties across measures and uses exact chord card pitches
+            this.replaceBassWithFoundationalChord(chordIndex, startBeat, durationBeats, chord);
+
+            // Mark as auto-generated for coloring purposes
+            const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+            const startMeasure = Math.floor(startBeat / beatsPerMeasure);
+            const endBeat = startBeat + durationBeats;
+            const endMeasure = Math.ceil(endBeat / beatsPerMeasure) - 1;
+
+            for (let m = startMeasure; m <= endMeasure && m < this.measures.length; m++) {
+                const measure = this.measures[m];
+                if (measure && measure.notation?.bass) {
+                    measure.notation.bass.autoGenerated = true;
+                }
+            }
+        }
+
+        // Emit event to trigger re-render
+        this.events.emit('bassUpdated', -1);
+        console.log('[CompositionState] Building blocks filled with chord bass');
+    }
+
+    /**
+     * Check if there's a valid bass backup
+     * @returns {boolean} True if backup exists
+     */
+    hasBassBackup() {
+        return this.bassNotesBackup !== null && this.bassNotesBackup.measures.length > 0;
     }
 }
 

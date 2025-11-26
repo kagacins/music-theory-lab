@@ -2548,6 +2548,37 @@ function renderSimplifiedChordSequence(container, progressionData, key, options 
 }
 
 /**
+ * Render progression display for the Chord Builder tab
+ * This is called by the chordBuilder module to render cards in its "Current Chord Progression" panel
+ * @param {HTMLElement} container - Container element
+ * @param {Array} progressionData - Chord progression data
+ * @param {string} key - Current key
+ * @param {Object} options - Rendering options
+ */
+export function renderProgressionDisplayForBuilder(container, progressionData, key, options = {}) {
+    const { showActionButtons = false, isBuilderTab = true, detailed = false } = options;
+
+    if (!progressionData || progressionData.length === 0) return;
+
+    // Clear existing content
+    container.innerHTML = '';
+
+    // Create card wrappers for each chord using the same functions as other tabs
+    progressionData.forEach((chord, index) => {
+        const wrapper = createChordCardWrapper(chord, index, key);
+        container.appendChild(wrapper);
+    });
+
+    // Update shift classes
+    requestAnimationFrame(() => {
+        updateCardShifts();
+    });
+
+    // Make container sortable (same as other tabs)
+    initializeSimplifiedSortable(container);
+}
+
+/**
  * Create a chord card wrapper (holds either simplified or detailed view)
  * @param {Object} chord - Chord data
  * @param {number} index - Chord index
@@ -3949,10 +3980,11 @@ function attachCardEventListeners(wrapper, index) {
  * Uses transform instead of margin to preserve card width
  */
 function updateCardShifts() {
-    // Update shifts for both containers
+    // Update shifts for all three containers (Progression Builder, Melody Composer, Chord Builder)
     const containers = [
         document.getElementById('progression-visualization'),
-        document.getElementById('melody-progression-visualization')
+        document.getElementById('melody-progression-visualization'),
+        document.getElementById('builder-progression-visualization')
     ].filter(c => c); // Filter out null containers
 
     containers.forEach(container => {
@@ -5199,7 +5231,7 @@ function initializeSimplifiedSortable(container) {
         chosenClass: 'sortable-chosen',
         dragClass: 'sortable-drag',
         handle: '.drag-handle',
-        filter: '.chord-card-wrapper:first-child', // Exclude Add/Clear buttons (first child)
+        filter: '.chord-card-wrapper:not([data-chord-index])', // Exclude Add/Clear buttons (no data-chord-index)
         swapThreshold: 0.65, // More tolerant swapping for transformed elements
         onStart: function(evt) {
             console.log('%c[Sortable onStart] === DRAG START ===', 'color: #ffcc00; font-weight: bold');
@@ -5986,6 +6018,12 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
 
         // Don't render old-style detailed cards below - they expand inline from simplified
         // (Sortable is already initialized in renderSimplifiedChordSequence)
+
+        // Update Chord Builder panel (three-way sync)
+        if (window.updateBuilderProgressionPanel) {
+            window.updateBuilderProgressionPanel();
+        }
+
         return;
     }
 
@@ -9020,14 +9058,8 @@ function updateChordAndRenderPreservingTrebleNotes(index) {
         }
     }
 
-    // Update chord cards on melody tab
-    const melodyContainer = document.getElementById('melody-progression-visualization');
-    if (melodyContainer && trainerState.progressionData.length > 0) {
-        melodyContainer.innerHTML = '';
-        renderSimplifiedChordSequence(melodyContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
-            showActionButtons: true
-        });
-    }
+    // Update chord cards across all tabs (Progression Builder, Melody Composer, Chord Builder)
+    updateSingleCard(index);
 
     // Render the notation
     if (notationComposer && typeof notationComposer.render === 'function') {
