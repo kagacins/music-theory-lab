@@ -609,11 +609,73 @@ function createButtonTooltip(button, tooltipText, chordType = null, chordRoot = 
         }
     }
     
-    // Add "Suggested Next Chords" button if this is a chord tooltip
+    // Add "Add Chord" and "Suggested Next" buttons side-by-side if this is a chord tooltip
     if (chordType && lines.length > 1) {
+        // Create a flex container for the buttons
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.display = 'flex';
+        buttonContainer.style.gap = '6px';
+        buttonContainer.style.marginTop = '8px';
+        buttonContainer.style.width = '100%';
+        
+        // Create "Add Chord" button
+        const addChordBtn = document.createElement('button');
+        addChordBtn.textContent = 'Add Chord';
+        addChordBtn.style.padding = '4px 8px';
+        addChordBtn.style.fontSize = '10px';
+        addChordBtn.style.backgroundColor = '#6366f1'; // indigo-500
+        addChordBtn.style.color = 'white';
+        addChordBtn.style.border = '1px solid #4f46e5'; // indigo-600
+        addChordBtn.style.borderRadius = '3px';
+        addChordBtn.style.cursor = 'pointer';
+        addChordBtn.style.flex = '1';
+        addChordBtn.style.fontWeight = '600';
+        addChordBtn.style.transition = 'all 0.2s';
+        addChordBtn.onmouseover = () => addChordBtn.style.backgroundColor = '#4f46e5'; // indigo-600
+        addChordBtn.onmouseout = () => addChordBtn.style.backgroundColor = '#6366f1'; // indigo-500
+        addChordBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            // Get the selected inversion from tooltip interaction, or default to 0
+            // Only use lastTooltipChordSelection if it matches the current chord type
+            const selectedInversion = (window.lastTooltipChordSelection?.chordType === chordType) 
+                ? window.lastTooltipChordSelection.inversion 
+                : 0;
+            
+            // Get the note array for index lookup
+            const currentNotes = getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+            // Get chord root index if specified (for diatonic mode)
+            const chordRootIndex = chordRoot ? currentNotes.indexOf(chordRoot) : -1;
+            
+            // Set the chord type and inversion before adding
+            const originalRoot = getBuilderRootIndex();
+            if (chordRootIndex !== -1) {
+                setBuilderRootIndex(chordRootIndex);
+            }
+            
+            // Ensure the correct chord type is selected
+            selectBuilderChordType(chordType, false);
+            // Select the inversion
+            selectBuilderInversion(selectedInversion, false);
+            
+            // Restore original root if we changed it (for diatonic mode)
+            if (chordRootIndex !== -1) {
+                setBuilderRootIndex(originalRoot);
+            }
+            
+            // Add the chord to progression (same as floating control panel button)
+            if (window.addChordToProgression) {
+                window.addChordToProgression(false);
+            }
+            
+            // Hide tooltip after adding
+            hideTooltip();
+        });
+        buttonContainer.appendChild(addChordBtn);
+        
+        // Create "Suggested Next" button
         const suggestionsBtn = document.createElement('button');
         suggestionsBtn.textContent = '💡 Suggested Next';
-        suggestionsBtn.style.marginTop = '8px';
         suggestionsBtn.style.padding = '4px 8px';
         suggestionsBtn.style.fontSize = '10px';
         suggestionsBtn.style.backgroundColor = '#60a5fa';
@@ -621,7 +683,7 @@ function createButtonTooltip(button, tooltipText, chordType = null, chordRoot = 
         suggestionsBtn.style.border = '1px solid #3b82f6';
         suggestionsBtn.style.borderRadius = '3px';
         suggestionsBtn.style.cursor = 'pointer';
-        suggestionsBtn.style.width = '100%';
+        suggestionsBtn.style.flex = '1';
         suggestionsBtn.style.fontWeight = '600';
         suggestionsBtn.style.transition = 'all 0.2s';
         suggestionsBtn.onmouseover = () => suggestionsBtn.style.backgroundColor = '#3b82f6';
@@ -631,7 +693,10 @@ function createButtonTooltip(button, tooltipText, chordType = null, chordRoot = 
             const selectedInversion = window.lastTooltipChordSelection?.inversion || 0;
             showChordSuggestionsModal(chordType, selectedInversion);
         });
-        tooltip.appendChild(suggestionsBtn);
+        buttonContainer.appendChild(suggestionsBtn);
+        
+        // Append the container to the tooltip
+        tooltip.appendChild(buttonContainer);
     }
     
     // Track tooltip timeout for touch devices

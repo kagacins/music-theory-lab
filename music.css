@@ -811,23 +811,40 @@ button:active:not(:disabled),
 
 /* Ensure proper spacing between grid items in progression visualization */
 #progression-visualization,
-#melody-progression-visualization {
-    gap: 0.75rem !important; /* Force 12px gap between cards for clear separation */
+#melody-progression-visualization,
+#builder-progression-visualization {
+    gap: 0.25rem !important; /* Force 4px gap between cards for minimal white space */
 }
 
-#progression-visualization > .chord-card-wrapper,
-#melody-progression-visualization > .chord-card-wrapper {
+/* Cards in grid containers (both direct children and nested in -cards-grid) */
+#progression-visualization .chord-card-wrapper,
+#melody-progression-visualization .chord-card-wrapper,
+#builder-progression-visualization .chord-card-wrapper,
+[id$="-cards-grid"] > .chord-card-wrapper {
     margin: 0 !important; /* Remove any margins that might cause overlap */
     box-sizing: border-box !important; /* Ensure padding is included in width */
     flex-shrink: 0; /* Prevent cards from shrinking and overlapping */
-    padding: 4px; /* Add padding to show selection ring highlight */
+    padding: 2px !important; /* Minimal padding to show selection ring highlight - consistent across all tabs */
     overflow: visible; /* Allow ring highlight to show */
+}
+
+/* Grid layout: Cards should fill their cell */
+[id$="-cards-grid"].grid > .chord-card-wrapper:not(.expanded-card-wrapper):not(.has-notation) {
+    width: 100% !important; /* Fill grid cell */
+}
+
+/* Flex layout: Cards should size naturally */
+[id$="-cards-grid"].flex > .chord-card-wrapper:not(.expanded-card-wrapper):not(.has-notation) {
+    width: auto !important; /* Natural width in flexbox */
+    min-width: 90px; /* Minimum card width */
 }
 
 /* Fix for simplified cards in progression visualization - prevent overflow */
 /* Only apply to non-expanded cards */
-#progression-visualization > .chord-card-wrapper:not(.expanded-card-wrapper) > div,
-#melody-progression-visualization > .chord-card-wrapper:not(.expanded-card-wrapper) > div {
+#progression-visualization .chord-card-wrapper:not(.expanded-card-wrapper) > div,
+#melody-progression-visualization .chord-card-wrapper:not(.expanded-card-wrapper) > div,
+#builder-progression-visualization .chord-card-wrapper:not(.expanded-card-wrapper) > div,
+[id$="-cards-grid"] > .chord-card-wrapper:not(.expanded-card-wrapper) > div {
     box-sizing: border-box !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -862,15 +879,19 @@ button:active:not(:disabled),
 }
 
 /* Hover effect for simplified cards - translateY combined with any existing translateX */
-#progression-visualization > .chord-card-wrapper:not(.shift-right):hover,
-#melody-progression-visualization > .chord-card-wrapper:not(.shift-right):hover {
+#progression-visualization .chord-card-wrapper:not(.shift-right):hover,
+#melody-progression-visualization .chord-card-wrapper:not(.shift-right):hover,
+#builder-progression-visualization .chord-card-wrapper:not(.shift-right):hover,
+[id$="-cards-grid"] .chord-card-wrapper:not(.shift-right):hover {
     transform: translateY(-4px);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
 }
 
 /* For shifted cards, combine both transforms */
-#progression-visualization > .chord-card-wrapper.shift-right:hover,
-#melody-progression-visualization > .chord-card-wrapper.shift-right:hover {
+#progression-visualization .chord-card-wrapper.shift-right:hover,
+#melody-progression-visualization .chord-card-wrapper.shift-right:hover,
+#builder-progression-visualization .chord-card-wrapper.shift-right:hover,
+[id$="-cards-grid"] .chord-card-wrapper.shift-right:hover {
     transform: translateX(var(--card-shift, 0px)) translateY(-4px);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
 }
@@ -905,17 +926,19 @@ button:active:not(:disabled),
 
 /* Expanded chord card wrapper - width controlled by JavaScript based on key signature */
 .expanded-card-wrapper {
-    /* Remove !important to allow JavaScript to set width based on notation complexity */
-    min-width: 125%;
+    /* Use fit-content to size based on actual content, not percentage */
+    width: fit-content !important;
+    min-width: auto !important;
     z-index: 10;
     position: relative;
     box-sizing: border-box;
+    flex-shrink: 0;
 }
 
-/* Ensure detailed card inside expanded wrapper takes full width */
+/* Detailed card inside expanded wrapper should size based on its content */
 .expanded-card-wrapper .detailed-card {
-    width: 100%;
-    min-width: 100%;
+    width: fit-content;
+    min-width: auto;
     box-sizing: border-box;
 }
 
@@ -2298,6 +2321,8 @@ canvas {
     /* Prevent scroll-into-view behavior */
     scroll-margin: 0;
     overflow-anchor: none;
+    width: 100% !important; /* Ensure consistent width across all tabs */
+    box-sizing: border-box !important;
 }
 
 /* Interactive tooltip for simplified cards */
@@ -2453,4 +2478,380 @@ canvas {
 
 .animate-fade-out {
     animation: fade-out 0.3s ease-out forwards;
+}
+
+/* ===========================
+   Song Sections Styles
+   =========================== */
+
+/* Sections container */
+.sections-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+/* Section toolbar */
+.section-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(249, 250, 251, 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+/* Section wrapper */
+.section-wrapper {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 0.5rem;
+    overflow: visible;
+}
+
+.section-wrapper.collapsed .section-cards-container {
+    max-height: 0;
+    padding: 0;
+    overflow: hidden;
+    border: none;
+}
+
+.section-wrapper:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Section header */
+.section-header {
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.section-header:hover {
+    filter: brightness(0.97);
+}
+
+.section-drag-handle {
+    cursor: grab;
+}
+
+.section-drag-handle:active {
+    cursor: grabbing;
+}
+
+/* Section collapse button animation */
+.section-collapse-btn svg {
+    transition: transform 0.2s ease;
+}
+
+.section-wrapper.collapsed .section-collapse-btn svg {
+    transform: rotate(-90deg);
+}
+
+/* Section cards container */
+.section-cards-container {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    max-height: 2000px;
+    min-height: 60px;
+}
+
+/* Section empty indicator */
+.section-empty-indicator {
+    grid-column: 1 / -1;
+    transition: all 0.2s ease;
+}
+
+.section-empty-indicator:hover {
+    border-color: #6366F1;
+    background: rgba(99, 102, 241, 0.05);
+}
+
+/* Ungrouped section */
+.ungrouped-section {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed #e5e7eb;
+}
+
+.ungrouped-header {
+    opacity: 0.7;
+}
+
+.ungrouped-cards-container {
+    min-height: 60px;
+    transition: all 0.2s ease;
+}
+
+.ungrouped-cards-container:hover {
+    border-color: #9ca3af;
+}
+
+/* Section type menu (dropdown) */
+.section-type-menu {
+    animation: fadeInScale 0.15s ease-out;
+    transform-origin: top left;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.section-type-menu button {
+    transition: background-color 0.15s ease;
+}
+
+/* Section context menu */
+.section-context-menu {
+    animation: fadeInScale 0.15s ease-out;
+    transform-origin: top left;
+}
+
+.section-context-menu button {
+    transition: background-color 0.15s ease;
+}
+
+.section-context-menu button:hover {
+    background-color: #f3f4f6;
+}
+
+.section-context-menu button.text-red-600:hover {
+    background-color: #fef2f2;
+}
+
+/* Section ghost (during drag) */
+.section-ghost {
+    opacity: 0.4;
+    background: #f3f4f6;
+    border-radius: 0.5rem;
+}
+
+/* Multi-select chord card styles */
+.chord-card-wrapper.multi-selected {
+    outline: 2px solid #3B82F6;
+    outline-offset: 2px;
+    border-radius: 0.75rem;
+}
+
+.chord-card-wrapper.multi-selected::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 0.875rem;
+    background: rgba(59, 130, 246, 0.1);
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* Selection count badge (when dragging multiple) */
+.chord-card-wrapper[data-dragging-count]::before {
+    content: attr(data-dragging-count);
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 20px;
+    height: 20px;
+    background: #3B82F6;
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Drag-over expansion for collapsed sections */
+.section-wrapper.collapsed.drag-over .section-cards-container {
+    max-height: 100px;
+    padding: 0.5rem;
+    border-width: 1px;
+    opacity: 0.6;
+}
+
+/* Label input (inline editing) */
+.section-label-input {
+    transition: all 0.15s ease;
+}
+
+.section-label-input:focus {
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+}
+
+/* Empty progression state */
+.empty-progression-state {
+    background: linear-gradient(135deg, rgba(249, 250, 251, 0.8) 0%, rgba(243, 244, 246, 0.9) 100%);
+    border: 2px dashed #d1d5db;
+    border-radius: 1rem;
+    min-height: 150px;
+}
+
+/* ============================================================================
+   INLINE SECTION GROUPS
+   Sections rendered as colored overlays behind sequential chord cards
+   ============================================================================ */
+
+/* Inline section grid - maintains natural chord flow */
+.section-inline-grid {
+    position: relative;
+}
+
+/* Section group wrapper - colored background with banner */
+.inline-section-group {
+    margin: 4px 0;
+}
+
+.section-group-wrapper {
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.section-group-wrapper:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+/* Section banner (top header) */
+.section-banner {
+    transition: all 0.15s ease;
+    z-index: 5;
+}
+
+.section-banner:hover {
+    filter: brightness(1.05);
+}
+
+.section-group-drag-handle {
+    cursor: grab;
+}
+
+.section-group-drag-handle:active {
+    cursor: grabbing;
+}
+
+/* Section banner label */
+.section-banner-label {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Section banner menu button */
+.section-banner-menu {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.section-banner:hover .section-banner-menu {
+    opacity: 1;
+}
+
+/* Cards area within section */
+.section-cards-area {
+    min-height: 50px;
+    transition: all 0.2s ease;
+}
+
+/* Cards inside sections get subtle visual distinction */
+.section-cards-area .chord-card-wrapper {
+    position: relative;
+}
+
+/* Drag feedback for section groups */
+.inline-section-group.sortable-ghost {
+    opacity: 0.5;
+}
+
+.inline-section-group.sortable-chosen {
+    transform: scale(1.02);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Drop zone indicator when dragging over section */
+.section-cards-area.drag-over {
+    background-color: rgba(99, 102, 241, 0.1);
+    outline: 2px dashed rgba(99, 102, 241, 0.5);
+    outline-offset: -2px;
+}
+
+/* Unified section container - wraps banner and cards */
+.section-unified-container {
+    min-width: fit-content;
+    display: inline-flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+/* Section banner - draggable header */
+.section-banner {
+    min-height: 28px;
+    user-select: none;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.section-banner:hover {
+    filter: brightness(1.1);
+}
+
+/* Section cards area - contains grouped cards */
+.section-cards-area {
+    min-height: 60px;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+}
+
+/* Cards inside a section - proper sizing for flex layout */
+.section-cards-area .chord-card-wrapper {
+    flex-shrink: 0; /* Don't shrink cards */
+    width: auto !important; /* Override the 100% width from grid layout */
+    min-width: 90px; /* Minimum card width */
+    max-width: 300px; /* Maximum for expanded cards */
+}
+
+/* Expanded cards inside sections - fit content width */
+.section-cards-area .chord-card-wrapper.expanded-card-wrapper,
+.section-cards-area .chord-card-wrapper.has-notation {
+    width: fit-content !important;
+    min-width: auto !important;
+    max-width: none !important;
+}
+
+/* Expanded cards - limit width growth everywhere */
+.expanded-card-wrapper {
+    min-width: auto !important;
+    width: fit-content !important;
+    flex-shrink: 0;
+}
+
+/* Expanded cards outside sections - use fit-content width */
+.chord-card-wrapper.has-notation {
+    width: fit-content !important;
+    flex-shrink: 0;
+}
+
+/* Drag over state for section cards area */
+.section-cards-area.drag-over {
+    background-color: rgba(99, 102, 241, 0.15) !important;
+    outline: 2px dashed rgba(99, 102, 241, 0.5);
+    outline-offset: -2px;
+}
+
+/* Section menu button */
+.section-menu-btn:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Ensure grid container allows overflow */
+[id$="-cards-grid"] {
+    overflow: visible;
+}
+
+/* Legacy support - individual card section styling */
+.chord-card-wrapper.in-section {
+    position: relative;
 }

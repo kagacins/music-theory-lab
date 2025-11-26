@@ -26,7 +26,14 @@ let trainerState = {
     tensionProfile: [],
     contextAwareMode: false, // Enable/disable context-aware chord suggestions
     progressionLookback: 4,   // Number of previous chords to analyze for context
-    selectedChordIndex: 0    // Currently selected chord card index (for persistent purple ring)
+    selectedChordIndex: 0,   // Currently selected chord card index (for persistent purple ring)
+
+    // Multi-select state for chord cards
+    selectedChordIndices: new Set(),  // Set of selected chord indices for multi-select
+    lastSelectedIndex: null,          // Last clicked index (for shift-click range selection)
+
+    // Clipboard for copy/paste operations
+    clipboard: null  // { type: 'chords'|'section', data: [...] }
 };
 
 // DEPRECATED: progressionData now in compositionState
@@ -233,6 +240,153 @@ export function setSelectedChordIndex(value) {
     trainerState.selectedChordIndex = value;
 }
 
+// ============================================================================
+// MULTI-SELECT STATE MANAGEMENT
+// ============================================================================
+
+/**
+ * Get all selected chord indices
+ * @returns {Set<number>} Set of selected indices
+ */
+export function getSelectedChordIndices() {
+    return trainerState.selectedChordIndices;
+}
+
+/**
+ * Check if a chord is selected
+ * @param {number} index - Chord index
+ * @returns {boolean} True if selected
+ */
+export function isChordSelected(index) {
+    return trainerState.selectedChordIndices.has(index);
+}
+
+/**
+ * Add a chord to the selection
+ * @param {number} index - Chord index to add
+ */
+export function addToSelection(index) {
+    trainerState.selectedChordIndices.add(index);
+    trainerState.lastSelectedIndex = index;
+}
+
+/**
+ * Remove a chord from the selection
+ * @param {number} index - Chord index to remove
+ */
+export function removeFromSelection(index) {
+    trainerState.selectedChordIndices.delete(index);
+}
+
+/**
+ * Toggle a chord's selection state
+ * @param {number} index - Chord index to toggle
+ * @returns {boolean} New selection state (true if now selected)
+ */
+export function toggleSelection(index) {
+    if (trainerState.selectedChordIndices.has(index)) {
+        trainerState.selectedChordIndices.delete(index);
+        return false;
+    } else {
+        trainerState.selectedChordIndices.add(index);
+        trainerState.lastSelectedIndex = index;
+        return true;
+    }
+}
+
+/**
+ * Clear all selections
+ */
+export function clearSelection() {
+    trainerState.selectedChordIndices.clear();
+    trainerState.lastSelectedIndex = null;
+}
+
+/**
+ * Select a single chord (clears other selections)
+ * @param {number} index - Chord index to select
+ */
+export function selectSingle(index) {
+    trainerState.selectedChordIndices.clear();
+    trainerState.selectedChordIndices.add(index);
+    trainerState.lastSelectedIndex = index;
+    trainerState.selectedChordIndex = index; // Also update primary selection
+}
+
+/**
+ * Select a range of chords (for shift-click)
+ * @param {number} fromIndex - Start of range
+ * @param {number} toIndex - End of range
+ */
+export function selectRange(fromIndex, toIndex) {
+    const start = Math.min(fromIndex, toIndex);
+    const end = Math.max(fromIndex, toIndex);
+    for (let i = start; i <= end; i++) {
+        trainerState.selectedChordIndices.add(i);
+    }
+    trainerState.lastSelectedIndex = toIndex;
+}
+
+/**
+ * Get the last selected index (for shift-click range selection)
+ * @returns {number|null} Last selected index or null
+ */
+export function getLastSelectedIndex() {
+    return trainerState.lastSelectedIndex;
+}
+
+/**
+ * Get selection count
+ * @returns {number} Number of selected chords
+ */
+export function getSelectionCount() {
+    return trainerState.selectedChordIndices.size;
+}
+
+/**
+ * Get selected indices as sorted array
+ * @returns {Array<number>} Sorted array of selected indices
+ */
+export function getSelectedIndicesArray() {
+    return Array.from(trainerState.selectedChordIndices).sort((a, b) => a - b);
+}
+
+// ============================================================================
+// CLIPBOARD STATE MANAGEMENT
+// ============================================================================
+
+/**
+ * Set clipboard content
+ * @param {string} type - 'chords' or 'section'
+ * @param {*} data - Data to store
+ */
+export function setClipboard(type, data) {
+    trainerState.clipboard = { type, data };
+}
+
+/**
+ * Get clipboard content
+ * @returns {{ type: string, data: * }|null} Clipboard content or null
+ */
+export function getClipboard() {
+    return trainerState.clipboard;
+}
+
+/**
+ * Clear clipboard
+ */
+export function clearClipboard() {
+    trainerState.clipboard = null;
+}
+
+/**
+ * Check if clipboard has content
+ * @returns {boolean} True if clipboard has content
+ */
+export function hasClipboard() {
+    return trainerState.clipboard !== null;
+}
+
 // Get complete trainer state
 export function getTrainerState() {
     return {
@@ -257,7 +411,10 @@ export function getTrainerState() {
         tensionProfile: trainerState.tensionProfile,
         contextAwareMode: trainerState.contextAwareMode,
         progressionLookback: trainerState.progressionLookback,
-        selectedChordIndex: trainerState.selectedChordIndex
+        selectedChordIndex: trainerState.selectedChordIndex,
+        selectedChordIndices: trainerState.selectedChordIndices,
+        lastSelectedIndex: trainerState.lastSelectedIndex,
+        clipboard: trainerState.clipboard
     };
 }
 
@@ -284,7 +441,10 @@ export function initializeTrainerState() {
         tensionProfile: [],
         contextAwareMode: false,
         progressionLookback: 4,
-        selectedChordIndex: 0
+        selectedChordIndex: 0,
+        selectedChordIndices: new Set(),
+        lastSelectedIndex: null,
+        clipboard: null
     };
 }
 

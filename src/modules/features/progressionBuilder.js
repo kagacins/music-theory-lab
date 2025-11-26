@@ -43,7 +43,24 @@ import {
     getTensionProfile,
     setTensionProfile,
     getSelectedChordIndex,
-    setSelectedChordIndex
+    setSelectedChordIndex,
+    // Multi-select state
+    getSelectedChordIndices,
+    isChordSelected,
+    addToSelection,
+    removeFromSelection,
+    toggleSelection,
+    clearSelection,
+    selectSingle,
+    selectRange,
+    getLastSelectedIndex,
+    getSelectionCount,
+    getSelectedIndicesArray,
+    // Clipboard state
+    setClipboard,
+    getClipboard,
+    clearClipboard,
+    hasClipboard
 } from '../state/trainerState.js';
 
 import {
@@ -833,13 +850,13 @@ export function toggleAllStaffNotation(showNotation) {
             // Add class to bypass CSS width constraints
             wrapper.classList.add('has-notation');
 
-            // Calculate dimensions and set width immediately
+            // Calculate dimensions and set width on the internal elements only
             const dimensions = calculateCanvasDimensions(key, chord.notes);
             card.style.minHeight = `${dimensions.height + 20}px`;
             card.style.minWidth = `${dimensions.width + 20}px`;
             notationView.style.minHeight = `${dimensions.height + 20}px`;
             notationView.style.minWidth = `${dimensions.width + 20}px`;
-            wrapper.style.minWidth = `${dimensions.width + 40}px`; // Set wrapper width
+            // Don't set wrapper.style.minWidth - let CSS handle via fit-content
 
             // Render notation on canvas
             requestAnimationFrame(() => {
@@ -2560,23 +2577,900 @@ export function renderProgressionDisplayForBuilder(container, progressionData, k
 
     if (!progressionData || progressionData.length === 0) return;
 
+    // Destroy existing Sortable instance before clearing
+    if (container.sortableInstance) {
+        try {
+            container.sortableInstance.destroy();
+            container.sortableInstance = null;
+        } catch (e) {
+            console.warn('Error destroying Sortable:', e);
+            container.sortableInstance = null;
+        }
+    }
+
     // Clear existing content
     container.innerHTML = '';
 
-    // Create card wrappers for each chord using the same functions as other tabs
+    // Check if we have sections
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    const hasSections = compositionState && compositionState.getSections().length > 0;
+
+    if (hasSections) {
+        // Override container classes for section-aware rendering
+        // Remove grid classes and use flexbox instead
+        container.className = 'flex flex-wrap items-start gap-2 p-2 bg-white rounded-lg border border-gray-200';
+        renderSectionAwareCards(container, progressionData, key, {
+            showActionButtons: showActionButtons
+        });
+        // Initialize sortable directly on the container
+        initializeSimplifiedSortable(container);
+    } else {
+        // Use grid for flat card rendering - keep original grid classes
+        container.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 p-2 bg-white rounded-lg border border-gray-200';
+        renderFlatCards(container, progressionData, key, {
+            showActionButtons: showActionButtons
+        });
+        // Initialize sortable directly on the container
+        initializeSimplifiedSortable(container);
+    }
+
+    // Update shift classes
+    requestAnimationFrame(() => {
+        updateCardShifts();
+    });
+}
+
+// ============================================================================
+// SONG SECTIONS UI - INLINE OVERLAY APPROACH
+// ============================================================================
+// Sections are rendered as colored background overlays behind sequential chord cards
+// maintaining the natural left-to-right flow of the progression.
+// Cards stay in a single horizontal grid - sections are indicated by colored
+// backgrounds and small label badges above the first card of each section.
+
+/**
+ * Render flat cards (no sections) into a grid container
+ * @param {HTMLElement} gridContainer - Grid container element
+ * @param {Array} progressionData - Chord progression data
+ * @param {string} key - Current key
+ * @param {Object} options - Rendering options
+ */
+function renderFlatCards(gridContainer, progressionData, key, options = {}) {
+    const { showActionButtons = true } = options;
+
+    if (!progressionData || progressionData.length === 0) return;
+
+    // Add "Add Chord" and "Clear All" buttons as first grid item
+    if (showActionButtons) {
+        const isMelodyComposer = gridContainer.id?.includes('melody');
+        const toggleFunction = isMelodyComposer ? 'toggleQuickAddChordMelody' : 'toggleQuickAddChord';
+
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'chord-card-wrapper flex flex-col justify-center items-center gap-2 p-2 bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl';
+        buttonContainer.innerHTML = `
+            <button onclick="window.${toggleFunction} && window.${toggleFunction}()"
+                    class="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    title="Add chord">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Add
+            </button>
+            <button onclick="window.clearProgression && window.clearProgression()"
+                    class="w-full px-3 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    title="Clear all">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"></path>
+                </svg>
+                Clear
+            </button>
+        `;
+        gridContainer.appendChild(buttonContainer);
+    }
+
+    // Create card wrappers for each chord
     progressionData.forEach((chord, index) => {
         const wrapper = createChordCardWrapper(chord, index, key);
-        container.appendChild(wrapper);
+        gridContainer.appendChild(wrapper);
     });
 
     // Update shift classes
     requestAnimationFrame(() => {
         updateCardShifts();
     });
-
-    // Make container sortable (same as other tabs)
-    initializeSimplifiedSortable(container);
 }
+
+/**
+ * Render cards with section indicators into a grid container
+ * Cards stay in horizontal flow, sections shown as colored backgrounds with labels
+ * @param {HTMLElement} gridContainer - Grid container element
+ * @param {Array} progressionData - Chord progression data
+ * @param {string} key - Current key
+ * @param {Object} options - Rendering options
+ */
+function renderSectionAwareCards(gridContainer, progressionData, key, options = {}) {
+    const { showActionButtons = true } = options;
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+
+    if (!progressionData || progressionData.length === 0) return;
+
+    // Get sections sorted by their first chord index
+    const sections = compositionState ? compositionState.getSections() : [];
+    const sortedSections = [...sections].sort((a, b) => {
+        const aMin = Math.min(...a.chordIndices);
+        const bMin = Math.min(...b.chordIndices);
+        return aMin - bMin;
+    });
+
+    // Build a map of chord index → section
+    const chordToSection = new Map();
+    sections.forEach(section => {
+        section.chordIndices.forEach(chordIdx => {
+            chordToSection.set(chordIdx, section);
+        });
+    });
+
+    // Add "Add Chord" and "Clear All" buttons as first item
+    if (showActionButtons) {
+        const isMelodyComposer = gridContainer.id?.includes('melody');
+        const toggleFunction = isMelodyComposer ? 'toggleQuickAddChordMelody' : 'toggleQuickAddChord';
+
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'chord-card-wrapper flex flex-col justify-center items-center gap-2 p-2 bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl';
+        buttonContainer.innerHTML = `
+            <button onclick="window.${toggleFunction} && window.${toggleFunction}()"
+                    class="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    title="Add chord">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Add
+            </button>
+            <button onclick="window.clearProgression && window.clearProgression()"
+                    class="w-full px-3 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    title="Clear all">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"></path>
+                </svg>
+                Clear
+            </button>
+        `;
+        gridContainer.appendChild(buttonContainer);
+    }
+
+    // Render cards in sequence, grouping adjacent section cards into containers
+    let i = 0;
+    while (i < progressionData.length) {
+        const section = chordToSection.get(i);
+
+        if (section) {
+            // This card is in a section - render the entire section as a unified container
+            const sectionContainer = createUnifiedSectionContainer(section, progressionData, key);
+            gridContainer.appendChild(sectionContainer);
+
+            // Skip all cards in this section
+            const maxIndex = Math.max(...section.chordIndices);
+            i = maxIndex + 1;
+        } else {
+            // Ungrouped card - render normally
+            const chord = progressionData[i];
+            const wrapper = createChordCardWrapper(chord, i, key);
+            gridContainer.appendChild(wrapper);
+            i++;
+        }
+    }
+
+    // Update shift classes
+    requestAnimationFrame(() => {
+        updateCardShifts();
+    });
+}
+
+/**
+ * Create a unified section container with banner and grouped cards
+ * @param {Object} section - Section object
+ * @param {Array} progressionData - Full progression data
+ * @param {string} key - Current key
+ * @returns {HTMLElement} Section container element
+ */
+function createUnifiedSectionContainer(section, progressionData, key) {
+    const container = document.createElement('div');
+    container.className = 'section-unified-container inline-flex flex-col rounded-lg overflow-visible';
+    container.setAttribute('data-section-id', section.id);
+    container.style.setProperty('--section-color', section.color);
+
+    // Draggable banner header
+    const banner = document.createElement('div');
+    banner.className = 'section-banner flex items-center gap-2 px-2 py-1 rounded-t-lg cursor-grab active:cursor-grabbing';
+    banner.style.backgroundColor = section.color;
+    banner.setAttribute('data-section-id', section.id);
+
+    banner.innerHTML = `
+        <svg class="w-3 h-3 text-white/70 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
+        </svg>
+        <span class="text-white text-xs font-semibold flex-grow">${section.label}</span>
+        <button class="section-menu-btn p-0.5 rounded hover:bg-white/20 transition"
+                onclick="event.stopPropagation(); window.showSectionMenu && window.showSectionMenu(event, '${section.id}')"
+                title="Section options">
+            <svg class="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
+            </svg>
+        </button>
+    `;
+
+    container.appendChild(banner);
+
+    // Cards container with colored background - force horizontal layout with inline styles
+    const cardsArea = document.createElement('div');
+    cardsArea.className = 'section-cards-area items-start gap-2 p-2 rounded-b-lg';
+    // Force horizontal layout with inline styles to avoid CSS specificity issues
+    cardsArea.style.display = 'flex';
+    cardsArea.style.flexDirection = 'row';
+    cardsArea.style.flexWrap = 'wrap';
+    cardsArea.style.backgroundColor = section.color + '20'; // 20% opacity
+    cardsArea.style.borderLeft = `3px solid ${section.color}`;
+    cardsArea.style.borderRight = `3px solid ${section.color}`;
+    cardsArea.style.borderBottom = `3px solid ${section.color}`;
+    cardsArea.setAttribute('data-section-id', section.id);
+
+    // Render cards in this section
+    section.chordIndices.forEach(chordIdx => {
+        if (chordIdx < progressionData.length) {
+            const chord = progressionData[chordIdx];
+            const wrapper = createChordCardWrapper(chord, chordIdx, key);
+            wrapper.setAttribute('data-in-section', section.id);
+            cardsArea.appendChild(wrapper);
+        }
+    });
+
+    container.appendChild(cardsArea);
+
+    // Initialize Sortable on the cards area for dragging cards within/out of section
+    if (typeof Sortable !== 'undefined') {
+        cardsArea.sortableInstance = new Sortable(cardsArea, {
+            group: {
+                name: 'progression-cards',  // MUST match other sortables for cross-container drag
+                pull: true,
+                put: function(to, from, dragEl) {
+                    // Only accept chord cards, NOT section containers
+                    return dragEl.classList.contains('chord-card-wrapper') &&
+                           dragEl.hasAttribute('data-chord-index');
+                }
+            },
+            animation: 200,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            dragClass: 'sortable-drag',
+            handle: '.drag-handle',
+            draggable: '.chord-card-wrapper[data-chord-index]',
+            swapThreshold: 0.65,
+            // Handle cards added FROM outside (ungrouped or another section) INTO this section
+            onAdd: function(evt) {
+                console.log('%c[Section onAdd] Card added to section', 'color: #00ff00; font-weight: bold', section.id);
+                handleCardDragWithinSection(evt, evt.from.getAttribute('data-section-id'));
+            },
+            onEnd: function(evt) {
+                // Only handle reorders within this section
+                // Cross-container moves are handled by onAdd
+                if (evt.from !== evt.to) {
+                    console.log('[Section onEnd] Cross-container move - handled by onAdd');
+                    return;
+                }
+                // Handle card movement within this section
+                handleCardDragWithinSection(evt, section.id);
+            }
+        });
+    }
+
+    return container;
+}
+
+/**
+ * Render progression with song sections (legacy wrapper - calls new functions)
+ * @deprecated Use renderSectionAwareCards directly
+ */
+function renderProgressionWithSections(container, progressionData, key, options = {}) {
+    // This is now handled by the main renderProgressionDisplay function
+    // which restructures the container and calls renderSectionAwareCards
+    console.warn('[renderProgressionWithSections] This function is deprecated. Use renderProgressionDisplay instead.');
+}
+
+/**
+ * Create the section toolbar with Add Section button
+ * @param {string} containerId - Container ID for targeting
+ * @returns {HTMLElement} Toolbar element
+ */
+function createSectionToolbar(containerId) {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'section-toolbar flex items-center gap-2 p-2 mb-2 bg-gray-50 rounded-lg border border-gray-200';
+
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    const sectionTypes = compositionState ? compositionState.constructor.SECTION_TYPES : {};
+
+    toolbar.innerHTML = `
+        <button class="add-section-btn flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-md transition"
+                onclick="window.showAddSectionMenu && window.showAddSectionMenu(event, '${containerId}')">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Add Section
+        </button>
+        <span class="text-xs text-gray-500 ml-2">
+            Select adjacent chords, then add to a section
+        </span>
+    `;
+
+    return toolbar;
+}
+
+/**
+ * Create a section element with header and card container
+ * @param {Object} section - Section data
+ * @param {number} sectionIndex - Index in sections array
+ * @param {Array} progressionData - Full progression data
+ * @param {string} key - Current key
+ * @returns {HTMLElement} Section element
+ */
+function createSectionElement(section, sectionIndex, progressionData, key) {
+    const sectionEl = document.createElement('div');
+    sectionEl.className = `section-wrapper mb-3 ${section.collapsed ? 'collapsed' : ''}`;
+    sectionEl.setAttribute('data-section-id', section.id);
+    sectionEl.setAttribute('data-section-index', sectionIndex);
+
+    // Section header
+    const header = document.createElement('div');
+    header.className = 'section-header flex items-center gap-2 px-3 py-2 rounded-t-lg cursor-pointer select-none';
+    header.style.backgroundColor = section.color + '20'; // 20 = 12.5% opacity
+    header.style.borderLeft = `4px solid ${section.color}`;
+
+    header.innerHTML = `
+        <button class="section-collapse-btn text-gray-500 hover:text-gray-700 transition p-0.5"
+                onclick="window.toggleSectionCollapse && window.toggleSectionCollapse('${section.id}')">
+            <svg class="w-4 h-4 transform transition-transform ${section.collapsed ? '-rotate-90' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+        <span class="section-color-dot w-3 h-3 rounded-full" style="background-color: ${section.color}"></span>
+        <span class="section-label text-sm font-semibold text-gray-700 flex-1"
+              ondblclick="window.editSectionLabel && window.editSectionLabel('${section.id}', this)">
+            ${section.label}
+        </span>
+        <span class="section-chord-count text-xs text-gray-400">${section.chordIndices.length} chords</span>
+        <button class="section-menu-btn text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-200 transition"
+                onclick="window.showSectionMenu && window.showSectionMenu(event, '${section.id}')">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path>
+            </svg>
+        </button>
+    `;
+
+    // Make header draggable for section reordering
+    header.classList.add('section-drag-handle');
+
+    sectionEl.appendChild(header);
+
+    // Cards container (collapsible)
+    const cardsContainer = document.createElement('div');
+    cardsContainer.className = `section-cards-container grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 p-2 rounded-b-lg border border-t-0 ${section.collapsed ? 'hidden' : ''}`;
+    cardsContainer.style.borderColor = section.color + '40';
+    cardsContainer.setAttribute('data-section-id', section.id);
+
+    // Render chords in this section
+    section.chordIndices.forEach(chordIndex => {
+        if (chordIndex < progressionData.length) {
+            const chord = progressionData[chordIndex];
+            const wrapper = createChordCardWrapper(chord, chordIndex, key);
+            // Add section membership indicator
+            wrapper.setAttribute('data-in-section', section.id);
+            cardsContainer.appendChild(wrapper);
+        }
+    });
+
+    // Add drop zone indicator for empty sections
+    if (section.chordIndices.length === 0) {
+        const emptyIndicator = document.createElement('div');
+        emptyIndicator.className = 'section-empty-indicator flex items-center justify-center p-4 text-xs text-gray-400 border-2 border-dashed border-gray-300 rounded-lg';
+        emptyIndicator.textContent = 'Drag chords here';
+        cardsContainer.appendChild(emptyIndicator);
+    }
+
+    sectionEl.appendChild(cardsContainer);
+
+    return sectionEl;
+}
+
+/**
+ * Create the ungrouped chords section
+ * @param {Array} ungroupedIndices - Indices of ungrouped chords
+ * @param {Array} progressionData - Full progression data
+ * @param {string} key - Current key
+ * @param {boolean} showActionButtons - Whether to show add/clear buttons
+ * @returns {HTMLElement} Ungrouped section element
+ */
+function createUngroupedSection(ungroupedIndices, progressionData, key, showActionButtons) {
+    const sectionEl = document.createElement('div');
+    sectionEl.className = 'ungrouped-section mt-2';
+    sectionEl.setAttribute('data-section-id', 'ungrouped');
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'ungrouped-header flex items-center gap-2 px-3 py-1.5 text-gray-500';
+    header.innerHTML = `
+        <span class="text-xs font-medium uppercase tracking-wide">Ungrouped</span>
+        <span class="text-xs text-gray-400">(${ungroupedIndices.length})</span>
+    `;
+    sectionEl.appendChild(header);
+
+    // Cards container
+    const cardsContainer = document.createElement('div');
+    cardsContainer.className = 'ungrouped-cards-container grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 p-2 bg-gray-50 rounded-lg border border-dashed border-gray-300';
+    cardsContainer.setAttribute('data-section-id', 'ungrouped');
+
+    // Add action buttons if requested
+    if (showActionButtons) {
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'chord-card-wrapper flex flex-col justify-center items-center gap-2 p-2 bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl';
+        buttonContainer.innerHTML = `
+            <button onclick="window.toggleQuickAddChord && window.toggleQuickAddChord()"
+                    class="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    title="Add chord">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Add
+            </button>
+            <button onclick="window.clearProgression && window.clearProgression()"
+                    class="w-full px-3 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    title="Clear all">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"></path>
+                </svg>
+                Clear
+            </button>
+        `;
+        cardsContainer.appendChild(buttonContainer);
+    }
+
+    // Render ungrouped chords
+    ungroupedIndices.forEach(chordIndex => {
+        if (chordIndex < progressionData.length) {
+            const chord = progressionData[chordIndex];
+            const wrapper = createChordCardWrapper(chord, chordIndex, key);
+            cardsContainer.appendChild(wrapper);
+        }
+    });
+
+    sectionEl.appendChild(cardsContainer);
+    return sectionEl;
+}
+
+/**
+ * Create empty state with action buttons when no progression
+ * @param {string} containerId - Container ID
+ * @returns {HTMLElement} Empty state element
+ */
+function createEmptyProgressionState(containerId) {
+    const emptyState = document.createElement('div');
+    emptyState.className = 'empty-progression-state flex flex-col items-center justify-center p-8 text-center';
+    emptyState.innerHTML = `
+        <p class="text-gray-500 text-sm mb-4">No chords in progression</p>
+        <button onclick="window.toggleQuickAddChord && window.toggleQuickAddChord()"
+                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow transition flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Add First Chord
+        </button>
+    `;
+    return emptyState;
+}
+
+/**
+ * Initialize SortableJS for sections and their card containers
+ * @param {HTMLElement} container - Main container
+ */
+function initializeSectionSortables(container) {
+    if (typeof Sortable === 'undefined') {
+        console.warn('[initializeSectionSortables] Sortable library not loaded!');
+        return;
+    }
+
+    // Initialize sortable for section reordering
+    const sectionsContainer = container.querySelector('.sections-container');
+    if (sectionsContainer) {
+        // Section-level sortable (reorder sections)
+        const sectionWrappers = sectionsContainer.querySelectorAll('.section-wrapper');
+        if (sectionWrappers.length > 1) {
+            if (sectionsContainer.sectionSortable) {
+                sectionsContainer.sectionSortable.destroy();
+            }
+            sectionsContainer.sectionSortable = new Sortable(sectionsContainer, {
+                animation: 200,
+                handle: '.section-drag-handle',
+                draggable: '.section-wrapper',
+                ghostClass: 'section-ghost',
+                onEnd: function(evt) {
+                    handleSectionReorder(evt.oldIndex - 1, evt.newIndex - 1); // -1 to account for toolbar
+                }
+            });
+        }
+    }
+
+    // Initialize sortable for each section's cards container
+    const cardContainers = container.querySelectorAll('.section-cards-container, .ungrouped-cards-container');
+    cardContainers.forEach(cardContainer => {
+        if (cardContainer.sortableInstance) {
+            cardContainer.sortableInstance.destroy();
+        }
+
+        cardContainer.sortableInstance = new Sortable(cardContainer, {
+            group: {
+                name: 'progression-cards',  // MUST match other sortables for cross-container drag
+                pull: true,
+                put: function(to, from, dragEl) {
+                    // Only accept chord cards, NOT section containers
+                    return dragEl.classList.contains('chord-card-wrapper') &&
+                           dragEl.hasAttribute('data-chord-index');
+                }
+            },
+            animation: 200,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            dragClass: 'sortable-drag',
+            handle: '.drag-handle',
+            filter: '.section-empty-indicator, .chord-card-wrapper:not([data-chord-index])',
+            onStart: function(evt) {
+                // Handle multi-select drag
+                const selectedCount = getSelectionCount();
+                if (selectedCount > 1) {
+                    evt.item.setAttribute('data-dragging-count', selectedCount);
+                }
+            },
+            // Handle cards added FROM outside INTO this container
+            onAdd: function(evt) {
+                console.log('%c[Legacy onAdd] Card added to container', 'color: #00ff00');
+                handleChordMoveToSection(evt);
+            },
+            onEnd: function(evt) {
+                // Only handle reorders within this container
+                if (evt.from !== evt.to) {
+                    console.log('[Legacy onEnd] Cross-container move - handled by onAdd');
+                    return;
+                }
+                handleChordMoveToSection(evt);
+            }
+        });
+    });
+}
+
+/**
+ * Handle section reorder after drag
+ * @param {number} oldIndex - Original section index
+ * @param {number} newIndex - New section index
+ */
+function handleSectionReorder(oldIndex, newIndex) {
+    if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    compositionState.reorderSections(oldIndex, newIndex);
+
+    // Re-render
+    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', false);
+}
+
+/**
+ * Handle chord move between sections after drag
+ * @param {Object} evt - Sortable event
+ */
+function handleChordMoveToSection(evt) {
+    const item = evt.item;
+    const chordIndex = parseInt(item.getAttribute('data-chord-index'), 10);
+    const fromSectionId = evt.from.getAttribute('data-section-id');
+    const toSectionId = evt.to.getAttribute('data-section-id');
+
+    if (isNaN(chordIndex)) return;
+
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    // Get the new position within the target section
+    const siblings = Array.from(evt.to.querySelectorAll('.chord-card-wrapper[data-chord-index]'));
+    const newPosition = siblings.indexOf(item);
+
+    // Handle multi-select move
+    const selectedIndices = getSelectedIndicesArray();
+    if (selectedIndices.length > 1 && selectedIndices.includes(chordIndex)) {
+        // Move all selected chords
+        selectedIndices.forEach((idx, i) => {
+            if (toSectionId === 'ungrouped') {
+                compositionState.removeChordFromSection(idx);
+            } else {
+                compositionState.addChordToSection(idx, toSectionId, newPosition + i);
+            }
+        });
+    } else {
+        // Single chord move
+        if (toSectionId === 'ungrouped') {
+            compositionState.removeChordFromSection(chordIndex);
+        } else {
+            compositionState.addChordToSection(chordIndex, toSectionId, newPosition);
+        }
+    }
+
+    // Re-render
+    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', false);
+}
+
+// ============================================================================
+// SECTION MANAGEMENT FUNCTIONS (exposed to window)
+// ============================================================================
+
+/**
+ * Show the add section menu/dropdown
+ * @param {Event} event - Click event
+ * @param {string} containerId - Container ID
+ */
+window.showAddSectionMenu = function(event, containerId) {
+    event.stopPropagation();
+
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    const sectionTypes = compositionState.constructor.SECTION_TYPES;
+
+    // Remove existing menu if any
+    const existingMenu = document.querySelector('.section-type-menu');
+    if (existingMenu) existingMenu.remove();
+
+    // Create menu
+    const menu = document.createElement('div');
+    menu.className = 'section-type-menu absolute z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]';
+
+    // Position near the button
+    const rect = event.target.closest('button').getBoundingClientRect();
+    menu.style.left = `${rect.left}px`;
+    menu.style.top = `${rect.bottom + 4}px`;
+
+    // Add menu items for each section type
+    Object.entries(sectionTypes).forEach(([typeKey, typeInfo]) => {
+        const item = document.createElement('button');
+        item.className = 'w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 transition';
+        item.innerHTML = `
+            <span class="w-3 h-3 rounded-full" style="background-color: ${typeInfo.color}"></span>
+            <span>${typeInfo.label}</span>
+        `;
+        item.onclick = () => {
+            menu.remove();
+            createNewSection(typeKey, containerId);
+        };
+        menu.appendChild(item);
+    });
+
+    document.body.appendChild(menu);
+
+    // Close menu on outside click
+    const closeMenu = (e) => {
+        if (!menu.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closeMenu), 0);
+};
+
+/**
+ * Create a new section (optionally with selected chords)
+ * Only allows adjacent chords to be grouped
+ * @param {string} type - Section type
+ * @param {string} containerId - Container ID
+ */
+function createNewSection(type, containerId) {
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    // Get selected chord indices (already sorted)
+    const selectedIndices = getSelectedIndicesArray();
+
+    // If we have selected indices, validate they are adjacent
+    if (selectedIndices.length > 1) {
+        // Check for adjacency - each index should be exactly 1 more than the previous
+        for (let i = 1; i < selectedIndices.length; i++) {
+            if (selectedIndices[i] !== selectedIndices[i - 1] + 1) {
+                // Non-adjacent selection - show warning and only use the first contiguous range
+                console.warn('[createNewSection] Non-adjacent chords selected. Using first contiguous range.');
+
+                // Find first contiguous range
+                const contiguousRange = [selectedIndices[0]];
+                for (let j = 1; j < selectedIndices.length; j++) {
+                    if (selectedIndices[j] === contiguousRange[contiguousRange.length - 1] + 1) {
+                        contiguousRange.push(selectedIndices[j]);
+                    } else {
+                        break;
+                    }
+                }
+
+                // Show a toast/notification to the user
+                if (window.showNotification) {
+                    window.showNotification('Only adjacent chords can be grouped. Using first contiguous selection.', 'warning');
+                }
+
+                // Use only the contiguous range
+                compositionState.createSection(type, contiguousRange);
+                clearSelection();
+                renderProgressionDisplay('progression-visualization', true);
+                renderProgressionDisplay('melody-progression-visualization', false);
+                return;
+            }
+        }
+    }
+
+    // All indices are adjacent (or single/empty) - create section
+    compositionState.createSection(type, selectedIndices);
+
+    // Clear selection
+    clearSelection();
+
+    // Re-render
+    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', false);
+}
+
+/**
+ * Toggle section collapse state
+ * @param {string} sectionId - Section ID
+ */
+window.toggleSectionCollapse = function(sectionId) {
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    const section = compositionState.getSection(sectionId);
+    if (!section) return;
+
+    compositionState.updateSection(sectionId, { collapsed: !section.collapsed });
+
+    // Re-render
+    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', false);
+};
+
+/**
+ * Edit section label inline
+ * @param {string} sectionId - Section ID
+ * @param {HTMLElement} labelElement - Label element to edit
+ */
+window.editSectionLabel = function(sectionId, labelElement) {
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    const section = compositionState.getSection(sectionId);
+    if (!section) return;
+
+    const currentLabel = section.label;
+
+    // Replace label with input
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentLabel;
+    input.className = 'section-label-input text-sm font-semibold text-gray-700 bg-white border border-indigo-500 rounded px-1 py-0.5 outline-none';
+    input.style.width = `${Math.max(currentLabel.length * 8 + 16, 80)}px`;
+
+    labelElement.replaceWith(input);
+    input.focus();
+    input.select();
+
+    const saveLabel = () => {
+        const newLabel = input.value.trim() || currentLabel;
+        compositionState.updateSection(sectionId, { label: newLabel });
+
+        // Re-render
+        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', false);
+    };
+
+    input.addEventListener('blur', saveLabel);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            input.blur();
+        } else if (e.key === 'Escape') {
+            input.value = currentLabel;
+            input.blur();
+        }
+    });
+};
+
+/**
+ * Show section context menu
+ * @param {Event} event - Click event
+ * @param {string} sectionId - Section ID
+ */
+window.showSectionMenu = function(event, sectionId) {
+    event.stopPropagation();
+
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    const section = compositionState.getSection(sectionId);
+    if (!section) return;
+
+    // Remove existing menu if any
+    const existingMenu = document.querySelector('.section-context-menu');
+    if (existingMenu) existingMenu.remove();
+
+    // Create context menu
+    const menu = document.createElement('div');
+    menu.className = 'section-context-menu fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]';
+
+    // Get button position (getBoundingClientRect returns viewport-relative coords)
+    const button = event.target.closest('button') || event.target;
+    const rect = button.getBoundingClientRect();
+
+    // Position menu below the button, aligned to left edge
+    menu.style.left = `${rect.left}px`;
+    menu.style.top = `${rect.bottom + 4}px`;
+
+    // Ensure menu stays within viewport
+    requestAnimationFrame(() => {
+        const menuRect = menu.getBoundingClientRect();
+        if (menuRect.right > window.innerWidth) {
+            menu.style.left = `${window.innerWidth - menuRect.width - 8}px`;
+        }
+        if (menuRect.bottom > window.innerHeight) {
+            menu.style.top = `${rect.top - menuRect.height - 4}px`;
+        }
+    });
+
+    const menuItems = [
+        { label: 'Rename', icon: 'M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z', action: () => {
+            const labelEl = document.querySelector(`[data-section-id="${sectionId}"] .section-label`);
+            if (labelEl) window.editSectionLabel(sectionId, labelEl);
+        }},
+        { label: 'Duplicate', icon: 'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z', action: () => {
+            compositionState.duplicateSection(sectionId);
+            renderProgressionDisplay('progression-visualization', true);
+            renderProgressionDisplay('melody-progression-visualization', false);
+        }},
+        { label: 'Delete Section', icon: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16', action: () => {
+            if (confirm(`Delete "${section.label}"? Chords will become ungrouped.`)) {
+                compositionState.deleteSection(sectionId);
+                renderProgressionDisplay('progression-visualization', true);
+                renderProgressionDisplay('melody-progression-visualization', false);
+            }
+        }, danger: true }
+    ];
+
+    menuItems.forEach(item => {
+        const btn = document.createElement('button');
+        btn.className = `w-full px-3 py-2 text-left text-sm flex items-center gap-2 transition ${item.danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-100'}`;
+        btn.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${item.icon}"></path>
+            </svg>
+            <span>${item.label}</span>
+        `;
+        btn.onclick = () => {
+            menu.remove();
+            item.action();
+        };
+        menu.appendChild(btn);
+    });
+
+    document.body.appendChild(menu);
+
+    // Close menu on outside click
+    const closeMenu = (e) => {
+        if (!menu.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closeMenu), 0);
+};
 
 /**
  * Create a chord card wrapper (holds either simplified or detailed view)
@@ -2610,12 +3504,8 @@ function createChordCardWrapper(chord, index, key) {
                 if (detailedCard) {
                     detailedCard.style.minWidth = `${dimensions.width + 20}px`;
                 }
-                // Also set wrapper width so it takes up space in grid
-                // Use extra padding for expanded cards to prevent overlap
-                wrapper.style.minWidth = `${dimensions.width + 80}px`;
-
-                // Force layout by reading dimensions
-                wrapper.getBoundingClientRect();
+                // Don't set wrapper minWidth - CSS handles it via fit-content
+                // Setting minWidth causes excessive whitespace between cards
 
                 // Update card shifts after layout is applied
                 requestAnimationFrame(() => {
@@ -3187,25 +4077,8 @@ function attachCardEventListeners(wrapper, index) {
     if (expandBtn) {
         expandBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            
-            // Preserve transform before expanding
-            const currentShift = wrapper.style.getPropertyValue('--card-shift') || '';
-            const currentTransform = wrapper.style.transform || '';
-            const hadShiftClass = wrapper.classList.contains('shift-right');
-            
             expandChordCard(index);
-            
-            // Restore transform immediately after expansion
-            if (currentShift) {
-                requestAnimationFrame(() => {
-                    wrapper.style.setProperty('--card-shift', currentShift);
-                    wrapper.style.transform = currentTransform || `translateX(${currentShift})`;
-                    if (hadShiftClass) {
-                        wrapper.classList.add('shift-right');
-                    }
-                    updateCardShifts();
-                });
-            }
+            // No longer need to preserve transforms - flexbox/grid handles layout
         });
     }
 
@@ -3219,30 +4092,7 @@ function attachCardEventListeners(wrapper, index) {
 
     // Play button
     if (playBtn) {
-        // Helper function to preserve transform when button is clicked
-        const preserveTransform = () => {
-            const currentShift = wrapper.style.getPropertyValue('--card-shift') || '';
-            const currentTransform = wrapper.style.transform || '';
-            const hadShiftClass = wrapper.classList.contains('shift-right');
-            
-            if (currentShift) {
-                wrapper.style.setProperty('--card-shift', currentShift);
-                wrapper.style.transform = currentTransform || `translateX(${currentShift})`;
-                if (hadShiftClass) {
-                    wrapper.classList.add('shift-right');
-                }
-            } else if (currentTransform) {
-                wrapper.style.transform = currentTransform;
-                if (hadShiftClass) {
-                    wrapper.classList.add('shift-right');
-                }
-            }
-        };
-        
         playBtn.addEventListener('mousedown', () => {
-            // Preserve transform before any operations
-            preserveTransform();
-
             // Select this card (persistent purple ring)
             selectChordCard(index);
 
@@ -3252,46 +4102,23 @@ function attachCardEventListeners(wrapper, index) {
                 highlightTensionPoint(index);
                 highlightChordCard(index);
             }
-
-            // Ensure transform is maintained after highlighting
-            requestAnimationFrame(() => {
-                preserveTransform();
-            });
         });
         playBtn.addEventListener('mouseup', () => {
-            // Preserve transform
-            preserveTransform();
-
             if (window.stopTrainerChord) window.stopTrainerChord();
             // Remove playback highlighting but keep selection (purple ring persists)
             unhighlightAllTensionPoints();
             unhighlightAllChordCards();
-
-            // Ensure transform is maintained
-            requestAnimationFrame(() => {
-                preserveTransform();
-            });
         });
         playBtn.addEventListener('mouseleave', () => {
-            // Preserve transform
-            preserveTransform();
-
             if (window.stopTrainerChord) window.stopTrainerChord();
             // Remove playback highlighting but keep selection (purple ring persists)
             unhighlightAllTensionPoints();
             unhighlightAllChordCards();
-
-            // Ensure transform is maintained
-            requestAnimationFrame(() => {
-                preserveTransform();
-            });
         });
-        
+
         // Also handle touch events
         playBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            preserveTransform();
-
             // Select this card (persistent purple ring)
             selectChordCard(index);
 
@@ -3300,80 +4127,53 @@ function attachCardEventListeners(wrapper, index) {
                 highlightTensionPoint(index);
                 highlightChordCard(index);
             }
-
-            requestAnimationFrame(() => {
-                preserveTransform();
-            });
         }, { passive: false });
 
         playBtn.addEventListener('touchend', (e) => {
             e.preventDefault();
-            preserveTransform();
-
             if (window.stopTrainerChord) window.stopTrainerChord();
             // Remove playback highlighting but keep selection (purple ring persists)
             unhighlightAllTensionPoints();
             unhighlightAllChordCards();
-
-            requestAnimationFrame(() => {
-                preserveTransform();
-            });
         }, { passive: false });
     }
 
     // Delete button
     if (deleteBtn) {
         deleteBtn.addEventListener('click', () => {
-            // Preserve transform before deletion (though card will be removed anyway)
-            const currentShift = wrapper.style.getPropertyValue('--card-shift') || '';
-            const currentTransform = wrapper.style.transform || '';
-            const hadShiftClass = wrapper.classList.contains('shift-right');
-            
             if (window.removeChordFromProgression) {
                 window.removeChordFromProgression(index);
             }
-            
-            // After deletion, update shifts for remaining cards
-            requestAnimationFrame(() => {
-                updateCardShifts();
-            });
         });
     }
 
     // Add click handler to simplified and detailed cards
     // Clicking anywhere on the card (except buttons) selects it WITHOUT playing
+    // Supports multi-select with Ctrl/Cmd+click and Shift+click
     const clickableCards = wrapper.querySelectorAll('.simplified-card, .detailed-card');
     clickableCards.forEach(card => {
         card.addEventListener('click', (e) => {
             // Don't interfere with button clicks, inputs, or selects - they have their own handlers
             if (e.target.closest('button') || e.target.closest('select') || e.target.closest('input')) return;
 
-            // Preserve the current shift immediately to prevent visual flash
-            const currentShift = wrapper.style.getPropertyValue('--card-shift') || '';
-            const currentTransform = wrapper.style.transform || '';
-            const hadShiftClass = wrapper.classList.contains('shift-right');
+            // Handle multi-select with Ctrl/Cmd+click or Shift+click
+            const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+            const isShift = e.shiftKey;
 
-            // Select this card (persistent purple ring) - NO playback, only selection
-            selectChordCard(index);
-
-            // Restore shift immediately using CSS custom property (persists even if inline style is reset)
-            if (currentShift) {
-                wrapper.style.setProperty('--card-shift', currentShift);
-                wrapper.style.transform = currentTransform || `translateX(${currentShift})`;
-                if (hadShiftClass) {
-                    wrapper.classList.add('shift-right');
-                }
-            } else if (currentTransform) {
-                wrapper.style.transform = currentTransform;
-                if (hadShiftClass) {
-                    wrapper.classList.add('shift-right');
-                }
+            if (isCtrlOrCmd) {
+                // Ctrl/Cmd+click: Toggle this card in multi-selection
+                handleMultiSelectToggle(index);
+            } else if (isShift) {
+                // Shift+click: Range select from last selected
+                handleMultiSelectRange(index);
+            } else {
+                // Normal click: Clear multi-selection and select single card
+                clearSelection();
+                selectChordCard(index);
+                // Also add to multi-select state for consistency
+                selectSingle(index);
             }
-
-            // Then recalculate shifts properly after any potential updates
-            requestAnimationFrame(() => {
-                updateCardShifts();
-            });
+            // No longer need to preserve transforms - flexbox/grid handles layout
         });
     });
 
@@ -4035,7 +4835,25 @@ function updateContainerShifts(container) {
     // Use double requestAnimationFrame to ensure DOM is fully rendered and all updates are complete
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-            const allWrappers = Array.from(container.querySelectorAll('.chord-card-wrapper[data-chord-index]'));
+            // Get the grid container (may be nested inside main container)
+            const gridContainer = container.querySelector('[id$="-cards-grid"]') || container;
+
+            // Check if we have sections - if so, use flexbox layout and skip manual shifting
+            // Flexbox handles layout naturally without needing transform shifts
+            const hasSections = gridContainer.querySelector('.section-unified-container') !== null;
+            if (hasSections) {
+                // Clear any existing shifts since flexbox handles layout
+                const allWrappers = gridContainer.querySelectorAll('.chord-card-wrapper[data-chord-index]');
+                allWrappers.forEach(wrapper => {
+                    wrapper.classList.remove('shift-right');
+                    wrapper.style.removeProperty('--card-shift');
+                    wrapper.style.transform = '';
+                });
+                return;
+            }
+
+            // For grid layouts without sections, apply manual shifting for expanded cards
+            const allWrappers = Array.from(gridContainer.querySelectorAll(':scope > .chord-card-wrapper[data-chord-index]'));
 
             if (allWrappers.length === 0) return;
 
@@ -4072,38 +4890,27 @@ function updateContainerShifts(container) {
                 return;
             }
 
-            // Calculate accumulated shift for each card based on actual card widths
-            // Any card wider than baseline causes subsequent cards to shift
-            allWrappers.forEach((wrapper, idx) => {
-                let accumulatedShift = 0;
-
-                // Check each previous card to see if it's wider than baseline
-                for (let i = 0; i < idx; i++) {
-                    const prevWrapper = allWrappers[i];
-                    const prevWidth = prevWrapper.offsetWidth;
-
-                    // If previous card is wider than baseline, shift this card
-                    if (prevWidth > baselineWidth + 10) { // 10px tolerance
-                        const extraWidth = prevWidth - baselineWidth;
-                        const shiftAmount = extraWidth + 16; // Full extra width + 16px gap for clear separation
-                        accumulatedShift += shiftAmount;
-                    }
-                }
-
-                // Apply shift if needed using CSS custom property to persist transform
-                // This prevents flash when inline styles are reset
-                if (accumulatedShift > 0) {
-                    wrapper.classList.add('shift-right');
-                    // Set CSS custom property which persists even if inline style is reset
-                    wrapper.style.setProperty('--card-shift', `${accumulatedShift}px`);
-                    // Also set inline transform as backup
-                    wrapper.style.transform = `translateX(${accumulatedShift}px)`;
-                } else {
+            // For flexbox layouts (when using flex container), don't apply manual shifting
+            // Flexbox handles spacing naturally via gap property
+            const isFlexLayout = gridContainer.classList.contains('flex');
+            if (isFlexLayout) {
+                // Clear any existing shifts since flexbox handles layout
+                allWrappers.forEach(wrapper => {
                     wrapper.classList.remove('shift-right');
-                    // Clear CSS custom property
                     wrapper.style.removeProperty('--card-shift');
                     wrapper.style.transform = '';
-                }
+                });
+                return;
+            }
+
+            // For CSS Grid layouts, the grid handles card placement automatically
+            // We don't need manual shifting - expanded cards will span their cell
+            // and grid flow handles the rest
+            // Clear any existing shifts
+            allWrappers.forEach(wrapper => {
+                wrapper.classList.remove('shift-right');
+                wrapper.style.removeProperty('--card-shift');
+                wrapper.style.transform = '';
             });
         });
     });
@@ -4143,12 +4950,7 @@ function expandChordCard(index) {
                 if (detailedCard) {
                     detailedCard.style.minWidth = `${dimensions.width + 20}px`;
                 }
-                // Also set wrapper width so it takes up space in grid
-                // Use extra padding for expanded cards to prevent overlap
-                wrapper.style.minWidth = `${dimensions.width + 80}px`;
-
-                // Force layout by reading dimensions
-                wrapper.getBoundingClientRect();
+                // Don't set wrapper minWidth - CSS handles it via fit-content
 
                 // Update card shifts after layout is applied
                 requestAnimationFrame(() => {
@@ -4156,13 +4958,9 @@ function expandChordCard(index) {
                 });
             }
         });
-
-        // Force layout by reading dimensions
-        wrapper.getBoundingClientRect();
     });
 
     // Update shifts for all cards after layout is applied
-    // (will be called again after notation renders and sets minWidth)
     requestAnimationFrame(() => {
         updateCardShifts();
     });
@@ -4306,11 +5104,6 @@ function updateSingleCard(index) {
 function updateSingleCardWrapper(wrapper, chord, index, key) {
     if (!wrapper || !chord) return;
 
-    // Preserve the current shift before updating to prevent visual flash
-    const currentShift = wrapper.style.getPropertyValue('--card-shift') || '';
-    const currentTransform = wrapper.style.transform || '';
-    const hadShiftClass = wrapper.classList.contains('shift-right');
-
     // Check if this card is currently expanded
     const isExpanded = expandedChords.has(index);
 
@@ -4336,17 +5129,7 @@ function updateSingleCardWrapper(wrapper, chord, index, key) {
                 if (detailedCard) {
                     detailedCard.style.minWidth = `${dimensions.width + 20}px`;
                 }
-                // Also set wrapper width so it takes up space in grid
-                // Use extra padding for expanded cards to prevent overlap
-                wrapper.style.minWidth = `${dimensions.width + 80}px`;
-
-                // Force layout by reading dimensions
-                wrapper.getBoundingClientRect();
-
-                // Update card shifts after layout is applied
-                requestAnimationFrame(() => {
-                    updateCardShifts();
-                });
+                // Don't set wrapper minWidth - CSS handles it via fit-content
             }
         });
     } else {
@@ -4355,21 +5138,6 @@ function updateSingleCardWrapper(wrapper, chord, index, key) {
         wrapper.appendChild(simplifiedStructure);
         // Ensure expanded class is removed
         wrapper.classList.remove('expanded-card-wrapper');
-    }
-
-    // Immediately restore the shift using CSS custom property (persists even if inline style is reset)
-    if (currentShift) {
-        wrapper.style.setProperty('--card-shift', currentShift);
-        wrapper.style.transform = currentTransform || `translateX(${currentShift})`;
-        if (hadShiftClass) {
-            wrapper.classList.add('shift-right');
-        }
-    } else if (currentTransform) {
-        // Fallback to inline transform if custom property wasn't set
-        wrapper.style.transform = currentTransform;
-        if (hadShiftClass) {
-            wrapper.classList.add('shift-right');
-        }
     }
 
     // Re-attach event listeners
@@ -4387,12 +5155,7 @@ function updateSingleCardWrapper(wrapper, chord, index, key) {
             card.setAttribute('data-selected', 'true');
         }
     }
-
-    // Recalculate and update shifts properly after DOM is ready
-    // This ensures all cards have correct shifts, but we've already prevented the flash
-    requestAnimationFrame(() => {
-        updateCardShifts();
-    });
+    // No longer need transforms - flexbox/grid handles layout automatically
 }
 
 /**
@@ -5195,13 +5958,7 @@ function toggleSimplifiedCardNotation(wrapper, index) {
 
             // IMPORTANT: Add class to bypass CSS width constraints
             wrapper.classList.add('has-notation');
-
-            // Set minWidth on the wrapper so it actually takes up space in the grid
-            const targetWidth = dimensions.width + 40;
-            wrapper.style.minWidth = `${targetWidth}px`;
-
-            // Force layout by reading dimensions
-            wrapper.getBoundingClientRect();
+            // Don't set wrapper.style.minWidth - let CSS fit-content handle it
 
             // Update card shifts after layout is applied
             requestAnimationFrame(() => {
@@ -5259,50 +6016,69 @@ function initializeSimplifiedSortable(container) {
         container.sortableInstance.destroy();
     }
 
+    // Check if we have section containers
+    const hasSections = container.querySelector('.section-unified-container') !== null;
+
+    // Main sortable for top-level items (individual cards OR section containers)
     container.sortableInstance = new Sortable(container, {
+        group: {
+            name: 'progression-cards',
+            pull: true,
+            put: true  // Accept cards from other sortables (like section-cards-area)
+        },
         animation: 200,
         ghostClass: 'sortable-ghost',
         chosenClass: 'sortable-chosen',
         dragClass: 'sortable-drag',
-        handle: '.drag-handle',
-        filter: '.chord-card-wrapper:not([data-chord-index])', // Exclude Add/Clear buttons (no data-chord-index)
-        swapThreshold: 0.65, // More tolerant swapping for transformed elements
+        // Use drag-handle class which exists on both cards and section banners
+        handle: '.drag-handle, .section-banner',
+        // Allow dragging direct children that are cards or sections
+        draggable: '.chord-card-wrapper[data-chord-index], .section-unified-container',
+        swapThreshold: 0.65,
         onStart: function(evt) {
             console.log('%c[Sortable onStart] === DRAG START ===', 'color: #ffcc00; font-weight: bold');
-            // Clear all transforms during drag so Sortable can calculate positions correctly
-            const allWrappers = container.querySelectorAll('.chord-card-wrapper[data-chord-index]');
-            allWrappers.forEach(wrapper => {
-                // Store current transform for restoration
-                wrapper.setAttribute('data-stored-transform', wrapper.style.transform || '');
-                wrapper.style.transform = '';
-                wrapper.classList.remove('shift-right');
-            });
+        },
+        // Handle cards added FROM sections TO the main container (ungrouped)
+        onAdd: function(evt) {
+            console.log('%c[Sortable onAdd] Card added to main container from section', 'color: #00ff00; font-weight: bold');
+            // Use the unified handler which handles cross-container moves
+            handleCardDragWithinSection(evt, evt.from.getAttribute('data-section-id'));
         },
         onEnd: function(evt) {
-            // First, restore transforms for all cards (in case drag was cancelled)
-            const allWrappers = container.querySelectorAll('.chord-card-wrapper[data-chord-index]');
-            allWrappers.forEach(wrapper => {
-                const storedTransform = wrapper.getAttribute('data-stored-transform') || '';
-                if (storedTransform) {
-                    wrapper.style.transform = storedTransform;
-                    wrapper.classList.add('shift-right');
-                }
-                wrapper.removeAttribute('data-stored-transform');
-            });
+            // Cross-container moves are handled by onAdd
+            if (evt.from !== evt.to) {
+                console.log('[Sortable onEnd] Cross-container move - handled by onAdd');
+                return;
+            }
 
-            // Use data-chord-index attributes directly instead of Sortable's indices
-            // This is more reliable when there are non-draggable elements in the container
             const draggedItem = evt.item;
+
+            // Check if we dragged a section container
+            if (draggedItem.classList.contains('section-unified-container')) {
+                // Section was dragged - need to reorder all chords within it
+                handleSectionDragEnd(container, draggedItem, evt);
+                return;
+            }
+
+            // For same-container moves (reordering ungrouped cards), use the unified handler
+            // This ensures section indices are properly updated
+            console.log('[Sortable onEnd] Same-container move - using unified handler');
+            handleCardDragWithinSection(evt, null); // null because cards are ungrouped
+            return;
+
+            // DEPRECATED: Old per-card reorder logic below is no longer used
+            // Kept for reference but execution never reaches here
             const oldChordIndex = parseInt(draggedItem.getAttribute('data-chord-index'), 10);
 
             // After the drag, find the new position by looking at sibling order
-            const chordWrappers = Array.from(container.querySelectorAll('.chord-card-wrapper[data-chord-index]'));
-            const newPosition = chordWrappers.indexOf(draggedItem);
+            // Need to account for cards inside sections vs standalone
+            const allChordWrappers = getAllChordWrappersInOrder(container);
+            const newPosition = allChordWrappers.indexOf(draggedItem);
 
             console.log('%c[Sortable onEnd] === DRAG END ===', 'color: #ff00ff; font-weight: bold');
             console.log('[Sortable onEnd] draggedItem data-chord-index:', oldChordIndex);
             console.log('[Sortable onEnd] newPosition in DOM:', newPosition);
-            console.log('[Sortable onEnd] Current DOM order:', chordWrappers.map(w => w.getAttribute('data-chord-index')).join(', '));
+            console.log('[Sortable onEnd] Current DOM order:', allChordWrappers.map(w => w.getAttribute('data-chord-index')).join(', '));
             console.log('[Sortable onEnd] Sortable evt.oldIndex:', evt.oldIndex, 'evt.newIndex:', evt.newIndex);
 
             if (oldChordIndex !== newPosition && newPosition >= 0) {
@@ -5380,6 +6156,204 @@ function initializeSimplifiedSortable(container) {
             }
         }
     });
+}
+
+/**
+ * Get all chord card wrappers in visual order (including those inside section containers)
+ * @param {HTMLElement} container - The grid/flex container
+ * @returns {HTMLElement[]} Array of chord wrappers in visual order
+ */
+function getAllChordWrappersInOrder(container) {
+    const result = [];
+    const topLevelItems = container.children;
+
+    for (const item of topLevelItems) {
+        if (item.classList.contains('section-unified-container')) {
+            // Section container - get cards inside it
+            const sectionCards = item.querySelectorAll('.chord-card-wrapper[data-chord-index]');
+            result.push(...Array.from(sectionCards));
+        } else if (item.classList.contains('chord-card-wrapper') && item.hasAttribute('data-chord-index')) {
+            // Individual chord card
+            result.push(item);
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Handle card drag within or between sections
+ * @param {Object} evt - Sortable event
+ * @param {string} originalSectionId - The section the card was originally in
+ */
+function handleCardDragWithinSection(evt, originalSectionId) {
+    const draggedItem = evt.item;
+    const oldChordIndex = parseInt(draggedItem.getAttribute('data-chord-index'), 10);
+    const fromContainer = evt.from;
+    const toContainer = evt.to;
+
+    console.log('%c[handleCardDragWithinSection] Card dragged', 'color: #ff8800', {
+        oldChordIndex,
+        from: fromContainer.getAttribute('data-section-id') || 'ungrouped',
+        to: toContainer.getAttribute('data-section-id') || 'ungrouped'
+    });
+
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    // Find the parent grid container
+    let gridContainer = toContainer;
+    while (gridContainer && !gridContainer.id?.includes('-cards-grid')) {
+        gridContainer = gridContainer.parentElement;
+    }
+    if (!gridContainer) {
+        // May be at the top-level flex container
+        gridContainer = toContainer.closest('[id$="-cards-grid"]') ||
+                       toContainer.closest('.flex.flex-wrap');
+    }
+
+    // Get the new order of all chords by walking through the container
+    const newChordOrder = getAllChordWrappersInOrder(gridContainer || toContainer.parentElement)
+        .map(el => parseInt(el.getAttribute('data-chord-index'), 10));
+
+    console.log('[handleCardDragWithinSection] New chord order:', newChordOrder);
+
+    // Check if the card moved to a different section or out of a section
+    const toSectionId = toContainer.getAttribute('data-section-id');
+    const fromSectionId = fromContainer.getAttribute('data-section-id');
+
+    // Update section membership if changed
+    if (fromSectionId !== toSectionId) {
+        // Remove from old section
+        if (fromSectionId) {
+            compositionState.removeChordFromSection(oldChordIndex, fromSectionId);
+        }
+        // Add to new section
+        if (toSectionId) {
+            const section = compositionState.getSection(toSectionId);
+            if (section) {
+                // Find position within the new section
+                const sectionCards = toContainer.querySelectorAll('.chord-card-wrapper[data-chord-index]');
+                const positionInSection = Array.from(sectionCards).indexOf(draggedItem);
+                compositionState.addChordToSection(oldChordIndex, toSectionId, positionInSection);
+            }
+        }
+    }
+
+    // Only proceed with reorder if order actually changed
+    const trainerState = getTrainerState();
+    const oldOrder = trainerState.progressionData.map((_, i) => i);
+
+    if (JSON.stringify(newChordOrder) === JSON.stringify(oldOrder)) {
+        console.log('[handleCardDragWithinSection] No change in order, but section membership may have changed');
+        // Still re-render to update section visuals
+        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', false);
+        return;
+    }
+
+    // Save state for undo
+    saveState({
+        type: 'card-drag',
+        data: { oldChordIndex, oldOrder, newOrder: newChordOrder }
+    });
+
+    // Reorder progression data to match new order
+    const newProgressionData = newChordOrder.map(oldIdx => trainerState.progressionData[oldIdx]);
+    const newProgressionRomans = newChordOrder.map(oldIdx => trainerState.progressionRomans[oldIdx]);
+
+    // Update all section chord indices to reflect new positions
+    compositionState.getSections().forEach(section => {
+        const newIndices = section.chordIndices.map(oldIdx => newChordOrder.indexOf(oldIdx));
+        compositionState.updateSection(section.id, { chordIndices: newIndices.filter(idx => idx >= 0) });
+    });
+
+    // Update trainer state
+    setProgressionData(newProgressionData);
+    setProgressionRomans(newProgressionRomans);
+
+    // Sync to compositionState
+    if (typeof compositionState.syncWithProgressionData === 'function') {
+        compositionState.syncWithProgressionData(newProgressionData);
+    }
+
+    // Re-render
+    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', false);
+
+    // Update notation
+    if (window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
+    }
+}
+
+/**
+ * Handle section container drag end - reorder all chords in the section
+ * @param {HTMLElement} container - The grid/flex container
+ * @param {HTMLElement} sectionEl - The dragged section container
+ * @param {Object} evt - Sortable event
+ */
+function handleSectionDragEnd(container, sectionEl, evt) {
+    const sectionId = sectionEl.getAttribute('data-section-id');
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+
+    if (!compositionState || !sectionId) return;
+
+    const section = compositionState.getSection(sectionId);
+    if (!section) return;
+
+    console.log('%c[handleSectionDragEnd] Section dragged:', 'color: #00ff88', section.label);
+
+    // Get the new order of all chords by walking through the container
+    const newChordOrder = getAllChordWrappersInOrder(container).map(el => parseInt(el.getAttribute('data-chord-index'), 10));
+
+    console.log('[handleSectionDragEnd] New chord order:', newChordOrder);
+
+    // Only proceed if order actually changed
+    const trainerState = getTrainerState();
+    const oldOrder = trainerState.progressionData.map((_, i) => i);
+
+    if (JSON.stringify(newChordOrder) === JSON.stringify(oldOrder)) {
+        console.log('[handleSectionDragEnd] No change in order');
+        return;
+    }
+
+    // Save state for undo
+    saveState({
+        type: 'section-reorder',
+        data: { sectionId, oldOrder, newOrder: newChordOrder }
+    });
+
+    // Reorder progression data to match new order
+    const newProgressionData = newChordOrder.map(oldIdx => trainerState.progressionData[oldIdx]);
+    const newProgressionRomans = newChordOrder.map(oldIdx => trainerState.progressionRomans[oldIdx]);
+
+    // Update ALL section chord indices to reflect new positions
+    // Each section's chords move to their new positions in the reordered array
+    compositionState.getSections().forEach(sec => {
+        const oldIndices = [...sec.chordIndices];
+        const newIndices = sec.chordIndices.map(oldIdx => newChordOrder.indexOf(oldIdx));
+        console.log(`[handleSectionDragEnd] Section ${sec.label}: indices ${oldIndices} → ${newIndices.filter(idx => idx >= 0)}`);
+        compositionState.updateSection(sec.id, { chordIndices: newIndices.filter(idx => idx >= 0) });
+    });
+
+    // Update trainer state
+    setProgressionData(newProgressionData);
+    setProgressionRomans(newProgressionRomans);
+
+    // Sync to compositionState
+    if (compositionState && typeof compositionState.syncWithProgressionData === 'function') {
+        compositionState.syncWithProgressionData(newProgressionData);
+    }
+
+    // Re-render
+    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', false);
+
+    // Update notation
+    if (window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
+    }
 }
 
 /**
@@ -5866,7 +6840,323 @@ function deselectAllChordCards() {
         card.classList.remove('ring-4', 'ring-purple-500', 'ring-offset-2');
         card.removeAttribute('data-selected');
     });
+    // Also clear multi-select visual styling
+    const allWrappers = document.querySelectorAll('.chord-card-wrapper.multi-selected');
+    allWrappers.forEach(wrapper => {
+        wrapper.classList.remove('multi-selected');
+    });
 }
+
+// ============================================================================
+// MULTI-SELECT HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Handle Ctrl/Cmd+click to toggle a card in multi-selection
+ * @param {number} index - Chord index
+ */
+function handleMultiSelectToggle(index) {
+    // Toggle the card in the selection set
+    toggleSelection(index);
+
+    // Update visual state
+    updateMultiSelectVisuals();
+
+    // Update card shifts
+    updateCardShifts();
+}
+
+/**
+ * Handle Shift+click to range-select from last selected to this card
+ * @param {number} index - Chord index
+ */
+function handleMultiSelectRange(index) {
+    // Get the last selected index
+    const lastIndex = getLastSelectedIndex();
+
+    if (lastIndex === null) {
+        // No previous selection, just select this one
+        selectSingle(index);
+    } else {
+        // Range select from lastIndex to index
+        selectRange(lastIndex, index);
+    }
+
+    // Update visual state
+    updateMultiSelectVisuals();
+
+    // Update card shifts
+    updateCardShifts();
+}
+
+/**
+ * Update visual styles for all cards based on multi-select state
+ */
+function updateMultiSelectVisuals() {
+    const selectedIndices = getSelectedIndicesArray();
+
+    // First, clear all multi-select visuals
+    const allWrappers = document.querySelectorAll('.chord-card-wrapper');
+    allWrappers.forEach(wrapper => {
+        wrapper.classList.remove('multi-selected');
+        const card = wrapper.querySelector('.simplified-card, .detailed-card');
+        if (card) {
+            card.classList.remove('ring-4', 'ring-purple-500', 'ring-offset-2', 'ring-blue-500');
+            card.removeAttribute('data-selected');
+        }
+    });
+
+    // Apply multi-select styling to selected cards
+    selectedIndices.forEach((idx, i) => {
+        const wrappers = document.querySelectorAll(`.chord-card-wrapper[data-chord-index="${idx}"]`);
+        wrappers.forEach(wrapper => {
+            wrapper.classList.add('multi-selected');
+            const card = wrapper.querySelector('.simplified-card, .detailed-card');
+            if (card) {
+                card.setAttribute('data-selected', 'true');
+                // First selected gets purple ring, others get blue
+                if (i === 0) {
+                    card.classList.add('ring-4', 'ring-purple-500', 'ring-offset-2');
+                } else {
+                    card.classList.add('ring-4', 'ring-blue-500', 'ring-offset-2');
+                }
+            }
+        });
+    });
+
+    // Update selection count display (if we add one later)
+    const count = selectedIndices.length;
+    if (count > 1) {
+        console.log(`[Multi-select] ${count} chords selected`);
+    }
+}
+
+/**
+ * Clear multi-selection and update visuals
+ */
+function clearMultiSelection() {
+    clearSelection();
+    updateMultiSelectVisuals();
+}
+
+// Expose to window for keyboard shortcuts
+window.clearMultiSelection = clearMultiSelection;
+
+// ============================================================================
+// GLOBAL KEYBOARD SHORTCUTS FOR MULTI-SELECT AND SECTIONS
+// ============================================================================
+
+// Set up global keyboard shortcuts (runs once when module loads)
+(function setupGlobalKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        // Don't handle shortcuts when typing in inputs/textareas
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+            return;
+        }
+
+        // Escape: Clear multi-selection
+        if (e.key === 'Escape') {
+            const selectionCount = getSelectionCount();
+            if (selectionCount > 0) {
+                clearMultiSelection();
+                e.preventDefault();
+            }
+        }
+
+        // Ctrl/Cmd+A: Select all chords in the current section (or all if no section focused)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+            const trainerState = getTrainerState();
+            const progressionCount = trainerState.progressionData?.length || 0;
+
+            if (progressionCount > 0) {
+                // Select all chords
+                for (let i = 0; i < progressionCount; i++) {
+                    addToSelection(i);
+                }
+                updateMultiSelectVisuals();
+                e.preventDefault();
+            }
+        }
+
+        // Delete/Backspace: Delete selected chords (with confirmation if multiple)
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            const selectedIndices = getSelectedIndicesArray();
+            if (selectedIndices.length > 0) {
+                deleteSelectedChords(selectedIndices);
+                e.preventDefault();
+            }
+        }
+
+        // Ctrl/Cmd+C: Copy selected chords
+        if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+            const selectedIndices = getSelectedIndicesArray();
+            if (selectedIndices.length > 0) {
+                copySelectedChords(selectedIndices);
+                e.preventDefault();
+            }
+        }
+
+        // Ctrl/Cmd+V: Paste chords
+        if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+            pasteChords();
+            e.preventDefault();
+        }
+
+        // Ctrl/Cmd+D: Duplicate selected chords
+        if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+            const selectedIndices = getSelectedIndicesArray();
+            if (selectedIndices.length > 0) {
+                duplicateSelectedChords(selectedIndices);
+                e.preventDefault();
+            }
+        }
+    });
+})();
+
+/**
+ * Delete selected chords with confirmation
+ * @param {number[]} indices - Array of chord indices to delete
+ */
+function deleteSelectedChords(indices) {
+    if (indices.length === 0) return;
+
+    // Confirm if deleting multiple
+    if (indices.length > 1) {
+        if (!confirm(`Delete ${indices.length} selected chords?`)) {
+            return;
+        }
+    }
+
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    // Delete in reverse order to preserve indices
+    const sortedIndices = [...indices].sort((a, b) => b - a);
+    sortedIndices.forEach(idx => {
+        compositionState.removeChord(idx);
+    });
+
+    // Clear selection
+    clearMultiSelection();
+
+    // Re-render
+    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', false);
+}
+
+/**
+ * Copy selected chords to clipboard
+ * @param {number[]} indices - Array of chord indices to copy
+ */
+function copySelectedChords(indices) {
+    if (indices.length === 0) return;
+
+    const trainerState = getTrainerState();
+    const progressionData = trainerState.progressionData || [];
+
+    // Get chord data for selected indices
+    const chordsToCopy = indices
+        .filter(idx => idx < progressionData.length)
+        .sort((a, b) => a - b)
+        .map(idx => ({ ...progressionData[idx] }));
+
+    if (chordsToCopy.length > 0) {
+        setClipboard({ type: 'chords', data: chordsToCopy });
+        console.log(`[Clipboard] Copied ${chordsToCopy.length} chord(s)`);
+    }
+}
+
+/**
+ * Paste chords from clipboard
+ */
+function pasteChords() {
+    const clipboard = getClipboard();
+    if (!clipboard || clipboard.type !== 'chords' || !clipboard.data?.length) {
+        console.log('[Clipboard] Nothing to paste');
+        return;
+    }
+
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    const trainerState = getTrainerState();
+    const progressionData = trainerState.progressionData || [];
+
+    // Find insertion point (after last selected, or at end)
+    const selectedIndices = getSelectedIndicesArray();
+    let insertAt = progressionData.length;
+    if (selectedIndices.length > 0) {
+        insertAt = Math.max(...selectedIndices) + 1;
+    }
+
+    // Insert each chord
+    clipboard.data.forEach((chord, i) => {
+        const newChord = { ...chord };
+        // Insert at the appropriate position
+        compositionState.insertChord(insertAt + i, newChord);
+    });
+
+    // Clear selection and select pasted chords
+    clearSelection();
+    for (let i = 0; i < clipboard.data.length; i++) {
+        addToSelection(insertAt + i);
+    }
+
+    // Re-render
+    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', false);
+
+    updateMultiSelectVisuals();
+    console.log(`[Clipboard] Pasted ${clipboard.data.length} chord(s)`);
+}
+
+/**
+ * Duplicate selected chords (insert copies after the selection)
+ * @param {number[]} indices - Array of chord indices to duplicate
+ */
+function duplicateSelectedChords(indices) {
+    if (indices.length === 0) return;
+
+    const trainerState = getTrainerState();
+    const progressionData = trainerState.progressionData || [];
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    // Get chord data for selected indices
+    const chordsToDuplicate = indices
+        .filter(idx => idx < progressionData.length)
+        .sort((a, b) => a - b)
+        .map(idx => ({ ...progressionData[idx] }));
+
+    if (chordsToDuplicate.length === 0) return;
+
+    // Insert after the last selected chord
+    const insertAt = Math.max(...indices) + 1;
+
+    // Insert each chord
+    chordsToDuplicate.forEach((chord, i) => {
+        compositionState.insertChord(insertAt + i, { ...chord });
+    });
+
+    // Clear selection and select duplicated chords
+    clearSelection();
+    for (let i = 0; i < chordsToDuplicate.length; i++) {
+        addToSelection(insertAt + i);
+    }
+
+    // Re-render
+    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', false);
+
+    updateMultiSelectVisuals();
+    console.log(`[Duplicate] Duplicated ${chordsToDuplicate.length} chord(s)`);
+}
+
+// Expose clipboard functions to window
+window.copySelectedChords = () => copySelectedChords(getSelectedIndicesArray());
+window.pasteChords = pasteChords;
+window.duplicateSelectedChords = () => duplicateSelectedChords(getSelectedIndicesArray());
+window.deleteSelectedChords = () => deleteSelectedChords(getSelectedIndicesArray());
 
 /**
  * Remove highlighting from all tension curve points
@@ -6034,7 +7324,47 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         }
 
         // 2. Simplified chord cards with Add Chord/Clear All buttons as first grid item
-        renderSimplifiedChordSequence(container, trainerState.progressionData, trainerState.currentKey || 'C');
+        // Check if we have any sections defined - if so, use section-aware rendering
+        const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+        const hasSections = compositionState && compositionState.getSections().length > 0;
+
+        // Both section-aware and flat rendering use the same approach:
+        // 1. Clear container and remove grid classes
+        // 2. Add toolbar at top (full width)
+        // 3. Add grid container with cards below
+
+        // Clear and restructure container
+        container.innerHTML = '';
+        // Save original classes and temporarily make it a flex column
+        const originalClasses = container.className;
+        container.className = 'flex flex-col gap-2 p-2 bg-white rounded-lg border border-gray-200';
+
+        // Add section toolbar at the TOP
+        const toolbar = createSectionToolbar(containerId);
+        container.appendChild(toolbar);
+
+        // Create container for cards
+        const gridContainer = document.createElement('div');
+        gridContainer.id = `${containerId}-cards-grid`;
+
+        if (hasSections) {
+            // Use flexbox for section-aware rendering (allows section containers to size naturally)
+            gridContainer.className = 'flex flex-wrap items-start gap-2';
+            renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
+                showActionButtons: true
+            });
+        } else {
+            // Use grid for flat card rendering - match Chord Lab's responsive grid
+            gridContainer.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2';
+            renderFlatCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
+                showActionButtons: true
+            });
+        }
+
+        container.appendChild(gridContainer);
+
+        // Initialize sortable on the grid container
+        initializeSimplifiedSortable(gridContainer);
 
         // 3. Tension curve visualization (after grid, at bottom of panel)
         if (panel) {
@@ -6063,10 +7393,40 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
 
     // MELODY COMPOSER: Use same simplified/detailed card style with Add/Clear buttons
     if (containerId === 'melody-progression-visualization' && trainerState.progressionData.length > 0) {
-        // Render simplified chord cards with action buttons (same as Progression Builder)
-        renderSimplifiedChordSequence(container, trainerState.progressionData, trainerState.currentKey || 'C', {
-            showActionButtons: true
-        });
+        // Check if we have any sections defined - if so, use section-aware rendering
+        const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+        const hasSections = compositionState && compositionState.getSections().length > 0;
+
+        // Same restructured layout as Progression Builder
+        container.innerHTML = '';
+        container.className = 'flex flex-col gap-2 p-2 bg-white rounded-lg border border-gray-200';
+
+        // Add section toolbar at the TOP
+        const toolbar = createSectionToolbar(containerId);
+        container.appendChild(toolbar);
+
+        // Create container for cards
+        const gridContainer = document.createElement('div');
+        gridContainer.id = `${containerId}-cards-grid`;
+
+        if (hasSections) {
+            // Use flexbox for section-aware rendering (allows section containers to size naturally)
+            gridContainer.className = 'flex flex-wrap items-start gap-2';
+            renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
+                showActionButtons: true
+            });
+        } else {
+            // Use grid for flat card rendering - match Chord Lab's responsive grid
+            gridContainer.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2';
+            renderFlatCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
+                showActionButtons: true
+            });
+        }
+
+        container.appendChild(gridContainer);
+
+        // Initialize sortable on the grid container
+        initializeSimplifiedSortable(gridContainer);
 
         // Also update the Melody Composer's notation
         if (window.refreshNotationFromProgression) {
@@ -9070,12 +10430,13 @@ function updateChordAndRenderPreservingTrebleNotes(index) {
             beats: chord.beats !== undefined ? chord.beats : 4 // Add beats property
         });
 
-        // Regenerate bass for this measure
+        // Regenerate bass for this building block (chord)
         const autoGenerateBass = compositionState.getSettings().autoGenerateBass;
         const measure = compositionState.getMeasure(index);
 
         if (autoGenerateBass) {
-            compositionState.updateBassFromChord(index);
+            // Use building-block-aware regeneration that handles multi-measure chords
+            compositionState.regenerateAutoBassByChordIndex(index);
         } else {
             // Create simple whole-note bass from chord notes
             if (measure && measure.notation && measure.notation.bass && chord.notes && chord.notes.length > 0) {

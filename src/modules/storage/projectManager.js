@@ -13,7 +13,9 @@
  */
 
 // Project file format version - increment when format changes
-const PROJECT_FORMAT_VERSION = '1.0.0';
+// 1.0.0 - Initial format
+// 1.1.0 - Added song sections (verse, chorus, etc.)
+const PROJECT_FORMAT_VERSION = '1.1.0';
 
 // File extension for IMTL projects
 const PROJECT_FILE_EXTENSION = '.imtl';
@@ -31,6 +33,7 @@ const PROJECT_MIME_TYPE = 'application/json';
  * @property {Object} metadata - Composition metadata (title, tempo, key, etc.)
  * @property {Object} settings - Composition settings
  * @property {Array} progressionData - Chord progression data (chord cards)
+ * @property {Array} sections - Song sections (verse, chorus, etc. groupings)
  * @property {Object} bassBlockSequence - Serialized bass BuildingBlockSequence
  * @property {Object} trebleBlockSequence - Serialized treble BuildingBlockSequence
  */
@@ -124,6 +127,9 @@ export function createProjectData(compositionState) {
 
         // Chord progression (chord cards)
         progressionData: progressionData,
+
+        // Song sections (verse, chorus, etc. groupings)
+        sections: compositionState.exportSections ? compositionState.exportSections() : [],
 
         // Building block sequences (full musical notation data)
         bassBlockSequence: bassBlockSequence,
@@ -328,6 +334,11 @@ export function applyProjectToState(projectData, compositionState, trainerState,
             compositionState.syncWithProgressionData(projectData.progressionData, {
                 preserveMelody: false // We'll load melody from the project
             });
+        }
+
+        // 4b. Load song sections (verse, chorus, etc. groupings)
+        if (projectData.sections && compositionState.importSections) {
+            compositionState.importSections(projectData.sections);
         }
 
         // 5. Load bass BuildingBlockSequence

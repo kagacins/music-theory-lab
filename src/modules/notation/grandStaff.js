@@ -1003,7 +1003,9 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     formatter.joinVoices([trebleVoice]);
     formatter.joinVoices([bassVoice]);
 
-    const staveWidth = width - trebleStave.getNoteStartX() + x;
+    // Reserve padding at the end of the measure to prevent notes touching the bar line
+    const endPadding = 15;
+    const staveWidth = width - trebleStave.getNoteStartX() + x - endPadding;
     formatter.format([trebleVoice, bassVoice], staveWidth);
 
     trebleVoice.draw(context, trebleStave);

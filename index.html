@@ -1657,21 +1657,35 @@
                                             <div class="flex-1">
                                                 <label class="block text-sm font-semibold text-gray-700 mb-2">Bass Pattern:</label>
                                                 <select id="bass-pattern-select" onchange="window.setBassPattern && window.setBassPattern(this.value); window.refreshNotationFromProgression && window.refreshNotationFromProgression();" class="w-full p-2 text-sm border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 cursor-pointer transition-colors">
-                                                    <option value="whole-note">Whole Note - Single root note</option>
-                                                    <option value="root-fifth" selected>Root-Fifth - Alternating root and fifth</option>
-                                                    <option value="arpeggio">Arpeggio - Ascending chord tones</option>
-                                                    <option value="alberti">Alberti Bass - Classical pattern</option>
-                                                    <option value="walking">Walking Bass - Jazz stepwise</option>
+                                                    <optgroup label="Simple Patterns">
+                                                        <option value="whole-note">Whole Note - Single root note</option>
+                                                        <option value="root-fifth" selected>Root-Fifth - Alternating root and fifth</option>
+                                                        <option value="arpeggio">Arpeggio - Ascending chord tones</option>
+                                                        <option value="alberti">Alberti Bass - Classical pattern</option>
+                                                        <option value="walking">Walking Bass - Jazz stepwise</option>
+                                                        <option value="broken-octave">Broken Octave - Alternating low/high root</option>
+                                                        <option value="country">Country - Two-beat boom-chick</option>
+                                                        <option value="pedal">Pedal Point - Sustained drone bass</option>
+                                                    </optgroup>
+                                                    <optgroup label="Rhythmic Patterns">
+                                                        <option value="boogie">Boogie-Woogie - 8-to-the-bar blues</option>
+                                                        <option value="driving-rock">Driving Rock - Straight 8th notes</option>
+                                                        <option value="montuno">Montuno - Cuban syncopated 8ths</option>
+                                                        <option value="tango">Tango - Latin habanera rhythm</option>
+                                                        <option value="reggae">Reggae - One-drop offbeat</option>
+                                                        <option value="funk">Funk - Syncopated with ghost notes</option>
+                                                    </optgroup>
+                                                    <optgroup label="Polyphonic Patterns (Chords)">
+                                                        <option value="octave-doubling">Octave Doubling - Root + octave chord</option>
+                                                        <option value="power-chord">Power Chord - Root + fifth chord</option>
+                                                        <option value="stride">Stride - Jazz/ragtime bass + chord</option>
+                                                        <option value="shell-voicing">Shell Voicing - Jazz root + 3rd/7th</option>
+                                                        <option value="tenths">Tenths - Root + 10th intervals</option>
+                                                    </optgroup>
                                                 </select>
                                             </div>
                                         </div>
 
-                                        <p class="text-xs text-gray-500 mt-2">
-                                            ℹ️ Bass is auto-generated from chord progression. Edit manually by clicking notes (coming soon).
-                                            <button onclick="window.regenerateAllBass && window.regenerateAllBass(); window.refreshNotationFromProgression && window.refreshNotationFromProgression();" class="ml-1 text-blue-600 hover:text-blue-800 underline text-xs" title="Force regenerate bass if needed">
-                                                Regenerate
-                                            </button>
-                                        </p>
                                     </div>
                                 </div>
                             </div>
