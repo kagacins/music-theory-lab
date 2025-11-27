@@ -1,15 +1,18 @@
+Need to check on bass clef overflow logic
+Need to check treble clef note insertion logic especially wrt ties
+
+as we add and shift notes and rests, sometimes we add new measures after the last measure.
+
+Remove all references to the chord and melody suggestion palettes as we now have a much better solution for those - asked for this once.  Sonnet wanted to comment out any related calls
+_______________________________________________________________________________________________________________________
+
+Chord suggestion weighting - emphasize resolution.  Emphasize tension.  Emphasize simple.  Emphasize complex
+
+Can we include two voices in one clef?  For example if I wanted to hold an interval for multiple beats and I had walking quarter or eighth notes while that is being held?  we alerady have a "Voice" toggle in the toolbar, but I don't think that does anything right now.
 
 
+Update Chord Suggestions.  Can we have the engine update relative to the currently selected measure?  Can we show more options - grid approach?
 
-AI-Suggested:
-Click-to-Play Functionality - Need to add click handlers that play notes/chords when clicked
+Alright I think we need to enhance how we edit the auto-generated bass.  I think ideally once we edit one auto-generated bass measure, it loses its "auto-generated" behavior and it becomes the same as a measure we edited when auto-generate bass was turned off.  
 
-How can I "select" a note or chord?  May need to be able to add ottava to a note?  Maybe want to add polyphony to a note, or so that I can insert a note between notes, or edit the duration of a note, etc.  
-
-Need to include some descriptive text explaining alt+click or alt+shift+click interaction with the canvas.
-
-Can we playback what is now rendered on the grand staff with the various "Play" buttons and the "Click to Play" capability?
-
-Right now i'm trying to figure out a way to blend the chord progression building blocks we have but also allow the user to modify the bass clef in a sensible way while maintaining a strong sense of the chord that the user selected in the chord progression.  I'm not sure we automatically add chord progression chords to the bass clef.  
-
-If the user tries to add a rest that is longer than the remaining available beats/duration of that measure, can we have the rest default to the maximum amount of beats/duration remaining?
+Hey Claude.  We've made a ton of enhancements to our application.  One area where I'm continuing to seek differentiation from alternatives to this application and to try to continue to enhance our unique value add is in the recommendations engines - the chord recommendation engines (for both the whole chord progression and the "next chord" recommendation), the melody recommendation engine, and the harmony recommendation engine.  Taking into account the current state of the application including things like chord progression groupings such as verse, chorus, bridge, ets., could you prepare a comprehensive .md document that details opportunities and approach to how we can enhance our recommendation engines to make this the  most powerful and useful music theory and song writing tool available?
