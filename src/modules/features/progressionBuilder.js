@@ -2639,26 +2639,35 @@ function renderFlatCards(gridContainer, progressionData, key, options = {}) {
 
     if (!progressionData || progressionData.length === 0) return;
 
-    // Add "Add Chord" and "Clear All" buttons as first grid item
+    // Add "Add Chord", "Section" and "Clear All" buttons as first grid item
     if (showActionButtons) {
         const isMelodyComposer = gridContainer.id?.includes('melody');
         const toggleFunction = isMelodyComposer ? 'toggleQuickAddChordMelody' : 'toggleQuickAddChord';
+        const containerId = gridContainer.id || 'melody-progression-visualization';
 
         const buttonContainer = document.createElement('div');
-        buttonContainer.className = 'chord-card-wrapper flex flex-col justify-center items-center gap-2 p-2 bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl';
+        buttonContainer.className = 'chord-card-wrapper flex flex-col justify-center items-center gap-1.5 p-2 bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl';
         buttonContainer.innerHTML = `
             <button onclick="window.${toggleFunction} && window.${toggleFunction}()"
-                    class="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
-                    title="Add chord">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="w-full px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    title="Add chord to progression">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                 </svg>
                 Add
             </button>
+            <button onclick="window.showAddSectionMenu && window.showAddSectionMenu(event, '${containerId}')"
+                    class="w-full px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    title="Select adjacent chords, then add to a section">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+                Section
+            </button>
             <button onclick="window.clearProgression && window.clearProgression()"
-                    class="w-full px-3 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
-                    title="Clear all">
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    class="w-full px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    title="Clear all chords">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"></path>
                 </svg>
                 Clear
@@ -2720,26 +2729,35 @@ function renderSectionAwareCards(gridContainer, progressionData, key, options = 
         });
     });
 
-    // Add "Add Chord" and "Clear All" buttons as first item
+    // Add "Add Chord", "Section" and "Clear All" buttons as first item
     if (showActionButtons) {
         const isMelodyComposer = gridContainer.id?.includes('melody');
         const toggleFunction = isMelodyComposer ? 'toggleQuickAddChordMelody' : 'toggleQuickAddChord';
+        const containerId = gridContainer.id || 'melody-progression-visualization';
 
         const buttonContainer = document.createElement('div');
-        buttonContainer.className = 'chord-card-wrapper flex flex-col justify-center items-center gap-2 p-2 bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl';
+        buttonContainer.className = 'chord-card-wrapper flex flex-col justify-center items-center gap-1.5 p-2 bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl';
         buttonContainer.innerHTML = `
             <button onclick="window.${toggleFunction} && window.${toggleFunction}()"
-                    class="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
-                    title="Add chord">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="w-full px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    title="Add chord to progression">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                 </svg>
                 Add
             </button>
+            <button onclick="window.showAddSectionMenu && window.showAddSectionMenu(event, '${containerId}')"
+                    class="w-full px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    title="Select adjacent chords, then add to a section">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+                Section
+            </button>
             <button onclick="window.clearProgression && window.clearProgression()"
-                    class="w-full px-3 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
-                    title="Clear all">
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    class="w-full px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    title="Clear all chords">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"></path>
                 </svg>
                 Clear
@@ -6927,13 +6945,12 @@ window.clearMultiSelection = clearMultiSelection;
             }
         }
 
-        // Delete/Backspace: Delete selected chords (with confirmation if multiple)
+        // Delete/Backspace: Only for notation - don't delete chord cards with keyboard
+        // Chord cards should only be deleted via their delete button
         if (e.key === 'Delete' || e.key === 'Backspace') {
-            const selectedIndices = getSelectedIndicesArray();
-            if (selectedIndices.length > 0) {
-                deleteSelectedChords(selectedIndices);
-                e.preventDefault();
-            }
+            // Let notation editor handle it if it has selected notes
+            // Otherwise, do nothing (don't delete chord cards)
+            return;
         }
 
         // Ctrl/Cmd+C: Copy selected chords
@@ -7351,9 +7368,8 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         container.innerHTML = '';
         container.className = 'flex flex-col gap-2 p-2 bg-white rounded-lg border border-gray-200';
 
-        // Add section toolbar at the TOP
-        const toolbar = createSectionToolbar(containerId);
-        container.appendChild(toolbar);
+        // Note: Section toolbar moved to card header in HTML (Add Section button)
+        // No longer render toolbar row here
 
         // Create container for cards
         const gridContainer = document.createElement('div');

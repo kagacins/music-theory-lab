@@ -190,7 +190,7 @@ export function initAllSectionDragDrop() {
     // Initialize for Progression Builder tab
     initSectionDragDrop('trainer', 'trainer-sections-container', 'trainer-section-item');
     
-    // Initialize for Melody Composer tab
-    initSectionDragDrop('melody', 'melody-sections-container', 'melody-section-item');
+    // Initialize for Melody Composer tab (new dashboard layout)
+    initSectionDragDrop('melody', 'melody-dashboard-sections-container', 'melody-section-item');
 }
 

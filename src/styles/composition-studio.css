@@ -1,0 +1,1283 @@
+/* ============================================
+   Composition Studio - Card-Based Dashboard
+   Option B: Modern card UI with progressive disclosure
+   ============================================ */
+
+/* Root Variables */
+:root {
+    --card-bg: #ffffff;
+    --card-border: #e5e7eb;
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --card-shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --card-radius: 16px;
+    --spacing-xs: 0.5rem;
+    --spacing-sm: 0.75rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --primary-gradient: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
+    --success-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    --danger-gradient: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    --info-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+/* ============================================
+   Main Dashboard Container
+   ============================================ */
+.melody-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: var(--spacing-md);
+}
+
+/* ============================================
+   Card Base Styles
+   ============================================ */
+.dashboard-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.dashboard-card:hover {
+    box-shadow: var(--card-shadow-hover);
+}
+
+.dashboard-card.card-highlighted {
+    border-color: #a855f7;
+    box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2), var(--card-shadow);
+}
+
+/* Card Header */
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: linear-gradient(to bottom, #fafafa, #f5f5f5);
+    border-bottom: 1px solid var(--card-border);
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
+}
+
+.card-header:hover {
+    background: linear-gradient(to bottom, #f5f5f5, #efefef);
+}
+
+/* Card Header Button (for section sidebar compatibility) */
+.card-header-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: linear-gradient(to bottom, #fafafa, #f5f5f5);
+    border: none;
+    border-radius: var(--card-radius) var(--card-radius) 0 0;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    font-size: inherit;
+}
+
+.card-header-btn:hover {
+    background: linear-gradient(to bottom, #f5f5f5, #efefef);
+}
+
+.card-header-btn.header-progression {
+    background: linear-gradient(to bottom, #faf5ff, #f3e8ff);
+}
+
+.card-header-btn.header-progression:hover {
+    background: linear-gradient(to bottom, #f3e8ff, #ede9fe);
+}
+
+.card-header-btn.header-notation {
+    background: linear-gradient(to bottom, #f5f3ff, #ede9fe);
+}
+
+.card-header-btn.header-notation:hover {
+    background: linear-gradient(to bottom, #ede9fe, #ddd6fe);
+}
+
+.card-header-btn.header-bass {
+    background: linear-gradient(to bottom, #ecfdf5, #d1fae5);
+}
+
+.card-header-btn.header-bass:hover {
+    background: linear-gradient(to bottom, #d1fae5, #a7f3d0);
+}
+
+/* Colored Headers */
+.header-progression {
+    background: linear-gradient(to bottom, #faf5ff, #f3e8ff);
+    border-bottom-color: #e9d5ff;
+}
+
+.header-progression:hover {
+    background: linear-gradient(to bottom, #f3e8ff, #ede9fe);
+}
+
+.header-notation {
+    background: linear-gradient(to bottom, #f5f3ff, #ede9fe);
+    border-bottom-color: #c4b5fd;
+}
+
+.header-notation:hover {
+    background: linear-gradient(to bottom, #ede9fe, #ddd6fe);
+}
+
+.header-bass {
+    background: linear-gradient(to bottom, #ecfdf5, #d1fae5);
+    border-bottom-color: #a7f3d0;
+}
+
+.header-bass:hover {
+    background: linear-gradient(to bottom, #d1fae5, #a7f3d0);
+}
+
+.card-header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.card-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    color: white;
+}
+
+.card-icon.icon-progression { background: linear-gradient(135deg, #a855f7, #ec4899); }
+.card-icon.icon-actions { background: linear-gradient(135deg, #10b981, #3b82f6); }
+.card-icon.icon-notation { background: linear-gradient(135deg, #8b5cf6, #6366f1); }
+.card-icon.icon-suggestions { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+.card-icon.icon-parameters { background: linear-gradient(135deg, #06b6d4, #3b82f6); }
+.card-icon.icon-bass { background: linear-gradient(135deg, #14b8a6, #0891b2); }
+
+.card-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #374151;
+}
+
+/* Stylized Shortcuts Button */
+.shortcuts-btn-styled {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(99, 102, 241, 0.3);
+}
+
+.shortcuts-btn-styled:hover {
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4);
+    transform: translateY(-1px);
+}
+
+.shortcuts-btn-styled svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Compact Add Section Button for header */
+.add-section-header-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 8px;
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 500;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgba(79, 70, 229, 0.3);
+}
+
+.add-section-header-btn:hover {
+    background: linear-gradient(135deg, #4f46e5, #4338ca);
+    box-shadow: 0 2px 4px rgba(79, 70, 229, 0.4);
+    transform: translateY(-1px);
+}
+
+.add-section-header-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
+.card-header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.card-chevron {
+    width: 20px;
+    height: 20px;
+    color: #9ca3af;
+    transition: transform 0.2s ease;
+}
+
+.card-collapsed .card-chevron {
+    transform: rotate(-90deg);
+}
+
+/* Card Body */
+.card-body {
+    padding: var(--spacing-md);
+    border-top: 1px solid var(--card-border);
+}
+
+/* Card body hidden state (for section sidebar) */
+.card-body.hidden {
+    display: none;
+}
+
+.card-collapsed .card-body {
+    display: none;
+}
+
+/* ============================================
+   Quick Actions Card (Always Visible)
+   ============================================ */
+.quick-actions-card {
+    background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
+    border: none;
+    box-shadow: var(--card-shadow);
+}
+
+.quick-actions-card .card-body {
+    padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.quick-actions-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    align-items: center;
+}
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.action-btn:active {
+    transform: translateY(0);
+}
+
+.action-btn.btn-play {
+    background: var(--success-gradient);
+    color: white;
+}
+
+.action-btn.btn-stop {
+    background: var(--danger-gradient);
+    color: white;
+}
+
+.action-btn.btn-generate {
+    background: var(--primary-gradient);
+    color: white;
+}
+
+.action-btn.btn-save {
+    background: var(--info-gradient);
+    color: white;
+}
+
+.action-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Action Divider */
+.action-divider {
+    width: 1px;
+    height: 32px;
+    background: #d1d5db;
+    margin: 0 var(--spacing-xs);
+}
+
+/* Mode Toggle in Actions */
+.mode-toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.mode-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+}
+
+.mode-label.active {
+    color: #8b5cf6;
+}
+
+/* ============================================
+   Progression Card (Compact Horizontal)
+   ============================================ */
+.progression-card .card-body {
+    padding: var(--spacing-sm);
+}
+
+.progression-scroll-container {
+    display: flex;
+    gap: var(--spacing-xs);
+    overflow-x: auto;
+    padding: var(--spacing-xs);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+.progression-scroll-container::-webkit-scrollbar {
+    height: 6px;
+}
+
+.progression-scroll-container::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+}
+
+.progression-chord-chip {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 12px;
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    min-width: 60px;
+}
+
+.progression-chord-chip:hover {
+    border-color: #a855f7;
+    background: #faf5ff;
+}
+
+.progression-chord-chip.selected {
+    border-color: #8b5cf6;
+    background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+}
+
+.chord-chip-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #1f2937;
+}
+
+.chord-chip-type {
+    font-size: 0.65rem;
+    color: #6b7280;
+    text-transform: uppercase;
+}
+
+.progression-empty {
+    padding: var(--spacing-md);
+    text-align: center;
+    color: #9ca3af;
+    font-style: italic;
+}
+
+/* Key Display Badge */
+.key-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: linear-gradient(135deg, #ddd6fe, #c4b5fd);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #5b21b6;
+}
+
+/* ============================================
+   Staff Notation Card (Primary Focus)
+   ============================================ */
+.notation-card {
+    border: 2px solid #c4b5fd;
+}
+
+.notation-card .card-header {
+    background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+    border-bottom-color: #c4b5fd;
+}
+
+.notation-card .card-body {
+    padding: var(--spacing-sm);
+    background: #fafafa;
+}
+
+.notation-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs);
+    background: white;
+    border-radius: 8px;
+    margin-bottom: var(--spacing-sm);
+    border: 1px solid #e5e7eb;
+}
+
+.notation-canvas-wrapper {
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    padding: var(--spacing-xs);
+    min-height: 200px;
+}
+
+/* BPM Control */
+.bpm-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: #f3f4f6;
+    border-radius: 6px;
+}
+
+.bpm-control label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #6b7280;
+}
+
+.bpm-control input[type="range"] {
+    width: 80px;
+    height: 4px;
+}
+
+.bpm-control .bpm-value {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #374151;
+    min-width: 30px;
+}
+
+/* ============================================
+   Notation Header Compact Buttons
+   ============================================ */
+.notation-header-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 4px 8px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.notation-header-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.1);
+}
+
+.notation-header-btn:active {
+    transform: translateY(0);
+}
+
+.notation-header-btn.btn-green {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.notation-header-btn.btn-teal {
+    background: linear-gradient(135deg, #14b8a6, #0d9488);
+}
+
+.notation-header-btn.btn-red {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.notation-header-btn.btn-orange {
+    background: linear-gradient(135deg, #f97316, #ea580c);
+}
+
+.notation-header-btn.btn-blue {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.notation-header-btn.btn-pink {
+    background: linear-gradient(135deg, #ec4899, #db2777);
+}
+
+.notation-header-btn.btn-purple {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+}
+
+/* ============================================
+   Notation Controls Bar
+   ============================================ */
+.notation-controls-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+    background: linear-gradient(to bottom, #f8f9fa, #f1f3f4);
+    border-bottom: 1px solid var(--card-border);
+}
+
+.controls-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.controls-group-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #6b7280;
+    margin-right: 2px;
+}
+
+.controls-divider {
+    width: 1px;
+    height: 24px;
+    background: #d1d5db;
+}
+
+/* Shortcuts Button (in header) */
+.shortcuts-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: #6b7280;
+    background: transparent;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.shortcuts-btn:hover {
+    color: #374151;
+    background: #f3f4f6;
+    border-color: #9ca3af;
+}
+
+.shortcuts-btn svg {
+    color: #9ca3af;
+}
+
+/* Responsive: Stack controls on small screens */
+@media (max-width: 768px) {
+    .notation-controls-bar {
+        padding: 6px 10px;
+    }
+
+    .controls-divider {
+        display: none;
+    }
+
+    .controls-group {
+        flex-wrap: wrap;
+    }
+
+    .controls-group-label {
+        width: 100%;
+        margin-bottom: 4px;
+    }
+}
+
+@media (max-width: 640px) {
+    .notation-header-btn span {
+        display: none;
+    }
+
+    .notation-header-btn {
+        padding: 6px;
+    }
+
+    .shortcuts-btn span {
+        display: none;
+    }
+
+    .shortcuts-btn {
+        padding: 6px;
+    }
+}
+
+/* ============================================
+   Side-by-Side Cards Container
+   ============================================ */
+.cards-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+}
+
+/* When there are two cards, show side-by-side on larger screens */
+.cards-row:has(> :nth-child(2)) {
+    grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 900px) {
+    .cards-row,
+    .cards-row:has(> :nth-child(2)) {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ============================================
+   Suggestions Card
+   ============================================ */
+.suggestions-card .card-body {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.suggestion-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: var(--spacing-sm);
+    padding: 4px;
+    background: #f3f4f6;
+    border-radius: 8px;
+}
+
+.suggestion-tab {
+    flex: 1;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.suggestion-tab:hover {
+    color: #374151;
+    background: #e5e7eb;
+}
+
+.suggestion-tab.active {
+    color: white;
+    background: var(--primary-gradient);
+}
+
+.suggestion-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.suggestion-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.suggestion-item:hover {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+}
+
+.suggestion-name {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #1f2937;
+}
+
+.suggestion-reason {
+    font-size: 0.7rem;
+    color: #6b7280;
+}
+
+.suggestion-score {
+    padding: 2px 8px;
+    background: #ddd6fe;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #5b21b6;
+}
+
+/* ============================================
+   Parameters Card
+   ============================================ */
+.parameters-card .card-body {
+    padding: var(--spacing-sm);
+}
+
+.param-group {
+    margin-bottom: var(--spacing-sm);
+}
+
+.param-group:last-child {
+    margin-bottom: 0;
+}
+
+.param-group-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--spacing-xs);
+}
+
+.param-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-xs);
+}
+
+.param-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.param-item label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+.param-item select,
+.param-item input {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: white;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.param-item select:focus,
+.param-item input:focus {
+    outline: none;
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+}
+
+/* ============================================
+   Bass Controls Card
+   ============================================ */
+.bass-card .card-body {
+    padding: var(--spacing-sm);
+}
+
+.bass-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-sm);
+    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+    border-radius: 8px;
+    margin-bottom: var(--spacing-sm);
+}
+
+.bass-toggle-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.bass-toggle-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #065f46;
+}
+
+.bass-toggle-desc {
+    font-size: 0.7rem;
+    color: #059669;
+}
+
+/* ============================================
+   Intent Selector (Compact Pills)
+   ============================================ */
+.intent-selector {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: #f3f4f6;
+    border-radius: 8px;
+}
+
+.intent-pill {
+    padding: 6px 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #6b7280;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.intent-pill:hover {
+    color: #374151;
+    background: #e5e7eb;
+}
+
+.intent-pill.active {
+    color: white;
+    background: var(--primary-gradient);
+}
+
+/* ============================================
+   Helper Buttons Row
+   ============================================ */
+.helper-buttons-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
+}
+
+.helper-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.helper-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.1);
+}
+
+.helper-btn.btn-chord-suggestions {
+    background: linear-gradient(135deg, #3b82f6, #06b6d4);
+}
+
+.helper-btn.btn-melody-suggestions {
+    background: linear-gradient(135deg, #ec4899, #f43f5e);
+}
+
+.helper-btn.btn-shortcuts {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+}
+
+.helper-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ============================================
+   Recording Indicator
+   ============================================ */
+.recording-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #dc2626;
+}
+
+.recording-dot {
+    width: 8px;
+    height: 8px;
+    background: #dc2626;
+    border-radius: 50%;
+    animation: pulse-recording 1s infinite;
+}
+
+@keyframes pulse-recording {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* ============================================
+   Empty State
+   ============================================ */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-xl);
+    text-align: center;
+    color: #9ca3af;
+}
+
+.empty-state-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: var(--spacing-sm);
+    opacity: 0.5;
+}
+
+.empty-state-text {
+    font-size: 0.875rem;
+}
+
+.empty-state-hint {
+    font-size: 0.75rem;
+    margin-top: 4px;
+}
+
+/* ============================================
+   Responsive Adjustments
+   ============================================ */
+@media (max-width: 768px) {
+    .melody-dashboard {
+        padding: var(--spacing-sm);
+        gap: var(--spacing-md);
+    }
+
+    .quick-actions-grid {
+        justify-content: center;
+    }
+
+    .action-btn {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+    }
+
+    .action-btn span {
+        display: none;
+    }
+
+    .action-divider {
+        display: none;
+    }
+
+    .mode-toggle-container {
+        width: 100%;
+        justify-content: center;
+        margin-top: var(--spacing-xs);
+    }
+
+    .param-row {
+        grid-template-columns: 1fr;
+    }
+
+    .helper-buttons-row {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .card-header {
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+
+    .card-body {
+        padding: var(--spacing-sm);
+    }
+
+    .card-title {
+        font-size: 0.8rem;
+    }
+
+    .progression-chord-chip {
+        padding: 6px 10px;
+        min-width: 50px;
+    }
+
+    .chord-chip-name {
+        font-size: 0.8rem;
+    }
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.dashboard-card {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.dashboard-card:nth-child(2) { animation-delay: 0.05s; }
+.dashboard-card:nth-child(3) { animation-delay: 0.1s; }
+.dashboard-card:nth-child(4) { animation-delay: 0.15s; }
+.dashboard-card:nth-child(5) { animation-delay: 0.2s; }
+
+/* ============================================
+   Custom Scrollbar for Cards
+   ============================================ */
+.dashboard-card .card-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.dashboard-card .card-body::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: 3px;
+}
+
+.dashboard-card .card-body::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+}
+
+.dashboard-card .card-body::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+/* ============================================
+   Toggle Switch Styling (Consistent)
+   ============================================ */
+.toggle-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.toggle-switch input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    width: 40px;
+    height: 22px;
+    background: #d1d5db;
+    border-radius: 11px;
+    transition: background 0.2s ease;
+    position: relative;
+}
+
+.toggle-slider::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: #8b5cf6;
+}
+
+.toggle-switch input:checked + .toggle-slider::after {
+    transform: translateX(18px);
+}
+
+/* Dashboard card styling for section sidebar compatibility */
+.dashboard-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+}
+
+/* ============================================
+   Auto Bass Accordion (Compact Expandable)
+   ============================================ */
+.auto-bass-accordion {
+    margin-top: 8px;
+    margin-bottom: 12px;
+    border: 1px solid #d1fae5;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+    overflow: hidden;
+}
+
+.auto-bass-accordion-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    font-family: inherit;
+}
+
+.auto-bass-accordion-header:hover {
+    background: rgba(16, 185, 129, 0.08);
+}
+
+.auto-bass-accordion-content {
+    max-height: 0;
+    overflow: hidden;
+    padding: 0 12px;
+    transition: max-height 0.25s ease, padding 0.25s ease;
+}
+
+/* Expanded state */
+.auto-bass-accordion.expanded .auto-bass-accordion-content {
+    max-height: 100px;
+    padding: 0 12px 10px 12px;
+}
+
+.auto-bass-accordion.expanded .accordion-chevron {
+    transform: rotate(180deg);
+}
+
+/* Chevron icon transition */
+.accordion-chevron {
+    transition: transform 0.25s ease;
+}
+
+/* ============================================
+   Colorful Sidebar Icons (Drag Handles & Chevrons)
+   ============================================ */
+
+/* Base Drag Handle Pill */
+.sidebar-icon-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.sidebar-icon-pill:hover {
+    transform: scale(1.1);
+}
+
+/* Purple variant (Chord Progression) */
+.sidebar-icon-purple {
+    background: linear-gradient(135deg, #a855f7, #9333ea);
+    color: white;
+    box-shadow: 0 2px 4px rgba(168, 85, 247, 0.3);
+}
+
+.sidebar-icon-purple:hover {
+    background: linear-gradient(135deg, #9333ea, #7c3aed);
+    box-shadow: 0 3px 6px rgba(168, 85, 247, 0.4);
+}
+
+/* Indigo variant (Staff Notation) */
+.sidebar-icon-indigo {
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    color: white;
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
+}
+
+.sidebar-icon-indigo:hover {
+    background: linear-gradient(135deg, #4f46e5, #4338ca);
+    box-shadow: 0 3px 6px rgba(99, 102, 241, 0.4);
+}
+
+/* Base Chevron Pill */
+.sidebar-chevron-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.sidebar-chevron-pill:hover {
+    transform: scale(1.05);
+}
+
+/* Purple chevron variant */
+.sidebar-chevron-purple {
+    background: linear-gradient(135deg, #f3e8ff, #e9d5ff);
+    color: #9333ea;
+    border: 1px solid #d8b4fe;
+}
+
+.sidebar-chevron-purple:hover {
+    background: linear-gradient(135deg, #e9d5ff, #d8b4fe);
+    color: #7c3aed;
+}
+
+/* Indigo chevron variant */
+.sidebar-chevron-indigo {
+    background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+    color: #4f46e5;
+    border: 1px solid #a5b4fc;
+}
+
+.sidebar-chevron-indigo:hover {
+    background: linear-gradient(135deg, #c7d2fe, #a5b4fc);
+    color: #4338ca;
+}

@@ -1011,7 +1011,7 @@ export function initInstantTooltips() {
 export function initAllSectionSidebars() {
     initSectionSidebar('builder', 'builder-sections-container', 'builder-section-item');
     initSectionSidebar('trainer', 'trainer-sections-container', 'trainer-section-item');
-    initSectionSidebar('melody', 'melody-sections-container', 'melody-section-item');
+    initSectionSidebar('melody', 'melody-dashboard-sections-container', 'melody-section-item');
     
     // Initialize instant tooltips for all floating controls and other buttons
     initInstantTooltips();

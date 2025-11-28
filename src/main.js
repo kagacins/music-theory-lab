@@ -1217,10 +1217,32 @@ window.toggleCurrentMelodyPanel = function() {
         panel.classList.add('hidden');
         chevron.classList.remove('rotate-180');
     }
-    
+
     // Save panel state
     if (window.savePanelState) {
         window.savePanelState('current-melody-panel', !isHidden);
+    }
+};
+
+// Melody Section Toggle (Composition Studio)
+// Uses standard section pattern with -toggle and -panel naming
+window.toggleMelodySection = function(sectionId) {
+    const panel = document.getElementById(`${sectionId}-panel`);
+    const chevron = document.getElementById(`${sectionId}-chevron`);
+    if (!panel) return;
+
+    const isHidden = panel.classList.contains('hidden');
+    if (isHidden) {
+        panel.classList.remove('hidden');
+        if (chevron) chevron.classList.add('rotate-180');
+    } else {
+        panel.classList.add('hidden');
+        if (chevron) chevron.classList.remove('rotate-180');
+    }
+
+    // Save panel state
+    if (window.savePanelState) {
+        window.savePanelState(`${sectionId}-panel`, !isHidden);
     }
 };
 
@@ -1489,6 +1511,44 @@ window.toggleQuickAddChordMelody = function() {
         form.classList.remove('hidden');
     } else {
         form.classList.add('hidden');
+    }
+};
+
+// Simplified Quick Add Chord for Melody Composer (new compact form)
+window.quickAddChordMelody = function() {
+    // Get selected values from the simplified Melody Composer form
+    const rootIndex = parseInt(document.getElementById('quick-add-root-melody')?.value || '0');
+    const chordTypeInput = document.getElementById('quick-add-type-input-melody');
+    const chordType = chordTypeInput?.value?.trim() || 'Major';
+    const duration = parseInt(document.getElementById('quick-add-duration-melody')?.value || '4');
+
+    // Use the existing addChordToProgression function from chord builder
+    if (window.addChordToProgression && window.selectBuilderRootNote && window.selectBuilderChordType) {
+        try {
+            // Set the builder state to match the quick add selection
+            window.selectBuilderRootNote(rootIndex, false); // Don't play audio
+            window.selectBuilderChordType(chordType, false); // Don't play audio
+            if (window.selectBuilderInversion) {
+                window.selectBuilderInversion(0, false); // Default to root position
+            }
+
+            // Add the chord without triggering playback
+            window.addChordToProgression(false); // false = don't switch to trainer tab
+
+            // Clear the type input for next chord
+            if (chordTypeInput) chordTypeInput.value = '';
+
+            // Show success feedback
+            const form = document.getElementById('quick-add-chord-form-melody');
+            if (form) {
+                form.style.borderColor = '#10b981'; // Green
+                setTimeout(() => {
+                    form.style.borderColor = '';
+                }, 300);
+            }
+        } catch (error) {
+            console.error('Error adding chord:', error);
+        }
     }
 };
 
