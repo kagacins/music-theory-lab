@@ -457,6 +457,13 @@ export function initEnhancedNotation(options = {}) {
 
         notationComposer.toolbar.updateSelectionState(selectedNoteObjects);
       }
+
+      // Phase 4: Trigger melody suggestion updates when note selection changes
+      if (window.onTrebleNoteSelectionChanged) {
+        // Get the selected treble note info for melody suggestions
+        const trebleNoteIds = noteIds.filter(id => id.split('-')[1] === 'treble');
+        window.onTrebleNoteSelectionChanged(trebleNoteIds);
+      }
     },
     onNoteDelete: (deletion) => {
       // Helper to clear isTied flag on the next note when deleting the first note of a tie
@@ -1005,12 +1012,72 @@ export function renderEnhancedNotation(canvas = null) {
  * Re-render with updated data from progression
  * @returns {boolean} - True if rendering was performed, false if not initialized
  */
-export function refreshNotationFromProgression() {
+export function refreshNotationFromProgression(preventScroll = false) {
   if (!notationComposer) {
     return false;
   }
 
-  notationComposer.syncFromProgression();
+  // Save scroll position before syncing to prevent page jumping
+  const scrollY = window.scrollY;
+  const scrollX = window.scrollX;
+  const canvasContainer = notationComposer.config?.container?.parentElement;
+  const containerScrollTop = canvasContainer ? canvasContainer.scrollTop : 0;
+  const containerScrollLeft = canvasContainer ? canvasContainer.scrollLeft : 0;
+
+  // Prevent canvas from getting focus (which causes scroll)
+  const canvas = notationComposer.config?.container;
+  if (canvas && preventScroll) {
+    // Make canvas non-focusable to prevent scroll
+    canvas.setAttribute('tabindex', '-1');
+    canvas.style.outline = 'none';
+    // Also prevent any scrollIntoView calls
+    const originalScrollIntoView = canvas.scrollIntoView;
+    canvas.scrollIntoView = () => {}; // No-op
+    // Restore after a delay
+    setTimeout(() => {
+      if (canvas.scrollIntoView === (() => {})) {
+        canvas.scrollIntoView = originalScrollIntoView;
+      }
+    }, 500);
+  }
+
+  notationComposer.syncFromProgression(preventScroll);
+  
+  // Restore scroll position after sync completes
+  const restoreScroll = () => {
+    window.scrollTo(scrollX, scrollY);
+    if (canvasContainer) {
+      canvasContainer.scrollTop = containerScrollTop;
+      canvasContainer.scrollLeft = containerScrollLeft;
+    }
+  };
+  
+  if (preventScroll) {
+    // More aggressive scroll prevention when explicitly requested
+    // Restore scroll immediately and multiple times
+    restoreScroll();
+    requestAnimationFrame(() => {
+      restoreScroll();
+      requestAnimationFrame(() => {
+        restoreScroll();
+        setTimeout(restoreScroll, 10);
+        setTimeout(restoreScroll, 50);
+        setTimeout(restoreScroll, 100);
+        setTimeout(restoreScroll, 200);
+      });
+    });
+  } else {
+    // Normal scroll restoration
+    requestAnimationFrame(() => {
+      restoreScroll();
+      requestAnimationFrame(() => {
+        restoreScroll();
+        setTimeout(restoreScroll, 50);
+        setTimeout(restoreScroll, 100);
+      });
+    });
+  }
+  
   return true;
 }
 

@@ -527,12 +527,15 @@ export class NotationComposer {
    * and prepares data for rendering. It does NOT modify compositionState - that's done by
    * syncWithProgressionData() which properly handles variable chord durations.
    */
-  syncFromProgression() {
+  syncFromProgression(preventScroll = false) {
     // Cancel any pending render since we're doing a full sync
     if (this.pendingRenderFrame) {
       cancelAnimationFrame(this.pendingRenderFrame);
       this.pendingRenderFrame = null;
     }
+
+    // Store preventScroll flag for use during render
+    this._preventScrollDuringSync = preventScroll;
 
     try {
       const progressionData = getProgressionData();
@@ -641,6 +644,7 @@ export class NotationComposer {
       // Reset sync flag with delay to allow event propagation
       setTimeout(() => {
         this.isSyncingFromProgression = false;
+        this._preventScrollDuringSync = false;
       }, 50);
     }
   }
@@ -705,6 +709,26 @@ export class NotationComposer {
         this.config.container = newContainer;
       } else {
         return;
+      }
+    }
+
+    // Capture scroll position BEFORE any rendering or DOM manipulation
+    // This is critical to prevent page jumps during sync/refresh
+    const scrollY = this._preventScrollDuringSync ? window.scrollY : null;
+    const scrollX = this._preventScrollDuringSync ? window.scrollX : null;
+    const canvasContainer = this.config.container ? this.config.container.parentElement : null;
+    const containerScrollTop = (this._preventScrollDuringSync && canvasContainer) ? canvasContainer.scrollTop : null;
+    const containerScrollLeft = (this._preventScrollDuringSync && canvasContainer) ? canvasContainer.scrollLeft : null;
+
+    // Prevent canvas from getting focus (which causes scroll)
+    if (this._preventScrollDuringSync && this.config.container) {
+      const canvas = this.config.container;
+      canvas.setAttribute('tabindex', '-1');
+      canvas.style.outline = 'none';
+      // Temporarily disable scrollIntoView
+      if (!canvas._originalScrollIntoView) {
+        canvas._originalScrollIntoView = canvas.scrollIntoView;
+        canvas.scrollIntoView = () => {}; // No-op
       }
     }
 
@@ -861,15 +885,32 @@ export class NotationComposer {
     // Force browser repaint by triggering a reflow
     // This ensures the canvas actually displays the new rendering
     if (this.config.container) {
-      void this.config.container.offsetHeight;
-      // Also force a style recalculation
       const canvas = this.config.container;
+      
+      void canvas.offsetHeight;
+      // Also force a style recalculation
       const computedStyle = window.getComputedStyle(canvas);
       void computedStyle.width; // Force style computation
       // Trigger paint by modifying and restoring a property
       canvas.style.transform = 'translateZ(0)';
+      
       setTimeout(() => {
         canvas.style.transform = '';
+        
+        // Restore scroll position if we're preventing scroll
+        if (this._preventScrollDuringSync && scrollY !== null) {
+          window.scrollTo(scrollX, scrollY);
+          if (canvasContainer && containerScrollTop !== null) {
+            canvasContainer.scrollTop = containerScrollTop;
+            canvasContainer.scrollLeft = containerScrollLeft;
+          }
+        }
+        
+        // Restore scrollIntoView
+        if (canvas._originalScrollIntoView) {
+           canvas.scrollIntoView = canvas._originalScrollIntoView;
+           delete canvas._originalScrollIntoView;
+        }
       }, 0);
     }
 

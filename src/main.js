@@ -3077,10 +3077,28 @@ import {
     insertNote as insertSuggestedNote
 } from './modules/ai/melodySuggestionController.js';
 
+// Phase 4: Import enhanced melody generation modules
+import {
+    initEnhancedMelodyController,
+    setSectionType as setEnhancedSectionType,
+    setSectionPosition as setEnhancedSectionPosition,
+    updatePhraseSettings,
+    generatePhrases,
+    getMotifSuggestions,
+    isEnhancedControllerInitialized,
+    getSelectedNoteInfo,
+    regeneratePhrases,
+    CONTOUR_SHAPE_LIST,
+    PHRASE_LENGTH_LIST,
+    RHYTHM_PATTERN_LIST,
+    SECTION_MELODY_PROFILE_LIST
+} from './modules/ai/enhancedMelodyController.js';
+
 // Global instances for recommendations (singleton pattern)
 let recommendationService = null;
 let recommendationsSidebarController = null;
 let melodySuggestionControllerInitialized = false;
+let enhancedMelodyControllerInitialized = false;
 
 /**
  * Initialize the chord recommendations sidebar
@@ -3153,6 +3171,23 @@ window.initMelodySuggestionController = function(options = {}) {
                 }
             }
         };
+
+        // Phase 4: Initialize enhanced melody controller
+        if (!enhancedMelodyControllerInitialized) {
+            try {
+                initEnhancedMelodyController({
+                    onPhraseSelected: (phrase) => {
+                        console.log('✅ Phrase inserted:', phrase.notes.length, 'notes');
+                    },
+                    onMotifDetected: (analysis) => {
+                        console.log('🎵 Motifs detected:', analysis.totalDetected);
+                    }
+                });
+                enhancedMelodyControllerInitialized = true;
+            } catch (err) {
+                console.warn('Enhanced melody controller initialization deferred');
+            }
+        }
     } catch (error) {
         // Error initializing melody suggestion controller
     }
@@ -3164,6 +3199,33 @@ window.setMelodySuggestionMeasure = setMelodySuggestionMeasure;
 window.setMelodySuggestionStyle = setMelodySuggestionStyle;
 window.setMelodySuggestionOctave = setMelodySuggestionOctave;
 window.insertSuggestedNote = insertSuggestedNote;
+
+// Phase 4: Expose enhanced melody generation functions to window
+window.setEnhancedSectionType = setEnhancedSectionType;
+window.setEnhancedSectionPosition = setEnhancedSectionPosition;
+window.updatePhraseSettings = updatePhraseSettings;
+window.generatePhrases = generatePhrases;
+window.getMotifSuggestions = getMotifSuggestions;
+window.getSelectedNoteInfo = getSelectedNoteInfo;
+window.regeneratePhrases = regeneratePhrases;
+window.CONTOUR_SHAPE_LIST = CONTOUR_SHAPE_LIST;
+window.PHRASE_LENGTH_LIST = PHRASE_LENGTH_LIST;
+window.RHYTHM_PATTERN_LIST = RHYTHM_PATTERN_LIST;
+window.SECTION_MELODY_PROFILE_LIST = SECTION_MELODY_PROFILE_LIST;
+
+// Phase 4: Handler for treble note selection changes
+// Called from notationInit.js when treble clef notes are selected
+window.onTrebleNoteSelectionChanged = function(trebleNoteIds) {
+    // Update single note suggestions based on new selection
+    if (melodySuggestionControllerInitialized) {
+        refreshMelodySuggestions();
+    }
+
+    // Update phrase suggestions based on new selection
+    if (enhancedMelodyControllerInitialized) {
+        regeneratePhrases();
+    }
+};
 
 // ===========================
 // SUGGESTION MODE TOGGLE (Chords/Melody)

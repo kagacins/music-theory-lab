@@ -265,7 +265,7 @@ export function showLoadingState() {
 /**
  * Update context display
  */
-export function updateSuggestionContext(chord, key, previousNote) {
+export function updateSuggestionContext(chord, key, previousNote, nextChord = null, anticipationFactor = 0) {
     const contextEl = document.getElementById('melody-suggestion-context');
     if (!contextEl) return;
 
@@ -273,11 +273,25 @@ export function updateSuggestionContext(chord, key, previousNote) {
     const keyDisplay = key || 'C';
     const prevDisplay = previousNote || 'None';
 
+    // Build next chord display if available
+    let nextChordHTML = '';
+    if (nextChord && anticipationFactor > 0) {
+        const anticipationPercent = Math.round(anticipationFactor * 100);
+        nextChordHTML = `
+        <div class="context-item">
+            <span class="context-label">Next:</span>
+            <span class="context-value text-indigo-600">${nextChord.root} ${nextChord.type}</span>
+            <span class="text-xs text-gray-400 ml-1">(${anticipationPercent}%)</span>
+        </div>
+        `;
+    }
+
     contextEl.innerHTML = `
         <div class="context-item">
             <span class="context-label">Chord:</span>
             <span class="context-value">${chordDisplay}</span>
         </div>
+        ${nextChordHTML}
         <div class="context-item">
             <span class="context-label">Key:</span>
             <span class="context-value">${keyDisplay}</span>
@@ -296,10 +310,23 @@ export function updateSuggestionContext(chord, key, previousNote) {
 /**
  * Generate and display suggestions based on context
  */
-export function updateSuggestions({ chord, key, previousNote, styleId = 'any', contourId = 'any', octave = 4, recentNotes = [] }) {
+export function updateSuggestions({
+    chord,
+    key,
+    previousNote,
+    styleId = 'any',
+    contourId = 'any',
+    octave = 4,
+    recentNotes = [],
+    nextChord = null,
+    anticipationFactor = 0
+}) {
     showLoadingState();
 
     console.log('🎼 Generating melody suggestions with styleId:', styleId);
+    if (nextChord && anticipationFactor > 0) {
+        console.log(`🎯 Anticipation active: ${(anticipationFactor * 100).toFixed(0)}% toward ${nextChord.root} ${nextChord.type}`);
+    }
 
     // Generate suggestions
     const result = generateMelodySuggestions({
@@ -310,11 +337,13 @@ export function updateSuggestions({ chord, key, previousNote, styleId = 'any', c
         contourId,
         octave,
         range: 2,
-        recentNotes
+        recentNotes,
+        nextChord,
+        anticipationFactor
     });
 
     // Update context display
-    updateSuggestionContext(chord, key, previousNote);
+    updateSuggestionContext(chord, key, previousNote, nextChord, anticipationFactor);
 
     // Render suggestions
     renderSuggestions(result.suggestions);

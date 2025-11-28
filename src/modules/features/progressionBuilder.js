@@ -10957,7 +10957,7 @@ function highlightTrainer(scaleNotes, chordNotes) {
  * Helper function to render melody notation if needed
  * Checks if we're on Melody Composer tab or if Free mode is active
  */
-function renderMelodyNotationIfNeeded() {
+function renderMelodyNotationIfNeeded(preventScroll = false) {
     // Check if we're on the Melody Composer tab
     const currentTab = getCurrentTab();
     const isMelodyTab = currentTab === 'melody';
@@ -10975,7 +10975,7 @@ function renderMelodyNotationIfNeeded() {
         }
         // refreshNotationFromProgression returns true if it rendered, false otherwise
         if (window.refreshNotationFromProgression) {
-            const result = window.refreshNotationFromProgression();
+            const result = window.refreshNotationFromProgression(preventScroll);
             if (result) {
                 return;
             }
@@ -10992,7 +10992,7 @@ function renderMelodyNotationIfNeeded() {
         if (window.refreshNotationFromProgression) {
             // Use setTimeout to ensure DOM updates are complete
             setTimeout(() => {
-                window.refreshNotationFromProgression();
+                window.refreshNotationFromProgression(preventScroll);
             }, 50);
         }
     }
@@ -11641,20 +11641,53 @@ export function addToProgressionData(chordData) {
     }
     setProgressionData(trainerState.progressionData);
     
+    // Save scroll position to prevent jumping when notation refreshes
+    // Save both window scroll and any scrollable container scroll positions
+    const scrollY = window.scrollY;
+    const scrollX = window.scrollX;
+    const canvasContainer = document.getElementById('interactive-melody-notation-canvas')?.parentElement;
+    const containerScrollTop = canvasContainer ? canvasContainer.scrollTop : 0;
+    const containerScrollLeft = canvasContainer ? canvasContainer.scrollLeft : 0;
+    
     // Render both progression displays to keep them in sync
     renderProgressionDisplay('progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
 
     // Auto-render melody notation if on Melody Composer tab or if Free mode is active
-    renderMelodyNotationIfNeeded();
-
-    // Sync added chord to compositionState, then refresh notation
-    if (window.syncProgressionToMelodyComposer) {
-        window.syncProgressionToMelodyComposer();
-    }
-    if (window.refreshNotationFromProgression) {
-        window.refreshNotationFromProgression();
-    }
+    // This function already checks the tab and only refreshes if needed
+    // Pass preventScroll=true to prevent page from jumping to notation
+    renderMelodyNotationIfNeeded(true);
+    
+    // Restore scroll position multiple times to catch any delayed scrolling
+    // This prevents the page from jumping when notation refreshes on any tab
+    const restoreScroll = () => {
+        // Prevent any element from getting focus that might cause scrolling
+        const activeElement = document.activeElement;
+        if (activeElement && (activeElement.tagName === 'CANVAS' || activeElement.id?.includes('canvas'))) {
+            // Blur canvas if it got focused (which would cause scroll)
+            activeElement.blur();
+        }
+        
+        window.scrollTo(scrollX, scrollY);
+        if (canvasContainer) {
+            canvasContainer.scrollTop = containerScrollTop;
+            canvasContainer.scrollLeft = containerScrollLeft;
+        }
+    };
+    
+    // Restore immediately and after rendering delays
+    restoreScroll();
+    requestAnimationFrame(() => {
+        restoreScroll();
+        requestAnimationFrame(() => {
+            restoreScroll();
+            // Multiple restores to catch any delayed scrolls from async rendering
+            setTimeout(restoreScroll, 50);
+            setTimeout(restoreScroll, 100);
+            setTimeout(restoreScroll, 200);
+            setTimeout(restoreScroll, 300);
+        });
+    });
 }
 
 /**

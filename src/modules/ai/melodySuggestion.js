@@ -485,6 +485,93 @@ function scoreContour(note, previousNote, contourPreset) {
 }
 
 // -----------------------------------------------------------------------------
+// Anticipation Scoring (for upcoming chord changes)
+// -----------------------------------------------------------------------------
+
+/**
+ * Score anticipation - how well a note leads into the next chord
+ * @param {string} note - Note to score
+ * @param {Object} currentChord - Current chord {root, type}
+ * @param {Object} nextChord - Next chord {root, type}
+ * @param {number} anticipationFactor - 0-1, how close we are to chord change (1 = at boundary)
+ * @returns {Object|null} Score object or null
+ */
+function scoreAnticipation(note, currentChord, nextChord, anticipationFactor) {
+    if (!nextChord || anticipationFactor <= 0) return null;
+
+    const notePc = getPitchClass(note);
+    const nextChordTones = getChordTones(nextChord);
+    const currentChordTones = getChordTones(currentChord);
+    const nextRootPc = getPitchClass(nextChord.root);
+
+    let anticipationScore = 0;
+    let detail = '';
+
+    // Check if note is a chord tone of the NEXT chord
+    if (nextChordTones.includes(notePc)) {
+        const interval = (notePc - nextRootPc + 12) % 12;
+        if (interval === 0) {
+            // Root of next chord - strong anticipation
+            anticipationScore = 35;
+            detail = `Anticipates ${nextChord.root} (root)`;
+        } else if (interval === 7) {
+            // Fifth of next chord
+            anticipationScore = 28;
+            detail = `Anticipates ${nextChord.root} (5th)`;
+        } else if (interval === 4 || interval === 3) {
+            // Third of next chord
+            anticipationScore = 30;
+            detail = `Anticipates ${nextChord.root} (3rd)`;
+        } else {
+            // Other chord tone (7th, etc.)
+            anticipationScore = 22;
+            detail = `Anticipates ${nextChord.root} (extension)`;
+        }
+
+        // Extra bonus if it's also a common tone (shared between chords)
+        if (currentChordTones.includes(notePc)) {
+            anticipationScore += 10;
+            detail += ' (common tone)';
+        }
+    }
+    // Check for leading tone to next chord's root (half-step below)
+    else if ((notePc + 1) % 12 === nextRootPc) {
+        anticipationScore = 32;
+        detail = `Leading tone to ${nextChord.root}`;
+    }
+    // Check for leading tone to next chord's third
+    else if ((notePc + 1) % 12 === nextChordTones[1] || (notePc + 11) % 12 === nextChordTones[1]) {
+        anticipationScore = 20;
+        detail = `Approach to ${nextChord.root}'s 3rd`;
+    }
+    // Check for common tone bonus (note in both chords)
+    else if (currentChordTones.includes(notePc) && nextChordTones.includes(notePc)) {
+        anticipationScore = 15;
+        detail = `Common tone (${currentChord.root}→${nextChord.root})`;
+    }
+
+    if (anticipationScore > 0) {
+        // Weight by anticipation factor - stronger effect closer to chord change
+        return {
+            score: anticipationScore * anticipationFactor,
+            category: 'anticipation',
+            detail
+        };
+    }
+
+    return null;
+}
+
+/**
+ * Get common tones between two chords
+ */
+export function getCommonTones(chord1, chord2) {
+    const tones1 = getChordTones(chord1);
+    const tones2 = getChordTones(chord2);
+    return tones1.filter(t => tones2.includes(t));
+}
+
+// -----------------------------------------------------------------------------
 // Main suggestion generation
 // -----------------------------------------------------------------------------
 
@@ -499,6 +586,9 @@ function scoreContour(note, previousNote, contourPreset) {
  * @param {string} options.contourId - Contour preset ID
  * @param {number} options.octave - Target octave (default 4)
  * @param {number} options.range - Octave range to consider (default 2)
+ * @param {Array} options.recentNotes - Array of recent note names for recency penalty
+ * @param {Object} options.nextChord - Next chord in progression (for anticipation)
+ * @param {number} options.anticipationFactor - 0-1, proximity to chord change (1 = at boundary)
  * @returns {Object} Suggestions and context
  */
 export function generateMelodySuggestions({
@@ -509,7 +599,9 @@ export function generateMelodySuggestions({
     contourId = 'any',
     octave = 4,
     range = 2,
-    recentNotes = [] // Array of recent note names for recency penalty
+    recentNotes = [],
+    nextChord = null,
+    anticipationFactor = 0
 } = {}) {
     const baseStyleRules = STYLE_RULES[styleId] || STYLE_RULES.any;
 
@@ -591,6 +683,19 @@ export function generateMelodySuggestions({
                     scores.push(tensionScore.score);
                     reasons.push(tensionScore.detail);
                     categories.push(tensionScore.category);
+                }
+            }
+
+            // Score anticipation (how well note leads into next chord)
+            let anticipationBonus = 0;
+            if (nextChord && anticipationFactor > 0) {
+                const anticipationResult = scoreAnticipation(noteName, chord, nextChord, anticipationFactor);
+                if (anticipationResult) {
+                    anticipationBonus = anticipationResult.score;
+                    reasons.push(anticipationResult.detail);
+                    if (!categories.includes('anticipation')) {
+                        categories.push('anticipation');
+                    }
                 }
             }
 
@@ -686,7 +791,7 @@ export function generateMelodySuggestions({
 
             // Calculate total score naturally without clamping
             // We'll normalize all scores to 0-100 range at the end
-            const totalScore = harmonicScore + proximityBonus;
+            const totalScore = harmonicScore + proximityBonus + anticipationBonus;
 
             // Only include notes with reasonable scores
             if (totalScore > 20) {
@@ -705,7 +810,10 @@ export function generateMelodySuggestions({
                     chordDegree: getChordDegree(noteName, chord),
                     isChordTone: isChordTone(noteName, chord),
                     isScaleTone: isScaleTone(noteName, keyRoot, scaleType),
-                    voiceLeadingDistance: previousNote ? getInterval(previousNote, noteName) : null
+                    voiceLeadingDistance: previousNote ? getInterval(previousNote, noteName) : null,
+                    // Anticipation info
+                    anticipatesNextChord: nextChord ? isChordTone(noteName, nextChord) : false,
+                    isCommonTone: nextChord ? (isChordTone(noteName, chord) && isChordTone(noteName, nextChord)) : false
                 });
             }
         }
@@ -741,7 +849,8 @@ export function generateMelodySuggestions({
         scaleTone: sortedCandidates.filter(c => c.category === 'scaleTone'),
         stepwiseMotion: sortedCandidates.filter(c => c.category === 'stepwiseMotion'),
         approachTone: sortedCandidates.filter(c => c.category === 'approachTone'),
-        tension: sortedCandidates.filter(c => c.category === 'tension')
+        tension: sortedCandidates.filter(c => c.category === 'tension'),
+        anticipation: sortedCandidates.filter(c => c.anticipatesNextChord)
     };
 
     return {
@@ -754,7 +863,9 @@ export function generateMelodySuggestions({
             styleId,
             contourId,
             octave,
-            range
+            range,
+            nextChord,
+            anticipationFactor
         }
     };
 }
