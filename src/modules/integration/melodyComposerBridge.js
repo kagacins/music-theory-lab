@@ -551,11 +551,30 @@ export function regenerateAllBass() {
  */
 export function getBassPatternOptions() {
     return [
+        // Simple Patterns
         { value: 'whole-note', label: 'Whole Note', description: 'Single root note per measure' },
         { value: 'root-fifth', label: 'Root-Fifth', description: 'Alternating root and fifth' },
         { value: 'arpeggio', label: 'Arpeggio', description: 'Ascending chord tones' },
         { value: 'alberti', label: 'Alberti Bass', description: 'Classical pattern (C-G-E-G)' },
-        { value: 'walking', label: 'Walking Bass', description: 'Jazz stepwise motion' }
+        { value: 'walking', label: 'Walking Bass', description: 'Jazz stepwise motion' },
+        { value: 'broken-octave', label: 'Broken Octave', description: 'Alternating low/high root' },
+        { value: 'country', label: 'Country', description: 'Two-beat boom-chick' },
+        { value: 'pedal', label: 'Pedal Point', description: 'Sustained drone bass' },
+        
+        // Rhythmic Patterns
+        { value: 'boogie', label: 'Boogie-Woogie', description: '8-to-the-bar blues' },
+        { value: 'driving-rock', label: 'Driving Rock', description: 'Straight 8th notes' },
+        { value: 'montuno', label: 'Montuno', description: 'Cuban syncopated 8ths' },
+        { value: 'tango', label: 'Tango', description: 'Latin habanera rhythm' },
+        { value: 'reggae', label: 'Reggae', description: 'One-drop offbeat' },
+        { value: 'funk', label: 'Funk', description: 'Syncopated with ghost notes' },
+        
+        // Polyphonic Patterns (Chords)
+        { value: 'octave-doubling', label: 'Octave Doubling', description: 'Root + octave chord' },
+        { value: 'power-chord', label: 'Power Chord', description: 'Root + fifth chord' },
+        { value: 'stride', label: 'Stride', description: 'Jazz/ragtime bass + chord' },
+        { value: 'shell-voicing', label: 'Shell Voicing', description: 'Jazz root + 3rd/7th' },
+        { value: 'tenths', label: 'Tenths', description: 'Root + 10th intervals' }
     ];
 }
 

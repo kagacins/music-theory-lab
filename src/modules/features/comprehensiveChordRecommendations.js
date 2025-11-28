@@ -40,6 +40,12 @@ import {
 } from './sectionTransitionAnalyzer.js';
 import { getSectionProfile, getChordTypePreference } from './sectionProfiles.js';
 
+// Phase 3 Tension Arc Modules
+import {
+    getTensionArcPlanner,
+    CHORD_TENSION_SCORES
+} from '../analysis/TensionArcPlanner.js';
+
 // Harmonic function definitions
 const HARMONIC_FUNCTIONS = {
     TONIC: 'tonic',           // I, iii, vi
@@ -395,6 +401,9 @@ function scoreModalInterchange(chordRoot, chordType, key, style, mood, context =
  * @param {Object} sectionInfo - Section context info (Phase 2)
  * @param {number} sectionInfo.currentChordIndex - Index of current chord in progression
  * @param {Array} sectionInfo.sections - Array of section objects from compositionState
+ * @param {Object} tensionArcInfo - Tension arc info (Phase 3)
+ * @param {boolean} tensionArcInfo.enabled - Whether to use tension arc scoring
+ * @param {number} tensionArcInfo.weight - Weight for tension arc scoring (0-1, default 0.15)
  * @returns {Array<{root:string, type:string, inversion:number, score:number, reason:string, confidence:number}>}
  */
 export function generateComprehensiveRecommendations(
@@ -411,7 +420,8 @@ export function generateComprehensiveRecommendations(
     lookbackDepth = 4,
     customWeights = null,
     useEnhancedScoring = true,  // Phase 1 enhanced scoring (voice leading, harmonic relationships)
-    sectionInfo = null          // Phase 2 section context
+    sectionInfo = null,         // Phase 2 section context
+    tensionArcInfo = null       // Phase 3 tension arc scoring
 ) {
     const recommendations = [];
 
@@ -518,6 +528,24 @@ export function generateComprehensiveRecommendations(
             }
         } catch (e) {
             sectionContext = null;
+        }
+    }
+
+    // Phase 3: Initialize tension arc planner and calculate target tension
+    let tensionArcPlanner = null;
+    let targetTension = null;
+    let tensionArcWeight = 0.15; // Default weight for tension arc scoring
+    if (tensionArcInfo && tensionArcInfo.enabled) {
+        try {
+            tensionArcPlanner = getTensionArcPlanner();
+            // Calculate normalized position for the next chord
+            const nextChordPosition = progressionData.length;
+            const totalExpectedChords = Math.max(nextChordPosition + 4, 8); // Estimate total progression length
+            const normalizedPosition = nextChordPosition / totalExpectedChords;
+            targetTension = tensionArcPlanner.getTargetTensionAt(normalizedPosition);
+            tensionArcWeight = tensionArcInfo.weight || 0.15;
+        } catch (e) {
+            tensionArcPlanner = null;
         }
     }
 
@@ -649,6 +677,34 @@ export function generateComprehensiveRecommendations(
                     }
                 }
 
+                // Phase 3: Calculate tension arc alignment score
+                let tensionArcScore = 0;
+                let tensionArcDetails = null;
+                if (tensionArcPlanner && targetTension !== null) {
+                    try {
+                        // Get the base tension for this chord type
+                        const chordTensionInfo = CHORD_TENSION_SCORES[nextType] || { baseTension: 0.5 };
+                        const chordTension = chordTensionInfo.baseTension;
+
+                        // Calculate how well this chord's tension aligns with the target
+                        const tensionDeviation = Math.abs(chordTension - targetTension);
+                        const tensionAlignment = 1 - tensionDeviation; // 0-1, higher is better
+
+                        // Convert to 0-100 score
+                        tensionArcScore = tensionAlignment * 100;
+
+                        tensionArcDetails = {
+                            chordTension,
+                            targetTension,
+                            tensionAlignment,
+                            deviation: tensionDeviation,
+                            direction: chordTension > targetTension ? 'above' : 'below'
+                        };
+                    } catch (e) {
+                        tensionArcScore = 0;
+                    }
+                }
+
                 // Get weights - use adaptive weights if enhanced scoring, otherwise standard
                 let weights;
                 if (useEnhancedScoring && context) {
@@ -685,6 +741,10 @@ export function generateComprehensiveRecommendations(
                 // Section scores are absolute adjustments, not weighted
                 const sectionAdjustment = sectionScore || 0;
 
+                // Phase 3: Calculate tension arc bonus/penalty
+                // Tension arc score is weighted and added to total
+                const tensionArcBonus = tensionArcScore * tensionArcWeight;
+
                 if (contextMode && context && context.hasContext) {
                     // Context-aware mode: use context weights (includes context and modal interchange factors)
                     totalScore =
@@ -695,7 +755,8 @@ export function generateComprehensiveRecommendations(
                         (contextScore * (weights.context || 0)) +
                         (modalInterchangeScore * (weights.modalInterchange || 0)) +
                         resolutionBonus +
-                        sectionAdjustment;  // Phase 2: Section-aware adjustment
+                        sectionAdjustment +   // Phase 2: Section-aware adjustment
+                        tensionArcBonus;      // Phase 3: Tension arc alignment
                 } else {
                     // Standard mode: use standard weights (includes modal interchange factor)
                     totalScore =
@@ -705,7 +766,8 @@ export function generateComprehensiveRecommendations(
                         (moodFit * weights.mood) +
                         (modalInterchangeScore * (weights.modalInterchange || 0)) +
                         resolutionBonus +
-                        sectionAdjustment;  // Phase 2: Section-aware adjustment
+                        sectionAdjustment +   // Phase 2: Section-aware adjustment
+                        tensionArcBonus;      // Phase 3: Tension arc alignment
                 }
 
                 // Apply penalty for recommending the exact same chord and inversion
@@ -756,7 +818,10 @@ export function generateComprehensiveRecommendations(
                     // Phase 2 section-aware details
                     sectionScore: sectionScore,
                     sectionDetails: sectionScoreDetails,
-                    sectionReasons: sectionReasons
+                    sectionReasons: sectionReasons,
+                    // Phase 3 tension arc details
+                    tensionArcScore: tensionArcScore,
+                    tensionArcDetails: tensionArcDetails
                 });
                 } catch (e) {
                     // Skip this chord if there's an error evaluating it

@@ -27,6 +27,9 @@ import {
     CONTINUE_SUBMODES
 } from '../state/sectionIntentState.js';
 
+// Phase 3: Tension Arc System
+import { getTensionArcPlanner } from '../analysis/TensionArcPlanner.js';
+
 /**
  * RecommendationService Class
  * Manages chord recommendations and notifies listeners of updates
@@ -170,6 +173,12 @@ export class RecommendationService {
                 // Section context not available, continue without it
             }
 
+            // Phase 3: Set up tension arc info for recommendations
+            const tensionArcInfo = {
+                enabled: true,
+                weight: 0.15  // 15% weight for tension arc alignment
+            };
+
             // Use advanced 3D scoring system with context awareness
             rawRecommendations = generateComprehensiveRecommendations(
                 referenceChord.root,
@@ -185,7 +194,8 @@ export class RecommendationService {
                 4,               // lookbackDepth
                 customWeights,   // Use user's saved recommendation weights
                 true,            // useEnhancedScoring (Phase 1)
-                sectionInfo      // Phase 2: Section context with intent
+                sectionInfo,     // Phase 2: Section context with intent
+                tensionArcInfo   // Phase 3: Tension arc scoring
             );
         } else {
             // Fallback to basic recommendations for empty progression

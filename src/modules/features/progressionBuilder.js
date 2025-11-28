@@ -156,6 +156,10 @@ import {
     analyzeTension
 } from './chordSuggestionEngine.js';
 
+// Phase 3: Tension Arc System
+import { renderEnhancedTensionCurve, getTensionArcUI } from '../ui/TensionArcUI.js';
+import { getTensionArcPlanner } from '../analysis/TensionArcPlanner.js';
+
 // ============================================================================
 // Chord Function Helper (Phase 3.3: Enhanced with Color-Coding)
 // ============================================================================
@@ -5179,21 +5183,26 @@ function updateSingleCardWrapper(wrapper, chord, index, key) {
  * Helper: Update tension curve if visible
  */
 function updateTensionCurveIfVisible() {
-    const tensionContainer = document.getElementById('tension-curve-container');
+    // Check for either old or new tension container
+    const tensionContainer = document.getElementById('tension-arc-container') || document.getElementById('tension-curve-container');
     if (tensionContainer && tensionContainer.style.display !== 'none') {
         const trainerState = getTrainerState();
+        const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+        const sections = compositionState ? compositionState.getSections() : [];
         const panel = document.getElementById('progression-visualization')?.parentElement;
         if (panel) {
-            // Remove old tension curve
+            // Remove old tension containers
             const oldTension = panel.querySelector('#tension-curve-container');
             if (oldTension) oldTension.remove();
+            const oldTensionArc = panel.querySelector('#tension-arc-container');
+            if (oldTensionArc) oldTensionArc.remove();
 
-            // Re-render tension curve with updated data
-            renderTensionCurve(panel, trainerState.progressionData, trainerState.currentKey || 'C');
+            // Re-render with enhanced tension arc visualization (Phase 3)
+            renderEnhancedTensionCurve(panel, trainerState.progressionData, trainerState.currentKey || 'C', sections);
 
             // Reposition Quick Analysis Bar above tension curve
             const quickAnalysisBar = panel?.querySelector('#quick-analysis-bar-container');
-            const tensionCurve = panel?.querySelector('#tension-curve-container');
+            const tensionCurve = panel?.querySelector('#tension-arc-container') || panel?.querySelector('#tension-curve-container');
             if (quickAnalysisBar && tensionCurve) {
                 quickAnalysisBar.remove();
                 panel.insertBefore(quickAnalysisBar, tensionCurve);
@@ -7267,8 +7276,10 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         // Remove old pattern badges and tension curve if they exist
         const oldPatterns = panel?.querySelector('#pattern-highlights-container');
         const oldTension = panel?.querySelector('#tension-curve-container');
+        const oldTensionArc = panel?.querySelector('#tension-arc-container');
         if (oldPatterns) oldPatterns.remove();
         if (oldTension) oldTension.remove();
+        if (oldTensionArc) oldTensionArc.remove();
 
         // Clear any existing pattern highlights from chord cards
         clearPatternHighlights();
@@ -7333,14 +7344,16 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         // Initialize sortable on the grid container
         initializeSimplifiedSortable(gridContainer);
 
-        // 3. Tension curve visualization (after grid, at bottom of panel)
+        // 3. Tension curve visualization (after grid, at bottom of panel) - Phase 3 Enhanced
         if (panel) {
-            renderTensionCurve(panel, trainerState.progressionData, trainerState.currentKey || 'C');
+            const compositionStateForTension = window.getCompositionState ? window.getCompositionState() : null;
+            const sectionsForTension = compositionStateForTension ? compositionStateForTension.getSections() : [];
+            renderEnhancedTensionCurve(panel, trainerState.progressionData, trainerState.currentKey || 'C', sectionsForTension);
         }
 
         // 4. Move Quick Analysis Bar above tension curve
         const quickAnalysisBar = panel?.querySelector('#quick-analysis-bar-container');
-        const tensionCurve = panel?.querySelector('#tension-curve-container');
+        const tensionCurve = panel?.querySelector('#tension-arc-container') || panel?.querySelector('#tension-curve-container');
         if (quickAnalysisBar && tensionCurve) {
             // Remove from current position and insert before tension curve
             quickAnalysisBar.remove();
@@ -12200,11 +12213,13 @@ export function toggleSimplifiedView() {
 
 /**
  * Toggle tension curve visualization visibility
+ * Phase 3: Updated to support both old and new tension arc containers
  */
 export function toggleTensionCurve() {
     tensionCurveVisible = !tensionCurveVisible;
 
-    const container = document.getElementById('tension-curve-container');
+    // Support both Phase 3 enhanced container and legacy container
+    const container = document.getElementById('tension-arc-container') || document.getElementById('tension-curve-container');
     const btn = document.getElementById('toggle-tension-curve-btn');
 
     if (container) {

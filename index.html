@@ -1495,18 +1495,30 @@
                                     <div class="flex-1">
                                         <label class="text-[10px] font-medium text-gray-500 mb-1 block">Pattern</label>
                                         <select id="bass-pattern-select-card" onchange="window.setBassPattern && window.setBassPattern(this.value); window.refreshNotationFromProgression && window.refreshNotationFromProgression();" class="w-full p-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500">
-                                            <optgroup label="Simple">
+                                            <optgroup label="Simple Patterns">
                                                 <option value="whole-note">Whole Note</option>
                                                 <option value="root-fifth" selected>Root-Fifth</option>
                                                 <option value="arpeggio">Arpeggio</option>
                                                 <option value="alberti">Alberti Bass</option>
                                                 <option value="walking">Walking Bass</option>
+                                                <option value="broken-octave">Broken Octave</option>
+                                                <option value="country">Country</option>
+                                                <option value="pedal">Pedal Point</option>
                                             </optgroup>
-                                            <optgroup label="Rhythmic">
+                                            <optgroup label="Rhythmic Patterns">
                                                 <option value="boogie">Boogie-Woogie</option>
                                                 <option value="driving-rock">Driving Rock</option>
+                                                <option value="montuno">Montuno</option>
+                                                <option value="tango">Tango</option>
                                                 <option value="reggae">Reggae</option>
                                                 <option value="funk">Funk</option>
+                                            </optgroup>
+                                            <optgroup label="Polyphonic Patterns (Chords)">
+                                                <option value="octave-doubling">Octave Doubling</option>
+                                                <option value="power-chord">Power Chord</option>
+                                                <option value="stride">Stride</option>
+                                                <option value="shell-voicing">Shell Voicing</option>
+                                                <option value="tenths">Tenths</option>
                                             </optgroup>
                                         </select>
                                     </div>
