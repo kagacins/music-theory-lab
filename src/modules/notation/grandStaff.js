@@ -54,6 +54,84 @@ export const GRAND_STAFF_DEFAULTS = {
 };
 
 /**
+ * Convert chord type to display suffix (e.g., "Suspended 4th" -> "sus4")
+ * @param {string} chordType - Full chord type name
+ * @returns {string} - Display suffix
+ */
+function getChordTypeSuffix(chordType) {
+  if (!chordType) return '';
+
+  const suffixes = {
+    // Basic triads
+    'Major': '',
+    'Minor': 'm',
+    'Diminished': 'dim',
+    'Augmented': 'aug',
+    'Power Chord': '5',
+
+    // Suspended chords (all variants)
+    'Suspended 2nd': 'sus2',
+    'Suspended 4th': 'sus4',
+    'Suspended 2': 'sus2',
+    'Suspended 4': 'sus4',
+    'Sus2': 'sus2',
+    'Sus4': 'sus4',
+
+    // Seventh chords
+    'Dominant 7th': '7',
+    'Major 7th': 'maj7',
+    'Minor 7th': 'm7',
+    'Half-Diminished 7th': 'm7b5',
+    'Diminished 7th': 'dim7',
+    'Minor-Major 7th': 'mMaj7',
+
+    // Ninth chords
+    'Add9': 'add9',
+    'Add 9': 'add9',
+    'Minor 9th': 'm9',
+    'Minor 9': 'm9',
+    'Major 9th': 'maj9',
+    'Major 9': 'maj9',
+    'Dominant 9th': '9',
+    'Dominant 9': '9',
+    '6/9': '6/9',
+
+    // Extended chords
+    'Minor 11th': 'm11',
+    'Minor 11': 'm11',
+    'Dominant 11th': '11',
+    'Dominant 11': '11',
+    'Minor 13th': 'm13',
+    'Minor 13': 'm13',
+    'Dominant 13th': '13',
+    'Dominant 13': '13',
+  };
+
+  return suffixes[chordType] || '';
+}
+
+/**
+ * Format chord name for display (e.g., "G" + "Suspended 4th" -> "Gsus4")
+ * @param {object} chord - Chord object with root, type, name, simpleName
+ * @returns {string} - Formatted chord name
+ */
+function formatChordNameForDisplay(chord) {
+  if (!chord) return '';
+
+  // Prefer simpleName (already formatted), then name
+  if (chord.simpleName) return chord.simpleName;
+  if (chord.name) {
+    // Strip inversion indicators from name if present
+    return chord.name.replace(/\s*\((Root|1st|2nd|3rd|4th|5th)\)$/i, '').trim();
+  }
+
+  // Fallback: build from root + type suffix
+  const root = chord.root || '';
+  const suffix = getChordTypeSuffix(chord.type);
+  return root + suffix;
+}
+
+/**
  * Get staff connector types (must be called at runtime when VF is available)
  */
 function getConnectorTypes() {
@@ -1857,11 +1935,8 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
           );
 
           // Draw the bracket with chord name beneath bass clef
-          // Format chord name with inversion
-          let chordName = chord.name || chord.simpleName || `${chord.root || ''}${chord.type || ''}`;
-
-          // Strip any existing inversion labels from the name (including "(Root)")
-          chordName = chordName.replace(/\s*\((Root|1st|2nd|3rd|4th|5th)\)$/i, '').trim();
+          // Format chord name with inversion using helper function
+          let chordName = formatChordNameForDisplay(chord);
 
           // Add inversion indicator only for non-root inversions
           const inversion = chord.inversion || 0;
@@ -1906,11 +1981,8 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
             );
 
             // Draw the bracket with chord name beneath bass clef
-            // Format chord name with inversion
-            let chordName = chord.name || chord.simpleName || `${chord.root}${chord.type || ''}`;
-
-            // Strip any existing inversion labels from the name (including "(Root)")
-            chordName = chordName.replace(/\s*\((Root|1st|2nd|3rd|4th|5th)\)$/i, '').trim();
+            // Format chord name using helper function
+            let chordName = formatChordNameForDisplay(chord);
 
             // Add inversion indicator only for non-root inversions
             const inversion = chord.inversion || 0;

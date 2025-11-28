@@ -1490,185 +1490,44 @@ window.showJazzProgressionsInfo = showJazzProgressionsInfo;
 window.showAlteredDominantsInfo = showAlteredDominantsInfo;
 window.showJazzVoicingsInfo = showJazzVoicingsInfo;
 
-// Quick Add Chord functions (for Progression Builder)
+// ============================================================================
+// QUICK ADD CHORD FUNCTIONS
+// These use the reusable Quick Add Chord component from progressionBuilder.js
+// The wrapper functions maintain backwards compatibility with existing HTML onclick handlers
+// ============================================================================
+
+// Toggle Quick Add form for Progression Builder
 window.toggleQuickAddChord = function() {
-    const form = document.getElementById('quick-add-chord-form');
-    if (!form) return;
-
-    if (form.classList.contains('hidden')) {
-        form.classList.remove('hidden');
-    } else {
-        form.classList.add('hidden');
+    if (window.toggleQuickAddChordForm) {
+        window.toggleQuickAddChordForm('quick-add-chord-form');
     }
 };
 
-// Quick Add Chord functions (for Melody Composer)
+// Toggle Quick Add form for Melody Composer (uses same component)
 window.toggleQuickAddChordMelody = function() {
-    const form = document.getElementById('quick-add-chord-form-melody');
-    if (!form) return;
-
-    if (form.classList.contains('hidden')) {
-        form.classList.remove('hidden');
-    } else {
-        form.classList.add('hidden');
+    if (window.toggleQuickAddChordForm) {
+        window.toggleQuickAddChordForm('quick-add-chord-form-melody');
     }
 };
 
-// Simplified Quick Add Chord for Melody Composer (new compact form)
-window.quickAddChordMelody = function() {
-    // Get selected values from the simplified Melody Composer form
-    const rootIndex = parseInt(document.getElementById('quick-add-root-melody')?.value || '0');
-    const chordTypeInput = document.getElementById('quick-add-type-input-melody');
-    const chordType = chordTypeInput?.value?.trim() || 'Major';
-    const duration = parseInt(document.getElementById('quick-add-duration-melody')?.value || '4');
-
-    // Use the existing addChordToProgression function from chord builder
-    if (window.addChordToProgression && window.selectBuilderRootNote && window.selectBuilderChordType) {
-        try {
-            // Set the builder state to match the quick add selection
-            window.selectBuilderRootNote(rootIndex, false); // Don't play audio
-            window.selectBuilderChordType(chordType, false); // Don't play audio
-            if (window.selectBuilderInversion) {
-                window.selectBuilderInversion(0, false); // Default to root position
-            }
-
-            // Add the chord without triggering playback
-            window.addChordToProgression(false); // false = don't switch to trainer tab
-
-            // Clear the type input for next chord
-            if (chordTypeInput) chordTypeInput.value = '';
-
-            // Show success feedback
-            const form = document.getElementById('quick-add-chord-form-melody');
-            if (form) {
-                form.style.borderColor = '#10b981'; // Green
-                setTimeout(() => {
-                    form.style.borderColor = '';
-                }, 300);
-            }
-        } catch (error) {
-            console.error('Error adding chord:', error);
-        }
-    }
-};
-
+// Add chord from Progression Builder Quick Add form
 window.quickAddChordToProgression = function() {
-    // Get selected values
-    const rootIndex = parseInt(document.getElementById('quick-add-root')?.value || '0');
-    const chordTypeInput = document.getElementById('quick-add-type-input');
-    const chordType = chordTypeInput?.value?.trim() || '';
-    const inversion = parseInt(document.getElementById('quick-add-inversion')?.value || '0');
-
-    // Validate that a chord/interval was selected from the list
-    if (!chordType) {
-        alert('Please select a chord or interval from the list.');
-        if (chordTypeInput) chordTypeInput.focus();
-        return;
-    }
-
-    // Get the datalist options to validate the selection
-    const datalist = document.getElementById('chord-type-datalist');
-    const validOptions = Array.from(datalist.options).map(opt => opt.value);
-
-    if (!validOptions.includes(chordType)) {
-        alert('Please select a chord or interval from the list.\n\n"' + chordType + '" is not a valid option.');
-        if (chordTypeInput) chordTypeInput.focus();
-        return;
-    }
-
-    // Use the existing addChordToProgression function from chord builder
-    if (window.addChordToProgression && window.selectBuilderRootNote && window.selectBuilderChordType && window.selectBuilderInversion) {
-        try {
-            // Temporarily set the builder state to match the quick add selection
-            // Pass false as playAudio parameter to prevent sound
-            window.selectBuilderRootNote(rootIndex, false); // Don't play audio
-            window.selectBuilderChordType(chordType, false); // Don't play audio
-            window.selectBuilderInversion(inversion, false); // Don't play audio
-
-            // Add the chord without triggering playback
-            window.addChordToProgression(false); // false = don't switch to trainer tab
-
-            // Don't hide the form - keep it open for adding more chords
-            // window.toggleQuickAddChord(); // Commented out to keep form open
-
-            // Clear the input for next time
-            if (chordTypeInput) chordTypeInput.value = '';
-
-            // Show success feedback
-            const form = document.getElementById('quick-add-chord-form');
-            if (form) {
-                const originalBorder = form.style.borderColor;
-                form.style.borderColor = '#10b981'; // Green
-                setTimeout(() => {
-                    form.style.borderColor = originalBorder;
-                }, 300);
-            }
-        } catch (error) {
-            console.error('Error adding chord:', error);
-            alert('Error adding chord: ' + error.message);
-        }
-    } else {
-        alert('Chord builder functions not available. Please refresh the page.');
+    if (window.quickAddChordFromForm) {
+        window.quickAddChordFromForm('quick-add-chord-form');
     }
 };
 
+// Add chord from Melody Composer Quick Add form
 window.quickAddChordToProgressionMelody = function() {
-    // Get selected values from Melody Composer form
-    const rootIndex = parseInt(document.getElementById('quick-add-root-melody')?.value || '0');
-    const chordTypeInput = document.getElementById('quick-add-type-input-melody');
-    const chordType = chordTypeInput?.value?.trim() || '';
-    const inversion = parseInt(document.getElementById('quick-add-inversion-melody')?.value || '0');
-
-    // Validate that a chord/interval was selected from the list
-    if (!chordType) {
-        alert('Please select a chord or interval from the list.');
-        if (chordTypeInput) chordTypeInput.focus();
-        return;
+    if (window.quickAddChordFromForm) {
+        window.quickAddChordFromForm('quick-add-chord-form-melody');
     }
+};
 
-    // Get the datalist options to validate the selection
-    const datalist = document.getElementById('chord-type-datalist-melody');
-    const validOptions = Array.from(datalist.options).map(opt => opt.value);
-
-    if (!validOptions.includes(chordType)) {
-        alert('Please select a chord or interval from the list.\n\n"' + chordType + '" is not a valid option.');
-        if (chordTypeInput) chordTypeInput.focus();
-        return;
-    }
-
-    // Use the existing addChordToProgression function from chord builder
-    if (window.addChordToProgression && window.selectBuilderRootNote && window.selectBuilderChordType && window.selectBuilderInversion) {
-        try {
-            // Temporarily set the builder state to match the quick add selection
-            // Pass false as playAudio parameter to prevent sound
-            window.selectBuilderRootNote(rootIndex, false); // Don't play audio
-            window.selectBuilderChordType(chordType, false); // Don't play audio
-            window.selectBuilderInversion(inversion, false); // Don't play audio
-
-            // Add the chord without triggering playback
-            window.addChordToProgression(false); // false = don't switch to trainer tab
-
-            // Don't hide the form - keep it open for adding more chords
-            // window.toggleQuickAddChordMelody(); // Commented out to keep form open
-
-            // Clear the input for next time
-            if (chordTypeInput) chordTypeInput.value = '';
-
-            // Show success feedback
-            const form = document.getElementById('quick-add-chord-form-melody');
-            if (form) {
-                const originalBorder = form.style.borderColor;
-                form.style.borderColor = '#10b981'; // Green
-                setTimeout(() => {
-                    form.style.borderColor = originalBorder;
-                }, 300);
-            }
-        } catch (error) {
-            console.error('Error adding chord:', error);
-            alert('Error adding chord: ' + error.message);
-        }
-    } else {
-        alert('Chord builder functions not available. Please refresh the page.');
+// Alias for quickAddChordToProgressionMelody (used by compact form)
+window.quickAddChordMelody = function() {
+    if (window.quickAddChordFromForm) {
+        window.quickAddChordFromForm('quick-add-chord-form-melody');
     }
 };
 

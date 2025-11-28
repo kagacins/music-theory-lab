@@ -473,22 +473,48 @@ export class NotationComposer {
     if (!chordType) return '';
 
     const suffixes = {
+      // Basic triads
       'Major': '',
       'Minor': 'm',
+      'Diminished': 'dim',
+      'Augmented': 'aug',
+      'Power Chord': '5',
+
+      // Suspended chords (all variants)
+      'Suspended 2nd': 'sus2',
+      'Suspended 4th': 'sus4',
+      'Suspended 2': 'sus2',
+      'Suspended 4': 'sus4',
+      'Sus2': 'sus2',
+      'Sus4': 'sus4',
+
+      // Seventh chords
       'Dominant 7th': '7',
       'Major 7th': 'maj7',
       'Minor 7th': 'm7',
-      'Diminished': 'dim',
-      'Augmented': 'aug',
-      'Suspended 2': 'sus2',
-      'Suspended 4': 'sus4',
+      'Half-Diminished 7th': 'm7b5',
+      'Diminished 7th': 'dim7',
+      'Minor-Major 7th': 'mMaj7',
+
+      // Ninth chords
+      'Add9': 'add9',
       'Add 9': 'add9',
+      'Minor 9th': 'm9',
       'Minor 9': 'm9',
+      'Major 9th': 'maj9',
       'Major 9': 'maj9',
+      'Dominant 9th': '9',
       'Dominant 9': '9',
+      '6/9': '6/9',
+
+      // Extended chords
+      'Minor 11th': 'm11',
       'Minor 11': 'm11',
+      'Dominant 11th': '11',
       'Dominant 11': '11',
+      'Minor 13th': 'm13',
       'Minor 13': 'm13',
+      'Dominant 13th': '13',
       'Dominant 13': '13',
     };
 

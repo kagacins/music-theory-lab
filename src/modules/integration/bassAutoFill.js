@@ -764,6 +764,62 @@ export function generateBuildingBlockBass(chord, previousChord = null, totalBeat
         case 'tenths':
             return generateTenthsBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
 
+        // NEW RHYTHMIC PATTERNS
+        case 'dotted-rhythm':
+            return generateDottedRhythmBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+
+        case 'syncopated':
+            return generateSyncopatedBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+
+        case 'anticipation':
+            return generateAnticipationBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+
+        case 'shuffle':
+            return generateShuffleBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+
+        // NEW MELODIC PATTERNS
+        case 'chromatic-approach':
+            return generateChromaticApproachBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+
+        case 'scalar-walk':
+            return generateScalarWalkBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+
+        case 'bebop':
+            return generateBebopBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+
+        // NEW STYLE PATTERNS
+        case 'bossa-nova':
+            return generateBossaNovaBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+
+        case 'disco-octave':
+            return generateDiscoOctaveBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+
+        case 'motown':
+            return generateMotownBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+
+        case 'ballad':
+            return generateBalladBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+
+        // REST-BASED PATTERNS
+        case 'staccato':
+            return generateStaccatoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+
+        case 'call-response':
+            return generateCallResponseBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+
+        // ADDITIONAL POLYPHONIC PATTERNS
+        case 'open-fifth':
+            return generateOpenFifthBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+
+        case 'rock-power':
+            return generateRockPowerBlockBass(root, fifth, totalBeats, beatsPerMeasure);
+
+        case 'gospel':
+            return generateGospelBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+
+        case 'half-time':
+            return generateHalfTimeBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+
         default:
             return generateWholeNoteBlockBass(root, totalBeats, beatsPerMeasure);
     }
@@ -1494,21 +1550,30 @@ function generateReggaeBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure)
 }
 
 /**
- * Generate country two-beat bass pattern for a building block
- * Simple alternating root-fifth on beats 1 and 3
+ * Generate country bass pattern for a building block
+ * Classic country "boom-chick" with walk-up approach at end of pattern
+ * Pattern per 4 beats: root (quarter), fifth (quarter), root (quarter), walk-up note (quarter)
+ * The walk-up note adds the characteristic country bass movement
  */
 function generateCountryBlockBass(root, fifth, totalBeats, beatsPerMeasure) {
     const notes = [];
     let currentBeat = 0;
-    let isRoot = true;
 
-    // Simple two-beat: root on 1, fifth on 3 (each is half note)
+    // Get MIDI for calculating walk-up note
+    const rootMidi = noteToMidi(root);
+    // Walk-up note is typically a major 2nd above the root (leading tone approach)
+    const walkUpNote = midiToNoteName(rootMidi + 2);
+
+    // Country pattern: root, fifth, root, walk-up (4 quarter notes)
+    const countryPattern = [root, fifth, root, walkUpNote];
+    let patternIndex = 0;
+
     while (currentBeat < totalBeats) {
         const remainingBeats = totalBeats - currentBeat;
-        const pitch = isRoot ? root : fifth;
+        const pitch = countryPattern[patternIndex % countryPattern.length];
 
-        // Each note is 2 beats (half note)
-        let noteBeats = Math.min(2, remainingBeats);
+        // Each note is 1 beat (quarter note) for country drive
+        let noteBeats = Math.min(1, remainingBeats);
 
         const { duration, dotted } = findBestDuration(noteBeats);
 
@@ -1523,7 +1588,7 @@ function generateCountryBlockBass(root, fifth, totalBeats, beatsPerMeasure) {
         });
 
         currentBeat += noteBeats;
-        isRoot = !isRoot;
+        patternIndex++;
     }
 
     return notes;
@@ -1531,30 +1596,38 @@ function generateCountryBlockBass(root, fifth, totalBeats, beatsPerMeasure) {
 
 /**
  * Generate pedal tone bass pattern for a building block
- * Sustained root note throughout - creates tension with changing harmonies
+ * Rhythmic pedal with half-note pulse - distinct from static whole-note
+ * Creates a grounded, pulsing foundation while harmonies change above
+ * Pattern: Half note on root, repeated (provides pulse unlike whole-note)
  */
 function generatePedalBlockBass(root, totalBeats, beatsPerMeasure) {
     const notes = [];
     let currentBeat = 0;
 
-    // Sustained whole notes on the root
+    // Extract note name and create octave version for emphasis
+    const noteName = root.replace(/\d+$/, '');
+    const lowRoot = `${noteName}2`;
+
+    // Half-note pedal pulse - gives more drive than static whole note
     while (currentBeat < totalBeats) {
         const remainingBeats = totalBeats - currentBeat;
         const beatInMeasure = currentBeat % beatsPerMeasure;
-        const beatsToMeasureEnd = beatsPerMeasure - beatInMeasure;
 
-        // Use whole notes or fill to measure boundary
-        let noteBeats = Math.min(beatsPerMeasure, remainingBeats, beatsToMeasureEnd);
-        if (beatInMeasure === 0 && remainingBeats >= beatsPerMeasure) {
-            noteBeats = beatsPerMeasure;
+        // Use half notes for pulsing effect (distinct from whole-note)
+        let noteBeats = Math.min(2, remainingBeats);
+
+        // Check measure boundary
+        const beatsToMeasureEnd = beatsPerMeasure - beatInMeasure;
+        if (noteBeats > beatsToMeasureEnd) {
+            noteBeats = beatsToMeasureEnd;
         }
 
         const { duration, dotted } = findBestDuration(noteBeats);
 
         notes.push({
             type: 'note',
-            pitch: root,
-            pitches: [root],
+            pitch: lowRoot,
+            pitches: [lowRoot],
             duration: duration,
             beat: currentBeat,
             dotted: dotted,
@@ -1723,6 +1796,887 @@ function generateTenthsBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure)
         });
 
         currentBeat += noteBeats;
+    }
+
+    return notes;
+}
+
+// ============================================================================
+// NEW RHYTHMIC PATTERNS
+// ============================================================================
+
+/**
+ * Generate dotted rhythm bass pattern
+ * Classic "long-short" feel: dotted quarter + eighth
+ * Creates a lilting, dance-like groove
+ * Pattern per 2 beats: dotted quarter (1.5) + eighth (0.5)
+ */
+function generateDottedRhythmBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const root = `${chord.root}2`;
+    const fifth = findFifth(chord.root, chordNotes);
+
+    // Dotted rhythm: long-short pattern alternating root and fifth
+    // Pattern: root (dotted quarter), fifth (eighth), root (dotted quarter), fifth (eighth)
+    const dottedPattern = [
+        { pitch: root, beats: 1.5 },   // Dotted quarter
+        { pitch: fifth, beats: 0.5 },  // Eighth
+    ];
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const patternNote = dottedPattern[patternIndex % dottedPattern.length];
+        let noteBeats = Math.min(patternNote.beats, remainingBeats);
+
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        notes.push({
+            type: 'note',
+            pitch: patternNote.pitch,
+            pitches: [patternNote.pitch],
+            duration: duration,
+            beat: currentBeat,
+            dotted: dotted,
+            isTied: false,
+        });
+
+        currentBeat += noteBeats;
+        patternIndex++;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate syncopated bass pattern
+ * Off-beat accents for rhythmic tension
+ * Pattern: rest on beat 1, note on "and", note on beat 3, rest on beat 4
+ */
+function generateSyncopatedBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const root = `${chord.root}2`;
+    const fifth = findFifth(chord.root, chordNotes);
+
+    // Syncopated pattern: emphasizes off-beats
+    // Pattern per 4 beats: rest (0.5), root (0.5), rest (0.5), fifth (0.5), root (1), rest (1)
+    const syncopatedPattern = [
+        { pitch: null, beats: 0.5 },    // Rest
+        { pitch: root, beats: 0.5 },    // Off-beat hit
+        { pitch: null, beats: 0.5 },    // Rest
+        { pitch: fifth, beats: 0.5 },   // Off-beat hit
+        { pitch: root, beats: 1 },      // Beat 3
+        { pitch: null, beats: 1 },      // Rest on beat 4
+    ];
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const patternNote = syncopatedPattern[patternIndex % syncopatedPattern.length];
+        let noteBeats = Math.min(patternNote.beats, remainingBeats);
+
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        if (patternNote.pitch === null) {
+            notes.push({
+                type: 'rest',
+                isRest: true,
+                pitch: null,
+                pitches: [],
+                duration: duration,
+                beat: currentBeat,
+                dotted: dotted,
+                isTied: false,
+            });
+        } else {
+            notes.push({
+                type: 'note',
+                pitch: patternNote.pitch,
+                pitches: [patternNote.pitch],
+                duration: duration,
+                beat: currentBeat,
+                dotted: dotted,
+                isTied: false,
+            });
+        }
+
+        currentBeat += noteBeats;
+        patternIndex++;
+    }
+
+    return combineConsecutiveRests(notes);
+}
+
+/**
+ * Generate anticipation bass pattern
+ * Notes anticipate the next beat - creates forward momentum
+ * Pattern: notes on the "and" of beats, creating push toward next measure
+ */
+function generateAnticipationBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const root = `${chord.root}2`;
+    const fifth = findFifth(chord.root, chordNotes);
+
+    // Anticipation pattern: notes slightly before the beat
+    // Pattern per 4 beats: rest (0.5), root (1.5), rest (0.5), fifth (1.5)
+    const anticipationPattern = [
+        { pitch: null, beats: 0.5 },    // Rest (beat 1)
+        { pitch: root, beats: 1.5 },    // Anticipation note held through beat 2
+        { pitch: null, beats: 0.5 },    // Rest (beat 3)
+        { pitch: fifth, beats: 1.5 },   // Anticipation note held through beat 4
+    ];
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const patternNote = anticipationPattern[patternIndex % anticipationPattern.length];
+        let noteBeats = Math.min(patternNote.beats, remainingBeats);
+
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        if (patternNote.pitch === null) {
+            notes.push({
+                type: 'rest',
+                isRest: true,
+                pitch: null,
+                pitches: [],
+                duration: duration,
+                beat: currentBeat,
+                dotted: dotted,
+                isTied: false,
+            });
+        } else {
+            notes.push({
+                type: 'note',
+                pitch: patternNote.pitch,
+                pitches: [patternNote.pitch],
+                duration: duration,
+                beat: currentBeat,
+                dotted: dotted,
+                isTied: false,
+            });
+        }
+
+        currentBeat += noteBeats;
+        patternIndex++;
+    }
+
+    return combineConsecutiveRests(notes);
+}
+
+/**
+ * Generate shuffle bass pattern
+ * Swing feel with long-short triplet subdivision
+ * Classic blues/swing groove
+ */
+function generateShuffleBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const root = `${chord.root}2`;
+    const fifth = findFifth(chord.root, chordNotes);
+    const rootMidi = noteToMidi(root);
+    const thirdBelow = midiToNoteName(rootMidi - 4); // Major third below for blues feel
+
+    // Shuffle pattern: approximated with dotted eighth + sixteenth
+    // For each beat: long note (0.75) + short note (0.25)
+    // Cycle through: root-root, fifth-fifth, root-root, third-root
+    const shufflePattern = [
+        { pitch: root, beats: 0.75 },
+        { pitch: root, beats: 0.25 },
+        { pitch: fifth, beats: 0.75 },
+        { pitch: fifth, beats: 0.25 },
+        { pitch: root, beats: 0.75 },
+        { pitch: root, beats: 0.25 },
+        { pitch: thirdBelow, beats: 0.75 },
+        { pitch: root, beats: 0.25 },
+    ];
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const patternNote = shufflePattern[patternIndex % shufflePattern.length];
+        let noteBeats = Math.min(patternNote.beats, remainingBeats);
+
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        notes.push({
+            type: 'note',
+            pitch: patternNote.pitch,
+            pitches: [patternNote.pitch],
+            duration: duration,
+            beat: currentBeat,
+            dotted: dotted,
+            isTied: false,
+        });
+
+        currentBeat += noteBeats;
+        patternIndex++;
+    }
+
+    return notes;
+}
+
+// ============================================================================
+// NEW MELODIC/WALKING PATTERNS
+// ============================================================================
+
+/**
+ * Generate chromatic approach bass pattern
+ * Walks chromatically toward the root from below
+ * Creates tension and resolution
+ */
+function generateChromaticApproachBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const root = `${chord.root}2`;
+    const rootMidi = noteToMidi(root);
+
+    // Chromatic approach: walk up chromatically to the root
+    // Pattern: 3 semitones below, 2 below, 1 below, root
+    const chromaticPattern = [
+        { pitch: midiToNoteName(rootMidi - 3), beats: 1 },
+        { pitch: midiToNoteName(rootMidi - 2), beats: 1 },
+        { pitch: midiToNoteName(rootMidi - 1), beats: 1 },
+        { pitch: root, beats: 1 },
+    ];
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const patternNote = chromaticPattern[patternIndex % chromaticPattern.length];
+        let noteBeats = Math.min(patternNote.beats, remainingBeats);
+
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        notes.push({
+            type: 'note',
+            pitch: patternNote.pitch,
+            pitches: [patternNote.pitch],
+            duration: duration,
+            beat: currentBeat,
+            dotted: dotted,
+            isTied: false,
+        });
+
+        currentBeat += noteBeats;
+        patternIndex++;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate scalar walk bass pattern
+ * Walks through scale tones for melodic interest
+ * Uses major scale intervals from the root
+ */
+function generateScalarWalkBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const root = `${chord.root}2`;
+    const rootMidi = noteToMidi(root);
+
+    // Scalar pattern using major scale intervals (ascending then descending)
+    // 0, 2, 4, 5, 7, 5, 4, 2 (root, 2nd, 3rd, 4th, 5th, 4th, 3rd, 2nd)
+    const scaleIntervals = [0, 2, 4, 5, 7, 5, 4, 2];
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const interval = scaleIntervals[patternIndex % scaleIntervals.length];
+        const pitch = midiToNoteName(rootMidi + interval);
+
+        let noteBeats = Math.min(0.5, remainingBeats); // Eighth notes for scalar movement
+
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        notes.push({
+            type: 'note',
+            pitch: pitch,
+            pitches: [pitch],
+            duration: duration,
+            beat: currentBeat,
+            dotted: dotted,
+            isTied: false,
+        });
+
+        currentBeat += noteBeats;
+        patternIndex++;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate bebop bass pattern
+ * Jazz bebop-style walking with chromatic passing tones
+ * Features characteristic chromatic approaches and enclosures
+ */
+function generateBebopBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const root = `${chord.root}2`;
+    const rootMidi = noteToMidi(root);
+    const fifth = findFifth(chord.root, chordNotes);
+    const fifthMidi = noteToMidi(fifth);
+
+    // Bebop pattern with enclosure and chromatic passing tones
+    // Root, chromatic below fifth, fifth, chromatic above root, repeat
+    const bebopPattern = [
+        { pitch: root, beats: 1 },
+        { pitch: midiToNoteName(fifthMidi - 1), beats: 1 }, // Chromatic approach to fifth
+        { pitch: fifth, beats: 1 },
+        { pitch: midiToNoteName(rootMidi + 1), beats: 1 },  // Chromatic neighbor above root
+    ];
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const patternNote = bebopPattern[patternIndex % bebopPattern.length];
+        let noteBeats = Math.min(patternNote.beats, remainingBeats);
+
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        notes.push({
+            type: 'note',
+            pitch: patternNote.pitch,
+            pitches: [patternNote.pitch],
+            duration: duration,
+            beat: currentBeat,
+            dotted: dotted,
+            isTied: false,
+        });
+
+        currentBeat += noteBeats;
+        patternIndex++;
+    }
+
+    return notes;
+}
+
+// ============================================================================
+// NEW STYLE-SPECIFIC PATTERNS
+// ============================================================================
+
+/**
+ * Generate bossa nova bass pattern
+ * Classic Brazilian bossa nova feel
+ * Syncopated pattern with emphasis on beats 1 and the "and" of 2
+ */
+function generateBossaNovaBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const root = `${chord.root}2`;
+    const fifth = findFifth(chord.root, chordNotes);
+
+    // Bossa nova pattern: root on 1, fifth on "and" of 2, root on 3
+    // Creates the characteristic syncopated Brazilian feel
+    const bossaPattern = [
+        { pitch: root, beats: 1.5 },   // Dotted quarter on beat 1
+        { pitch: fifth, beats: 0.5 },  // Eighth on "and" of 2
+        { pitch: root, beats: 2 },     // Half note on beat 3
+    ];
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const patternNote = bossaPattern[patternIndex % bossaPattern.length];
+        let noteBeats = Math.min(patternNote.beats, remainingBeats);
+
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        notes.push({
+            type: 'note',
+            pitch: patternNote.pitch,
+            pitches: [patternNote.pitch],
+            duration: duration,
+            beat: currentBeat,
+            dotted: dotted,
+            isTied: false,
+        });
+
+        currentBeat += noteBeats;
+        patternIndex++;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate disco octave bass pattern
+ * Classic disco pumping octaves on every beat
+ * Alternates between low and high octave
+ */
+function generateDiscoOctaveBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const noteName = chord.root;
+    const lowRoot = `${noteName}2`;
+    const highRoot = `${noteName}3`;
+
+    // Disco pattern: steady eighths alternating octaves
+    // Low-high-low-high... (8 per measure)
+    let isLow = true;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const pitch = isLow ? lowRoot : highRoot;
+
+        let noteBeats = Math.min(0.5, remainingBeats); // Eighth notes
+
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        notes.push({
+            type: 'note',
+            pitch: pitch,
+            pitches: [pitch],
+            duration: duration,
+            beat: currentBeat,
+            dotted: dotted,
+            isTied: false,
+        });
+
+        currentBeat += noteBeats;
+        isLow = !isLow;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate Motown bass pattern
+ * Melodic, syncopated Motown/soul style bass
+ * Uses chord tones with rhythmic variety
+ */
+function generateMotownBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const root = `${chord.root}2`;
+    const rootMidi = noteToMidi(root);
+    const fifth = findFifth(chord.root, chordNotes);
+    const third = midiToNoteName(rootMidi + 4); // Major third
+    const octave = midiToNoteName(rootMidi + 12);
+
+    // Motown pattern: melodic with syncopation
+    // Pattern: root, third (syncopated), fifth, octave drop back to root
+    const motownPattern = [
+        { pitch: root, beats: 0.75 },    // Dotted eighth
+        { pitch: third, beats: 0.25 },   // Sixteenth (syncopated)
+        { pitch: fifth, beats: 0.5 },    // Eighth
+        { pitch: octave, beats: 0.5 },   // Eighth
+        { pitch: root, beats: 0.5 },     // Eighth
+        { pitch: null, beats: 0.5 },     // Eighth rest
+        { pitch: fifth, beats: 0.5 },    // Eighth
+        { pitch: root, beats: 0.5 },     // Eighth
+    ];
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const patternNote = motownPattern[patternIndex % motownPattern.length];
+        let noteBeats = Math.min(patternNote.beats, remainingBeats);
+
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        if (patternNote.pitch === null) {
+            notes.push({
+                type: 'rest',
+                isRest: true,
+                pitch: null,
+                pitches: [],
+                duration: duration,
+                beat: currentBeat,
+                dotted: dotted,
+                isTied: false,
+            });
+        } else {
+            notes.push({
+                type: 'note',
+                pitch: patternNote.pitch,
+                pitches: [patternNote.pitch],
+                duration: duration,
+                beat: currentBeat,
+                dotted: dotted,
+                isTied: false,
+            });
+        }
+
+        currentBeat += noteBeats;
+        patternIndex++;
+    }
+
+    return combineConsecutiveRests(notes);
+}
+
+/**
+ * Generate ballad bass pattern
+ * Sparse, expressive pattern for slow songs
+ * Leaves space for emotional impact
+ */
+function generateBalladBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const root = `${chord.root}2`;
+    const fifth = findFifth(chord.root, chordNotes);
+
+    // Ballad pattern: sparse with breathing room
+    // Pattern: root (dotted half), rest, fifth to root pickup
+    const balladPattern = [
+        { pitch: root, beats: 3 },     // Dotted half note
+        { pitch: null, beats: 0.5 },   // Rest (breathing room)
+        { pitch: fifth, beats: 0.5 },  // Pickup note
+    ];
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const patternNote = balladPattern[patternIndex % balladPattern.length];
+        let noteBeats = Math.min(patternNote.beats, remainingBeats);
+
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        if (patternNote.pitch === null) {
+            notes.push({
+                type: 'rest',
+                isRest: true,
+                pitch: null,
+                pitches: [],
+                duration: duration,
+                beat: currentBeat,
+                dotted: dotted,
+                isTied: false,
+            });
+        } else {
+            notes.push({
+                type: 'note',
+                pitch: patternNote.pitch,
+                pitches: [patternNote.pitch],
+                duration: duration,
+                beat: currentBeat,
+                dotted: dotted,
+                isTied: false,
+            });
+        }
+
+        currentBeat += noteBeats;
+        patternIndex++;
+    }
+
+    return combineConsecutiveRests(notes);
+}
+
+// ============================================================================
+// REST-BASED PATTERNS
+// ============================================================================
+
+/**
+ * Generate staccato bass pattern
+ * Short, detached notes with rests between
+ * Creates a punchy, percussive feel
+ */
+function generateStaccatoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const root = `${chord.root}2`;
+    const fifth = findFifth(chord.root, chordNotes);
+
+    // Staccato pattern: short note followed by rest
+    // Creates a punchy, detached feel
+    const staccatoPattern = [
+        { pitch: root, beats: 0.25 },  // Sixteenth note
+        { pitch: null, beats: 0.75 },  // Rest
+        { pitch: fifth, beats: 0.25 }, // Sixteenth note
+        { pitch: null, beats: 0.75 },  // Rest
+        { pitch: root, beats: 0.25 },  // Sixteenth note
+        { pitch: null, beats: 0.75 },  // Rest
+        { pitch: root, beats: 0.25 },  // Sixteenth note
+        { pitch: null, beats: 0.75 },  // Rest
+    ];
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const patternNote = staccatoPattern[patternIndex % staccatoPattern.length];
+        let noteBeats = Math.min(patternNote.beats, remainingBeats);
+
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        if (patternNote.pitch === null) {
+            notes.push({
+                type: 'rest',
+                isRest: true,
+                pitch: null,
+                pitches: [],
+                duration: duration,
+                beat: currentBeat,
+                dotted: dotted,
+                isTied: false,
+            });
+        } else {
+            notes.push({
+                type: 'note',
+                pitch: patternNote.pitch,
+                pitches: [patternNote.pitch],
+                duration: duration,
+                beat: currentBeat,
+                dotted: dotted,
+                isTied: false,
+            });
+        }
+
+        currentBeat += noteBeats;
+        patternIndex++;
+    }
+
+    return combineConsecutiveRests(notes);
+}
+
+/**
+ * Generate call-and-response bass pattern
+ * Phrases followed by rests - like a musical conversation
+ * Great for gospel, blues, and soul
+ */
+function generateCallResponseBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const root = `${chord.root}2`;
+    const rootMidi = noteToMidi(root);
+    const fifth = findFifth(chord.root, chordNotes);
+    const third = midiToNoteName(rootMidi + 4);
+
+    // Call-response pattern: "call" phrase then rest for "response"
+    // Pattern: root-third-fifth (call), rest, root-fifth (response), rest
+    const callResponsePattern = [
+        { pitch: root, beats: 0.5 },     // Call starts
+        { pitch: third, beats: 0.5 },
+        { pitch: fifth, beats: 0.5 },    // Call ends
+        { pitch: null, beats: 0.5 },     // Rest (response space)
+        { pitch: root, beats: 0.5 },     // Response starts
+        { pitch: fifth, beats: 0.5 },    // Response ends
+        { pitch: null, beats: 1 },       // Rest (breathing room)
+    ];
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const patternNote = callResponsePattern[patternIndex % callResponsePattern.length];
+        let noteBeats = Math.min(patternNote.beats, remainingBeats);
+
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        if (patternNote.pitch === null) {
+            notes.push({
+                type: 'rest',
+                isRest: true,
+                pitch: null,
+                pitches: [],
+                duration: duration,
+                beat: currentBeat,
+                dotted: dotted,
+                isTied: false,
+            });
+        } else {
+            notes.push({
+                type: 'note',
+                pitch: patternNote.pitch,
+                pitches: [patternNote.pitch],
+                duration: duration,
+                beat: currentBeat,
+                dotted: dotted,
+                isTied: false,
+            });
+        }
+
+        currentBeat += noteBeats;
+        patternIndex++;
+    }
+
+    return combineConsecutiveRests(notes);
+}
+
+// ============================================================================
+// ADDITIONAL POLYPHONIC PATTERNS
+// ============================================================================
+
+/**
+ * Generate open fifth bass pattern
+ * Root and fifth played together with open voicing
+ * Creates a powerful, open sound
+ */
+function generateOpenFifthBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const root = `${chord.root}2`;
+    const fifth = findFifth(chord.root, chordNotes);
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const beatInMeasure = currentBeat % beatsPerMeasure;
+        const beatsToMeasureEnd = beatsPerMeasure - beatInMeasure;
+
+        // Use whole notes for sustained open sound
+        let noteBeats = Math.min(beatsPerMeasure, remainingBeats, beatsToMeasureEnd);
+        if (beatInMeasure === 0 && remainingBeats >= beatsPerMeasure) {
+            noteBeats = beatsPerMeasure;
+        }
+
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        // Root + fifth together
+        notes.push({
+            type: 'note',
+            pitch: root,
+            pitches: [root, fifth],
+            duration: duration,
+            beat: currentBeat,
+            dotted: dotted,
+            isTied: false,
+        });
+
+        currentBeat += noteBeats;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate rock power bass pattern
+ * Root and fifth power chord with rhythmic drive
+ * Half note chords for rock/metal feel
+ */
+function generateRockPowerBlockBass(root, fifth, totalBeats, beatsPerMeasure) {
+    const notes = [];
+    let currentBeat = 0;
+
+    // Rock power pattern: power chord on half notes
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+
+        // Half notes for driving rock feel
+        let noteBeats = Math.min(2, remainingBeats);
+
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        notes.push({
+            type: 'note',
+            pitch: root,
+            pitches: [root, fifth],
+            duration: duration,
+            beat: currentBeat,
+            dotted: dotted,
+            isTied: false,
+        });
+
+        currentBeat += noteBeats;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate gospel bass pattern
+ * Rich passing chord movement typical of gospel music
+ * Uses passing chords and chromatic approaches
+ */
+function generateGospelBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const root = `${chord.root}2`;
+    const rootMidi = noteToMidi(root);
+    const third = midiToNoteName(rootMidi + 4);
+    const fifth = findFifth(chord.root, chordNotes);
+    const sixth = midiToNoteName(rootMidi + 9);
+
+    // Gospel pattern: root-third, passing chord, fifth-root
+    // Uses major 6th for typical gospel sound
+    const gospelPattern = [
+        { pitches: [root, third], beats: 1 },
+        { pitches: [midiToNoteName(rootMidi + 2), fifth], beats: 1 },  // Passing chord
+        { pitches: [root, sixth], beats: 1 },
+        { pitches: [root, fifth], beats: 1 },
+    ];
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const patternNote = gospelPattern[patternIndex % gospelPattern.length];
+        let noteBeats = Math.min(patternNote.beats, remainingBeats);
+
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        notes.push({
+            type: 'note',
+            pitch: patternNote.pitches[0],
+            pitches: patternNote.pitches,
+            duration: duration,
+            beat: currentBeat,
+            dotted: dotted,
+            isTied: false,
+        });
+
+        currentBeat += noteBeats;
+        patternIndex++;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate half-time feel bass pattern
+ * Notes only on beats 1 and 3 - creates spacious feel
+ * Great for ballads and slow grooves
+ */
+function generateHalfTimeBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const root = `${chord.root}2`;
+    const fifth = findFifth(chord.root, chordNotes);
+
+    // Half-time: notes on 1 and 3 only
+    const halfTimePattern = [
+        { pitch: root, beats: 2 },   // Beat 1-2
+        { pitch: fifth, beats: 2 },  // Beat 3-4
+    ];
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const patternNote = halfTimePattern[patternIndex % halfTimePattern.length];
+        let noteBeats = Math.min(patternNote.beats, remainingBeats);
+
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        notes.push({
+            type: 'note',
+            pitch: patternNote.pitch,
+            pitches: [patternNote.pitch],
+            duration: duration,
+            beat: currentBeat,
+            dotted: dotted,
+            isTied: false,
+        });
+
+        currentBeat += noteBeats;
+        patternIndex++;
     }
 
     return notes;

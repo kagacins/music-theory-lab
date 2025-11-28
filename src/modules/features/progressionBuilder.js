@@ -630,6 +630,284 @@ export function toggleProgressionCardsPanel() {
     }
 }
 
+// ============================================================================
+// REUSABLE QUICK ADD CHORD COMPONENT
+// ============================================================================
+
+/**
+ * Quick Add Chord Component
+ * A reusable component for adding chords to the progression
+ * Can be instantiated in any container
+ */
+
+// Track initialized Quick Add forms to avoid duplicates
+const initializedQuickAddForms = new Set();
+
+/**
+ * Generate the HTML for the Quick Add Chord form
+ * @param {string} formId - Unique ID for this form instance
+ * @returns {string} HTML string for the form
+ */
+function generateQuickAddChordHTML(formId) {
+    const datalistId = `chord-type-datalist-${formId}`;
+
+    return `
+        <div id="${formId}" class="hidden mb-3 p-4 bg-white rounded-lg border-2 border-indigo-300 shadow-lg relative z-20">
+            <div class="flex items-center justify-between mb-3">
+                <h4 class="text-sm font-bold text-indigo-800">Quick Add Chord</h4>
+                <button onclick="window.toggleQuickAddChordForm('${formId}')" class="text-gray-500 hover:text-gray-700 text-xs font-semibold px-2 py-1 rounded hover:bg-gray-100" title="Close">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Root Note</label>
+                    <select id="${formId}-root" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <option value="0">C</option>
+                        <option value="1">C# / Db</option>
+                        <option value="2">D</option>
+                        <option value="3">D# / Eb</option>
+                        <option value="4">E</option>
+                        <option value="5">F</option>
+                        <option value="6">F# / Gb</option>
+                        <option value="7">G</option>
+                        <option value="8">G# / Ab</option>
+                        <option value="9">A</option>
+                        <option value="10">A# / Bb</option>
+                        <option value="11">B</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Chord/Interval Type <span class="text-gray-500">(type to filter)</span></label>
+                    <input
+                        type="text"
+                        id="${formId}-type-input"
+                        list="${datalistId}"
+                        class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Start typing or click dropdown arrow..."
+                        value=""
+                    >
+                    <datalist id="${datalistId}">
+                        <optgroup label="─── TRIADS ───">
+                            <option value="Major">Major</option>
+                            <option value="Minor">Minor</option>
+                            <option value="Augmented">Augmented</option>
+                            <option value="Diminished">Diminished</option>
+                            <option value="Sus2">Sus2</option>
+                            <option value="Sus4">Sus4</option>
+                            <option value="Power Chord">Power Chord</option>
+                        </optgroup>
+                        <optgroup label="─── SEVENTHS ───">
+                            <option value="Dominant 7th">Dominant 7th</option>
+                            <option value="Major 7th">Major 7th</option>
+                            <option value="Minor 7th">Minor 7th</option>
+                            <option value="Half-Diminished 7th">Half-Diminished 7th</option>
+                            <option value="Diminished 7th">Diminished 7th</option>
+                            <option value="Minor-Major 7th">Minor-Major 7th</option>
+                        </optgroup>
+                        <optgroup label="─── NINTHS ───">
+                            <option value="Major 9th">Major 9th</option>
+                            <option value="Dominant 9th">Dominant 9th</option>
+                            <option value="Minor 9th">Minor 9th</option>
+                            <option value="6/9">6/9</option>
+                            <option value="Add9">Add9</option>
+                        </optgroup>
+                        <optgroup label="─── EXTENDED ───">
+                            <option value="Dominant 11th">Dominant 11th</option>
+                            <option value="Minor 11th">Minor 11th</option>
+                            <option value="Dominant 13th">Dominant 13th</option>
+                            <option value="Major 6th">Major 6th</option>
+                            <option value="Minor 6th">Minor 6th</option>
+                        </optgroup>
+                        <optgroup label="─── ALTERED ───">
+                            <option value="Augmented 7th">Augmented 7th</option>
+                            <option value="7b5">7b5</option>
+                            <option value="7#5">7#5</option>
+                            <option value="7b9">7b9</option>
+                            <option value="7#9">7#9</option>
+                        </optgroup>
+                        <optgroup label="─── INTERVALS ───">
+                            <option value="Major 2nd">Major 2nd</option>
+                            <option value="Minor 2nd">Minor 2nd</option>
+                            <option value="Major 3rd">Major 3rd</option>
+                            <option value="Minor 3rd">Minor 3rd</option>
+                            <option value="Perfect 4th">Perfect 4th</option>
+                            <option value="Tritone">Tritone</option>
+                            <option value="Perfect 5th">Perfect 5th</option>
+                            <option value="Major 6th">Major 6th (interval)</option>
+                            <option value="Minor 6th">Minor 6th (interval)</option>
+                            <option value="Major 7th">Major 7th (interval)</option>
+                            <option value="Minor 7th">Minor 7th (interval)</option>
+                            <option value="Octave">Octave</option>
+                        </optgroup>
+                    </datalist>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Inversion</label>
+                    <select id="${formId}-inversion" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <option value="0">Root Position</option>
+                        <option value="1">1st Inversion</option>
+                        <option value="2">2nd Inversion</option>
+                        <option value="3">3rd Inversion</option>
+                    </select>
+                </div>
+                <div class="flex items-end gap-2">
+                    <button onclick="window.quickAddChordFromForm('${formId}')" class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg shadow transition">
+                        Add
+                    </button>
+                    <button onclick="window.toggleQuickAddChordForm('${formId}')" class="px-3 py-2 bg-gray-400 hover:bg-gray-500 text-white text-sm font-semibold rounded-lg shadow transition">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Initialize a Quick Add Chord form in a container
+ * @param {string} containerId - ID of the container to insert the form into
+ * @param {string} formId - Unique ID for this form instance (defaults to 'quick-add-chord-form')
+ * @param {string} insertPosition - 'beforeend', 'afterbegin', etc. (default: 'beforeend')
+ * @returns {boolean} True if form was created, false if it already exists
+ */
+export function initQuickAddChordForm(containerId, formId = 'quick-add-chord-form', insertPosition = 'beforeend') {
+    // Check if form already exists
+    if (document.getElementById(formId)) {
+        return false;
+    }
+
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.warn(`[QuickAddChord] Container '${containerId}' not found`);
+        return false;
+    }
+
+    // Generate and insert the form HTML
+    const formHTML = generateQuickAddChordHTML(formId);
+    container.insertAdjacentHTML(insertPosition, formHTML);
+
+    // Track this form
+    initializedQuickAddForms.add(formId);
+
+    return true;
+}
+
+/**
+ * Toggle the visibility of a Quick Add Chord form
+ * @param {string} formId - ID of the form to toggle
+ */
+export function toggleQuickAddChordForm(formId = 'quick-add-chord-form') {
+    const form = document.getElementById(formId);
+    if (!form) {
+        console.warn(`[QuickAddChord] Form '${formId}' not found`);
+        return;
+    }
+
+    if (form.classList.contains('hidden')) {
+        form.classList.remove('hidden');
+        // Focus the type input for quick typing
+        const typeInput = document.getElementById(`${formId}-type-input`);
+        if (typeInput) {
+            setTimeout(() => typeInput.focus(), 100);
+        }
+    } else {
+        form.classList.add('hidden');
+    }
+}
+
+/**
+ * Add a chord from a Quick Add form
+ * @param {string} formId - ID of the form to read values from
+ */
+export function quickAddChordFromForm(formId = 'quick-add-chord-form') {
+    // Get form elements
+    const rootSelect = document.getElementById(`${formId}-root`);
+    const typeInput = document.getElementById(`${formId}-type-input`);
+    const inversionSelect = document.getElementById(`${formId}-inversion`);
+
+    if (!rootSelect || !typeInput || !inversionSelect) {
+        console.warn(`[QuickAddChord] Form elements not found for '${formId}'`);
+        return;
+    }
+
+    const rootIndex = parseInt(rootSelect.value || '0');
+    const chordType = typeInput.value?.trim() || '';
+    const inversion = parseInt(inversionSelect.value || '0');
+
+    // Validate that a chord/interval was selected
+    if (!chordType) {
+        alert('Please select a chord or interval from the list.');
+        typeInput.focus();
+        return;
+    }
+
+    // Get the datalist to validate the selection
+    const datalistId = `chord-type-datalist-${formId}`;
+    const datalist = document.getElementById(datalistId);
+    if (datalist) {
+        const validOptions = Array.from(datalist.querySelectorAll('option')).map(opt => opt.value);
+        if (!validOptions.includes(chordType)) {
+            alert('Please select a valid chord or interval from the dropdown list.');
+            typeInput.focus();
+            return;
+        }
+    }
+
+    // Use the existing addChordToProgression function from chord builder
+    if (window.addChordToProgression && window.selectBuilderRootNote && window.selectBuilderChordType && window.selectBuilderInversion) {
+        try {
+            // Temporarily set the builder state to match the quick add selection
+            window.selectBuilderRootNote(rootIndex, false); // Don't play audio
+            window.selectBuilderChordType(chordType, false); // Don't play audio
+            window.selectBuilderInversion(inversion, false); // Don't play audio
+
+            // Add the chord without triggering playback
+            window.addChordToProgression(false); // false = don't switch to trainer tab
+
+            // Clear the input for next chord
+            typeInput.value = '';
+
+            // Show success feedback
+            const form = document.getElementById(formId);
+            if (form) {
+                form.style.borderColor = '#10b981'; // Green
+                setTimeout(() => {
+                    form.style.borderColor = '';
+                }, 300);
+            }
+        } catch (error) {
+            console.error('[QuickAddChord] Error adding chord:', error);
+            alert('Error adding chord. Please try again.');
+        }
+    } else {
+        console.error('[QuickAddChord] Required chord builder functions not available');
+        alert('Chord builder not available. Please try from the Scale Explorer tab.');
+    }
+}
+
+/**
+ * Get the default form ID for a container
+ * Maps container IDs to their Quick Add form IDs
+ * @param {string} containerId - Container ID
+ * @returns {string} Form ID
+ */
+export function getQuickAddFormId(containerId) {
+    // Map containers to their form IDs
+    const formIdMap = {
+        'progression-visualization-panel': 'quick-add-chord-form',
+        'chord-progression-card-panel': 'quick-add-chord-form-melody',
+        'melody-progression-visualization': 'quick-add-chord-form-melody',
+    };
+
+    return formIdMap[containerId] || 'quick-add-chord-form';
+}
+
+// Make functions available globally
+window.toggleQuickAddChordForm = toggleQuickAddChordForm;
+window.quickAddChordFromForm = quickAddChordFromForm;
+window.initQuickAddChordForm = initQuickAddChordForm;
+
 /**
  * Suggest inversion for smoother voice leading
  * @param {number} chordIndex - Index of current chord in progression

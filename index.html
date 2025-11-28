@@ -714,18 +714,18 @@
                         </div>
 
 
-                        <!-- Quick Add Chord Form (Initially Hidden) -->
+                        <!-- Quick Add Chord Form - Uses reusable component IDs -->
                         <div id="quick-add-chord-form" class="hidden mb-3 p-4 bg-white rounded-lg border-2 border-indigo-300 shadow-lg relative z-20">
                             <div class="flex items-center justify-between mb-3">
                                 <h4 class="text-sm font-bold text-indigo-800">Quick Add Chord</h4>
-                                <button onclick="window.toggleQuickAddChord && window.toggleQuickAddChord()" class="text-gray-500 hover:text-gray-700 text-xs font-semibold px-2 py-1 rounded hover:bg-gray-100" title="Close">
+                                <button onclick="window.toggleQuickAddChordForm && window.toggleQuickAddChordForm('quick-add-chord-form')" class="text-gray-500 hover:text-gray-700 text-xs font-semibold px-2 py-1 rounded hover:bg-gray-100" title="Close">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                 </button>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                                 <div>
                                     <label class="block text-xs font-medium text-gray-700 mb-1">Root Note</label>
-                                    <select id="quick-add-root" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                                    <select id="quick-add-chord-form-root" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
                                         <option value="0">C</option>
                                         <option value="1">C# / Db</option>
                                         <option value="2">D</option>
@@ -744,13 +744,13 @@
                                     <label class="block text-xs font-medium text-gray-700 mb-1">Chord/Interval Type <span class="text-gray-500">(type to filter)</span></label>
                                     <input
                                         type="text"
-                                        id="quick-add-type-input"
-                                        list="chord-type-datalist"
+                                        id="quick-add-chord-form-type-input"
+                                        list="chord-type-datalist-quick-add-chord-form"
                                         class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                                         placeholder="Start typing or click dropdown arrow..."
                                         value=""
                                     >
-                                    <datalist id="chord-type-datalist">
+                                    <datalist id="chord-type-datalist-quick-add-chord-form">
                                         <optgroup label="─── TRIADS ───">
                                             <option value="Major">Major</option>
                                             <option value="Minor">Minor</option>
@@ -807,7 +807,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-700 mb-1">Inversion</label>
-                                    <select id="quick-add-inversion" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                                    <select id="quick-add-chord-form-inversion" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
                                         <option value="0">Root Position</option>
                                         <option value="1">1st Inversion</option>
                                         <option value="2">2nd Inversion</option>
@@ -815,10 +815,10 @@
                                     </select>
                                 </div>
                                 <div class="flex items-end gap-2">
-                                    <button onclick="window.quickAddChordToProgression && window.quickAddChordToProgression()" class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg shadow transition">
+                                    <button onclick="window.quickAddChordFromForm && window.quickAddChordFromForm('quick-add-chord-form')" class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg shadow transition">
                                         Add
                                     </button>
-                                    <button onclick="window.toggleQuickAddChord && window.toggleQuickAddChord()" class="px-3 py-2 bg-gray-400 hover:bg-gray-500 text-white text-sm font-semibold rounded-lg shadow transition">
+                                    <button onclick="window.toggleQuickAddChordForm && window.toggleQuickAddChordForm('quick-add-chord-form')" class="px-3 py-2 bg-gray-400 hover:bg-gray-500 text-white text-sm font-semibold rounded-lg shadow transition">
                                         Cancel
                                     </button>
                                 </div>
@@ -1321,18 +1321,18 @@
                         <svg id="chord-progression-card-chevron" class="w-5 h-5 transform rotate-180 transition-transform" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                     </button>
                     <div id="chord-progression-card-panel" class="mt-2 bg-gradient-to-br from-purple-400/5 to-pink-400/5 rounded-lg p-3">
-                        <!-- Quick Add Chord Form (Initially Hidden) -->
-                        <div id="quick-add-chord-form-melody" class="hidden mb-3 p-3 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg border border-indigo-200 shadow-sm">
-                            <div class="flex items-center justify-between mb-2">
+                        <!-- Quick Add Chord Form - Uses same reusable component as Progression Workshop -->
+                        <div id="quick-add-chord-form-melody" class="hidden mb-3 p-4 bg-white rounded-lg border-2 border-indigo-300 shadow-lg relative z-20">
+                            <div class="flex items-center justify-between mb-3">
                                 <h4 class="text-sm font-bold text-indigo-800">Quick Add Chord</h4>
-                                <button onclick="window.toggleQuickAddChordMelody && window.toggleQuickAddChordMelody()" class="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-white/50" title="Close">
+                                <button onclick="window.toggleQuickAddChordForm && window.toggleQuickAddChordForm('quick-add-chord-form-melody')" class="text-gray-500 hover:text-gray-700 text-xs font-semibold px-2 py-1 rounded hover:bg-gray-100" title="Close">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                 </button>
                             </div>
-                            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                                 <div>
-                                    <label class="block text-[10px] font-medium text-gray-600 mb-1">Root Note</label>
-                                    <select id="quick-add-root-melody" class="w-full p-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500">
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">Root Note</label>
+                                    <select id="quick-add-chord-form-melody-root" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
                                         <option value="0">C</option>
                                         <option value="1">C# / Db</option>
                                         <option value="2">D</option>
@@ -1348,35 +1348,85 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <label class="block text-[10px] font-medium text-gray-600 mb-1">Chord Type</label>
-                                    <input type="text" id="quick-add-type-input-melody" list="chord-type-datalist-melody"
-                                           class="w-full p-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
-                                           placeholder="Type or select..." value="">
-                                    <datalist id="chord-type-datalist-melody">
-                                        <option value="Major">Major</option>
-                                        <option value="Minor">Minor</option>
-                                        <option value="7">Dominant 7</option>
-                                        <option value="Maj7">Major 7</option>
-                                        <option value="m7">Minor 7</option>
-                                        <option value="dim">Diminished</option>
-                                        <option value="aug">Augmented</option>
-                                        <option value="sus4">Sus4</option>
-                                        <option value="sus2">Sus2</option>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">Chord/Interval Type <span class="text-gray-500">(type to filter)</span></label>
+                                    <input
+                                        type="text"
+                                        id="quick-add-chord-form-melody-type-input"
+                                        list="chord-type-datalist-quick-add-chord-form-melody"
+                                        class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="Start typing or click dropdown arrow..."
+                                        value=""
+                                    >
+                                    <datalist id="chord-type-datalist-quick-add-chord-form-melody">
+                                        <optgroup label="─── TRIADS ───">
+                                            <option value="Major">Major</option>
+                                            <option value="Minor">Minor</option>
+                                            <option value="Augmented">Augmented</option>
+                                            <option value="Diminished">Diminished</option>
+                                            <option value="Sus2">Sus2</option>
+                                            <option value="Sus4">Sus4</option>
+                                            <option value="Power Chord">Power Chord</option>
+                                        </optgroup>
+                                        <optgroup label="─── SEVENTHS ───">
+                                            <option value="Dominant 7th">Dominant 7th</option>
+                                            <option value="Major 7th">Major 7th</option>
+                                            <option value="Minor 7th">Minor 7th</option>
+                                            <option value="Half-Diminished 7th">Half-Diminished 7th</option>
+                                            <option value="Diminished 7th">Diminished 7th</option>
+                                            <option value="Minor-Major 7th">Minor-Major 7th</option>
+                                        </optgroup>
+                                        <optgroup label="─── NINTHS ───">
+                                            <option value="Major 9th">Major 9th</option>
+                                            <option value="Dominant 9th">Dominant 9th</option>
+                                            <option value="Minor 9th">Minor 9th</option>
+                                            <option value="6/9">6/9</option>
+                                            <option value="Add9">Add9</option>
+                                        </optgroup>
+                                        <optgroup label="─── EXTENDED ───">
+                                            <option value="Dominant 11th">Dominant 11th</option>
+                                            <option value="Minor 11th">Minor 11th</option>
+                                            <option value="Dominant 13th">Dominant 13th</option>
+                                            <option value="Major 6th">Major 6th</option>
+                                            <option value="Minor 6th">Minor 6th</option>
+                                        </optgroup>
+                                        <optgroup label="─── ALTERED ───">
+                                            <option value="Augmented 7th">Augmented 7th</option>
+                                            <option value="7b5">7b5</option>
+                                            <option value="7#5">7#5</option>
+                                            <option value="7b9">7b9</option>
+                                            <option value="7#9">7#9</option>
+                                        </optgroup>
+                                        <optgroup label="─── INTERVALS ───">
+                                            <option value="Major 2nd">Major 2nd</option>
+                                            <option value="Minor 2nd">Minor 2nd</option>
+                                            <option value="Major 3rd">Major 3rd</option>
+                                            <option value="Minor 3rd">Minor 3rd</option>
+                                            <option value="Perfect 4th">Perfect 4th</option>
+                                            <option value="Tritone">Tritone</option>
+                                            <option value="Perfect 5th">Perfect 5th</option>
+                                            <option value="Major 6th">Major 6th (interval)</option>
+                                            <option value="Minor 6th">Minor 6th (interval)</option>
+                                            <option value="Major 7th">Major 7th (interval)</option>
+                                            <option value="Minor 7th">Minor 7th (interval)</option>
+                                            <option value="Octave">Octave</option>
+                                        </optgroup>
                                     </datalist>
                                 </div>
                                 <div>
-                                    <label class="block text-[10px] font-medium text-gray-600 mb-1">Duration</label>
-                                    <select id="quick-add-duration-melody" class="w-full p-1.5 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500">
-                                        <option value="1">1 Beat</option>
-                                        <option value="2">2 Beats</option>
-                                        <option value="4" selected>4 Beats (1 Bar)</option>
-                                        <option value="8">8 Beats (2 Bars)</option>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">Inversion</label>
+                                    <select id="quick-add-chord-form-melody-inversion" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                                        <option value="0">Root Position</option>
+                                        <option value="1">1st Inversion</option>
+                                        <option value="2">2nd Inversion</option>
+                                        <option value="3">3rd Inversion</option>
                                     </select>
                                 </div>
-                                <div class="flex items-end">
-                                    <button onclick="window.quickAddChordMelody && window.quickAddChordMelody()"
-                                            class="w-full p-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded transition">
-                                        Add Chord
+                                <div class="flex items-end gap-2">
+                                    <button onclick="window.quickAddChordFromForm && window.quickAddChordFromForm('quick-add-chord-form-melody')" class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg shadow transition">
+                                        Add
+                                    </button>
+                                    <button onclick="window.toggleQuickAddChordForm && window.toggleQuickAddChordForm('quick-add-chord-form-melody')" class="px-3 py-2 bg-gray-400 hover:bg-gray-500 text-white text-sm font-semibold rounded-lg shadow transition">
+                                        Cancel
                                     </button>
                                 </div>
                             </div>
@@ -1498,27 +1548,52 @@
                                             <optgroup label="Simple Patterns">
                                                 <option value="whole-note">Whole Note</option>
                                                 <option value="root-fifth" selected>Root-Fifth</option>
+                                                <option value="half-time">Half Time</option>
+                                                <option value="pedal">Pedal Pulse</option>
+                                            </optgroup>
+                                            <optgroup label="Arpeggiated Patterns">
                                                 <option value="arpeggio">Arpeggio</option>
                                                 <option value="alberti">Alberti Bass</option>
-                                                <option value="walking">Walking Bass</option>
                                                 <option value="broken-octave">Broken Octave</option>
-                                                <option value="country">Country</option>
-                                                <option value="pedal">Pedal Point</option>
+                                            </optgroup>
+                                            <optgroup label="Walking & Melodic">
+                                                <option value="walking">Walking Bass</option>
+                                                <option value="chromatic-approach">Chromatic Approach</option>
+                                                <option value="scalar-walk">Scalar Walk</option>
+                                                <option value="bebop">Bebop</option>
                                             </optgroup>
                                             <optgroup label="Rhythmic Patterns">
-                                                <option value="boogie">Boogie-Woogie</option>
+                                                <option value="dotted-rhythm">Dotted Rhythm</option>
+                                                <option value="syncopated">Syncopated</option>
+                                                <option value="anticipation">Anticipation</option>
+                                                <option value="shuffle">Shuffle</option>
                                                 <option value="driving-rock">Driving Rock</option>
-                                                <option value="montuno">Montuno</option>
+                                                <option value="boogie">Boogie-Woogie</option>
+                                            </optgroup>
+                                            <optgroup label="Rest & Space">
+                                                <option value="staccato">Staccato</option>
+                                                <option value="call-response">Call & Response</option>
+                                                <option value="ballad">Ballad</option>
+                                            </optgroup>
+                                            <optgroup label="Style Patterns">
+                                                <option value="country">Country</option>
+                                                <option value="bossa-nova">Bossa Nova</option>
+                                                <option value="disco-octave">Disco Octave</option>
+                                                <option value="motown">Motown</option>
                                                 <option value="tango">Tango</option>
+                                                <option value="montuno">Montuno</option>
                                                 <option value="reggae">Reggae</option>
                                                 <option value="funk">Funk</option>
                                             </optgroup>
-                                            <optgroup label="Polyphonic Patterns (Chords)">
+                                            <optgroup label="Polyphonic (Chords)">
                                                 <option value="octave-doubling">Octave Doubling</option>
                                                 <option value="power-chord">Power Chord</option>
+                                                <option value="rock-power">Rock Power</option>
+                                                <option value="open-fifth">Open Fifth</option>
                                                 <option value="stride">Stride</option>
                                                 <option value="shell-voicing">Shell Voicing</option>
                                                 <option value="tenths">Tenths</option>
+                                                <option value="gospel">Gospel</option>
                                             </optgroup>
                                         </select>
                                     </div>
@@ -1579,116 +1654,7 @@
                             </div>
                         </div>
 
-                        <!-- Quick Add Chord Form (Initially Hidden) -->
-                        <div id="quick-add-chord-form-melody" class="hidden mb-3 p-4 bg-white rounded-lg border-2 border-indigo-300 shadow-lg relative z-20">
-                            <div class="flex items-center justify-between mb-3">
-                                <h4 class="text-sm font-bold text-indigo-800">Quick Add Chord</h4>
-                                <button onclick="window.toggleQuickAddChordMelody && window.toggleQuickAddChordMelody()" class="text-gray-500 hover:text-gray-700 text-xs font-semibold px-2 py-1 rounded hover:bg-gray-100" title="Close">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                </button>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-                                <div>
-                                    <label class="block text-xs font-medium text-gray-700 mb-1">Root Note</label>
-                                    <select id="quick-add-root-melody" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-                                        <option value="0">C</option>
-                                        <option value="1">C# / Db</option>
-                                        <option value="2">D</option>
-                                        <option value="3">D# / Eb</option>
-                                        <option value="4">E</option>
-                                        <option value="5">F</option>
-                                        <option value="6">F# / Gb</option>
-                                        <option value="7">G</option>
-                                        <option value="8">G# / Ab</option>
-                                        <option value="9">A</option>
-                                        <option value="10">A# / Bb</option>
-                                        <option value="11">B</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-gray-700 mb-1">Chord/Interval Type <span class="text-gray-500">(type to filter)</span></label>
-                                    <input
-                                        type="text"
-                                        id="quick-add-type-input-melody"
-                                        list="chord-type-datalist-melody"
-                                        class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                                        placeholder="Start typing or click dropdown arrow..."
-                                        value=""
-                                    >
-                                    <datalist id="chord-type-datalist-melody">
-                                        <optgroup label="─── TRIADS ───">
-                                            <option value="Major">Major</option>
-                                            <option value="Minor">Minor</option>
-                                            <option value="Augmented">Augmented</option>
-                                            <option value="Diminished">Diminished</option>
-                                            <option value="Sus2">Sus2</option>
-                                            <option value="Sus4">Sus4</option>
-                                            <option value="Power Chord">Power Chord</option>
-                                        </optgroup>
-                                        <optgroup label="─── SEVENTHS ───">
-                                            <option value="Dominant 7th">Dominant 7th</option>
-                                            <option value="Major 7th">Major 7th</option>
-                                            <option value="Minor 7th">Minor 7th</option>
-                                            <option value="Half-Diminished 7th">Half-Diminished 7th</option>
-                                            <option value="Diminished 7th">Diminished 7th</option>
-                                            <option value="Minor-Major 7th">Minor-Major 7th</option>
-                                        </optgroup>
-                                        <optgroup label="─── NINTHS ───">
-                                            <option value="Major 9th">Major 9th</option>
-                                            <option value="Dominant 9th">Dominant 9th</option>
-                                            <option value="Minor 9th">Minor 9th</option>
-                                            <option value="6/9">6/9</option>
-                                            <option value="Add9">Add9</option>
-                                        </optgroup>
-                                        <optgroup label="─── EXTENDED ───">
-                                            <option value="Dominant 11th">Dominant 11th</option>
-                                            <option value="Minor 11th">Minor 11th</option>
-                                            <option value="Dominant 13th">Dominant 13th</option>
-                                            <option value="Major 6th">Major 6th</option>
-                                            <option value="Minor 6th">Minor 6th</option>
-                                        </optgroup>
-                                        <optgroup label="─── ALTERED ───">
-                                            <option value="Augmented 7th">Augmented 7th</option>
-                                            <option value="7b5">7b5</option>
-                                            <option value="7#5">7#5</option>
-                                            <option value="7b9">7b9</option>
-                                            <option value="7#9">7#9</option>
-                                        </optgroup>
-                                        <optgroup label="─── INTERVALS ───">
-                                            <option value="Major 2nd">Major 2nd</option>
-                                            <option value="Minor 2nd">Minor 2nd</option>
-                                            <option value="Major 3rd">Major 3rd</option>
-                                            <option value="Minor 3rd">Minor 3rd</option>
-                                            <option value="Perfect 4th">Perfect 4th</option>
-                                            <option value="Tritone">Tritone</option>
-                                            <option value="Perfect 5th">Perfect 5th</option>
-                                            <option value="Major 6th">Major 6th (interval)</option>
-                                            <option value="Minor 6th">Minor 6th (interval)</option>
-                                            <option value="Major 7th">Major 7th (interval)</option>
-                                            <option value="Minor 7th">Minor 7th (interval)</option>
-                                            <option value="Octave">Octave</option>
-                                        </optgroup>
-                                    </datalist>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-gray-700 mb-1">Inversion</label>
-                                    <select id="quick-add-inversion-melody" class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-                                        <option value="0">Root Position</option>
-                                        <option value="1">1st Inversion</option>
-                                        <option value="2">2nd Inversion</option>
-                                        <option value="3">3rd Inversion</option>
-                                    </select>
-                                </div>
-                                <div class="flex items-end gap-2">
-                                    <button onclick="window.quickAddChordToProgressionMelody && window.quickAddChordToProgressionMelody()" class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg shadow transition">
-                                        Add
-                                    </button>
-                                    <button onclick="window.toggleQuickAddChordMelody && window.toggleQuickAddChordMelody()" class="px-3 py-2 bg-gray-400 hover:bg-gray-500 text-white text-sm font-semibold rounded-lg shadow transition">
-                                        Cancel
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                        <!-- Quick Add Chord Form removed - using shared component from active melody section -->
 
                         <!-- Progression cards container (legacy - hidden) -->
                         <div id="melody-progression-visualization-legacy" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 p-2 bg-white rounded-lg border border-gray-200">
@@ -1913,29 +1879,54 @@
                                                 <label class="block text-sm font-semibold text-gray-700 mb-2">Bass Pattern:</label>
                                                 <select id="bass-pattern-select" onchange="window.setBassPattern && window.setBassPattern(this.value); window.refreshNotationFromProgression && window.refreshNotationFromProgression();" class="w-full p-2 text-sm border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 cursor-pointer transition-colors">
                                                     <optgroup label="Simple Patterns">
-                                                        <option value="whole-note">Whole Note - Single root note</option>
+                                                        <option value="whole-note">Whole Note - Sustained root</option>
                                                         <option value="root-fifth" selected>Root-Fifth - Alternating root and fifth</option>
+                                                        <option value="half-time">Half Time - Spacious half notes</option>
+                                                        <option value="pedal">Pedal Pulse - Rhythmic root pulse</option>
+                                                    </optgroup>
+                                                    <optgroup label="Arpeggiated Patterns">
                                                         <option value="arpeggio">Arpeggio - Ascending chord tones</option>
                                                         <option value="alberti">Alberti Bass - Classical pattern</option>
+                                                        <option value="broken-octave">Broken Octave - Low/high alternation</option>
+                                                    </optgroup>
+                                                    <optgroup label="Walking & Melodic">
                                                         <option value="walking">Walking Bass - Jazz stepwise</option>
-                                                        <option value="broken-octave">Broken Octave - Alternating low/high root</option>
-                                                        <option value="country">Country - Two-beat boom-chick</option>
-                                                        <option value="pedal">Pedal Point - Sustained drone bass</option>
+                                                        <option value="chromatic-approach">Chromatic Approach - Walk to root</option>
+                                                        <option value="scalar-walk">Scalar Walk - Scale-based movement</option>
+                                                        <option value="bebop">Bebop - Chromatic jazz walking</option>
                                                     </optgroup>
                                                     <optgroup label="Rhythmic Patterns">
-                                                        <option value="boogie">Boogie-Woogie - 8-to-the-bar blues</option>
+                                                        <option value="dotted-rhythm">Dotted Rhythm - Long-short swing</option>
+                                                        <option value="syncopated">Syncopated - Off-beat accents</option>
+                                                        <option value="anticipation">Anticipation - Forward momentum</option>
+                                                        <option value="shuffle">Shuffle - Blues swing feel</option>
                                                         <option value="driving-rock">Driving Rock - Straight 8th notes</option>
-                                                        <option value="montuno">Montuno - Cuban syncopated 8ths</option>
-                                                        <option value="tango">Tango - Latin habanera rhythm</option>
-                                                        <option value="reggae">Reggae - One-drop offbeat</option>
-                                                        <option value="funk">Funk - Syncopated with ghost notes</option>
+                                                        <option value="boogie">Boogie-Woogie - 8-to-the-bar blues</option>
                                                     </optgroup>
-                                                    <optgroup label="Polyphonic Patterns (Chords)">
-                                                        <option value="octave-doubling">Octave Doubling - Root + octave chord</option>
-                                                        <option value="power-chord">Power Chord - Root + fifth chord</option>
-                                                        <option value="stride">Stride - Jazz/ragtime bass + chord</option>
-                                                        <option value="shell-voicing">Shell Voicing - Jazz root + 3rd/7th</option>
-                                                        <option value="tenths">Tenths - Root + 10th intervals</option>
+                                                    <optgroup label="Rest & Space">
+                                                        <option value="staccato">Staccato - Short detached notes</option>
+                                                        <option value="call-response">Call & Response - Musical conversation</option>
+                                                        <option value="ballad">Ballad - Sparse expressive</option>
+                                                    </optgroup>
+                                                    <optgroup label="Style Patterns">
+                                                        <option value="country">Country - Boom-chick with walk-up</option>
+                                                        <option value="bossa-nova">Bossa Nova - Brazilian syncopation</option>
+                                                        <option value="disco-octave">Disco Octave - Pumping octaves</option>
+                                                        <option value="motown">Motown - Melodic soul bass</option>
+                                                        <option value="tango">Tango - Habanera rhythm</option>
+                                                        <option value="montuno">Montuno - Cuban syncopated</option>
+                                                        <option value="reggae">Reggae - One-drop offbeat</option>
+                                                        <option value="funk">Funk - Syncopated 16ths</option>
+                                                    </optgroup>
+                                                    <optgroup label="Polyphonic (Chords)">
+                                                        <option value="octave-doubling">Octave Doubling - Root + octave</option>
+                                                        <option value="power-chord">Power Chord - Root + fifth</option>
+                                                        <option value="rock-power">Rock Power - Driving power chords</option>
+                                                        <option value="open-fifth">Open Fifth - Sustained R+5</option>
+                                                        <option value="stride">Stride - Jazz/ragtime LH</option>
+                                                        <option value="shell-voicing">Shell Voicing - Root + 3rd/7th</option>
+                                                        <option value="tenths">Tenths - Romantic 10th intervals</option>
+                                                        <option value="gospel">Gospel - Rich passing chords</option>
                                                     </optgroup>
                                                 </select>
                                             </div>
