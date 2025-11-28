@@ -131,7 +131,8 @@ export const LayoutConstants = {
     PALETTE_WIDTH: {
         small: 200,
         medium: 280,
-        large: 360
+        large: 360,
+        expanded: 400  // Phase 2: Wider palette for section intent selector
     },
     PALETTE_MIN_HEIGHT: 120,
     PALETTE_MAX_HEIGHT: 500,

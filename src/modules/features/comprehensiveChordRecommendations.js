@@ -21,6 +21,25 @@ import { getInvertedChordNotes, noteToMidi } from '../utils/noteUtils.js';
 import { analyzeProgressionContext, scoreContextAwareness } from './progressionContext.js';
 import { getSavedWeights } from '../config/weightPresets.js';
 
+// Phase 1 Enhancement Modules
+import { scoreEnhancedVoiceLeading, detectParallelMotion } from './enhancedVoiceLeading.js';
+import {
+    scoreExtendedHarmonicRelationships,
+    ResolutionExpectationTracker,
+    detectSecondaryDominant,
+    detectChromaticMediant
+} from './extendedHarmonicRelationships.js';
+import { getAdaptiveWeights, explainWeightChoices } from './dynamicWeights.js';
+import { getRelevantChordTypes, CHORD_TYPE_PROFILES } from './chordTypeProfiles.js';
+
+// Phase 2 Section Context Modules
+import {
+    analyzeSectionContext,
+    getSectionAwareScore,
+    generateSectionReasons
+} from './sectionTransitionAnalyzer.js';
+import { getSectionProfile, getChordTypePreference } from './sectionProfiles.js';
+
 // Harmonic function definitions
 const HARMONIC_FUNCTIONS = {
     TONIC: 'tonic',           // I, iii, vi
@@ -371,6 +390,11 @@ function scoreModalInterchange(chordRoot, chordType, key, style, mood, context =
  * @param {Array} progressionData - Full progression history (optional, for context-aware mode)
  * @param {boolean} contextMode - Enable context-aware scoring (default false)
  * @param {number} lookbackDepth - Number of previous chords to analyze (default 4)
+ * @param {Object} customWeights - Custom scoring weights (optional)
+ * @param {boolean} useEnhancedScoring - Enable Phase 1 enhanced scoring (default true)
+ * @param {Object} sectionInfo - Section context info (Phase 2)
+ * @param {number} sectionInfo.currentChordIndex - Index of current chord in progression
+ * @param {Array} sectionInfo.sections - Array of section objects from compositionState
  * @returns {Array<{root:string, type:string, inversion:number, score:number, reason:string, confidence:number}>}
  */
 export function generateComprehensiveRecommendations(
@@ -385,9 +409,21 @@ export function generateComprehensiveRecommendations(
     progressionData = [],
     contextMode = false,
     lookbackDepth = 4,
-    customWeights = null
+    customWeights = null,
+    useEnhancedScoring = true,  // Phase 1 enhanced scoring (voice leading, harmonic relationships)
+    sectionInfo = null          // Phase 2 section context
 ) {
     const recommendations = [];
+
+    // Safety check for required parameters
+    if (!currentRoot || !currentChordType) {
+        return getDefaultRecommendations(key || 'C');
+    }
+
+    // Ensure progressionData is an array
+    if (!Array.isArray(progressionData)) {
+        progressionData = [];
+    }
 
     // Get current chord's MIDI notes for voice leading analysis
     const currentMidi = getChordMidi(currentRoot, currentChordType, currentInversion);
@@ -404,7 +440,85 @@ export function generateComprehensiveRecommendations(
     // Analyze progression context if context mode is enabled
     let context = null;
     if (contextMode && progressionData && progressionData.length > 0) {
-        context = analyzeProgressionContext(progressionData, key, lookbackDepth);
+        try {
+            context = analyzeProgressionContext(progressionData, key, lookbackDepth);
+        } catch (e) {
+            context = null;
+        }
+    }
+
+    // Initialize resolution expectation tracker for enhanced scoring
+    let resolutionTracker = null;
+    if (useEnhancedScoring && progressionData && progressionData.length > 0) {
+        try {
+            resolutionTracker = new ResolutionExpectationTracker();
+            // Process progression history to build expectation state
+            for (let i = 0; i < progressionData.length; i++) {
+                const chord = progressionData[i];
+                if (chord && chord.root) {
+                    resolutionTracker.processChord(chord, key);
+                }
+            }
+        } catch (e) {
+            resolutionTracker = null;
+        }
+    }
+
+    // Get adaptive weights if enhanced scoring is enabled
+    let adaptiveWeightsInfo = null;
+    if (useEnhancedScoring && context) {
+        try {
+            adaptiveWeightsInfo = explainWeightChoices(context, style);
+        } catch (e) {
+        }
+    }
+
+    // Get relevant chord types based on context (smart filtering)
+    let chordTypesToEvaluate = CHORD_TYPES_TO_EVALUATE;
+    if (useEnhancedScoring) {
+        try {
+            const filterContext = {
+                style,
+                mood,
+                tensionDirection,
+                progressionLength: progressionData ? progressionData.length : 0,
+                isApproachingCadence: context?.cadence?.approaching || false,
+                currentTension: context?.tension?.currentTension || 50
+            };
+            const relevantTypes = getRelevantChordTypes(filterContext);
+            // Use top-scoring chord types (those with score >= 50)
+            chordTypesToEvaluate = relevantTypes
+                .filter(ct => ct.score >= 50)
+                .map(ct => ct.type);
+            // Ensure we have at least the basic types
+            if (chordTypesToEvaluate.length < 5) {
+                chordTypesToEvaluate = CHORD_TYPES_TO_EVALUATE;
+            }
+        } catch (e) {
+            chordTypesToEvaluate = CHORD_TYPES_TO_EVALUATE;
+        }
+    }
+
+    // Phase 2: Analyze section context if provided
+    let sectionContext = null;
+    let nextChordIndex = null;
+    if (sectionInfo) {
+        try {
+            // Phase 2.1: Check for intent-based context override
+            if (sectionInfo.intentContext) {
+                // Use the intent-based section context directly
+                // This provides user-specified section type and position
+                sectionContext = sectionInfo.intentContext;
+                nextChordIndex = (sectionInfo.insertAfterIndex ?? sectionInfo.currentChordIndex ?? progressionData.length - 1) + 1;
+            } else if (sectionInfo.sections && sectionInfo.sections.length > 0) {
+                // Fallback: Analyze section context from existing sections
+                // The next chord index is current + 1 (we're recommending the NEXT chord)
+                nextChordIndex = (sectionInfo.currentChordIndex ?? progressionData.length - 1) + 1;
+                sectionContext = analyzeSectionContext(nextChordIndex, sectionInfo.sections);
+            }
+        } catch (e) {
+            sectionContext = null;
+        }
     }
 
     // Evaluate all possible next chords across all three dimensions
@@ -422,8 +536,8 @@ export function generateComprehensiveRecommendations(
             return; // Skip this root
         }
 
-        // For each root, evaluate multiple chord types
-        CHORD_TYPES_TO_EVALUATE.forEach(nextType => {
+        // For each root, evaluate multiple chord types (using filtered list if enhanced scoring)
+        chordTypesToEvaluate.forEach(nextType => {
             const chordDef = CHORD_DEFINITIONS[nextType];
             if (!chordDef) return;
 
@@ -439,11 +553,60 @@ export function generateComprehensiveRecommendations(
             // For each chord type, evaluate all possible inversions
             const maxInversion = chordDef.intervals.length - 1;
             for (let nextInversion = 0; nextInversion <= maxInversion; nextInversion++) {
-                const nextMidi = getChordMidi(nextRoot, nextType, nextInversion);
-                if (nextMidi.length === 0) continue;
+                try {
+                    const nextMidi = getChordMidi(nextRoot, nextType, nextInversion);
+                    if (nextMidi.length === 0) continue;
 
-                // Calculate comprehensive voice leading score
-                const voiceLeadingScore = scoreVoiceLeading(currentMidi, nextMidi, nextInversion);
+                    // Calculate voice leading score (enhanced or standard)
+                    let voiceLeadingScore;
+                    let voiceLeadingDetails = null;
+                    if (useEnhancedScoring) {
+                        try {
+                            const vlResult = scoreEnhancedVoiceLeading(currentMidi, nextMidi, key, {
+                                checkParallelMotion: true,
+                                checkTendencyTones: true,
+                                checkLeapRecovery: true,
+                                penalizeVoiceCrossing: true
+                            });
+                            voiceLeadingScore = vlResult.score;
+                            voiceLeadingDetails = vlResult;
+                        } catch (e) {
+                            voiceLeadingScore = scoreVoiceLeading(currentMidi, nextMidi, nextInversion);
+                        }
+                    } else {
+                        voiceLeadingScore = scoreVoiceLeading(currentMidi, nextMidi, nextInversion);
+                    }
+
+                    // Calculate extended harmonic relationship score (Phase 1 enhancement)
+                    let extendedHarmonicScore = 0;
+                    let harmonicDetails = null;
+                    if (useEnhancedScoring) {
+                        try {
+                            const currentChord = { root: currentRoot, type: currentChordType };
+                            const nextChord = { root: nextRoot, type: nextType };
+                            const harmonicResult = scoreExtendedHarmonicRelationships(
+                                currentChord,
+                                nextChord,
+                                key,
+                                progressionData || []
+                            );
+                            extendedHarmonicScore = harmonicResult.score;
+                            harmonicDetails = harmonicResult;
+                        } catch (e) {
+                            // Fall back to no extended harmonic score
+                        }
+                    }
+
+                    // Calculate resolution expectation score
+                    let resolutionScore = 0;
+                    if (useEnhancedScoring && resolutionTracker) {
+                        try {
+                            const nextChord = { root: nextRoot, type: nextType };
+                            resolutionScore = resolutionTracker.scoreResolution(nextChord, key);
+                        } catch (e) {
+                            // Fall back to no resolution score
+                        }
+                    }
 
                 // Calculate context-aware score if enabled
                 let contextScore = 0;
@@ -465,28 +628,84 @@ export function generateComprehensiveRecommendations(
                     context
                 );
 
-                // Get custom weights from parameter, or from localStorage (or defaults)
-                const weights = customWeights || getSavedWeights(contextMode);
+                // Phase 2: Calculate section-aware score
+                let sectionScore = 0;
+                let sectionScoreDetails = null;
+                if (sectionContext) {
+                    try {
+                        const nextChord = { root: nextRoot, type: nextType, inversion: nextInversion };
+                        // Phase 2.1: Pass intent context to scoring function
+                        // This allows user's position intent (building/concluding/final) to affect recommendations
+                        sectionScoreDetails = getSectionAwareScore(
+                            nextChord,
+                            nextChordIndex,
+                            sectionInfo.sections,
+                            key,
+                            sectionContext  // Pass the intent context for position override
+                        );
+                        sectionScore = sectionScoreDetails.totalAdjustment;
+                    } catch (e) {
+                        // Fall back to no section score
+                    }
+                }
+
+                // Get weights - use adaptive weights if enhanced scoring, otherwise standard
+                let weights;
+                if (useEnhancedScoring && context) {
+                    weights = getAdaptiveWeights(context, style, {
+                        usePositionProfile: true,
+                        useStyleModifiers: true,
+                        usePatternAdjustments: true,
+                        useTensionAdjustments: true,
+                        customOverrides: customWeights
+                    });
+                } else {
+                    weights = customWeights || getSavedWeights(contextMode);
+                }
 
                 // Calculate total score (weighted combination using custom weights)
                 let totalScore;
+
+                // Blend extended harmonic score with base function score when enhanced scoring is enabled
+                let harmonicScoreBlended = functionScore;
+                if (useEnhancedScoring && extendedHarmonicScore > 0) {
+                    // Blend: 60% extended harmonic (which includes secondary dominants, chromatic mediants, sequences)
+                    // 40% traditional function score
+                    harmonicScoreBlended = (extendedHarmonicScore * 0.6) + (functionScore * 0.4);
+                }
+
+                // Add resolution expectation bonus when enhanced scoring is enabled
+                let resolutionBonus = 0;
+                if (useEnhancedScoring && resolutionScore > 0) {
+                    // Resolution expectations can boost the score significantly
+                    resolutionBonus = resolutionScore * 0.15; // Up to 15 point bonus
+                }
+
+                // Phase 2: Section context adds/subtracts from score directly
+                // Section scores are absolute adjustments, not weighted
+                const sectionAdjustment = sectionScore || 0;
+
                 if (contextMode && context && context.hasContext) {
                     // Context-aware mode: use context weights (includes context and modal interchange factors)
                     totalScore =
-                        (functionScore * weights.harmonic) +
+                        (harmonicScoreBlended * weights.harmonic) +
                         (voiceLeadingScore * weights.voiceLeading) +
                         (styleFit * weights.style) +
                         (moodFit * weights.mood) +
                         (contextScore * (weights.context || 0)) +
-                        (modalInterchangeScore * (weights.modalInterchange || 0));
+                        (modalInterchangeScore * (weights.modalInterchange || 0)) +
+                        resolutionBonus +
+                        sectionAdjustment;  // Phase 2: Section-aware adjustment
                 } else {
                     // Standard mode: use standard weights (includes modal interchange factor)
                     totalScore =
-                        (functionScore * weights.harmonic) +
+                        (harmonicScoreBlended * weights.harmonic) +
                         (voiceLeadingScore * weights.voiceLeading) +
                         (styleFit * weights.style) +
                         (moodFit * weights.mood) +
-                        (modalInterchangeScore * (weights.modalInterchange || 0));
+                        (modalInterchangeScore * (weights.modalInterchange || 0)) +
+                        resolutionBonus +
+                        sectionAdjustment;  // Phase 2: Section-aware adjustment
                 }
 
                 // Apply penalty for recommending the exact same chord and inversion
@@ -498,13 +717,21 @@ export function generateComprehensiveRecommendations(
                 // Check if this is a borrowed chord
                 const borrowedInfo = getBorrowedChordInfo(nextRoot, nextType, key);
 
+                // Phase 2: Get section-specific reasons
+                let sectionReasons = [];
+                if (sectionScoreDetails && sectionScoreDetails.hasSection) {
+                    sectionReasons = generateSectionReasons(sectionScoreDetails);
+                }
+
                 // Generate human-readable reason
                 const reason = generateReason(
                     currentRoot, nextRoot, nextType, nextInversion,
                     functionScore, voiceLeadingScore, styleFit, moodFit,
                     currentFunction, nextFunction, tensionDirection,
                     contextScore, context, modalInterchangeScore, borrowedInfo,
-                    key, nextDegree  // Add key and degree for accurate cadence text
+                    key, nextDegree,  // Add key and degree for accurate cadence text
+                    harmonicDetails, voiceLeadingDetails,  // Phase 1 enhanced scoring details
+                    sectionReasons  // Phase 2: Section-aware reasons
                 );
 
                 recommendations.push({
@@ -520,8 +747,20 @@ export function generateComprehensiveRecommendations(
                     moodFit,
                     contextScore,
                     modalInterchangeScore,
-                    borrowedFrom: borrowedInfo ? borrowedInfo.mode : null
+                    borrowedFrom: borrowedInfo ? borrowedInfo.mode : null,
+                    // Phase 1 enhanced scoring details
+                    extendedHarmonicScore: useEnhancedScoring ? extendedHarmonicScore : null,
+                    resolutionScore: useEnhancedScoring ? resolutionScore : null,
+                    harmonicDetails: useEnhancedScoring ? harmonicDetails : null,
+                    voiceLeadingDetails: useEnhancedScoring ? voiceLeadingDetails : null,
+                    // Phase 2 section-aware details
+                    sectionScore: sectionScore,
+                    sectionDetails: sectionScoreDetails,
+                    sectionReasons: sectionReasons
                 });
+                } catch (e) {
+                    // Skip this chord if there's an error evaluating it
+                }
             }
         });
     });
@@ -763,9 +1002,51 @@ function generateReason(
     functionScore, voiceLeadingScore, styleFit, moodFit,
     currentFunction, nextFunction, tensionDirection,
     contextScore = 0, context = null, modalInterchangeScore = 50, borrowedInfo = null,
-    key = 'C', nextDegree = null  // Add key and degree for accurate cadence text
+    key = 'C', nextDegree = null,  // Add key and degree for accurate cadence text
+    harmonicDetails = null, voiceLeadingDetails = null,  // Phase 1 enhanced scoring details
+    sectionReasons = []  // Phase 2 section-aware reasons
 ) {
     const reasons = [];
+
+    // Phase 2: Add section-specific reasons first (highest priority for user context)
+    if (sectionReasons && sectionReasons.length > 0) {
+        // Add top 2 section reasons to keep output concise
+        reasons.push(...sectionReasons.slice(0, 2));
+    }
+
+    // Phase 1 Enhanced: Secondary dominant reasons (highest priority)
+    if (harmonicDetails && harmonicDetails.isSecondaryDominant) {
+        const target = harmonicDetails.secondaryDominantTarget;
+        if (target) {
+            reasons.push(`Secondary dominant (V/${target})`);
+        }
+    }
+
+    // Phase 1 Enhanced: Chromatic mediant reasons
+    if (harmonicDetails && harmonicDetails.chromaticMediant) {
+        const mediant = harmonicDetails.chromaticMediant;
+        if (mediant.isChromaticMediant) {
+            reasons.push(`Chromatic mediant (${mediant.type})`);
+        }
+    }
+
+    // Phase 1 Enhanced: Sequence continuation
+    if (harmonicDetails && harmonicDetails.continuesSequence) {
+        reasons.push('Continues harmonic sequence');
+    }
+
+    // Phase 1 Enhanced: Voice leading quality reasons
+    if (voiceLeadingDetails) {
+        if (voiceLeadingDetails.hasParallelFifths || voiceLeadingDetails.hasParallelOctaves) {
+            // Note: these are typically penalized, but if score is still high, chord has other merits
+        }
+        if (voiceLeadingDetails.tendencyToneResolved) {
+            reasons.push('Resolves leading tone');
+        }
+        if (voiceLeadingDetails.contraryMotion && voiceLeadingScore >= 75) {
+            reasons.push('Strong contrary motion');
+        }
+    }
 
     // Modal interchange reason (high priority for borrowed chords)
     if (borrowedInfo && modalInterchangeScore >= 70) {
@@ -890,4 +1171,133 @@ function getDefaultRecommendations(key) {
         { root: key, type: 'Minor', inversion: 0, score: 85, reason: 'Start with minor for a darker feel', confidence: 85 },
         { root: key, type: 'Major 7th', inversion: 0, score: 80, reason: 'Jazz-influenced starting point', confidence: 80 }
     ];
+}
+
+/**
+ * Analyze a specific chord transition with detailed scoring breakdown
+ * Useful for UI/debugging to understand why a chord was recommended
+ *
+ * @param {Object} currentChord - {root, type, inversion}
+ * @param {Object} nextChord - {root, type, inversion}
+ * @param {string} key - Musical key
+ * @param {Array} progressionData - Full progression history
+ * @param {Object} options - {style, mood, tensionDirection}
+ * @returns {Object} Detailed analysis of the chord transition
+ */
+export function analyzeChordTransition(currentChord, nextChord, key, progressionData = [], options = {}) {
+    const { style = 'balanced', mood = 'bright', tensionDirection = 'resolve' } = options;
+
+    const currentMidi = getChordMidi(currentChord.root, currentChord.type, currentChord.inversion || 0);
+    const nextMidi = getChordMidi(nextChord.root, nextChord.type, nextChord.inversion || 0);
+
+    if (currentMidi.length === 0 || nextMidi.length === 0) {
+        return { error: 'Invalid chord(s)' };
+    }
+
+    // Enhanced voice leading analysis
+    const voiceLeadingResult = scoreEnhancedVoiceLeading(currentMidi, nextMidi, key, {
+        checkParallelMotion: true,
+        checkTendencyTones: true,
+        checkLeapRecovery: true,
+        penalizeVoiceCrossing: true
+    });
+
+    // Extended harmonic relationships
+    const harmonicResult = scoreExtendedHarmonicRelationships(
+        currentChord,
+        nextChord,
+        key,
+        progressionData
+    );
+
+    // Detect specific patterns
+    const secondaryDominant = detectSecondaryDominant(currentChord, nextChord, key);
+    const chromaticMediant = detectChromaticMediant(currentChord, nextChord);
+    const parallelMotion = detectParallelMotion(currentMidi, nextMidi);
+
+    // Context analysis
+    let contextAnalysis = null;
+    if (progressionData.length > 0) {
+        contextAnalysis = analyzeProgressionContext(progressionData, key, 4);
+    }
+
+    // Get adaptive weights for this context
+    const adaptiveWeights = contextAnalysis
+        ? getAdaptiveWeights(contextAnalysis, style)
+        : null;
+    const weightExplanation = contextAnalysis
+        ? explainWeightChoices(contextAnalysis, style)
+        : null;
+
+    return {
+        voiceLeading: {
+            score: voiceLeadingResult.score,
+            details: voiceLeadingResult,
+            parallelMotion
+        },
+        harmony: {
+            score: harmonicResult.score,
+            details: harmonicResult,
+            secondaryDominant,
+            chromaticMediant
+        },
+        context: contextAnalysis,
+        weights: {
+            adaptive: adaptiveWeights,
+            explanation: weightExplanation
+        },
+        overallAssessment: generateTransitionAssessment(voiceLeadingResult, harmonicResult, secondaryDominant, chromaticMediant)
+    };
+}
+
+/**
+ * Generate a human-readable assessment of a chord transition
+ */
+function generateTransitionAssessment(voiceLeading, harmony, secondaryDominant, chromaticMediant) {
+    const assessments = [];
+
+    // Voice leading quality
+    if (voiceLeading.score >= 80) {
+        assessments.push('Excellent voice leading with smooth motion');
+    } else if (voiceLeading.score >= 60) {
+        assessments.push('Good voice leading');
+    } else if (voiceLeading.score < 40) {
+        assessments.push('Voice leading could be smoother');
+    }
+
+    // Parallel motion warnings
+    if (voiceLeading.hasParallelFifths) {
+        assessments.push('Contains parallel fifths (traditionally avoided)');
+    }
+    if (voiceLeading.hasParallelOctaves) {
+        assessments.push('Contains parallel octaves (traditionally avoided)');
+    }
+
+    // Special harmonic relationships
+    if (secondaryDominant && secondaryDominant.isSecondaryDominant) {
+        assessments.push(`Functions as secondary dominant (${secondaryDominant.label})`);
+    }
+    if (chromaticMediant && chromaticMediant.isChromaticMediant) {
+        assessments.push(`Chromatic mediant relationship (${chromaticMediant.type})`);
+    }
+
+    // Harmonic quality
+    if (harmony.score >= 75) {
+        assessments.push('Strong harmonic connection');
+    } else if (harmony.score >= 50) {
+        assessments.push('Acceptable harmonic progression');
+    } else {
+        assessments.push('Unusual harmonic relationship');
+    }
+
+    return assessments;
+}
+
+/**
+ * Get chord type profile information for UI display
+ * @param {string} chordType - The chord type to look up
+ * @returns {Object|null} Profile information or null if not found
+ */
+export function getChordTypeProfile(chordType) {
+    return CHORD_TYPE_PROFILES[chordType] || null;
 }

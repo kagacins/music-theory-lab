@@ -11,14 +11,15 @@ This document outlines a comprehensive strategy to transform Music Theory Lab's 
 1. [Executive Summary](#1-executive-summary)
 2. [Current State Analysis](#2-current-state-analysis)
 3. [Competitive Differentiation Strategy](#3-competitive-differentiation-strategy)
-4. [Chord Progression Recommendation Enhancements](#4-chord-progression-recommendation-enhancements)
-5. [Next Chord Recommendation Enhancements](#5-next-chord-recommendation-enhancements)
-6. [Melody Recommendation Enhancements](#6-melody-recommendation-enhancements)
-7. [Harmony Recommendation Enhancements](#7-harmony-recommendation-enhancements)
-8. [Cross-Engine Integration](#8-cross-engine-integration)
-9. [Implementation Priorities](#9-implementation-priorities)
-10. [Technical Architecture](#10-technical-architecture)
-11. [Success Metrics](#11-success-metrics)
+4. [Graceful Degradation: Working Without Sections](#4-graceful-degradation-working-without-sections)
+5. [Chord Progression Recommendation Enhancements](#5-chord-progression-recommendation-enhancements)
+6. [Next Chord Recommendation Enhancements](#6-next-chord-recommendation-enhancements)
+7. [Melody Recommendation Enhancements](#7-melody-recommendation-enhancements)
+8. [Harmony Recommendation Enhancements](#8-harmony-recommendation-enhancements)
+9. [Cross-Engine Integration](#9-cross-engine-integration)
+10. [Implementation Priorities](#10-implementation-priorities)
+11. [Technical Architecture](#11-technical-architecture)
+12. [Success Metrics](#12-success-metrics)
 
 ---
 
@@ -152,9 +153,461 @@ Level 4: Compositional (Future State)
 
 ---
 
-## 4. Chord Progression Recommendation Enhancements
+## 4. Graceful Degradation: Working Without Sections
 
-### 4.1 Section-Aware Progression Generation
+### 4.1 Design Principle: Sections Enhance, Never Gate
+
+**Critical Requirement**: All recommendation engines MUST function fully when users have no defined sections. Section awareness is an **enhancement layer**, not a prerequisite.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    CONTEXT AVAILABILITY                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  No Context          Basic Context       Section Context         │
+│  (Empty prog.)       (Chords only)       (Full structure)        │
+│       │                   │                    │                 │
+│       ▼                   ▼                    ▼                 │
+│  ┌─────────┐         ┌─────────┐          ┌─────────┐           │
+│  │ Base    │         │ Base +  │          │ Base +  │           │
+│  │ Engine  │         │ Chord   │          │ Chord + │           │
+│  │         │         │ Context │          │ Section │           │
+│  └─────────┘         └─────────┘          └─────────┘           │
+│       │                   │                    │                 │
+│       └───────────────────┴────────────────────┘                │
+│                           │                                      │
+│                           ▼                                      │
+│                  Quality suggestions                             │
+│                  at ALL context levels                           │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 4.2 Context Detection Hierarchy
+
+The recommendation engine should detect and adapt to available context:
+
+```javascript
+class ContextDetector {
+  analyzeAvailableContext(progression, sectionInfo) {
+    return {
+      level: this.determineContextLevel(progression, sectionInfo),
+      availableSignals: this.gatherAvailableSignals(progression, sectionInfo),
+      recommendationStrategy: this.selectStrategy(progression, sectionInfo)
+    };
+  }
+
+  determineContextLevel(progression, sectionInfo) {
+    // Level 0: No progression at all
+    if (!progression || progression.length === 0) {
+      return {
+        level: 0,
+        name: 'empty',
+        description: 'Starting fresh - suggest common starting chords'
+      };
+    }
+
+    // Level 1: Single chord only
+    if (progression.length === 1) {
+      return {
+        level: 1,
+        name: 'single_chord',
+        description: 'One chord - suggest based on harmonic function'
+      };
+    }
+
+    // Level 2: Short progression (2-4 chords), no sections
+    const hasSections = sectionInfo?.sections?.length > 0;
+    if (progression.length <= 4 && !hasSections) {
+      return {
+        level: 2,
+        name: 'short_progression',
+        description: 'Short progression - pattern matching and voice leading'
+      };
+    }
+
+    // Level 3: Longer progression, no sections
+    if (!hasSections) {
+      return {
+        level: 3,
+        name: 'progression_only',
+        description: 'Full progression context without section structure'
+      };
+    }
+
+    // Level 4: Partial sections (some chords grouped, some ungrouped)
+    const groupedChords = sectionInfo.sections.flatMap(s => s.chordIndices);
+    const ungroupedCount = progression.length - groupedChords.length;
+    if (ungroupedCount > 0) {
+      return {
+        level: 4,
+        name: 'partial_sections',
+        description: 'Mixed - some sections defined, some chords ungrouped'
+      };
+    }
+
+    // Level 5: Full section structure
+    return {
+      level: 5,
+      name: 'full_structure',
+      description: 'Complete section structure - full compositional context'
+    };
+  }
+}
+```
+
+### 4.3 Fallback Strategies by Context Level
+
+#### Level 0: Empty Progression
+```javascript
+const LEVEL_0_STRATEGY = {
+  approach: 'suggest_common_starts',
+
+  getRecommendations(key, style, mood) {
+    // Suggest common starting chords based on style/mood
+    const commonStarts = {
+      pop: ['I', 'vi', 'IV'],
+      rock: ['I', 'IV', 'v'],
+      jazz: ['Imaj7', 'IVmaj7', 'ii7'],
+      ballad: ['I', 'vi', 'IV'],
+      default: ['I', 'IV', 'vi', 'V']
+    };
+
+    return {
+      suggestions: commonStarts[style] || commonStarts.default,
+      reasoning: 'Common starting chords for this style',
+      sectionHint: null  // No section context to provide
+    };
+  }
+};
+```
+
+#### Level 1-2: Single Chord or Short Progression
+```javascript
+const LEVEL_1_2_STRATEGY = {
+  approach: 'harmonic_function_and_voice_leading',
+
+  getRecommendations(progression, key, style, mood) {
+    // Use existing comprehensive engine without section context
+    const lastChord = progression[progression.length - 1];
+
+    return generateComprehensiveRecommendations(
+      lastChord.root,
+      lastChord.type,
+      lastChord.inversion,
+      key,
+      style,
+      mood,
+      'maintain',  // Default tension direction
+      10,
+      progression,
+      true,        // Enable context mode for pattern detection
+      Math.min(progression.length, 4),  // Look back at available chords
+      null         // No custom weights - use defaults
+    );
+  }
+};
+```
+
+#### Level 3: Progression Without Sections
+```javascript
+const LEVEL_3_STRATEGY = {
+  approach: 'inferred_structure',
+
+  getRecommendations(progression, key, style, mood, position) {
+    // Infer structural position from progression length and patterns
+    const inferredContext = this.inferStructuralContext(progression, position);
+
+    return {
+      ...this.getBaseRecommendations(progression, key, style, mood),
+      inferredPosition: inferredContext,
+      structureSuggestion: this.suggestSectionCreation(progression, position)
+    };
+  },
+
+  inferStructuralContext(progression, position) {
+    const length = progression.length;
+    const relativePosition = position / length;
+
+    // Infer based on common song structures
+    if (length <= 4) {
+      return { inferred: 'single_phrase', confidence: 0.7 };
+    }
+
+    if (length <= 8) {
+      // Likely a single section (verse or chorus)
+      if (relativePosition < 0.25) {
+        return { inferred: 'section_opening', confidence: 0.6 };
+      } else if (relativePosition > 0.75) {
+        return { inferred: 'section_closing', confidence: 0.6 };
+      }
+      return { inferred: 'section_middle', confidence: 0.5 };
+    }
+
+    // Longer progressions - look for repetition patterns
+    const patterns = this.detectRepetitionPatterns(progression);
+    if (patterns.found) {
+      return {
+        inferred: 'multi_section',
+        detectedPatterns: patterns,
+        confidence: 0.7
+      };
+    }
+
+    return { inferred: 'unknown_structure', confidence: 0.3 };
+  },
+
+  // Gently suggest creating sections if patterns detected
+  suggestSectionCreation(progression, position) {
+    const patterns = this.detectRepetitionPatterns(progression);
+
+    if (patterns.found && patterns.repeats >= 2) {
+      return {
+        suggestion: 'section_grouping_available',
+        message: `Detected a ${patterns.length}-chord pattern that repeats. ` +
+                 `Consider grouping into sections for enhanced recommendations.`,
+        autoGroupOption: patterns
+      };
+    }
+
+    return null;
+  }
+};
+```
+
+#### Level 4: Partial Sections
+```javascript
+const LEVEL_4_STRATEGY = {
+  approach: 'hybrid_context',
+
+  getRecommendations(progression, sectionInfo, key, style, mood, position) {
+    const isInSection = this.isPositionInSection(position, sectionInfo);
+
+    if (isInSection) {
+      // Use full section-aware recommendations
+      return this.getSectionAwareRecommendations(
+        progression, sectionInfo, key, style, mood, position
+      );
+    } else {
+      // Use progression-only context for ungrouped chords
+      const nearestSection = this.findNearestSection(position, sectionInfo);
+
+      return {
+        ...LEVEL_3_STRATEGY.getRecommendations(progression, key, style, mood, position),
+        nearbyContext: nearestSection ? {
+          section: nearestSection,
+          relationship: this.describeRelationship(position, nearestSection)
+        } : null,
+        sectionSuggestion: this.suggestAddingToSection(position, sectionInfo)
+      };
+    }
+  }
+};
+```
+
+### 4.4 Unified Recommendation Interface
+
+All strategies feed into a unified interface that handles context detection automatically:
+
+```javascript
+class AdaptiveRecommendationEngine {
+  getRecommendations(options) {
+    const {
+      progression = [],
+      sectionInfo = null,
+      key,
+      style = 'balanced',
+      mood = 'neutral',
+      position = progression.length  // Default: suggesting next chord
+    } = options;
+
+    // Step 1: Detect available context
+    const context = this.contextDetector.analyzeAvailableContext(
+      progression,
+      sectionInfo
+    );
+
+    // Step 2: Select appropriate strategy
+    const strategy = this.selectStrategy(context.level);
+
+    // Step 3: Generate recommendations using selected strategy
+    const recommendations = strategy.getRecommendations(
+      progression, sectionInfo, key, style, mood, position
+    );
+
+    // Step 4: Enrich with context-appropriate metadata
+    return this.enrichRecommendations(recommendations, context);
+  }
+
+  enrichRecommendations(recommendations, context) {
+    return {
+      ...recommendations,
+
+      // Always include base recommendation quality
+      suggestions: recommendations.suggestions.map(s => ({
+        ...s,
+        // Core scores always available
+        voiceLeadingScore: s.voiceLeadingScore,
+        harmonicFunctionScore: s.harmonicFunctionScore,
+        styleScore: s.styleScore,
+        moodScore: s.moodScore,
+
+        // Section scores only if sections available
+        sectionFitScore: context.level >= 4 ? s.sectionFitScore : null,
+        transitionScore: context.level >= 4 ? s.transitionScore : null,
+
+        // Clear indication of what context was used
+        contextUsed: context.name
+      })),
+
+      // Meta information
+      meta: {
+        contextLevel: context.level,
+        contextName: context.name,
+        sectionsAvailable: context.level >= 4,
+
+        // Helpful hints when sections would improve recommendations
+        enhancementHint: context.level < 4
+          ? this.getEnhancementHint(context, recommendations)
+          : null
+      }
+    };
+  }
+
+  getEnhancementHint(context, recommendations) {
+    // Only show hints when they'd be genuinely helpful
+    if (context.level === 3 && recommendations.structureSuggestion) {
+      return {
+        type: 'section_suggestion',
+        message: recommendations.structureSuggestion.message,
+        action: 'group_into_sections'
+      };
+    }
+
+    // Don't nag users who prefer working without sections
+    return null;
+  }
+}
+```
+
+### 4.5 UI Considerations for Section-less Mode
+
+```javascript
+// The UI should adapt based on context level
+class RecommendationUI {
+  render(recommendations) {
+    const { meta } = recommendations;
+
+    // Always show core recommendations
+    this.renderSuggestionCards(recommendations.suggestions);
+
+    // Show appropriate context indicators
+    if (meta.sectionsAvailable) {
+      this.renderSectionContext(recommendations.sectionContext);
+    } else {
+      // Show simpler context (last few chords, pattern detection)
+      this.renderProgressionContext(recommendations.progressionContext);
+    }
+
+    // Optionally show enhancement hints (non-intrusive)
+    if (meta.enhancementHint && this.userPreferences.showHints) {
+      this.renderEnhancementHint(meta.enhancementHint);
+    }
+  }
+}
+```
+
+### 4.6 Quality Parity Commitment
+
+**Key Principle**: Users working without sections should get **excellent** recommendations, not degraded ones.
+
+| Context Level | Recommendation Quality | Additional Features |
+|---------------|----------------------|---------------------|
+| Level 0 (Empty) | Excellent starting suggestions | Style/mood aware |
+| Level 1-2 (Short) | Full harmonic analysis | Voice leading, patterns |
+| Level 3 (Prog only) | Complete analysis + inferred structure | Pattern detection |
+| Level 4 (Partial) | Hybrid: full where available | Graceful transitions |
+| Level 5 (Full) | Maximum context utilization | All section features |
+
+**The difference between levels is ADDITIONAL insight, not BETTER recommendations.**
+
+### 4.7 Testing Requirements
+
+```javascript
+// All recommendation tests must pass at every context level
+describe('RecommendationEngine', () => {
+  describe('Context Level 0 - Empty', () => {
+    it('provides quality starting chord suggestions', () => {
+      const recs = engine.getRecommendations({ key: 'C', style: 'pop' });
+      expect(recs.suggestions.length).toBeGreaterThan(0);
+      expect(recs.suggestions[0].confidence).toBeGreaterThan(70);
+    });
+  });
+
+  describe('Context Level 3 - Progression Only', () => {
+    it('provides recommendations without requiring sections', () => {
+      const recs = engine.getRecommendations({
+        progression: [
+          { root: 'C', type: 'Major' },
+          { root: 'G', type: 'Major' },
+          { root: 'A', type: 'Minor' },
+          { root: 'F', type: 'Major' }
+        ],
+        key: 'C',
+        sectionInfo: null  // Explicitly no sections
+      });
+
+      expect(recs.suggestions.length).toBeGreaterThan(0);
+      expect(recs.suggestions[0].voiceLeadingScore).toBeDefined();
+      expect(recs.meta.contextLevel).toBe(3);
+    });
+
+    it('infers structural position for longer progressions', () => {
+      const longProgression = generateProgression(16);
+      const recs = engine.getRecommendations({
+        progression: longProgression,
+        position: 12,
+        key: 'C'
+      });
+
+      expect(recs.inferredPosition).toBeDefined();
+      expect(recs.inferredPosition.confidence).toBeGreaterThan(0.3);
+    });
+  });
+
+  describe('Quality Parity', () => {
+    it('maintains recommendation quality across context levels', () => {
+      const progression = [
+        { root: 'C', type: 'Major' },
+        { root: 'F', type: 'Major' }
+      ];
+
+      // Without sections
+      const withoutSections = engine.getRecommendations({
+        progression,
+        key: 'C'
+      });
+
+      // With sections
+      const withSections = engine.getRecommendations({
+        progression,
+        sectionInfo: { sections: [{ type: 'verse', chordIndices: [0, 1] }] },
+        key: 'C'
+      });
+
+      // Core recommendation quality should be equivalent
+      expect(withoutSections.suggestions[0].voiceLeadingScore)
+        .toBeCloseTo(withSections.suggestions[0].voiceLeadingScore, 5);
+    });
+  });
+});
+```
+
+---
+
+## 5. Chord Progression Recommendation Enhancements
+
+### 5.1 Section-Aware Progression Generation
 
 #### Concept
 Generate complete chord progressions for sections based on:
@@ -281,7 +734,7 @@ class SectionProgressionGenerator {
 }
 ```
 
-### 4.2 Tension Arc Planning
+### 5.2 Tension Arc Planning
 
 #### Concept
 Plan chord progressions that create intentional emotional journeys across sections.
@@ -414,7 +867,7 @@ class TensionArcPlanner {
 }
 ```
 
-### 4.3 Section Transition Optimization
+### 5.3 Section Transition Optimization
 
 #### Concept
 Ensure smooth or intentionally dramatic transitions between sections.
@@ -473,7 +926,7 @@ class SectionTransitionAnalyzer {
 }
 ```
 
-### 4.4 Genre-Specific Progression Libraries
+### 5.4 Genre-Specific Progression Libraries
 
 #### Enhanced Pattern Database
 
@@ -574,9 +1027,612 @@ const GENRE_PROGRESSION_LIBRARIES = {
 
 ---
 
-## 5. Next Chord Recommendation Enhancements
+## 6. Next Chord Recommendation Enhancements
 
-### 5.1 Deep Context Analysis
+### 6.1 Core Algorithm Improvements
+
+The base recommendation engine (`comprehensiveChordRecommendations.js`) has solid foundations but can be enhanced with improved scoring algorithms independent of section context.
+
+#### 6.1.1 Enhanced Voice Leading Scoring
+
+**Current Implementation:**
+```javascript
+// Current: Simple distance-based scoring
+const bassDiff = Math.abs(nextMidi[0] - currentMidi[0]);
+const bassScore = Math.max(0, 25 - bassDiff);
+```
+
+**Enhancement: Interval-Quality-Aware Voice Leading**
+
+```javascript
+class EnhancedVoiceLeadingScorer {
+  scoreVoiceLeading(currentMidi, nextMidi, key) {
+    let score = 0;
+    const details = [];
+
+    // 1. Bass Movement Quality (0-25 points)
+    // Not just distance, but INTERVAL QUALITY matters
+    const bassInterval = Math.abs(nextMidi[0] - currentMidi[0]) % 12;
+    const bassMovementScores = {
+      0: 20,   // Unison - stable but static
+      1: 12,   // Minor 2nd - can be harsh
+      2: 18,   // Major 2nd - smooth stepwise
+      3: 15,   // Minor 3rd - acceptable
+      4: 14,   // Major 3rd - acceptable
+      5: 22,   // Perfect 4th - very strong (common in bass)
+      6: 8,    // Tritone - unstable, needs resolution
+      7: 25,   // Perfect 5th - strongest bass movement
+      8: 13,   // Minor 6th
+      9: 12,   // Major 6th
+      10: 16,  // Minor 7th - can work in jazz
+      11: 10   // Major 7th - awkward
+    };
+    score += bassMovementScores[bassInterval] || 10;
+
+    // 2. Parallel Fifths/Octaves Detection (penalty)
+    const parallelIssues = this.detectParallelMotion(currentMidi, nextMidi);
+    if (parallelIssues.parallelFifths) {
+      score -= 15;
+      details.push('parallel 5ths (avoid)');
+    }
+    if (parallelIssues.parallelOctaves) {
+      score -= 12;
+      details.push('parallel 8ves (avoid)');
+    }
+
+    // 3. Voice Crossing Detection (penalty)
+    const voiceCrossings = this.detectVoiceCrossing(currentMidi, nextMidi);
+    score -= voiceCrossings * 8;
+    if (voiceCrossings > 0) {
+      details.push(`${voiceCrossings} voice crossing(s)`);
+    }
+
+    // 4. Leap Recovery Analysis
+    // Large leaps should be followed by stepwise motion in opposite direction
+    const leapRecoveryScore = this.analyzeLeapRecovery(currentMidi, nextMidi);
+    score += leapRecoveryScore;
+
+    // 5. Soprano Contour Quality
+    const sopranoContour = this.analyzeSopranoContour(currentMidi, nextMidi);
+    score += sopranoContour.score;
+    if (sopranoContour.quality) details.push(sopranoContour.quality);
+
+    // 6. Resolution of Tendency Tones
+    const tendencyResolution = this.checkTendencyToneResolution(currentMidi, nextMidi, key);
+    score += tendencyResolution.score;
+    if (tendencyResolution.resolved) details.push('proper resolution');
+    if (tendencyResolution.unresolved) details.push('unresolved tendency tone');
+
+    return {
+      score: Math.max(0, Math.min(100, score)),
+      details,
+      issues: parallelIssues
+    };
+  }
+
+  detectParallelMotion(currentMidi, nextMidi) {
+    const issues = { parallelFifths: false, parallelOctaves: false };
+
+    // Check each voice pair for parallel perfect intervals
+    for (let i = 0; i < currentMidi.length - 1; i++) {
+      for (let j = i + 1; j < currentMidi.length; j++) {
+        const currentInterval = Math.abs(currentMidi[j] - currentMidi[i]) % 12;
+        const nextInterval = Math.abs(nextMidi[j] - nextMidi[i]) % 12;
+
+        // Both voices moved in same direction
+        const voice1Movement = nextMidi[i] - currentMidi[i];
+        const voice2Movement = nextMidi[j] - currentMidi[j];
+        const parallelMotion = Math.sign(voice1Movement) === Math.sign(voice2Movement);
+
+        if (parallelMotion && voice1Movement !== 0) {
+          if (currentInterval === 7 && nextInterval === 7) {
+            issues.parallelFifths = true;
+          }
+          if (currentInterval === 0 && nextInterval === 0) {
+            issues.parallelOctaves = true;
+          }
+        }
+      }
+    }
+
+    return issues;
+  }
+
+  checkTendencyToneResolution(currentMidi, nextMidi, key) {
+    const keyMidi = this.noteToMidi(key);
+
+    // Leading tone (scale degree 7) should resolve up to tonic
+    const leadingTone = (keyMidi + 11) % 12;
+    // 4th scale degree often resolves down to 3rd
+    const fourthDegree = (keyMidi + 5) % 12;
+
+    let score = 0;
+    let resolved = false;
+    let unresolved = false;
+
+    currentMidi.forEach((note, i) => {
+      const pc = note % 12;
+      const nextPc = nextMidi[i] ? nextMidi[i] % 12 : null;
+
+      if (pc === leadingTone) {
+        if (nextPc === keyMidi) {
+          score += 10;
+          resolved = true;
+        } else {
+          score -= 8;
+          unresolved = true;
+        }
+      }
+
+      if (pc === fourthDegree) {
+        const thirdDegree = (keyMidi + 4) % 12;
+        if (nextPc === thirdDegree) {
+          score += 5;
+        }
+      }
+    });
+
+    return { score, resolved, unresolved };
+  }
+}
+```
+
+#### 6.1.2 Improved Harmonic Function Scoring
+
+**Current Limitation:** Simple function-to-function mapping doesn't account for:
+- Secondary dominants
+- Applied chords
+- Chromatic mediants
+- Sequence patterns
+
+**Enhancement: Extended Harmonic Relationships**
+
+```javascript
+class ExtendedHarmonicScorer {
+  scoreHarmonicRelationship(currentChord, nextChord, key, progression) {
+    let score = 50;
+    const relationships = [];
+
+    // 1. Basic Functional Harmony (existing logic, refined)
+    const functionalScore = this.scoreFunctionalProgression(currentChord, nextChord, key);
+    score += functionalScore.adjustment;
+    relationships.push(...functionalScore.relationships);
+
+    // 2. Secondary Dominant Detection (NEW)
+    const secondaryDominant = this.detectSecondaryDominant(currentChord, nextChord, key);
+    if (secondaryDominant.isSecondaryDominant) {
+      score += 25; // Strong bonus for proper V/x resolution
+      relationships.push(`V/${secondaryDominant.target} → ${secondaryDominant.target}`);
+    }
+    if (secondaryDominant.couldBeSecondaryDominant && !secondaryDominant.resolves) {
+      score -= 10; // Penalty for unresolved secondary dominant
+    }
+
+    // 3. Chromatic Mediant Relationships (NEW)
+    const chromaticMediant = this.detectChromaticMediant(currentChord, nextChord);
+    if (chromaticMediant.isChromaticMediant) {
+      score += chromaticMediant.score; // 15-25 based on type
+      relationships.push(chromaticMediant.type);
+    }
+
+    // 4. Circle of Fifths Movement (NEW)
+    const circleMovement = this.analyzeCircleOfFifthsMovement(currentChord, nextChord);
+    if (circleMovement.isCircleMovement) {
+      score += 20; // Circle of fifths = strong harmonic motion
+      relationships.push('circle of 5ths');
+    }
+
+    // 5. Sequence Detection (NEW)
+    const sequence = this.detectSequence(progression, currentChord, nextChord);
+    if (sequence.continuesSequence) {
+      score += 18; // Continuing established pattern
+      relationships.push(`continues ${sequence.type} sequence`);
+    }
+
+    return {
+      score: Math.min(100, Math.max(0, score)),
+      relationships
+    };
+  }
+
+  detectSecondaryDominant(currentChord, nextChord, key) {
+    // V/ii, V/iii, V/IV, V/V, V/vi detection
+    const currentRoot = this.noteToSemitone(currentChord.root);
+    const nextRoot = this.noteToSemitone(nextChord.root);
+    const keyRoot = this.noteToSemitone(key);
+
+    // Is current chord a dominant 7th?
+    const isDom7 = currentChord.type.includes('Dominant') ||
+                   currentChord.type === 'Major'; // Major can act as V
+
+    if (!isDom7) return { isSecondaryDominant: false };
+
+    // Would this resolve as V → I?
+    const interval = (nextRoot - currentRoot + 12) % 12;
+    const isResolution = interval === 5; // Up a P4 = down a P5
+
+    if (isResolution) {
+      // What diatonic chord does it resolve to?
+      const targetDegree = this.getScaleDegree(nextChord.root, key);
+
+      if (targetDegree && targetDegree !== 1) { // Not the actual I chord
+        return {
+          isSecondaryDominant: true,
+          target: this.degreeToRoman(targetDegree),
+          resolves: true
+        };
+      }
+    }
+
+    // Check if it COULD be a secondary dominant but doesn't resolve
+    const potentialTargets = [2, 3, 4, 5, 6]; // ii, iii, IV, V, vi
+    for (const degree of potentialTargets) {
+      const targetRoot = (keyRoot + this.degreeToSemitone(degree)) % 12;
+      if ((currentRoot + 7) % 12 === targetRoot) {
+        return {
+          couldBeSecondaryDominant: true,
+          potentialTarget: this.degreeToRoman(degree),
+          resolves: false
+        };
+      }
+    }
+
+    return { isSecondaryDominant: false };
+  }
+
+  detectChromaticMediant(currentChord, nextChord) {
+    const currentRoot = this.noteToSemitone(currentChord.root);
+    const nextRoot = this.noteToSemitone(nextChord.root);
+    const interval = Math.abs(nextRoot - currentRoot);
+
+    // Chromatic mediants: root motion by major/minor 3rd with mode change
+    const isMajorThird = interval === 4 || interval === 8;
+    const isMinorThird = interval === 3 || interval === 9;
+
+    if (!isMajorThird && !isMinorThird) {
+      return { isChromaticMediant: false };
+    }
+
+    const currentIsMajor = currentChord.type.includes('Major') ||
+                          currentChord.type === 'Dominant';
+    const nextIsMajor = nextChord.type.includes('Major') ||
+                        nextChord.type === 'Dominant';
+
+    // Chromatic mediant: same quality = more striking
+    // Diatonic mediant: different quality = smoother
+    const sameQuality = currentIsMajor === nextIsMajor;
+
+    if (sameQuality) {
+      return {
+        isChromaticMediant: true,
+        type: 'chromatic mediant (striking)',
+        score: 25
+      };
+    } else {
+      return {
+        isChromaticMediant: true,
+        type: 'diatonic mediant (smooth)',
+        score: 15
+      };
+    }
+  }
+}
+```
+
+#### 6.1.3 Dynamic Weight Adjustment
+
+**Current Implementation:** Fixed weights or user-configured presets.
+
+**Enhancement: Context-Adaptive Weights**
+
+```javascript
+class AdaptiveWeightManager {
+  getWeights(context) {
+    // Start with base weights
+    const weights = {
+      harmonic: 0.25,
+      voiceLeading: 0.25,
+      style: 0.15,
+      mood: 0.15,
+      context: 0.10,
+      modalInterchange: 0.10
+    };
+
+    // Adapt based on progression state
+    if (context.progressionLength === 0) {
+      // First chord: style and mood matter most
+      weights.style = 0.30;
+      weights.mood = 0.30;
+      weights.harmonic = 0.15;
+      weights.voiceLeading = 0.10;
+      weights.context = 0.05;
+      weights.modalInterchange = 0.10;
+    }
+
+    if (context.progressionLength === 1) {
+      // Second chord: establish harmonic direction
+      weights.harmonic = 0.35;
+      weights.voiceLeading = 0.25;
+      weights.style = 0.15;
+      weights.mood = 0.15;
+      weights.context = 0.05;
+      weights.modalInterchange = 0.05;
+    }
+
+    if (context.isApproachingCadence) {
+      // Near cadence: voice leading critical
+      weights.voiceLeading = 0.35;
+      weights.harmonic = 0.30;
+      weights.style = 0.10;
+      weights.mood = 0.10;
+      weights.context = 0.10;
+      weights.modalInterchange = 0.05;
+    }
+
+    if (context.style === 'jazz') {
+      // Jazz: more modal interchange, complex voicings
+      weights.modalInterchange = 0.20;
+      weights.voiceLeading = 0.20;
+      weights.harmonic = 0.20;
+    }
+
+    if (context.patternDetected) {
+      // Pattern in progress: context weight increases
+      weights.context = 0.25;
+      weights.harmonic = 0.20;
+    }
+
+    return this.normalizeWeights(weights);
+  }
+
+  normalizeWeights(weights) {
+    const sum = Object.values(weights).reduce((a, b) => a + b, 0);
+    const normalized = {};
+    for (const key in weights) {
+      normalized[key] = weights[key] / sum;
+    }
+    return normalized;
+  }
+}
+```
+
+#### 6.1.4 Expanded Chord Type Evaluation
+
+**Current Implementation:** Evaluates 17 chord types.
+
+**Enhancement: Smart Chord Type Filtering**
+
+```javascript
+const CHORD_TYPE_PROFILES = {
+  // Each chord type has a profile determining when it's appropriate
+  'Major': {
+    baseScore: 100,
+    styleMultipliers: { pop: 1.2, rock: 1.2, classical: 1.1, jazz: 0.9 },
+    moodMultipliers: { bright: 1.3, calm: 1.1, dark: 0.7 },
+    contextRules: {
+      avoidAfter: [],
+      preferAfter: ['Dominant 7th', 'Minor'],
+      resolvesTension: true
+    }
+  },
+
+  'Minor': {
+    baseScore: 95,
+    styleMultipliers: { pop: 1.1, rock: 1.1, classical: 1.1, jazz: 1.0 },
+    moodMultipliers: { dark: 1.3, calm: 1.1, bright: 0.8 },
+    contextRules: {
+      avoidAfter: [],
+      preferAfter: ['Major', 'Dominant 7th'],
+      addsTension: false
+    }
+  },
+
+  'Dominant 7th': {
+    baseScore: 90,
+    styleMultipliers: { pop: 1.0, rock: 1.0, classical: 1.1, jazz: 1.3, blues: 1.4 },
+    moodMultipliers: { energetic: 1.2, tense: 1.2, calm: 0.8 },
+    contextRules: {
+      // Dominant 7ths create expectation - should usually resolve
+      expectsResolution: true,
+      resolvesTo: ['Major', 'Minor'], // Usually resolves to I or vi
+      tensionLevel: 0.7
+    }
+  },
+
+  'Diminished 7th': {
+    baseScore: 70,
+    styleMultipliers: { pop: 0.6, rock: 0.7, classical: 1.2, jazz: 1.1 },
+    moodMultipliers: { tense: 1.4, dark: 1.2, bright: 0.5, calm: 0.4 },
+    contextRules: {
+      requiresResolution: true,
+      // Diminished 7th can resolve many ways (symmetric chord)
+      resolvesTo: ['Major', 'Minor', 'Dominant 7th'],
+      maxConsecutive: 1, // Don't suggest multiple dim7 in a row
+      tensionLevel: 0.9
+    }
+  },
+
+  'Augmented': {
+    baseScore: 60,
+    styleMultipliers: { pop: 0.5, rock: 0.6, classical: 0.9, jazz: 1.0, indie: 1.2 },
+    moodMultipliers: { tense: 1.3, bright: 0.6, calm: 0.4 },
+    contextRules: {
+      requiresResolution: true,
+      tensionLevel: 0.85,
+      maxInProgression: 1 // Augmented is very distinctive
+    }
+  },
+
+  'Major 7th': {
+    baseScore: 85,
+    styleMultipliers: { pop: 0.9, rock: 0.7, classical: 0.9, jazz: 1.4, rnb: 1.3 },
+    moodMultipliers: { calm: 1.3, jazzy: 1.3, bright: 1.1, tense: 0.6 },
+    contextRules: {
+      tensionLevel: 0.3, // Very stable, dreamy
+      preferAfter: ['Dominant 7th', 'Minor 7th']
+    }
+  },
+
+  'Suspended 4th': {
+    baseScore: 80,
+    styleMultipliers: { pop: 1.2, rock: 1.3, classical: 0.8, indie: 1.2 },
+    moodMultipliers: { energetic: 1.2, tense: 1.1, calm: 0.9 },
+    contextRules: {
+      // Sus4 creates expectation of resolution to major/minor
+      expectsResolution: true,
+      resolvesTo: ['Major', 'Minor'],
+      tensionLevel: 0.5
+    }
+  }
+
+  // ... additional chord types
+};
+
+class SmartChordTypeFilter {
+  getRelevantChordTypes(context) {
+    const { style, mood, previousChord, tensionDirection, progressionLength } = context;
+
+    return Object.entries(CHORD_TYPE_PROFILES)
+      .map(([type, profile]) => {
+        let score = profile.baseScore;
+
+        // Apply style multiplier
+        score *= profile.styleMultipliers[style] || 1.0;
+
+        // Apply mood multiplier
+        score *= profile.moodMultipliers[mood] || 1.0;
+
+        // Apply context rules
+        if (previousChord && profile.contextRules.preferAfter?.includes(previousChord.type)) {
+          score *= 1.15;
+        }
+        if (previousChord && profile.contextRules.avoidAfter?.includes(previousChord.type)) {
+          score *= 0.7;
+        }
+
+        // Check progression constraints
+        if (profile.contextRules.maxInProgression) {
+          const count = this.countInProgression(type, context.progression);
+          if (count >= profile.contextRules.maxInProgression) {
+            score *= 0.3;
+          }
+        }
+
+        // Tension direction alignment
+        if (tensionDirection === 'build' && profile.contextRules.tensionLevel > 0.6) {
+          score *= 1.1;
+        }
+        if (tensionDirection === 'resolve' && profile.contextRules.resolvesTension) {
+          score *= 1.2;
+        }
+
+        return { type, relevanceScore: score };
+      })
+      .filter(item => item.relevanceScore > 40) // Filter out very low scores
+      .sort((a, b) => b.relevanceScore - a.relevanceScore);
+  }
+}
+```
+
+#### 6.1.5 Resolution Expectation Tracking
+
+**New Feature:** Track "open" harmonic expectations and suggest resolutions.
+
+```javascript
+class ResolutionTracker {
+  constructor() {
+    this.openExpectations = [];
+  }
+
+  analyzeChord(chord, key) {
+    const expectations = [];
+
+    // Dominant 7th creates strong resolution expectation
+    if (chord.type.includes('Dominant')) {
+      expectations.push({
+        type: 'dominant_resolution',
+        strength: 0.9,
+        expectedTarget: this.getExpectedResolution(chord, key),
+        urgency: 'high'
+      });
+    }
+
+    // Suspended chords want to resolve
+    if (chord.type.includes('Suspended')) {
+      expectations.push({
+        type: 'suspension_resolution',
+        strength: 0.7,
+        expectedTarget: { root: chord.root, type: 'Major' }, // or Minor
+        urgency: 'medium'
+      });
+    }
+
+    // Diminished chords are unstable
+    if (chord.type.includes('Diminished')) {
+      expectations.push({
+        type: 'diminished_resolution',
+        strength: 0.85,
+        expectedTargets: this.getDiminishedResolutions(chord, key),
+        urgency: 'high'
+      });
+    }
+
+    // Leading tone in bass creates resolution expectation
+    if (this.hasLeadingToneInBass(chord, key)) {
+      expectations.push({
+        type: 'leading_tone_resolution',
+        strength: 0.8,
+        expectedTarget: { root: key, type: 'Major' },
+        urgency: 'high'
+      });
+    }
+
+    return expectations;
+  }
+
+  scoreResolutionSatisfaction(nextChord, openExpectations) {
+    let score = 0;
+
+    openExpectations.forEach(expectation => {
+      const satisfied = this.checkSatisfaction(nextChord, expectation);
+
+      if (satisfied) {
+        score += expectation.strength * 20; // Bonus for satisfying expectation
+      } else if (expectation.urgency === 'high') {
+        score -= expectation.strength * 10; // Penalty for ignoring urgent expectation
+      }
+    });
+
+    return score;
+  }
+
+  // Get expectations that remain unresolved
+  getUnresolvedExpectations(progression, key) {
+    const allExpectations = [];
+    const resolved = new Set();
+
+    progression.forEach((chord, i) => {
+      // Add new expectations from this chord
+      const newExpectations = this.analyzeChord(chord, key);
+      newExpectations.forEach(exp => {
+        exp.createdAt = i;
+        allExpectations.push(exp);
+      });
+
+      // Check if this chord resolves any previous expectations
+      allExpectations.forEach((exp, j) => {
+        if (!resolved.has(j) && this.checkSatisfaction(chord, exp)) {
+          resolved.add(j);
+        }
+      });
+    });
+
+    return allExpectations.filter((_, i) => !resolved.has(i));
+  }
+}
+```
+
+### 6.2 Deep Context Analysis
 
 #### Current Limitation
 The `comprehensiveChordRecommendations.js` looks at only 4 previous chords.
@@ -691,7 +1747,7 @@ class DeepContextAnalyzer {
 }
 ```
 
-### 5.2 Position-Aware Recommendations
+### 6.2 Position-Aware Recommendations
 
 #### Concept
 Recommendations change based on WHERE in the section/song you are.
@@ -766,7 +1822,7 @@ class PositionAwareRecommender {
 }
 ```
 
-### 5.3 Harmonic Rhythm Awareness
+### 6.3 Harmonic Rhythm Awareness
 
 #### Concept
 Understand and respect the rate of harmonic change.
@@ -796,7 +1852,7 @@ class HarmonicRhythmAnalyzer {
 }
 ```
 
-### 5.4 Motif Recognition & Development
+### 6.4 Motif Recognition & Development
 
 #### Concept
 Recognize short chord patterns (motifs) and suggest developments.
@@ -861,9 +1917,9 @@ class MotifRecognizer {
 
 ---
 
-## 6. Melody Recommendation Enhancements
+## 7. Melody Recommendation Enhancements
 
-### 6.1 Phrase-Level Generation
+### 7.1 Phrase-Level Generation
 
 #### Current Limitation
 `melodySuggestion.js` suggests individual notes.
@@ -948,7 +2004,7 @@ class MelodicPhraseGenerator {
 }
 ```
 
-### 6.2 Section-Appropriate Melodies
+### 7.2 Section-Appropriate Melodies
 
 #### Concept
 Different sections need different melodic approaches.
@@ -1051,7 +2107,7 @@ class SectionAwareMelodyGenerator extends MelodicPhraseGenerator {
 }
 ```
 
-### 6.3 Melodic Motif Development
+### 7.3 Melodic Motif Development
 
 #### Concept
 Recognize and develop melodic motifs across sections.
@@ -1129,7 +2185,7 @@ class MelodicMotifDeveloper {
 }
 ```
 
-### 6.4 Lyric-Aware Melody Suggestions
+### 7.4 Lyric-Aware Melody Suggestions
 
 #### Concept (Future Enhancement)
 If lyrics are provided, match melodic rhythm and contour to syllable stress.
@@ -1168,9 +2224,9 @@ class LyricAwareMelodyGenerator {
 
 ---
 
-## 7. Harmony Recommendation Enhancements
+## 8. Harmony Recommendation Enhancements
 
-### 7.1 Smart Auto-Harmonization
+### 8.1 Smart Auto-Harmonization
 
 #### Current Limitation
 `autoHarmonize.js` suggests basic chord matches for melody notes.
@@ -1249,7 +2305,7 @@ class SmartAutoHarmonizer {
 }
 ```
 
-### 7.2 Counter-Melody Generation
+### 8.2 Counter-Melody Generation
 
 #### Concept
 Generate independent melodic lines that complement the main melody.
@@ -1329,7 +2385,7 @@ class CounterMelodyGenerator {
 }
 ```
 
-### 7.3 Bass Line Generation
+### 8.3 Bass Line Generation
 
 #### Concept
 Generate bass lines that support the harmony.
@@ -1410,9 +2466,9 @@ class BassLineGenerator {
 
 ---
 
-## 8. Cross-Engine Integration
+## 9. Cross-Engine Integration
 
-### 8.1 Unified Composition Context
+### 9.1 Unified Composition Context
 
 #### Concept
 All engines share a common understanding of the composition.
@@ -1476,7 +2532,7 @@ class CompositionContext {
 }
 ```
 
-### 8.2 Coordinated Recommendations
+### 9.2 Coordinated Recommendations
 
 #### Concept
 When one engine makes a suggestion, others adjust accordingly.
@@ -1540,7 +2596,7 @@ class CoordinatedRecommendationService {
 }
 ```
 
-### 8.3 "Complete Section" Generation
+### 9.3 "Complete Section" Generation
 
 #### Concept
 Generate complete sections with chords, melody, bass, and harmony.
@@ -1624,9 +2680,43 @@ class SectionGenerator {
 
 ---
 
-## 9. Implementation Priorities
+## 10. Implementation Priorities
 
-### Phase 1: Section Context Integration (High Impact, Medium Effort)
+### Phase 1: Core Algorithm Improvements (High Impact, Medium Effort)
+
+**Goal**: Improve base recommendation quality independent of context features.
+
+#### Tasks:
+1. **Enhanced Voice Leading Scoring**
+   - Implement interval-quality-aware bass movement scoring
+   - Add parallel fifths/octaves detection with penalties
+   - Add voice crossing detection
+   - Implement tendency tone resolution checking (leading tone → tonic)
+   - Add leap recovery analysis
+
+2. **Extended Harmonic Relationships**
+   - Implement secondary dominant detection (V/ii, V/V, etc.)
+   - Add chromatic mediant relationship scoring
+   - Enhance circle of fifths movement detection
+   - Add sequence pattern detection and continuation scoring
+
+3. **Resolution Expectation Tracking**
+   - Track "open" harmonic expectations (dominant → tonic, sus → resolution)
+   - Score recommendations based on satisfying or ignoring expectations
+   - Detect unresolved tension at progression end
+
+4. **Dynamic Weight Adjustment**
+   - Adapt scoring weights based on progression position
+   - First chord: emphasize style/mood
+   - Near cadence: emphasize voice leading
+   - Pattern detected: emphasize context continuation
+
+5. **Smart Chord Type Filtering**
+   - Implement chord type profiles with context rules
+   - Add `maxConsecutive` and `maxInProgression` constraints
+   - Add `expectsResolution` tracking for unstable chords
+
+### Phase 2: Section Context Integration (High Impact, Medium Effort)
 
 **Goal**: Make existing engines section-aware.
 
@@ -1650,7 +2740,7 @@ class SectionGenerator {
    - Show section-relevant explanations
    - Highlight transition recommendations
 
-### Phase 2: Tension Arc System (High Impact, Medium Effort)
+### Phase 3: Tension Arc System (High Impact, Medium Effort)
 
 **Goal**: Enable compositional planning through tension analysis.
 
@@ -1669,7 +2759,7 @@ class SectionGenerator {
    - Factor tension targets into chord scoring
    - Suggest chords that match tension trajectory
 
-### Phase 3: Enhanced Melody Generation (High Impact, High Effort)
+### Phase 4: Enhanced Melody Generation (High Impact, High Effort)
 
 **Goal**: Move from single-note to phrase-level generation.
 
@@ -1689,7 +2779,7 @@ class SectionGenerator {
    - Suggest motif developments
    - Track motifs across sections
 
-### Phase 4: Cross-Engine Coordination (Medium Impact, High Effort)
+### Phase 5: Cross-Engine Coordination (Medium Impact, High Effort)
 
 **Goal**: All engines work together holistically.
 
@@ -1709,7 +2799,7 @@ class SectionGenerator {
    - Adjust recommendations over time
    - Style profile building
 
-### Phase 5: Advanced Harmony Features (Medium Impact, Medium Effort)
+### Phase 6: Advanced Harmony Features (Medium Impact, Medium Effort)
 
 **Goal**: Rich harmonization and counterpoint.
 
@@ -1731,9 +2821,9 @@ class SectionGenerator {
 
 ---
 
-## 10. Technical Architecture
+## 11. Technical Architecture
 
-### 10.1 Proposed Module Structure
+### 11.1 Proposed Module Structure
 
 ```
 src/modules/
@@ -1772,7 +2862,7 @@ src/modules/
 │       └── UserPreferenceLearner.js  # Adapts to user style
 ```
 
-### 10.2 Data Flow
+### 11.2 Data Flow
 
 ```
 User Action (add chord, select section, etc.)
@@ -1816,7 +2906,7 @@ User Action (add chord, select section, etc.)
                    └─────────────────────┘
 ```
 
-### 10.3 API Design
+### 11.3 API Design
 
 ```javascript
 // Primary API for UI integration
@@ -1873,9 +2963,9 @@ class RecommendationAPI {
 
 ---
 
-## 11. Success Metrics
+## 12. Success Metrics
 
-### 11.1 User Experience Metrics
+### 12.1 User Experience Metrics
 
 | Metric | Current Baseline | Target | Measurement |
 |--------|------------------|--------|-------------|
@@ -1884,7 +2974,7 @@ class RecommendationAPI {
 | User engagement with suggestions | Unknown | +50% | Track suggestion panel interactions |
 | Return user rate | Unknown | +25% | Track daily/weekly active users |
 
-### 11.2 Technical Quality Metrics
+### 12.2 Technical Quality Metrics
 
 | Metric | Target | Validation |
 |--------|--------|------------|
@@ -1893,7 +2983,7 @@ class RecommendationAPI {
 | Voice leading quality | Average score > 75 | Existing scoring system |
 | Cross-section contrast | > 40% harmonic variety | Automated analysis |
 
-### 11.3 Competitive Differentiation Metrics
+### 12.3 Competitive Differentiation Metrics
 
 | Feature | Competitors | Our Target |
 |---------|-------------|------------|

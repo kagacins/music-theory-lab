@@ -38,11 +38,45 @@ let trainerState = {
 
 // DEPRECATED: progressionData now in compositionState
 // These functions remain for backwards compatibility but delegate to compositionState
+
+// Cache for progression data to avoid excessive exports
+let cachedProgressionData = null;
+let cachedMeasuresLength = 0;
+let cachedMeasuresHash = null;
+
+/**
+ * Generate a simple hash of measures to detect changes
+ * @param {Array} measures - Array of measures
+ * @returns {string} Hash string
+ */
+function generateMeasuresHash(measures) {
+    if (!measures || measures.length === 0) return '0';
+    // Create a simple hash based on measure count and first/last chord info
+    const firstChord = measures[0]?.chord;
+    const lastChord = measures[measures.length - 1]?.chord;
+    return `${measures.length}-${firstChord?.root || ''}${firstChord?.type || ''}-${lastChord?.root || ''}${lastChord?.type || ''}`;
+}
+
 export function getProgressionData() {
     // Silent delegation to compositionState (single source of truth)
     if (window.getCompositionState) {
         const compositionState = window.getCompositionState();
-        return compositionState ? compositionState.exportToProgressionData() : [];
+        if (!compositionState) return [];
+        
+        // Check if measures have changed by comparing length and a simple hash
+        const currentMeasuresLength = compositionState.measures?.length || 0;
+        const currentMeasuresHash = generateMeasuresHash(compositionState.measures);
+        
+        // Only re-export if measures have changed
+        if (cachedProgressionData === null || 
+            cachedMeasuresLength !== currentMeasuresLength ||
+            cachedMeasuresHash !== currentMeasuresHash) {
+            cachedProgressionData = compositionState.exportToProgressionData();
+            cachedMeasuresLength = currentMeasuresLength;
+            cachedMeasuresHash = currentMeasuresHash;
+        }
+        
+        return cachedProgressionData;
     }
     return [];
 }
@@ -56,8 +90,20 @@ export function setProgressionData(value) {
                 key: trainerState.currentKey,
                 timeSignature: { num: 4, denom: 4 }
             });
+            // Invalidate cache when progression data is set
+            invalidateProgressionDataCache();
         }
     }
+}
+
+/**
+ * Invalidate the progression data cache
+ * Call this when you know the composition state has changed
+ */
+export function invalidateProgressionDataCache() {
+    cachedProgressionData = null;
+    cachedMeasuresLength = 0;
+    cachedMeasuresHash = null;
 }
 
 // Getters and Setters for currentIndex

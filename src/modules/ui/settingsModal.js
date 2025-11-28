@@ -406,15 +406,17 @@ export function showSettingsModal(initialTab = 'chords') {
             detail: { style: styleSelect.value, mood: moodSelect.value }
         }));
 
+        // Refresh recommendations immediately with new weights
+        if (window.refreshChordRecommendations) {
+            window.refreshChordRecommendations();
+        }
+
         chordQuickSaveBtn.textContent = '✓ Saved!';
         chordQuickSaveBtn.style.backgroundColor = '#10b981';
         setTimeout(() => {
             chordQuickSaveBtn.textContent = 'Save Settings';
             chordQuickSaveBtn.style.backgroundColor = '#3b82f6';
             overlay.remove();
-            if (window.refreshChordRecommendations) {
-                window.refreshChordRecommendations();
-            }
         }, 1000);
     };
 
@@ -752,17 +754,17 @@ export function showSettingsModal(initialTab = 'chords') {
             detail: { style: styleSelect.value, mood: moodSelect.value }
         }));
 
+        // Refresh recommendations immediately with new weights
+        if (window.refreshChordRecommendations) {
+            window.refreshChordRecommendations();
+        }
+
         chordSaveBtn.textContent = '✓ Saved!';
         chordSaveBtn.style.backgroundColor = '#10b981';
         setTimeout(() => {
             chordSaveBtn.textContent = 'Save Settings';
             chordSaveBtn.style.backgroundColor = '#3b82f6';
             overlay.remove();
-
-            // Trigger chord recommendations refresh
-            if (window.refreshChordRecommendations) {
-                window.refreshChordRecommendations();
-            }
         }, 1000);
     };
 

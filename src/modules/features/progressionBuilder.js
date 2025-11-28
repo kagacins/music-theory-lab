@@ -92,6 +92,10 @@ let staffNotationStates = new Map(); // Map<position, boolean>
 // Track which chords are expanded in simplified view (Phase 3.3)
 const expandedChords = new Set();
 
+// Temporary escape hatch: force a one-time flat layout render (ignoring sections)
+// Used when inserting chords via suggestions to avoid rare section+layout bugs.
+let forceFlatLayoutOnce = false;
+
 // Import note/chord utilities
 import {
     noteToMidi,
@@ -121,6 +125,13 @@ import { showChordSuggestionModal } from '../ui/chordSuggestionModal.js';
 
 // Import template browser modal (Phase 3.1)
 import { showTemplateBrowser } from '../ui/templateBrowserModal.js';
+
+// Phase 2.1: Import section intent state for position-based insertion
+import {
+    getInsertAfterIndex,
+    getSectionIntent,
+    INTENT_MODES
+} from '../state/sectionIntentState.js';
 
 // Import harmony analyzer (Phase 3.3) - use its COMMON_PROGRESSIONS as the single source of truth
 import { HarmonyAnalyzer, COMMON_PROGRESSIONS } from '../analysis/harmonyAnalyzer.js';
@@ -1105,7 +1116,6 @@ function getKeySignatureAccidentals(key) {
     if (key.endsWith('m')) {
         const relativeMajor = getRelativeMajorForVexFlow(key);
         keySig = keySignatures[relativeMajor];
-        console.log(`Minor key ${key} -> relative major ${relativeMajor} -> key signature:`, keySig);
     }
     
     // If not a minor key, look up directly
@@ -1199,7 +1209,6 @@ function renderChordNotation(chord, key, canvas) {
     try {
         // VexFlow 5.x browser build exposes VexFlow namespace
         if (typeof VexFlow === 'undefined') {
-            console.error('VexFlow library not loaded');
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#666';
@@ -1212,7 +1221,6 @@ function renderChordNotation(chord, key, canvas) {
         const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental } = VexFlow;
 
         if (!Renderer || !Stave || !StaveNote || !Voice || !Formatter || !Accidental) {
-            console.error('Missing VexFlow classes');
             return;
         }
 
@@ -1284,7 +1292,6 @@ function renderChordNotation(chord, key, canvas) {
         try {
             stave.addKeySignature(vexFlowKey);
         } catch (e) {
-            console.warn(`VexFlow key signature error for ${key} (tried ${vexFlowKey}):`, e);
             // Continue without key signature
         }
 
@@ -1360,7 +1367,6 @@ function renderChordNotation(chord, key, canvas) {
         voice.draw(ctx, stave);
 
     } catch (e) {
-        console.error('Error rendering chord notation:', e);
     }
 }
 
@@ -1373,8 +1379,6 @@ function renderStaffNotation(chordIndex, canvas) {
     try {
         // VexFlow 5.x browser build exposes VexFlow namespace
         if (typeof VexFlow === 'undefined') {
-            console.error('VexFlow library not loaded. Available window keys:',
-                Object.keys(window).filter(k => k.toLowerCase().includes('vex')));
             // Show loading message on canvas
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1389,7 +1393,6 @@ function renderStaffNotation(chordIndex, canvas) {
         const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental, TextBracket } = VexFlow;
 
         if (!Renderer || !Stave || !StaveNote || !Voice || !Formatter || !Accidental) {
-            console.error('Missing VexFlow classes');
             throw new Error('VexFlow classes not found - incomplete library');
         }
 
@@ -1434,7 +1437,6 @@ function renderStaffNotation(chordIndex, canvas) {
             try {
                 midi = noteToMidi(note);
             } catch (e) {
-                console.warn('Error calculating MIDI for note:', note, e);
                 return { shift: 0, label: null };
             }
 
@@ -1709,7 +1711,6 @@ function renderStaffNotation(chordIndex, canvas) {
                 stave.addKeySignature(vexFlowKey);
             } catch (e) {
                 // Fallback: if VexFlow doesn't support the key, try without key signature
-                console.warn(`VexFlow key signature error for ${currentKey} (tried ${vexFlowKey}):`, e);
                 // Continue without key signature - accidentals will still be shown per-note
             }
 
@@ -1791,7 +1792,6 @@ function renderStaffNotation(chordIndex, canvas) {
                     });
                     textBracket.setContext(ctx).draw();
                 } catch (e) {
-                    console.warn('Error drawing treble ottava bracket:', e);
                 }
             }
 
@@ -1810,7 +1810,6 @@ function renderStaffNotation(chordIndex, canvas) {
                 stave.addKeySignature(vexFlowKey);
             } catch (e) {
                 // Fallback: if VexFlow doesn't support the key, try without key signature
-                console.warn(`VexFlow key signature error for ${currentKey} (tried ${vexFlowKey}):`, e);
                 // Continue without key signature - accidentals will still be shown per-note
             }
 
@@ -1890,13 +1889,10 @@ function renderStaffNotation(chordIndex, canvas) {
                     });
                     textBracket.setContext(ctx).draw();
                 } catch (e) {
-                    console.warn('Error drawing bass ottava bracket:', e);
                 }
             }
         }
     } catch (error) {
-        console.error('Error rendering staff notation:', error);
-        console.error('Error stack:', error.stack);
         // Show error message on canvas
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1918,11 +1914,9 @@ function renderStaffNotation(chordIndex, canvas) {
  * @param {string} key - Current key (e.g., "C", "Dm")
  */
 export function renderChordStaffNotation(canvas, chordData, key) {
-    console.log('renderChordStaffNotation called with chordData:', chordData, 'key:', key);
     try {
         // VexFlow 5.x browser build exposes VexFlow namespace
         if (typeof VexFlow === 'undefined') {
-            console.error('VexFlow library not loaded');
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#666';
@@ -1934,7 +1928,6 @@ export function renderChordStaffNotation(canvas, chordData, key) {
         const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental } = VexFlow;
 
         if (!Renderer || !Stave || !StaveNote || !Voice || !Formatter || !Accidental) {
-            console.error('Missing VexFlow classes');
             throw new Error('VexFlow classes not found');
         }
 
@@ -2010,7 +2003,6 @@ export function renderChordStaffNotation(canvas, chordData, key) {
             try {
                 stave.addKeySignature(vexFlowKey);
             } catch (e) {
-                console.warn('VexFlow key signature error:', e);
             }
 
             stave.setContext(ctx).draw();
@@ -2064,7 +2056,6 @@ export function renderChordStaffNotation(canvas, chordData, key) {
             try {
                 stave.addKeySignature(vexFlowKey);
             } catch (e) {
-                console.warn('VexFlow key signature error:', e);
             }
 
             stave.setContext(ctx).draw();
@@ -2107,7 +2098,6 @@ export function renderChordStaffNotation(canvas, chordData, key) {
             voice.draw(ctx, stave);
         }
     } catch (error) {
-        console.error('Error rendering staff notation:', error);
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#ff0000';
@@ -2447,7 +2437,6 @@ function createEnhancedPatternBadge(pattern, category) {
                 );
             }
 
-            console.log('Highlighting positions:', positions, 'for pattern:', name);
             highlightPatternChordsByPositions(positions);
         } else {
             // Deactivate this badge
@@ -2472,7 +2461,6 @@ function highlightPatternChordsByPositions(positions) {
     // Use specific selector for chord card wrappers with data-chord-index
     const chordCards = document.querySelectorAll('.chord-card-wrapper[data-chord-index]');
 
-    console.log('Found chord cards:', chordCards.length, 'Highlighting positions:', positions);
 
     positions.forEach(pos => {
         // Find card by data-chord-index attribute
@@ -2484,9 +2472,7 @@ function highlightPatternChordsByPositions(positions) {
             card.style.setProperty('box-shadow', '0 0 15px rgba(168, 85, 247, 0.6)', 'important');
             card.style.setProperty('border-color', '#a855f7', 'important');
             card.style.setProperty('border-width', '2px', 'important');
-            console.log('Highlighted card at position:', pos);
         } else {
-            console.log('Could not find card at position:', pos);
         }
     });
 
@@ -2583,7 +2569,6 @@ export function renderProgressionDisplayForBuilder(container, progressionData, k
             container.sortableInstance.destroy();
             container.sortableInstance = null;
         } catch (e) {
-            console.warn('Error destroying Sortable:', e);
             container.sortableInstance = null;
         }
     }
@@ -2602,22 +2587,36 @@ export function renderProgressionDisplayForBuilder(container, progressionData, k
         renderSectionAwareCards(container, progressionData, key, {
             showActionButtons: showActionButtons
         });
-        // Initialize sortable directly on the container
-        initializeSimplifiedSortable(container);
     } else {
-        // Use grid for flat card rendering - keep original grid classes
-        container.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 p-2 bg-white rounded-lg border border-gray-200';
-        renderFlatCards(container, progressionData, key, {
+        // Use the same two-layer structure as the main progression view:
+        // outer container is a flex column, inner container is the actual grid.
+        container.className = 'flex flex-col gap-2 p-2 bg-white rounded-lg border border-gray-200';
+
+        const gridContainer = document.createElement('div');
+        // Match the ID pattern used by the main progression view so shared CSS rules apply
+        gridContainer.id = `${container.id || 'builder-progression-visualization'}-cards-grid`;
+        // Use flexbox with wrapping for card layout to avoid any CSS Grid edge cases
+        gridContainer.className = 'flex flex-wrap items-start gap-2';
+
+        renderFlatCards(gridContainer, progressionData, key, {
             showActionButtons: showActionButtons
         });
-        // Initialize sortable directly on the container
-        initializeSimplifiedSortable(container);
+
+        container.appendChild(gridContainer);
+
+        // Initialize sortable on the inner grid container (same pattern as renderProgressionDisplay)
+        initializeSimplifiedSortable(gridContainer);
     }
 
     // Update shift classes
     requestAnimationFrame(() => {
         updateCardShifts();
     });
+
+    // NOTE: Builder layout now mirrors the main progression view and relies on
+    // native CSS Grid/Flexbox for placement. Previous overlap-detection and
+    // forced re-layout logic caused more issues than it solved, so it has been
+    // removed in favor of letting the browser handle layout naturally.
 }
 
 // ============================================================================
@@ -2669,12 +2668,22 @@ function renderFlatCards(gridContainer, progressionData, key, options = {}) {
     }
 
     // Create card wrappers for each chord
+    let cardsCreated = 0;
     progressionData.forEach((chord, index) => {
         const wrapper = createChordCardWrapper(chord, index, key);
+        // CRITICAL: Clear any stale positioning styles that could cause grid overlap
+        // This ensures CSS Grid auto-placement works correctly
+        wrapper.style.gridColumn = '';
+        wrapper.style.gridRow = '';
+        wrapper.style.position = '';
+        wrapper.style.left = '';
+        wrapper.style.top = '';
+        wrapper.style.transform = '';
         gridContainer.appendChild(wrapper);
+        cardsCreated++;
     });
 
-    // Update shift classes
+    // Update shift classes after the browser has had a chance to lay out the grid
     requestAnimationFrame(() => {
         updateCardShifts();
     });
@@ -2691,6 +2700,7 @@ function renderFlatCards(gridContainer, progressionData, key, options = {}) {
 function renderSectionAwareCards(gridContainer, progressionData, key, options = {}) {
     const { showActionButtons = true } = options;
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+
 
     if (!progressionData || progressionData.length === 0) return;
 
@@ -2847,14 +2857,12 @@ function createUnifiedSectionContainer(section, progressionData, key) {
             swapThreshold: 0.65,
             // Handle cards added FROM outside (ungrouped or another section) INTO this section
             onAdd: function(evt) {
-                console.log('%c[Section onAdd] Card added to section', 'color: #00ff00; font-weight: bold', section.id);
                 handleCardDragWithinSection(evt, evt.from.getAttribute('data-section-id'));
             },
             onEnd: function(evt) {
                 // Only handle reorders within this section
                 // Cross-container moves are handled by onAdd
                 if (evt.from !== evt.to) {
-                    console.log('[Section onEnd] Cross-container move - handled by onAdd');
                     return;
                 }
                 // Handle card movement within this section
@@ -2873,7 +2881,6 @@ function createUnifiedSectionContainer(section, progressionData, key) {
 function renderProgressionWithSections(container, progressionData, key, options = {}) {
     // This is now handled by the main renderProgressionDisplay function
     // which restructures the container and calls renderSectionAwareCards
-    console.warn('[renderProgressionWithSections] This function is deprecated. Use renderProgressionDisplay instead.');
 }
 
 /**
@@ -3072,7 +3079,6 @@ function createEmptyProgressionState(containerId) {
  */
 function initializeSectionSortables(container) {
     if (typeof Sortable === 'undefined') {
-        console.warn('[initializeSectionSortables] Sortable library not loaded!');
         return;
     }
 
@@ -3129,13 +3135,11 @@ function initializeSectionSortables(container) {
             },
             // Handle cards added FROM outside INTO this container
             onAdd: function(evt) {
-                console.log('%c[Legacy onAdd] Card added to container', 'color: #00ff00');
                 handleChordMoveToSection(evt);
             },
             onEnd: function(evt) {
                 // Only handle reorders within this container
                 if (evt.from !== evt.to) {
-                    console.log('[Legacy onEnd] Cross-container move - handled by onAdd');
                     return;
                 }
                 handleChordMoveToSection(evt);
@@ -3282,7 +3286,6 @@ function createNewSection(type, containerId) {
         for (let i = 1; i < selectedIndices.length; i++) {
             if (selectedIndices[i] !== selectedIndices[i - 1] + 1) {
                 // Non-adjacent selection - show warning and only use the first contiguous range
-                console.warn('[createNewSection] Non-adjacent chords selected. Using first contiguous range.');
 
                 // Find first contiguous range
                 const contiguousRange = [selectedIndices[0]];
@@ -4261,7 +4264,6 @@ function attachCardEventListeners(wrapper, index) {
             // Get compositionState directly - the single source of truth
             const compositionState = window.getCompositionState ? window.getCompositionState() : null;
             if (!compositionState) {
-                console.warn('CompositionState not available');
                 return;
             }
 
@@ -4294,7 +4296,6 @@ function attachCardEventListeners(wrapper, index) {
             // Get compositionState directly - the single source of truth
             const compositionState = window.getCompositionState ? window.getCompositionState() : null;
             if (!compositionState) {
-                console.warn('CompositionState not available');
                 return;
             }
 
@@ -4409,7 +4410,6 @@ function attachCardEventListeners(wrapper, index) {
             // Get compositionState directly - the single source of truth
             const compositionState = window.getCompositionState ? window.getCompositionState() : null;
             if (!compositionState) {
-                console.warn('CompositionState not available');
                 return;
             }
 
@@ -4438,7 +4438,6 @@ function attachCardEventListeners(wrapper, index) {
             // Get compositionState directly - the single source of truth
             const compositionState = window.getCompositionState ? window.getCompositionState() : null;
             if (!compositionState) {
-                console.warn('CompositionState not available');
                 return;
             }
 
@@ -5192,14 +5191,12 @@ function updateChordType(index, newType) {
     // Get compositionState directly - the single source of truth
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
     if (!compositionState) {
-        console.warn('CompositionState not available');
         return;
     }
 
     const trainerState = getTrainerState();
     const chord = compositionState.getChord(index);
     if (!chord) {
-        console.warn('Chord not found at index', index);
         return;
     }
 
@@ -5212,7 +5209,6 @@ function updateChordType(index, newType) {
     );
 
     if (!chordInfo) {
-        console.warn('Failed to generate chord info');
         return;
     }
 
@@ -5280,14 +5276,12 @@ function updateChordDuration(index, sourceElement) {
     // Get compositionState directly - the single source of truth
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
     if (!compositionState) {
-        console.warn('CompositionState not available');
         return;
     }
 
     // Get the chord from compositionState
     const chord = compositionState.getChord(index);
     if (!chord) {
-        console.warn('Chord not found at index', index);
         return;
     }
 
@@ -5320,7 +5314,6 @@ function updateChordDuration(index, sourceElement) {
     }
 
     if (!durationWholeSelect || !durationFracSelect) {
-        console.warn('Duration selectors not found for chord', index);
         return;
     }
 
@@ -5505,14 +5498,12 @@ function updateChordInversion(index, newInversion, shouldUpdateUI = true, should
     // Get compositionState directly - the single source of truth
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
     if (!compositionState) {
-        console.warn('CompositionState not available');
         return;
     }
 
     const trainerState = getTrainerState();
     const chord = compositionState.getChord(index);
     if (!chord) {
-        console.warn('Chord not found at index', index);
         return;
     }
 
@@ -5525,7 +5516,6 @@ function updateChordInversion(index, newInversion, shouldUpdateUI = true, should
     );
 
     if (!chordInfo) {
-        console.warn('Failed to generate chord info');
         return;
     }
 
@@ -5661,14 +5651,12 @@ function updateRHOctaveShift(index, shift) {
     // Get compositionState directly - the single source of truth
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
     if (!compositionState) {
-        console.warn('CompositionState not available');
         return;
     }
 
     const trainerState = getTrainerState();
     const chord = compositionState.getChord(index);
     if (!chord) {
-        console.warn('Chord not found at index', index);
         return;
     }
 
@@ -5681,7 +5669,6 @@ function updateRHOctaveShift(index, shift) {
     );
 
     if (!chordInfo || !chordInfo.notes) {
-        console.warn('Failed to generate chord info');
         return;
     }
 
@@ -5739,14 +5726,12 @@ function updateLHOctaveShift(index, shift) {
     // Get compositionState directly - the single source of truth
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
     if (!compositionState) {
-        console.warn('CompositionState not available');
         return;
     }
 
     const trainerState = getTrainerState();
     const chord = compositionState.getChord(index);
     if (!chord) {
-        console.warn('Chord not found at index', index);
         return;
     }
 
@@ -5795,14 +5780,12 @@ function updateLHInversion(index, newInversion, shouldUpdateUI = true, shouldSyn
     // Get compositionState directly - the single source of truth
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
     if (!compositionState) {
-        console.warn('CompositionState not available');
         return;
     }
 
     const trainerState = getTrainerState();
     const chord = compositionState.getChord(index);
     if (!chord) {
-        console.warn('Chord not found at index', index);
         return;
     }
 
@@ -5851,14 +5834,12 @@ function toggleLHNote(index, note) {
     // Get compositionState directly - the single source of truth
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
     if (!compositionState) {
-        console.warn('CompositionState not available');
         return;
     }
 
     const trainerState = getTrainerState();
     const chord = compositionState.getChord(index);
     if (!chord) {
-        console.warn('Chord not found at index', index);
         return;
     }
 
@@ -6005,14 +5986,11 @@ function toggleSimplifiedCardNotation(wrapper, index) {
  */
 function initializeSimplifiedSortable(container) {
     if (typeof Sortable === 'undefined') {
-        console.warn('[initializeSimplifiedSortable] Sortable library not loaded!');
         return;
     }
 
-    console.log('%c[initializeSimplifiedSortable] Initializing for container:', 'color: #00ccff; font-weight: bold', container.id);
 
     if (container.sortableInstance) {
-        console.log('[initializeSimplifiedSortable] Destroying existing instance');
         container.sortableInstance.destroy();
     }
 
@@ -6036,18 +6014,15 @@ function initializeSimplifiedSortable(container) {
         draggable: '.chord-card-wrapper[data-chord-index], .section-unified-container',
         swapThreshold: 0.65,
         onStart: function(evt) {
-            console.log('%c[Sortable onStart] === DRAG START ===', 'color: #ffcc00; font-weight: bold');
         },
         // Handle cards added FROM sections TO the main container (ungrouped)
         onAdd: function(evt) {
-            console.log('%c[Sortable onAdd] Card added to main container from section', 'color: #00ff00; font-weight: bold');
             // Use the unified handler which handles cross-container moves
             handleCardDragWithinSection(evt, evt.from.getAttribute('data-section-id'));
         },
         onEnd: function(evt) {
             // Cross-container moves are handled by onAdd
             if (evt.from !== evt.to) {
-                console.log('[Sortable onEnd] Cross-container move - handled by onAdd');
                 return;
             }
 
@@ -6062,7 +6037,6 @@ function initializeSimplifiedSortable(container) {
 
             // For same-container moves (reordering ungrouped cards), use the unified handler
             // This ensures section indices are properly updated
-            console.log('[Sortable onEnd] Same-container move - using unified handler');
             handleCardDragWithinSection(evt, null); // null because cards are ungrouped
             return;
 
@@ -6075,17 +6049,11 @@ function initializeSimplifiedSortable(container) {
             const allChordWrappers = getAllChordWrappersInOrder(container);
             const newPosition = allChordWrappers.indexOf(draggedItem);
 
-            console.log('%c[Sortable onEnd] === DRAG END ===', 'color: #ff00ff; font-weight: bold');
-            console.log('[Sortable onEnd] draggedItem data-chord-index:', oldChordIndex);
-            console.log('[Sortable onEnd] newPosition in DOM:', newPosition);
-            console.log('[Sortable onEnd] Current DOM order:', allChordWrappers.map(w => w.getAttribute('data-chord-index')).join(', '));
-            console.log('[Sortable onEnd] Sortable evt.oldIndex:', evt.oldIndex, 'evt.newIndex:', evt.newIndex);
 
             if (oldChordIndex !== newPosition && newPosition >= 0) {
                 const actualOldIndex = oldChordIndex;
                 const actualNewIndex = newPosition;
 
-                console.log('%c[Sortable onEnd] Will reorder:', 'color: #00ff00', `from ${actualOldIndex} to ${actualNewIndex}`);
 
                 if (actualOldIndex < 0 || actualNewIndex < 0) return; // Shouldn't happen, but safety check
 
@@ -6098,7 +6066,6 @@ function initializeSimplifiedSortable(container) {
                 // Use CompositionState's reorderChord which preserves edited bass notes
                 const compositionState = window.getCompositionState ? window.getCompositionState() : null;
                 if (compositionState && typeof compositionState.reorderChord === 'function') {
-                    console.log('[ProgressionBuilder-Simplified] Using segment-aware reorderChord');
 
                     // Call reorderChord FIRST - it handles everything internally
                     compositionState.reorderChord(actualOldIndex, actualNewIndex);
@@ -6109,7 +6076,6 @@ function initializeSimplifiedSortable(container) {
                     setProgressionData(updatedProgression);
                 } else {
                     // Fallback to old behavior if compositionState not available
-                    console.log('[ProgressionBuilder-Simplified] Fallback: manual reorder');
                     const trainerState = getTrainerState();
                     const progressionData = [...trainerState.progressionData];
                     const progressionRomans = [...trainerState.progressionRomans];
@@ -6143,10 +6109,8 @@ function initializeSimplifiedSortable(container) {
                 renderProgressionDisplay('melody-progression-visualization', false);
 
                 // Update grand staff notation
-                console.log('[ProgressionBuilder-Simplified] Drag/drop completed, refreshing notation...');
                 if (window.refreshNotationFromProgression) {
-                    const result = window.refreshNotationFromProgression();
-                    console.log('[ProgressionBuilder-Simplified] Notation refresh result:', result);
+                    window.refreshNotationFromProgression();
                 } else if (window.getNotationComposer) {
                     const notationComposer = window.getNotationComposer();
                     if (notationComposer) {
@@ -6192,12 +6156,6 @@ function handleCardDragWithinSection(evt, originalSectionId) {
     const fromContainer = evt.from;
     const toContainer = evt.to;
 
-    console.log('%c[handleCardDragWithinSection] Card dragged', 'color: #ff8800', {
-        oldChordIndex,
-        from: fromContainer.getAttribute('data-section-id') || 'ungrouped',
-        to: toContainer.getAttribute('data-section-id') || 'ungrouped'
-    });
-
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
     if (!compositionState) return;
 
@@ -6216,7 +6174,6 @@ function handleCardDragWithinSection(evt, originalSectionId) {
     const newChordOrder = getAllChordWrappersInOrder(gridContainer || toContainer.parentElement)
         .map(el => parseInt(el.getAttribute('data-chord-index'), 10));
 
-    console.log('[handleCardDragWithinSection] New chord order:', newChordOrder);
 
     // Check if the card moved to a different section or out of a section
     const toSectionId = toContainer.getAttribute('data-section-id');
@@ -6245,7 +6202,6 @@ function handleCardDragWithinSection(evt, originalSectionId) {
     const oldOrder = trainerState.progressionData.map((_, i) => i);
 
     if (JSON.stringify(newChordOrder) === JSON.stringify(oldOrder)) {
-        console.log('[handleCardDragWithinSection] No change in order, but section membership may have changed');
         // Still re-render to update section visuals
         renderProgressionDisplay('progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
@@ -6302,19 +6258,16 @@ function handleSectionDragEnd(container, sectionEl, evt) {
     const section = compositionState.getSection(sectionId);
     if (!section) return;
 
-    console.log('%c[handleSectionDragEnd] Section dragged:', 'color: #00ff88', section.label);
 
     // Get the new order of all chords by walking through the container
     const newChordOrder = getAllChordWrappersInOrder(container).map(el => parseInt(el.getAttribute('data-chord-index'), 10));
 
-    console.log('[handleSectionDragEnd] New chord order:', newChordOrder);
 
     // Only proceed if order actually changed
     const trainerState = getTrainerState();
     const oldOrder = trainerState.progressionData.map((_, i) => i);
 
     if (JSON.stringify(newChordOrder) === JSON.stringify(oldOrder)) {
-        console.log('[handleSectionDragEnd] No change in order');
         return;
     }
 
@@ -6333,7 +6286,6 @@ function handleSectionDragEnd(container, sectionEl, evt) {
     compositionState.getSections().forEach(sec => {
         const oldIndices = [...sec.chordIndices];
         const newIndices = sec.chordIndices.map(oldIdx => newChordOrder.indexOf(oldIdx));
-        console.log(`[handleSectionDragEnd] Section ${sec.label}: indices ${oldIndices} → ${newIndices.filter(idx => idx >= 0)}`);
         compositionState.updateSection(sec.id, { chordIndices: newIndices.filter(idx => idx >= 0) });
     });
 
@@ -6375,9 +6327,6 @@ function highlightPatternChords(pattern) {
     // Get pattern length from COMMON_PROGRESSIONS (from harmonyAnalyzer.js)
     const patternInfo = COMMON_PROGRESSIONS[pattern.id];
     if (!patternInfo) {
-        console.warn('Pattern not found in COMMON_PROGRESSIONS:', pattern.id);
-        console.log('Available patterns:', Object.keys(COMMON_PROGRESSIONS));
-        console.log('Pattern object:', pattern);
         return;
     }
 
@@ -6394,13 +6343,11 @@ function highlightPatternChords(pattern) {
         { bg: 'rgba(244, 63, 94, 0.3)', border: 'rgba(244, 63, 94, 0.8)', shadow: '0 4px 12px rgba(244, 63, 94, 0.4)' },     // Rose
     ];
 
-    console.log(`Highlighting ${pattern.matches.length} occurrence(s) of pattern "${pattern.id}" with length ${patternLength}`);
 
     // Highlight all chords in each pattern match
     pattern.matches.forEach((startIndex, matchIdx) => {
         const color = highlightColors[matchIdx % highlightColors.length];
 
-        console.log(`  Match ${matchIdx + 1}: Starting at index ${startIndex}, using colors bg:${color.bg}, border:${color.border}`);
 
         // Highlight the sequence of cards
         for (let i = 0; i < patternLength; i++) {
@@ -6409,7 +6356,6 @@ function highlightPatternChords(pattern) {
             // Highlight card wrapper (works for both simplified and detailed views)
             const wrapper = document.querySelector(`.chord-card-wrapper[data-chord-index="${chordIndex}"]`);
             if (wrapper) {
-                console.log(`    ✓ Found wrapper for chord ${chordIndex}`);
                 wrapper.classList.add('pattern-highlight-active');
                 wrapper.setAttribute('data-pattern-match', pattern.id);
                 wrapper.setAttribute('data-match-index', matchIdx);
@@ -6420,7 +6366,6 @@ function highlightPatternChords(pattern) {
                 wrapper.style.padding = '4px';
                 wrapper.style.transition = 'all 0.3s ease';
             } else {
-                console.warn(`    ✗ Could not find wrapper for chord index ${chordIndex}`);
             }
         }
     });
@@ -6798,7 +6743,12 @@ export function selectChordCard(index) {
     setSelectedChordIndex(index);
     setCurrentIndex(index);
 
-    // First remove all existing selections
+    // CRITICAL: Also update multi-select state so getSelectedIndicesArray() returns correct data
+    // This is needed for sectionIntentUI to properly track insert position
+    clearSelection();
+    selectSingle(index);
+
+    // First remove all existing selections (visual)
     deselectAllChordCards();
 
     // Select the specified card in both containers
@@ -6927,7 +6877,6 @@ function updateMultiSelectVisuals() {
     // Update selection count display (if we add one later)
     const count = selectedIndices.length;
     if (count > 1) {
-        console.log(`[Multi-select] ${count} chords selected`);
     }
 }
 
@@ -7062,7 +7011,6 @@ function copySelectedChords(indices) {
 
     if (chordsToCopy.length > 0) {
         setClipboard({ type: 'chords', data: chordsToCopy });
-        console.log(`[Clipboard] Copied ${chordsToCopy.length} chord(s)`);
     }
 }
 
@@ -7072,7 +7020,6 @@ function copySelectedChords(indices) {
 function pasteChords() {
     const clipboard = getClipboard();
     if (!clipboard || clipboard.type !== 'chords' || !clipboard.data?.length) {
-        console.log('[Clipboard] Nothing to paste');
         return;
     }
 
@@ -7107,7 +7054,6 @@ function pasteChords() {
     renderProgressionDisplay('melody-progression-visualization', false);
 
     updateMultiSelectVisuals();
-    console.log(`[Clipboard] Pasted ${clipboard.data.length} chord(s)`);
 }
 
 /**
@@ -7149,7 +7095,6 @@ function duplicateSelectedChords(indices) {
     renderProgressionDisplay('melody-progression-visualization', false);
 
     updateMultiSelectVisuals();
-    console.log(`[Duplicate] Duplicated ${chordsToDuplicate.length} chord(s)`);
 }
 
 // Expose clipboard functions to window
@@ -7278,7 +7223,6 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
     
     const container = document.getElementById(containerId);
     if (!container) {
-        console.warn(`Container with ID "${containerId}" not found`);
         return;
     }
     
@@ -7290,7 +7234,6 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             container.sortableInstance.destroy();
             container.sortableInstance = null;
         } catch (e) {
-            console.warn('Error destroying Sortable:', e);
             container.sortableInstance = null;
         }
     }
@@ -7324,9 +7267,18 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         }
 
         // 2. Simplified chord cards with Add Chord/Clear All buttons as first grid item
-        // Check if we have any sections defined - if so, use section-aware rendering
+        // Check if we have any sections defined - if so, use section-aware rendering,
+        // unless a one-time flat layout has been requested.
         const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-        const hasSections = compositionState && compositionState.getSections().length > 0;
+        let hasSections = compositionState && compositionState.getSections().length > 0;
+
+        // One-time override: when forceFlatLayoutOnce is true, ignore sections
+        // for this render of the main progression view. This avoids rare stacking
+        // issues when inserting chords via suggestions in heavily-sectioned songs.
+        if (containerId === 'progression-visualization' && forceFlatLayoutOnce) {
+            hasSections = false;
+            forceFlatLayoutOnce = false;
+        }
 
         // Both section-aware and flat rendering use the same approach:
         // 1. Clear container and remove grid classes
@@ -7347,15 +7299,13 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         const gridContainer = document.createElement('div');
         gridContainer.id = `${containerId}-cards-grid`;
 
+        // Use flexbox with wrapping in both cases; section-aware rendering controls its own layout
+        gridContainer.className = 'flex flex-wrap items-start gap-2';
         if (hasSections) {
-            // Use flexbox for section-aware rendering (allows section containers to size naturally)
-            gridContainer.className = 'flex flex-wrap items-start gap-2';
             renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
                 showActionButtons: true
             });
         } else {
-            // Use grid for flat card rendering - match Chord Lab's responsive grid
-            gridContainer.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2';
             renderFlatCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
                 showActionButtons: true
             });
@@ -8577,12 +8527,9 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
 
                     // Update grand staff notation (chord order affects rendering)
                     // Always update regardless of active tab so it's ready when user switches
-                    console.log('[ProgressionBuilder] Drag/drop completed, refreshing notation...');
-                    if (window.refreshNotationFromProgression) {
-                        const result = window.refreshNotationFromProgression();
-                        console.log('[ProgressionBuilder] Notation refresh result:', result);
+                if (window.refreshNotationFromProgression) {
+                    window.refreshNotationFromProgression();
                     } else {
-                        console.warn('[ProgressionBuilder] window.refreshNotationFromProgression not available');
                     }
 
                     // Re-render melody notation if needed (chord order affects melody rendering)
@@ -9124,7 +9071,6 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
 
     // Validate chordResult
     if (!chordResult || !chordResult.specificNotes) {
-        console.warn(`Invalid chord result for ${chordRootNote} ${selectedType} (inversion ${selectedInversion})`);
         return null;
     }
 
@@ -9135,7 +9081,6 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
     
     // If no valid notes, return null
     if (validNotes.length === 0) {
-        console.warn(`No valid notes generated for ${chordRootNote} ${selectedType} (inversion ${selectedInversion})`);
         return null;
     }
 
@@ -9974,7 +9919,6 @@ export function startProgressionChord(index) {
                 // Store notes for release when button is released
                 setTrainerChordNotes(allNotes);
             } catch (e) {
-                console.error('Error playing chord:', e);
             }
         };
         
@@ -9983,7 +9927,6 @@ export function startProgressionChord(index) {
             Tone.context.resume().then(() => {
                 playChord();
             }).catch(err => {
-                console.error('Error resuming audio context:', err);
                 playChord(); // Try anyway
             });
         } else {
@@ -10128,7 +10071,6 @@ function playProgressionChord(index, advance = true) {
                 const chordDurationSeconds = chordBeats * secondsPerBeat;
                 const chordDuration = `${chordDurationSeconds * 0.9}s`; // 90% to prevent overlap
 
-                console.log(`[Playback] Chord ${index}: ${chordBeats} beats, speedValue: ${speedValue}s/measure, duration: ${chordDurationSeconds}s`);
 
 
                 // Play the chord with duration based on beats and tempo
@@ -10230,7 +10172,6 @@ export function showProgressionChordSuggestions(chordIndex) {
     const progression = trainerState.progressionData;
 
     if (!progression || chordIndex < 0 || chordIndex >= progression.length) {
-        console.warn('Invalid chord index for suggestions:', chordIndex);
         return;
     }
 
@@ -10308,13 +10249,11 @@ export function showProgressionChordSuggestions(chordIndex) {
 
             const heldNotes = res.specificNotes || [];
             if (heldNotes.length === 0) {
-                console.warn('No notes generated for chord:', chordType, root, inversion);
                 return;
             }
 
             const instrument = getInstrument();
             if (!instrument) {
-                console.warn('Instrument not ready');
                 return;
             }
 
@@ -10343,7 +10282,6 @@ export function showProgressionChordSuggestions(chordIndex) {
             currentlyPlayingNotes = heldNotes;
             setTrainerChordNotes(heldNotes);
         } catch (error) {
-            console.error('Error playing chord:', error);
         }
     };
 
@@ -10396,7 +10334,6 @@ function updateChordAndRenderPreservingTrebleNotes(index) {
 
     if (!chord || !compositionState || !notationComposer) return;
 
-    console.log('[UPDATE CHORD] Updating chord at index', index);
 
     // Block renders and syncs during update
     const wasBlockingRenders = notationComposer.isSyncingFromProgression;
@@ -10506,20 +10443,25 @@ window.updateChordNotation = function(index) {
  */
 window.fullRebuildNotation = function() {
     if (window.syncProgressionToComposition) {
-        console.warn('[FULL REBUILD] Rebuilding notation - this will wipe user-added treble notes');
         window.syncProgressionToComposition();
     } else if (window.syncNotationFromProgression) {
-        console.warn('[FULL REBUILD] Rebuilding notation - this will wipe user-added treble notes');
         window.syncNotationFromProgression();
     }
 };
 
 export function addChordToProgressionByParams(chordType, root, inversion = 0, octaveShift = 0) {
-    // Save current state for undo
+    // Save current state for undo (same mechanism as other progression edits)
     const currentState = captureProgressionState();
     pushToUndoStack(currentState);
 
     const trainerState = getTrainerState();
+
+    // Phase 2.1: Get insert position from section intent state
+    const insertAfterIndex = getInsertAfterIndex();
+    const sectionIntent = getSectionIntent();
+    const usePositionBasedInsert = insertAfterIndex !== null &&
+                                   insertAfterIndex >= 0 &&
+                                   insertAfterIndex < trainerState.progressionData.length;
 
     // Get full chord information using getInvertedChordNotes
     const result = getInvertedChordNotes(
@@ -10571,142 +10513,85 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
         beats: 4 // Default: 4 beats (whole note in 4/4 time)
     };
 
-    // Add to the end of the progression
-    const updatedProgression = [...trainerState.progressionData, newChordData];
+    // === Stable add path: reuse addToProgressionData (same as Chord Builder) ===
+    const currentProgression = getProgressionData();
+    const originalLength = currentProgression.length;
 
-    // Update state
-    setProgressionData(updatedProgression);
+    // Append using the canonical helper (handles compositionState + notation)
+    if (window.addToProgressionData) {
+        window.addToProgressionData(newChordData);
+    } else {
+        // Fallback: append and sync manually
+        const appended = [...currentProgression, newChordData];
+        setProgressionData(appended);
+        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', false);
+    }
 
-    // Re-render progression display
-    renderProgressionDisplay('progression-visualization', true);
-    // DON'T render melody-progression-visualization here - we manually update compositionState below
+    // After append, compute actual indices
+    const afterAppend = getProgressionData();
+    const newLength = afterAppend.length;
+    const appendedIndex = newLength - 1;
 
-    // Phase 1B: Sync to melody composer if it's active
-    // This ensures bass auto-fill updates when chords are added while on melody tab
-    if (window.getCompositionState && window.getNotationComposer) {
-        const compositionState = window.getCompositionState();
-        const notationComposer = window.getNotationComposer();
+    // Track the final index where the chord ends up
+    let insertedIndex = appendedIndex;
 
-        console.log('[ADD CHORD] Treble notes BEFORE:');
-        for (let i = 0; i < compositionState.getMeasureCount(); i++) {
-            const measure = compositionState.getMeasure(i);
-            const trebleNotes = measure?.notation?.treble?.voices?.[0]?.notes || [];
-            console.log(`  M${i}: ${trebleNotes.length} notes`);
-        }
+    // If we have a valid insert-after index, move the appended chord there
+    if (usePositionBasedInsert && appendedIndex >= 0) {
+        const targetIndex = insertAfterIndex + 1;
+        if (targetIndex >= 0 && targetIndex < newLength && targetIndex !== appendedIndex) {
+            const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+            if (compositionState && typeof compositionState.reorderChord === 'function') {
+                compositionState.reorderChord(appendedIndex, targetIndex);
 
-        // CRITICAL: Block BOTH automatic renders AND bi-directional sync during update
-        // This prevents progressionNotationSync from syncing our changes back to progressionData
-        // and then back to compositionState (which would wipe treble notes)
-        const wasBlockingRenders = notationComposer.isSyncingFromProgression;
-        notationComposer.isSyncingFromProgression = true;
-
-        // Also block the bi-directional sync
-        const syncInstance = window.getProgressionNotationSync && window.getProgressionNotationSync();
-        const wasBlockingSync = syncInstance ? syncInstance.isUpdating : false;
-        if (syncInstance) {
-            syncInstance.isUpdating = true;
-        }
-
-        try {
-            // Instead of full sync (which wipes user's treble notes), just add the new measure
-            // Get the index where the chord was added (last in progression)
-            const measureIndex = updatedProgression.length - 1;
-
-            // Add measure to compositionState if it doesn't exist
-            while (compositionState.getMeasureCount() <= measureIndex) {
-                compositionState.addMeasure({});
-            }
-
-            // Update the chord for this measure
-            const chord = updatedProgression[measureIndex];
-            compositionState.updateChord(measureIndex, {
-                root: chord.root,
-                type: chord.type,
-                notes: chord.notes || [],
-                inversion: chord.inversion || 0,
-                voicing: chord.voicing || 'close',
-                roman: chord.roman || null,
-                name: chord.name || null,
-                octaveShift: chord.octaveShift || 0,
-                lhOctaveShift: chord.lhOctaveShift || 0,
-                omittedNotes: chord.omittedNotes || [],
-                lhOmittedNotes: chord.lhOmittedNotes || [],
-            });
-
-            // Generate bass for this measure
-            const autoGenerateBass = compositionState.getSettings().autoGenerateBass;
-            console.log('[ADD CHORD] autoGenerateBass:', autoGenerateBass, 'for measure', measureIndex);
-
-            const measure = compositionState.getMeasure(measureIndex);
-
-            if (autoGenerateBass) {
-                // Auto-generate is ON: generate pattern-based bass
-                console.log('[ADD CHORD] Calling updateBassFromChord for measure', measureIndex);
-                compositionState.updateBassFromChord(measureIndex);
+                const reordered = compositionState.exportToProgressionData();
+                setProgressionData(reordered);
+                renderProgressionDisplay('progression-visualization', true);
+                renderProgressionDisplay('melody-progression-visualization', false);
             } else {
-                // Auto-generate is OFF: create simple whole-note chord bass
-                console.log('[ADD CHORD] Creating simple whole-note bass for measure', measureIndex);
-                if (measure && measure.notation && measure.notation.bass && chord.notes && chord.notes.length > 0) {
-                    const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
-                    if (voicedNotes.length > 0) {
-                        // CRITICAL: Shift chord voicing down one octave for bass clef
-                        // chord.notes are typically in treble range (C4-C5)
-                        // Bass clef needs them in C3-C4 range to avoid ottava markings
-                        const bassVoicing = voicedNotes.map(note => {
-                            const match = note.match(/^([A-G][#b]?)(\d+)$/);
-                            if (!match) return note;
-                            const noteName = match[1];
-                            const octave = parseInt(match[2], 10);
-                            return `${noteName}${octave - 1}`; // Shift down one octave
-                        });
+                // Pure JS fallback reorder if compositionState is unavailable
+                const manual = [...afterAppend];
+                const [moved] = manual.splice(appendedIndex, 1);
+                manual.splice(targetIndex, 0, moved);
+                setProgressionData(manual);
+                renderProgressionDisplay('progression-visualization', true);
+                renderProgressionDisplay('melody-progression-visualization', false);
+            }
+            // Update insertedIndex to reflect the actual position
+            insertedIndex = targetIndex;
+        }
+    }
 
-                        measure.notation.bass.voices[0].notes = [{
-                            type: 'note',
-                            pitches: bassVoicing,
-                            duration: '1n',
-                            beat: 0,
-                            dotted: false
-                        }];
-                        measure.notation.bass.autoGenerated = false;
+    // Phase 2.1: Handle section assignment based on intent
+    let sectionWasModified = false;
+    if (window.getCompositionState) {
+        const compositionState = window.getCompositionState();
+        if (compositionState && sectionIntent) {
+            try {
+                if (sectionIntent.mode === INTENT_MODES.NEW_SECTION && sectionIntent.newSectionType) {
+                    // Create a new section with this chord as the first chord
+                    const newSection = compositionState.createSection(
+                        sectionIntent.newSectionType,
+                        [insertedIndex]
+                    );
+                    if (newSection) {
+                        sectionWasModified = true;
                     }
+                } else if (sectionIntent.mode === INTENT_MODES.CONTINUE && sectionIntent.targetSection) {
+                    // Add the chord to the existing section
+                    compositionState.addChordToSection(insertedIndex, sectionIntent.targetSection.id);
+                    sectionWasModified = true;
                 }
-            }
-
-            // Verify bass was generated
-            const bassNotes = measure?.notation?.bass?.voices?.[0]?.notes || [];
-            console.log('[ADD CHORD] Measure', measureIndex, 'now has', bassNotes.length, 'bass notes');
-        } finally {
-            // Restore previous render blocking state
-            notationComposer.isSyncingFromProgression = wasBlockingRenders;
-
-            // Restore previous sync blocking state
-            if (syncInstance) {
-                syncInstance.isUpdating = wasBlockingSync;
+                // If ungrouped (no targetSection), leave the chord ungrouped
+            } catch (e) {
             }
         }
+    }
 
-        console.log('[ADD CHORD] Treble notes AFTER:');
-        for (let i = 0; i < compositionState.getMeasureCount(); i++) {
-            const measure = compositionState.getMeasure(i);
-            const trebleNotes = measure?.notation?.treble?.voices?.[0]?.notes || [];
-            console.log(`  M${i}: ${trebleNotes.length} notes`);
-        }
-
-        // First update the chord cards on the melody tab (without wiping compositionState)
-        const melodyContainer = document.getElementById('melody-progression-visualization');
-        if (melodyContainer && updatedProgression.length > 0) {
-            // Render just the simplified chord cards, skip the sync
-            melodyContainer.innerHTML = '';
-            renderSimplifiedChordSequence(melodyContainer, updatedProgression, trainerState.currentKey || 'C', {
-                showActionButtons: true
-            });
-        }
-
-        // CRITICAL: Render canvas AFTER DOM updates
-        // performRender now includes aggressive repaint triggers
-        if (notationComposer && typeof notationComposer.render === 'function') {
-            notationComposer.render();
-        }
+    // Re-render display if a section was modified (to show section visuals)
+    if (sectionWasModified) {
+        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', false);
     }
 
     // Update unified suggestions
@@ -10721,6 +10606,9 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
             key: trainerState.currentKey
         }
     }));
+
+    // Phase 2.1: Select the newly inserted chord
+    selectChordCard(insertedIndex);
 }
 
 // Make it available globally
@@ -10875,14 +10763,9 @@ export function removeChordFromProgression(index) {
     if (window.getCompositionState) {
         const compositionState = window.getCompositionState();
         const progressionData = [...trainerState.progressionData]; // Get current data
-        console.log('[removeChordFromProgression] BEFORE delete - progressionData:', progressionData.map((c, i) => `[${i}] ${c.root}${c.type}`).join(', '));
-        console.log('[removeChordFromProgression] BEFORE delete - progressionData length:', progressionData.length);
-        console.log('[removeChordFromProgression] BEFORE delete - compositionState measures:', compositionState.getMeasureCount());
 
         progressionData.splice(index, 1); // Remove the chord
 
-        console.log('[removeChordFromProgression] AFTER splice - progressionData:', progressionData.map((c, i) => `[${i}] ${c.root}${c.type}`).join(', '));
-        console.log('[removeChordFromProgression] AFTER splice - progressionData length:', progressionData.length);
 
         // Sync back to compositionState
         compositionState.syncWithProgressionData(progressionData, {
@@ -10890,12 +10773,9 @@ export function removeChordFromProgression(index) {
             timeSignature: { num: 4, denom: 4 }
         });
 
-        console.log('[removeChordFromProgression] AFTER sync - compositionState measures:', compositionState.getMeasureCount());
 
         // Verify the deletion worked by exporting again
         const verifyData = compositionState.exportToProgressionData();
-        console.log('[removeChordFromProgression] VERIFY - exportToProgressionData():', verifyData.map((c, i) => `[${i}] ${c.root}${c.type}`).join(', '));
-        console.log('[removeChordFromProgression] VERIFY - exportToProgressionData() length:', verifyData.length);
     } else {
         // Fallback for legacy code
         trainerState.progressionData.splice(index, 1);
@@ -10958,7 +10838,6 @@ export function toggleProgressionNote(chordIndex, note) {
     // Get compositionState directly - the single source of truth
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
     if (!compositionState) {
-        console.warn('CompositionState not available');
         return;
     }
 
@@ -10988,7 +10867,6 @@ export function toggleProgressionNote(chordIndex, note) {
     const updatedChord = compositionState.getChord(chordIndex);
 
     if (!updatedChord) {
-        console.warn('Could not get updated chord after toggle');
         return;
     }
 
@@ -11200,7 +11078,6 @@ function updateProgressionChord(index, property, value) {
             newData.omittedNotes = mappedOmittedNotes;
             
             // Debug logging to help diagnose issues (can be removed later)
-            // console.log('Octave shift mapping:', {
             //     chordIndex: index,
             //     oldOctaveShift,
             //     newOctaveShift: chordState.octaveShift,
@@ -11533,7 +11410,6 @@ export function renderProgressionControls() {
             const trainerState = getTrainerState();
             if (trainerState.isPlaying && window.handleAutoPlayback) {
                 // Restart playback with new speed
-                console.log('[speedSelect] Speed changed, restarting playback');
                 handleAutoPlayback(); // This will stop current playback
                 // Then start again after a brief delay
                 setTimeout(() => {
@@ -11859,7 +11735,6 @@ function parseChordSymbol(chordSymbol) {
 export function importChordList(mode = 'replace') {
     const input = document.getElementById('chord-list-input');
     if (!input) {
-        console.error('Chord list input not found');
         return;
     }
     
@@ -11873,7 +11748,6 @@ export function importChordList(mode = 'replace') {
     
     // Parse the chord list
     const chordSymbols = parseChordList(chordListString);
-    console.log('Parsed chord symbols:', chordSymbols);
     if (chordSymbols.length === 0) {
         if (window.showModal) {
             window.showModal('No valid chords found in the input. Please check the format.', true);
@@ -11889,7 +11763,6 @@ export function importChordList(mode = 'replace') {
     const enharmonicPreference = getEnharmonicPreference();
     const notationPreference = getNotationPreference();
     
-    console.log('Import settings:', { mode, currentKey, keyForCalculation, octaveShift, enharmonicPreference });
     
     // Clear progression if replacing
     if (mode === 'replace') {
@@ -11919,9 +11792,7 @@ export function importChordList(mode = 'replace') {
     
     chordSymbols.forEach((chordSymbol, index) => {
         const parsed = parseChordSymbol(chordSymbol);
-        console.log(`Processing chord ${index + 1}/${chordSymbols.length}: "${chordSymbol}" ->`, parsed);
         if (!parsed) {
-            console.warn(`Could not parse chord: ${chordSymbol}`);
             errorCount++;
             return;
         }
@@ -11939,7 +11810,6 @@ export function importChordList(mode = 'replace') {
             root = FLAT_NOTES[sharpIndex];
         }
         
-        console.log(`  Root: ${parsed.root} -> ${root}, Type: ${parsed.type}`);
         
         // Get chord notes
         const chordResult = getInvertedChordNotes(
@@ -11952,10 +11822,8 @@ export function importChordList(mode = 'replace') {
             notationPreference
         );
         
-        console.log(`  Chord result:`, chordResult);
         
         if (!chordResult || !chordResult.specificNotes || chordResult.specificNotes.length === 0) {
-            console.warn(`Could not generate notes for chord: ${chordSymbol} (root: ${root}, type: ${parsed.type})`);
             errorCount++;
             return;
         }
@@ -11967,7 +11835,6 @@ export function importChordList(mode = 'replace') {
             addedChordRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[root] || root);
         }
         if (addedChordRootIndex === -1) {
-            console.warn(`Could not find root note index for: ${root}`);
             errorCount++;
             return;
         }
@@ -12061,7 +11928,6 @@ export function importChordList(mode = 'replace') {
     });
     
     // Add all chords to progression
-    console.log(`Total chords to add: ${newChords.length}, Success: ${successCount}, Errors: ${errorCount}`);
     if (newChords.length > 0) {
         // Save state before adding
         saveStateBeforeChange();
@@ -12077,18 +11943,15 @@ export function importChordList(mode = 'replace') {
             trainerState.progressionRomans = [];
         }
         
-        console.log(`Before adding: progression has ${trainerState.progressionData.length} chords`);
         
         // Add chords to progression
         newChords.forEach((chordData, idx) => {
-            console.log(`Adding chord ${idx + 1}:`, chordData);
             trainerState.progressionData.push(chordData);
             if (chordData.roman && !trainerState.progressionRomans.includes(chordData.roman)) {
                 trainerState.progressionRomans.push(chordData.roman);
             }
         });
         
-        console.log(`After adding: progression has ${trainerState.progressionData.length} chords`);
         
         // Update state using setters
         setProgressionData(trainerState.progressionData);
@@ -12097,10 +11960,8 @@ export function importChordList(mode = 'replace') {
         
         // Get fresh state after updating
         trainerState = getTrainerState();
-        console.log(`State after setProgressionData: ${trainerState.progressionData.length} chords`);
         
         // Render progression display
-        console.log('Rendering progression display...');
         renderProgressionDisplay('progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
         
@@ -12125,7 +11986,6 @@ export function importChordList(mode = 'replace') {
             }
         }
     } else {
-        console.error('No chords were successfully parsed!');
         if (window.showModal) {
             window.showModal('No valid chords could be imported. Please check the format.', true);
         }
@@ -12152,7 +12012,6 @@ export function openTemplateBrowser() {
  * @param {string} action - 'load' (replace) or 'append' (add to end)
  */
 function loadTemplateToProgression(template, action = 'load') {
-    console.log('Loading template:', template.name);
 
     const keySelect = document.getElementById('trainer-key-select');
     const currentKey = keySelect ? keySelect.value : 'C';
@@ -12245,7 +12104,6 @@ function loadTemplateToProgression(template, action = 'load') {
             progressionData.push(chordData);
             progressionRomans.push(roman);
         } else {
-            console.warn(`Could not generate chord for roman numeral: ${roman} (base: ${baseRoman}) in key ${currentKey}`, chordInfo);
         }
     });
 
@@ -12286,11 +12144,6 @@ function loadTemplateToProgression(template, action = 'load') {
         }, 100);
     }
 
-    console.log('Template loaded successfully:', {
-        template: template.name,
-        chords: progressionData.length,
-        key: currentKey
-    });
 }
 
 // ============================================================================

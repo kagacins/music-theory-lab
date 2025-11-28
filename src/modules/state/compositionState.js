@@ -177,10 +177,7 @@ class BassNoteStore {
      * Debug: log store contents
      */
     debugLog(prefix = '') {
-        console.log(`${prefix}[BassNoteStore] ${this.notes.size} notes:`);
-        for (const [id, entry] of this.notes) {
-            console.log(`  ${id}: chordIndex=${entry.chordIndex}, duration=${entry.duration}, pitches=${JSON.stringify(entry.pitches)}, isSplit=${entry.isSplit}`);
-        }
+        // Debug logging removed
     }
 }
 
@@ -984,7 +981,6 @@ export class CompositionState {
                 const chordStart = chordStartBeats[noteChordIndex] || 0;
                 const beatInChord = absoluteNoteBeat - chordStart;
 
-                console.log(`[syncMeasuresToBuildingBlocks] Measure ${measureIndex}, note at beat ${note.beat}: chordIndex=${noteChordIndex}, absoluteBeat=${absoluteNoteBeat}, chordStart=${chordStart}, beatInChord=${beatInChord}`);
 
                 chordNotes.get(noteChordIndex).push({
                     pitches: note.pitches || (note.pitch ? [note.pitch] : []),
@@ -1015,17 +1011,14 @@ export class CompositionState {
             }
         }
 
-        console.log(`[syncMeasuresToBuildingBlocks] Found ${chordNotes.size} chords with notes`);
 
         // For each chord, reconstruct the block's units from collected notes
         for (const [chordIndex, allNotes] of chordNotes) {
             const block = this.bassBlockSequence.getBlock(chordIndex);
             if (!block) {
-                console.warn(`[syncMeasuresToBuildingBlocks] No block for chord ${chordIndex}`);
                 continue;
             }
 
-            console.log(`[syncMeasuresToBuildingBlocks] Chord ${chordIndex}: ${allNotes.length} notes`);
 
             // Rebuild the block's units from these notes
             // First, clear the block by reinitializing with empty pitches
@@ -1086,7 +1079,6 @@ export class CompositionState {
             const newDuration = beatsToDuration(newBeats);
             note.duration = newDuration;
             note.dotted = newDuration.includes('.');
-            console.log(`[updateBassNoteStoreDuration] Updated note ${note.id}: duration=${newDuration}`);
         } else {
             // For multiple notes, we need more complex logic
             // For now, truncate or extend the last note
@@ -1099,7 +1091,6 @@ export class CompositionState {
                 const newLastNoteBeats = Math.max(0.25, lastNoteBeats + delta); // Min 16th note
                 lastNote.duration = beatsToDuration(newLastNoteBeats);
                 lastNote.dotted = lastNote.duration.includes('.');
-                console.log(`[updateBassNoteStoreDuration] Adjusted last note ${lastNote.id}: duration=${lastNote.duration}`);
             }
         }
 
@@ -1149,7 +1140,6 @@ export class CompositionState {
             const notes = this.bassNoteStore.getNotesForChord(chordIndex);
             let noteStartBeat = chordStartBeats.get(chordIndex);
 
-            console.log(`[renderBassNotesToMeasures] Chord ${chordIndex}: startBeat=${noteStartBeat}, ${notes.length} notes`);
 
             for (const noteEntry of notes) {
                 const noteDuration = getDurationInBeats(noteEntry.duration);
@@ -1162,7 +1152,6 @@ export class CompositionState {
                     this.addMeasure({});
                 }
 
-                console.log(`  Note ${noteEntry.id}: duration=${noteEntry.duration} (${noteDuration} beats), measureIndex=${measureIndex}, beatInMeasure=${beatInMeasure}, remainingInMeasure=${remainingInMeasure}`);
 
                 if (noteDuration <= remainingInMeasure) {
                     // Note fits in current measure - no split needed
@@ -1180,7 +1169,6 @@ export class CompositionState {
                     this.measures[measureIndex].notation.bass.voices[0].notes.push(noteToAdd);
                     noteEntry.isSplit = false;
                     noteEntry.splitParts = [];
-                    console.log(`    -> Added to measure ${measureIndex} (no split): duration=${noteToAdd.duration}`);
                 } else {
                     // Note needs to be split across measure boundary
                     noteEntry.isSplit = true;
@@ -1201,7 +1189,6 @@ export class CompositionState {
                     };
                     this.measures[measureIndex].notation.bass.voices[0].notes.push(firstNote);
                     noteEntry.splitParts.push({ measureIndex, duration: firstPartDuration, isTied: false });
-                    console.log(`    -> SPLIT part 1 in measure ${measureIndex}: duration=${firstPartDuration}, isTied=false`);
 
                     // Second part in next measure
                     const secondPartBeats = noteDuration - remainingInMeasure;
@@ -1225,7 +1212,6 @@ export class CompositionState {
                     };
                     this.measures[nextMeasureIndex].notation.bass.voices[0].notes.push(secondNote);
                     noteEntry.splitParts.push({ measureIndex: nextMeasureIndex, duration: secondPartDuration, isTied: true });
-                    console.log(`    -> SPLIT part 2 in measure ${nextMeasureIndex}: duration=${secondPartDuration}, isTied=true`);
                 }
 
                 noteStartBeat += noteDuration;
@@ -1551,7 +1537,6 @@ export class CompositionState {
                 if (pitchesMatch && continuationMatches) {
                     // Extend the last note's duration
                     lastNote.durationUnits += note.durationUnits;
-                    console.log(`[syncMeasuresToTrebleBlock] Combined tied note at unit ${note.startUnit}, new duration: ${lastNote.durationUnits} units`);
                     continue;
                 }
             }
@@ -1810,7 +1795,6 @@ export class CompositionState {
         // Find the note at this position
         const noteToDelete = notes.find(n => n.startUnit === noteStartUnit);
         if (!noteToDelete) {
-            console.warn(`[deleteTrebleNoteWithShift] No note found at unit ${noteStartUnit}`);
             return;
         }
 
@@ -2047,7 +2031,6 @@ export class CompositionState {
             // Get the unit position of this note
             const noteUnit = this.getTrebleNoteUnit(measureIndex, noteIndex);
             if (!noteUnit) {
-                console.warn('[deleteTrebleNote] Could not find unit for note');
                 return false;
             }
 
@@ -2160,7 +2143,6 @@ export class CompositionState {
      */
     removeMeasure(measureIndex) {
         if (measureIndex < 0 || measureIndex >= this.measures.length) {
-            console.warn('Invalid measure index:', measureIndex);
             return;
         }
 
@@ -2219,7 +2201,6 @@ export class CompositionState {
     updateChord(measureIndex, chord) {
         const measure = this.getMeasure(measureIndex);
         if (!measure) {
-            console.warn('Measure not found:', measureIndex);
             return;
         }
 
@@ -2475,7 +2456,6 @@ export class CompositionState {
         const beatsInMeasure = chord.beatsInMeasure || 4;
         const isChordContinuation = chord.isChordContinuation || false;
 
-        console.log(`[placeChordVoicingInBass] Measure ${measureIndex}: chord=${chord.root}${chord.type}, chordIndex=${chord.chordIndex}, beatsInMeasure=${beatsInMeasure}, isChordContinuation=${isChordContinuation}`);
 
         // Use the chord's notes directly - these are the exact pitches from the chord card
         let bassNotes = chord.notes || [];
@@ -2501,7 +2481,6 @@ export class CompositionState {
         // Find the appropriate duration for the beats
         const duration = beatsToDuration(beatsInMeasure);
 
-        console.log(`[placeChordVoicingInBass] -> Creating note: duration=${duration}, pitches=${bassNotes.length}, isTied=${isChordContinuation}`);
 
         // Create the bass note (chord voicing)
         const bassNote = {
@@ -2533,13 +2512,11 @@ export class CompositionState {
     addNote(measureIndex, staff, voiceIndex, note) {
         const measure = this.getMeasure(measureIndex);
         if (!measure) {
-            console.warn('Measure not found:', measureIndex);
             return;
         }
 
         const staffData = measure.notation[staff];
         if (!staffData) {
-            console.warn('Invalid staff:', staff);
             return;
         }
 
@@ -2688,7 +2665,6 @@ export class CompositionState {
     syncWithProgressionData(progressionData, options = {}) {
         // Prevent recursive calls
         if (this._isSyncing) {
-            console.warn('[syncWithProgressionData] Blocked recursive call');
             return;
         }
 
@@ -2892,12 +2868,8 @@ export class CompositionState {
         const uniqueChords = [];
         const seenChordIndices = new Set();
 
-        console.log(`[exportToProgressionData] Exporting from ${this.measures.length} measures`);
-
         this.measures.forEach((measure, idx) => {
             const chordIndex = measure.chord.chordIndex;
-
-            console.log(`[exportToProgressionData] Measure ${idx}: chordIndex=${chordIndex}, chord=${measure.chord.root}${measure.chord.type}, beats=${measure.chord.beats}`);
 
             // Only export the first measure for each chord (skip continuations)
             if (chordIndex !== undefined && !seenChordIndices.has(chordIndex)) {
@@ -2921,12 +2893,10 @@ export class CompositionState {
                     lhNotes: measure.chord.lhNotes || [] // Left-hand specific notes
                 };
 
-                console.log(`[exportToProgressionData] Adding chord ${chordIndex}:`, chordData);
                 uniqueChords.push(chordData);
             }
         });
 
-        console.log(`[exportToProgressionData] Exported ${uniqueChords.length} unique chords`);
         return uniqueChords;
     }
 
@@ -3102,7 +3072,6 @@ export class CompositionState {
         const progressionData = this.exportToProgressionData();
 
         if (chordIndex < 0 || chordIndex >= progressionData.length) {
-            console.warn(`[updateChordByIndex] Invalid chordIndex: ${chordIndex}`);
             return false;
         }
 
@@ -3227,7 +3196,6 @@ export class CompositionState {
 
         // Validate index
         if (atIndex < 0 || atIndex > progressionData.length) {
-            console.warn(`[insertChord] Invalid index: ${atIndex}`);
             return false;
         }
 
@@ -3258,7 +3226,6 @@ export class CompositionState {
 
         // Validate index
         if (atIndex < 0 || atIndex >= progressionData.length) {
-            console.warn(`[removeChord] Invalid index: ${atIndex}`);
             return false;
         }
 
@@ -3534,15 +3501,8 @@ export class CompositionState {
      */
     replaceBassWithFoundationalChord(chordIndex, startBeat, durationBeats, chordData, options = {}) {
         const { markAsAutoGenerated = false } = options;
-        console.log('[CompositionState] replaceBassWithFoundationalChord:', {
-            chordIndex,
-            startBeat,
-            durationBeats,
-            chordData,
-        });
 
         if (!chordData || !chordData.root) {
-            console.warn('[CompositionState] Cannot replace - invalid chord data');
             return;
         }
 
@@ -3551,18 +3511,15 @@ export class CompositionState {
         // Get foundational chord pitches - exact pitches from chord card
         const bassPitches = this.getFoundationalBassPitches(chordData);
         if (bassPitches.length === 0) {
-            console.warn('[CompositionState] No bass pitches generated for chord');
             return;
         }
 
-        console.log('[CompositionState] Using exact pitches from chord card:', bassPitches);
 
         // Calculate which measures are affected
         const startMeasure = Math.floor(startBeat / beatsPerMeasure);
         const endBeat = startBeat + durationBeats;
         const endMeasure = Math.ceil(endBeat / beatsPerMeasure) - 1;
 
-        console.log(`[CompositionState] Affecting measures ${startMeasure} to ${endMeasure}, beats ${startBeat} to ${endBeat}`);
 
         // Generate bass notes for the entire duration, handling ties across measures
         // The chord starts at beat 0 of the building block (which is startBeat)
@@ -3622,7 +3579,6 @@ export class CompositionState {
         // Emit change event
         this.events.emit('bassNotesChanged', { chordIndex, startBeat, durationBeats });
 
-        console.log('[CompositionState] Bass replacement complete');
     }
 
     /**
@@ -3771,7 +3727,6 @@ export class CompositionState {
         }
 
         this.bassNotesBackup = backup;
-        console.log('[CompositionState] Bass notes backed up:', backup.measures.length, 'measures');
     }
 
     /**
@@ -3779,11 +3734,9 @@ export class CompositionState {
      */
     restoreBassNotes() {
         if (!this.bassNotesBackup) {
-            console.warn('[CompositionState] No bass notes backup to restore');
             return false;
         }
 
-        console.log('[CompositionState] Restoring bass notes from backup');
 
         for (const backupMeasure of this.bassNotesBackup.measures) {
             const measureIndex = backupMeasure.measureIndex;
@@ -3802,7 +3755,6 @@ export class CompositionState {
 
         // Emit event to trigger re-render
         this.events.emit('bassUpdated', -1);
-        console.log('[CompositionState] Bass notes restored');
         return true;
     }
 
@@ -3811,7 +3763,6 @@ export class CompositionState {
      * Uses the exact pitches from each chord card to fill its building block duration
      */
     fillBuildingBlocksWithChordBass() {
-        console.log('[CompositionState] Filling building blocks with chord card bass');
 
         // Get chord segments (building blocks)
         const segments = this.getChordSegments();
@@ -3821,17 +3772,14 @@ export class CompositionState {
         }
 
         const chordSegments = this.getChordSegments();
-        console.log('[CompositionState] Found', chordSegments.length, 'building blocks');
 
         for (const segment of chordSegments) {
             const { chordIndex, startBeat, durationBeats, chord } = segment;
 
             if (!chord || !chord.root) {
-                console.warn(`[CompositionState] Skipping segment ${chordIndex} - no chord data`);
                 continue;
             }
 
-            console.log(`[CompositionState] Filling building block ${chordIndex}: ${chord.root}${chord.type || ''} at beat ${startBeat}, duration ${durationBeats}`);
 
             // Use replaceBassWithFoundationalChord to fill this building block
             // This handles ties across measures and uses exact chord card pitches
@@ -3843,7 +3791,6 @@ export class CompositionState {
 
         // Emit event to trigger re-render
         this.events.emit('bassUpdated', -1);
-        console.log('[CompositionState] Building blocks filled with chord bass');
     }
 
     /**
@@ -3923,11 +3870,39 @@ export class CompositionState {
             this.removeChordFromSection(idx);
         });
 
-        // Count existing sections of this type for auto-numbering
-        const sameTypeCount = this.sections.filter(s => s.type === type).length;
-        const autoLabel = sameTypeCount > 0
-            ? `${sectionType.label} ${sameTypeCount + 1}`
-            : sectionType.label;
+        // Find the lowest available number for auto-labeling
+        const baseLabel = sectionType.label;
+        const sameTypeSections = this.sections.filter(s => s.type === type);
+
+        let autoLabel;
+        if (sameTypeSections.length === 0) {
+            // No sections of this type exist - use base label without number
+            autoLabel = baseLabel;
+        } else {
+            // Parse existing labels to find used numbers
+            const usedNumbers = new Set();
+            sameTypeSections.forEach(s => {
+                // Check if label is exactly the base label (counts as 1)
+                if (s.label === baseLabel) {
+                    usedNumbers.add(1);
+                } else {
+                    // Try to parse number from label like "Bridge 2", "Verse 3", etc.
+                    const match = s.label.match(new RegExp(`^${baseLabel}\\s+(\\d+)$`));
+                    if (match) {
+                        usedNumbers.add(parseInt(match[1], 10));
+                    }
+                }
+            });
+
+            // Find lowest available number (starting from 1 for unnumbered base label)
+            let lowestAvailable = 1;
+            while (usedNumbers.has(lowestAvailable)) {
+                lowestAvailable++;
+            }
+
+            // Use base label alone for 1, numbered for 2+
+            autoLabel = lowestAvailable === 1 ? baseLabel : `${baseLabel} ${lowestAvailable}`;
+        }
 
         const section = {
             id: this._generateSectionId(),

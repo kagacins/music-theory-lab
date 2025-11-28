@@ -169,7 +169,7 @@ import {
     getNumOctaves,
     setNumOctaves
 } from './modules/state/globalState.js';
-import { getTrainerState, setProgressionData, setIsReady, getCurrentKey } from './modules/state/trainerState.js';
+import { getTrainerState, setProgressionData, setIsReady, getCurrentKey, invalidateProgressionDataCache } from './modules/state/trainerState.js';
 import {
     getBuilderRootIndex,
     getBuilderChordType,
@@ -2750,6 +2750,23 @@ window.onload = () => {
 
     // Initialize undo/redo button states
     updateUndoRedoButtons();
+    
+    // Set up cache invalidation for progression data when composition state changes
+    // This prevents excessive calls to exportToProgressionData() when tooltips open or cards are clicked
+    if (window.getCompositionState) {
+        const compositionState = window.getCompositionState();
+        if (compositionState && compositionState.events) {
+            // Invalidate cache when chords are modified
+            compositionState.events.on('chordChanged', () => invalidateProgressionDataCache());
+            compositionState.events.on('chordInserted', () => invalidateProgressionDataCache());
+            compositionState.events.on('chordRemoved', () => invalidateProgressionDataCache());
+            compositionState.events.on('chordReordered', () => invalidateProgressionDataCache());
+            compositionState.events.on('chordDurationChanged', () => invalidateProgressionDataCache());
+            compositionState.events.on('progressionSynced', () => invalidateProgressionDataCache());
+            compositionState.events.on('progressionImported', () => invalidateProgressionDataCache());
+            compositionState.events.on('cleared', () => invalidateProgressionDataCache());
+        }
+    }
     
     // Initialize Sortable for progression - commented out for now, need to access trainer state properly
     // const progressionContainer = document.getElementById('progression-visualization');

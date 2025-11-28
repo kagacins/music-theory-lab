@@ -3,6 +3,8 @@
  * Manages a floating panel for chord and melody suggestions that appears near the mouse cursor
  */
 
+import { initSectionIntentUI, refreshUI as refreshSectionIntentUI } from './sectionIntentUI.js';
+
 let panel = null;
 let isVisible = false;
 let currentMode = 'chords'; // 'chords' or 'melody'
@@ -20,7 +22,6 @@ export function initFloatingSuggestionsPanel() {
     panel = document.getElementById('floating-suggestions-panel');
 
     if (!panel) {
-        console.error('Floating suggestions panel element not found');
         return;
     }
 
@@ -51,6 +52,9 @@ export function initFloatingSuggestionsPanel() {
 
     // Initially hide the panel
     hidePanel();
+
+    // Phase 2.1: Initialize section intent UI
+    initSectionIntentUI();
 }
 
 /**
@@ -158,6 +162,16 @@ export function showPanel(mode) {
     // Show the panel with animation
     panel.classList.remove('hidden');
     panel.classList.add('visible');
+
+    // Phase 2.1: Refresh section intent UI when showing chord suggestions
+    if (mode === 'chords') {
+        refreshSectionIntentUI();
+
+        // Ensure recommendation service is initialized (may not be if not on Melody tab)
+        if (window.initializeRecommendationsSidebar) {
+            window.initializeRecommendationsSidebar();
+        }
+    }
 
     // Dispatch event for other components
     window.dispatchEvent(new CustomEvent('suggestionsPanelShown', {

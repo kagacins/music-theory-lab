@@ -2092,6 +2092,78 @@
         <div class="panel-content">
             <!-- CHORD SUGGESTIONS SECTION -->
             <div id="chord-suggestions-section">
+                <!-- Phase 2.1: Section Intent Selector -->
+                <div id="section-intent-selector" class="section-intent-container">
+                    <!-- Selection Required Prompt (shown when no chord is selected) -->
+                    <div id="selection-required-prompt" class="selection-prompt hidden">
+                        <div class="prompt-icon">⚠️</div>
+                        <div class="prompt-text">
+                            <strong>Select a chord first</strong>
+                            <p>Click on a chord card to indicate where to insert the next chord.</p>
+                        </div>
+                        <div class="prompt-actions">
+                            <button id="select-last-chord-btn" class="btn-select-last">Select Last Chord</button>
+                        </div>
+                    </div>
+
+                    <!-- Section Intent Controls (shown when a chord is selected) -->
+                    <div id="section-intent-controls" class="intent-controls">
+                        <!-- Insertion Position Display -->
+                        <div class="insert-position-display">
+                            <span class="insert-label">Inserting after:</span>
+                            <span id="insert-position-chord" class="insert-chord-name">(none)</span>
+                        </div>
+
+                        <!-- Intent Mode Toggle -->
+                        <div class="intent-mode-group">
+                            <label class="intent-radio">
+                                <input type="radio" name="section-intent-mode" value="continue" checked>
+                                <span class="radio-label">Continue Section</span>
+                            </label>
+                            <label class="intent-radio">
+                                <input type="radio" name="section-intent-mode" value="new">
+                                <span class="radio-label">Start New Section</span>
+                            </label>
+                        </div>
+
+                        <!-- Continue Section Sub-options -->
+                        <div id="continue-section-options" class="sub-options">
+                            <label class="sub-option">
+                                <input type="radio" name="continue-submode" value="building" checked>
+                                <span>Continue building</span>
+                            </label>
+                            <label class="sub-option">
+                                <input type="radio" name="continue-submode" value="concluding">
+                                <span>Work toward conclusion</span>
+                            </label>
+                            <label class="sub-option">
+                                <input type="radio" name="continue-submode" value="final">
+                                <span>Conclude section</span>
+                            </label>
+                        </div>
+
+                        <!-- New Section Options -->
+                        <div id="new-section-options" class="sub-options hidden">
+                            <label class="section-type-label">Section Type:</label>
+                            <select id="new-section-type-select" class="section-type-select">
+                                <option value="verse">Verse</option>
+                                <option value="chorus">Chorus</option>
+                                <option value="bridge">Bridge</option>
+                                <option value="pre-chorus">Pre-Chorus</option>
+                                <option value="intro">Intro</option>
+                                <option value="outro">Outro</option>
+                                <option value="breakdown">Breakdown</option>
+                            </select>
+                        </div>
+
+                        <!-- Current Section Info -->
+                        <div id="current-section-info" class="section-info">
+                            <span class="section-info-label">Current section:</span>
+                            <span id="current-section-name" class="section-name">(ungrouped)</span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Current Context Display -->
                 <div class="context-display">
                     <h4>Context</h4>

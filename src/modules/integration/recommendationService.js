@@ -14,6 +14,19 @@ import { ALL_NOTES } from '../../data/music-data.js';
 import { getHarmonyAnalyzer } from '../analysis/harmonyAnalyzer.js';
 import { getSavedWeights } from '../config/weightPresets.js';
 
+// Phase 2: Section context support
+import { getCompositionState } from '../state/compositionState.js';
+
+// Phase 2.1: Section intent support
+import {
+    getSectionIntent,
+    getEffectiveSectionContext,
+    getInsertAfterIndex,
+    refreshInsertContext,
+    INTENT_MODES,
+    CONTINUE_SUBMODES
+} from '../state/sectionIntentState.js';
+
 /**
  * RecommendationService Class
  * Manages chord recommendations and notifies listeners of updates
@@ -55,6 +68,40 @@ export class RecommendationService {
         window.addEventListener('keyChanged', () => {
             this.refreshRecommendations();
         });
+
+        // Phase 2: Listen for section changes to update recommendations
+        window.addEventListener('sectionCreated', () => {
+            this.refreshRecommendations();
+        });
+        window.addEventListener('sectionUpdated', () => {
+            this.refreshRecommendations();
+        });
+        window.addEventListener('sectionDeleted', () => {
+            this.refreshRecommendations();
+        });
+        window.addEventListener('chordAddedToSection', () => {
+            this.refreshRecommendations();
+        });
+        window.addEventListener('chordRemovedFromSection', () => {
+            this.refreshRecommendations();
+        });
+        window.addEventListener('sectionsReordered', () => {
+            this.refreshRecommendations();
+        });
+
+        // Phase 2.1: Listen for section intent changes to update recommendations
+        window.addEventListener('sectionIntentChanged', (e) => {
+            this.refreshRecommendations();
+        });
+
+        // Phase 2.1: Listen for chord selection changes
+        // Listen to both event names for compatibility (chordCardSelected is dispatched by selectChordCard)
+        window.addEventListener('chordSelected', () => {
+            this.refreshRecommendations();
+        });
+        window.addEventListener('chordCardSelected', () => {
+            this.refreshRecommendations();
+        });
     }
 
     /**
@@ -72,8 +119,15 @@ export class RecommendationService {
 
         // Phase 2.3: Use comprehensive 3D scoring system for better recommendations
         if (currentProgression && currentProgression.length > 0) {
-            // Get last chord from progression
-            const lastChord = currentProgression[currentProgression.length - 1];
+            // Phase 2.1: Get insert position from section intent
+            // This determines which chord we're inserting after
+            const insertAfterIndex = getInsertAfterIndex();
+            const effectiveIndex = (insertAfterIndex !== null && insertAfterIndex >= 0)
+                ? insertAfterIndex
+                : currentProgression.length - 1;
+
+            // Get the chord we're inserting after (could be different from last chord)
+            const referenceChord = currentProgression[effectiveIndex];
 
             // Get user's recommendation weight settings
             const customWeights = getSavedWeights(true); // true for context mode
@@ -83,11 +137,44 @@ export class RecommendationService {
             const savedMood = localStorage.getItem('chord-suggestion-mood') || 'bright';
             const savedTension = localStorage.getItem('chord-suggestion-tension') || 'resolve';
 
+            // Phase 2: Get section context if available
+            let sectionInfo = null;
+            try {
+                const compositionState = getCompositionState();
+                if (compositionState) {
+                    const sections = compositionState.getSections();
+
+                    // Phase 2.1: Use section intent for context
+                    const sectionIntent = getSectionIntent();
+                    const effectiveSectionContext = getEffectiveSectionContext();
+
+
+                    if (effectiveSectionContext) {
+                        // Use intent-based section context
+                        sectionInfo = {
+                            currentChordIndex: effectiveIndex,
+                            sections: sections || [],
+                            // Phase 2.1: Intent-based context override
+                            intentContext: effectiveSectionContext,
+                            insertAfterIndex: insertAfterIndex
+                        };
+                    } else if (sections && sections.length > 0) {
+                        // Fallback to original section context
+                        sectionInfo = {
+                            currentChordIndex: effectiveIndex,
+                            sections: sections
+                        };
+                    }
+                }
+            } catch (e) {
+                // Section context not available, continue without it
+            }
+
             // Use advanced 3D scoring system with context awareness
             rawRecommendations = generateComprehensiveRecommendations(
-                lastChord.root,
-                lastChord.type,
-                lastChord.inversion || 0,
+                referenceChord.root,
+                referenceChord.type,
+                referenceChord.inversion || 0,
                 currentKey,
                 savedStyle,      // Use user's saved style preference
                 savedMood,       // Use user's saved mood preference
@@ -96,7 +183,9 @@ export class RecommendationService {
                 currentProgression,
                 true,            // contextMode - enables progression pattern analysis
                 4,               // lookbackDepth
-                customWeights    // Use user's saved recommendation weights
+                customWeights,   // Use user's saved recommendation weights
+                true,            // useEnhancedScoring (Phase 1)
+                sectionInfo      // Phase 2: Section context with intent
             );
         } else {
             // Fallback to basic recommendations for empty progression
@@ -168,9 +257,14 @@ export class RecommendationService {
                     styleFit: rec.styleFit || 0,
                     moodFit: rec.moodFit || 0,
                     contextScore: rec.contextScore || 0,
-                    modalInterchangeScore: rec.modalInterchangeScore || 0
+                    modalInterchangeScore: rec.modalInterchangeScore || 0,
+                    // Phase 2: Section-aware scoring
+                    sectionScore: rec.sectionScore || 0
                 },
-                borrowedFrom: rec.borrowedFrom || null
+                borrowedFrom: rec.borrowedFrom || null,
+                // Phase 2: Section context details
+                sectionDetails: rec.sectionDetails || null,
+                sectionReasons: rec.sectionReasons || []
             };
         });
     }

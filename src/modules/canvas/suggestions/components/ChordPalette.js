@@ -1,10 +1,18 @@
 /**
  * Chord Suggestion Palette
  * Specialized palette for chord progression suggestions
+ * Phase 2: Enhanced with Section Intent Selector
  */
 
 import { FloatingPalette } from './FloatingPalette.js';
 import { LayoutConstants } from '../config/SuggestionConfig.js';
+import { SectionIntentSelector } from './SectionIntentSelector.js';
+import {
+    getSectionIntent,
+    refreshInsertContext,
+    needsChordSelection,
+    subscribeToIntentChanges
+} from '../../../state/sectionIntentState.js';
 
 export class ChordPalette extends FloatingPalette {
     constructor(options = {}) {
@@ -12,6 +20,124 @@ export class ChordPalette extends FloatingPalette {
             ...options,
             type: 'chord'
         });
+
+        // Phase 2: Section intent integration
+        this.sectionIntentSelector = null;
+        this.progressionData = options.progressionData || [];
+        this.sections = options.sections || [];
+        this.onIntentChange = options.onIntentChange || (() => {});
+        this.onSelectChordRequest = options.onSelectChordRequest || (() => {});
+
+        // Subscribe to intent changes for real-time updates
+        this.intentUnsubscribe = subscribeToIntentChanges((intent) => {
+            this.handleIntentChange(intent);
+        });
+    }
+
+    /**
+     * Handle section intent changes
+     * @param {Object} intent - New intent state
+     */
+    handleIntentChange(intent) {
+        // Notify parent to refresh recommendations
+        this.onIntentChange(intent);
+    }
+
+    /**
+     * Override applyStyles to use wider palette for section intent selector
+     */
+    applyStyles() {
+        // Use 'expanded' size for chord palette with section intent
+        const width = LayoutConstants.PALETTE_WIDTH.expanded || 400;
+
+        Object.assign(this.element.style, {
+            position: 'absolute',
+            left: `${this.position.x}px`,
+            top: `${this.position.y}px`,
+            width: `${width}px`,
+            minHeight: `${LayoutConstants.PALETTE_MIN_HEIGHT}px`,
+            maxHeight: `${LayoutConstants.PALETTE_MAX_HEIGHT + 100}px`, // Extra height for intent selector
+            backgroundColor: LayoutConstants.COLORS.BACKGROUND,
+            border: `1px solid ${LayoutConstants.COLORS.BORDER}`,
+            borderRadius: `${LayoutConstants.BORDER_RADIUS}px`,
+            boxShadow: LayoutConstants.SHADOW,
+            zIndex: LayoutConstants.Z_INDEX.PALETTE,
+            opacity: '0',
+            transform: 'scale(0.95)',
+            transition: `opacity ${LayoutConstants.ANIMATION.FADE_IN}ms ease-out, transform ${LayoutConstants.ANIMATION.FADE_IN}ms ease-out`,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
+        });
+    }
+
+    /**
+     * Override renderContent to include section intent selector
+     */
+    renderContent() {
+        this.contentElement.innerHTML = '';
+        this.itemElements = [];
+
+        // Header (title + close button)
+        const header = this.createHeader();
+        if (header) {
+            this.contentElement.appendChild(header);
+        }
+
+        // Phase 2: Section Intent Selector (below header, above suggestions)
+        this.sectionIntentSelector = new SectionIntentSelector({
+            progressionData: this.progressionData,
+            onIntentChange: (intent) => {
+                this.onIntentChange(intent);
+            },
+            onSelectChordRequest: (action) => {
+                this.onSelectChordRequest(action);
+            }
+        });
+        this.contentElement.appendChild(this.sectionIntentSelector.getElement());
+
+        // Suggestions list (only show if we don't need selection)
+        if (!needsChordSelection()) {
+            const list = this.createSuggestionsList();
+            this.contentElement.appendChild(list);
+        }
+
+        // Footer (controls, settings)
+        const footer = this.createFooter();
+        if (footer) {
+            this.contentElement.appendChild(footer);
+        }
+    }
+
+    /**
+     * Update palette with new context
+     * @param {Object} options - Update options
+     */
+    updateContext(options = {}) {
+        if (options.progressionData !== undefined) {
+            this.progressionData = options.progressionData;
+        }
+        if (options.sections !== undefined) {
+            this.sections = options.sections;
+        }
+        if (options.suggestions !== undefined) {
+            this.suggestions = options.suggestions;
+        }
+
+        // Refresh the insert context
+        refreshInsertContext(this.sections, this.progressionData.length);
+
+        // Update the selector if it exists
+        if (this.sectionIntentSelector) {
+            this.sectionIntentSelector.update({
+                progressionData: this.progressionData
+            });
+        }
+
+        // Re-render if we have new suggestions
+        if (options.suggestions !== undefined) {
+            this.renderContent();
+        }
     }
 
     /**
@@ -245,5 +371,25 @@ export class ChordPalette extends FloatingPalette {
                 hint?.remove();
             }, 2000);
         }
+    }
+
+    /**
+     * Override dispose to clean up subscriptions
+     */
+    dispose() {
+        // Clean up intent subscription
+        if (this.intentUnsubscribe) {
+            this.intentUnsubscribe();
+            this.intentUnsubscribe = null;
+        }
+
+        // Clean up section intent selector
+        if (this.sectionIntentSelector) {
+            this.sectionIntentSelector.dispose();
+            this.sectionIntentSelector = null;
+        }
+
+        // Call parent dispose
+        super.dispose();
     }
 }

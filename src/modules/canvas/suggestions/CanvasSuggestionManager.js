@@ -1,6 +1,7 @@
 /**
  * Canvas Suggestion Manager
  * Main controller for integrated suggestion system
+ * Phase 2.1: Enhanced with section intent integration
  */
 
 import { FeatureFlags } from './config/FeatureFlags.js';
@@ -10,6 +11,15 @@ import { GhostNoteRenderer } from './GhostNoteRenderer.js';
 import { KeyboardHandler } from './KeyboardHandler.js';
 import { MelodyPalette } from './components/MelodyPalette.js';
 import { ChordPalette } from './components/ChordPalette.js';
+
+// Phase 2.1: Section intent state
+import {
+    refreshInsertContext,
+    getSectionIntent,
+    needsChordSelection,
+    setInsertAfterIndex
+} from '../../state/sectionIntentState.js';
+import { getProgressionData, getSelectedIndicesArray, selectSingle } from '../../state/trainerState.js';
 
 export class CanvasSuggestionManager {
     constructor(options = {}) {
@@ -331,6 +341,21 @@ export class CanvasSuggestionManager {
         // Hide existing chord palette
         this.hidePalette('chord');
 
+        // Phase 2.1: Initialize section intent context
+        const progressionData = getProgressionData();
+        let sections = [];
+        try {
+            const compositionState = window.getCompositionState?.();
+            if (compositionState) {
+                sections = compositionState.getSections() || [];
+            }
+        } catch (e) {
+            console.warn('Could not get sections:', e);
+        }
+
+        // Refresh the insert context based on current selection
+        refreshInsertContext(sections, progressionData.length);
+
         // Get musical context
         const musicalContext = context.musicalContext || this.getMusicalContext(position);
 
@@ -363,14 +388,21 @@ export class CanvasSuggestionManager {
 
         console.log('Using direct position (bypassing SmartPositioner):', palettePosition);
 
-        // Create and show palette
+        // Create and show palette with section intent integration
         const palette = new ChordPalette({
             position: palettePosition,
             suggestions,
             config: this.config,
+            // Phase 2.1: Pass progression and section data
+            progressionData: progressionData,
+            sections: sections,
             onSelect: (suggestion, index) => this.handleChordSuggestionSelect(suggestion, index),
             onPreview: (suggestion, index) => this.handleChordSuggestionPreview(suggestion, index),
-            onDismiss: () => this.hidePalette('chord')
+            onDismiss: () => this.hidePalette('chord'),
+            // Phase 2.1: Intent change handler
+            onIntentChange: (intent) => this.handleSectionIntentChange(intent),
+            // Phase 2.1: Selection request handler
+            onSelectChordRequest: (action) => this.handleSelectChordRequest(action)
         });
 
         // Add mood/style change handlers
@@ -384,6 +416,50 @@ export class CanvasSuggestionManager {
         window.dispatchEvent(new CustomEvent(SuggestionEvents.PALETTE_OPENED, {
             detail: { type: 'chord', position: palettePosition }
         }));
+    }
+
+    /**
+     * Phase 2.1: Handle section intent changes from the palette
+     * @param {Object} intent - New intent state
+     */
+    handleSectionIntentChange(intent) {
+        console.log('[CanvasSuggestionManager] Section intent changed:', intent);
+        // Refresh recommendations with new intent
+        // The recommendationService listens for sectionIntentChanged events
+    }
+
+    /**
+     * Phase 2.1: Handle chord selection requests from the palette
+     * @param {string} action - 'last' to select last chord, 'cancel' to dismiss
+     */
+    handleSelectChordRequest(action) {
+        if (action === 'last') {
+            // Select the last chord in the progression
+            const progressionData = getProgressionData();
+            if (progressionData.length > 0) {
+                const lastIndex = progressionData.length - 1;
+                selectSingle(lastIndex);
+                setInsertAfterIndex(lastIndex);
+
+                // Refresh the palette to show normal UI
+                const palette = this.activePalettes.get('chord');
+                if (palette) {
+                    const sections = window.getCompositionState?.()?.getSections() || [];
+                    refreshInsertContext(sections, progressionData.length);
+                    palette.updateContext({
+                        progressionData: progressionData,
+                        sections: sections
+                    });
+                }
+
+                // Dispatch selection event
+                window.dispatchEvent(new CustomEvent('chordSelected', {
+                    detail: { index: lastIndex }
+                }));
+            }
+        } else if (action === 'cancel') {
+            this.hidePalette('chord');
+        }
     }
 
     /**
