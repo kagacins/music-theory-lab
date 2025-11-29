@@ -122,10 +122,10 @@ const CHORD_INTERVALS = {
     'Diminished 7th': [0, 3, 6, 9],
     'Minor-Major 7th': [0, 3, 7, 11],
     'Augmented 7th': [0, 4, 8, 10],
-    'Suspended 2nd': [0, 2, 7],
-    'Suspended 4th': [0, 5, 7],
-    'Add 9': [0, 2, 4, 7],
-    '6th': [0, 4, 7, 9],
+    'Sus2': [0, 2, 7],
+    'Sus4': [0, 5, 7],
+    'Add9': [0, 2, 4, 7],
+    'Major 6th': [0, 4, 7, 9],
     'Minor 6th': [0, 3, 7, 9],
     '9th': [0, 4, 7, 10, 14],
     'Major 9th': [0, 4, 7, 11, 14],
@@ -139,7 +139,7 @@ const CHORD_INTERVALS = {
 // Style-specific scoring rules
 // -----------------------------------------------------------------------------
 
-const STYLE_RULES = {
+export const STYLE_RULES = {
     any: {
         chordToneBoost: 1.0,
         scaleToneBoost: 1.0,

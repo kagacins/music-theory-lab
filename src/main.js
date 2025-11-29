@@ -29,6 +29,7 @@ import { initPresetUI, togglePresetPanel, openPresetPanel, closePresetPanel } fr
 import { initUnifiedSuggestionsPanel, updateUnifiedSuggestions } from './modules/ui/unifiedSuggestionsPanel.js';
 import { openManualChordEntryModal, closeManualChordEntryModal } from './modules/ui/manualChordEntryModal.js';
 import { showAutoHarmonizeModal } from './modules/ui/autoHarmonizeModal.js';
+import { showTensionOptimizerModal } from './modules/ui/tensionOptimizerModal.js';
 import { initCircleOfFifths, toggleCircleOfFifthsPanel, openCircleOfFifthsPanel, closeCircleOfFifthsPanel } from './modules/features/circleOfFifths.js';
 import { initGuitarFretboard, toggleGuitarFretboardPanel, openGuitarFretboardPanel, closeGuitarFretboardPanel, updateGuitarFretboard } from './modules/features/guitarFretboard.js';
 import {
@@ -2057,17 +2058,43 @@ window.showAutoHarmonize = function() {
             }
 
             // Update the trainer state with the modified progression data
+            // NOTE: setProgressionData also calls syncWithProgressionData internally,
+            // but the _isSyncing guard prevents double-processing
             if (window.setProgressionData) {
                 window.setProgressionData(progressionData);
             }
 
-            // Force immediate render without delay
-            if (window.getNotationComposer) {
-                const notationComposer = window.getNotationComposer();
-                if (notationComposer && typeof notationComposer.render === 'function') {
-                    notationComposer.render(true);
-                }
+            // Invalidate caches to ensure fresh data on next access
+            invalidateProgressionDataCache();
+
+            // Update chord card display to show new chords
+            if (typeof renderProgressionDisplay === 'function') {
+                renderProgressionDisplay();
             }
+
+            // Force immediate render with a small delay to ensure state is fully updated
+            // Use the SAME approach as chord card changes:
+            // 1. syncProgressionToMelodyComposer() - syncs trainerState to compositionState
+            // 2. refreshNotationFromProgression() - renders from compositionState
+            setTimeout(() => {
+                // CRITICAL: Sync progression to compositionState first (same as chord card changes)
+                if (window.syncProgressionToMelodyComposer) {
+                    window.syncProgressionToMelodyComposer();
+                }
+
+                // Then refresh notation from the synced state
+                if (window.refreshNotationFromProgression) {
+                    window.refreshNotationFromProgression();
+                } else {
+                    // Fallback to direct render if refreshNotationFromProgression not available
+                    if (window.getNotationComposer) {
+                        const notationComposer = window.getNotationComposer();
+                        if (notationComposer && typeof notationComposer.render === 'function') {
+                            notationComposer.render(true);
+                        }
+                    }
+                }
+            }, 50);
 
             // Make sure we stay on the Melody Composer tab
             if (window.switchTab) {
@@ -2110,6 +2137,14 @@ window.startStepMeasureMelody = startStepMeasureMelody;
 window.stopStepMeasureMelody = stopStepMeasureMelody;
 window.setMelodyClef = setMelodyClef;
 window.setChordClef = setChordClef;
+
+/**
+ * Show the Tension Optimizer modal
+ * Optimizes chord inversions and suggests extensions to match target tension curve
+ */
+window.showTensionOptimizer = function() {
+    showTensionOptimizerModal();
+};
 window.toggleMelodyHighlight = function(enabled) {
     setHighlightEnabled(enabled);
     // Re-render the notation to show/hide highlighting
@@ -3235,30 +3270,37 @@ window.onTrebleNoteSelectionChanged = function(trebleNoteIds) {
 let currentSuggestionMode = 'chords';
 
 /**
- * Switch between Chords and Melody suggestion modes
- * @param {string} mode - 'chords' or 'melody'
+ * Switch between Chords, Melody, and Generate suggestion modes
+ * @param {string} mode - 'chords', 'melody', or 'generate'
  */
 window.switchSuggestionMode = function(mode) {
-    if (mode !== 'chords' && mode !== 'melody') return;
+    if (mode !== 'chords' && mode !== 'melody' && mode !== 'generate') return;
 
     currentSuggestionMode = mode;
 
     // Update floating panel toggle buttons
     const chordsBtn = document.getElementById('suggestions-mode-chords');
     const melodyBtn = document.getElementById('suggestions-mode-melody');
+    const generateBtn = document.getElementById('suggestions-mode-generate');
 
-    if (chordsBtn && melodyBtn) {
-        chordsBtn.classList.toggle('active', mode === 'chords');
-        melodyBtn.classList.toggle('active', mode === 'melody');
-    }
+    if (chordsBtn) chordsBtn.classList.toggle('active', mode === 'chords');
+    if (melodyBtn) melodyBtn.classList.toggle('active', mode === 'melody');
+    if (generateBtn) generateBtn.classList.toggle('active', mode === 'generate');
 
     // Show/hide sections
     const chordsSection = document.getElementById('chord-suggestions-section');
     const melodySection = document.getElementById('melody-suggestions-section');
+    const generateSection = document.getElementById('generate-suggestions-section');
 
-    if (chordsSection && melodySection) {
-        chordsSection.classList.toggle('hidden', mode !== 'chords');
-        melodySection.classList.toggle('hidden', mode !== 'melody');
+    if (chordsSection) chordsSection.classList.toggle('hidden', mode !== 'chords');
+    if (melodySection) melodySection.classList.toggle('hidden', mode !== 'melody');
+    if (generateSection) generateSection.classList.toggle('hidden', mode !== 'generate');
+
+    // Refresh Generate tab UI when switching to generate mode
+    if (mode === 'generate') {
+        import('./modules/ui/generateTabUI.js').then(module => {
+            module.refreshUI();
+        });
     }
 };
 
@@ -3269,6 +3311,84 @@ window.switchSuggestionMode = function(mode) {
 window.getCurrentSuggestionMode = function() {
     return currentSuggestionMode;
 };
+
+// ===========================
+// GENERATED SECTION APPLICATION
+// ===========================
+
+/**
+ * Handle applying a generated section to the composition
+ * Listens for the 'applyGeneratedSection' event from generateTabUI
+ */
+window.addEventListener('applyGeneratedSection', async (event) => {
+    const { progression, sectionType, style } = event.detail;
+
+    if (!progression || !Array.isArray(progression) || progression.length === 0) {
+        return;
+    }
+
+    // Get current progression length before adding (to know indices of new chords)
+    let startIndex = 0;
+    try {
+        const compositionState = getCompositionState();
+        if (compositionState) {
+            const currentChords = compositionState.exportToProgressionData();
+            startIndex = currentChords ? currentChords.length : 0;
+        }
+    } catch (e) {
+        // Fall back to trainer state
+        const trainerProgression = getProgressionData();
+        startIndex = trainerProgression ? trainerProgression.length : 0;
+    }
+
+    // Import the chordBuilder module to add chords
+    const chordBuilder = await import('./modules/features/chordBuilder.js');
+
+    // Add each chord in the progression
+    for (let i = 0; i < progression.length; i++) {
+        const chord = progression[i];
+        const root = chord.root;
+        const type = chord.type || 'Major';
+        const inversion = chord.inversion || 0;
+
+        // Set the builder root note first
+        const rootIndex = ALL_NOTES.indexOf(root);
+        if (rootIndex !== -1) {
+            chordBuilder.selectBuilderRootNote(rootIndex, false); // Don't play audio
+        }
+
+        // Add the chord (no shutter sound for batch operations except first)
+        const playSound = (i === 0);
+        chordBuilder.addSpecificChordToProgression(type, inversion, playSound, root);
+    }
+
+    // Create a section group for the newly added chords
+    try {
+        const compositionState = getCompositionState();
+
+        if (compositionState && sectionType) {
+            // Calculate indices of the newly added chords
+            const newChordIndices = [];
+            for (let i = 0; i < progression.length; i++) {
+                newChordIndices.push(startIndex + i);
+            }
+
+            // Create the section with the new chord indices
+            compositionState.createSection(sectionType, newChordIndices);
+        }
+    } catch (e) {
+        console.warn('Could not create section group:', e);
+    }
+
+    // Dispatch event to notify other components
+    window.dispatchEvent(new CustomEvent('progressionUpdated'));
+
+    // Refresh the progression display to show the new section grouping
+    if (window.renderProgressionDisplay) {
+        window.renderProgressionDisplay('progression-visualization', true);
+        window.renderProgressionDisplay('melody-progression-visualization', false);
+    }
+});
 
 /**
  * Open the suggestion weights modal to the appropriate tab based on current mode

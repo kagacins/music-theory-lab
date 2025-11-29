@@ -62,20 +62,20 @@ export function getProgressionData() {
     if (window.getCompositionState) {
         const compositionState = window.getCompositionState();
         if (!compositionState) return [];
-        
+
         // Check if measures have changed by comparing length and a simple hash
         const currentMeasuresLength = compositionState.measures?.length || 0;
         const currentMeasuresHash = generateMeasuresHash(compositionState.measures);
-        
+
         // Only re-export if measures have changed
-        if (cachedProgressionData === null || 
+        if (cachedProgressionData === null ||
             cachedMeasuresLength !== currentMeasuresLength ||
             cachedMeasuresHash !== currentMeasuresHash) {
             cachedProgressionData = compositionState.exportToProgressionData();
             cachedMeasuresLength = currentMeasuresLength;
             cachedMeasuresHash = currentMeasuresHash;
         }
-        
+
         return cachedProgressionData;
     }
     return [];

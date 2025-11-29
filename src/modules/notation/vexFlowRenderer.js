@@ -134,11 +134,11 @@ export const KEY_SIGNATURES = {
 /**
  * Comfortable note ranges for each clef (MIDI numbers)
  * Notes outside these ranges will get octave shift indicators (8va, 8vb, etc.)
- * PHASE 1.4+: Adjusted thresholds - 8va starts at E6 (88), 8vb starts at E3 (52)
+ * PHASE 1.4+: Adjusted thresholds - 8va starts at E6 (88), 8vb starts below F3 (includes E3)
  */
 export const CLEF_RANGES = {
   treble: {
-    min: 52,    // E3 - notes below get 8vb
+    min: 53,    // F3 - notes at E3 (52) and below get 8vb
     max: 87,    // D#6 - notes at E6 (88) and above get 8va
     min16: 40,  // E2 - notes below get 16vb (two octaves)
     max16: 99,  // D#7 - notes at E7 (100) and above get 16va (two octaves)

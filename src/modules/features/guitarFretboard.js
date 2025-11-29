@@ -45,11 +45,11 @@ const GUITAR_CHORD_FINGERINGS = {
             { name: 'Cm7 (3rd fret)', positions: [3, 3, 5, 3, 4, 3], rootFret: 3 },
             { name: 'Cm7 (8th fret)', positions: [8, 8, 10, 8, 9, 8], rootFret: 8 }
         ],
-        'Suspended 2nd': [
+        'Sus2': [
             { name: 'Csus2 Open', positions: [-1, 3, 0, 0, 1, 3], rootFret: 0 },
             { name: 'Csus2 (3rd fret)', positions: [3, 3, 5, 5, 3, 3], rootFret: 3 }
         ],
-        'Suspended 4th': [
+        'Sus4': [
             { name: 'Csus4 Open', positions: [-1, 3, 3, 0, 1, 1], rootFret: 0 },
             { name: 'Csus4 (3rd fret)', positions: [3, 3, 5, 5, 6, 3], rootFret: 3 }
         ],
@@ -61,7 +61,7 @@ const GUITAR_CHORD_FINGERINGS = {
             { name: 'Caug Open', positions: [-1, 3, 2, 1, 1, 0], rootFret: 0 },
             { name: 'Caug (4th fret)', positions: [4, 4, 6, 5, 5, 4], rootFret: 4 }
         ],
-        '6th': [
+        'Major 6th': [
             { name: 'C6 Open', positions: [-1, 3, 2, 2, 1, 0], rootFret: 0 },
             { name: 'C6 (8th fret)', positions: [8, 8, 10, 10, 10, 10], rootFret: 8 }
         ],
@@ -78,7 +78,7 @@ const GUITAR_CHORD_FINGERINGS = {
         'Major 9th': [
             { name: 'Cmaj9 (3rd fret)', positions: [3, 3, 2, 4, 3, 3], rootFret: 3 }
         ],
-        'Add 9': [
+        'Add9': [
             { name: 'Cadd9 Open', positions: [-1, 3, 2, 0, 3, 0], rootFret: 0 },
             { name: 'Cadd9 (3rd fret)', positions: [3, 3, 5, 5, 3, 3], rootFret: 3 }
         ],
@@ -123,11 +123,11 @@ const GUITAR_CHORD_FINGERINGS = {
             { name: 'Dm7 Open', positions: [-1, -1, 0, 2, 1, 1], rootFret: 0 },
             { name: 'Dm7 (5th fret)', positions: [5, 5, 7, 5, 6, 5], rootFret: 5 }
         ],
-        'Suspended 2nd': [
+        'Sus2': [
             { name: 'Dsus2 Open', positions: [-1, -1, 0, 2, 3, 0], rootFret: 0 },
             { name: 'Dsus2 (5th fret)', positions: [5, 5, 7, 7, 5, 5], rootFret: 5 }
         ],
-        'Suspended 4th': [
+        'Sus4': [
             { name: 'Dsus4 Open', positions: [-1, -1, 0, 2, 3, 3], rootFret: 0 },
             { name: 'Dsus4 (5th fret)', positions: [5, 5, 7, 7, 8, 5], rootFret: 5 }
         ],
@@ -139,11 +139,11 @@ const GUITAR_CHORD_FINGERINGS = {
             { name: 'Daug (5th fret)', positions: [5, 5, 7, 6, 6, 5], rootFret: 5 },
             { name: 'Daug (10th fret)', positions: [10, 10, 12, 11, 11, 10], rootFret: 10 }
         ],
-        '6th': [
+        'Major 6th': [
             { name: 'D6 Open', positions: [-1, -1, 0, 2, 0, 2], rootFret: 0 },
             { name: 'D6 (5th fret)', positions: [5, 5, 7, 7, 7, 7], rootFret: 5 }
         ],
-        'Add 9': [
+        'Add9': [
             { name: 'Dadd9 Open', positions: [-1, -1, 0, 2, 3, 5], rootFret: 0 },
             { name: 'Dadd9 (5th fret)', positions: [5, 5, 7, 7, 5, 5], rootFret: 5 }
         ],
@@ -179,11 +179,11 @@ const GUITAR_CHORD_FINGERINGS = {
             { name: 'Em7 Open', positions: [0, 2, 0, 0, 0, 0], rootFret: 0 },
             { name: 'Em7 (7th fret)', positions: [7, 7, 9, 7, 8, 7], rootFret: 7 }
         ],
-        'Suspended 2nd': [
+        'Sus2': [
             { name: 'Esus2 Open', positions: [0, 2, 2, 2, 0, 0], rootFret: 0 },
             { name: 'Esus2 (7th fret)', positions: [7, 7, 9, 9, 7, 7], rootFret: 7 }
         ],
-        'Suspended 4th': [
+        'Sus4': [
             { name: 'Esus4 Open', positions: [0, 2, 2, 2, 0, 0], rootFret: 0 },
             { name: 'Esus4 (7th fret)', positions: [7, 7, 9, 9, 10, 7], rootFret: 7 }
         ],
@@ -195,11 +195,11 @@ const GUITAR_CHORD_FINGERINGS = {
             { name: 'Eaug Open', positions: [0, 2, 2, 1, 1, 0], rootFret: 0 },
             { name: 'Eaug (8th fret)', positions: [8, 8, 10, 9, 9, 8], rootFret: 8 }
         ],
-        '6th': [
+        'Major 6th': [
             { name: 'E6 Open', positions: [0, 2, 2, 1, 2, 0], rootFret: 0 },
             { name: 'E6 (7th fret)', positions: [7, 7, 9, 9, 9, 9], rootFret: 7 }
         ],
-        'Add 9': [
+        'Add9': [
             { name: 'Eadd9 Open', positions: [0, 2, 2, 1, 2, 0], rootFret: 0 },
             { name: 'Eadd9 (7th fret)', positions: [7, 7, 9, 9, 7, 7], rootFret: 7 }
         ],
@@ -235,11 +235,11 @@ const GUITAR_CHORD_FINGERINGS = {
             { name: 'Fm7 Barre (1st fret)', positions: [1, 3, 1, 1, 1, 1], rootFret: 1 },
             { name: 'Fm7 (8th fret)', positions: [8, 8, 10, 8, 9, 8], rootFret: 8 }
         ],
-        'Suspended 2nd': [
+        'Sus2': [
             { name: 'Fsus2 Barre (1st fret)', positions: [1, 3, 3, 3, 1, 1], rootFret: 1 },
             { name: 'Fsus2 (8th fret)', positions: [8, 8, 10, 10, 8, 8], rootFret: 8 }
         ],
-        'Suspended 4th': [
+        'Sus4': [
             { name: 'Fsus4 Barre (1st fret)', positions: [1, 3, 3, 3, 4, 1], rootFret: 1 },
             { name: 'Fsus4 (8th fret)', positions: [8, 8, 10, 10, 11, 8], rootFret: 8 }
         ],
@@ -251,11 +251,11 @@ const GUITAR_CHORD_FINGERINGS = {
             { name: 'Faug Barre (1st fret)', positions: [1, 3, 3, 2, 2, 1], rootFret: 1 },
             { name: 'Faug (9th fret)', positions: [9, 9, 11, 10, 10, 9], rootFret: 9 }
         ],
-        '6th': [
+        'Major 6th': [
             { name: 'F6 Barre (1st fret)', positions: [1, 3, 3, 2, 3, 1], rootFret: 1 },
             { name: 'F6 (8th fret)', positions: [8, 8, 10, 10, 10, 10], rootFret: 8 }
         ],
-        'Add 9': [
+        'Add9': [
             { name: 'Fadd9 Barre (1st fret)', positions: [1, 3, 3, 2, 3, 1], rootFret: 1 },
             { name: 'Fadd9 (8th fret)', positions: [8, 8, 10, 10, 8, 8], rootFret: 8 }
         ],
@@ -293,11 +293,11 @@ const GUITAR_CHORD_FINGERINGS = {
             { name: 'Gm7 (3rd fret)', positions: [3, 3, 5, 3, 4, 3], rootFret: 3 },
             { name: 'Gm7 (10th fret)', positions: [10, 10, 12, 10, 11, 10], rootFret: 10 }
         ],
-        'Suspended 2nd': [
+        'Sus2': [
             { name: 'Gsus2 Open', positions: [3, 0, 0, 0, 3, 3], rootFret: 0 },
             { name: 'Gsus2 (3rd fret)', positions: [3, 3, 5, 5, 3, 3], rootFret: 3 }
         ],
-        'Suspended 4th': [
+        'Sus4': [
             { name: 'Gsus4 Open', positions: [3, 3, 0, 0, 3, 3], rootFret: 0 },
             { name: 'Gsus4 (3rd fret)', positions: [3, 3, 5, 5, 6, 3], rootFret: 3 }
         ],
@@ -308,10 +308,10 @@ const GUITAR_CHORD_FINGERINGS = {
             { name: 'Gaug Open', positions: [3, 2, 1, 0, 0, 3], rootFret: 0 },
             { name: 'Gaug (4th fret)', positions: [4, 4, 6, 5, 5, 4], rootFret: 4 }
         ],
-        '6th': [
+        'Major 6th': [
             { name: 'G6 Open', positions: [3, 2, 0, 0, 0, 0], rootFret: 0 }
         ],
-        'Add 9': [
+        'Add9': [
             { name: 'Gadd9 Open', positions: [3, 0, 0, 0, 0, 3], rootFret: 0 },
             { name: 'Gadd9 (3rd fret)', positions: [3, 3, 5, 5, 3, 3], rootFret: 3 }
         ],
@@ -347,11 +347,11 @@ const GUITAR_CHORD_FINGERINGS = {
             { name: 'Am7 Open', positions: [0, 0, 2, 0, 1, 0], rootFret: 0 },
             { name: 'Am7 (5th fret)', positions: [5, 5, 7, 5, 6, 5], rootFret: 5 }
         ],
-        'Suspended 2nd': [
+        'Sus2': [
             { name: 'Asus2 Open', positions: [0, 0, 2, 2, 0, 0], rootFret: 0 },
             { name: 'Asus2 (5th fret)', positions: [5, 5, 7, 7, 5, 5], rootFret: 5 }
         ],
-        'Suspended 4th': [
+        'Sus4': [
             { name: 'Asus4 Open', positions: [0, 0, 2, 2, 3, 0], rootFret: 0 },
             { name: 'Asus4 (5th fret)', positions: [5, 5, 7, 7, 8, 5], rootFret: 5 }
         ],
@@ -362,10 +362,10 @@ const GUITAR_CHORD_FINGERINGS = {
             { name: 'Aaug Open', positions: [0, 0, 2, 1, 1, 0], rootFret: 0 },
             { name: 'Aaug (6th fret)', positions: [6, 6, 8, 7, 7, 6], rootFret: 6 }
         ],
-        '6th': [
+        'Major 6th': [
             { name: 'A6 Open', positions: [0, 0, 2, 2, 2, 2], rootFret: 0 }
         ],
-        'Add 9': [
+        'Add9': [
             { name: 'Aadd9 Open', positions: [0, 0, 2, 4, 2, 0], rootFret: 0 },
             { name: 'Aadd9 (5th fret)', positions: [5, 5, 7, 7, 5, 5], rootFret: 5 }
         ],
@@ -401,11 +401,11 @@ const GUITAR_CHORD_FINGERINGS = {
             { name: 'Bm7 Barre (2nd fret)', positions: [2, 2, 4, 2, 3, 2], rootFret: 2 },
             { name: 'Bm7 (7th fret)', positions: [7, 7, 9, 7, 8, 7], rootFret: 7 }
         ],
-        'Suspended 2nd': [
+        'Sus2': [
             { name: 'Bsus2 Barre (2nd fret)', positions: [2, 2, 4, 4, 2, 2], rootFret: 2 },
             { name: 'Bsus2 (7th fret)', positions: [7, 7, 9, 9, 7, 7], rootFret: 7 }
         ],
-        'Suspended 4th': [
+        'Sus4': [
             { name: 'Bsus4 Barre (2nd fret)', positions: [2, 2, 4, 4, 5, 2], rootFret: 2 },
             { name: 'Bsus4 (7th fret)', positions: [7, 7, 9, 9, 10, 7], rootFret: 7 }
         ],
@@ -417,11 +417,11 @@ const GUITAR_CHORD_FINGERINGS = {
             { name: 'Baug Barre (2nd fret)', positions: [2, 2, 4, 3, 3, 2], rootFret: 2 },
             { name: 'Baug (8th fret)', positions: [8, 8, 10, 9, 9, 8], rootFret: 8 }
         ],
-        '6th': [
+        'Major 6th': [
             { name: 'B6 Barre (2nd fret)', positions: [2, 2, 4, 4, 4, 4], rootFret: 2 },
             { name: 'B6 (7th fret)', positions: [7, 7, 9, 9, 9, 9], rootFret: 7 }
         ],
-        'Add 9': [
+        'Add9': [
             { name: 'Badd9 Barre (2nd fret)', positions: [2, 2, 4, 4, 2, 2], rootFret: 2 },
             { name: 'Badd9 (7th fret)', positions: [7, 7, 9, 9, 7, 7], rootFret: 7 }
         ],
@@ -464,20 +464,20 @@ function getChordFingerings(rootNote, chordType) {
         'm7': 'Minor 7th',
         'Min7': 'Minor 7th',
         'min7': 'Minor 7th',
-        'Sus2': 'Suspended 2nd',
-        'sus2': 'Suspended 2nd',
-        'Sus4': 'Suspended 4th',
-        'sus4': 'Suspended 4th',
+        'Sus2': 'Sus2',
+        'sus2': 'Sus2',
+        'Sus4': 'Sus4',
+        'sus4': 'Sus4',
         'Diminished': 'Diminished',
         'dim': 'Diminished',
         'Augmented': 'Augmented',
         'aug': 'Augmented',
-        'Major 6th': '6th',
-        '6': '6th',
+        'Major 6th': 'Major 6th',
+        '6': 'Major 6th',
         'Minor 6th': 'Minor 6th',
         'm6': 'Minor 6th',
-        'Add9': 'Add 9',
-        'add9': 'Add 9',
+        'Add9': 'Add9',
+        'add9': 'Add9',
         'Half-Diminished 7th': 'Half-Diminished 7th',
         'm7b5': 'Half-Diminished 7th',
         'Diminished 7th': 'Diminished 7th',

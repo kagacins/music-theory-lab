@@ -477,7 +477,7 @@ export class ResolutionExpectationTracker {
         }
 
         // Suspended chords expect resolution
-        if (chord.type === 'Suspended 4th') {
+        if (chord.type === 'Sus4') {
             expectations.push({
                 type: 'suspension_resolution',
                 strength: 0.7,
@@ -489,7 +489,7 @@ export class ResolutionExpectationTracker {
             });
         }
 
-        if (chord.type === 'Suspended 2nd') {
+        if (chord.type === 'Sus2') {
             expectations.push({
                 type: 'suspension_resolution',
                 strength: 0.6,

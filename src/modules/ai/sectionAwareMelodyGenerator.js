@@ -216,6 +216,8 @@ export function getSectionMelodyProfile(sectionType) {
  * @param {string} options.previousNote - Last note for voice leading
  * @param {string} options.styleId - Style preset (pop, jazz, etc.)
  * @param {number} options.octave - Base octave
+ * @param {number} options.range - Melodic range in semitones
+ * @param {number} options.densityMultiplier - Note density multiplier (0.5-1.5)
  * @param {Object} options.overrides - Optional overrides for any profile setting
  * @param {Array} options.chordSequence - Optional chord sequence for multi-chord phrases
  * @returns {Object} Generated phrase with section-aware scoring
@@ -228,6 +230,8 @@ export function generateSectionAwarePhrase({
     previousNote = null,
     styleId = 'any',
     octave = 4,
+    range = 12,
+    densityMultiplier = 1.0,
     overrides = {},
     chordSequence = null
 } = {}) {
@@ -242,7 +246,7 @@ export function generateSectionAwarePhrase({
         previousNote,
 
         // Contour selection based on section
-        contourId: selectContourForSection(melodyProfile, sectionPosition),
+        contourId: overrides.contourId || selectContourForSection(melodyProfile, sectionPosition),
 
         // Phrase length based on section
         lengthId: overrides.lengthId || melodyProfile.phraseLengthPreference,
@@ -250,11 +254,16 @@ export function generateSectionAwarePhrase({
         // Rhythm pattern based on section
         rhythmId: overrides.rhythmId || melodyProfile.rhythmPreference,
 
-        // Octave with section offset
+        // Octave with section offset (use provided octave as base)
         octave: octave + (overrides.octaveOffset ?? melodyProfile.octaveOffset),
 
-        // Range with section multiplier
-        range: Math.round(12 * (overrides.rangeMultiplier ?? melodyProfile.rangeMultiplier)),
+        // Range: use provided range, optionally adjusted by section multiplier
+        range: overrides.rangeMultiplier
+            ? Math.round(range * overrides.rangeMultiplier)
+            : Math.round(range * melodyProfile.rangeMultiplier),
+
+        // Note density multiplier
+        densityMultiplier: densityMultiplier * (melodyProfile.melodicDensity || 1.0),
 
         // Chord sequence for multi-chord awareness
         chordSequence
@@ -320,23 +329,39 @@ function selectContourForSection(melodyProfile, sectionPosition) {
 
 /**
  * Apply section-specific post-processing to phrase
+ * Note: This function respects the user's density setting passed through the phrase context.
+ * Embellishment (which adds notes and shortens rhythm) is skipped for sparse settings.
  */
 function applySectionProcessing(phrase, melodyProfile, sectionPosition) {
     let processedPhrase = { ...phrase };
 
-    // Apply embellishment based on profile
-    if (Math.random() < melodyProfile.embellishmentLevel) {
+    // Get user's density multiplier from phrase context (if available)
+    // If user explicitly chose sparse (< 0.7), skip embellishment entirely
+    const userDensity = phrase.context?.densityMultiplier || 1.0;
+    const isSparse = userDensity < 0.7;
+    const isDense = userDensity > 1.3;
+
+    // Apply embellishment based on profile, BUT skip if user chose sparse
+    // Embellishment adds notes and shortens rhythm, which contradicts sparse intent
+    if (!isSparse && Math.random() < melodyProfile.embellishmentLevel) {
         processedPhrase = createPhraseVariation(processedPhrase, 'embellish');
     }
 
-    // For low density sections, potentially simplify
-    if (melodyProfile.melodicDensity < 0.4 && Math.random() > melodyProfile.melodicDensity) {
+    // For low density SECTIONS (not user settings), potentially simplify
+    // Note: User's sparse setting already reduces note count via densityMultiplier,
+    // so we don't want to double-reduce. Only apply simplify based on section profile.
+    if (!isSparse && melodyProfile.melodicDensity < 0.4 && Math.random() < 0.4) {
         processedPhrase = createPhraseVariation(processedPhrase, 'simplify');
+    }
+
+    // For dense settings, potentially add embellishment even if section doesn't call for it
+    if (isDense && !processedPhrase.variationType && Math.random() < 0.3) {
+        processedPhrase = createPhraseVariation(processedPhrase, 'embellish');
     }
 
     // Ensure strong resolution at section ends if required
     if (sectionPosition === 'end' && melodyProfile.resolutionStrength > 0.7) {
-        processedPhrase = ensureResolution(processedPhrase, phrase.context.chord);
+        processedPhrase = ensureResolution(processedPhrase, phrase.context?.chord || phrase.chord);
     }
 
     return processedPhrase;
@@ -424,17 +449,37 @@ export function generateSectionAwareCandidates(options, count = 5) {
         candidates.push(generateSectionAwarePhrase(options));
     }
 
-    // Score candidates for section appropriateness
-    const scoredCandidates = candidates.map(candidate => ({
-        ...candidate,
-        sectionScore: calculateSectionScore(candidate, melodyProfile, options.sectionPosition)
-    }));
+    // Score candidates for section appropriateness and calculate combined score
+    const scoredCandidates = candidates.map(candidate => {
+        const sectionScore = calculateSectionScore(candidate, melodyProfile, options.sectionPosition);
+        // Combined score is what determines ranking
+        const combinedScore = candidate.phraseScore * 0.6 + sectionScore * 0.4;
+        return {
+            ...candidate,
+            sectionScore,
+            rawCombinedScore: combinedScore  // Store raw combined score for sorting
+        };
+    });
 
     // Sort by combined score (phrase quality + section appropriateness)
-    scoredCandidates.sort((a, b) => {
-        const aTotal = a.phraseScore * 0.6 + a.sectionScore * 0.4;
-        const bTotal = b.phraseScore * 0.6 + b.sectionScore * 0.4;
-        return bTotal - aTotal;
+    scoredCandidates.sort((a, b) => b.rawCombinedScore - a.rawCombinedScore);
+
+    // Normalize the COMBINED score to 0-100% range (this is what's displayed)
+    const rawScores = scoredCandidates.map(c => c.rawCombinedScore);
+    const minScore = Math.min(...rawScores);
+    const maxScore = Math.max(...rawScores);
+    const scoreRange = maxScore - minScore;
+
+    // Normalize scores: highest = 100%, lowest = 10% (to show they still have value)
+    scoredCandidates.forEach(c => {
+        if (scoreRange > 0) {
+            // Linear interpolation: lowest gets 10%, highest gets 100%
+            const normalized = ((c.rawCombinedScore - minScore) / scoreRange) * 90 + 10;
+            c.phraseScore = Math.round(normalized);
+        } else {
+            // All scores are the same - set to a reasonable middle value
+            c.phraseScore = 75;
+        }
     });
 
     // Add rank

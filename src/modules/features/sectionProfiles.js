@@ -23,7 +23,7 @@ export const SECTION_PROFILES = {
         chordPreferences: {
             // Prefer stable, key-establishing chords
             preferredFunctions: ['tonic', 'dominant'],
-            preferredTypes: ['Major', 'Minor', 'Suspended 4th', 'Add9'],
+            preferredTypes: ['Major', 'Minor', 'Sus4', 'Add9'],
             avoidTypes: ['Diminished', 'Augmented', 'Diminished 7th'],
             inversionBias: 0,                 // Prefer root position for clarity
             modalInterchangeBias: 0.3         // Low - keep it stable
@@ -68,7 +68,7 @@ export const SECTION_PROFILES = {
         },
         chordPreferences: {
             preferredFunctions: ['tonic', 'subdominant', 'dominant'],
-            preferredTypes: ['Major', 'Minor', 'Minor 7th', 'Major 7th', 'Suspended 4th'],
+            preferredTypes: ['Major', 'Minor', 'Minor 7th', 'Major 7th', 'Sus4'],
             avoidTypes: ['Augmented', 'Diminished 7th'],
             inversionBias: 0.3,               // Some inversions OK
             modalInterchangeBias: 0.5         // Moderate borrowing OK
@@ -108,7 +108,7 @@ export const SECTION_PROFILES = {
         },
         chordPreferences: {
             preferredFunctions: ['subdominant', 'dominant'],
-            preferredTypes: ['Minor', 'Major', 'Dominant 7th', 'Suspended 4th', 'Minor 7th'],
+            preferredTypes: ['Minor', 'Major', 'Dominant 7th', 'Sus4', 'Minor 7th'],
             avoidTypes: ['Major 7th'],         // Too resolved
             inversionBias: 0.4,
             modalInterchangeBias: 0.7          // Good place for borrowed chords
@@ -145,7 +145,7 @@ export const SECTION_PROFILES = {
         },
         chordPreferences: {
             preferredFunctions: ['tonic', 'subdominant', 'dominant'],
-            preferredTypes: ['Major', 'Minor', 'Dominant 7th', 'Add9', 'Suspended 4th'],
+            preferredTypes: ['Major', 'Minor', 'Dominant 7th', 'Add9', 'Sus4'],
             avoidTypes: ['Half Diminished 7th', 'Diminished 7th'],
             inversionBias: 0.2,               // Prefer strong root positions
             modalInterchangeBias: 0.6          // Borrowed chords add color
@@ -296,7 +296,7 @@ export const SECTION_PROFILES = {
         },
         chordPreferences: {
             preferredFunctions: ['tonic', 'subdominant'],
-            preferredTypes: ['Minor', 'Major', 'Suspended 4th', 'Suspended 2nd'],
+            preferredTypes: ['Minor', 'Major', 'Sus4', 'Sus2'],
             avoidTypes: ['Dominant 7th', 'Diminished'],  // Too much tension
             inversionBias: 0.2,
             modalInterchangeBias: 0.4

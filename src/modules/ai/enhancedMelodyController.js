@@ -58,6 +58,34 @@ let currentSectionType = 'verse';
 let currentSectionPosition = 'middle';
 let isInitialized = false;
 
+// -----------------------------------------------------------------------------
+// Note Density, Melodic Range, and Starting Octave Presets
+// -----------------------------------------------------------------------------
+
+export const NOTE_DENSITY_PRESETS = [
+    { id: 'sparse', label: 'Sparse', description: 'Fewer notes, more space', multiplier: 0.5 },
+    { id: 'light', label: 'Light', description: 'Below average density', multiplier: 0.75 },
+    { id: 'normal', label: 'Normal', description: 'Standard note density', multiplier: 1.0 },
+    { id: 'moderate', label: 'Moderate', description: 'Slightly more notes', multiplier: 1.25 },
+    { id: 'dense', label: 'Dense', description: 'Many notes, busy melody', multiplier: 1.5 }
+];
+
+export const MELODIC_RANGE_PRESETS = [
+    { id: 'narrow', label: 'Narrow (5th)', description: 'Within a perfect 5th', semitones: 7 },
+    { id: 'small', label: 'Small (Octave)', description: 'Within one octave', semitones: 12 },
+    { id: 'medium', label: 'Medium (10th)', description: 'About an octave and a third', semitones: 16 },
+    { id: 'wide', label: 'Wide (12th)', description: 'An octave and a fifth', semitones: 19 },
+    { id: 'extended', label: 'Extended (2 Oct)', description: 'Two full octaves', semitones: 24 }
+];
+
+export const STARTING_OCTAVE_PRESETS = [
+    { id: '2', label: 'Octave 2 (Low)', description: 'Deep bass register', value: 2 },
+    { id: '3', label: 'Octave 3 (Low-Mid)', description: 'Lower register', value: 3 },
+    { id: '4', label: 'Octave 4 (Middle)', description: 'Standard melody range', value: 4 },
+    { id: '5', label: 'Octave 5 (High-Mid)', description: 'Upper register', value: 5 },
+    { id: '6', label: 'Octave 6 (High)', description: 'High register', value: 6 }
+];
+
 // Generation settings
 let phraseSettings = {
     contourId: 'arch',
@@ -66,7 +94,11 @@ let phraseSettings = {
     styleId: 'any',
     octave: 4,
     range: 12,
-    useSectionAware: true
+    useSectionAware: true,
+    // New options
+    densityId: 'normal',
+    melodicRangeId: 'small',
+    startingOctaveId: '4'
 };
 
 // Cached results
@@ -119,13 +151,15 @@ export function initEnhancedMelodyController(options = {}) {
  * Initialize the enhanced melody UI elements
  */
 function initEnhancedMelodyUI() {
-    // Add phrase generation controls to melody suggestion form
-    // Look for the melody suggestions section in the floating panel
-    const container = document.getElementById('melody-suggestions-section') ||
-                     document.getElementById('melody-suggestions-container') ||
-                     document.getElementById('floating-suggestions-container');
+    // Try the new #phrases-section container first (new UI layout)
+    let phrasesContainer = document.getElementById('phrases-section');
 
-    if (!container) {
+    // Fall back to the main melody suggestions section (legacy layout)
+    const mainContainer = document.getElementById('melody-suggestions-section') ||
+                          document.getElementById('melody-suggestions-container') ||
+                          document.getElementById('floating-suggestions-container');
+
+    if (!mainContainer && !phrasesContainer) {
         console.warn('Enhanced Melody UI: Container not found, will retry on next initialization');
         return;
     }
@@ -137,21 +171,19 @@ function initEnhancedMelodyUI() {
 
     console.log('✅ Injecting Phase 4 Enhanced Melody UI');
 
-    // Create enhanced controls section
-    const controlsHTML = `
-        <div id="phrase-generation-controls" class="phrase-controls-section mt-4 pt-4 border-t border-gray-700">
-            <h4 class="text-sm font-semibold text-gray-200 mb-3 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
-                </svg>
-                Phrase Generation
-            </h4>
+    // Set up mode toggle listeners if the new UI layout exists
+    setupModeToggle();
 
+    // Determine where to inject - new layout uses #phrases-section, legacy uses after suggestions list
+    const useNewLayout = !!phrasesContainer;
+
+    // Create enhanced controls section (no top border in new layout since it's in its own section)
+    const controlsHTML = `
+        <div id="phrase-generation-controls" class="phrase-controls-section ${useNewLayout ? '' : 'mt-4 pt-4 border-t border-gray-700'}">
             <!-- Section Context -->
             <div class="mb-3">
                 <label class="block text-xs text-gray-300 mb-1">Section Type</label>
-                <select id="phrase-section-type" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                <select id="phrase-section-type" class="w-full px-2 py-1.5 text-sm border border-gray-600 rounded bg-gray-700 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
                     <option value="intro">Intro</option>
                     <option value="verse" selected>Verse</option>
                     <option value="prechorus">Pre-Chorus</option>
@@ -167,15 +199,15 @@ function initEnhancedMelodyUI() {
             <!-- Contour Shape -->
             <div class="mb-3">
                 <label class="block text-xs text-gray-300 mb-1">Contour Shape</label>
-                <select id="phrase-contour" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                <select id="phrase-contour" class="w-full px-2 py-1.5 text-sm border border-gray-600 rounded bg-gray-700 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
                     ${CONTOUR_SHAPE_LIST.map(c => `<option value="${c.id}" title="${c.description}">${c.label}</option>`).join('')}
                 </select>
             </div>
 
-            <!-- Phrase Length -->
+            <!-- Number of Beats -->
             <div class="mb-3">
-                <label class="block text-xs text-gray-300 mb-1">Phrase Length</label>
-                <select id="phrase-length" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                <label class="block text-xs text-gray-300 mb-1">Number of Beats</label>
+                <select id="phrase-length" class="w-full px-2 py-1.5 text-sm border border-gray-600 rounded bg-gray-700 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
                     ${PHRASE_LENGTH_LIST.map(l => `<option value="${l.id}">${l.label}</option>`).join('')}
                 </select>
             </div>
@@ -183,14 +215,38 @@ function initEnhancedMelodyUI() {
             <!-- Rhythm Pattern -->
             <div class="mb-3">
                 <label class="block text-xs text-gray-300 mb-1">Rhythm Pattern</label>
-                <select id="phrase-rhythm" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                <select id="phrase-rhythm" class="w-full px-2 py-1.5 text-sm border border-gray-600 rounded bg-gray-700 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
                     ${RHYTHM_PATTERN_LIST.map(r => `<option value="${r.id}" title="${r.description}">${r.label}</option>`).join('')}
+                </select>
+            </div>
+
+            <!-- Note Density -->
+            <div class="mb-3">
+                <label class="block text-xs text-gray-300 mb-1">Note Density</label>
+                <select id="phrase-density" class="w-full px-2 py-1.5 text-sm border border-gray-600 rounded bg-gray-700 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                    ${NOTE_DENSITY_PRESETS.map(d => `<option value="${d.id}" title="${d.description}" ${d.id === 'normal' ? 'selected' : ''}>${d.label}</option>`).join('')}
+                </select>
+            </div>
+
+            <!-- Melodic Range -->
+            <div class="mb-3">
+                <label class="block text-xs text-gray-300 mb-1">Melodic Range</label>
+                <select id="phrase-melodic-range" class="w-full px-2 py-1.5 text-sm border border-gray-600 rounded bg-gray-700 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                    ${MELODIC_RANGE_PRESETS.map(r => `<option value="${r.id}" title="${r.description}" ${r.id === 'small' ? 'selected' : ''}>${r.label}</option>`).join('')}
+                </select>
+            </div>
+
+            <!-- Starting Octave -->
+            <div class="mb-3">
+                <label class="block text-xs text-gray-300 mb-1">Starting Octave</label>
+                <select id="phrase-starting-octave" class="w-full px-2 py-1.5 text-sm border border-gray-600 rounded bg-gray-700 text-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                    ${STARTING_OCTAVE_PRESETS.map(o => `<option value="${o.id}" title="${o.description}" ${o.id === '4' ? 'selected' : ''}>${o.label}</option>`).join('')}
                 </select>
             </div>
 
             <!-- Context Display (auto-updates with selections) -->
             <div id="phrase-generation-context" class="mt-2">
-                <div class="text-xs text-gray-400 p-2 bg-gray-50 rounded">
+                <div class="text-xs text-gray-400 p-2 bg-gray-700 rounded">
                     Phrase suggestions auto-update when note selection or settings change
                 </div>
             </div>
@@ -201,7 +257,7 @@ function initEnhancedMelodyUI() {
             </div>
 
             <!-- Motif Section -->
-            <div class="mt-4 pt-4 border-t border-gray-700">
+            <div class="mt-4 pt-4 border-t border-gray-600">
                 <h4 class="text-sm font-semibold text-gray-200 mb-3 flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -210,7 +266,7 @@ function initEnhancedMelodyUI() {
                     Detected Motifs
                 </h4>
                 <button id="analyze-motifs-btn"
-                        class="w-full px-3 py-1.5 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors mb-2">
+                        class="w-full px-3 py-1.5 bg-gray-600 text-white text-sm rounded hover:bg-gray-500 transition-colors mb-2">
                     Analyze Melody for Motifs
                 </button>
                 <div id="motif-list" class="space-y-1 text-sm">
@@ -220,18 +276,65 @@ function initEnhancedMelodyUI() {
         </div>
     `;
 
-    // Find the right place to insert
-    const suggestionsList = container.querySelector('#melody-suggestions-list') ||
-                           container.querySelector('.melody-suggestions-list');
+    // Insert into the appropriate container
+    if (useNewLayout && phrasesContainer) {
+        // New layout: inject directly into #phrases-section
+        phrasesContainer.innerHTML = controlsHTML;
+    } else if (mainContainer) {
+        // Legacy layout: insert after suggestions list
+        const suggestionsList = mainContainer.querySelector('#melody-suggestions-list') ||
+                               mainContainer.querySelector('.melody-suggestions-list');
 
-    if (suggestionsList) {
-        suggestionsList.insertAdjacentHTML('afterend', controlsHTML);
-    } else {
-        container.insertAdjacentHTML('beforeend', controlsHTML);
+        if (suggestionsList) {
+            suggestionsList.insertAdjacentHTML('afterend', controlsHTML);
+        } else {
+            mainContainer.insertAdjacentHTML('beforeend', controlsHTML);
+        }
     }
 
     // Attach event listeners to new controls
     attachControlListeners();
+}
+
+/**
+ * Set up mode toggle between One Note and Phrases sections
+ */
+function setupModeToggle() {
+    const oneNoteBtn = document.getElementById('mode-one-note');
+    const phrasesBtn = document.getElementById('mode-phrases');
+    const oneNoteSection = document.getElementById('one-note-section');
+    const phrasesSection = document.getElementById('phrases-section');
+
+    if (!oneNoteBtn || !phrasesBtn || !oneNoteSection || !phrasesSection) {
+        return; // Toggle not available in this layout
+    }
+
+    oneNoteBtn.addEventListener('click', () => {
+        // Show One Note section, hide Phrases section
+        oneNoteSection.classList.remove('hidden');
+        phrasesSection.classList.add('hidden');
+
+        // Update button styles
+        oneNoteBtn.classList.remove('bg-gray-700', 'text-gray-300');
+        oneNoteBtn.classList.add('bg-indigo-600', 'text-white');
+        phrasesBtn.classList.remove('bg-indigo-600', 'text-white');
+        phrasesBtn.classList.add('bg-gray-700', 'text-gray-300');
+    });
+
+    phrasesBtn.addEventListener('click', () => {
+        // Show Phrases section, hide One Note section
+        phrasesSection.classList.remove('hidden');
+        oneNoteSection.classList.add('hidden');
+
+        // Update button styles
+        phrasesBtn.classList.remove('bg-gray-700', 'text-gray-300');
+        phrasesBtn.classList.add('bg-indigo-600', 'text-white');
+        oneNoteBtn.classList.remove('bg-indigo-600', 'text-white');
+        oneNoteBtn.classList.add('bg-gray-700', 'text-gray-300');
+
+        // Regenerate phrases when switching to Phrases tab
+        handleGeneratePhrases();
+    });
 }
 
 /**
@@ -279,6 +382,66 @@ function attachControlListeners() {
             phraseSettings.rhythmId = e.target.value;
             handleGeneratePhrases(); // Auto-regenerate on change
         });
+    }
+
+    // Note Density change - auto-regenerate
+    const densitySelect = document.getElementById('phrase-density');
+    if (densitySelect) {
+        densitySelect.addEventListener('change', (e) => {
+            phraseSettings.densityId = e.target.value;
+            handleGeneratePhrases(); // Auto-regenerate on change
+        });
+    }
+
+    // Melodic Range change - auto-regenerate
+    const rangeSelect = document.getElementById('phrase-melodic-range');
+    if (rangeSelect) {
+        rangeSelect.addEventListener('change', (e) => {
+            phraseSettings.melodicRangeId = e.target.value;
+            // Update the range value based on preset
+            const preset = MELODIC_RANGE_PRESETS.find(p => p.id === e.target.value);
+            if (preset) {
+                phraseSettings.range = preset.semitones;
+            }
+            handleGeneratePhrases(); // Auto-regenerate on change
+        });
+    }
+
+    // Starting Octave change - auto-regenerate
+    const octaveSelect = document.getElementById('phrase-starting-octave');
+    if (octaveSelect) {
+        octaveSelect.addEventListener('change', (e) => {
+            phraseSettings.startingOctaveId = e.target.value;
+            // Update the octave value based on preset
+            const preset = STARTING_OCTAVE_PRESETS.find(p => p.id === e.target.value);
+            if (preset) {
+                phraseSettings.octave = preset.value;
+            }
+            handleGeneratePhrases(); // Auto-regenerate on change
+        });
+    }
+
+    // Style dropdown - listen for changes to update phrase generation style
+    const setupStyleListener = () => {
+        const styleSelect = document.getElementById('floating-melody-style-select');
+        if (styleSelect) {
+            styleSelect.addEventListener('change', (e) => {
+                phraseSettings.styleId = e.target.value;
+                console.log('🎼 Phrase style updated:', phraseSettings.styleId);
+                // Regenerate phrases if currently viewing phrases section
+                const phrasesSection = document.getElementById('phrases-section');
+                if (phrasesSection && !phrasesSection.classList.contains('hidden')) {
+                    handleGeneratePhrases();
+                }
+            });
+            return true;
+        }
+        return false;
+    };
+
+    // Try immediately, then with delay for floating panel initialization
+    if (!setupStyleListener()) {
+        setTimeout(setupStyleListener, 500);
     }
 
     // Auto-generate phrases on initial load (with slight delay for DOM)
@@ -353,6 +516,21 @@ function handleGeneratePhrases() {
     // Update UI to show context (including next chord if available)
     updateGenerationContextDisplay(selectedInfo, chord, key, nextChord);
 
+    // Get density multiplier from preset
+    const densityPreset = NOTE_DENSITY_PRESETS.find(p => p.id === phraseSettings.densityId) ||
+                          NOTE_DENSITY_PRESETS.find(p => p.id === 'normal');
+    const densityMultiplier = densityPreset?.multiplier || 1.0;
+
+    // Get melodic range from preset
+    const rangePreset = MELODIC_RANGE_PRESETS.find(p => p.id === phraseSettings.melodicRangeId) ||
+                        MELODIC_RANGE_PRESETS.find(p => p.id === 'small');
+    const melodicRange = rangePreset?.semitones || 12;
+
+    // Get starting octave from preset
+    const octavePreset = STARTING_OCTAVE_PRESETS.find(p => p.id === phraseSettings.startingOctaveId) ||
+                         STARTING_OCTAVE_PRESETS.find(p => p.id === '4');
+    const startingOctave = octavePreset?.value || 4;
+
     // Generate section-aware candidates with chord sequence
     const candidates = generateSectionAwareCandidates({
         chord,
@@ -361,7 +539,9 @@ function handleGeneratePhrases() {
         sectionPosition: currentSectionPosition,
         previousNote,
         styleId: phraseSettings.styleId,
-        octave: phraseSettings.octave,
+        octave: startingOctave,
+        range: melodicRange,
+        densityMultiplier,
         chordSequence, // Pass chord sequence for multi-chord awareness
         overrides: {
             contourId: phraseSettings.contourId,
@@ -741,7 +921,8 @@ function showInsertModeDialog(onChoice) {
 
     const dialog = document.createElement('div');
     dialog.id = 'phrase-insert-mode-dialog';
-    dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center';
+    dialog.style.zIndex = '10001';
     dialog.innerHTML = `
         <div class="bg-white rounded-lg shadow-xl p-5 max-w-md w-full mx-4">
             <h3 class="font-semibold text-gray-800 mb-3">Insert Phrase</h3>
@@ -822,6 +1003,8 @@ function insertPhrase(phrase) {
 function appendPhraseAtEnd(phrase) {
     const notationComposer = window.getNotationComposer && window.getNotationComposer();
 
+    console.log(`[appendPhraseAtEnd] Inserting ${phrase.notes.length} notes with rhythm:`, phrase.rhythm);
+
     // Insert each note using the standard method
     phrase.notes.forEach((note, i) => {
         const rhythmValue = phrase.rhythm[i] || 1;
@@ -855,6 +1038,8 @@ function insertPhraseWithShift(phrase, selectedInfo) {
     const { measureIndex, noteIndex } = selectedInfo;
     const UNITS_PER_BEAT = 48;
     const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+
+    console.log(`[insertPhraseWithShift] Inserting ${phrase.notes.length} notes with rhythm:`, phrase.rhythm);
 
     // Ensure treble block sequence is initialized
     if (!compositionState.trebleBlockSequence?.blocks?.length) {

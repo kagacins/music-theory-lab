@@ -3979,8 +3979,8 @@ function createSimplifiedCardHTML(chord, index, key) {
         else if (chord.type === 'Diminished 7th') chordSymbol += 'dim7';
         else if (chord.type === 'Half-Diminished 7th') chordSymbol += 'ø7';
         else if (chord.type === 'Augmented') chordSymbol += '+';
-        else if (chord.type === 'Suspended 4th' || chord.type === 'Sus4') chordSymbol += 'sus4';
-        else if (chord.type === 'Suspended 2nd' || chord.type === 'Sus2') chordSymbol += 'sus2';
+        else if (chord.type === 'Sus4') chordSymbol += 'sus4';
+        else if (chord.type === 'Sus2') chordSymbol += 'sus2';
         else if (chord.type === 'Add9') chordSymbol += 'add9';
         else if (chord.type === 'Major 6th') chordSymbol += '6';
         else if (chord.type === 'Minor 6th') chordSymbol += 'm6';
@@ -5310,7 +5310,7 @@ function collapseChordCard(index) {
 function getChordTypeOptions(currentType) {
     // Organized by chord groups for better UX
     const chordGroups = [
-        { label: 'Triads', types: ['Major', 'Minor', 'Diminished', 'Augmented', 'Suspended 2nd', 'Suspended 4th', 'Power Chord'] },
+        { label: 'Triads', types: ['Major', 'Minor', 'Diminished', 'Augmented', 'Sus2', 'Sus4', 'Power Chord'] },
         { label: '7th Chords', types: ['Dominant 7th', 'Major 7th', 'Minor 7th', 'Minor-Major 7th', 'Diminished 7th', 'Half-Diminished 7th', 'Augmented 7th'] },
         { label: '6th Chords', types: ['Major 6th', 'Minor 6th'] },
         { label: '9th Chords', types: ['Add9', 'Major 9th', 'Dominant 9th', 'Minor 9th', '6/9'] },
@@ -12059,7 +12059,7 @@ function parseChordSymbol(chordSymbol) {
     } else if (typeAndExtensions.includes('aug') || typeAndExtensions.includes('+')) {
         chordType = 'Augmented';
     } else if (typeAndExtensions.includes('sus')) {
-        chordType = typeAndExtensions.includes('sus2') || typeAndExtensions.includes('2') ? 'Suspended 2nd' : 'Suspended 4th';
+        chordType = typeAndExtensions.includes('sus2') || typeAndExtensions.includes('2') ? 'Sus2' : 'Sus4';
     } else if (typeAndExtensions.startsWith('m') && !typeAndExtensions.startsWith('maj')) {
         // Plain minor (only after checking for m7, m9, m6, etc.)
         chordType = 'Minor';

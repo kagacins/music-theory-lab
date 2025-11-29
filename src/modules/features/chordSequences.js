@@ -17,7 +17,7 @@ const CHORD_TYPES_FOR_SEQUENCES = [
     'Major 7th',
     'Minor 7th',
     'Diminished',
-    'Suspended 4th',
+    'Sus4',
     'Add9',
     'Major 6th',
     'Minor 6th'
@@ -444,7 +444,7 @@ function getChordTension(chord) {
         'Major': 20, 'Minor': 30, 'Dominant 7th': 75,
         'Major 7th': 25, 'Minor 7th': 40, 'Diminished': 85,
         'Diminished 7th': 90, 'Half Diminished 7th': 70,
-        'Augmented': 80, 'Suspended 4th': 55, 'Suspended 2nd': 45,
+        'Augmented': 80, 'Sus4': 55, 'Sus2': 45,
         'Add9': 30, 'Major 6th': 25, 'Minor 6th': 35,
         'Dominant 9th': 70, 'Major 9th': 30, 'Minor 9th': 45
     };

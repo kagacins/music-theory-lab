@@ -2246,6 +2246,12 @@
                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"></path></svg>
                     Harmonize
                 </button>
+
+                <!-- Tension Optimizer Button -->
+                <button id="tension-optimizer-btn" onclick="window.showTensionOptimizer && window.showTensionOptimizer()" class="w-full px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 text-sm flex items-center justify-center gap-1" title="Optimize chord inversions to match target tension curve">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                    Optimize Tension
+                </button>
             </div>
         </div>
 
@@ -2331,6 +2337,9 @@
                 </button>
                 <button id="suggestions-mode-melody" onclick="window.switchSuggestionMode && window.switchSuggestionMode('melody')">
                     Melody
+                </button>
+                <button id="suggestions-mode-generate" onclick="window.switchSuggestionMode && window.switchSuggestionMode('generate')">
+                    Generate
                 </button>
             </div>
         </div>
@@ -2475,26 +2484,14 @@
 
             <!-- MELODY SUGGESTIONS SECTION -->
             <div id="melody-suggestions-section" class="hidden">
-                <!-- Context Display -->
-                <div id="melody-suggestion-context" class="context-display">
-                    <h4>Context</h4>
-                    <div class="context-info">
-                        <div class="context-item">
-                            <strong>Chord:</strong> <span>No chord selected</span>
-                        </div>
-                        <div class="context-item">
-                            <strong>Key:</strong> <span>C</span>
-                        </div>
-                        <div class="context-item">
-                            <strong>Previous:</strong> <span>None</span>
-                        </div>
+                <!-- Compact Context + Style Row -->
+                <div id="melody-context-row" class="flex items-center justify-between gap-2 mb-2 text-xs">
+                    <div id="melody-suggestion-context" class="flex items-center gap-3 text-gray-300">
+                        <span><strong class="text-gray-400">Chord:</strong> <span id="ctx-chord">-</span></span>
+                        <span><strong class="text-gray-400">Key:</strong> <span id="ctx-key">C</span></span>
+                        <span><strong class="text-gray-400">Prev:</strong> <span id="ctx-prev">-</span></span>
                     </div>
-                </div>
-
-                <!-- Style Selector -->
-                <div class="style-selector mb-2">
-                    <label class="text-xs text-gray-600">Style:</label>
-                    <select id="floating-melody-style-select" class="text-xs p-1 border rounded w-full">
+                    <select id="floating-melody-style-select" class="text-xs px-2 py-1 border border-gray-600 rounded bg-gray-700 text-white" style="min-width: 90px;">
                         <option value="any">Balanced</option>
                         <option value="pop" selected>Pop / Top 40</option>
                         <option value="jazz">Jazz</option>
@@ -2503,16 +2500,52 @@
                     </select>
                 </div>
 
-                <!-- Suggestions List -->
-                <div id="melody-suggestions-list" class="suggestions-list space-y-2">
-                    <p class="suggestions-empty">Please select a chord to see suggestions</p>
+                <!-- Mode Toggle: One Note / Phrases -->
+                <div id="melody-mode-toggle" class="flex rounded-lg overflow-hidden border border-gray-600 mb-3">
+                    <button id="mode-one-note" class="flex-1 px-3 py-1.5 text-xs font-medium bg-indigo-600 text-white transition-colors">
+                        One Note
+                    </button>
+                    <button id="mode-phrases" class="flex-1 px-3 py-1.5 text-xs font-medium bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors">
+                        Phrases
+                    </button>
+                </div>
+
+                <!-- One Note Section -->
+                <div id="one-note-section">
+                    <!-- Suggestions List -->
+                    <div id="melody-suggestions-list" class="suggestions-list space-y-2">
+                        <p class="suggestions-empty">Please select a chord to see suggestions</p>
+                    </div>
+                </div>
+
+                <!-- Phrases Section (hidden by default, populated by enhancedMelodyController) -->
+                <div id="phrases-section" class="hidden">
+                    <!-- Phrase generation controls will be injected here by enhancedMelodyController -->
+                </div>
+            </div>
+
+            <!-- GENERATE SECTION (Phase 5) -->
+            <div id="generate-suggestions-section" class="hidden">
+                <!-- Next Section Suggestion -->
+                <div id="next-section-suggestion" class="next-section-container">
+                    <!-- Populated by generateTabUI.js -->
+                </div>
+
+                <!-- Section Generator Buttons -->
+                <div id="section-generator-buttons" class="section-generator-container">
+                    <!-- Populated by generateTabUI.js -->
+                </div>
+
+                <!-- Style Profile Display -->
+                <div id="style-profile-display" class="style-profile-container">
+                    <!-- Populated by generateTabUI.js -->
                 </div>
             </div>
         </div>
 
         <!-- Keyboard Shortcuts Hint -->
         <div class="keyboard-shortcuts-hint">
-            Press <kbd>Tab</kbd> for Chord Suggestions, <kbd>Shift+Tab</kbd> for Melody Suggestions, <kbd>Esc</kbd> to close
+            Press <kbd>Tab</kbd> Chords, <kbd>Shift+Tab</kbd> Melody, <kbd>Ctrl+Tab</kbd> Generate, <kbd>Esc</kbd> close
         </div>
     </div>
 

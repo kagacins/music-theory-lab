@@ -1,13 +1,15 @@
 /**
  * Floating Suggestions Panel
  * Manages a floating panel for chord and melody suggestions that appears near the mouse cursor
+ * Phase 5: Added 'generate' mode for section generation and style profile
  */
 
 import { initSectionIntentUI, refreshUI as refreshSectionIntentUI } from './sectionIntentUI.js';
+import { initGenerateTabUI, refreshUI as refreshGenerateTabUI } from './generateTabUI.js';
 
 let panel = null;
 let isVisible = false;
-let currentMode = 'chords'; // 'chords' or 'melody'
+let currentMode = 'chords'; // 'chords', 'melody', or 'generate'
 let lastMouseX = 0;
 let lastMouseY = 0;
 let isDragging = false;
@@ -55,6 +57,9 @@ export function initFloatingSuggestionsPanel() {
 
     // Phase 2.1: Initialize section intent UI
     initSectionIntentUI();
+
+    // Phase 5: Initialize generate tab UI
+    initGenerateTabUI();
 }
 
 /**
@@ -92,7 +97,7 @@ function setupDragging() {
 }
 
 /**
- * Set up Tab and Shift+Tab keyboard shortcuts
+ * Set up Tab, Shift+Tab, and Ctrl+Tab keyboard shortcuts
  */
 function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
@@ -110,6 +115,14 @@ function setupKeyboardShortcuts() {
             if (!isInputElement(e.target)) {
                 e.preventDefault();
                 togglePanel('melody');
+            }
+        }
+        // Ctrl+Tab - toggle generate panel (Phase 5)
+        else if (e.key === 'Tab' && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+            // Only handle if not in an input/textarea
+            if (!isInputElement(e.target)) {
+                e.preventDefault();
+                togglePanel('generate');
             }
         }
         // Escape - hide panel
@@ -173,6 +186,11 @@ export function showPanel(mode) {
         }
     }
 
+    // Phase 5: Refresh generate tab UI when showing generate panel
+    if (mode === 'generate') {
+        refreshGenerateTabUI();
+    }
+
     // Dispatch event for other components
     window.dispatchEvent(new CustomEvent('suggestionsPanelShown', {
         detail: { mode }
@@ -196,6 +214,7 @@ export function hidePanel() {
 // Expose functions globally for buttons and close
 window.hideSuggestionsPanel = hidePanel;
 window.togglePanel = togglePanel;
+window.switchSuggestionMode = switchMode;
 
 /**
  * Update the panel to show the correct mode
@@ -203,19 +222,31 @@ window.togglePanel = togglePanel;
 function updatePanelMode(mode) {
     const chordSection = document.getElementById('chord-suggestions-section');
     const melodySection = document.getElementById('melody-suggestions-section');
+    const generateSection = document.getElementById('generate-suggestions-section');
     const chordBtn = document.getElementById('suggestions-mode-chords');
     const melodyBtn = document.getElementById('suggestions-mode-melody');
+    const generateBtn = document.getElementById('suggestions-mode-generate');
 
+    // Hide all sections first
+    chordSection?.classList.add('hidden');
+    melodySection?.classList.add('hidden');
+    generateSection?.classList.add('hidden');
+
+    // Remove active from all buttons
+    chordBtn?.classList.remove('active');
+    melodyBtn?.classList.remove('active');
+    generateBtn?.classList.remove('active');
+
+    // Show the appropriate section and activate button
     if (mode === 'chords') {
         chordSection?.classList.remove('hidden');
-        melodySection?.classList.add('hidden');
         chordBtn?.classList.add('active');
-        melodyBtn?.classList.remove('active');
-    } else {
-        chordSection?.classList.add('hidden');
+    } else if (mode === 'melody') {
         melodySection?.classList.remove('hidden');
-        chordBtn?.classList.remove('active');
         melodyBtn?.classList.add('active');
+    } else if (mode === 'generate') {
+        generateSection?.classList.remove('hidden');
+        generateBtn?.classList.add('active');
     }
 }
 
@@ -273,11 +304,22 @@ export function getCurrentMode() {
 }
 
 /**
- * Switch to a specific mode without toggling visibility
+ * Switch to a specific mode, showing the panel if hidden
  */
 export function switchMode(mode) {
     if (isVisible) {
+        // Panel is visible - just switch mode
         currentMode = mode;
         updatePanelMode(mode);
+
+        // Refresh the appropriate UI
+        if (mode === 'chords') {
+            refreshSectionIntentUI();
+        } else if (mode === 'generate') {
+            refreshGenerateTabUI();
+        }
+    } else {
+        // Panel is hidden - show it in the specified mode
+        showPanel(mode);
     }
 }

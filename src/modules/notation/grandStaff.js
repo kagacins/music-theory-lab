@@ -70,10 +70,8 @@ function getChordTypeSuffix(chordType) {
     'Power Chord': '5',
 
     // Suspended chords (all variants)
-    'Suspended 2nd': 'sus2',
-    'Suspended 4th': 'sus4',
-    'Suspended 2': 'sus2',
-    'Suspended 4': 'sus4',
+    'Sus2': 'sus2',
+    'Sus4': 'sus4',
     'Sus2': 'sus2',
     'Sus4': 'sus4',
 
@@ -87,7 +85,7 @@ function getChordTypeSuffix(chordType) {
 
     // Ninth chords
     'Add9': 'add9',
-    'Add 9': 'add9',
+    'Add9': 'add9',
     'Minor 9th': 'm9',
     'Minor 9': 'm9',
     'Major 9th': 'maj9',
@@ -118,17 +116,25 @@ function getChordTypeSuffix(chordType) {
 function formatChordNameForDisplay(chord) {
   if (!chord) return '';
 
-  // Prefer simpleName (already formatted), then name
+  // ALWAYS build from root + type to ensure we show the current chord data
+  // The 'name' property can be stale if only root/type were updated
+  const root = chord.root || '';
+  const type = chord.type || '';
+
+  // If we have root, build the display name from root + type
+  if (root) {
+    const suffix = getChordTypeSuffix(type);
+    return root + suffix;
+  }
+
+  // Fallback to simpleName or name if no root
   if (chord.simpleName) return chord.simpleName;
   if (chord.name) {
     // Strip inversion indicators from name if present
     return chord.name.replace(/\s*\((Root|1st|2nd|3rd|4th|5th)\)$/i, '').trim();
   }
 
-  // Fallback: build from root + type suffix
-  const root = chord.root || '';
-  const suffix = getChordTypeSuffix(chord.type);
-  return root + suffix;
+  return '';
 }
 
 /**
@@ -265,6 +271,8 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
   }
 
   // Look for tied notes across measure boundaries
+  // Semantic: note.tied=true means "tie FROM this note TO the next note"
+  // So we check the LAST note of the current measure for the tied flag
   for (let i = 0; i < renderedMeasures.length - 1; i++) {
     const currentMeasure = renderedMeasures[i];
     const nextMeasure = renderedMeasures[i + 1];
@@ -277,36 +285,37 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
       continue;
     }
 
-    // Get measure data - the structure depends on where it came from
-    const measureData = measures[nextMeasure.index];
+    // Get measure data for the CURRENT measure (where the tie starts)
+    const currentMeasureData = measures[currentMeasure.index];
 
-    // Try both paths to get the bass note data
-    let bassNoteData = measureData?.notation?.bass?.voices?.[0]?.notes;
-    if (!bassNoteData || bassNoteData.length === 0) {
-      bassNoteData = measureData?.bassNotes;
+    // Try both paths to get the bass note data for current measure
+    let currentBassNoteData = currentMeasureData?.notation?.bass?.voices?.[0]?.notes;
+    if (!currentBassNoteData || currentBassNoteData.length === 0) {
+      currentBassNoteData = currentMeasureData?.bassNotes;
     }
 
-    if (!bassNoteData || bassNoteData.length === 0) {
+    if (!currentBassNoteData || currentBassNoteData.length === 0) {
       continue;
     }
 
-    const firstNoteData = bassNoteData[0];
+    // Check the LAST note of current measure for tied flag
+    const lastNoteData = currentBassNoteData[currentBassNoteData.length - 1];
 
-    // Check if this note is tied to the previous measure
+    // Check if this note is tied TO the next measure
     // Skip ties for rests - rests don't need tie markings
-    if (firstNoteData && (firstNoteData.isTied === true || firstNoteData.tied === true) && !firstNoteData.isRest) {
+    if (lastNoteData && (lastNoteData.isTied === true || lastNoteData.tied === true) && !lastNoteData.isRest) {
       const lastCurrentNote = currentBassNotes[currentBassNotes.length - 1];
       const firstNextNote = nextBassNotes[0];
 
-      // Also check if the previous note is a rest - skip tie if so
-      const prevMeasureData = measures[currentMeasure.index];
-      let prevBassNoteData = prevMeasureData?.notation?.bass?.voices?.[0]?.notes;
-      if (!prevBassNoteData || prevBassNoteData.length === 0) {
-        prevBassNoteData = prevMeasureData?.bassNotes;
+      // Also check if the next note is a rest - skip tie if so
+      const nextMeasureData = measures[nextMeasure.index];
+      let nextBassNoteData = nextMeasureData?.notation?.bass?.voices?.[0]?.notes;
+      if (!nextBassNoteData || nextBassNoteData.length === 0) {
+        nextBassNoteData = nextMeasureData?.bassNotes;
       }
-      const lastNoteData = prevBassNoteData?.[prevBassNoteData.length - 1];
-      if (lastNoteData?.isRest) {
-        continue; // Skip tie if previous note is a rest
+      const firstNextNoteData = nextBassNoteData?.[0];
+      if (firstNextNoteData?.isRest) {
+        continue; // Skip tie if next note is a rest
       }
 
       // Check if measures are on the same row
@@ -389,6 +398,8 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
   }
 
   // Also check for ties within measures (for split notes)
+  // Semantic: note.tied=true means "tie FROM this note TO the next note"
+  // So we check each note (except the last) for the tied flag
   for (const renderedMeasure of renderedMeasures) {
     const bassNotes = renderedMeasure.bassNotes;
     if (!bassNotes || bassNotes.length < 2) continue;
@@ -402,22 +413,23 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
 
     if (!bassNoteData || bassNoteData.length < 2) continue;
 
-    // Check each note after the first for isTied flag
-    for (let j = 1; j < bassNotes.length && j < bassNoteData.length; j++) {
+    // Check each note (except the last) for tied flag
+    for (let j = 0; j < bassNotes.length - 1 && j < bassNoteData.length - 1; j++) {
       const noteData = bassNoteData[j];
-      const prevNoteData = bassNoteData[j - 1];
+      const nextNoteData = bassNoteData[j + 1];
 
       // Skip ties for rests - rests don't need tie markings
-      if (noteData && (noteData.isTied === true || noteData.tied === true) && !noteData.isRest && !prevNoteData?.isRest) {
-        const prevNote = bassNotes[j - 1];
+      // Check if THIS note has tied=true (meaning tie TO the next note)
+      if (noteData && (noteData.isTied === true || noteData.tied === true) && !noteData.isRest && !nextNoteData?.isRest) {
         const currNote = bassNotes[j];
+        const nextNote = bassNotes[j + 1];
 
         try {
-          const startBox = prevNote.getBoundingBox();
-          const endBox = currNote.getBoundingBox();
+          const startBox = currNote.getBoundingBox();
+          const endBox = nextNote.getBoundingBox();
 
           if (startBox && endBox) {
-            const direction = getTieDirection(prevNote);
+            const direction = getTieDirection(currNote);
 
             const startX = startBox.getX() + startBox.getW();
             const endX = endBox.getX();
@@ -473,6 +485,8 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
   }
 
   // Look for tied treble notes across measure boundaries
+  // Semantic: note.tied=true means "tie FROM this note TO the next note"
+  // So we check the LAST note of the current measure for the tied flag
   for (let i = 0; i < renderedMeasures.length - 1; i++) {
     const currentMeasure = renderedMeasures[i];
     const nextMeasure = renderedMeasures[i + 1];
@@ -485,35 +499,36 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
       continue;
     }
 
-    // Get measure data
-    const measureData = measures[nextMeasure.index];
+    // Get measure data for the CURRENT measure (where the tie starts)
+    const currentMeasureData = measures[currentMeasure.index];
 
-    // Try both paths to get the treble note data
-    let trebleNoteData = measureData?.notation?.treble?.voices?.[0]?.notes;
-    if (!trebleNoteData || trebleNoteData.length === 0) {
-      trebleNoteData = measureData?.trebleNotes;
+    // Try both paths to get the treble note data for current measure
+    let currentTrebleNoteData = currentMeasureData?.notation?.treble?.voices?.[0]?.notes;
+    if (!currentTrebleNoteData || currentTrebleNoteData.length === 0) {
+      currentTrebleNoteData = currentMeasureData?.trebleNotes;
     }
 
-    if (!trebleNoteData || trebleNoteData.length === 0) {
+    if (!currentTrebleNoteData || currentTrebleNoteData.length === 0) {
       continue;
     }
 
-    const firstNoteData = trebleNoteData[0];
+    // Check the LAST note of current measure for tied flag
+    const lastNoteData = currentTrebleNoteData[currentTrebleNoteData.length - 1];
 
-    // Check if this note is tied to the previous measure
-    if (firstNoteData && (firstNoteData.isTied === true || firstNoteData.tied === true) && !firstNoteData.isRest) {
+    // Check if this note is tied TO the next measure
+    if (lastNoteData && (lastNoteData.isTied === true || lastNoteData.tied === true) && !lastNoteData.isRest) {
       const lastCurrentNote = currentTrebleNotes[currentTrebleNotes.length - 1];
       const firstNextNote = nextTrebleNotes[0];
 
-      // Check if previous note is a rest
-      const prevMeasureData = measures[currentMeasure.index];
-      let prevTrebleNoteData = prevMeasureData?.notation?.treble?.voices?.[0]?.notes;
-      if (!prevTrebleNoteData || prevTrebleNoteData.length === 0) {
-        prevTrebleNoteData = prevMeasureData?.trebleNotes;
+      // Check if next note is a rest
+      const nextMeasureData = measures[nextMeasure.index];
+      let nextTrebleNoteData = nextMeasureData?.notation?.treble?.voices?.[0]?.notes;
+      if (!nextTrebleNoteData || nextTrebleNoteData.length === 0) {
+        nextTrebleNoteData = nextMeasureData?.trebleNotes;
       }
-      const lastNoteData = prevTrebleNoteData?.[prevTrebleNoteData.length - 1];
-      if (lastNoteData?.isRest) {
-        continue; // Skip tie if previous note is a rest
+      const firstNextNoteData = nextTrebleNoteData?.[0];
+      if (firstNextNoteData?.isRest) {
+        continue; // Skip tie if next note is a rest
       }
 
       // Check if measures are on the same row
@@ -586,6 +601,8 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
   }
 
   // Also check for treble ties within measures (for split notes)
+  // Semantic: note.tied=true means "tie FROM this note TO the next note"
+  // So we check each note (except the last) for the tied flag
   for (const renderedMeasure of renderedMeasures) {
     const trebleNotes = renderedMeasure.trebleNotes;
     if (!trebleNotes || trebleNotes.length < 2) continue;
@@ -599,21 +616,22 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
 
     if (!trebleNoteData || trebleNoteData.length < 2) continue;
 
-    // Check each note after the first for isTied flag
-    for (let j = 1; j < trebleNotes.length && j < trebleNoteData.length; j++) {
+    // Check each note (except the last) for tied flag
+    for (let j = 0; j < trebleNotes.length - 1 && j < trebleNoteData.length - 1; j++) {
       const noteData = trebleNoteData[j];
-      const prevNoteData = trebleNoteData[j - 1];
+      const nextNoteData = trebleNoteData[j + 1];
 
-      if (noteData && (noteData.isTied === true || noteData.tied === true) && !noteData.isRest && !prevNoteData?.isRest) {
-        const prevNote = trebleNotes[j - 1];
+      // Check if THIS note has tied=true (meaning tie TO the next note)
+      if (noteData && (noteData.isTied === true || noteData.tied === true) && !noteData.isRest && !nextNoteData?.isRest) {
         const currNote = trebleNotes[j];
+        const nextNote = trebleNotes[j + 1];
 
         try {
-          const startBox = prevNote.getBoundingBox();
-          const endBox = currNote.getBoundingBox();
+          const startBox = currNote.getBoundingBox();
+          const endBox = nextNote.getBoundingBox();
 
           if (startBox && endBox) {
-            const direction = getTrebleTieDirection(prevNote);
+            const direction = getTrebleTieDirection(currNote);
 
             const startX = startBox.getX() + startBox.getW();
             const endX = endBox.getX();
@@ -1095,28 +1113,53 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   drawBeams(context, bassBeams);
 
   // Draw ties (only within same measure for now)
-  // TODO: Cross-measure ties need to be handled at the system level
+  // TODO: Cross-measure ties are handled at the system level by drawManualTies
+  // note.tied=true means "this note is tied TO the next note"
   trebleTies.forEach(tieInfo => {
-    if (tieInfo.startIndex < vexTrebleNotes.length - 1) {
-      const staveTie = new VF.StaveTie({
-        first_note: vexTrebleNotes[tieInfo.startIndex],
-        last_note: vexTrebleNotes[tieInfo.startIndex + 1],
-        first_indices: [0],
-        last_indices: [0]
-      });
-      staveTie.setContext(context).draw();
+    const startIdx = tieInfo.startIndex;
+    const endIdx = startIdx + 1;
+    // Validate: need valid indices and both notes must exist
+    if (startIdx >= 0 && endIdx < vexTrebleNotes.length) {
+      const firstNote = vexTrebleNotes[startIdx];
+      const lastNote = vexTrebleNotes[endIdx];
+      // VexFlow StaveTie requires both notes to be valid StaveNote objects
+      if (firstNote && lastNote && !firstNote.isRest() && !lastNote.isRest()) {
+        try {
+          const staveTie = new VF.StaveTie({
+            first_note: firstNote,
+            last_note: lastNote,
+            first_indices: [0],
+            last_indices: [0]
+          });
+          staveTie.setContext(context).draw();
+        } catch (e) {
+          // Silently skip invalid ties (e.g., incompatible note types)
+        }
+      }
     }
   });
 
   bassTies.forEach(tieInfo => {
-    if (tieInfo.startIndex < vexBassNotes.length - 1) {
-      const staveTie = new VF.StaveTie({
-        first_note: vexBassNotes[tieInfo.startIndex],
-        last_note: vexBassNotes[tieInfo.startIndex + 1],
-        first_indices: [0],
-        last_indices: [0]
-      });
-      staveTie.setContext(context).draw();
+    const startIdx = tieInfo.startIndex;
+    const endIdx = startIdx + 1;
+    // Validate: need valid indices and both notes must exist
+    if (startIdx >= 0 && endIdx < vexBassNotes.length) {
+      const firstNote = vexBassNotes[startIdx];
+      const lastNote = vexBassNotes[endIdx];
+      // VexFlow StaveTie requires both notes to be valid StaveNote objects
+      if (firstNote && lastNote && !firstNote.isRest() && !lastNote.isRest()) {
+        try {
+          const staveTie = new VF.StaveTie({
+            first_note: firstNote,
+            last_note: lastNote,
+            first_indices: [0],
+            last_indices: [0]
+          });
+          staveTie.setContext(context).draw();
+        } catch (e) {
+          // Silently skip invalid ties (e.g., incompatible note types)
+        }
+      }
     }
   });
 
@@ -1746,6 +1789,7 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       if (context.svg) {
         // SVG rendering
         const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        group.setAttribute('class', 'chord-bracket-group');
 
         // Horizontal line
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -1889,6 +1933,11 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
   // Draw chord span shading and brackets - alternating colors for consecutive chords
   // Uses beat-based positioning to show exact horizontal spans, even within measures
   if (showChordSpans) {
+    // Clear any existing chord bracket SVG groups before re-drawing
+    if (context.svg) {
+      const existingBrackets = context.svg.querySelectorAll('.chord-bracket-group');
+      existingBrackets.forEach(el => el.remove());
+    }
     const chordSpanColors = [
       'rgba(200, 220, 255, 0.15)',  // Light blue
       'rgba(220, 255, 220, 0.15)',  // Light green
@@ -2305,16 +2354,31 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       const hasOttava = brackets && brackets.length > 0;
       const ottavaLabel = hasOttava ? brackets[0].label : null;
 
+      // Find first and last note with this ottava label in the measure
+      // The brackets array tracks startIndex/endIndex within the measure
+      let firstOttavaNote = trebleNotes[0];
+      let lastOttavaNote = trebleNotes[0];
+      if (hasOttava && brackets[0]) {
+        const bracket = brackets[0];
+        if (bracket.startIndex !== undefined && trebleNotes[bracket.startIndex]) {
+          firstOttavaNote = trebleNotes[bracket.startIndex];
+        }
+        if (bracket.endIndex !== undefined && trebleNotes[bracket.endIndex]) {
+          lastOttavaNote = trebleNotes[bracket.endIndex];
+        }
+      }
+
       if (ottavaLabel) {
         if (currentTrebleOttava === ottavaLabel) {
-          // Continue the bracket
-          trebleOttavaEnd = { measure: i, noteIndex: 0, note: trebleNotes[0] };
-          // Update extreme note positions
-          // For treble clef: smallest line = highest pitch, largest line = lowest pitch
-          const highPitchLine = getLowestPitchLine(trebleNotes[0]); // MIN = highest pitch in treble
-          const lowPitchLine = getHighestPitchLine(trebleNotes[0]); // MAX = lowest pitch in treble
-          if (highPitchLine < trebleHighestPitchLine) trebleHighestPitchLine = highPitchLine;
-          if (lowPitchLine > trebleLowestPitchLine) trebleLowestPitchLine = lowPitchLine;
+          // Continue the bracket - use last note with ottava in this measure
+          trebleOttavaEnd = { measure: i, noteIndex: brackets[0]?.endIndex || 0, note: lastOttavaNote };
+          // Update extreme note positions for all notes in this measure's bracket
+          for (let j = (brackets[0]?.startIndex || 0); j <= (brackets[0]?.endIndex || 0) && j < trebleNotes.length; j++) {
+            const highPitchLine = getLowestPitchLine(trebleNotes[j]); // MIN = highest pitch in treble
+            const lowPitchLine = getHighestPitchLine(trebleNotes[j]); // MAX = lowest pitch in treble
+            if (highPitchLine < trebleHighestPitchLine) trebleHighestPitchLine = highPitchLine;
+            if (lowPitchLine > trebleLowestPitchLine) trebleLowestPitchLine = lowPitchLine;
+          }
         } else {
           // Draw previous bracket if exists
           if (currentTrebleOttava && trebleOttavaStart && trebleOttavaEnd) {
@@ -2339,12 +2403,19 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
               console.warn('Error drawing ottava bracket:', e);
             }
           }
-          // Start new bracket
+          // Start new bracket - use first note with ottava in this measure
           currentTrebleOttava = ottavaLabel;
-          trebleOttavaStart = { measure: i, noteIndex: 0, note: trebleNotes[0] };
-          trebleOttavaEnd = { measure: i, noteIndex: 0, note: trebleNotes[0] };
-          trebleHighestPitchLine = getLowestPitchLine(trebleNotes[0]); // MIN = highest pitch in treble
-          trebleLowestPitchLine = getHighestPitchLine(trebleNotes[0]); // MAX = lowest pitch in treble
+          trebleOttavaStart = { measure: i, noteIndex: brackets[0]?.startIndex || 0, note: firstOttavaNote };
+          trebleOttavaEnd = { measure: i, noteIndex: brackets[0]?.endIndex || 0, note: lastOttavaNote };
+          // Update extreme positions for all notes in the bracket
+          trebleHighestPitchLine = Infinity;
+          trebleLowestPitchLine = -Infinity;
+          for (let j = (brackets[0]?.startIndex || 0); j <= (brackets[0]?.endIndex || 0) && j < trebleNotes.length; j++) {
+            const highPitchLine = getLowestPitchLine(trebleNotes[j]); // MIN = highest pitch in treble
+            const lowPitchLine = getHighestPitchLine(trebleNotes[j]); // MAX = lowest pitch in treble
+            if (highPitchLine < trebleHighestPitchLine) trebleHighestPitchLine = highPitchLine;
+            if (lowPitchLine > trebleLowestPitchLine) trebleLowestPitchLine = lowPitchLine;
+          }
         }
       } else {
         // No ottava in this measure - draw any pending bracket

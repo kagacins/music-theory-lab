@@ -121,8 +121,8 @@ export function getChordSuffix(type) {
         'Half-Diminished 7th': 'm7♭5',
         'Minor-Major 7th': 'm(maj7)',
         // Suspended chords
-        'Suspended 2nd': 'sus2',
-        'Suspended 4th': 'sus4',
+        'Sus2': 'sus2',
+        'Sus4': 'sus4',
         // Extended chords
         'Add9': 'add9',
         'Major 9th': 'maj9',
@@ -130,7 +130,7 @@ export function getChordSuffix(type) {
         'Minor 9th': 'm9',
         '6/9': '6/9',
         // 6th chords
-        '6th': '6',
+        'Major 6th': '6',
         'Minor 6th': 'm6',
         // 11th and 13th
         'Dominant 11th': '11',

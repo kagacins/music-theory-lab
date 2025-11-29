@@ -311,7 +311,7 @@ function getChordTypeOptions(currentType) {
     const types = [
         'Major', 'Minor', 'Diminished', 'Augmented',
         'Dominant 7th', 'Major 7th', 'Minor 7th', 'Diminished 7th', 'Half-Diminished 7th',
-        'Suspended 4th', 'Suspended 2nd', 'Add9'
+        'Sus4', 'Sus2', 'Add9'
     ];
     return types.map(type =>
         `<option value="${type}" ${type === currentType ? 'selected' : ''}>${type}</option>`

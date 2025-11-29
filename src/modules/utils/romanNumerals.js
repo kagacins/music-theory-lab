@@ -149,7 +149,7 @@ export function noteToRomanNumeral(noteName, key, chordType) {
  */
 function getChordQualitySuffix(chordType, baseRoman) {
     // Basic triads - no suffix needed (include aliases Sus2/Sus4)
-    if (['Major', 'Minor', 'Augmented', 'Suspended 2nd', 'Sus2', 'Suspended 4th', 'Sus4', 'Power Chord'].includes(chordType)) {
+    if (['Major', 'Minor', 'Augmented', 'Sus2', 'Sus4', 'Power Chord'].includes(chordType)) {
         return '';
     }
 

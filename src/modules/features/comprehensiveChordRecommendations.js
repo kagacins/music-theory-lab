@@ -72,8 +72,8 @@ const CHORD_TYPES_TO_EVALUATE = [
     'Major 7th',
     'Minor 7th',
     'Diminished',
-    'Suspended 4th',
-    'Suspended 2nd',
+    'Sus4',
+    'Sus2',
     'Add9',
     'Major 6th',
     'Minor 6th',
@@ -980,7 +980,7 @@ function scoreStyleFit(chordType, style) {
 
     if (style === 'pop') {
         if (['Major', 'Minor', 'Dominant 7th'].includes(chordType)) score = 95;
-        else if (['Suspended 4th', 'Add9'].includes(chordType)) score = 80;
+        else if (['Sus4', 'Add9'].includes(chordType)) score = 80;
         else if (chordType.includes('9th') || chordType.includes('13th')) score = 30;
         else score = 60;
     } else if (style === 'jazz') {
@@ -994,7 +994,7 @@ function scoreStyleFit(chordType, style) {
         else score = 50;
     } else if (style === 'rock') {
         if (['Major', 'Minor', 'Dominant 7th'].includes(chordType)) score = 95;
-        else if (['Suspended 4th', 'Power 5th'].includes(chordType)) score = 90;
+        else if (['Sus4', 'Power 5th'].includes(chordType)) score = 90;
         else score = 60;
     } else if (style === 'indie') {
         if (chordType.includes('Add') || chordType.includes('6th')) score = 95;
@@ -1051,7 +1051,7 @@ function scoreMoodFit(nextChordType, currentChordType, mood) {
     } else if (mood === 'energetic') {
         if (nextChordType === 'Dominant 7th') score = 95;
         else if (nextChordType === 'Major') score = 90;
-        else if (nextChordType === 'Suspended 4th') score = 85;
+        else if (nextChordType === 'Sus4') score = 85;
         else if (nextChordType === 'Dominant 9th') score = 85;
         else score = 70;
     }

@@ -1,9 +1,15 @@
 /**
  * Recommendation Service
  * Phase 2.2: Recommendation Engine Integration
+ * Phase 5: Cross-Engine Coordination Integration
  *
  * This service bridges the existing chord recommendation engine with the sidebar UI.
  * It listens for progression changes and generates appropriate chord recommendations.
+ *
+ * Phase 5 adds integration with the coordinated recommendation system for:
+ * - User preference learning
+ * - Holistic recommendations across engines
+ * - Section generation capabilities
  */
 
 import { generateChordRecommendations } from '../features/chordRecommendations.js';
@@ -30,6 +36,12 @@ import {
 // Phase 3: Tension Arc System
 import { getTensionArcPlanner } from '../analysis/TensionArcPlanner.js';
 
+// Phase 5: Cross-Engine Coordination
+import { getCompositionContext } from '../recommendations/core/CompositionContext.js';
+import { getCoordinatedRecommendationService } from '../recommendations/coordination/CoordinatedRecommendationService.js';
+import { getUserPreferenceLearner } from '../recommendations/coordination/UserPreferenceLearner.js';
+import { getSectionGenerator } from '../recommendations/coordination/SectionGenerator.js';
+
 /**
  * RecommendationService Class
  * Manages chord recommendations and notifies listeners of updates
@@ -42,6 +54,13 @@ export class RecommendationService {
         this.currentAnalysis = null;
         this.isInitialized = false;
         this.harmonyAnalyzer = getHarmonyAnalyzer();
+
+        // Phase 5: Cross-engine coordination components
+        this._compositionContext = null;
+        this._coordinatedService = null;
+        this._preferenceLearner = null;
+        this._sectionGenerator = null;
+        this._phase5Enabled = true; // Can be toggled for A/B testing
     }
 
     /**
@@ -50,11 +69,43 @@ export class RecommendationService {
     initialize() {
         if (this.isInitialized) return;
 
+        // Phase 5: Initialize coordination components
+        this._initializePhase5Components();
+
         this.setupEventListeners();
         this.isInitialized = true;
 
         // Get initial recommendations
         this.refreshRecommendations();
+    }
+
+    /**
+     * Phase 5: Initialize cross-engine coordination components
+     */
+    _initializePhase5Components() {
+        try {
+            // Initialize composition context (shared state)
+            this._compositionContext = getCompositionContext();
+            this._compositionContext.initialize();
+
+            // Initialize user preference learner
+            this._preferenceLearner = getUserPreferenceLearner();
+            this._preferenceLearner.initialize();
+
+            // Initialize coordinated service
+            this._coordinatedService = getCoordinatedRecommendationService();
+            this._coordinatedService.setPreferenceLearner(this._preferenceLearner);
+            this._coordinatedService.initialize();
+
+            // Initialize section generator
+            this._sectionGenerator = getSectionGenerator();
+            this._sectionGenerator.initialize();
+
+            console.log('[Phase 5] Cross-engine coordination initialized');
+        } catch (error) {
+            console.warn('[Phase 5] Failed to initialize coordination components:', error);
+            this._phase5Enabled = false;
+        }
     }
 
     /**
@@ -377,6 +428,123 @@ export class RecommendationService {
     clearRecommendations() {
         this.currentRecommendations = [];
         this.notifyListeners();
+    }
+
+    // =========================================================================
+    // PHASE 5: Cross-Engine Coordination Methods
+    // =========================================================================
+
+    /**
+     * Record that the user selected a recommendation
+     * This helps the system learn user preferences over time
+     *
+     * @param {Object} recommendation - The selected recommendation
+     */
+    recordUserChoice(recommendation) {
+        if (!this._phase5Enabled || !this._preferenceLearner) return;
+
+        try {
+            this._preferenceLearner.recordChordChoice(
+                recommendation.chord || recommendation,
+                {
+                    function: recommendation.function,
+                    voiceLeadingScore: recommendation.voiceLeadingScore,
+                    style: localStorage.getItem('chord-suggestion-style'),
+                    mood: localStorage.getItem('chord-suggestion-mood')
+                }
+            );
+        } catch (error) {
+            console.warn('[Phase 5] Failed to record user choice:', error);
+        }
+    }
+
+    /**
+     * Get the Section Generator for complete section generation
+     * @returns {SectionGenerator|null}
+     */
+    getSectionGenerator() {
+        return this._sectionGenerator;
+    }
+
+    /**
+     * Get the Coordinated Recommendation Service for advanced features
+     * @returns {CoordinatedRecommendationService|null}
+     */
+    getCoordinatedService() {
+        return this._coordinatedService;
+    }
+
+    /**
+     * Get the User Preference Learner for preference management
+     * @returns {UserPreferenceLearner|null}
+     */
+    getPreferenceLearner() {
+        return this._preferenceLearner;
+    }
+
+    /**
+     * Get the Composition Context for shared state access
+     * @returns {CompositionContext|null}
+     */
+    getCompositionContext() {
+        return this._compositionContext;
+    }
+
+    /**
+     * Generate a complete section using the Section Generator
+     *
+     * @param {Object} options - Section generation options
+     * @returns {Object|null} Generated section or null if not available
+     */
+    generateSection(options = {}) {
+        if (!this._phase5Enabled || !this._sectionGenerator) {
+            console.warn('[Phase 5] Section generator not available');
+            return null;
+        }
+
+        return this._sectionGenerator.generateSection(options);
+    }
+
+    /**
+     * Get a suggestion for the next section type
+     *
+     * @param {Array} existingSections - Current section structure
+     * @returns {Object|null} Suggestion with reasoning
+     */
+    suggestNextSection(existingSections = []) {
+        if (!this._phase5Enabled || !this._sectionGenerator) {
+            return null;
+        }
+
+        return this._sectionGenerator.suggestNextSection(existingSections);
+    }
+
+    /**
+     * Get user's style profile based on learned preferences
+     * @returns {Object|null} Style profile
+     */
+    getUserStyleProfile() {
+        if (!this._phase5Enabled || !this._preferenceLearner) {
+            return null;
+        }
+
+        return this._preferenceLearner.getStyleProfile();
+    }
+
+    /**
+     * Check if Phase 5 features are enabled
+     * @returns {boolean}
+     */
+    isPhase5Enabled() {
+        return this._phase5Enabled;
+    }
+
+    /**
+     * Enable or disable Phase 5 features (for A/B testing)
+     * @param {boolean} enabled
+     */
+    setPhase5Enabled(enabled) {
+        this._phase5Enabled = enabled;
     }
 }
 

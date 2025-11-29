@@ -481,10 +481,8 @@ export class NotationComposer {
       'Power Chord': '5',
 
       // Suspended chords (all variants)
-      'Suspended 2nd': 'sus2',
-      'Suspended 4th': 'sus4',
-      'Suspended 2': 'sus2',
-      'Suspended 4': 'sus4',
+      'Sus2': 'sus2',
+      'Sus4': 'sus4',
       'Sus2': 'sus2',
       'Sus4': 'sus4',
 
@@ -498,7 +496,7 @@ export class NotationComposer {
 
       // Ninth chords
       'Add9': 'add9',
-      'Add 9': 'add9',
+      'Add9': 'add9',
       'Minor 9th': 'm9',
       'Minor 9': 'm9',
       'Major 9th': 'maj9',
@@ -1591,13 +1589,32 @@ export class NotationComposer {
    * @param {MouseEvent} e - Mouse event
    */
   handleMouseMove(e) {
-    const rect = this.config.container.getBoundingClientRect();
+    // Use e.target (the actual canvas) for correct coordinates in multi-page mode
+    const target = e.target || this.config.container;
+    const rect = target.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+
+    // In multi-page mode, determine which page this event is from
+    let currentPageIndex = null;
+    if (this.pageManager && target.id) {
+      const pages = this.pageManager.getAllPages();
+      for (let i = 0; i < pages.length; i++) {
+        if (pages[i].canvas === target || pages[i].canvas.id === target.id) {
+          currentPageIndex = i;
+          break;
+        }
+      }
+    }
 
     // Check if mouse is over any note region (uses actual VexFlow bounding boxes)
     let hoveredRegion = null;
     for (const region of this.noteRegions) {
+      // In multi-page mode, only check regions from the current page
+      if (currentPageIndex !== null && region.pageIndex !== undefined && region.pageIndex !== currentPageIndex) {
+        continue;
+      }
+
       if (region.bounds) {
         const { x: rx, y: ry, width, height } = region.bounds;
         if (

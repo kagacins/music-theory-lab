@@ -424,6 +424,7 @@ export class CompositionState {
      */
     buildChordSegments() {
         const progressionData = this.exportToProgressionData();
+        console.log('[buildChordSegments] Building from progressionData:', progressionData.map(c => `${c.root} ${c.type}`));
         this.chordSegments = [];
 
         let currentBeat = 0;
@@ -1460,6 +1461,15 @@ export class CompositionState {
         const block = this.trebleBlockSequence.blocks[0]; // Single treble block
         const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
 
+        console.log(`[syncMeasuresToTrebleBlock] Syncing ${this.measures.length} measures to treble block`);
+
+        // Ensure block has correct duration for all measures
+        const requiredBeats = this.measures.length * beatsPerMeasure;
+        if (block.beats !== requiredBeats) {
+            console.log(`[syncMeasuresToTrebleBlock] Resizing block from ${block.beats} to ${requiredBeats} beats`);
+            block.setDuration(requiredBeats);
+        }
+
         // Clear the block - reinitialize all units as rests
         const totalUnits = block.beats * UNITS_PER_BEAT;
         for (let i = 0; i < block.units.length; i++) {
@@ -1551,12 +1561,20 @@ export class CompositionState {
             });
         }
 
+        console.log(`[syncMeasuresToTrebleBlock] Found ${combinedNotes.length} combined notes to write:`,
+            combinedNotes.map(n => `${n.pitches?.join(',') || 'rest'} at unit ${n.startUnit} (${n.durationUnits} units)`));
+
         // Now write the combined notes to the block
         for (const note of combinedNotes) {
             if (note.startUnit >= 0 && note.startUnit < totalUnits) {
                 block.setNote(note.startUnit, note.durationUnits, note.isRest ? [] : note.pitches, note.attributes);
             }
         }
+
+        // Debug: verify notes after sync
+        const notesAfterSync = block.getNotes();
+        console.log(`[syncMeasuresToTrebleBlock] After sync, block has ${notesAfterSync.length} notes:`,
+            notesAfterSync.map(n => `${n.pitches?.join(',') || 'rest'} at unit ${n.startUnit} (${n.durationUnits} units)`));
     }
 
     /**
@@ -1738,12 +1756,25 @@ export class CompositionState {
      * @param {Object} attributes - Musical attributes
      */
     insertTrebleNoteWithShift(insertUnit, durationUnits, pitches, attributes = {}) {
+        // ALWAYS sync from measures before modifying the block sequence
+        // This ensures we have the latest notes, even if they were added via keyboard
         if (this.trebleBlockSequence.blocks.length === 0) {
+            console.log('[insertTrebleNoteWithShift] Initializing treble block sequence');
             this.initializeTrebleBlockSequence();
+        } else {
+            // Block exists but might be stale - force a re-sync from measures
+            console.log('[insertTrebleNoteWithShift] Re-syncing treble block from measures');
+            this.syncMeasuresToTrebleBlock();
         }
 
         const block = this.trebleBlockSequence.blocks[0];
         const totalUnits = block.units.length;
+
+        // Debug: log existing notes before modification
+        const notesBefore = block.getNotes();
+        console.log(`[insertTrebleNoteWithShift] BEFORE: ${notesBefore.length} notes in block:`,
+            notesBefore.map(n => `${n.pitches.join(',')} at unit ${n.startUnit} (${n.durationUnits} units)`));
+        console.log(`[insertTrebleNoteWithShift] Inserting at unit ${insertUnit}, duration ${durationUnits} units, pitches: ${pitches}`);
 
         // Step 1: Extend the block by the duration of the new note
         const newTotalUnits = totalUnits + durationUnits;
@@ -1767,6 +1798,11 @@ export class CompositionState {
 
         // Step 3: Insert the new note at insertUnit
         block.setNote(insertUnit, durationUnits, pitches, attributes);
+
+        // Debug: log notes after modification
+        const notesAfter = block.getNotes();
+        console.log(`[insertTrebleNoteWithShift] AFTER: ${notesAfter.length} notes in block:`,
+            notesAfter.map(n => `${n.pitches.join(',')||'rest'} at unit ${n.startUnit} (${n.durationUnits} units)`));
 
         // Step 4: Ensure we have enough measures
         const beatsPerMeasure = this.metadata.timeSignature?.num || 4;

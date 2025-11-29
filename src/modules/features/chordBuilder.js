@@ -137,9 +137,9 @@ function getContextAwareChordDescription(chordType, rootNote, baseDescription) {
         contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}m(maj7) combines the darkness of a minor triad with the tension of a major 7th. Often used as a passing chord in minor keys when the melody moves from the root to the major 7th, creating a cinematic, mysterious sound.`;
     }
 
-    // Suspended chords (sus2, sus4) - handle both full names and aliases
-    else if (chordType === 'Suspended 2nd' || chordType === 'Sus2' || chordType === 'Suspended 4th' || chordType === 'Sus4') {
-        const interval = (chordType.includes('2nd') || chordType === 'Sus2') ? '2nd' : '4th';
+    // Suspended chords (sus2, sus4)
+    else if (chordType === 'Sus2' || chordType === 'Sus4') {
+        const interval = (chordType === 'Sus2') ? '2nd' : '4th';
         const resolveInterval = '3rd';
         contextInfo = `\n\nWith ${rootNote} as the root, ${rootNote}sus${interval === '2nd' ? '2' : '4'} creates an unresolved, floating quality. It typically resolves when the ${interval} moves to the ${resolveInterval}, creating either ${rootNote} major or ${rootNote} minor. This creates a satisfying sense of arrival.`;
     }
@@ -3875,8 +3875,8 @@ export function selectBuilderChordBySymbol(root, type, playShutterSound = true, 
         'minor': 'Minor',
         'diminished': 'Diminished',
         'augmented': 'Augmented',
-        'sus2': 'Suspended 2nd',
-        'sus4': 'Suspended 4th',
+        'sus2': 'Sus2',
+        'sus4': 'Sus4',
         'major7': 'Major 7th',  // Note: CHORD_DEFINITIONS uses 'Major 7th' with space
         'minor7': 'Minor 7th',  // Note: CHORD_DEFINITIONS uses 'Minor 7th' with space
         'dominant7': 'Dominant 7th',  // Note: CHORD_DEFINITIONS uses 'Dominant 7th' with space

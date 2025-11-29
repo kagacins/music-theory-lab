@@ -162,7 +162,7 @@ export function scoreSectionFit(chord, sectionContext, key, options = {}) {
 
     // 5. Tension bonus (for building sections)
     if (positionAdj.tensionBonus) {
-        const tensionChords = ['Dominant 7th', 'Diminished', 'Augmented', 'Suspended 4th'];
+        const tensionChords = ['Dominant 7th', 'Diminished', 'Augmented', 'Sus4'];
         if (tensionChords.includes(chord.type)) {
             breakdown.tensionBonus = positionAdj.tensionBonus;
             totalAdjustment += positionAdj.tensionBonus;
@@ -184,7 +184,7 @@ export function scoreSectionFit(chord, sectionContext, key, options = {}) {
     // 7. Variety bonus (for middle positions - encourages harmonic movement)
     if (positionAdj.varietyBonus) {
         // Prefer chords that add color/movement in middle of sections
-        const varietyChords = ['Minor 7th', 'Major 7th', 'Dominant 7th', 'Add9', 'Suspended 4th', 'Suspended 2nd'];
+        const varietyChords = ['Minor 7th', 'Major 7th', 'Dominant 7th', 'Add9', 'Sus4', 'Sus2'];
         const isVarietyChord = varietyChords.includes(chord.type) || chordFunction === 'subdominant';
         if (isVarietyChord) {
             breakdown.varietyBonus = positionAdj.varietyBonus;
@@ -203,7 +203,7 @@ export function scoreSectionFit(chord, sectionContext, key, options = {}) {
             reasons.push('Prepares transition');
         }
         // Also reward suspended chords which create forward motion
-        if (chord.type === 'Suspended 4th' || chord.type === 'Dominant 7th') {
+        if (chord.type === 'Sus4' || chord.type === 'Dominant 7th') {
             const suspBonus = Math.round(bonus * 0.8);
             breakdown.suspensionBonus = suspBonus;
             totalAdjustment += suspBonus;
@@ -213,7 +213,7 @@ export function scoreSectionFit(chord, sectionContext, key, options = {}) {
 
     // 9. Suspension bonus (explicit sus chord preference at section ends)
     if (positionAdj.suspensionBonus) {
-        if (chord.type === 'Suspended 4th' || chord.type === 'Suspended 2nd') {
+        if (chord.type === 'Sus4' || chord.type === 'Sus2') {
             breakdown.suspensionBonus = positionAdj.suspensionBonus;
             totalAdjustment += positionAdj.suspensionBonus;
             reasons.push('Suspension creates anticipation');
@@ -312,7 +312,7 @@ export function scoreTransitionFit(chord, sectionContext, key) {
     }
 
     if (transitionRules.buildTension) {
-        const tensionChords = ['Dominant 7th', 'Suspended 4th', 'Diminished'];
+        const tensionChords = ['Dominant 7th', 'Sus4', 'Diminished'];
         if (tensionChords.includes(chord.type)) {
             breakdown.tensionBuild = 15;
             totalAdjustment += 15;

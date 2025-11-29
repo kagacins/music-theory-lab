@@ -16,7 +16,8 @@ import {
     isScaleTone,
     getScaleNotes,
     SCALES,
-    CHORD_INTERVALS
+    CHORD_INTERVALS,
+    STYLE_RULES
 } from './melodySuggestion.js';
 
 // -----------------------------------------------------------------------------
@@ -115,10 +116,10 @@ export const CONTOUR_SHAPES = {
 // -----------------------------------------------------------------------------
 
 export const PHRASE_LENGTHS = {
-    short: { notes: 4, label: 'Short (4 notes)', beats: 2 },
-    medium: { notes: 8, label: 'Medium (8 notes)', beats: 4 },
-    long: { notes: 12, label: 'Long (12 notes)', beats: 8 },
-    extended: { notes: 16, label: 'Extended (16 notes)', beats: 8 }
+    short: { notes: 4, label: '2 beats (half measure)', beats: 2 },
+    medium: { notes: 8, label: '4 beats (1 measure)', beats: 4 },
+    long: { notes: 12, label: '8 beats (2 measures)', beats: 8 },
+    extended: { notes: 16, label: '16 beats (4 measures)', beats: 16 }
 };
 
 export const RHYTHM_PATTERNS = {
@@ -190,6 +191,8 @@ const FLAT_NOTES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 
  * @param {string} options.previousNote - Last note before phrase (for voice leading)
  * @param {number} options.octave - Target octave (default 4)
  * @param {number} options.range - Range in semitones (default 12)
+ * @param {number} options.densityMultiplier - Note density multiplier (0.5-1.5, default 1.0)
+ * @param {Array} options.chordSequence - Chord sequence for multi-chord phrases
  * @returns {Object} Generated phrase with notes, rhythm, and scoring
  */
 export function generatePhrase({
@@ -202,7 +205,9 @@ export function generatePhrase({
     previousNote = null,
     octave = 4,
     range = 12,
-    // New: chord sequence for multi-chord phrases
+    // Note density multiplier (0.5 = sparse, 1.0 = normal, 1.5 = dense)
+    densityMultiplier = 1.0,
+    // Chord sequence for multi-chord phrases
     // Array of { chord, noteIndices } or null to use single chord
     chordSequence = null
 } = {}) {
@@ -210,7 +215,10 @@ export function generatePhrase({
     const phraseLength = PHRASE_LENGTHS[lengthId] || PHRASE_LENGTHS.medium;
     const rhythmPattern = RHYTHM_PATTERNS[rhythmId] || RHYTHM_PATTERNS.steady;
 
-    const noteCount = phraseLength.notes;
+    // Apply density multiplier to note count
+    // Clamp between 2 notes minimum and 24 notes maximum
+    const baseNoteCount = phraseLength.notes;
+    const noteCount = Math.max(2, Math.min(24, Math.round(baseNoteCount * densityMultiplier)));
     const notes = [];
     const noteDetails = [];
 
@@ -255,6 +263,9 @@ export function generatePhrase({
         const noteChord = getChordForNoteIndex(i);
         const noteChordTones = getChordTones(noteChord);
 
+        // Get style rules for scoring
+        const styleRules = STYLE_RULES[styleId] || STYLE_RULES.any;
+
         // Get candidates around target, using the note's chord context
         const candidates = getCandidatesAroundTarget(targetMidi, noteChord, key, scaleNotes, noteChordTones, styleId);
 
@@ -276,9 +287,10 @@ export function generatePhrase({
             score -= distanceFromTarget * 3;
 
             // Chord tone bonus - now using the chord for THIS note position
+            // Apply style-specific chordToneBoost
             const isChordToneOfNoteChord = noteChordTones.includes(candidate.midi % 12);
             if (isChordToneOfNoteChord) {
-                score += 20;
+                score += Math.round(20 * styleRules.chordToneBoost);
                 // Root and 5th get extra bonus at phrase boundaries
                 if (i === 0 || i === noteCount - 1) {
                     const rootPc = getPitchClass(noteChord.root);
@@ -288,9 +300,14 @@ export function generatePhrase({
                 }
             }
 
-            // Scale tone bonus
+            // Scale tone bonus - apply style-specific scaleToneBoost
             if (candidate.isScaleTone) {
-                score += 10;
+                score += Math.round(10 * styleRules.scaleToneBoost);
+            }
+
+            // Tension penalty for non-scale, non-chord tones
+            if (!candidate.isScaleTone && !isChordToneOfNoteChord) {
+                score -= Math.round(15 * styleRules.tensionPenalty);
             }
 
             // Voice leading from previous note
@@ -298,10 +315,19 @@ export function generatePhrase({
                 const prevMidi = noteToMidi(currentNote);
                 if (prevMidi !== null) {
                     const interval = Math.abs(candidate.midi - prevMidi);
-                    if (interval <= 2) score += 15; // Stepwise
+                    // Apply style-specific stepwiseBoost
+                    if (interval <= 2) score += Math.round(15 * styleRules.stepwiseBoost); // Stepwise
                     else if (interval <= 4) score += 10; // Small leap
                     else if (interval <= 7) score += 5; // Medium leap
                     else if (interval > 12) score -= 10; // Large leap penalty
+
+                    // Apply preferred/avoided intervals
+                    if (styleRules.preferredIntervals && styleRules.preferredIntervals.includes(interval)) {
+                        score += 5;
+                    }
+                    if (styleRules.avoidIntervals && styleRules.avoidIntervals.includes(interval)) {
+                        score -= 8;
+                    }
                 }
             }
 
@@ -367,7 +393,23 @@ export function generatePhrase({
     }
 
     // Generate rhythm
-    const rhythm = rhythmPattern.getPattern(noteCount);
+    let rhythm = rhythmPattern.getPattern(noteCount);
+
+    // Apply density-based rhythm scaling:
+    // - Sparse (density < 1.0): Longer notes (multiply rhythm values)
+    // - Dense (density > 1.0): Shorter notes (divide rhythm values)
+    // This ensures "Sparse" produces quarter/half notes, not 16th notes
+    if (densityMultiplier !== 1.0) {
+        // Inverse relationship: lower density = longer notes
+        // densityMultiplier 0.5 (sparse) → rhythm multiplier 2.0 (double length)
+        // densityMultiplier 1.5 (dense) → rhythm multiplier 0.67 (shorter)
+        const rhythmMultiplier = 1 / densityMultiplier;
+        rhythm = rhythm.map(r => {
+            const scaled = r * rhythmMultiplier;
+            // Clamp to reasonable range: 0.5 (16th) to 4 (half note)
+            return Math.max(0.5, Math.min(4, scaled));
+        });
+    }
 
     // Calculate overall phrase score
     const phraseScore = calculatePhraseScore(noteDetails, contour, chord, key);
@@ -386,12 +428,15 @@ export function generatePhrase({
         rhythmPattern: rhythmId,
         phraseScore,
         chordsUsed,
+        noteCount,
+        densityMultiplier,
         context: {
             chord,
             key,
             styleId,
             octave,
             range,
+            densityMultiplier,
             chordSequence: chordSequence || null
         }
     };
@@ -515,6 +560,22 @@ export function generatePhraseCandidates(options, count = 5) {
 
     // Sort by score (highest first)
     candidates.sort((a, b) => b.phraseScore - a.phraseScore);
+
+    // Normalize phraseScore to 0-100% range (min-max normalization)
+    const rawScores = candidates.map(c => c.phraseScore);
+    const minScore = Math.min(...rawScores);
+    const maxScore = Math.max(...rawScores);
+    const scoreRange = maxScore - minScore;
+
+    // Normalize scores: highest = 100%, lowest = 10% (to show they still have value)
+    candidates.forEach(c => {
+        if (scoreRange > 0) {
+            const normalized = ((c.phraseScore - minScore) / scoreRange) * 90 + 10;
+            c.phraseScore = Math.round(normalized);
+        } else {
+            c.phraseScore = 75;
+        }
+    });
 
     // Add rank to each candidate
     candidates.forEach((c, i) => {

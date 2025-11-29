@@ -234,8 +234,8 @@ export const CHORD_TENSION_SCORES = {
     'Augmented': { baseTension: 0.75, stability: 0.25, resolution: false },
 
     // Suspended
-    'Suspended 2nd': { baseTension: 0.35, stability: 0.70, resolution: false },
-    'Suspended 4th': { baseTension: 0.40, stability: 0.65, resolution: false },
+    'Sus2': { baseTension: 0.35, stability: 0.70, resolution: false },
+    'Sus4': { baseTension: 0.40, stability: 0.65, resolution: false },
 
     // Seventh chords
     'Dominant 7th': { baseTension: 0.70, stability: 0.35, resolution: false },

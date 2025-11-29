@@ -179,9 +179,9 @@ function buildChordNotes(rootNote, chordType) {
         'Diminished': { intervals: [0, 3, 6] },
         'Diminished 7th': { intervals: [0, 3, 6, 9] },
         'Augmented': { intervals: [0, 4, 8] },
-        'Suspended 2nd': { intervals: [0, 2, 7] },
-        'Suspended 4th': { intervals: [0, 5, 7] },
-        'Add 9': { intervals: [0, 4, 7, 14] },
+        'Sus2': { intervals: [0, 2, 7] },
+        'Sus4': { intervals: [0, 5, 7] },
+        'Add9': { intervals: [0, 4, 7, 14] },
         'Minor 9th': { intervals: [0, 3, 7, 10, 14] },
         'Major 9th': { intervals: [0, 4, 7, 11, 14] },
         'Dominant 9th': { intervals: [0, 4, 7, 10, 14] },
@@ -400,9 +400,9 @@ function getChordSymbol(rootNote, chordType) {
         'Minor 7th': 'm7',
         'Diminished': 'dim',
         'Augmented': 'aug',
-        'Suspended 2nd': 'sus2',
-        'Suspended 4th': 'sus4',
-        'Add 9': 'add9',
+        'Sus2': 'sus2',
+        'Sus4': 'sus4',
+        'Add9': 'add9',
         'Minor 9th': 'm9',
         'Major 9th': 'maj9'
     };
@@ -598,7 +598,7 @@ function getChordSubstitutions(chord, key, chordIndex = null, progressionData = 
         });
         substitutions.push({
             rootNote: chord.root,
-            chordType: 'Add 9',
+            chordType: 'Add9',
             reason: 'Add 9 for shimmer - modern, bright voicing'
         });
     } else if (chord.type === 'Minor') {
@@ -618,12 +618,12 @@ function getChordSubstitutions(chord, key, chordIndex = null, progressionData = 
     if (chord.type === 'Major') {
         substitutions.push({
             rootNote: chord.root,
-            chordType: 'Suspended 4th',
+            chordType: 'Sus4',
             reason: 'Sus4 for tension - creates anticipation, wants to resolve to major'
         });
         substitutions.push({
             rootNote: chord.root,
-            chordType: 'Suspended 2nd',
+            chordType: 'Sus2',
             reason: 'Sus2 for openness - airy, ambiguous quality'
         });
     }

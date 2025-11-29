@@ -40,7 +40,7 @@ export const CHORD_TYPE_PROFILES = {
             jazzy: 0.8
         },
         contextRules: {
-            preferAfter: ['Dominant 7th', 'Suspended 4th', 'Diminished'],
+            preferAfter: ['Dominant 7th', 'Sus4', 'Diminished'],
             avoidAfter: [],
             resolvesTension: true,
             expectsResolution: false
@@ -334,7 +334,7 @@ export const CHORD_TYPE_PROFILES = {
         }
     },
 
-    'Suspended 4th': {
+    'Sus4': {
         baseScore: 80,
         styleMultipliers: {
             pop: 1.3,
@@ -354,7 +354,7 @@ export const CHORD_TYPE_PROFILES = {
         },
         contextRules: {
             preferAfter: ['Major', 'Minor'],
-            avoidAfter: ['Suspended 4th', 'Suspended 2nd'],
+            avoidAfter: ['Sus4', 'Sus2'],
             resolvesTension: false,
             expectsResolution: true,
             resolvesTo: ['Major', 'Minor'],
@@ -369,7 +369,7 @@ export const CHORD_TYPE_PROFILES = {
         }
     },
 
-    'Suspended 2nd': {
+    'Sus2': {
         baseScore: 75,
         styleMultipliers: {
             pop: 1.2,
@@ -389,7 +389,7 @@ export const CHORD_TYPE_PROFILES = {
         },
         contextRules: {
             preferAfter: ['Major', 'Minor'],
-            avoidAfter: ['Suspended 4th', 'Suspended 2nd'],
+            avoidAfter: ['Sus4', 'Sus2'],
             resolvesTension: false,
             expectsResolution: true,
             resolvesTo: ['Major', 'Minor'],

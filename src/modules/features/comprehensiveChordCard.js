@@ -116,7 +116,7 @@ export function createComprehensiveDetailedCardHTML(chord, index, key, harmonyAn
     const types = [
         'Major', 'Minor', 'Diminished', 'Augmented',
         'Dominant 7th', 'Major 7th', 'Minor 7th', 'Diminished 7th', 'Half-Diminished 7th',
-        'Suspended 4th', 'Suspended 2nd', 'Add9', 'Major 6th', 'Minor 6th',
+        'Sus4', 'Sus2', 'Add9', 'Major 6th', 'Minor 6th',
         'Dominant 9th', 'Major 9th', 'Minor 9th'
     ];
     const typeOptions = types.map(type =>

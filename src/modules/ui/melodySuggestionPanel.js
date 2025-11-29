@@ -264,14 +264,29 @@ export function showLoadingState() {
 
 /**
  * Update context display
+ * Supports both compact inline mode (new UI) and legacy block mode
  */
 export function updateSuggestionContext(chord, key, previousNote, nextChord = null, anticipationFactor = 0) {
+    const chordDisplay = chord ? `${chord.root} ${chord.type}` : '-';
+    const keyDisplay = key || 'C';
+    const prevDisplay = previousNote || '-';
+
+    // Try compact inline elements first (new UI)
+    const ctxChord = document.getElementById('ctx-chord');
+    const ctxKey = document.getElementById('ctx-key');
+    const ctxPrev = document.getElementById('ctx-prev');
+
+    if (ctxChord && ctxKey && ctxPrev) {
+        // New compact inline UI
+        ctxChord.textContent = chordDisplay;
+        ctxKey.textContent = keyDisplay;
+        ctxPrev.textContent = prevDisplay;
+        return;
+    }
+
+    // Fall back to legacy block display
     const contextEl = document.getElementById('melody-suggestion-context');
     if (!contextEl) return;
-
-    const chordDisplay = chord ? `${chord.root} ${chord.type}` : 'No chord';
-    const keyDisplay = key || 'C';
-    const prevDisplay = previousNote || 'None';
 
     // Build next chord display if available
     let nextChordHTML = '';

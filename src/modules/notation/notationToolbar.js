@@ -75,6 +75,7 @@ export class NotationToolbar {
     this.selectionDuration = null;  // null = no selection, 'mixed' = multiple durations, '4n' = all same
     this.selectionArticulation = null;  // null = none, 'mixed' = multiple, 'staccato' = all same
     this.selectionDotted = null;  // null = no selection, 'mixed' = multiple, true/false = all same
+    this.selectionTied = null;  // null = no selection, 'mixed' = multiple, true/false = all same
 
     // Callbacks
     this.onDurationChange = options.onDurationChange || (() => {});
@@ -792,6 +793,7 @@ export class NotationToolbar {
       this.selectionDotted = null;
       this.selectionIsRest = null;
       this.selectionAccidental = null;
+      this.selectionTied = null;
 
       // Hide selection indicator
       const indicator = this.container?.querySelector('.selection-indicator');
@@ -799,6 +801,8 @@ export class NotationToolbar {
 
       // Reset accidental buttons to show current toolbar state
       this.updateAccidentalButtons();
+      // Reset tie button
+      this.updateTieButtonForSelection();
 
       return;
     }
@@ -809,6 +813,7 @@ export class NotationToolbar {
     const dottedStates = new Set();
     const restStates = new Set();
     const accidentals = new Set();
+    const tiedStates = new Set();
 
     selectedNotes.forEach(note => {
       if (note.duration) durations.add(note.duration);
@@ -816,6 +821,7 @@ export class NotationToolbar {
       dottedStates.add(note.dotted || false);
       restStates.add(note.isRest || note.type === 'rest' || false);
       accidentals.add(note.accidental || 'none');
+      tiedStates.add(note.tied || note.isTied || false);
     });
 
     // Set selection state
@@ -824,6 +830,7 @@ export class NotationToolbar {
     this.selectionDotted = dottedStates.size === 1 ? [...dottedStates][0] : 'mixed';
     this.selectionIsRest = restStates.size === 1 ? [...restStates][0] : 'mixed';
     this.selectionAccidental = accidentals.size === 1 ? ([...accidentals][0] === 'none' ? null : [...accidentals][0]) : 'mixed';
+    this.selectionTied = tiedStates.size === 1 ? [...tiedStates][0] : 'mixed';
 
     console.log('[NotationToolbar] Selection state:', {
       count: this.selectedNotesCount,
@@ -831,7 +838,8 @@ export class NotationToolbar {
       articulation: this.selectionArticulation,
       dotted: this.selectionDotted,
       isRest: this.selectionIsRest,
-      accidental: this.selectionAccidental
+      accidental: this.selectionAccidental,
+      tied: this.selectionTied
     });
 
     // Update selection indicator
@@ -853,6 +861,7 @@ export class NotationToolbar {
     this.updateDotButtonForSelection();
     this.updateRestButtonForSelection();
     this.updateAccidentalButtonsForSelection();
+    this.updateTieButtonForSelection();
   }
 
   /**
@@ -970,6 +979,29 @@ export class NotationToolbar {
         btn.title = accName;
       }
     });
+  }
+
+  /**
+   * Update tie button to show selection state
+   */
+  updateTieButtonForSelection() {
+    if (!this.container) return;
+
+    const btn = this.container.querySelector('.tie-btn');
+    if (!btn) return;
+
+    const isActive = this.selectionTied === true;
+    const isMixed = this.selectionTied === 'mixed';
+
+    btn.classList.toggle('active', isActive);
+    btn.classList.toggle('mixed', isMixed);
+
+    // Update title
+    if (this.selectedNotesCount > 0) {
+      btn.title = isActive ? 'Remove tie from selected note(s)' : 'Tie selected note(s) to next';
+    } else {
+      btn.title = 'Tie';
+    }
   }
 
   /**

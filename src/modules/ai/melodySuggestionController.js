@@ -178,14 +178,48 @@ export function refreshSuggestions() {
     }
 
     // Get current context
-    const chord = measure.chord;
     const key = compositionState.metadata.key;
 
-    // Get chord context including next chord for anticipation
+    // Get chord context for where the NEW note would be inserted (after selected note)
+    // This is more accurate than getting context at the selected note's position
     const noteIndex = selectedNoteInfo ? selectedNoteInfo.noteIndex : 0;
-    const chordContext = getChordContext(contextMeasureIndex, noteIndex);
-    const nextChord = chordContext?.nextChord || null;
-    const anticipationFactor = chordContext?.anticipationFactor || 0;
+    const chordContextAtSelected = getChordContext(contextMeasureIndex, noteIndex);
+
+    // Calculate where the new note would land (after the selected note ends)
+    // We need to get context at noteIndex + 1, or account for the selected note's duration
+    let insertionChordContext = chordContextAtSelected;
+    let effectiveChord = measure.chord;
+    let nextChord = chordContextAtSelected?.nextChord || null;
+    let anticipationFactor = chordContextAtSelected?.anticipationFactor || 0;
+
+    if (selectedNoteInfo && selectedNoteInfo.note) {
+        // Get chord context at the position AFTER the selected note
+        // This is where the new note would actually be inserted
+        const chordContextAfterSelected = getChordContext(contextMeasureIndex, noteIndex + 1);
+
+        if (chordContextAfterSelected) {
+            // Check if the insertion point lands in a different chord
+            const selectedChord = chordContextAtSelected?.currentChord;
+            const insertionChord = chordContextAfterSelected?.currentChord;
+
+            if (insertionChord && selectedChord &&
+                (insertionChord.root !== selectedChord.root || insertionChord.type !== selectedChord.type)) {
+                // New note would land in a DIFFERENT chord - use that as the primary chord
+                effectiveChord = insertionChord;
+                nextChord = chordContextAfterSelected.nextChord;
+                anticipationFactor = chordContextAfterSelected.anticipationFactor;
+                insertionChordContext = chordContextAfterSelected;
+                console.log(`🎯 New note will land in different chord: ${insertionChord.root} ${insertionChord.type}`);
+            } else if (insertionChord) {
+                // Same chord, but update context for accurate anticipation
+                effectiveChord = insertionChord;
+                nextChord = chordContextAfterSelected.nextChord;
+                anticipationFactor = chordContextAfterSelected.anticipationFactor;
+            }
+        }
+    } else {
+        effectiveChord = measure.chord;
+    }
 
     // Get the reference note (selected note or last note)
     let previousNote = null;
@@ -239,8 +273,9 @@ export function refreshSuggestions() {
     }
 
     // Generate and display suggestions
+    // Use effectiveChord (where new note will land) instead of measure.chord (where selected note is)
     updateSuggestions({
-        chord: chord.root ? chord : { root: 'C', type: 'Major' },
+        chord: effectiveChord?.root ? effectiveChord : { root: 'C', type: 'Major' },
         key,
         previousNote: previousNote,
         styleId: currentStyleId,
@@ -372,7 +407,8 @@ function showNoteInsertModeDialog(suggestion) {
 
     const dialog = document.createElement('div');
     dialog.id = 'note-insert-mode-dialog';
-    dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center';
+    dialog.style.zIndex = '10001';
     dialog.innerHTML = `
         <div class="bg-white rounded-lg shadow-xl p-5 max-w-md w-full mx-4">
             <h3 class="font-semibold text-gray-800 mb-3">Insert Note: ${suggestion.note}</h3>
