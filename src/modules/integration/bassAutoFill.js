@@ -7,6 +7,71 @@
  * Based on Phase 1.2 of progression-builder-integration.md
  */
 
+// Intervals for different chord types (in semitones from root)
+const CHORD_INTERVALS = {
+    'Major': [0, 4, 7],
+    'Minor': [0, 3, 7],
+    'Diminished': [0, 3, 6],
+    'Augmented': [0, 4, 8],
+    'Major7': [0, 4, 7, 11],
+    'Minor7': [0, 3, 7, 10],
+    'Dominant7': [0, 4, 7, 10],
+    'Diminished7': [0, 3, 6, 9],
+    'HalfDiminished7': [0, 3, 6, 10],
+    'Sus2': [0, 2, 7],
+    'Sus4': [0, 5, 7],
+    'Add9': [0, 4, 7, 14],
+    'Major6': [0, 4, 7, 9],
+    'Minor6': [0, 3, 7, 9],
+    'Major9': [0, 4, 7, 11, 14],
+    'Minor9': [0, 3, 7, 10, 14],
+    'Dominant9': [0, 4, 7, 10, 14]
+};
+
+// Note names for calculation
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const NOTE_TO_SEMITONE = {
+    'C': 0, 'C#': 1, 'Db': 1,
+    'D': 2, 'D#': 3, 'Eb': 3,
+    'E': 4, 'Fb': 4,
+    'F': 5, 'E#': 5, 'F#': 6, 'Gb': 6,
+    'G': 7, 'G#': 8, 'Ab': 8,
+    'A': 9, 'A#': 10, 'Bb': 10,
+    'B': 11, 'Cb': 11
+};
+
+/**
+ * Get the bass note based on chord inversion and bassFollowsInversion setting
+ * @param {object} chord - Chord data { root, type, inversion }
+ * @param {boolean} bassFollowsInversion - Whether bass should follow inversion
+ * @param {number} octave - Bass octave (default: 2)
+ * @returns {string} Bass note with octave (e.g., 'C2', 'E2', 'G2')
+ */
+function getBassNoteForChord(chord, bassFollowsInversion, octave = 2) {
+    // If not following inversion, always return root
+    if (!bassFollowsInversion || !chord.inversion || chord.inversion === 0) {
+        return `${chord.root}${octave}`;
+    }
+
+    // Get intervals for this chord type
+    const intervals = CHORD_INTERVALS[chord.type] || CHORD_INTERVALS['Major'];
+
+    // Get the interval index for this inversion (clamped to available intervals)
+    const inversionIndex = Math.min(chord.inversion, intervals.length - 1);
+    const semitones = intervals[inversionIndex];
+
+    // Calculate the bass note
+    const rootSemitone = NOTE_TO_SEMITONE[chord.root];
+    if (rootSemitone === undefined) {
+        return `${chord.root}${octave}`; // Fallback to root if unknown note
+    }
+
+    const bassNoteSemitone = (rootSemitone + semitones) % 12;
+    const bassNoteName = NOTE_NAMES[bassNoteSemitone];
+
+    return `${bassNoteName}${octave}`;
+}
+
 /**
  * Convert note name to MIDI number (standalone implementation)
  * @param {string} note - Note name with octave (e.g., 'C4', 'D#3')
@@ -63,7 +128,8 @@ export function generateBassVoicing(chord, previousChord = null, options = {}) {
         timeSignature = { num: 4, denom: 4 },
         style = 'classical',
         beatsInMeasure = 4, // New: how many beats this chord occupies in this measure
-        isChordContinuation = false // New: is this a tied continuation from previous measure?
+        isChordContinuation = false, // New: is this a tied continuation from previous measure?
+        bassFollowsInversion = false // New: whether bass should follow chord inversion
     } = options;
 
     if (!chord || !chord.root) {
@@ -76,21 +142,21 @@ export function generateBassVoicing(chord, previousChord = null, options = {}) {
     // If this is a chord continuation (tied from previous measure),
     // generate a simple tied whole note (or fill the available beats)
     if (isChordContinuation) {
-        return generateTiedBass(chord, chordNotes, beatsInMeasure);
+        return generateTiedBass(chord, chordNotes, beatsInMeasure, bassFollowsInversion);
     }
 
     // First chord: use root position
     if (!previousChord || !previousChord.root) {
-        return generateFirstChordBass(chord, chordNotes, bassPattern, timeSignature, beatsInMeasure);
+        return generateFirstChordBass(chord, chordNotes, bassPattern, timeSignature, beatsInMeasure, bassFollowsInversion);
     }
 
     // Subsequent chords: use voice leading
     if (voiceLeadingStrict) {
-        return generateVoiceLedBass(chord, chordNotes, previousChord, bassPattern, timeSignature, beatsInMeasure);
+        return generateVoiceLedBass(chord, chordNotes, previousChord, bassPattern, timeSignature, beatsInMeasure, bassFollowsInversion);
     }
 
     // Fallback: simple root note
-    return generateSimpleBass(chord, chordNotes, bassPattern, timeSignature, beatsInMeasure);
+    return generateSimpleBass(chord, chordNotes, bassPattern, timeSignature, beatsInMeasure, bassFollowsInversion);
 }
 
 /**
@@ -143,16 +209,19 @@ function getChordNotesInBassRegister(chord) {
  * @param {array} chordNotes - Available bass notes
  * @param {string} pattern - Bass pattern
  * @param {object} timeSignature - Time signature
+ * @param {number} beatsInMeasure - Number of beats to fill
+ * @param {boolean} bassFollowsInversion - Whether bass should follow chord inversion
  * @returns {object} Bass voicing
  */
-function generateFirstChordBass(chord, chordNotes, pattern, timeSignature) {
-    const root = `${chord.root}2`; // Root in bass octave
+function generateFirstChordBass(chord, chordNotes, pattern, timeSignature, beatsInMeasure = 4, bassFollowsInversion = false) {
+    // Get the bass note based on inversion setting
+    const bassNote = getBassNoteForChord(chord, bassFollowsInversion, 2);
 
     if (pattern === 'whole-note') {
         return {
             notes: [{
                 type: 'note',
-                pitch: root,
+                pitch: bassNote,
                 duration: '1n',
                 beat: 0,
                 dotted: false
@@ -164,7 +233,7 @@ function generateFirstChordBass(chord, chordNotes, pattern, timeSignature) {
         const fifth = findFifth(chord.root, chordNotes);
         return {
             notes: [
-                { type: 'note', pitch: root, duration: '2n', beat: 0, dotted: false },
+                { type: 'note', pitch: bassNote, duration: '2n', beat: 0, dotted: false },
                 { type: 'note', pitch: fifth, duration: '2n', beat: 2, dotted: false }
             ]
         };
@@ -179,17 +248,17 @@ function generateFirstChordBass(chord, chordNotes, pattern, timeSignature) {
     }
 
     if (pattern === 'walking' && timeSignature.num === 4) {
-        // For first chord, create walking pattern starting from root
-        // Pattern: root → up a step → back to root → fifth
-        const rootMidi = noteToMidi(root);
-        const approachNote = midiToNoteName(rootMidi + 1); // Whole step up
+        // For first chord, create walking pattern starting from bass note
+        // Pattern: bass → up a step → back to bass → fifth
+        const bassMidi = noteToMidi(bassNote);
+        const approachNote = midiToNoteName(bassMidi + 1); // Whole step up
         const fifth = findFifth(chord.root, chordNotes);
 
         return {
             notes: [
-                { type: 'note', pitch: root, duration: '4n', beat: 0, dotted: false },
+                { type: 'note', pitch: bassNote, duration: '4n', beat: 0, dotted: false },
                 { type: 'note', pitch: approachNote, duration: '4n', beat: 1, dotted: false },
-                { type: 'note', pitch: root, duration: '4n', beat: 2, dotted: false },
+                { type: 'note', pitch: bassNote, duration: '4n', beat: 2, dotted: false },
                 { type: 'note', pitch: fifth, duration: '4n', beat: 3, dotted: false }
             ]
         };
@@ -199,7 +268,7 @@ function generateFirstChordBass(chord, chordNotes, pattern, timeSignature) {
     return {
         notes: [{
             type: 'note',
-            pitch: root,
+            pitch: bassNote,
             duration: '1n',
             beat: 0,
             dotted: false
@@ -214,9 +283,11 @@ function generateFirstChordBass(chord, chordNotes, pattern, timeSignature) {
  * @param {object} previousChord - Previous chord
  * @param {string} pattern - Bass pattern
  * @param {object} timeSignature - Time signature
+ * @param {number} beatsInMeasure - Number of beats to fill
+ * @param {boolean} bassFollowsInversion - Whether bass should follow chord inversion
  * @returns {object} Bass voicing
  */
-function generateVoiceLedBass(chord, chordNotes, previousChord, pattern, timeSignature) {
+function generateVoiceLedBass(chord, chordNotes, previousChord, pattern, timeSignature, beatsInMeasure = 4, bassFollowsInversion = false) {
     // CRITICAL FIX: Get the ACTUAL bass note from previous chord's generated bass
     // Don't assume it was the root in octave 2 - use the actual generated note!
     let previousBass = `${previousChord.root}2`; // Default fallback
@@ -235,10 +306,9 @@ function generateVoiceLedBass(chord, chordNotes, previousChord, pattern, timeSig
     // Find closest note in current chord to previous bass (octave 2 only)
     const closestNote = findClosestNote(bassOctaveNotes, previousMidi);
 
-    // Phase 1C Round 4 Fix: Only use voice leading (closestNote) for whole-note pattern
-    // All other patterns (root-fifth, arpeggio, alberti, walking) should use the actual chord root
-    // to maintain the pattern's musical intent
-    const actualRoot = `${chord.root}2`;
+    // Get the bass note based on inversion setting (Phase: Bass Follows Inversion)
+    // Use this for patterns that emphasize the bass note (root-fifth, walking, etc.)
+    const bassNote = getBassNoteForChord(chord, bassFollowsInversion, 2);
 
     if (pattern === 'whole-note') {
         // Whole-note pattern uses voice leading for smooth bass lines
@@ -257,8 +327,8 @@ function generateVoiceLedBass(chord, chordNotes, previousChord, pattern, timeSig
         const fifth = findFifth(chord.root, chordNotes);
         return {
             notes: [
-                // Use actual root, not voice-led note, to maintain root-fifth pattern integrity
-                { type: 'note', pitch: actualRoot, duration: '2n', beat: 0, dotted: false },
+                // Use bass note (respects inversion setting) to maintain pattern integrity
+                { type: 'note', pitch: bassNote, duration: '2n', beat: 0, dotted: false },
                 { type: 'note', pitch: fifth, duration: '2n', beat: 2, dotted: false }
             ]
         };
@@ -297,10 +367,12 @@ function generateVoiceLedBass(chord, chordNotes, previousChord, pattern, timeSig
  * @param {object} chord - Chord data
  * @param {array} chordNotes - Available bass notes
  * @param {number} beatsInMeasure - Number of beats to fill in this measure
+ * @param {boolean} bassFollowsInversion - Whether bass should follow chord inversion
  * @returns {object} Bass voicing with tied notes
  */
-function generateTiedBass(chord, chordNotes, beatsInMeasure) {
-    const root = `${chord.root}2`;
+function generateTiedBass(chord, chordNotes, beatsInMeasure, bassFollowsInversion = false) {
+    // Get the bass note based on inversion setting
+    const bassNote = getBassNoteForChord(chord, bassFollowsInversion, 2);
 
     // Import the note+tie algorithm from vexFlowRenderer
     // For now, use a simple whole note if beatsInMeasure === 4, otherwise use the appropriate duration
@@ -314,7 +386,7 @@ function generateTiedBass(chord, chordNotes, beatsInMeasure) {
     return {
         notes: [{
             type: 'note',
-            pitch: root,
+            pitch: bassNote,
             duration: duration,
             beat: 0,
             dotted: duration.includes('.'),
@@ -324,16 +396,18 @@ function generateTiedBass(chord, chordNotes, beatsInMeasure) {
 }
 
 /**
- * Generate simple bass (root note)
+ * Generate simple bass (root note or inversion bass note)
  * @param {object} chord - Chord data
  * @param {array} chordNotes - Available bass notes
  * @param {string} pattern - Bass pattern
  * @param {object} timeSignature - Time signature
  * @param {number} beatsInMeasure - Number of beats to fill (default: 4)
+ * @param {boolean} bassFollowsInversion - Whether bass should follow chord inversion
  * @returns {object} Bass voicing
  */
-function generateSimpleBass(chord, chordNotes, pattern, timeSignature, beatsInMeasure = 4) {
-    const root = `${chord.root}2`;
+function generateSimpleBass(chord, chordNotes, pattern, timeSignature, beatsInMeasure = 4, bassFollowsInversion = false) {
+    // Get the bass note based on inversion setting
+    const bassNote = getBassNoteForChord(chord, bassFollowsInversion, 2);
 
     // Use appropriate duration based on beatsInMeasure
     const duration = beatsInMeasure === 4 ? '1n' :
@@ -346,7 +420,7 @@ function generateSimpleBass(chord, chordNotes, pattern, timeSignature, beatsInMe
     return {
         notes: [{
             type: 'note',
-            pitch: root,
+            pitch: bassNote,
             duration: duration,
             beat: 0,
             dotted: duration.includes('.')
@@ -682,7 +756,7 @@ function getDurationBeats(duration) {
  * Generate bass pattern for an entire building block duration
  * This handles variable durations (e.g., 7 beats) and creates proper rhythmic patterns
  *
- * @param {object} chord - Chord data { root, type, notes }
+ * @param {object} chord - Chord data { root, type, notes, inversion }
  * @param {object|null} previousChord - Previous chord for voice leading
  * @param {number} totalBeats - Total duration of the building block in beats
  * @param {object} options - Generation options
@@ -691,6 +765,7 @@ function getDurationBeats(duration) {
 export function generateBuildingBlockBass(chord, previousChord = null, totalBeats, options = {}) {
     const {
         bassPattern = 'root-fifth',
+        bassFollowsInversion = false,
         timeSignature = { num: 4, denom: 4 },
     } = options;
 
@@ -699,17 +774,19 @@ export function generateBuildingBlockBass(chord, previousChord = null, totalBeat
     }
 
     const chordNotes = getChordNotesInBassRegister(chord);
-    const root = `${chord.root}2`;
+    // Get the bass note based on inversion setting
+    const bassNote = getBassNoteForChord(chord, bassFollowsInversion, 2);
     const fifth = findFifth(chord.root, chordNotes);
     const beatsPerMeasure = timeSignature.num || 4;
 
     // Generate the pattern based on type
+    // Note: bassNote respects the bassFollowsInversion setting
     switch (bassPattern) {
         case 'whole-note':
-            return generateWholeNoteBlockBass(root, totalBeats, beatsPerMeasure);
+            return generateWholeNoteBlockBass(bassNote, totalBeats, beatsPerMeasure);
 
         case 'root-fifth':
-            return generateRootFifthBlockBass(root, fifth, totalBeats, beatsPerMeasure);
+            return generateRootFifthBlockBass(bassNote, fifth, totalBeats, beatsPerMeasure);
 
         case 'arpeggio':
             return generateArpeggioBlockBass(chordNotes, totalBeats, beatsPerMeasure);
@@ -722,13 +799,13 @@ export function generateBuildingBlockBass(chord, previousChord = null, totalBeat
 
         // Polyphonic patterns
         case 'broken-octave':
-            return generateBrokenOctaveBlockBass(root, totalBeats, beatsPerMeasure);
+            return generateBrokenOctaveBlockBass(bassNote, totalBeats, beatsPerMeasure);
 
         case 'octave-doubling':
-            return generateOctaveDoublingBlockBass(root, totalBeats, beatsPerMeasure);
+            return generateOctaveDoublingBlockBass(bassNote, totalBeats, beatsPerMeasure);
 
         case 'power-chord':
-            return generatePowerChordBlockBass(root, fifth, totalBeats, beatsPerMeasure);
+            return generatePowerChordBlockBass(bassNote, fifth, totalBeats, beatsPerMeasure);
 
         case 'stride':
             return generateStrideBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
@@ -750,13 +827,13 @@ export function generateBuildingBlockBass(chord, previousChord = null, totalBeat
             return generateReggaeBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
 
         case 'country':
-            return generateCountryBlockBass(root, fifth, totalBeats, beatsPerMeasure);
+            return generateCountryBlockBass(bassNote, fifth, totalBeats, beatsPerMeasure);
 
         case 'pedal':
-            return generatePedalBlockBass(root, totalBeats, beatsPerMeasure);
+            return generatePedalBlockBass(bassNote, totalBeats, beatsPerMeasure);
 
         case 'driving-rock':
-            return generateDrivingRockBlockBass(root, totalBeats, beatsPerMeasure);
+            return generateDrivingRockBlockBass(bassNote, totalBeats, beatsPerMeasure);
 
         case 'funk':
             return generateFunkBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
@@ -812,7 +889,7 @@ export function generateBuildingBlockBass(chord, previousChord = null, totalBeat
             return generateOpenFifthBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
 
         case 'rock-power':
-            return generateRockPowerBlockBass(root, fifth, totalBeats, beatsPerMeasure);
+            return generateRockPowerBlockBass(bassNote, fifth, totalBeats, beatsPerMeasure);
 
         case 'gospel':
             return generateGospelBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
@@ -821,7 +898,7 @@ export function generateBuildingBlockBass(chord, previousChord = null, totalBeat
             return generateHalfTimeBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
 
         default:
-            return generateWholeNoteBlockBass(root, totalBeats, beatsPerMeasure);
+            return generateWholeNoteBlockBass(bassNote, totalBeats, beatsPerMeasure);
     }
 }
 

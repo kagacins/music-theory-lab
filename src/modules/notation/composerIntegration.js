@@ -165,6 +165,29 @@ export class NotationComposer {
             this.noteEditor.toggleTieOnSelected();
           }
         },
+        onTupletModeToggle: (tupletType) => {
+          if (this.noteEditor) {
+            if (tupletType) {
+              this.noteEditor.toggleTupletInsertMode(tupletType);
+            } else {
+              this.noteEditor.exitTupletInsertMode();
+            }
+          }
+        },
+        onTupletCreate: (tupletType) => {
+          if (this.noteEditor) {
+            this.noteEditor.createTupletFromSelection(tupletType);
+            // Re-trigger selection state update after tuplet creation
+            this.updateToolbarSelectionState();
+          }
+        },
+        onTupletRemove: (tupletType) => {
+          if (this.noteEditor) {
+            this.noteEditor.removeTupletFromSelection();
+            // Re-trigger selection state update after tuplet removal
+            this.updateToolbarSelectionState();
+          }
+        },
       });
       this.toolbar.create(this.config.toolbarContainer);
     }
@@ -400,6 +423,7 @@ export class NotationComposer {
             isRest: note.isRest || false,
             dotted: note.dotted || false,
             accidental: note.accidental || null,
+            tuplet: note.tuplet || null,
           }));
       }
       // NOTE: Fallback to interactiveMelody.melodyNotes REMOVED
@@ -423,6 +447,7 @@ export class NotationComposer {
               beat: note.beat || 0,
               dotted: note.dotted || false,
               isTied: note.isTied,  // CRITICAL: Preserve isTied for cross-measure ties
+              tuplet: note.tuplet || null,
             };
           }
           return {
@@ -432,6 +457,7 @@ export class NotationComposer {
             isRest: note.isRest || false,
             dotted: note.dotted || false,
             isTied: note.isTied,  // CRITICAL: Preserve isTied for cross-measure ties
+            tuplet: note.tuplet || null,
           };
         });
       }
@@ -597,7 +623,6 @@ export class NotationComposer {
           const bassNotes = bassVoices[0].notes || [];
 
           if (bassNotes.length > 0) {
-            console.log(`[syncFromProgression] Measure ${measureIndex} bass notes from compositionState:`, bassNotes.map(n => `dur=${n.duration}, tied=${n.isTied}, pitches=${n.pitches?.length || 0}`).join('; '));
             measureData.bassNotes = bassNotes.map(note => ({
               pitch: note.pitch,
               pitches: note.pitches,
@@ -606,7 +631,8 @@ export class NotationComposer {
               isRest: note.isRest || note.type === 'rest',
               dotted: note.dotted || false,
               tie: note.tie,
-              isTied: note.isTied
+              isTied: note.isTied,
+              tuplet: note.tuplet || null
             }));
           }
         }
@@ -625,7 +651,8 @@ export class NotationComposer {
               dotted: note.dotted || false,
               tie: note.tie,
               tied: note.tied,
-              isTied: note.isTied
+              isTied: note.isTied,
+              tuplet: note.tuplet || null
             }));
           }
         }
@@ -751,7 +778,8 @@ export class NotationComposer {
                 articulation: note.articulation || null,  // CRITICAL: Articulations (staccato, accent, etc.)
                 velocity: note.velocity,
                 isChordTone: note.isChordTone,
-                isRest: note.isRest || note.type === 'rest'  // CRITICAL: Include rests
+                isRest: note.isRest || note.type === 'rest',  // CRITICAL: Include rests
+                tuplet: note.tuplet || null  // CRITICAL: Preserve tuplet grouping for rendering
               };
             }),
           bassNotes: m.notation.bass.voices[0].notes
@@ -768,7 +796,8 @@ export class NotationComposer {
               articulation: note.articulation || null,  // CRITICAL: Articulations
               velocity: note.velocity,
               isChordTone: note.isChordTone,
-              isRest: note.isRest || note.type === 'rest'  // CRITICAL: Include rests
+              isRest: note.isRest || note.type === 'rest',  // CRITICAL: Include rests
+              tuplet: note.tuplet || null  // CRITICAL: Preserve tuplet grouping
             })),
           keySignature: m.keySignature || this.compositionState.metadata.key,
           timeSignature: m.timeSignature
@@ -1759,6 +1788,37 @@ export class NotationComposer {
   redo() {
     // Deprecated - undo/redo now managed at CompositionState level
     console.warn('[ComposerIntegration] redo() is deprecated');
+  }
+
+  /**
+   * Update toolbar selection state based on currently selected notes
+   * Called after operations that modify selected notes (like tuplet create/remove)
+   */
+  updateToolbarSelectionState() {
+    if (!this.toolbar || !this.noteEditor || !this.compositionState) return;
+
+    const selectedNoteObjects = [];
+    for (const noteId of this.noteEditor.selectedNotes) {
+      const parts = noteId.split('-');
+      const measureIndex = parseInt(parts[0]);
+      const staff = parts[1];
+      const noteIndex = parseInt(parts[2]);
+
+      const measure = this.compositionState.getMeasure(measureIndex);
+      if (measure) {
+        const note = measure.notation[staff]?.voices[0]?.notes[noteIndex];
+        if (note) {
+          selectedNoteObjects.push({
+            ...note,
+            measureIndex,
+            staff,
+            noteIndex,
+          });
+        }
+      }
+    }
+
+    this.toolbar.updateSelectionState(selectedNoteObjects);
   }
 
   // ============================================================================

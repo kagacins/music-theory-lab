@@ -126,6 +126,18 @@ import { showChordSuggestionModal } from '../ui/chordSuggestionModal.js';
 // Import template browser modal (Phase 3.1)
 import { showTemplateBrowser } from '../ui/templateBrowserModal.js';
 
+// Import rhythmic patterns (Phase 3.2)
+import {
+    RHYTHMIC_PATTERNS,
+    getPatternsForChordCount,
+    getPatternById,
+    applyRhythmPattern,
+    detectCurrentPattern,
+    formatBeatsDisplay,
+    getDefaultPatternForChordCount,
+    getRecommendedPatterns
+} from './rhythmicPatterns.js';
+
 // Phase 2.1: Import section intent state for position-based insertion
 import {
     getInsertAfterIndex,
@@ -7597,10 +7609,6 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         const originalClasses = container.className;
         container.className = 'flex flex-col gap-2 p-2 bg-white rounded-lg border border-gray-200';
 
-        // Add section toolbar at the TOP
-        const toolbar = createSectionToolbar(containerId);
-        container.appendChild(toolbar);
-
         // Create container for cards
         const gridContainer = document.createElement('div');
         gridContainer.id = `${containerId}-cards-grid`;
@@ -12341,8 +12349,8 @@ export function importChordList(mode = 'replace') {
  * Allows users to browse and select progression templates by category
  */
 export function openTemplateBrowser() {
-    showTemplateBrowser((template, action) => {
-        loadTemplateToProgression(template, action);
+    showTemplateBrowser((template, action, rhythmPattern) => {
+        loadTemplateToProgression(template, action, rhythmPattern);
     });
 }
 
@@ -12350,8 +12358,9 @@ export function openTemplateBrowser() {
  * Load a selected template into the progression
  * @param {object} template - Template object from template browser
  * @param {string} action - 'load' (replace) or 'append' (add to end)
+ * @param {string} rhythmPattern - Optional rhythm pattern ID to apply
  */
-function loadTemplateToProgression(template, action = 'load') {
+function loadTemplateToProgression(template, action = 'load', rhythmPattern = null) {
 
     const keySelect = document.getElementById('trainer-key-select');
     const currentKey = keySelect ? keySelect.value : 'C';
@@ -12364,6 +12373,10 @@ function loadTemplateToProgression(template, action = 'load') {
 
     // Get roman numerals from template
     const romans = template.progressions;
+
+    // Get rhythm pattern beats if specified
+    const pattern = rhythmPattern ? getPatternById(rhythmPattern) : null;
+    const patternBeats = pattern ? pattern.beats : null;
 
     // Set the key
     setCurrentKey(currentKey);
@@ -12422,6 +12435,7 @@ function loadTemplateToProgression(template, action = 'load') {
 
             // LH defaults to 'off' for template-loaded chords (no left hand playing by default)
             // Template chords load one octave lower (-12 semitones)
+            // Apply rhythm pattern beats if specified, otherwise default to 4 (whole note)
             const chordData = {
                 root: chordInfo.root,
                 type: finalType,
@@ -12438,7 +12452,8 @@ function loadTemplateToProgression(template, action = 'load') {
                 lhOmittedNotes: [],
                 omittedNotes: [],
                 octaveShift: -12,
-                key: currentKey
+                key: currentKey,
+                beats: patternBeats ? patternBeats[index] : 4
             };
 
             progressionData.push(chordData);
@@ -12473,7 +12488,8 @@ function loadTemplateToProgression(template, action = 'load') {
 
     // Show success message with template info
     const actionText = action === 'append' ? 'Appended' : 'Loaded';
-    const message = `${actionText} template: "${template.name}"\n${progressionData.length} total chords in ${currentKey}`;
+    const patternName = pattern ? ` with ${pattern.name} rhythm` : '';
+    const message = `${actionText} template: "${template.name}"${patternName}\n${progressionData.length} total chords in ${currentKey}`;
     if (window.showModal) {
         setTimeout(() => {
             window.showModal(message, false);
@@ -12484,6 +12500,193 @@ function loadTemplateToProgression(template, action = 'load') {
         }, 100);
     }
 
+}
+
+// ============================================================================
+// PHASE 3.2: Rhythm Pattern Modal
+// ============================================================================
+
+/**
+ * Show rhythm pattern selector modal for applying patterns to existing progressions
+ */
+export function showRhythmPatternModal() {
+    const progressionData = getProgressionData();
+
+    if (!progressionData || progressionData.length === 0) {
+        if (window.showModal) {
+            window.showModal('No Chords', 'Add chords to the progression first before applying a rhythm pattern.');
+        }
+        return;
+    }
+
+    const chordCount = progressionData.length;
+    const patterns = getPatternsForChordCount(chordCount);
+    const currentPattern = detectCurrentPattern(progressionData);
+
+    if (patterns.length === 0) {
+        if (window.showModal) {
+            window.showModal('No Patterns Available', `No rhythm patterns available for ${chordCount}-chord progressions.`);
+        }
+        return;
+    }
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.id = 'rhythm-pattern-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+
+    modal.innerHTML = `
+        <div class="bg-gray-900 rounded-lg shadow-2xl w-full max-w-md flex flex-col">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
+                <h2 class="text-xl font-bold text-white">Rhythm Pattern</h2>
+                <button id="rhythm-modal-close-btn" class="text-gray-400 hover:text-white transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Content -->
+            <div class="px-6 py-4">
+                <p class="text-gray-300 text-sm mb-4">
+                    Apply a rhythmic pattern to set durations for your ${chordCount}-chord progression.
+                </p>
+
+                ${currentPattern ? `
+                    <div class="mb-4 p-3 bg-gray-800 rounded-lg border border-gray-700">
+                        <div class="text-xs text-gray-500 mb-1">Current Pattern:</div>
+                        <div class="text-white font-medium">${currentPattern.name}</div>
+                        <div class="text-gray-400 text-sm">${formatBeatsDisplay(currentPattern.beats)}</div>
+                    </div>
+                ` : `
+                    <div class="mb-4 p-3 bg-gray-800 rounded-lg border border-gray-700">
+                        <div class="text-xs text-gray-500 mb-1">Current Pattern:</div>
+                        <div class="text-gray-400 italic">Custom/Mixed durations</div>
+                    </div>
+                `}
+
+                <label class="block text-sm font-medium text-gray-300 mb-2">Select Pattern:</label>
+                <select id="rhythm-pattern-select" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-orange-500">
+                    ${patterns.map(pattern => {
+                        const beatsDisplay = formatBeatsDisplay(pattern.beats);
+                        const isSelected = currentPattern && currentPattern.id === pattern.id;
+                        return `
+                            <option value="${pattern.id}" ${isSelected ? 'selected' : ''}>
+                                ${pattern.name} (${beatsDisplay})
+                            </option>
+                        `;
+                    }).join('')}
+                </select>
+
+                <div id="rhythm-pattern-preview" class="mt-4 p-3 bg-gray-800 rounded-lg border border-gray-700">
+                    <!-- Preview will be populated by JS -->
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="px-6 py-4 border-t border-gray-700 flex justify-end gap-2">
+                <button id="rhythm-modal-cancel-btn" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition">
+                    Cancel
+                </button>
+                <button id="rhythm-modal-apply-btn" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition font-semibold">
+                    Apply Pattern
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Update preview for selected pattern
+    const updatePreview = () => {
+        const select = document.getElementById('rhythm-pattern-select');
+        const preview = document.getElementById('rhythm-pattern-preview');
+        const selectedPattern = getPatternById(select.value);
+
+        if (selectedPattern && preview) {
+            const beatsDisplay = formatBeatsDisplay(selectedPattern.beats);
+            preview.innerHTML = `
+                <div class="text-xs text-gray-500 mb-2">Pattern Preview:</div>
+                <div class="text-white font-medium mb-1">${selectedPattern.name}</div>
+                <div class="text-sm text-gray-300 mb-2">${selectedPattern.description}</div>
+                <div class="flex flex-wrap gap-1">
+                    ${selectedPattern.beats.map((beat, i) => `
+                        <span class="px-2 py-1 bg-orange-600 bg-opacity-30 text-orange-300 rounded text-xs font-mono">
+                            ${progressionData[i]?.roman || '?'}: ${beat} beat${beat !== 1 ? 's' : ''}
+                        </span>
+                    `).join('')}
+                </div>
+            `;
+        }
+    };
+
+    // Initial preview
+    updatePreview();
+
+    // Event listeners
+    const closeModal = () => {
+        modal.remove();
+    };
+
+    document.getElementById('rhythm-modal-close-btn').addEventListener('click', closeModal);
+    document.getElementById('rhythm-modal-cancel-btn').addEventListener('click', closeModal);
+    document.getElementById('rhythm-pattern-select').addEventListener('change', updatePreview);
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+
+    document.getElementById('rhythm-modal-apply-btn').addEventListener('click', () => {
+        const select = document.getElementById('rhythm-pattern-select');
+        const patternId = select.value;
+        applyRhythmPatternToProgression(patternId);
+        closeModal();
+    });
+}
+
+/**
+ * Apply a rhythm pattern to the current progression
+ * @param {string} patternId - Pattern ID to apply
+ */
+export function applyRhythmPatternToProgression(patternId) {
+    const progressionData = getProgressionData();
+    const updated = applyRhythmPattern(progressionData, patternId);
+
+    if (!updated) {
+        console.warn('[applyRhythmPatternToProgression] Failed to apply pattern:', patternId);
+        return;
+    }
+
+    // Save state before changes for undo
+    saveState({
+        progressionData: [...progressionData],
+        progressionRomans: getTrainerState().progressionRomans
+    });
+
+    // Update state
+    setProgressionData(updated);
+
+    // Re-render displays
+    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', false);
+
+    // Sync to composition state for playback
+    if (window.syncProgressionToMelodyComposer) {
+        window.syncProgressionToMelodyComposer();
+    }
+    if (window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
+    }
+
+    // Show confirmation
+    const pattern = getPatternById(patternId);
+    if (pattern && window.showModal) {
+        window.showModal(`Applied "${pattern.name}" rhythm pattern`, false);
+        setTimeout(() => {
+            if (window.hideModal) window.hideModal();
+        }, 1500);
+    }
 }
 
 // ============================================================================

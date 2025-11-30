@@ -15,6 +15,8 @@ import {
   createVoice,
   generateBeams,
   drawBeams,
+  createTuplet,
+  drawTuplets,
   getVexFlowKeySignature,
   noteToMidi,
   midiToNote,
@@ -32,6 +34,74 @@ import { analyzeChordTone, CHORD_TONE_COLORS } from '../analysis/chordToneAnalyz
 // VexFlow 5.x uses window.VexFlow, older versions use window.Vex.Flow
 function getVF() {
   return window.VexFlow || (window.Vex ? window.Vex.Flow : null);
+}
+
+// ============================================================================
+// TUPLET-AWARE BEAM GENERATION
+// ============================================================================
+
+/**
+ * Check if a VexFlow note is beamable (eighth note or smaller)
+ * @param {Object} vexNote - VexFlow StaveNote
+ * @returns {boolean} - True if the note can be beamed
+ */
+function isBeamable(vexNote) {
+  if (!vexNote || vexNote.isRest?.() || vexNote.getNoteType?.() === 'r') return false;
+  const duration = vexNote.getDuration?.();
+  // Beamable durations: 8, 16, 32 (and their dotted variants)
+  return duration && ['8', '16', '32'].some(d => duration.startsWith(d));
+}
+
+/**
+ * Generate beams that respect tuplet groupings
+ * Tuplet notes are beamed together as a unit, non-tuplet notes use standard beaming
+ * @param {Array} vexNotes - All VexFlow notes in the measure
+ * @param {Object} tupletGroups - Tuplet groups from createNotesForStaff
+ * @returns {Array} - Array of VexFlow Beam objects
+ */
+function generateBeamsWithTuplets(vexNotes, tupletGroups) {
+  const VF = getVF();
+  if (!VF || !vexNotes || vexNotes.length === 0) return [];
+
+  const beams = [];
+
+  // Collect all notes that are in tuplet groups
+  const tupletNoteSet = new Set();
+
+  // Create beams for each tuplet group
+  for (const group of Object.values(tupletGroups)) {
+    if (!group.notes || group.notes.length < 2) continue;
+
+    // Filter to only beamable notes in this tuplet
+    const beamableNotes = group.notes.filter(n => isBeamable(n));
+
+    if (beamableNotes.length >= 2) {
+      try {
+        const beam = new VF.Beam(beamableNotes);
+        beams.push(beam);
+      } catch (e) {
+        console.warn('[generateBeamsWithTuplets] Error creating tuplet beam:', e);
+      }
+    }
+
+    // Mark all notes in this tuplet as processed
+    group.notes.forEach(n => tupletNoteSet.add(n));
+  }
+
+  // Collect non-tuplet beamable notes
+  const nonTupletNotes = vexNotes.filter(n => !tupletNoteSet.has(n) && isBeamable(n));
+
+  // Generate standard beams for non-tuplet notes
+  if (nonTupletNotes.length >= 2) {
+    try {
+      const standardBeams = generateBeams(nonTupletNotes);
+      beams.push(...standardBeams);
+    } catch (e) {
+      console.warn('[generateBeamsWithTuplets] Error creating standard beams:', e);
+    }
+  }
+
+  return beams;
 }
 
 // ============================================================================
@@ -1053,14 +1123,16 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   const vexTrebleNotes = trebleResult.notes;
   const trebleOttavaBrackets = trebleResult.ottavaBrackets;
   const trebleTies = trebleResult.ties;
-  const trebleBeams = generateBeams(vexTrebleNotes.filter(n => !n.isRest()));
+  const trebleTupletGroups = trebleResult.tupletGroups;
+  const trebleBeams = generateBeamsWithTuplets(vexTrebleNotes, trebleTupletGroups);
 
   // Render bass notes
   const bassResult = createNotesForStaff(bassNotes, keySignature, 'bass', timeSignature);
   const vexBassNotes = bassResult.notes;
   const bassOttavaBrackets = bassResult.ottavaBrackets;
   const bassTies = bassResult.ties;
-  const bassBeams = generateBeams(vexBassNotes.filter(n => !n.isRest()));
+  const bassTupletGroups = bassResult.tupletGroups;
+  const bassBeams = generateBeamsWithTuplets(vexBassNotes, bassTupletGroups);
 
   // Apply note coloring
   applyNoteColoring(vexTrebleNotes, trebleNotes, {
@@ -1090,27 +1162,111 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     beatValue: parseInt(denom, 10),
   };
 
-  const trebleVoice = createVoice(vexTrebleNotes, voiceOptions);
-  const bassVoice = createVoice(vexBassNotes, voiceOptions);
+  // === Beat-aligned voice creation using GhostNotes ===
+  // Build a unified beat grid and insert GhostNotes to ensure both voices
+  // have tickables at the same beat positions for proper vertical alignment
+
+  // Helper to round beats for comparison (avoid floating point issues)
+  const roundBeat = (beat) => Math.round((beat ?? 0) * 10000) / 10000;
+
+  // Helper to convert beats to VexFlow duration string
+  const beatsToDuration = (beats) => {
+    if (beats >= 4) return 'w';
+    if (beats >= 2) return 'h';
+    if (beats >= 1) return 'q';
+    if (beats >= 0.5) return '8';
+    if (beats >= 0.25) return '16';
+    if (beats >= 0.125) return '32';
+    // For tuplet subdivisions (e.g., 0.667, 0.333)
+    if (beats >= 0.6) return 'q';  // Approximate as quarter
+    if (beats >= 0.3) return '8';  // Approximate as eighth
+    return '16';
+  };
+
+  // Build beat maps for both voices: beat -> { note, index, duration }
+  const trebleBeatMap = new Map();
+  trebleNotes.forEach((note, i) => {
+    const beat = roundBeat(note.beat);
+    trebleBeatMap.set(beat, { note, index: i, vexNote: vexTrebleNotes[i] });
+  });
+
+  const bassBeatMap = new Map();
+  bassNotes.forEach((note, i) => {
+    const beat = roundBeat(note.beat);
+    bassBeatMap.set(beat, { note, index: i, vexNote: vexBassNotes[i] });
+  });
+
+  // Collect all unique beat positions
+  const allBeats = new Set([...trebleBeatMap.keys(), ...bassBeatMap.keys()]);
+  const sortedBeats = Array.from(allBeats).sort((a, b) => a - b);
+
+  // Create aligned note arrays with GhostNotes where needed
+  const alignedTrebleNotes = [];
+  const alignedBassNotes = [];
+
+  for (let i = 0; i < sortedBeats.length; i++) {
+    const beat = sortedBeats[i];
+    const nextBeat = i < sortedBeats.length - 1 ? sortedBeats[i + 1] : 4; // Assume 4/4
+    const gapBeats = nextBeat - beat;
+
+    const trebleEntry = trebleBeatMap.get(beat);
+    const bassEntry = bassBeatMap.get(beat);
+
+    if (trebleEntry) {
+      alignedTrebleNotes.push(trebleEntry.vexNote);
+    } else if (gapBeats > 0) {
+      // Insert GhostNote for treble at this beat
+      const ghostDuration = beatsToDuration(gapBeats);
+      const ghost = new VF.GhostNote({ duration: ghostDuration });
+      alignedTrebleNotes.push(ghost);
+    }
+
+    if (bassEntry) {
+      alignedBassNotes.push(bassEntry.vexNote);
+    } else if (gapBeats > 0) {
+      // Insert GhostNote for bass at this beat
+      const ghostDuration = beatsToDuration(gapBeats);
+      const ghost = new VF.GhostNote({ duration: ghostDuration });
+      alignedBassNotes.push(ghost);
+    }
+  }
+
+  // Create voices with aligned notes
+  const alignedTrebleVoice = createVoice(alignedTrebleNotes, voiceOptions);
+  const alignedBassVoice = createVoice(alignedBassNotes, voiceOptions);
 
   // Format and draw voices
-  if (vexTrebleNotes.length > 0 && vexBassNotes.length > 0) {
+  if (alignedTrebleNotes.length > 0 && alignedBassNotes.length > 0) {
     const formatter = new VF.Formatter();
-    formatter.joinVoices([trebleVoice]);
-    formatter.joinVoices([bassVoice]);
+    formatter.joinVoices([alignedTrebleVoice]);
+    formatter.joinVoices([alignedBassVoice]);
 
     // Reserve padding at the end of the measure to prevent notes touching the bar line
     const endPadding = 15;
     const staveWidth = width - trebleStave.getNoteStartX() + x - endPadding;
-    formatter.format([trebleVoice, bassVoice], staveWidth);
+    formatter.format([alignedTrebleVoice, alignedBassVoice], staveWidth);
 
-    trebleVoice.draw(context, trebleStave);
-    bassVoice.draw(context, bassStave);
+    alignedTrebleVoice.draw(context, trebleStave);
+    alignedBassVoice.draw(context, bassStave);
   }
 
   // Draw beams
   drawBeams(context, trebleBeams);
   drawBeams(context, bassBeams);
+
+  // Draw tuplet brackets
+  // Convert tuplet groups to VexFlow Tuplet objects and draw them
+  const trebleTuplets = Object.values(trebleTupletGroups)
+    .filter(group => group.notes.length >= 2)
+    .map(group => createTuplet(group.notes, group.info, { location: 'top' }))
+    .filter(t => t !== null);
+  drawTuplets(context, trebleTuplets);
+
+  const bassTuplets = Object.values(bassTupletGroups)
+    .filter(group => group.notes.length >= 2)
+    .map(group => createTuplet(group.notes, group.info, { location: 'bottom' }))
+    .filter(t => t !== null);
+  drawTuplets(context, bassTuplets);
 
   // Draw ties (only within same measure for now)
   // TODO: Cross-measure ties are handled at the system level by drawManualTies
@@ -1305,8 +1461,8 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     trebleStave,
     bassStave,
     connectors,
-    trebleVoice,
-    bassVoice,
+    trebleVoice: alignedTrebleVoice,
+    bassVoice: alignedBassVoice,
     trebleNotes: vexTrebleNotes,
     bassNotes: vexBassNotes,
     trebleOttavaBrackets,
@@ -1379,12 +1535,13 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature) {
 
   if (!notes || notes.length === 0) {
     // Return a whole rest for empty measures
-    return { notes: [createRest('1n', clef)], ottavaBrackets: [], ties: [] };
+    return { notes: [createRest('1n', clef)], ottavaBrackets: [], ties: [], tupletGroups: {} };
   }
 
   const vexNotes = [];
   const ottavaBrackets = []; // Track brackets: { startIndex, endIndex, label }
   const ties = []; // Track tie starts for rendering
+  const tupletGroups = {}; // Track tuplet groups: { groupId: { notes: [], info: {} } }
   let currentBracket = null;
 
   for (let i = 0; i < notes.length; i++) {
@@ -1399,7 +1556,24 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature) {
         }
         currentBracket = null;
       }
-      vexNotes.push(createRest(note.duration || '4n', clef));
+      const restNote = createRest(note.duration || '4n', clef);
+      vexNotes.push(restNote);
+
+      // Track tuplet groups for rests too
+      if (note.tuplet && note.tuplet.groupId) {
+        const groupId = note.tuplet.groupId;
+        if (!tupletGroups[groupId]) {
+          tupletGroups[groupId] = {
+            notes: [],
+            info: {
+              actual: note.tuplet.actual,
+              normal: note.tuplet.normal,
+              type: note.tuplet.type,
+            },
+          };
+        }
+        tupletGroups[groupId].notes.push(restNote);
+      }
     } else if (note.pitches && Array.isArray(note.pitches)) {
       // Chord - apply ottava adjustment
       const { adjustedPitches, ottavaLabel } = applyOttavaAdjustment(note.pitches, clef);
@@ -1440,6 +1614,22 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature) {
       }
 
       vexNotes.push(chordNote);
+
+      // Track tuplet groups
+      if (note.tuplet && note.tuplet.groupId) {
+        const groupId = note.tuplet.groupId;
+        if (!tupletGroups[groupId]) {
+          tupletGroups[groupId] = {
+            notes: [],
+            info: {
+              actual: note.tuplet.actual,
+              normal: note.tuplet.normal,
+              type: note.tuplet.type,
+            },
+          };
+        }
+        tupletGroups[groupId].notes.push(chordNote);
+      }
     } else if (note.pitch) {
       // Single note - apply ottava adjustment
       const { adjustedPitches, ottavaLabel } = applyOttavaAdjustment([note.pitch], clef);
@@ -1479,6 +1669,22 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature) {
       }
 
       vexNotes.push(staveNote);
+
+      // Track tuplet groups (for single notes)
+      if (note.tuplet && note.tuplet.groupId) {
+        const groupId = note.tuplet.groupId;
+        if (!tupletGroups[groupId]) {
+          tupletGroups[groupId] = {
+            notes: [],
+            info: {
+              actual: note.tuplet.actual,
+              normal: note.tuplet.normal,
+              type: note.tuplet.type,
+            },
+          };
+        }
+        tupletGroups[groupId].notes.push(staveNote);
+      }
     }
 
     // Track ties: if this note has tied=true, mark it for tie rendering
@@ -1495,7 +1701,7 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature) {
     ottavaBrackets.push(currentBracket);
   }
 
-  return { notes: vexNotes, ottavaBrackets, ties };
+  return { notes: vexNotes, ottavaBrackets, ties, tupletGroups };
 }
 
 // ============================================================================
@@ -2235,21 +2441,30 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       const bassNotes = measure.bassNotes;
       const brackets = measure.bassOttavaBrackets;
 
-      // Check if this measure has ottava (for chord progressions, typically one chord per measure)
+      // Check if this measure has ottava (for chord progressions, may have multiple notes per measure)
       const hasOttava = brackets && brackets.length > 0;
-      const ottavaLabel = hasOttava ? brackets[0].label : null;
+      // Get the first bracket's label and indices (for measures with multiple notes)
+      const firstBracket = hasOttava ? brackets[0] : null;
+      const lastBracket = hasOttava ? brackets[brackets.length - 1] : null;
+      const ottavaLabel = firstBracket ? firstBracket.label : null;
+      const bracketStartIndex = firstBracket ? firstBracket.startIndex : 0;
+      const bracketEndIndex = lastBracket ? lastBracket.endIndex : 0;
 
       if (ottavaLabel) {
+        // Get the actual notes at the bracket indices
+        const startNote = bassNotes[bracketStartIndex] || bassNotes[0];
+        const endNote = bassNotes[bracketEndIndex] || bassNotes[bassNotes.length - 1];
+
         if (currentBassOttava === ottavaLabel) {
-          // Continue the bracket
-          bassOttavaEnd = { measure: i, noteIndex: 0, note: bassNotes[0] };
-          // Update extreme note positions
-          // For 8va in bass clef, highest pitch has largest line number
-          // For 8vb in bass clef, lowest pitch has smallest line number
-          const highPitchLine = getHighestPitchLine(bassNotes[0]);
-          const lowPitchLine = getLowestPitchLine(bassNotes[0]);
-          if (highPitchLine > bassHighestPitchLine) bassHighestPitchLine = highPitchLine;
-          if (lowPitchLine < bassLowestPitchLine) bassLowestPitchLine = lowPitchLine;
+          // Continue the bracket - use the end note index from this measure's bracket
+          bassOttavaEnd = { measure: i, noteIndex: bracketEndIndex, note: endNote };
+          // Update extreme note positions for all notes in the bracket
+          for (let ni = bracketStartIndex; ni <= bracketEndIndex && ni < bassNotes.length; ni++) {
+            const highPitchLine = getHighestPitchLine(bassNotes[ni]);
+            const lowPitchLine = getLowestPitchLine(bassNotes[ni]);
+            if (highPitchLine > bassHighestPitchLine) bassHighestPitchLine = highPitchLine;
+            if (lowPitchLine < bassLowestPitchLine) bassLowestPitchLine = lowPitchLine;
+          }
         } else {
           // Draw previous bracket if exists
           if (currentBassOttava && bassOttavaStart && bassOttavaEnd) {
@@ -2275,12 +2490,19 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
               console.warn('Error drawing ottava bracket:', e);
             }
           }
-          // Start new bracket
+          // Start new bracket using the correct start index from this measure
           currentBassOttava = ottavaLabel;
-          bassOttavaStart = { measure: i, noteIndex: 0, note: bassNotes[0] };
-          bassOttavaEnd = { measure: i, noteIndex: 0, note: bassNotes[0] };
-          bassHighestPitchLine = getHighestPitchLine(bassNotes[0]);
-          bassLowestPitchLine = getLowestPitchLine(bassNotes[0]);
+          bassOttavaStart = { measure: i, noteIndex: bracketStartIndex, note: startNote };
+          bassOttavaEnd = { measure: i, noteIndex: bracketEndIndex, note: endNote };
+          // Calculate extreme positions for all notes in this bracket
+          bassHighestPitchLine = -Infinity;
+          bassLowestPitchLine = Infinity;
+          for (let ni = bracketStartIndex; ni <= bracketEndIndex && ni < bassNotes.length; ni++) {
+            const highPitchLine = getHighestPitchLine(bassNotes[ni]);
+            const lowPitchLine = getLowestPitchLine(bassNotes[ni]);
+            if (highPitchLine > bassHighestPitchLine) bassHighestPitchLine = highPitchLine;
+            if (lowPitchLine < bassLowestPitchLine) bassLowestPitchLine = lowPitchLine;
+          }
         }
       } else {
         // No ottava in this measure - draw any pending bracket
@@ -2609,6 +2831,7 @@ export function convertToGrandStaffFormat(composerData) {
           pitch: note.pitch || note,
           duration: note.duration || '4n',
           isRest: note.isRest || false,
+          tuplet: note.tuplet || null,
         }));
     }
 
@@ -2630,6 +2853,7 @@ export function convertToGrandStaffFormat(composerData) {
             pitch: note.pitch || note,
             duration: note.duration || '1n',
             isRest: note.isRest || false,
+            tuplet: note.tuplet || null,
           }));
       } else {
         // Single bass note - validate before adding

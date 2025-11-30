@@ -34,26 +34,38 @@ export const DURATION_UNITS = {
     '16n': 12,      // 16th note (0.25 beats)
     '16n.': 18,     // Dotted 16th (0.375 beats)
     '32n': 6,       // 32nd note (0.125 beats)
-    // Triplets
+    // Triplets (3:2 - 3 notes in space of 2)
     '4t': 32,       // Quarter triplet (2/3 beat)
     '8t': 16,       // Eighth triplet (1/3 beat)
     '16t': 8,       // 16th triplet (1/6 beat)
+    // Quintuplets (5:4 - 5 notes in space of 4)
+    '4q': 38,       // Quarter quintuplet = 48 * (4/5) ≈ 38.4
+    '8q': 19,       // Eighth quintuplet = 24 * (4/5) ≈ 19.2
+    '16q': 10,      // 16th quintuplet = 12 * (4/5) ≈ 9.6
+    // Sextuplets (6:4 - 6 notes in space of 4, same ratio as triplets 2/3)
+    '4x': 32,       // Quarter sextuplet (same as triplet)
+    '8x': 16,       // Eighth sextuplet
+    '16x': 8,       // 16th sextuplet
 };
 
 // Reverse lookup: units to duration string
+// Note: Quintuplets have unique unit values; triplets/sextuplets share values
 export const UNITS_TO_DURATION = {
     192: '1n',
     144: '2n.',
     96: '2n',
     72: '4n.',
     48: '4n',
+    38: '4q',       // Quarter quintuplet
     36: '8n.',
-    32: '4t',
+    32: '4t',       // Quarter triplet (also sextuplet '4x')
     24: '8n',
+    19: '8q',       // Eighth quintuplet
     18: '16n.',
-    16: '8t',
+    16: '8t',       // Eighth triplet (also sextuplet '8x')
     12: '16n',
-    8: '16t',
+    10: '16q',      // 16th quintuplet
+    8: '16t',       // 16th triplet (also sextuplet '16x')
     6: '32n',
 };
 
@@ -89,6 +101,88 @@ export function unitsToDuration(units) {
  */
 export function durationToUnits(duration) {
     return DURATION_UNITS[duration] || 48; // Default to quarter note
+}
+
+// ============================================================================
+// TUPLET HELPERS
+// ============================================================================
+
+/**
+ * Tuplet ratio definitions
+ * - actual: number of notes in the tuplet
+ * - normal: number of notes they replace (time span)
+ * - ratio: duration multiplier (normal/actual)
+ */
+export const TUPLET_RATIOS = {
+    triplet: { actual: 3, normal: 2, ratio: 2/3 },
+    quintuplet: { actual: 5, normal: 4, ratio: 4/5 },
+    sextuplet: { actual: 6, normal: 4, ratio: 4/6 },
+};
+
+/**
+ * Generate a unique ID for a tuplet group
+ * @returns {string} Unique tuplet group ID
+ */
+export function generateTupletGroupId() {
+    return `tuplet_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Create a tuplet attribute object for a note
+ * @param {string} type - 'triplet', 'quintuplet', or 'sextuplet'
+ * @param {string} groupId - Unique ID for this tuplet group
+ * @param {boolean} isStart - Is this the first note of the tuplet?
+ * @param {boolean} isEnd - Is this the last note of the tuplet?
+ * @returns {Object} Tuplet attribute object
+ */
+export function createTupletAttribute(type, groupId, isStart, isEnd) {
+    const config = TUPLET_RATIOS[type];
+    if (!config) {
+        console.warn(`[createTupletAttribute] Unknown tuplet type: ${type}`);
+        return null;
+    }
+    return {
+        type,
+        groupId,
+        groupStart: isStart,
+        groupEnd: isEnd,
+        actual: config.actual,
+        normal: config.normal,
+    };
+}
+
+/**
+ * Get the duration string for a tuplet note based on base duration and tuplet type
+ * @param {string} baseDuration - Base duration like '4n', '8n'
+ * @param {string} tupletType - 'triplet', 'quintuplet', or 'sextuplet'
+ * @returns {string} Tuplet duration string like '4t', '8q', '4x'
+ */
+export function getTupletDuration(baseDuration, tupletType) {
+    // Map base duration to tuplet suffix
+    const suffixMap = {
+        triplet: 't',
+        quintuplet: 'q',
+        sextuplet: 'x',
+    };
+    const suffix = suffixMap[tupletType];
+    if (!suffix) return baseDuration;
+
+    // Extract the note value (e.g., '4' from '4n', '8' from '8n')
+    const match = baseDuration.match(/^(\d+)/);
+    if (!match) return baseDuration;
+
+    return match[1] + suffix;
+}
+
+/**
+ * Get tuplet-adjusted duration in units
+ * @param {string} baseDuration - Base duration like '4n', '8n'
+ * @param {string} tupletType - 'triplet', 'quintuplet', or 'sextuplet'
+ * @returns {number} Duration in units
+ */
+export function getTupletUnits(baseDuration, tupletType) {
+    const tupletDuration = getTupletDuration(baseDuration, tupletType);
+    return DURATION_UNITS[tupletDuration] || durationToUnits(baseDuration);
 }
 
 /**

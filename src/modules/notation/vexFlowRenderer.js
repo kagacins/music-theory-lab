@@ -35,6 +35,17 @@ export const DURATION_MAP = {
   '8n.': '8d',    // dotted eighth
   '16n.': '16d',  // dotted sixteenth
   '32n.': '32d',  // dotted thirty-second
+  // Tuplet durations - map to base note visual representation
+  // (VexFlow handles the tuplet bracket/number separately)
+  '4t': 'q',      // Quarter triplet
+  '8t': '8',      // Eighth triplet
+  '16t': '16',    // 16th triplet
+  '4q': 'q',      // Quarter quintuplet
+  '8q': '8',      // Eighth quintuplet
+  '16q': '16',    // 16th quintuplet
+  '4x': 'q',      // Quarter sextuplet
+  '8x': '8',      // Eighth sextuplet
+  '16x': '16',    // 16th sextuplet
 };
 
 /**
@@ -92,6 +103,16 @@ export const TONE_DURATION_BEATS = {
   '8n.': 0.75,
   '16n.': 0.375,
   '32n.': 0.1875,
+  // Tuplet durations (actual beat values)
+  '4t': 2/3,        // Quarter triplet = 2/3 beat
+  '8t': 1/3,        // Eighth triplet = 1/3 beat
+  '16t': 1/6,       // 16th triplet = 1/6 beat
+  '4q': 4/5,        // Quarter quintuplet = 4/5 beat
+  '8q': 2/5,        // Eighth quintuplet = 2/5 beat
+  '16q': 1/5,       // 16th quintuplet = 1/5 beat
+  '4x': 2/3,        // Quarter sextuplet = 2/3 beat (same as triplet)
+  '8x': 1/3,        // Eighth sextuplet = 1/3 beat
+  '16x': 1/6,       // 16th sextuplet = 1/6 beat
 };
 
 /**
@@ -779,6 +800,72 @@ export function generateBeams(notes, options = {}) {
 export function drawBeams(context, beams) {
   if (!beams) return;
   beams.forEach(beam => beam.setContext(context).draw());
+}
+
+// ============================================================================
+// TUPLET RENDERING
+// ============================================================================
+
+/**
+ * Create a VexFlow Tuplet bracket for a group of notes
+ * @param {Array} vexNotes - Array of VexFlow StaveNote objects in the tuplet
+ * @param {Object} tupletInfo - Tuplet information { actual, normal, type }
+ * @param {Object} options - Additional tuplet options
+ * @returns {Object|null} - VexFlow Tuplet object or null on error
+ */
+export function createTuplet(vexNotes, tupletInfo, options = {}) {
+  const VF = getVF();
+  if (!VF || !vexNotes || vexNotes.length < 2) {
+    console.warn('[createTuplet] Invalid inputs:', { hasVF: !!VF, noteCount: vexNotes?.length });
+    return null;
+  }
+
+  const { actual, normal } = tupletInfo;
+  if (!actual || !normal) {
+    console.warn('[createTuplet] Missing actual/normal in tupletInfo:', tupletInfo);
+    return null;
+  }
+
+  const {
+    location = 'top',      // 'top' or 'bottom'
+    bracketed = true,      // Show bracket
+    ratioed = false,       // Show as "3:2" vs just "3"
+  } = options;
+
+  try {
+    // VexFlow 5.x uses different constants
+    const LOCATION_TOP = VF.Tuplet?.LOCATION_TOP ?? VF.Tuplet?.Position?.TOP ?? 1;
+    const LOCATION_BOTTOM = VF.Tuplet?.LOCATION_BOTTOM ?? VF.Tuplet?.Position?.BOTTOM ?? -1;
+
+    const tuplet = new VF.Tuplet(vexNotes, {
+      num_notes: actual,
+      notes_occupied: normal,
+      location: location === 'top' ? LOCATION_TOP : LOCATION_BOTTOM,
+      bracketed: bracketed,
+      ratioed: ratioed,
+    });
+
+    return tuplet;
+  } catch (e) {
+    console.error('[createTuplet] Error creating tuplet:', e);
+    return null;
+  }
+}
+
+/**
+ * Draw tuplet brackets on context
+ * @param {Object} context - VexFlow context
+ * @param {Array} tuplets - Array of VexFlow Tuplet objects
+ */
+export function drawTuplets(context, tuplets) {
+  if (!tuplets || !context) return;
+  tuplets.forEach(tuplet => {
+    try {
+      tuplet.setContext(context).draw();
+    } catch (e) {
+      console.warn('[drawTuplets] Error drawing tuplet:', e);
+    }
+  });
 }
 
 // ============================================================================

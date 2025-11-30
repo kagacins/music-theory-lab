@@ -76,6 +76,7 @@ export class NotationToolbar {
     this.selectionArticulation = null;  // null = none, 'mixed' = multiple, 'staccato' = all same
     this.selectionDotted = null;  // null = no selection, 'mixed' = multiple, true/false = all same
     this.selectionTied = null;  // null = no selection, 'mixed' = multiple, true/false = all same
+    this.selectionTuplet = null;  // null = no tuplet, 'triplet'/'quintuplet'/'sextuplet' = all same tuplet type
 
     // Callbacks
     this.onDurationChange = options.onDurationChange || (() => {});
@@ -91,6 +92,16 @@ export class NotationToolbar {
     this.onDelete = options.onDelete || (() => {});
     this.onTie = options.onTie || (() => {});
     this.onChordSymbolApply = options.onChordSymbolApply || (() => {});
+    this.onCopy = options.onCopy || (() => {});
+    this.onPaste = options.onPaste || (() => {});
+    this.onCopyBlock = options.onCopyBlock || (() => {});
+    this.onOctaveShift = options.onOctaveShift || (() => {});
+    this.onTupletCreate = options.onTupletCreate || (() => {});
+    this.onTupletModeToggle = options.onTupletModeToggle || (() => {});
+    this.onTupletRemove = options.onTupletRemove || (() => {});
+
+    // Tuplet mode state
+    this.tupletInsertMode = null; // null, 'triplet', 'quintuplet', 'sextuplet'
   }
 
   /**
@@ -157,6 +168,34 @@ export class NotationToolbar {
           </button>
         </div>
 
+        <!-- Tuplet Section -->
+        <div class="toolbar-section tuplet-section">
+          <span class="section-label">Tuplet</span>
+          <div class="button-group tuplet-buttons">
+            <button
+              class="toolbar-btn tuplet-btn ${this.tupletInsertMode === 'triplet' ? 'active' : ''}"
+              data-tuplet="triplet"
+              title="Triplet (3:2) - Select 3 notes + Shift+3, or Ctrl+Shift+3 for insert mode"
+            >
+              3
+            </button>
+            <button
+              class="toolbar-btn tuplet-btn ${this.tupletInsertMode === 'quintuplet' ? 'active' : ''}"
+              data-tuplet="quintuplet"
+              title="Quintuplet (5:4) - Select 5 notes + Shift+5, or Ctrl+Shift+5 for insert mode"
+            >
+              5
+            </button>
+            <button
+              class="toolbar-btn tuplet-btn ${this.tupletInsertMode === 'sextuplet' ? 'active' : ''}"
+              data-tuplet="sextuplet"
+              title="Sextuplet (6:4) - Select 6 notes + Shift+6, or Ctrl+Shift+6 for insert mode"
+            >
+              6
+            </button>
+          </div>
+        </div>
+
         <!-- Accidentals Section -->
         <div class="toolbar-section accidentals-section">
           <span class="section-label">Accidental</span>
@@ -206,11 +245,55 @@ export class NotationToolbar {
             ↪
           </button>
           <button
+            class="toolbar-btn copy-btn"
+            data-action="copy"
+            title="Copy Notes (Ctrl+C)"
+          >
+            📋
+          </button>
+          <button
+            class="toolbar-btn copy-block-btn"
+            data-action="copyBlock"
+            title="Copy Building Block (Ctrl+Shift+C)"
+          >
+            ⊞
+          </button>
+          <button
+            class="toolbar-btn paste-btn"
+            data-action="paste"
+            title="Paste (Ctrl+V)"
+          >
+            📥
+          </button>
+          <select class="paste-position-select" title="Paste Position">
+            <option value="afterSelection">After Selection</option>
+            <option value="beginning">At Beginning</option>
+            <option value="end">At End</option>
+          </select>
+          <button
             class="toolbar-btn delete-btn"
             data-action="delete"
             title="Delete (Del)"
           >
             🗑
+          </button>
+        </div>
+
+        <!-- Octave Section -->
+        <div class="toolbar-section octave-section">
+          <button
+            class="toolbar-btn octave-up-btn"
+            data-action="octaveUp"
+            title="Octave Up (Ctrl+↑)"
+          >
+            ⬆8
+          </button>
+          <button
+            class="toolbar-btn octave-down-btn"
+            data-action="octaveDown"
+            title="Octave Down (Ctrl+↓)"
+          >
+            ⬇8
           </button>
         </div>
 
@@ -482,6 +565,33 @@ export class NotationToolbar {
       });
     });
 
+    // Tuplet buttons
+    this.container.querySelectorAll('.tuplet-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const tupletType = e.currentTarget.dataset.tuplet;
+        console.log('[NotationToolbar] Tuplet button clicked:', tupletType, 'selectedNotesCount:', this.selectedNotesCount);
+
+        // If notes are selected and selection has tuplet, remove it
+        if (this.selectedNotesCount > 0 && this.selectionTuplet === tupletType) {
+          this.onTupletRemove(tupletType);
+          return;
+        }
+
+        // If notes are selected, try to create tuplet from selection
+        if (this.selectedNotesCount > 0) {
+          this.onTupletCreate(tupletType);
+          return;
+        }
+
+        // No selection - toggle tuplet insert mode
+        if (this.tupletInsertMode === tupletType) {
+          this.setTupletInsertMode(null);
+        } else {
+          this.setTupletInsertMode(tupletType);
+        }
+      });
+    });
+
     // Undo/Redo/Delete
     this.container.querySelector('[data-action="undo"]')?.addEventListener('click', () => {
       this.onUndo();
@@ -493,6 +603,28 @@ export class NotationToolbar {
 
     this.container.querySelector('[data-action="delete"]')?.addEventListener('click', () => {
       this.onDelete();
+    });
+
+    // Copy/Paste buttons
+    this.container.querySelector('[data-action="copy"]')?.addEventListener('click', () => {
+      this.onCopy();
+    });
+
+    this.container.querySelector('[data-action="paste"]')?.addEventListener('click', () => {
+      const position = this.container.querySelector('.paste-position-select')?.value || 'afterSelection';
+      this.onPaste(position);
+    });
+
+    this.container.querySelector('[data-action="copyBlock"]')?.addEventListener('click', () => {
+      this.onCopyBlock();
+    });
+
+    this.container.querySelector('[data-action="octaveUp"]')?.addEventListener('click', () => {
+      this.onOctaveShift(1);
+    });
+
+    this.container.querySelector('[data-action="octaveDown"]')?.addEventListener('click', () => {
+      this.onOctaveShift(-1);
     });
 
     // Voice select
@@ -594,8 +726,10 @@ export class NotationToolbar {
     }
 
     // Accidentals - only when no modifiers to avoid conflicts with browser shortcuts
+    // Note: '#' comes from Shift+3, but we only want it for accidentals, not tuplets
+    // Only set sharp accidental with 's/S' keys, not '#' (which conflicts with tuplet Shift+3)
     if (!hasModifier) {
-      if (e.key === '#' || e.key === 's' || e.key === 'S') {
+      if (e.key === 's' || e.key === 'S') {
         e.preventDefault();
         this.setAccidental('#');
       }
@@ -686,6 +820,38 @@ export class NotationToolbar {
     }
     this.updateArticulationButtons();
     this.onArticulationChange(this.currentArticulation);
+  }
+
+  /**
+   * Set tuplet insert mode
+   * @param {string|null} tupletType - 'triplet', 'quintuplet', 'sextuplet', or null to exit
+   * @param {boolean} notifyNoteEditor - Whether to notify noteEditor of the change (default true)
+   */
+  setTupletInsertMode(tupletType, notifyNoteEditor = true) {
+    console.log('[NotationToolbar] setTupletInsertMode called with:', tupletType, 'notify:', notifyNoteEditor);
+
+    // Only notify if mode actually changed and notification is requested
+    const modeChanged = this.tupletInsertMode !== tupletType;
+    this.tupletInsertMode = tupletType;
+    this.updateTupletButtons();
+
+    // Only notify noteEditor if this is a user-initiated change (not a sync callback)
+    if (modeChanged && notifyNoteEditor) {
+      this.onTupletModeToggle(tupletType);
+    }
+  }
+
+  /**
+   * Update tuplet button states
+   */
+  updateTupletButtons() {
+    if (!this.container) return;
+    console.log('[NotationToolbar] updateTupletButtons - tupletInsertMode:', this.tupletInsertMode);
+    this.container.querySelectorAll('.tuplet-btn').forEach(btn => {
+      const isActive = btn.dataset.tuplet === this.tupletInsertMode;
+      console.log(`[NotationToolbar] Button ${btn.dataset.tuplet}: active=${isActive}`);
+      btn.classList.toggle('active', isActive);
+    });
   }
 
   /**
@@ -794,6 +960,7 @@ export class NotationToolbar {
       this.selectionIsRest = null;
       this.selectionAccidental = null;
       this.selectionTied = null;
+      this.selectionTuplet = null;
 
       // Hide selection indicator
       const indicator = this.container?.querySelector('.selection-indicator');
@@ -803,6 +970,8 @@ export class NotationToolbar {
       this.updateAccidentalButtons();
       // Reset tie button
       this.updateTieButtonForSelection();
+      // Reset tuplet buttons
+      this.updateTupletButtonsForSelection();
 
       return;
     }
@@ -814,6 +983,7 @@ export class NotationToolbar {
     const restStates = new Set();
     const accidentals = new Set();
     const tiedStates = new Set();
+    const tupletTypes = new Set();
 
     selectedNotes.forEach(note => {
       if (note.duration) durations.add(note.duration);
@@ -822,6 +992,7 @@ export class NotationToolbar {
       restStates.add(note.isRest || note.type === 'rest' || false);
       accidentals.add(note.accidental || 'none');
       tiedStates.add(note.tied || note.isTied || false);
+      tupletTypes.add(note.tuplet?.type || 'none');
     });
 
     // Set selection state
@@ -831,6 +1002,7 @@ export class NotationToolbar {
     this.selectionIsRest = restStates.size === 1 ? [...restStates][0] : 'mixed';
     this.selectionAccidental = accidentals.size === 1 ? ([...accidentals][0] === 'none' ? null : [...accidentals][0]) : 'mixed';
     this.selectionTied = tiedStates.size === 1 ? [...tiedStates][0] : 'mixed';
+    this.selectionTuplet = tupletTypes.size === 1 ? ([...tupletTypes][0] === 'none' ? null : [...tupletTypes][0]) : 'mixed';
 
     console.log('[NotationToolbar] Selection state:', {
       count: this.selectedNotesCount,
@@ -839,7 +1011,8 @@ export class NotationToolbar {
       dotted: this.selectionDotted,
       isRest: this.selectionIsRest,
       accidental: this.selectionAccidental,
-      tied: this.selectionTied
+      tied: this.selectionTied,
+      tuplet: this.selectionTuplet
     });
 
     // Update selection indicator
@@ -862,6 +1035,7 @@ export class NotationToolbar {
     this.updateRestButtonForSelection();
     this.updateAccidentalButtonsForSelection();
     this.updateTieButtonForSelection();
+    this.updateTupletButtonsForSelection();
   }
 
   /**
@@ -1002,6 +1176,44 @@ export class NotationToolbar {
     } else {
       btn.title = 'Tie';
     }
+  }
+
+  /**
+   * Update tuplet buttons to show selection state
+   */
+  updateTupletButtonsForSelection() {
+    if (!this.container) return;
+    console.log('[NotationToolbar] updateTupletButtonsForSelection - selectedNotesCount:', this.selectedNotesCount, 'tupletInsertMode:', this.tupletInsertMode);
+
+    this.container.querySelectorAll('.tuplet-btn').forEach(btn => {
+      const tupletType = btn.dataset.tuplet;
+
+      // If notes are selected, show selection tuplet state
+      if (this.selectedNotesCount > 0) {
+        const isActive = this.selectionTuplet === tupletType;
+        const isMixed = this.selectionTuplet === 'mixed';
+
+        btn.classList.toggle('active', isActive);
+        btn.classList.toggle('mixed', isMixed);
+
+        // Update title based on selection state
+        if (isActive) {
+          btn.title = `Remove ${tupletType} from selected notes`;
+        } else {
+          btn.title = `Convert selected notes to ${tupletType}`;
+        }
+      } else {
+        // No selection - show insert mode state
+        const isInsertMode = this.tupletInsertMode === tupletType;
+        btn.classList.toggle('active', isInsertMode);
+        btn.classList.remove('mixed');
+
+        const noteCount = tupletType === 'triplet' ? 3 : tupletType === 'quintuplet' ? 5 : 6;
+        btn.title = isInsertMode
+          ? `Exit ${tupletType} insert mode`
+          : `Enter ${tupletType} insert mode (${noteCount} notes)`;
+      }
+    });
   }
 
   /**

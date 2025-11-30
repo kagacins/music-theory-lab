@@ -144,8 +144,8 @@ export function addNoteViaBridge(measureIndex, staff, note) {
 }
 
 /**
- * Helper to convert duration string to beats
- * @param {string} duration - Duration like '4n', '8n', etc.
+ * Helper to convert duration string to beats (with tuplet support)
+ * @param {string} duration - Duration like '4n', '8n', '8t' (triplet), etc.
  * @param {boolean} dotted - Whether the note is dotted
  * @returns {number} - Number of beats
  */
@@ -159,8 +159,38 @@ function durationToBeats(duration, dotted = false) {
         '32n': 0.125,
     };
 
-    const baseBeats = baseDurations[duration] || 1;
-    return dotted ? baseBeats * 1.5 : baseBeats;
+    // Tuplet ratios
+    const tupletRatios = {
+        triplet: { actual: 3, normal: 2 },
+        quintuplet: { actual: 5, normal: 4 },
+        sextuplet: { actual: 6, normal: 4 },
+    };
+
+    // Check for tuplet duration suffix (t=triplet, q=quintuplet, x=sextuplet)
+    let baseDuration = duration;
+    let tupletType = null;
+    if (duration && typeof duration === 'string') {
+        if (duration.endsWith('t') && /^\d+t$/.test(duration)) {
+            baseDuration = duration.replace('t', 'n');
+            tupletType = 'triplet';
+        } else if (duration.endsWith('q') && /^\d+q$/.test(duration)) {
+            baseDuration = duration.replace('q', 'n');
+            tupletType = 'quintuplet';
+        } else if (duration.endsWith('x') && /^\d+x$/.test(duration)) {
+            baseDuration = duration.replace('x', 'n');
+            tupletType = 'sextuplet';
+        }
+    }
+
+    let beats = baseDurations[baseDuration] || 1;
+
+    // Apply tuplet ratio if this is a tuplet note
+    if (tupletType && tupletRatios[tupletType]) {
+        const ratio = tupletRatios[tupletType];
+        beats = beats * (ratio.normal / ratio.actual);
+    }
+
+    return dotted ? beats * 1.5 : beats;
 }
 
 /**
@@ -243,9 +273,11 @@ function getCurrentBeat(measureIndex, staff) {
  * @param {string} staff - 'treble' or 'bass'
  * @param {boolean} isRest - Whether this is a rest
  * @param {string} accidental - Accidental ('#', 'b', 'n', or null)
+ * @param {string} articulation - Articulation type
+ * @param {Object} tuplet - Tuplet attribute object (optional)
  * @returns {Object} - {success: boolean, measuresFilled: number}
  */
-export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = false, accidental = null, articulation = null) {
+export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = false, accidental = null, articulation = null, tuplet = null) {
     if (!useCompositionState) return { success: false, measuresFilled: 0 };
 
     // DEBUG: Track progressionData state at start of note addition
@@ -290,7 +322,9 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
     }
 
     // If the note fits completely, add it normally
-    if (noteBeats <= remainingBeats) {
+    // Use small epsilon for floating-point comparison (important for tuplet calculations)
+    const BEAT_EPSILON = 0.01;
+    if (noteBeats <= remainingBeats + BEAT_EPSILON) {
         // Calculate beat position for this note
         const beatPosition = getCurrentBeat(selectedMeasureIndex, staff);
 
@@ -305,6 +339,11 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
             articulation: articulation, // Include articulation from toolbar
             beat: beatPosition,
         };
+
+        // Add tuplet attribute if provided
+        if (tuplet) {
+            noteData.tuplet = tuplet;
+        }
 
         compositionState.addNote(selectedMeasureIndex, staff, 0, noteData);
 
@@ -338,6 +377,11 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
                 articulation: articulation,
                 beat: beatPosition,
             };
+
+            // Add tuplet attribute if provided
+            if (tuplet) {
+                truncatedNote.tuplet = tuplet;
+            }
 
             compositionState.addNote(selectedMeasureIndex, staff, 0, truncatedNote);
 
@@ -436,9 +480,37 @@ export function setBassPattern(pattern) {
 }
 
 /**
+ * Toggle bass follows inversion setting
+ * When ON: Bass plays the inversion note (3rd for 1st inv, 5th for 2nd inv)
+ * When OFF: Bass always plays the root note regardless of chord inversion
+ * @param {boolean} enabled - Whether bass should follow chord inversion
+ */
+export function setBassFollowsInversion(enabled) {
+    if (!useCompositionState) return;
+
+    compositionState.updateSettings({ bassFollowsInversion: enabled });
+
+    // Only regenerate if auto-generate bass is enabled
+    if (compositionState.settings.autoGenerateBass) {
+        // Use building-block-aware regeneration for proper multi-measure chord handling
+        compositionState.regenerateAllAutoBassByBuildingBlock();
+    }
+}
+
+/**
  * Toggle auto-generate bass on/off
- * When ON: Backs up current bass notes, then fills each building block with chord card bass
- * When OFF: Restores the backed-up manual bass notes
+ *
+ * When ON:
+ *   - Saves current bass notes to editedBassNotes (preserves user's work)
+ *   - Regenerates bass using the selected pattern
+ *
+ * When OFF:
+ *   - Restores bass notes from editedBassNotes (user's edited state)
+ *   - User edits made while ON are preserved in editedBassNotes
+ *
+ * The editedBassNotes persists across multiple ON/OFF toggles, so user edits
+ * are never lost. Edits made while auto-generate is ON update editedBassNotes.
+ *
  * @param {boolean} enabled - Whether to enable auto-generation
  */
 export function setAutoGenerateBass(enabled) {
@@ -447,19 +519,21 @@ export function setAutoGenerateBass(enabled) {
     compositionState.updateSettings({ autoGenerateBass: enabled });
 
     if (enabled) {
-        // Back up current bass notes before auto-generating
-        compositionState.backupBassNotes();
+        // Save current bass notes as the user's edited state
+        // This preserves any manual work before auto-generating
+        compositionState.saveEditedBassNotes();
 
         // Regenerate bass for ALL building blocks using the current bass pattern
         // This properly handles chords that span multiple measures
         compositionState.regenerateAllAutoBassByBuildingBlock();
     } else {
-        // When turning OFF, restore the backed-up bass notes
-        const restored = compositionState.restoreBassNotes();
+        // Restore bass notes from the user's edited state
+        const restored = compositionState.restoreEditedBassNotes();
 
         if (!restored) {
-            // No backup available - clear bass notes as fallback
-            console.log('[setAutoGenerateBass] No backup to restore, clearing bass');
+            // No edited state available - clear bass notes as fallback
+            // This happens when auto-generate was never turned on before
+            console.log('[setAutoGenerateBass] No edited state to restore, clearing bass');
             for (let i = 0; i < compositionState.getMeasureCount(); i++) {
                 const measure = compositionState.getMeasure(i);
                 if (measure && measure.notation && measure.notation.bass) {
@@ -486,6 +560,8 @@ export function isBassAutoGenerated(measureIndex) {
 
 /**
  * Manually edit bass note (marks as user-edited)
+ * When auto-generate is ON, also saves the edit to editedBassNotes
+ * so it persists when toggling auto-generate OFF
  * @param {number} measureIndex - Measure index
  * @param {number} noteIndex - Note index in bass staff
  * @param {object} changes - Changes to apply
@@ -500,10 +576,15 @@ export function editBassNote(measureIndex, noteIndex, changes) {
     if (measure) {
         measure.notation.bass.autoGenerated = false;
     }
+
+    // Save this edit to editedBassNotes so it persists across auto-generate toggles
+    compositionState.saveEditedBassNotesForMeasure(measureIndex);
 }
 
 /**
  * Add bass note manually (marks measure as user-edited)
+ * When auto-generate is ON, also saves the edit to editedBassNotes
+ * so it persists when toggling auto-generate OFF
  * @param {number} measureIndex - Measure index
  * @param {object} note - Note data
  */
@@ -522,6 +603,9 @@ export function addBassNote(measureIndex, note) {
     if (measure) {
         measure.notation.bass.autoGenerated = false;
     }
+
+    // Save this edit to editedBassNotes so it persists across auto-generate toggles
+    compositionState.saveEditedBassNotesForMeasure(measureIndex);
 }
 
 /**

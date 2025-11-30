@@ -29,6 +29,85 @@ let activeNotes = new Set();
 // Track timeouts for playMeasure so they can be cleared on stop
 let measurePlaybackTimeouts = [];
 
+// ============================================================================
+// TUPLET DURATION HELPERS
+// ============================================================================
+
+/**
+ * Tuplet ratio lookup for duration adjustment
+ */
+const TUPLET_RATIOS = {
+    triplet: { actual: 3, normal: 2 },      // 3 notes in time of 2
+    quintuplet: { actual: 5, normal: 4 },   // 5 notes in time of 4
+    sextuplet: { actual: 6, normal: 4 },    // 6 notes in time of 4
+};
+
+/**
+ * Check if a duration string is a tuplet duration
+ * @param {string} duration - Duration string like '4n', '8t', '4q', etc.
+ * @returns {Object|null} - Tuplet info { type, baseDuration } or null
+ */
+function parseTupletDuration(duration) {
+    if (!duration || typeof duration !== 'string') return null;
+
+    // Triplet: ends with 't' (e.g., '4t', '8t', '16t')
+    if (duration.endsWith('t') && /^\d+t$/.test(duration)) {
+        return { type: 'triplet', baseDuration: duration.replace('t', 'n') };
+    }
+    // Quintuplet: ends with 'q' (e.g., '4q', '8q', '16q')
+    if (duration.endsWith('q') && /^\d+q$/.test(duration)) {
+        return { type: 'quintuplet', baseDuration: duration.replace('q', 'n') };
+    }
+    // Sextuplet: ends with 'x' (e.g., '4x', '8x', '16x')
+    if (duration.endsWith('x') && /^\d+x$/.test(duration)) {
+        return { type: 'sextuplet', baseDuration: duration.replace('x', 'n') };
+    }
+    return null;
+}
+
+/**
+ * Convert a duration string to seconds, with tuplet support
+ * @param {string} duration - Duration string (e.g., '4n', '8t', '4q')
+ * @param {number} tempo - Tempo in BPM
+ * @param {Object} [tuplet] - Optional tuplet attribute from note { type: 'triplet', actual: 3, normal: 2 }
+ * @returns {number} - Duration in seconds
+ */
+function getDurationInSeconds(duration, tempo, tuplet = null) {
+    const beatDuration = 60.0 / tempo;
+
+    // First check if note has a tuplet attribute (from notation system)
+    if (tuplet && tuplet.type && TUPLET_RATIOS[tuplet.type]) {
+        // Get base duration in seconds using the standard duration
+        try {
+            const baseDuration = Tone.Time(duration).toSeconds();
+            // Apply tuplet ratio (e.g., triplet: multiply by 2/3)
+            const ratio = TUPLET_RATIOS[tuplet.type];
+            return baseDuration * (ratio.normal / ratio.actual);
+        } catch (e) {
+            console.warn(`[getDurationInSeconds] Error parsing duration ${duration} with tuplet, falling back`);
+        }
+    }
+
+    // Then check for tuplet duration suffix (e.g., '8t' for triplet eighth)
+    const tupletInfo = parseTupletDuration(duration);
+    if (tupletInfo) {
+        // Get base duration in seconds (e.g., '4n' -> 0.5s at 120bpm)
+        const baseDuration = Tone.Time(tupletInfo.baseDuration).toSeconds();
+        // Apply tuplet ratio (e.g., triplet: multiply by 2/3)
+        const ratio = TUPLET_RATIOS[tupletInfo.type];
+        return baseDuration * (ratio.normal / ratio.actual);
+    }
+
+    // Standard duration - use Tone.js
+    try {
+        return Tone.Time(duration).toSeconds();
+    } catch (e) {
+        // Fallback: assume quarter note
+        console.warn(`[getDurationInSeconds] Unknown duration: ${duration}, defaulting to quarter note`);
+        return beatDuration;
+    }
+}
+
 /**
  * Get notes available for melody based on chord and style
  */
@@ -2324,11 +2403,12 @@ function startMeasurePlayback(canvas, measureIndex) {
         bassNoteData.forEach(bassNote => {
             const noteBeat = bassNote.beat || 0;
             const delay = noteBeat * beatDuration; // Calculate delay based on beat position
-            const noteDuration = bassNote.duration ? Tone.Time(bassNote.duration).toSeconds() : beatDuration;
+            // Use tuplet-aware duration calculation (pass tuplet attribute for correct rhythm)
+            const noteDuration = bassNote.duration ? getDurationInSeconds(bassNote.duration, tempo, bassNote.tuplet) : beatDuration;
 
             // Schedule the bass note to play at its proper beat timing
             const timeoutId = setTimeout(() => {
-                piano.triggerAttackRelease(bassNote.pitch, bassNote.duration || '4n', Tone.now());
+                piano.triggerAttackRelease(bassNote.pitch, noteDuration, Tone.now());
 
                 // Add to activeNotes for highlighting (use actual beat value)
                 const noteId = `${measureIndex}-${noteBeat}-${bassNote.pitch}`;
@@ -3173,7 +3253,8 @@ export function playMeasure(measureIndex) {
         bassNoteData.forEach(bassNote => {
             const noteBeat = bassNote.beat || 0;
             const delay = noteBeat * beatDuration;
-            const noteDuration = bassNote.duration ? Tone.Time(bassNote.duration).toSeconds() : beatDuration;
+            // Use tuplet-aware duration calculation (pass tuplet attribute for correct rhythm)
+            const noteDuration = bassNote.duration ? getDurationInSeconds(bassNote.duration, tempo, bassNote.tuplet) : beatDuration;
 
             // Handle both single notes (pitch) and chords (pitches)
             const notesToPlay = bassNote.pitches || (bassNote.pitch ? [bassNote.pitch] : []);
@@ -3262,12 +3343,24 @@ export function playMeasure(measureIndex) {
 
     // Play melody notes with Tone.js scheduling for perfect sync
     if (measureMelodyNotes.length > 0) {
+        console.log(`[playMeasure] ===== TUPLET DEBUG: Measure ${measureIndex} =====`);
+        console.log(`[playMeasure] Tempo: ${tempo} BPM, beatDuration: ${beatDuration}s`);
+        console.log(`[playMeasure] Total melody notes: ${measureMelodyNotes.length}`);
+
         measureMelodyNotes.forEach((note, index) => {
-            if (note.type === 'rest') return; // Skip rests
+            if (note.type === 'rest') {
+                console.log(`[playMeasure] Note ${index}: REST, beat=${note.beat}, duration=${note.duration}`);
+                return; // Skip rests
+            }
 
             const delay = note.beat * beatDuration; // Use actual beat position for timing
-            const noteDuration = note.duration ? Tone.Time(note.duration).toSeconds() : 0.5;
+            // Use tuplet-aware duration calculation (pass tuplet attribute for correct rhythm)
+            const noteDuration = note.duration ? getDurationInSeconds(note.duration, tempo, note.tuplet) : 0.5;
             const noteStartTime = startTime + delay;
+
+            // Debug logging for tuplet timing
+            console.log(`[playMeasure] Note ${index}: pitch=${note.pitch || note.pitches?.[0]}, beat=${note.beat}, duration=${note.duration}, tuplet=${JSON.stringify(note.tuplet)}`);
+            console.log(`[playMeasure]   -> delay=${delay.toFixed(3)}s, noteDuration=${noteDuration.toFixed(3)}s, startTime=${noteStartTime.toFixed(3)}s`);
 
             // PHASE 1.4: Handle both single notes (pitch) and chords (pitches)
             const notesToPlay = note.pitches || (note.pitch ? [note.pitch] : []);
@@ -3867,6 +3960,13 @@ export function playAllMelody() {
             const events = [];
             let exportedIndex = 0;
 
+            // Debug: Log all melody notes with their beat positions
+            console.log('[playAllMelody] ===== TUPLET DEBUG =====');
+            console.log(`[playAllMelody] Tempo: ${tempo} BPM, beatDuration: ${beatDuration}s, measureDuration: ${measureDuration}s`);
+            melodyNotes.forEach((n, idx) => {
+                console.log(`[playAllMelody] Note ${idx}: measure=${n.measure}, beat=${n.beat?.toFixed?.(3) || n.beat}, duration=${n.duration}, pitch=${n.pitch || n.pitches?.[0]}, tuplet=${JSON.stringify(n.tuplet)}`);
+            });
+
             for (let i = 0; i < melodyNotes.length; i++) {
                 const note = melodyNotes[i];
 
@@ -3893,8 +3993,11 @@ export function playAllMelody() {
                 const baseTime = (note.measure * measureDuration) + (note.beat * beatDuration);
                 const safeTime = Math.max(0, baseTime);
 
-                // Start with this note's duration
-                let totalDurationSeconds = Tone.Time(note.duration).toSeconds();
+                // Start with this note's duration - use tuplet-aware calculation
+                let totalDurationSeconds = getDurationInSeconds(note.duration, tempo, note.tuplet);
+
+                // Debug log for timing
+                console.log(`[playAllMelody] Scheduling note ${i}: pitch=${note.pitch}, measure=${note.measure}, beat=${note.beat?.toFixed?.(3)}, baseTime=${baseTime.toFixed(3)}s, duration=${totalDurationSeconds.toFixed(3)}s`);
 
                 // Look ahead to merge durations of tied continuation notes
                 let j = i + 1;
@@ -3914,8 +4017,8 @@ export function playAllMelody() {
                         break;
                     }
 
-                    // Merge this continuation note's duration into the total
-                    totalDurationSeconds += Tone.Time(next.duration).toSeconds();
+                    // Merge this continuation note's duration into the total (use tuplet-aware calculation)
+                    totalDurationSeconds += getDurationInSeconds(next.duration, tempo, next.tuplet);
 
                     // Advance chain
                     j++;

@@ -6,7 +6,7 @@
  * - Listens for recommendation updates from the service
  * - Updates the sidebar UI when recommendations change
  * - Handles user interactions (clicks, refresh button)
- * - Manages sidebar context display (key, last chord)
+ * - Manages sidebar context display (key, currently selected chord)
  */
 
 import {
@@ -21,7 +21,7 @@ import {
 } from './recommendationsSidebar.js';
 
 import { getRecommendationService } from '../integration/recommendationService.js';
-import { getProgressionData, getCurrentKey } from '../state/trainerState.js';
+import { getProgressionData, getCurrentKey, getSelectedChordIndex } from '../state/trainerState.js';
 import { addChordToProgressionByParams } from '../features/progressionBuilder.js';
 
 /**
@@ -145,6 +145,13 @@ export class RecommendationsSidebarController {
         // Listen for recommendation updates from the service
         window.addEventListener('recommendationsUpdated', (e) => {
             this.handleRecommendationsUpdate(e);
+        });
+
+        // Listen for chord selection changes to update the "Selected Chord" display
+        window.addEventListener('chordCardSelected', () => {
+            const progression = getProgressionData();
+            const key = getCurrentKey();
+            this.updateContext(key, progression);
         });
 
         // Setup refresh button click handler
@@ -374,30 +381,36 @@ export class RecommendationsSidebarController {
     }
 
     /**
-     * Update context display (key and last chord)
+     * Update context display (key and currently selected chord)
      * @param {string} key - Current key
      * @param {Array} progression - Current progression
      */
     updateContext(key, progression) {
-        // Get last chord from progression
-        let lastChordSymbol = null;
-        let lastChordData = null;
+        // Get the currently selected chord from progression
+        let selectedChordSymbol = null;
+        let selectedChordData = null;
 
         if (progression && progression.length > 0) {
-            const lastChord = progression[progression.length - 1];
-            const suffix = this.getChordSuffix(lastChord.type);
-            lastChordSymbol = lastChord.root + suffix;
+            // Get the selected chord index (defaults to last chord if no selection)
+            const selectedIndex = getSelectedChordIndex();
+            const chordIndex = (selectedIndex !== null && selectedIndex >= 0 && selectedIndex < progression.length)
+                ? selectedIndex
+                : progression.length - 1;
+
+            const selectedChord = progression[chordIndex];
+            const suffix = this.getChordSuffix(selectedChord.type);
+            selectedChordSymbol = selectedChord.root + suffix;
 
             // Pass chord data for playback button
-            lastChordData = {
-                root: lastChord.root,
-                type: lastChord.type,
-                inversion: lastChord.inversion || 0
+            selectedChordData = {
+                root: selectedChord.root,
+                type: selectedChord.type,
+                inversion: selectedChord.inversion || 0
             };
         }
 
         // Update the context display in the sidebar
-        updateContextDisplay(key, lastChordSymbol, lastChordData);
+        updateContextDisplay(key, selectedChordSymbol, selectedChordData);
     }
 
     /**

@@ -14,6 +14,13 @@ import {
     saveCustomTemplate
 } from '../features/progressionTemplates.js';
 
+import {
+    getPatternsForChordCount,
+    getRecommendedPatterns,
+    getDefaultPatternForChordCount,
+    formatBeatsDisplay
+} from '../features/rhythmicPatterns.js';
+
 import { getProgressionData } from '../state/trainerState.js';
 
 let currentCategory = 'All';
@@ -384,6 +391,9 @@ function createTemplateCard(template) {
                 </div>
             ` : ''}
 
+            <!-- Rhythm Pattern Selector -->
+            ${createRhythmPatternSelector(template)}
+
             <!-- Action Buttons -->
             <div class="flex gap-2 mt-3">
                 <button class="template-load-btn flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition text-xs font-semibold" data-template-id="${template.id}" data-action="load">
@@ -398,13 +408,75 @@ function createTemplateCard(template) {
 }
 
 /**
+ * Create rhythm pattern selector HTML for a template
+ * @param {object} template - Template object
+ * @returns {string} HTML string
+ */
+function createRhythmPatternSelector(template) {
+    const chordCount = template.progressions.length;
+    const patterns = getPatternsForChordCount(chordCount);
+    const recommended = getRecommendedPatterns(template.id);
+    const defaultPattern = getDefaultPatternForChordCount(chordCount);
+
+    if (patterns.length === 0) {
+        return '';
+    }
+
+    // Get recommended pattern IDs for quick lookup
+    const recommendedIds = new Set(recommended.map(p => p.id));
+
+    // Sort patterns: default first, then recommended, then others
+    const sortedPatterns = [...patterns].sort((a, b) => {
+        if (a.isDefault) return -1;
+        if (b.isDefault) return 1;
+        if (recommendedIds.has(a.id) && !recommendedIds.has(b.id)) return -1;
+        if (!recommendedIds.has(a.id) && recommendedIds.has(b.id)) return 1;
+        return 0;
+    });
+
+    return `
+        <div class="mt-3 pt-3 border-t border-gray-700">
+            <div class="flex items-center gap-2">
+                <label class="text-xs text-gray-400 whitespace-nowrap">Rhythm:</label>
+                <select
+                    class="rhythm-pattern-select flex-1 px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-xs text-white focus:outline-none focus:border-purple-500"
+                    data-template-id="${template.id}"
+                >
+                    ${sortedPatterns.map(pattern => {
+                        const isRecommended = recommendedIds.has(pattern.id);
+                        const beatsDisplay = formatBeatsDisplay(pattern.beats);
+                        const label = pattern.isDefault
+                            ? `${pattern.name}`
+                            : isRecommended
+                                ? `★ ${pattern.name}`
+                                : pattern.name;
+                        return `
+                            <option value="${pattern.id}" ${pattern.isDefault ? 'selected' : ''}>
+                                ${label} (${beatsDisplay})
+                            </option>
+                        `;
+                    }).join('')}
+                </select>
+            </div>
+            ${recommended.length > 0 ? `
+                <div class="text-[10px] text-purple-400 mt-1">★ = Recommended for this progression</div>
+            ` : ''}
+        </div>
+    `;
+}
+
+/**
  * Handle template selection
  * @param {object} template - Selected template
  * @param {string} action - Action to perform ('load' or 'append')
  */
 function selectTemplate(template, action = 'load') {
+    // Get the selected rhythm pattern from the dropdown
+    const patternSelect = document.querySelector(`select.rhythm-pattern-select[data-template-id="${template.id}"]`);
+    const rhythmPattern = patternSelect ? patternSelect.value : null;
+
     if (onTemplateSelectCallback) {
-        onTemplateSelectCallback(template, action);
+        onTemplateSelectCallback(template, action, rhythmPattern);
     }
     hideTemplateBrowser();
 }

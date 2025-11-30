@@ -252,46 +252,46 @@ export function renderRecommendations(recommendations) {
 }
 
 /**
- * Update context display (key and last chord)
+ * Update context display (key and currently selected chord)
  * @param {string} key - Current key (e.g., 'C', 'G')
- * @param {string} [lastChord] - Last chord symbol (e.g., 'Cmaj7', 'Dm')
- * @param {object} [lastChordData] - Last chord data {root, type, inversion}
+ * @param {string} [selectedChord] - Selected chord symbol (e.g., 'Cmaj7', 'Dm')
+ * @param {object} [selectedChordData] - Selected chord data {root, type, inversion}
  */
-export function updateContextDisplay(key, lastChord = null, lastChordData = null) {
+export function updateContextDisplay(key, selectedChord = null, selectedChordData = null) {
     const keyDisplay = document.getElementById('current-key-display');
-    const lastChordDisplay = document.getElementById('last-chord-display');
+    const selectedChordDisplay = document.getElementById('last-chord-display');
 
     if (keyDisplay) {
         keyDisplay.textContent = key + ' Major';
     }
 
-    if (lastChordDisplay) {
+    if (selectedChordDisplay) {
         // Clear existing content
-        lastChordDisplay.innerHTML = '';
+        selectedChordDisplay.innerHTML = '';
 
-        if (lastChord && lastChordData) {
+        if (selectedChord && selectedChordData) {
             // Create text node for chord symbol
             const chordText = document.createElement('span');
-            chordText.textContent = lastChord;
+            chordText.textContent = selectedChord;
             chordText.style.marginRight = '4px';
 
             // Create play button
             const playBtn = document.createElement('button');
             playBtn.className = 'context-play-btn';
-            playBtn.dataset.chordRoot = lastChordData.root;
-            playBtn.dataset.chordType = lastChordData.type;
-            playBtn.dataset.chordInversion = lastChordData.inversion || 0;
-            playBtn.title = 'Preview last chord';
+            playBtn.dataset.chordRoot = selectedChordData.root;
+            playBtn.dataset.chordType = selectedChordData.type;
+            playBtn.dataset.chordInversion = selectedChordData.inversion || 0;
+            playBtn.title = 'Preview selected chord';
             playBtn.innerHTML = `
                 <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"></path>
                 </svg>
             `;
 
-            lastChordDisplay.appendChild(chordText);
-            lastChordDisplay.appendChild(playBtn);
+            selectedChordDisplay.appendChild(chordText);
+            selectedChordDisplay.appendChild(playBtn);
         } else {
-            lastChordDisplay.textContent = lastChord || '(none)';
+            selectedChordDisplay.textContent = selectedChord || '(none)';
         }
     }
 }

@@ -13,6 +13,7 @@ import { getInvertedChordNotes } from '../utils/noteUtils.js';
 let modalElement = null;
 let previewResult = null;
 let originalProgression = null;
+let selectedChords = {}; // Store user selections by chord index
 
 /**
  * Show the tension optimizer modal
@@ -27,6 +28,9 @@ export function showTensionOptimizerModal() {
 
     // Store original for undo
     originalProgression = JSON.parse(JSON.stringify(progression));
+
+    // Reset user selections
+    selectedChords = {};
 
     // Create modal if it doesn't exist
     if (!modalElement) {
@@ -132,13 +136,8 @@ function createModal() {
                 <!-- Preview Results -->
                 <div class="mb-6">
                     <div class="flex items-center justify-between mb-3">
-                        <h3 class="text-sm font-semibold text-gray-700">Preview Changes</h3>
-                        <button id="refresh-preview" class="text-sm text-purple-600 hover:text-purple-800 flex items-center gap-1">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                            </svg>
-                            Refresh
-                        </button>
+                        <h3 class="text-sm font-semibold text-gray-700">Chord Optimization</h3>
+                        <p class="text-xs text-gray-500">Click on highlighted rows to see alternatives</p>
                     </div>
 
                     <!-- Summary -->
@@ -153,26 +152,18 @@ function createModal() {
                         <table class="w-full text-sm">
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th class="px-3 py-2 text-left text-gray-600">#</th>
-                                    <th class="px-3 py-2 text-left text-gray-600">Chord</th>
-                                    <th class="px-3 py-2 text-center text-gray-600">Target</th>
-                                    <th class="px-3 py-2 text-center text-gray-600">Current</th>
-                                    <th class="px-3 py-2 text-center text-gray-600">After</th>
-                                    <th class="px-3 py-2 text-left text-gray-600">Changes</th>
+                                    <th class="px-3 py-2 text-left text-gray-600 w-8">#</th>
+                                    <th class="px-3 py-2 text-left text-gray-600">Current</th>
+                                    <th class="px-3 py-2 text-center text-gray-600 w-20">Score</th>
+                                    <th class="px-3 py-2 text-left text-gray-600">Selected</th>
+                                    <th class="px-3 py-2 text-center text-gray-600 w-20">Score</th>
+                                    <th class="px-3 py-2 text-center text-gray-600 w-20">Target</th>
                                 </tr>
                             </thead>
                             <tbody id="chord-changes-body">
                                 <!-- Populated dynamically -->
                             </tbody>
                         </table>
-                    </div>
-
-                    <!-- Extension Suggestions -->
-                    <div id="extension-suggestions-container" class="mt-4 hidden">
-                        <h4 class="text-sm font-medium text-gray-700 mb-2">Extension Suggestions</h4>
-                        <div id="extension-suggestions-list" class="space-y-2">
-                            <!-- Populated dynamically -->
-                        </div>
                     </div>
                 </div>
             </div>
@@ -247,9 +238,6 @@ function attachEventListeners() {
         });
     });
 
-    // Refresh button
-    modalElement.querySelector('#refresh-preview').addEventListener('click', runPreview);
-
     // Apply button
     modalElement.querySelector('#apply-optimization').addEventListener('click', applyOptimization);
 }
@@ -321,6 +309,142 @@ function runPreview() {
 }
 
 /**
+ * Format tension score nicely (no lengthy decimals)
+ * @param {number} tension - Tension value (0-100 or 0-1)
+ * @returns {string} Formatted tension string
+ */
+function formatTension(tension) {
+    if (tension === undefined || tension === null) return '—';
+    // Ensure we have a whole number percentage
+    const value = Math.round(tension);
+    return `${value}%`;
+}
+
+/**
+ * Get chord display name with inversion
+ * @param {Object} chord - Chord object
+ * @returns {string} Display name
+ */
+function getChordDisplayName(chord) {
+    const inversionLabels = ['Root', '1st', '2nd', '3rd', '4th'];
+    const inv = chord.inversion || 0;
+    const invLabel = inv > 0 ? ` (${inversionLabels[inv]} inv)` : '';
+    return `${chord.root} ${chord.type}${invLabel}`;
+}
+
+/**
+ * Build alternatives list for a chord (inversions + extensions)
+ * @param {Object} mod - Modification object from optimizer
+ * @param {number} index - Chord index
+ * @returns {Array} Array of alternative options
+ */
+function buildAlternatives(mod, index) {
+    const alternatives = [];
+    const progression = getProgressionData();
+    const chord = progression[index];
+    const key = getCurrentKey() || 'C';
+    const planner = getTensionArcPlanner();
+
+    // Get context for tension calculation
+    const context = {
+        positionInProgression: index,
+        totalChords: progression.length
+    };
+
+    // Add inversion alternatives
+    const maxInversions = chord.type.includes('7') || chord.type.includes('9') ? 3 : 2;
+    for (let inv = 0; inv <= maxInversions; inv++) {
+        if (inv === (chord.inversion || 0)) continue; // Skip current inversion
+
+        const testChord = { ...chord, inversion: inv };
+        const tension = planner.calculateChordTension(testChord, key, context).total;
+        const inversionLabels = ['Root', '1st', '2nd', '3rd', '4th'];
+
+        alternatives.push({
+            type: 'inversion',
+            label: `${chord.root} ${chord.type} (${inversionLabels[inv]} inv)`,
+            shortLabel: `${inversionLabels[inv]} inv`,
+            inversion: inv,
+            chordType: chord.type,
+            tension: Math.round(tension * 100),
+            root: chord.root
+        });
+    }
+
+    // Add extension alternatives from mod.extensionSuggestions
+    if (mod.extensionSuggestions && mod.extensionSuggestions.length > 0) {
+        mod.extensionSuggestions.forEach(s => {
+            alternatives.push({
+                type: 'extension',
+                label: `${chord.root} ${s.type}`,
+                shortLabel: s.type,
+                chordType: s.type,
+                inversion: chord.inversion || 0,
+                tension: Math.round(s.tension * 100),
+                root: chord.root
+            });
+        });
+    }
+
+    // Sort by how close they are to target
+    alternatives.sort((a, b) => {
+        const diffA = Math.abs(a.tension - mod.targetTension);
+        const diffB = Math.abs(b.tension - mod.targetTension);
+        return diffA - diffB;
+    });
+
+    return alternatives;
+}
+
+/**
+ * Play a chord with specified parameters
+ * @param {string} root - Chord root note
+ * @param {string} type - Chord type
+ * @param {number} inversion - Inversion number
+ */
+function playChord(root, type, inversion) {
+    const key = getCurrentKey() || 'C';
+
+    // Get the notes for this chord
+    const result = getInvertedChordNotes(root, type, inversion, key, 0);
+    const notes = result.specificNotes;
+
+    if (notes && notes.length > 0 && window.Tone) {
+        // Initialize audio if needed
+        if (window.initAudio) {
+            window.initAudio();
+        }
+
+        // Get the instrument and play
+        if (window.getInstrument) {
+            const instrument = window.getInstrument();
+            if (instrument) {
+                instrument.triggerAttackRelease(notes, '2n', window.Tone.now());
+            }
+        }
+    }
+}
+
+/**
+ * Select an alternative for a chord
+ * @param {number} index - Chord index
+ * @param {Object} alternative - Alternative object
+ */
+function selectAlternative(index, alternative) {
+    selectedChords[index] = alternative;
+    updatePreviewUI();
+}
+
+/**
+ * Clear selection for a chord
+ * @param {number} index - Chord index
+ */
+function clearSelection(index) {
+    delete selectedChords[index];
+    updatePreviewUI();
+}
+
+/**
  * Update preview UI with results
  */
 function updatePreviewUI() {
@@ -330,6 +454,9 @@ function updatePreviewUI() {
     const summaryEl = modalElement.querySelector('#optimization-summary');
     const { summary } = previewResult;
 
+    // Count how many selections have been made
+    const selectionCount = Object.keys(selectedChords).length;
+
     summaryEl.innerHTML = `
         <div class="flex items-center gap-6 text-sm">
             <div>
@@ -337,15 +464,13 @@ function updatePreviewUI() {
                 <span class="font-medium text-purple-700">${summary.templateUsed}</span>
             </div>
             <div>
-                <span class="text-gray-600">Chords to modify:</span>
+                <span class="text-gray-600">Suggestions available:</span>
                 <span class="font-medium ${summary.chordsModified > 0 ? 'text-green-600' : 'text-gray-500'}">${summary.chordsModified} of ${summary.totalChords}</span>
             </div>
-            ${summary.chordsModified > 0 ? `
             <div>
-                <span class="text-gray-600">Avg. improvement:</span>
-                <span class="font-medium text-green-600">+${summary.averageImprovement}%</span>
+                <span class="text-gray-600">Selected changes:</span>
+                <span class="font-medium ${selectionCount > 0 ? 'text-purple-600' : 'text-gray-500'}">${selectionCount}</span>
             </div>
-            ` : ''}
         </div>
     `;
 
@@ -353,90 +478,198 @@ function updatePreviewUI() {
     const tbody = modalElement.querySelector('#chord-changes-body');
     tbody.innerHTML = '';
 
-    let hasExtensionSuggestions = false;
-    const extensionSuggestionsList = [];
+    const progression = getProgressionData();
 
     previewResult.modifications.forEach((mod, i) => {
+        const chord = progression[i];
+        const alternatives = buildAlternatives(mod, i);
+        const hasSuggestions = alternatives.length > 0;
+        const selection = selectedChords[i];
+
+        // Calculate current chord tension for display
+        const currentTension = mod.originalTension;
+
+        // Calculate selected tension if there's a selection
+        let selectedTension = null;
+        let selectedDisplay = '—';
+        if (selection) {
+            selectedTension = selection.tension;
+            selectedDisplay = selection.label;
+        }
+
+        // Determine row color
+        const rowClass = hasSuggestions ? 'bg-green-50 cursor-pointer hover:bg-green-100' : 'bg-white';
+
         const row = document.createElement('tr');
-        row.className = mod.status === 'optimized' ? 'bg-green-50' : 'bg-white';
+        row.className = rowClass;
+        row.dataset.index = i;
+        row.dataset.hasSuggestions = hasSuggestions ? 'true' : 'false';
 
-        const changesText = mod.changes.length > 0
-            ? mod.changes.map(c => {
-                if (c.type === 'inversion') {
-                    return `Inv: ${c.from} → ${c.to}`;
-                }
-                return '';
-            }).filter(Boolean).join(', ')
-            : mod.status === 'within_tolerance' ? '✓ Good' : '—';
+        // Current score color coding
+        const currentDiff = Math.abs(currentTension - mod.targetTension);
+        const currentScoreClass = currentDiff <= 15 ? 'text-green-600' :
+                                  currentDiff <= 25 ? 'text-yellow-600' : 'text-red-600';
 
-        const tensionDiff = mod.finalTension - mod.targetTension;
-        const tensionClass = Math.abs(tensionDiff) <= 15 ? 'text-green-600' :
-                           Math.abs(tensionDiff) <= 25 ? 'text-yellow-600' : 'text-red-600';
+        // Selected score color coding
+        let selectedScoreClass = 'text-gray-400';
+        if (selection) {
+            const selectedDiff = Math.abs(selectedTension - mod.targetTension);
+            selectedScoreClass = selectedDiff <= 15 ? 'text-green-600' :
+                                 selectedDiff <= 25 ? 'text-yellow-600' : 'text-red-600';
+        }
 
         row.innerHTML = `
             <td class="px-3 py-2 text-gray-500">${i + 1}</td>
-            <td class="px-3 py-2 font-medium">${mod.chord}</td>
-            <td class="px-3 py-2 text-center text-purple-600">${mod.targetTension}%</td>
-            <td class="px-3 py-2 text-center text-gray-600">${mod.originalTension}%</td>
-            <td class="px-3 py-2 text-center ${tensionClass}">${mod.finalTension}%</td>
-            <td class="px-3 py-2 text-gray-600">${changesText}</td>
+            <td class="px-3 py-2 font-medium">${getChordDisplayName(chord)}</td>
+            <td class="px-3 py-2 text-center ${currentScoreClass}">${formatTension(currentTension)}</td>
+            <td class="px-3 py-2 ${selection ? 'font-medium text-purple-700' : 'text-gray-400'}">${selectedDisplay}</td>
+            <td class="px-3 py-2 text-center ${selectedScoreClass}">${selection ? formatTension(selectedTension) : '—'}</td>
+            <td class="px-3 py-2 text-center text-purple-600">${formatTension(mod.targetTension)}</td>
         `;
 
         tbody.appendChild(row);
 
-        // Collect extension suggestions
-        if (mod.extensionSuggestions && mod.extensionSuggestions.length > 0) {
-            hasExtensionSuggestions = true;
-            extensionSuggestionsList.push({
-                index: i,
-                chord: mod.chord,
-                suggestions: mod.extensionSuggestions
+        // Create expandable row for alternatives (hidden by default)
+        if (hasSuggestions) {
+            const expandRow = document.createElement('tr');
+            expandRow.className = 'expansion-row hidden';
+            expandRow.dataset.parentIndex = i;
+
+            const expandCell = document.createElement('td');
+            expandCell.colSpan = 6;
+            expandCell.className = 'px-3 py-3 bg-green-50 border-t border-green-200';
+
+            // Build alternatives HTML
+            let alternativesHtml = `
+                <div class="mb-2 flex items-center justify-between">
+                    <span class="text-sm font-medium text-gray-700">Available alternatives:</span>
+                    ${selection ? `
+                        <button class="clear-selection-btn text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50" data-index="${i}">
+                            Clear Selection
+                        </button>
+                    ` : ''}
+                </div>
+                <div class="space-y-2">
+            `;
+
+            alternatives.forEach((alt, altIndex) => {
+                const isSelected = selection &&
+                    selection.type === alt.type &&
+                    selection.chordType === alt.chordType &&
+                    selection.inversion === alt.inversion;
+
+                const altDiff = Math.abs(alt.tension - mod.targetTension);
+                const tensionClass = altDiff <= 15 ? 'text-green-600' :
+                                     altDiff <= 25 ? 'text-yellow-600' : 'text-red-600';
+
+                const selectedClass = isSelected ? 'ring-2 ring-purple-500 bg-purple-50' : 'bg-white hover:bg-gray-50';
+
+                alternativesHtml += `
+                    <div class="flex items-center justify-between p-2 rounded border ${selectedClass}" data-alt-index="${altIndex}">
+                        <div class="flex items-center gap-3">
+                            <span class="font-medium text-gray-800">${alt.label}</span>
+                            <span class="text-sm ${tensionClass}">${formatTension(alt.tension)}</span>
+                            ${isSelected ? '<span class="text-xs text-purple-600 font-medium">✓ Selected</span>' : ''}
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button class="play-current-btn px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded text-gray-700"
+                                    data-root="${chord.root}" data-type="${chord.type}" data-inversion="${chord.inversion || 0}"
+                                    title="Play current chord">
+                                ▶ Current
+                            </button>
+                            <button class="play-suggestion-btn px-2 py-1 text-xs bg-purple-100 hover:bg-purple-200 rounded text-purple-700"
+                                    data-root="${alt.root}" data-type="${alt.chordType}" data-inversion="${alt.inversion}"
+                                    title="Play this suggestion">
+                                ▶ This
+                            </button>
+                            <button class="select-btn px-2 py-1 text-xs ${isSelected ? 'bg-purple-600 text-white' : 'bg-purple-100 hover:bg-purple-200 text-purple-700'} rounded"
+                                    data-index="${i}" data-alt-index="${altIndex}">
+                                ${isSelected ? 'Selected' : 'Select'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            alternativesHtml += '</div>';
+            expandCell.innerHTML = alternativesHtml;
+            expandRow.appendChild(expandCell);
+            tbody.appendChild(expandRow);
+
+            // Add click handler to toggle expansion
+            row.addEventListener('click', () => {
+                toggleExpansion(i);
             });
         }
     });
 
-    // Update extension suggestions
-    const extContainer = modalElement.querySelector('#extension-suggestions-container');
-    const extList = modalElement.querySelector('#extension-suggestions-list');
+    // Add event handlers for the buttons
+    attachRowEventHandlers();
+}
 
-    if (hasExtensionSuggestions) {
-        extContainer.classList.remove('hidden');
-        extList.innerHTML = '';
-
-        extensionSuggestionsList.forEach(item => {
-            const div = document.createElement('div');
-            div.className = 'p-3 bg-yellow-50 border border-yellow-200 rounded-lg';
-
-            const suggestions = item.suggestions.map(s =>
-                `<span class="inline-flex items-center px-2 py-1 bg-white rounded border text-sm cursor-pointer hover:bg-yellow-100"
-                       data-index="${item.index}" data-type="${s.type}">
-                    ${s.type} <span class="ml-1 text-xs text-gray-500">(${s.tension}%)</span>
-                </span>`
-            ).join(' ');
-
-            div.innerHTML = `
-                <div class="text-sm font-medium text-gray-700 mb-2">
-                    Chord ${item.index + 1} (${item.chord}):
-                </div>
-                <div class="flex flex-wrap gap-2">
-                    ${suggestions}
-                </div>
-            `;
-
-            extList.appendChild(div);
-        });
-
-        // Add click handlers for extension suggestions
-        extList.querySelectorAll('[data-type]').forEach(el => {
-            el.addEventListener('click', () => {
-                const index = parseInt(el.dataset.index);
-                const type = el.dataset.type;
-                applyExtensionSuggestion(index, type);
-            });
-        });
-    } else {
-        extContainer.classList.add('hidden');
+/**
+ * Toggle expansion row visibility
+ * @param {number} index - Chord index
+ */
+function toggleExpansion(index) {
+    const expansionRow = modalElement.querySelector(`tr.expansion-row[data-parent-index="${index}"]`);
+    if (expansionRow) {
+        expansionRow.classList.toggle('hidden');
     }
+}
+
+/**
+ * Attach event handlers to dynamically created row elements
+ */
+function attachRowEventHandlers() {
+    // Play current buttons
+    modalElement.querySelectorAll('.play-current-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const root = btn.dataset.root;
+            const type = btn.dataset.type;
+            const inversion = parseInt(btn.dataset.inversion) || 0;
+            playChord(root, type, inversion);
+        });
+    });
+
+    // Play suggestion buttons
+    modalElement.querySelectorAll('.play-suggestion-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const root = btn.dataset.root;
+            const type = btn.dataset.type;
+            const inversion = parseInt(btn.dataset.inversion) || 0;
+            playChord(root, type, inversion);
+        });
+    });
+
+    // Select buttons
+    modalElement.querySelectorAll('.select-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const index = parseInt(btn.dataset.index);
+            const altIndex = parseInt(btn.dataset.altIndex);
+
+            // Get the alternatives for this index
+            const mod = previewResult.modifications[index];
+            const alternatives = buildAlternatives(mod, index);
+            const alternative = alternatives[altIndex];
+
+            if (alternative) {
+                selectAlternative(index, alternative);
+            }
+        });
+    });
+
+    // Clear selection buttons
+    modalElement.querySelectorAll('.clear-selection-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const index = parseInt(btn.dataset.index);
+            clearSelection(index);
+        });
+    });
 }
 
 /**
@@ -473,18 +706,14 @@ function applyExtensionSuggestion(index, newType) {
 }
 
 /**
- * Apply the full optimization
+ * Apply the full optimization based on user selections
  */
 function applyOptimization() {
-    if (!previewResult || !previewResult.success) {
-        alert('No optimization available to apply.');
-        return;
-    }
+    // Check if there are any selections
+    const selectionCount = Object.keys(selectedChords).length;
 
-    // Check if there are any changes
-    if (previewResult.summary.chordsModified === 0) {
-        alert('No changes needed - your progression already matches the target tension curve well!');
-        hideTensionOptimizerModal();
+    if (selectionCount === 0) {
+        alert('No changes selected. Click on a highlighted chord row to see alternatives and select one.');
         return;
     }
 
@@ -492,33 +721,39 @@ function applyOptimization() {
     const currentState = captureProgressionState();
     pushToUndoStack(currentState);
 
-    // Apply the optimized progression
-    const optimizedProgression = previewResult.optimizedProgression;
-
-    // Update notes for chords that changed inversion
+    // Get current progression and apply selections
+    const progression = getProgressionData();
     const key = getCurrentKey() || 'C';
-    const updatedProgression = optimizedProgression.map((chord, index) => {
-        const original = originalProgression[index];
 
-        // If inversion changed, recalculate notes
-        if (chord.inversion !== original.inversion) {
-            const result = getInvertedChordNotes(
-                chord.root,
-                chord.type,
-                chord.inversion,
-                key,
-                chord.octaveShift || 0
-            );
+    const updatedProgression = progression.map((chord, index) => {
+        const selection = selectedChords[index];
 
-            return {
-                ...chord,
-                notes: result.specificNotes,
-                name: result.name,
-                simpleName: result.simpleName
-            };
+        if (!selection) {
+            // No change for this chord
+            return chord;
         }
 
-        return chord;
+        // Apply the selected change
+        const newType = selection.chordType;
+        const newInversion = selection.inversion;
+
+        // Get new chord notes
+        const result = getInvertedChordNotes(
+            chord.root,
+            newType,
+            newInversion,
+            key,
+            chord.octaveShift || 0
+        );
+
+        return {
+            ...chord,
+            type: newType,
+            inversion: newInversion,
+            notes: result.specificNotes,
+            name: result.name,
+            simpleName: result.simpleName
+        };
     });
 
     setProgressionData(updatedProgression);
@@ -535,8 +770,7 @@ function applyOptimization() {
     }
 
     // Show success message
-    const changedCount = previewResult.summary.chordsModified;
-    console.log(`[TensionOptimizer] Applied optimization: ${changedCount} chord(s) modified`);
+    console.log(`[TensionOptimizer] Applied optimization: ${selectionCount} chord(s) modified`);
 
     // Close modal
     hideTensionOptimizerModal();
