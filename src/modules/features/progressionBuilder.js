@@ -5552,11 +5552,11 @@ function updateChordType(index, newType) {
         });
     }
 
+    // Save state for undo BEFORE making changes
+    saveStateBeforeChange();
+
     // Update chord in compositionState
     compositionState.updateChordByIndex(index, updates);
-
-    // Save state
-    saveState({ type: 'chord-update', data: { index, property: 'type', value: newType } });
 
     // Update only this card and tension curve (type changes affect tension)
     updateSingleCard(index);
@@ -5656,8 +5656,8 @@ function updateChordDuration(index, sourceElement) {
         return; // No change needed
     }
 
-    // Save state for undo
-    saveState({ type: 'chord-update', data: { index, property: 'beats', value: totalBeats } });
+    // Save state for undo BEFORE making changes
+    saveStateBeforeChange();
 
     // Update the chord duration using compositionState's dedicated method
     // This now returns confirmation info if truncation is needed
@@ -5858,11 +5858,11 @@ function updateChordInversion(index, newInversion, shouldUpdateUI = true, should
         });
     }
 
+    // Save state for undo BEFORE making changes
+    saveStateBeforeChange();
+
     // Update chord in compositionState
     compositionState.updateChordByIndex(index, updates);
-
-    // Save state
-    saveState({ type: 'chord-update', data: { index, property: 'inversion', value: newInversion } });
 
     // Update only this card and tension curve (inversions affect tension and voice leading)
     // Skip UI update if called from tooltip to prevent closing the tooltip
@@ -5882,12 +5882,12 @@ function updateChordInversion(index, newInversion, shouldUpdateUI = true, should
  * Update chord voicing from simplified view
  */
 function updateChordVoicing(index, newVoicing) {
+    // Save state for undo BEFORE making changes
+    saveStateBeforeChange();
+
     const trainerState = getTrainerState();
     const chord = trainerState.progressionData[index];
     chord.voicing = newVoicing;
-
-    // Save state
-    saveState({ type: 'chord-update', data: { index, property: 'voicing', value: newVoicing } });
 
     // Update only this card (voicing doesn't affect tension curve)
     updateSingleCard(index);
@@ -5897,6 +5897,9 @@ function updateChordVoicing(index, newVoicing) {
  * Update chord LH pattern from simplified view
  */
 function updateChordLHPattern(index, newLHPattern) {
+    // Save state for undo BEFORE making changes
+    saveStateBeforeChange();
+
     const trainerState = getTrainerState();
     const chord = trainerState.progressionData[index];
     chord.lhType = newLHPattern;
@@ -5914,9 +5917,6 @@ function updateChordLHPattern(index, newLHPattern) {
         chord.type,
         getEnharmonicPreference()
     );
-
-    // Save state
-    saveState({ type: 'chord-update', data: { index, property: 'lhType', value: newLHPattern } });
 
     // Update only this card (LH pattern doesn't affect tension curve)
     updateSingleCard(index);
@@ -6001,14 +6001,14 @@ function updateRHOctaveShift(index, shift) {
         return `${noteName}${clampedOctave}`;
     });
 
+    // Save state for undo BEFORE making changes
+    saveStateBeforeChange();
+
     // Update chord in compositionState
     compositionState.updateChordByIndex(index, {
         octaveShift: shift,
         notes: shiftedNotes
     });
-
-    // Save state
-    saveState({ type: 'chord-update', data: { index, property: 'octaveShift', value: shift } });
 
     // Update only this card
     updateSingleCard(index);
@@ -6065,14 +6065,14 @@ function updateLHOctaveShift(index, shift) {
         getEnharmonicPreference()
     );
 
+    // Save state for undo BEFORE making changes
+    saveStateBeforeChange();
+
     // Update chord in compositionState
     compositionState.updateChordByIndex(index, {
         lhOctaveShift: shift,
         lhNotes: newLhNotes
     });
-
-    // Save state
-    saveState({ type: 'chord-update', data: { index, property: 'lhOctaveShift', value: shift } });
 
     // Update only this card
     updateSingleCard(index);
@@ -6120,15 +6120,15 @@ function updateLHInversion(index, newInversion, shouldUpdateUI = true, shouldSyn
         getEnharmonicPreference()
     );
 
+    // Save state for undo BEFORE making changes
+    saveStateBeforeChange();
+
     // Update chord in compositionState
     compositionState.updateChordByIndex(index, {
         lhInversion: newInversion,
         lhNotes: newLhNotes,
         lhOmittedNotes: [] // Clear since note names change with inversion
     });
-
-    // Save state
-    saveState({ type: 'chord-update', data: { index, property: 'lhInversion', value: newInversion } });
 
     // Update only this card (if requested)
     if (shouldUpdateUI) {
@@ -6169,13 +6169,13 @@ function toggleLHNote(index, note) {
         lhOmittedNotes.push(note);
     }
 
+    // Save state for undo BEFORE making changes
+    saveStateBeforeChange();
+
     // Update chord in compositionState
     compositionState.updateChordByIndex(index, {
         lhOmittedNotes: lhOmittedNotes
     });
-
-    // Save state
-    saveState({ type: 'chord-update', data: { index, property: 'lhOmittedNotes', value: lhOmittedNotes } });
 
     // Update the grand staff notation
     updateChordAndRenderPreservingTrebleNotes(index);
@@ -6374,11 +6374,8 @@ function initializeSimplifiedSortable(container) {
 
                 if (actualOldIndex < 0 || actualNewIndex < 0) return; // Shouldn't happen, but safety check
 
-                // Save state for undo/redo BEFORE making changes
-                saveState({
-                    type: 'reorder',
-                    data: { fromIndex: actualOldIndex, toIndex: actualNewIndex }
-                });
+                // Save state for undo BEFORE making changes
+                saveStateBeforeChange();
 
                 // Use CompositionState's reorderChord which preserves edited bass notes
                 const compositionState = window.getCompositionState ? window.getCompositionState() : null;
@@ -6525,11 +6522,8 @@ function handleCardDragWithinSection(evt, originalSectionId) {
         return;
     }
 
-    // Save state for undo
-    saveState({
-        type: 'card-drag',
-        data: { oldChordIndex, oldOrder, newOrder: newChordOrder }
-    });
+    // Save state for undo BEFORE making changes
+    saveStateBeforeChange();
 
     // Reorder progression data to match new order
     const newProgressionData = newChordOrder.map(oldIdx => trainerState.progressionData[oldIdx]);
@@ -6588,11 +6582,8 @@ function handleSectionDragEnd(container, sectionEl, evt) {
         return;
     }
 
-    // Save state for undo
-    saveState({
-        type: 'section-reorder',
-        data: { sectionId, oldOrder, newOrder: newChordOrder }
-    });
+    // Save state for undo BEFORE making changes
+    saveStateBeforeChange();
 
     // Reorder progression data to match new order
     const newProgressionData = newChordOrder.map(oldIdx => trainerState.progressionData[oldIdx]);
@@ -7295,6 +7286,9 @@ function deleteSelectedChords(indices) {
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
     if (!compositionState) return;
 
+    // Save state for undo before making changes
+    saveStateBeforeChange();
+
     // Delete in reverse order to preserve indices
     const sortedIndices = [...indices].sort((a, b) => b - a);
     sortedIndices.forEach(idx => {
@@ -7342,6 +7336,9 @@ function pasteChords() {
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
     if (!compositionState) return;
 
+    // Save state for undo before making changes
+    saveStateBeforeChange();
+
     const trainerState = getTrainerState();
     const progressionData = trainerState.progressionData || [];
 
@@ -7383,6 +7380,9 @@ function duplicateSelectedChords(indices) {
     const progressionData = trainerState.progressionData || [];
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
     if (!compositionState) return;
+
+    // Save state for undo before making changes
+    saveStateBeforeChange();
 
     // Get chord data for selected indices
     const chordsToDuplicate = indices
@@ -11822,28 +11822,50 @@ function updateProgressionControlsUI() {
 
 /**
  * Capture the current progression state for undo/redo
+ * Includes both chord progression data AND notation data for full undo support
  * @returns {Object} State snapshot
  */
 function captureProgressionState() {
     const trainerState = getTrainerState();
-    return {
+    const state = {
         progressionData: JSON.parse(JSON.stringify(trainerState.progressionData)),
         progressionRomans: [...trainerState.progressionRomans],
         currentKey: trainerState.currentKey
     };
+
+    // Capture notation state from CompositionState for full undo support
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (compositionState && compositionState.measures) {
+        // Deep clone the measures array which contains all notation data
+        state.notationData = JSON.parse(JSON.stringify(compositionState.measures));
+    }
+
+    return state;
 }
 
 /**
  * Restore a progression state snapshot
+ * Restores both chord progression data AND notation data for full undo support
  * @param {Object} state - State snapshot to restore
  */
 function restoreProgressionState(state) {
     if (!state) return;
 
-    // Restore state
+    // Restore chord progression state
     setProgressionData(state.progressionData);
     setProgressionRomans(state.progressionRomans);
     setCurrentKey(state.currentKey);
+
+    // Restore notation state if it was captured
+    if (state.notationData) {
+        const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+        if (compositionState) {
+            // Deep clone and restore the measures array
+            compositionState.measures = JSON.parse(JSON.stringify(state.notationData));
+            // Emit event to notify listeners of the change
+            compositionState.events.emit('loaded', { measures: compositionState.measures });
+        }
+    }
 
     // Re-render display
     renderProgressionDisplay('progression-visualization', true);
@@ -11973,8 +11995,9 @@ export function handleRedo() {
 
 /**
  * Save current state before making changes (to be called before mutations)
+ * Call this before any edit operation to enable undo support
  */
-function saveStateBeforeChange() {
+export function saveStateBeforeChange() {
     const currentState = captureProgressionState();
     saveState(currentState);
 }
@@ -12473,12 +12496,6 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
         clearHistory();
     }
 
-    // Save initial state
-    saveState({
-        progressionData: [...progressionData],
-        progressionRomans: [...progressionRomans]
-    });
-
     // Render progression display
     renderProgressionDisplay('progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
@@ -12658,11 +12675,8 @@ export function applyRhythmPatternToProgression(patternId) {
         return;
     }
 
-    // Save state before changes for undo
-    saveState({
-        progressionData: [...progressionData],
-        progressionRomans: getTrainerState().progressionRomans
-    });
+    // Save state for undo BEFORE making changes
+    saveStateBeforeChange();
 
     // Update state
     setProgressionData(updated);

@@ -841,59 +841,60 @@ export function initEnhancedNotation(options = {}) {
       onArticulationChange: notationComposer.toolbar.onArticulationChange,
     };
 
-    // Enhance callbacks to support both mode: setting defaults OR editing selected notes
+    // Enhance callbacks to support both mode: setting defaults AND editing selected notes
+    // IMPORTANT: Always update the default for new notes, AND apply to selected notes if any
     notationComposer.toolbar.onDurationChange = (duration) => {
+      // Always set the duration for new notes (keeps toolbar and noteEditor in sync)
+      noteEditor.setDuration(duration);
+      originalCallbacks.onDurationChange(duration);
+
       if (noteEditor.selectedNotes.size > 0) {
-        // Contextual mode: Change duration of selected notes
+        // Also change duration of selected notes
         noteEditor.changeDurationOfSelected(duration);
-      } else {
-        // Default mode: Set duration for new notes
-        noteEditor.setDuration(duration);
-        originalCallbacks.onDurationChange(duration);
       }
     };
 
     notationComposer.toolbar.onRestModeChange = (isRest) => {
+      // Always set rest mode for new notes
+      noteEditor.setRestMode(isRest);
+      originalCallbacks.onRestModeChange(isRest);
+
       if (noteEditor.selectedNotes.size > 0) {
-        // Contextual mode: Toggle rest mode on selected notes
+        // Also toggle rest mode on selected notes
         noteEditor.toggleRestOnSelected();
-      } else {
-        // Default mode: Set rest mode for new notes
-        noteEditor.setRestMode(isRest);
-        originalCallbacks.onRestModeChange(isRest);
       }
     };
 
     notationComposer.toolbar.onDottedChange = (isDotted) => {
+      // Always set dotted for new notes
+      noteEditor.setDotted(isDotted);
+      originalCallbacks.onDottedChange(isDotted);
+
       if (noteEditor.selectedNotes.size > 0) {
-        // Contextual mode: Toggle dotted on selected notes
+        // Also toggle dotted on selected notes
         noteEditor.toggleDottedOnSelected();
-      } else {
-        // Default mode: Set dotted for new notes
-        noteEditor.setDotted(isDotted);
-        originalCallbacks.onDottedChange(isDotted);
       }
     };
 
     notationComposer.toolbar.onAccidentalChange = (accidental) => {
+      // Always set accidental for new notes
+      noteEditor.setAccidental(accidental);
+      originalCallbacks.onAccidentalChange(accidental);
+
       if (noteEditor.selectedNotes.size > 0) {
-        // Contextual mode: Change accidental on selected notes
+        // Also change accidental on selected notes
         noteEditor.changeAccidentalOnSelected(accidental);
-      } else {
-        // Default mode: Set accidental for new notes
-        noteEditor.setAccidental(accidental);
-        originalCallbacks.onAccidentalChange(accidental);
       }
     };
 
     notationComposer.toolbar.onArticulationChange = (articulation) => {
+      // Always set articulation for new notes
+      noteEditor.setArticulation(articulation);
+      originalCallbacks.onArticulationChange(articulation);
+
       if (noteEditor.selectedNotes.size > 0) {
-        // Contextual mode: Toggle articulation on selected notes
+        // Also toggle articulation on selected notes
         noteEditor.toggleArticulationOnSelected(articulation);
-      } else {
-        // Default mode: Set articulation for new notes
-        noteEditor.setArticulation(articulation);
-        originalCallbacks.onArticulationChange(articulation);
       }
     };
 
@@ -1368,78 +1369,261 @@ export function destroyEnhancedNotation() {
 }
 
 /**
+ * Centralized keyboard shortcuts data structure
+ * When adding new shortcuts, add them here to keep the modal in sync
+ */
+export const KEYBOARD_SHORTCUTS = {
+  mouse: {
+    title: 'Mouse Controls',
+    icon: '🖱️',
+    color: 'violet',
+    shortcuts: [
+      { key: 'Click on note', action: 'Select note', detail: 'Click any note to select it (shows blue highlight). The toolbar will update to show the selected note\'s properties.' },
+      { key: 'Shift + Click', action: 'Multi-select notes', detail: 'Hold Shift and click multiple notes to select them together. You can then modify all selected notes at once.' },
+      { key: 'Alt + Click on staff', action: 'Add note at position', detail: 'Hold Alt and click anywhere on the treble or bass staff to insert a new note at that pitch and beat position.' },
+      { key: 'Alt + Hover', action: 'Ghost note preview', detail: 'Hold Alt while hovering over the staff to see a transparent preview of where the note will be placed before clicking.' },
+      { key: 'Click on measure', action: 'Select measure', detail: 'Click on an empty area of a measure to select it. The measure will be highlighted with a blue border.' },
+      { key: 'Hold click (200ms)', action: 'Play measure', detail: 'Click and hold on a measure for 200ms to play all notes in that measure. Release to stop.' },
+    ]
+  },
+  selection: {
+    title: 'Selection & Clipboard',
+    icon: '📋',
+    color: 'blue',
+    shortcuts: [
+      { key: 'Ctrl/⌘ + A', action: 'Select all notes', detail: 'Selects every note in the current composition. Useful for bulk operations like transposition.' },
+      { key: 'Ctrl/⌘ + C', action: 'Copy selected notes', detail: 'Copies the currently selected notes to the clipboard. Notes retain their relative positions and properties.' },
+      { key: 'Ctrl/⌘ + Shift + C', action: 'Copy building block', detail: 'Copies the entire building block (chord section) containing the selected notes, including all bass patterns.' },
+      { key: 'Ctrl/⌘ + V', action: 'Paste notes', detail: 'Pastes copied notes after the current selection. If no selection, pastes at the current cursor position.' },
+      { key: 'Ctrl/⌘ + Shift + V', action: 'Paste at beginning', detail: 'Pastes copied notes at the very beginning of the composition, before all existing notes.' },
+      { key: 'Ctrl/⌘ + Alt + V', action: 'Paste at end', detail: 'Pastes copied notes at the end of the composition, after all existing notes.' },
+      { key: 'Delete / Backspace', action: 'Delete selected', detail: 'Removes all currently selected notes from the composition. Cannot delete auto-generated bass notes.' },
+      { key: 'Escape', action: 'Clear selection', detail: 'Deselects all notes and exits any special modes (tuplet insert mode, etc.).' },
+    ]
+  },
+  undoRedo: {
+    title: 'Undo & Redo',
+    icon: '↩️',
+    color: 'gray',
+    shortcuts: [
+      { key: 'Ctrl/⌘ + Z', action: 'Undo', detail: 'Reverses the last action. Works for note additions, deletions, pitch changes, and most other edits.' },
+      { key: 'Ctrl/⌘ + Shift + Z', action: 'Redo', detail: 'Re-applies an action that was undone. Redo history is cleared when you make a new change.' },
+      { key: 'Ctrl/⌘ + Y', action: 'Redo (alternate)', detail: 'Alternative shortcut for Redo, common in Windows applications.' },
+    ]
+  },
+  noteEditing: {
+    title: 'Note Editing',
+    icon: '🎵',
+    color: 'indigo',
+    shortcuts: [
+      { key: 'Space or P', action: 'Play selected notes', detail: 'Plays the currently selected notes through the audio engine. Great for auditioning your work.' },
+      { key: '↑ Arrow Up', action: 'Transpose up (step)', detail: 'Moves selected notes up by one scale step (semitone). Works on single or multiple selected notes.' },
+      { key: '↓ Arrow Down', action: 'Transpose down (step)', detail: 'Moves selected notes down by one scale step (semitone). Works on single or multiple selected notes.' },
+      { key: 'Ctrl/⌘ + ↑', action: 'Transpose up (octave)', detail: 'Moves selected notes up by one full octave (12 semitones). Useful for voice leading adjustments.' },
+      { key: 'Ctrl/⌘ + ↓', action: 'Transpose down (octave)', detail: 'Moves selected notes down by one full octave (12 semitones). Useful for voice leading adjustments.' },
+      { key: 'Shift + ←', action: 'Insert before', detail: 'Inserts a new note before the currently selected note, using the current toolbar duration settings.' },
+      { key: 'Shift + →', action: 'Insert after', detail: 'Inserts a new note after the currently selected note, using the current toolbar duration settings.' },
+    ]
+  },
+  duration: {
+    title: 'Note Duration',
+    icon: '⏱️',
+    color: 'purple',
+    shortcuts: [
+      { key: '1 (with selection)', action: 'Whole note', detail: 'Changes selected notes to whole notes (4 beats in 4/4 time). Also sets toolbar default.' },
+      { key: '2 (with selection)', action: 'Half note', detail: 'Changes selected notes to half notes (2 beats in 4/4 time). Also sets toolbar default.' },
+      { key: '3 (with selection)', action: 'Quarter note', detail: 'Changes selected notes to quarter notes (1 beat in 4/4 time). Also sets toolbar default.' },
+      { key: '4 (with selection)', action: 'Eighth note', detail: 'Changes selected notes to eighth notes (½ beat in 4/4 time). Also sets toolbar default.' },
+      { key: '5 (with selection)', action: '16th note', detail: 'Changes selected notes to 16th notes (¼ beat in 4/4 time). Also sets toolbar default.' },
+      { key: '6 (with selection)', action: '32nd note', detail: 'Changes selected notes to 32nd notes (⅛ beat in 4/4 time). Also sets toolbar default.' },
+      { key: 'Shift + 1-6', action: 'Set toolbar duration', detail: 'Sets the toolbar duration for new notes without requiring a selection. Shift+1=whole, Shift+2=half, etc.' },
+      { key: '. (period)', action: 'Toggle dotted', detail: 'Toggles dotted mode, which adds 50% to note duration (e.g., dotted quarter = 1.5 beats).' },
+    ]
+  },
+  accidentals: {
+    title: 'Accidentals',
+    icon: '♯♭',
+    color: 'amber',
+    shortcuts: [
+      { key: 'S', action: 'Sharp (♯)', detail: 'Adds or toggles a sharp accidental. When notes are selected, applies to selection. Otherwise sets toolbar default.' },
+      { key: 'F or -', action: 'Flat (♭)', detail: 'Adds or toggles a flat accidental. When notes are selected, applies to selection. Otherwise sets toolbar default.' },
+      { key: 'N or =', action: 'Natural (♮)', detail: 'Adds or toggles a natural accidental. Useful for canceling key signature accidentals on specific notes.' },
+    ]
+  },
+  articulations: {
+    title: 'Articulations',
+    icon: '🎼',
+    color: 'teal',
+    shortcuts: [
+      { key: 'Shift + S', action: 'Staccato (.)', detail: 'Toggles staccato articulation on selected notes. Staccato notes are played short and detached.' },
+      { key: 'Shift + A', action: 'Accent (>)', detail: 'Toggles accent articulation on selected notes. Accented notes are played with emphasis.' },
+      { key: 'Shift + T', action: 'Tenuto (—)', detail: 'Toggles tenuto articulation on selected notes. Tenuto notes are held for their full duration.' },
+      { key: 'Shift + M', action: 'Marcato (^)', detail: 'Toggles marcato articulation on selected notes. Marcato is a stronger accent.' },
+    ]
+  },
+  tiesAndTuplets: {
+    title: 'Ties & Tuplets',
+    icon: '🔗',
+    color: 'rose',
+    shortcuts: [
+      { key: 'T', action: 'Toggle tie', detail: 'Ties the selected note to the next note of the same pitch. Tied notes play as one continuous sound.' },
+      { key: 'R', action: 'Toggle rest mode', detail: 'Switches between inserting notes and inserting rests. Active when the rest button is highlighted.' },
+      { key: 'Shift + 3', action: 'Create triplet', detail: 'Converts 3 selected notes into a triplet (3 notes in the time of 2). Select exactly 3 notes first.' },
+      { key: 'Shift + 5', action: 'Create quintuplet', detail: 'Converts 5 selected notes into a quintuplet (5 notes in the time of 4). Select exactly 5 notes first.' },
+      { key: 'Shift + 6', action: 'Create sextuplet', detail: 'Converts 6 selected notes into a sextuplet (6 notes in the time of 4). Select exactly 6 notes first.' },
+      { key: 'Ctrl/⌘ + Shift + 3', action: 'Triplet insert mode', detail: 'Enters triplet insert mode. Next 3 notes you add will automatically form a triplet.' },
+      { key: 'Ctrl/⌘ + Shift + 5', action: 'Quintuplet insert mode', detail: 'Enters quintuplet insert mode. Next 5 notes you add will automatically form a quintuplet.' },
+      { key: 'Ctrl/⌘ + Shift + 6', action: 'Sextuplet insert mode', detail: 'Enters sextuplet insert mode. Next 6 notes you add will automatically form a sextuplet.' },
+    ]
+  },
+  suggestions: {
+    title: 'Suggestions Panel',
+    icon: '💡',
+    color: 'yellow',
+    shortcuts: [
+      { key: 'Tab', action: 'Chord suggestions', detail: 'Opens/closes the floating chord suggestions panel. Shows recommended next chords based on music theory.' },
+      { key: 'Shift + Tab', action: 'Melody suggestions', detail: 'Opens/closes the melody suggestions panel. Shows melodic ideas based on current chord and style.' },
+      { key: 'Ctrl/⌘ + Tab', action: 'Generate panel', detail: 'Opens the AI generation panel for creating chord progressions or melodies automatically.' },
+      { key: '1-9', action: 'Quick select', detail: 'Quickly applies suggestion #1-9 from the panel. Number corresponds to position in the list.' },
+      { key: '↑↓ Arrows', action: 'Navigate suggestions', detail: 'Move up/down through the suggestions list when the panel is open.' },
+      { key: 'Enter', action: 'Apply suggestion', detail: 'Applies the currently highlighted suggestion to your composition.' },
+      { key: 'Space (hold)', action: 'Preview suggestion', detail: 'Hold Space to temporarily hear how a suggestion would sound. Release to stop preview.' },
+      { key: 'R', action: 'Refresh suggestions', detail: 'Regenerates the suggestions list with new options based on current context.' },
+      { key: 'Ctrl/⌘ + I', action: 'Toggle AI assist', detail: 'Enables/disables the AI assist mode which provides real-time composition suggestions.' },
+    ]
+  },
+  chordProgression: {
+    title: 'Chord Progression',
+    icon: '🎹',
+    color: 'emerald',
+    shortcuts: [
+      { key: 'Ctrl/⌘ + A', action: 'Select all chords', detail: 'Selects all chord cards in the progression builder for bulk operations.' },
+      { key: 'Ctrl/⌘ + C', action: 'Copy chords', detail: 'Copies selected chord cards to clipboard, including their voicings and bass patterns.' },
+      { key: 'Ctrl/⌘ + V', action: 'Paste chords', detail: 'Pastes copied chord cards after the current selection in the progression.' },
+      { key: 'Ctrl/⌘ + D', action: 'Duplicate chords', detail: 'Creates a copy of selected chord cards immediately after the originals.' },
+      { key: 'Escape', action: 'Clear selection', detail: 'Deselects all chord cards and cancels any ongoing chord label editing.' },
+    ]
+  },
+  pageNavigation: {
+    title: 'Page Navigation',
+    icon: '📄',
+    color: 'slate',
+    shortcuts: [
+      { key: 'Ctrl/⌘ + →', action: 'Next page', detail: 'Navigates to the next page of notation when viewing multi-page scores.' },
+      { key: 'Ctrl/⌘ + ←', action: 'Previous page', detail: 'Navigates to the previous page of notation when viewing multi-page scores.' },
+      { key: 'Ctrl/⌘ + Page Down', action: 'Next page (alt)', detail: 'Alternative shortcut for navigating to the next page.' },
+      { key: 'Ctrl/⌘ + Page Up', action: 'Previous page (alt)', detail: 'Alternative shortcut for navigating to the previous page.' },
+    ]
+  },
+  general: {
+    title: 'General',
+    icon: '⚙️',
+    color: 'zinc',
+    shortcuts: [
+      { key: 'Escape', action: 'Close modal/panel', detail: 'Closes any open modal dialog, popup, or floating panel. Also exits special editing modes.' },
+      { key: 'Enter', action: 'Confirm input', detail: 'Confirms text input in chord symbol fields, label editing, and other input contexts.' },
+    ]
+  }
+};
+
+/**
  * Show keyboard shortcuts modal
  */
 export function showNotationShortcuts() {
+  // Generate shortcut sections HTML
+  const generateSections = () => {
+    return Object.entries(KEYBOARD_SHORTCUTS).map(([key, section]) => {
+      const colorClasses = {
+        violet: 'text-violet-700 bg-violet-50 border-violet-200',
+        blue: 'text-blue-700 bg-blue-50 border-blue-200',
+        gray: 'text-gray-700 bg-gray-50 border-gray-200',
+        indigo: 'text-indigo-700 bg-indigo-50 border-indigo-200',
+        purple: 'text-purple-700 bg-purple-50 border-purple-200',
+        amber: 'text-amber-700 bg-amber-50 border-amber-200',
+        teal: 'text-teal-700 bg-teal-50 border-teal-200',
+        rose: 'text-rose-700 bg-rose-50 border-rose-200',
+        yellow: 'text-yellow-700 bg-yellow-50 border-yellow-200',
+        emerald: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+        slate: 'text-slate-700 bg-slate-50 border-slate-200',
+        zinc: 'text-zinc-700 bg-zinc-50 border-zinc-200',
+      };
+      const colors = colorClasses[section.color] || colorClasses.gray;
+      const [textColor, bgColor, borderColor] = colors.split(' ');
+
+      return `
+        <div class="shortcut-section mb-4">
+          <h4 class="font-semibold ${textColor} mb-2 flex items-center gap-2">
+            <span>${section.icon}</span>
+            <span>${section.title}</span>
+          </h4>
+          <div class="space-y-1 text-sm">
+            ${section.shortcuts.map(s => `
+              <div class="shortcut-row flex justify-between items-start py-1 px-2 rounded hover:${bgColor} cursor-help group relative"
+                   title="${s.detail.replace(/"/g, '&quot;')}">
+                <span class="font-medium text-gray-800 flex-shrink-0">
+                  <kbd class="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">${s.key}</kbd>
+                </span>
+                <span class="text-gray-600 text-right ml-2">${s.action}</span>
+                <div class="tooltip absolute left-0 right-0 bottom-full mb-1 p-2 ${bgColor} border ${borderColor} rounded shadow-lg text-xs ${textColor} opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                  ${s.detail}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+  };
+
   // Create modal HTML
   const modalHTML = `
     <div id="notation-shortcuts-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="if(event.target===this) this.remove()">
-      <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div class="p-6">
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="text-xl font-bold text-gray-900">Notation Editor Keyboard Shortcuts</h3>
-            <button onclick="document.getElementById('notation-shortcuts-modal').remove()" class="text-gray-400 hover:text-gray-600">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
-            </button>
+      <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+          <div>
+            <h3 class="text-xl font-bold text-gray-900">⌨️ Keyboard Shortcuts</h3>
+            <p class="text-sm text-gray-500 mt-1">Hover over any shortcut for detailed information</p>
+          </div>
+          <button onclick="document.getElementById('notation-shortcuts-modal').remove()" class="text-gray-400 hover:text-gray-600 p-2">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="p-4 overflow-y-auto flex-1">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            ${generateSections()}
           </div>
 
-          <div class="space-y-4">
-            <div>
-              <h4 class="font-semibold text-violet-700 mb-2">Mouse Controls</h4>
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between"><span class="font-medium">Click on note/chord</span><span class="text-gray-600">Select note (blue highlight)</span></div>
-                <div class="flex justify-between"><span class="font-medium">Shift + Click</span><span class="text-gray-600">Multi-select notes</span></div>
-                <div class="flex justify-between"><span class="font-medium">Alt + Click on staff</span><span class="text-gray-600">Add note at position</span></div>
-                <div class="flex justify-between"><span class="font-medium">Alt + Hover on staff</span><span class="text-gray-600">Show ghost note preview</span></div>
-                <div class="flex justify-between"><span class="font-medium">Click on empty measure</span><span class="text-gray-600">Select/play measure</span></div>
-                <div class="flex justify-between"><span class="font-medium">Hold click on measure</span><span class="text-gray-600">Play measure (200ms hold)</span></div>
-              </div>
-            </div>
+          <div class="mt-4 p-3 bg-violet-50 border border-violet-200 rounded-lg">
+            <p class="text-sm text-violet-900">
+              <strong>💡 Tip:</strong> Bass clef notes from chord progression cards are auto-generated. To modify them, edit the chord cards directly or use the rhythmic pattern templates. Treble clef notes can be freely edited.
+            </p>
+          </div>
 
-            <div>
-              <h4 class="font-semibold text-indigo-700 mb-2">💡 Suggestions Panel</h4>
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between"><span class="font-medium">Tab</span><span class="text-gray-600">Toggle Chord Suggestions panel</span></div>
-                <div class="flex justify-between"><span class="font-medium">Shift + Tab</span><span class="text-gray-600">Toggle Melody Suggestions panel</span></div>
-                <div class="flex justify-between"><span class="font-medium">1-5</span><span class="text-gray-600">Quick select suggestion from panel</span></div>
-                <div class="flex justify-between"><span class="font-medium">R</span><span class="text-gray-600">Refresh suggestions</span></div>
-                <div class="flex justify-between"><span class="font-medium">Escape</span><span class="text-gray-600">Close suggestions panel</span></div>
-              </div>
-              <div class="mt-2 p-2 bg-indigo-50 rounded">
-                <p class="text-xs text-indigo-900">The floating panel appears near your cursor with chord recommendations, melody suggestions, and harmonic analysis. Click the gear icon to adjust suggestion weights.</p>
-              </div>
-            </div>
-
-            <div>
-              <h4 class="font-semibold text-violet-700 mb-2">Note Editor Controls</h4>
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between"><span class="font-medium">Space or P</span><span class="text-gray-600">Play selected notes</span></div>
-                <div class="flex justify-between"><span class="font-medium">Delete / Backspace</span><span class="text-gray-600">Delete selected notes</span></div>
-                <div class="flex justify-between"><span class="font-medium">Arrow Up / Down</span><span class="text-gray-600">Transpose selected notes</span></div>
-                <div class="flex justify-between"><span class="font-medium">Escape</span><span class="text-gray-600">Clear note selection</span></div>
-                <div class="flex justify-between"><span class="font-medium">Ctrl + A</span><span class="text-gray-600">Select all notes</span></div>
-              </div>
-            </div>
-
-            <div>
-              <h4 class="font-semibold text-violet-700 mb-2">Toolbar Controls</h4>
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between"><span class="font-medium">Duration buttons</span><span class="text-gray-600">Set note duration (whole, half, quarter, etc.)</span></div>
-                <div class="flex justify-between"><span class="font-medium">Dot button</span><span class="text-gray-600">Toggle dotted notes (1.5x duration)</span></div>
-                <div class="flex justify-between"><span class="font-medium">Rest button</span><span class="text-gray-600">Add rests instead of notes</span></div>
-                <div class="flex justify-between"><span class="font-medium">Accidental buttons</span><span class="text-gray-600">Add sharp, flat, or natural</span></div>
-              </div>
-            </div>
-
-            <div class="bg-violet-50 border border-violet-200 rounded p-3">
-              <p class="text-sm text-violet-900"><strong>Note:</strong> Bass clef notes from chord progression cards are auto-generated and cannot be deleted individually. To change them, modify the chord progression cards or disable "Auto-generate Bass" toggle.</p>
-            </div>
+          <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p class="text-sm text-blue-900">
+              <strong>🖥️ Platform Note:</strong> On Mac, use <kbd class="px-1 py-0.5 bg-blue-100 border border-blue-300 rounded text-xs">⌘ Command</kbd> instead of <kbd class="px-1 py-0.5 bg-blue-100 border border-blue-300 rounded text-xs">Ctrl</kbd> for all shortcuts.
+            </p>
           </div>
         </div>
       </div>
     </div>
+    <style>
+      #notation-shortcuts-modal .tooltip {
+        pointer-events: none;
+        max-width: 300px;
+        white-space: normal;
+        line-height: 1.4;
+      }
+      #notation-shortcuts-modal .shortcut-row:hover {
+        z-index: 5;
+      }
+      #notation-shortcuts-modal kbd {
+        white-space: nowrap;
+      }
+    </style>
   `;
 
   // Remove existing modal if any

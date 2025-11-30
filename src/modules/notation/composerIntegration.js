@@ -153,8 +153,16 @@ export class NotationComposer {
           this.layoutManager.setConfig({ measuresPerLine: mpl });
           this.render();
         },
-        onUndo: () => this.undo(),
-        onRedo: () => this.redo(),
+        onUndo: () => {
+          if (typeof window.handleUndo === 'function') {
+            window.handleUndo();
+          }
+        },
+        onRedo: () => {
+          if (typeof window.handleRedo === 'function') {
+            window.handleRedo();
+          }
+        },
         onDelete: () => {
           if (this.noteEditor) {
             this.noteEditor.deleteSelectedNotes();

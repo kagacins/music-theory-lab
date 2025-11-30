@@ -1183,18 +1183,49 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     return '16';
   };
 
-  // Build beat maps for both voices: beat -> { note, index, duration }
+  // Helper to get note duration in beats from VexFlow duration string
+  const getDurationInBeats = (durationStr) => {
+    if (!durationStr) return 1;
+    // Remove any dot suffix for base duration
+    const baseDuration = durationStr.replace('.', '');
+    const isDotted = durationStr.includes('.');
+    let beats = 1;
+    switch (baseDuration) {
+      case '1n': case 'w': beats = 4; break;
+      case '2n': case 'h': beats = 2; break;
+      case '4n': case 'q': beats = 1; break;
+      case '8n': case '8': beats = 0.5; break;
+      case '16n': case '16': beats = 0.25; break;
+      case '32n': case '32': beats = 0.125; break;
+      default: beats = 1;
+    }
+    return isDotted ? beats * 1.5 : beats;
+  };
+
+  // Build beat maps for both voices: beat -> { note, index, duration, endBeat }
   const trebleBeatMap = new Map();
   trebleNotes.forEach((note, i) => {
     const beat = roundBeat(note.beat);
-    trebleBeatMap.set(beat, { note, index: i, vexNote: vexTrebleNotes[i] });
+    const duration = getDurationInBeats(note.duration);
+    trebleBeatMap.set(beat, { note, index: i, vexNote: vexTrebleNotes[i], duration, endBeat: beat + duration });
   });
 
   const bassBeatMap = new Map();
   bassNotes.forEach((note, i) => {
     const beat = roundBeat(note.beat);
-    bassBeatMap.set(beat, { note, index: i, vexNote: vexBassNotes[i] });
+    const duration = getDurationInBeats(note.duration);
+    bassBeatMap.set(beat, { note, index: i, vexNote: vexBassNotes[i], duration, endBeat: beat + duration });
   });
+
+  // Helper to check if a beat is covered by any note in a voice (note started earlier but duration extends past)
+  const isBeatCoveredByPreviousNote = (beatMap, currentBeat) => {
+    for (const [startBeat, entry] of beatMap) {
+      if (startBeat < currentBeat && entry.endBeat > currentBeat) {
+        return true;
+      }
+    }
+    return false;
+  };
 
   // Collect all unique beat positions
   const allBeats = new Set([...trebleBeatMap.keys(), ...bassBeatMap.keys()]);
@@ -1206,25 +1237,27 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
 
   for (let i = 0; i < sortedBeats.length; i++) {
     const beat = sortedBeats[i];
-    const nextBeat = i < sortedBeats.length - 1 ? sortedBeats[i + 1] : 4; // Assume 4/4
+    const nextBeat = i < sortedBeats.length - 1 ? sortedBeats[i + 1] : parseInt(num, 10); // Use time signature
     const gapBeats = nextBeat - beat;
 
     const trebleEntry = trebleBeatMap.get(beat);
     const bassEntry = bassBeatMap.get(beat);
 
+    // Treble voice
     if (trebleEntry) {
       alignedTrebleNotes.push(trebleEntry.vexNote);
-    } else if (gapBeats > 0) {
-      // Insert GhostNote for treble at this beat
+    } else if (gapBeats > 0 && !isBeatCoveredByPreviousNote(trebleBeatMap, beat)) {
+      // Insert GhostNote for treble only if not covered by a previous note's duration
       const ghostDuration = beatsToDuration(gapBeats);
       const ghost = new VF.GhostNote({ duration: ghostDuration });
       alignedTrebleNotes.push(ghost);
     }
 
+    // Bass voice
     if (bassEntry) {
       alignedBassNotes.push(bassEntry.vexNote);
-    } else if (gapBeats > 0) {
-      // Insert GhostNote for bass at this beat
+    } else if (gapBeats > 0 && !isBeatCoveredByPreviousNote(bassBeatMap, beat)) {
+      // Insert GhostNote for bass only if not covered by a previous note's duration
       const ghostDuration = beatsToDuration(gapBeats);
       const ghost = new VF.GhostNote({ duration: ghostDuration });
       alignedBassNotes.push(ghost);

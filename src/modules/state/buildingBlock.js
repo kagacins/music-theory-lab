@@ -554,8 +554,12 @@ export class BuildingBlock {
     setDuration(newBeats) {
         const oldTotal = this.units.length;
         const newTotal = newBeats * UNITS_PER_BEAT;
+        const oldBeats = this.beats;
+
+        console.log(`[BuildingBlock.setDuration] Block ${this.id}: ${oldBeats} beats (${oldTotal} units) -> ${newBeats} beats (${newTotal} units)`);
 
         if (newTotal === oldTotal) {
+            console.log(`[BuildingBlock.setDuration] No change needed`);
             return; // No change needed
         }
 
@@ -577,9 +581,11 @@ export class BuildingBlock {
         } else {
             // Shortening - truncate from the end
             this.units.length = newTotal;
+            console.log(`[BuildingBlock.setDuration] Truncated units array to ${this.units.length} units`);
         }
 
         this.beats = newBeats;
+        console.log(`[BuildingBlock.setDuration] Final state: beats=${this.beats}, units.length=${this.units.length}`);
     }
 
     /**
@@ -633,6 +639,8 @@ export class BuildingBlock {
         const notes = [];
         let i = 0;
 
+        console.log(`[BuildingBlock.getNotes] Block ${this.id}: beats=${this.beats}, units.length=${this.units.length}`);
+
         while (i < this.units.length) {
             const unit = this.units[i];
 
@@ -650,6 +658,7 @@ export class BuildingBlock {
                         break;
                     }
                 }
+                console.log(`[BuildingBlock.getNotes]   Note at startUnit=${startUnit}, durationUnits=${durationUnits} (${durationUnits/UNITS_PER_BEAT} beats)`);
 
                 // Build note object with all attributes from the start unit
                 const note = {

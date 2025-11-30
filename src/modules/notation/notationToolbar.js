@@ -400,6 +400,10 @@ export class NotationToolbar {
         background: var(--bg-hover, #444);
       }
 
+      .toolbar-btn:focus {
+        outline: none;
+      }
+
       .toolbar-btn.active {
         background: var(--accent-color, #4a9eff);
         color: white;
@@ -529,10 +533,14 @@ export class NotationToolbar {
   attachEventListeners() {
     if (!this.container) return;
 
-    // Duration buttons
+    // Duration buttons - use currentTarget to ensure we get the button element, not child text nodes
     this.container.querySelectorAll('.duration-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        this.setDuration(e.target.dataset.duration);
+        const duration = e.currentTarget.dataset.duration;
+        console.log('[NotationToolbar] Duration button clicked:', duration);
+        if (duration) {
+          this.setDuration(duration);
+        }
       });
     });
 
@@ -551,17 +559,25 @@ export class NotationToolbar {
       this.onTie();
     });
 
-    // Accidental buttons
+    // Accidental buttons - use currentTarget to ensure we get the button element
     this.container.querySelectorAll('.accidental-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        this.setAccidental(e.target.dataset.accidental);
+        const accidental = e.currentTarget.dataset.accidental;
+        console.log('[NotationToolbar] Accidental button clicked:', accidental);
+        if (accidental) {
+          this.setAccidental(accidental);
+        }
       });
     });
 
-    // Articulation buttons
+    // Articulation buttons - use currentTarget to ensure we get the button element
     this.container.querySelectorAll('.articulation-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        this.setArticulation(e.target.dataset.articulation);
+        const articulation = e.currentTarget.dataset.articulation;
+        console.log('[NotationToolbar] Articulation button clicked:', articulation);
+        if (articulation) {
+          this.setArticulation(articulation);
+        }
       });
     });
 
@@ -761,6 +777,7 @@ export class NotationToolbar {
    * @param {string} duration - Duration ID
    */
   setDuration(duration) {
+    console.log('[NotationToolbar] setDuration called:', duration, '(was:', this.currentDuration, ')');
     this.currentDuration = duration;
     this.updateDurationButtons();
     this.onDurationChange(duration);

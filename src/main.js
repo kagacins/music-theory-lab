@@ -113,6 +113,7 @@ import {
     removeChordFromProgression,
     handleUndo,
     handleRedo,
+    saveStateBeforeChange,
     toggleProgressionNote,
     toggleProgressionLHNote,
     addToProgressionData,
@@ -1133,6 +1134,7 @@ window.toggleProgressionNote = toggleProgressionNote;
 window.toggleProgressionLHNote = toggleProgressionLHNote;
 window.handleUndo = handleUndo;
 window.handleRedo = handleRedo;
+window.saveStateBeforeChange = saveStateBeforeChange;
 window.updateUndoRedoButtons = updateUndoRedoButtons;
 window.selectChordCard = selectChordCard;
 

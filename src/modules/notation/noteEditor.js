@@ -923,6 +923,11 @@ export class NoteEditor {
       return;
     }
 
+    // Save state for undo before making changes
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
     // DEBUG: Track progressionData state at start of note addition
     if (window.getCompositionState) {
       const compositionState = window.getCompositionState();
@@ -1130,6 +1135,7 @@ export class NoteEditor {
         accidental: this.currentAccidental,
         articulation: this.currentArticulation, // Include articulation from toolbar
       };
+      console.log('[NoteEditor] Inserting note with duration:', durationToUse, '(toolbar currentDuration:', this.currentDuration, ')');
 
       // Insert note at the specified position
       const targetIndex = insertionPoint.action === 'before' ? insertionPoint.noteIndex : insertionPoint.noteIndex + 1;
@@ -1217,6 +1223,7 @@ export class NoteEditor {
     // If the note fits completely, add it normally
     if (noteBeats <= effectiveRemainingBeats) {
       const beatPosition = this.getCurrentBeat(targetMeasureIndex, staff);
+      console.log('[NoteEditor] Appending note - using currentDuration:', this.currentDuration, 'isRestMode:', this.isRestMode, 'isDotted:', this.isDotted);
 
       const noteData = {
         type: this.isRestMode ? 'rest' : 'note',
@@ -1492,6 +1499,11 @@ export class NoteEditor {
    * @param {number} steps - Number of steps (positive = up, negative = down)
    */
   moveSelectedNotes(steps) {
+    // Save state for undo before making changes
+    if (this.selectedNotes.size > 0 && typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
     console.log('[NoteEditor] moveSelectedNotes called with steps:', steps, 'selectedNotes:', this.selectedNotes);
     const moves = [];
 
@@ -1524,6 +1536,11 @@ export class NoteEditor {
    * Delete selected notes (supports individual pitch deletion from chords)
    */
   deleteSelectedNotes() {
+    // Only save state if there are notes to delete
+    if (this.selectedNotes.size > 0 && typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
     const fullDeletions = [];
     const pitchDeletions = [];
 
@@ -2452,6 +2469,11 @@ export class NoteEditor {
   toggleArticulationOnSelected(articulation) {
     if (this.selectedNotes.size === 0) return;
 
+    // Save state for undo before making changes
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
     let changedCount = 0;
 
     for (const noteId of this.selectedNotes) {
@@ -2504,6 +2526,11 @@ export class NoteEditor {
    */
   toggleTieOnSelected() {
     if (this.selectedNotes.size === 0) return;
+
+    // Save state for undo before making changes
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
 
     let changedCount = 0;
 
@@ -2683,6 +2710,11 @@ export class NoteEditor {
     if (!tupletInfo) {
       console.error('[NoteEditor] Unknown tuplet type:', tupletType);
       return;
+    }
+
+    // Save state for undo before making changes
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
     }
 
     // Parse and sort selected notes by measure, staff, and note index
@@ -4126,6 +4158,7 @@ export class NoteEditor {
    * @param {string} duration - Duration like '4n', '8n'
    */
   setDuration(duration) {
+    console.log('[NoteEditor] setDuration called:', duration, '(was:', this.currentDuration, ')');
     this.currentDuration = duration;
   }
 
@@ -4134,6 +4167,7 @@ export class NoteEditor {
    * @param {boolean} isRest - Whether to insert rests
    */
   setRestMode(isRest) {
+    console.log('[NoteEditor] setRestMode called:', isRest, '(was:', this.isRestMode, ')');
     this.isRestMode = isRest;
   }
 
@@ -4142,6 +4176,7 @@ export class NoteEditor {
    * @param {boolean} isDotted - Whether to insert dotted notes
    */
   setDotted(isDotted) {
+    console.log('[NoteEditor] setDotted called:', isDotted, '(was:', this.isDotted, ')');
     this.isDotted = isDotted;
   }
 
