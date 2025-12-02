@@ -120,8 +120,11 @@ import {
     ROMAN_MAP_BASE
 } from '../../data/music-data.js';
 
-// Import chord suggestion modal
+// Import chord suggestion modal (legacy - kept for compatibility)
 import { showChordSuggestionModal } from '../ui/chordSuggestionModal.js';
+
+// Import unified recommendation modal (new consolidated UI)
+import { showUnifiedRecommendationModal } from '../ui/recommendations/UnifiedRecommendationModal.js';
 
 // Import template browser modal (Phase 3.1)
 import { showTemplateBrowser } from '../ui/templateBrowserModal.js';
@@ -7674,15 +7677,14 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         const gridContainer = document.createElement('div');
         gridContainer.id = `${containerId}-cards-grid`;
 
+        // Use flexbox with wrapping for both section-aware and flat rendering
+        // This matches Progression Workshop and ensures consistent spacing and shifting behavior
+        gridContainer.className = 'flex flex-wrap items-start gap-2';
         if (hasSections) {
-            // Use flexbox for section-aware rendering (allows section containers to size naturally)
-            gridContainer.className = 'flex flex-wrap items-start gap-2';
             renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
                 showActionButtons: true
             });
         } else {
-            // Use grid for flat card rendering - match Chord Lab's responsive grid
-            gridContainer.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2';
             renderFlatCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
                 showActionButtons: true
             });
@@ -10619,8 +10621,17 @@ export function showProgressionChordSuggestions(chordIndex) {
         }
     };
 
-    // Show the modal
-    showChordSuggestionModal(currentType, currentRoot, currentInversion, onAddChord, onPlayChord, onStopChord);
+    // Show the unified recommendation modal (chord tab, quick suggestions view)
+    showUnifiedRecommendationModal({
+        currentChordType: currentType,
+        currentRoot: currentRoot,
+        currentInversion: currentInversion,
+        onAddChord: onAddChord,
+        onPlayChord: onPlayChord,
+        onStopChord: onStopChord,
+        initialTab: 'chord',
+        initialView: 'quick'
+    });
 }
 
 // Make it available globally for onclick handlers
@@ -11636,19 +11647,28 @@ export function saveRecording() {
 /**
  * Add a chord to the progression data
  * @param {Object} chordData - Chord data object to add
+ * @param {Object} options - Optional settings
+ * @param {boolean} options.skipRender - Skip rendering (for batch operations)
  */
-export function addToProgressionData(chordData) {
+export function addToProgressionData(chordData, options = {}) {
     const trainerState = getTrainerState();
 
-    // Save state before adding
-    saveStateBeforeChange();
+    // Save state before adding (only on first chord of batch to avoid multiple undo states)
+    if (!options.skipRender) {
+        saveStateBeforeChange();
+    }
 
     trainerState.progressionData.push(chordData);
     if (chordData.roman && !trainerState.progressionRomans.includes(chordData.roman)) {
         trainerState.progressionRomans.push(chordData.roman);
     }
     setProgressionData(trainerState.progressionData);
-    
+
+    // Skip all rendering if in batch mode
+    if (options.skipRender) {
+        return;
+    }
+
     // Save scroll position to prevent jumping when notation refreshes
     // Save both window scroll and any scrollable container scroll positions
     const scrollY = window.scrollY;
@@ -11656,7 +11676,7 @@ export function addToProgressionData(chordData) {
     const canvasContainer = document.getElementById('interactive-melody-notation-canvas')?.parentElement;
     const containerScrollTop = canvasContainer ? canvasContainer.scrollTop : 0;
     const containerScrollLeft = canvasContainer ? canvasContainer.scrollLeft : 0;
-    
+
     // Render both progression displays to keep them in sync
     renderProgressionDisplay('progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
@@ -11665,7 +11685,7 @@ export function addToProgressionData(chordData) {
     // This function already checks the tab and only refreshes if needed
     // Pass preventScroll=true to prevent page from jumping to notation
     renderMelodyNotationIfNeeded(true);
-    
+
     // Restore scroll position multiple times to catch any delayed scrolling
     // This prevents the page from jumping when notation refreshes on any tab
     const restoreScroll = () => {
@@ -11675,14 +11695,14 @@ export function addToProgressionData(chordData) {
             // Blur canvas if it got focused (which would cause scroll)
             activeElement.blur();
         }
-        
+
         window.scrollTo(scrollX, scrollY);
         if (canvasContainer) {
             canvasContainer.scrollTop = containerScrollTop;
             canvasContainer.scrollLeft = containerScrollLeft;
         }
     };
-    
+
     // Restore immediately and after rendering delays
     restoreScroll();
     requestAnimationFrame(() => {
@@ -11910,12 +11930,15 @@ export function handleUndo() {
             window.renderProgressionDisplay('melody-progression-visualization', false);
         }
 
-        // Sync to composition state and refresh VexFlow notation
-        if (window.syncProgressionToMelodyComposer) {
-            window.syncProgressionToMelodyComposer();
-        }
-        if (window.refreshNotationFromProgression) {
-            window.refreshNotationFromProgression();
+        // Re-render VexFlow notation from the restored compositionState.measures
+        // IMPORTANT: Do NOT call syncProgressionToMelodyComposer() here!
+        // That would overwrite the restored notation data with a fresh sync from progressionData,
+        // losing the specific note edits (duration, accidentals, etc.) we just restored.
+        if (window.getNotationComposer) {
+            const notationComposer = window.getNotationComposer();
+            if (notationComposer && typeof notationComposer.render === 'function') {
+                notationComposer.render(true);
+            }
         }
 
         // Refresh chord recommendations and analysis (includes borrowed chords)
@@ -11963,12 +11986,15 @@ export function handleRedo() {
             window.renderProgressionDisplay('melody-progression-visualization', false);
         }
 
-        // Sync to composition state and refresh VexFlow notation
-        if (window.syncProgressionToMelodyComposer) {
-            window.syncProgressionToMelodyComposer();
-        }
-        if (window.refreshNotationFromProgression) {
-            window.refreshNotationFromProgression();
+        // Re-render VexFlow notation from the restored compositionState.measures
+        // IMPORTANT: Do NOT call syncProgressionToMelodyComposer() here!
+        // That would overwrite the restored notation data with a fresh sync from progressionData,
+        // losing the specific note edits (duration, accidentals, etc.) we just restored.
+        if (window.getNotationComposer) {
+            const notationComposer = window.getNotationComposer();
+            if (notationComposer && typeof notationComposer.render === 'function') {
+                notationComposer.render(true);
+            }
         }
 
         // Refresh chord recommendations and analysis (includes borrowed chords)

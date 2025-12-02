@@ -2926,8 +2926,8 @@ export class CompositionState {
                 }
             }
         } else {
-            // Even if structure is the same, update block durations if they changed
-            // This handles rhythm pattern changes where chords stay the same but durations change
+            // Even if structure is the same, update block durations and chord types if they changed
+            // This handles rhythm pattern changes AND chord type changes (e.g., C Major -> C Major 7th)
             progressionData.forEach((chord, i) => {
                 const block = this.bassBlockSequence.blocks[i];
                 if (block) {
@@ -2935,6 +2935,60 @@ export class CompositionState {
                     if (block.beats !== newBeats) {
                         block.setDuration(newBeats);
                         console.log(`[syncWithProgressionData] Updated block ${i} duration: ${block.beats} -> ${newBeats}`);
+                    }
+
+                    // Check if chord TYPE has changed (e.g., Major -> Major 7th)
+                    // Even if root is the same, type change requires regenerating bass notes
+                    const oldType = block.chord?.type;
+                    const newType = chord.type;
+                    const oldInversion = block.chord?.inversion || 0;
+                    const newInversion = chord.inversion || 0;
+
+                    if (oldType !== newType || oldInversion !== newInversion) {
+                        console.log(`[syncWithProgressionData] Chord type/inversion changed at ${i}: ${oldType}(inv:${oldInversion}) -> ${newType}(inv:${newInversion})`);
+
+                        // Update the block's chord data
+                        block.chord = {
+                            ...block.chord,
+                            type: newType,
+                            inversion: newInversion
+                        };
+
+                        // Regenerate bass notes for this block from the new chord type
+                        // getChordNotes is already imported at the top of this file
+                        const chordNotesObj = getChordNotes(chord.root, newType, this.metadata?.key || 'C');
+
+                        if (chordNotesObj && chordNotesObj.specificNotes) {
+                            // Transpose notes down one octave for bass clef (octave 4 -> octave 3)
+                            let bassNotes = chordNotesObj.specificNotes.map(note => {
+                                const pitchMatch = note.match(/^([A-G][#b]?)(\d+)$/);
+                                if (pitchMatch) {
+                                    const [, noteName, octave] = pitchMatch;
+                                    return `${noteName}${parseInt(octave) - 1}`;
+                                }
+                                return note;
+                            });
+
+                            // Apply inversion if specified
+                            if (newInversion > 0 && bassNotes.length > newInversion) {
+                                for (let inv = 0; inv < newInversion; inv++) {
+                                    const note = bassNotes.shift();
+                                    // Move to higher octave
+                                    const pitchMatch = note.match(/^([A-G][#b]?)(\d+)$/);
+                                    if (pitchMatch) {
+                                        const [, noteName, octave] = pitchMatch;
+                                        bassNotes.push(`${noteName}${parseInt(octave) + 1}`);
+                                    } else {
+                                        bassNotes.push(note);
+                                    }
+                                }
+                            }
+
+                            // Update the block's notes
+                            const totalUnits = block.beats * UNITS_PER_BEAT;
+                            block.setNote(0, totalUnits, bassNotes, {});
+                            console.log(`[syncWithProgressionData] Regenerated bass for block ${i}:`, bassNotes);
+                        }
                     }
                 }
             });

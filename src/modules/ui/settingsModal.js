@@ -403,7 +403,11 @@ export function showSettingsModal(initialTab = 'chords') {
 
         // Dispatch event for other components
         document.dispatchEvent(new CustomEvent('chord-suggestion-preference-changed', {
-            detail: { style: styleSelect.value, mood: moodSelect.value }
+            detail: {
+                style: styleSelect.value,
+                mood: moodSelect.value,
+                weightsChanged: true
+            }
         }));
 
         // Refresh recommendations immediately with new weights
@@ -751,7 +755,11 @@ export function showSettingsModal(initialTab = 'chords') {
 
         // Dispatch event for other components
         document.dispatchEvent(new CustomEvent('chord-suggestion-preference-changed', {
-            detail: { style: styleSelect.value, mood: moodSelect.value }
+            detail: {
+                style: styleSelect.value,
+                mood: moodSelect.value,
+                weightsChanged: true
+            }
         }));
 
         // Refresh recommendations immediately with new weights

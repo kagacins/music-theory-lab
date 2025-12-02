@@ -102,6 +102,10 @@ export class NotationToolbar {
 
     // Tuplet mode state
     this.tupletInsertMode = null; // null, 'triplet', 'quintuplet', 'sextuplet'
+
+    // Interaction mode: 'noteEntry' = Alt+click always adds note, 'select' = clicking on notes selects them
+    this.interactionMode = localStorage.getItem('notation-interaction-mode') || 'select';
+    this.onInteractionModeChange = options.onInteractionModeChange || (() => {});
   }
 
   /**
@@ -125,6 +129,26 @@ export class NotationToolbar {
         <!-- Selection Indicator (shown when notes selected) -->
         <div class="toolbar-section selection-indicator" style="display: ${this.selectedNotesCount > 0 ? 'flex' : 'none'};">
           <span class="selection-badge">✓ ${this.selectedNotesCount} note${this.selectedNotesCount !== 1 ? 's' : ''} selected</span>
+        </div>
+
+        <!-- Interaction Mode Toggle -->
+        <div class="toolbar-section interaction-mode-section">
+          <div class="button-group interaction-mode-buttons">
+            <button
+              class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'noteEntry' ? 'active' : ''}"
+              data-interaction-mode="noteEntry"
+              title="Note Entry Mode: Alt+Click always adds a note, ignoring existing notes"
+            >
+              ✏
+            </button>
+            <button
+              class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'select' ? 'active' : ''}"
+              data-interaction-mode="select"
+              title="Select Mode: Click on notes to select them, Alt+Click to add"
+            >
+              ⎀
+            </button>
+          </div>
         </div>
 
         <!-- Duration Section -->
@@ -533,6 +557,16 @@ export class NotationToolbar {
   attachEventListeners() {
     if (!this.container) return;
 
+    // Interaction mode buttons
+    this.container.querySelectorAll('.interaction-mode-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const mode = e.currentTarget.dataset.interactionMode;
+        if (mode) {
+          this.setInteractionMode(mode);
+        }
+      });
+    });
+
     // Duration buttons - use currentTarget to ensure we get the button element, not child text nodes
     this.container.querySelectorAll('.duration-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -789,6 +823,37 @@ export class NotationToolbar {
    */
   getDuration() {
     return this.isDotted ? this.currentDuration + '.' : this.currentDuration;
+  }
+
+  /**
+   * Set interaction mode
+   * @param {string} mode - 'noteEntry' or 'select'
+   */
+  setInteractionMode(mode) {
+    if (mode !== 'noteEntry' && mode !== 'select') return;
+    this.interactionMode = mode;
+    localStorage.setItem('notation-interaction-mode', mode);
+    this.updateInteractionModeButtons();
+    this.onInteractionModeChange(mode);
+  }
+
+  /**
+   * Get current interaction mode
+   * @returns {string} - 'noteEntry' or 'select'
+   */
+  getInteractionMode() {
+    return this.interactionMode;
+  }
+
+  /**
+   * Update interaction mode button states
+   */
+  updateInteractionModeButtons() {
+    if (!this.container) return;
+    this.container.querySelectorAll('.interaction-mode-btn').forEach(btn => {
+      const isActive = btn.dataset.interactionMode === this.interactionMode;
+      btn.classList.toggle('active', isActive);
+    });
   }
 
   /**

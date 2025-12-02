@@ -261,11 +261,17 @@ export class NoteEditor {
       staffPosition = this.hoveredPosition;
     }
 
+    // Check interaction mode from toolbar
+    // In 'noteEntry' mode with Alt held, skip note selection and go directly to note addition
+    const interactionMode = this.composerIntegration?.toolbar?.getInteractionMode?.() || 'select';
+    const isNoteEntryMode = interactionMode === 'noteEntry' && e.altKey;
+
     // Check if clicking on an existing note FIRST (before checking Alt key)
-    const clickedNote = this.findNoteAtPosition(position.x, position.y);
+    // Skip this check in noteEntry mode when Alt is held - prioritize adding notes
+    const clickedNote = isNoteEntryMode ? null : this.findNoteAtPosition(position.x, position.y);
 
     if (clickedNote) {
-      // Clicking on a note - handle selection (works with or without Alt)
+      // Clicking on a note - handle selection (works with or without Alt in select mode)
       e.stopPropagation();
       e.preventDefault();
 
@@ -2129,6 +2135,11 @@ export class NoteEditor {
       return;
     }
 
+    // Save state for undo before making changes
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
     console.log('[NoteEditor] changeDurationOfSelected:', {
       newDuration,
       isDotted: this.isDotted,
@@ -2584,6 +2595,11 @@ export class NoteEditor {
    */
   toggleDottedOnSelected() {
     if (this.selectedNotes.size === 0) return;
+
+    // Save state for undo before making changes
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
 
     let changedCount = 0;
 
@@ -3206,6 +3222,11 @@ export class NoteEditor {
    */
   changeAccidentalOnSelected(accidental) {
     if (this.selectedNotes.size === 0) return;
+
+    // Save state for undo before making changes
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
 
     let changedCount = 0;
 

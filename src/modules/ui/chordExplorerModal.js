@@ -1465,12 +1465,17 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
     const headerRow = document.createElement('tr');
     headerRow.style.cssText = 'background-color: #f3f4f6; border-bottom: 2px solid #d1d5db;';
 
+    // Check if rhythm awareness is enabled (Phase 5)
+    const rhythmAwarenessEnabled = localStorage.getItem('chord-suggestion-rhythm-awareness') !== 'false';
+
     // Define columns
     const columns = [
         { name: 'Root', align: 'left', hasFilter: true, filterKey: 'root', allValues: allRoots, sortKey: 'root', sortable: true },
         { name: 'Chord Type', align: 'left', hasFilter: true, filterKey: 'type', allValues: allTypes, sortKey: 'type', sortable: true },
         { name: 'Inversion', align: 'left', hasFilter: true, filterKey: 'inversion', allValues: allInversions, sortKey: 'inversion', sortable: true },
         { name: 'Score', align: 'center', hasFilter: false, sortKey: 'score', sortable: true },
+        // Duration column (Phase 5) - only show if rhythm awareness is enabled
+        ...(rhythmAwarenessEnabled ? [{ name: '⏱ Dur', align: 'center', hasFilter: false, sortKey: 'suggestedDuration', sortable: true }] : []),
         { name: 'Harmonic', align: 'center', hasFilter: false, sortKey: 'functionScore', sortable: true },
         { name: 'Voice Lead', align: 'center', hasFilter: false, sortKey: 'voiceLeadingScore', sortable: true },
         { name: 'Style Fit', align: 'center', hasFilter: false, sortKey: 'styleFit', sortable: true },
@@ -1597,6 +1602,10 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
                 case 'moodFit':
                     aVal = a.moodFit || 0;
                     bVal = b.moodFit || 0;
+                    break;
+                case 'suggestedDuration':
+                    aVal = a.suggestedDuration || 4;
+                    bVal = b.suggestedDuration || 4;
                     break;
                 default:
                     return 0;
@@ -1956,11 +1965,17 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
         // Create borrowed chord indicator
         const borrowedBadge = rec.borrowedFrom ? `<span style="display: inline-block; margin-left: 6px; padding: 1px 5px; background-color: #8b5cf6; color: white; border-radius: 3px; font-size: 9px; font-weight: 600; vertical-align: middle;" title="Borrowed from ${rec.borrowedFrom}">⭐</span>` : '';
 
+        // Duration cell (Phase 5) - only show if rhythm awareness is enabled
+        const durationCell = rhythmAwarenessEnabled
+            ? `<td style="padding: 4px 6px; text-align: center; font-size: 11px;"><span style="color: #6366f1; background: #eef2ff; padding: 1px 4px; border-radius: 3px; font-weight: 600;" title="${rec.durationReason || 'Suggested duration'}">${rec.suggestedDuration || 4}b</span></td>`
+            : '';
+
         tr.innerHTML = `
             <td style="padding: 4px 6px; font-weight: 600; font-size: 12px;">${rec.root}</td>
             <td style="padding: 4px 6px; font-size: 12px;">${rec.type}${borrowedBadge}</td>
             <td style="padding: 4px 6px; font-size: 12px;">${invName}</td>
             <td style="padding: 4px 6px; text-align: center;"><span data-action="show-score" data-index="${idx}" class="score-badge" style="padding: 2px 6px; background-color: ${getScoreColor(rec.score)}; color: white; border-radius: 3px; font-weight: 600; font-size: 11px; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s;" title="Click for detailed breakdown">${rec.score}</span></td>
+            ${durationCell}
             <td style="padding: 4px 6px; text-align: center; font-size: 12px;">${Math.round(rec.functionScore || 0)}</td>
             <td style="padding: 4px 6px; text-align: center; font-size: 12px;">${Math.round(rec.voiceLeadingScore || 0)}</td>
             <td style="padding: 4px 6px; text-align: center; font-size: 12px;">${Math.round(rec.styleFit || 0)}</td>

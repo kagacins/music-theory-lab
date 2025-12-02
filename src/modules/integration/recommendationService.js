@@ -148,14 +148,14 @@ export class RecommendationService {
             this.refreshRecommendations();
         });
 
-        // Phase 2.1: Listen for chord selection changes
-        // Listen to both event names for compatibility (chordCardSelected is dispatched by selectChordCard)
-        window.addEventListener('chordSelected', () => {
-            this.refreshRecommendations();
-        });
-        window.addEventListener('chordCardSelected', () => {
-            this.refreshRecommendations();
-        });
+        // Note: We intentionally do NOT listen to chordSelected/chordCardSelected events.
+        // Selecting a chord (e.g., to play it) should not regenerate recommendations.
+        // Recommendations only need to refresh when:
+        // - The progression changes (add/remove chords)
+        // - The key changes
+        // - Section structure changes
+        // - Section intent changes
+        // The Recommendations modal will generate fresh suggestions when opened.
     }
 
     /**
@@ -230,6 +230,15 @@ export class RecommendationService {
                 weight: 0.15  // 15% weight for tension arc alignment
             };
 
+            // Rhythmic Awareness: Set up rhythm info for duration suggestions
+            // User can toggle this via localStorage setting
+            const rhythmAwarenessEnabled = localStorage.getItem('chord-suggestion-rhythm-awareness') !== 'false'; // Default enabled
+            const rhythmInfo = rhythmAwarenessEnabled ? {
+                enabled: true,
+                compositionState: getCompositionState(),
+                insertAfterIndex: insertAfterIndex
+            } : null;
+
             // Use advanced 3D scoring system with context awareness
             rawRecommendations = generateComprehensiveRecommendations(
                 referenceChord.root,
@@ -246,7 +255,8 @@ export class RecommendationService {
                 customWeights,   // Use user's saved recommendation weights
                 true,            // useEnhancedScoring (Phase 1)
                 sectionInfo,     // Phase 2: Section context with intent
-                tensionArcInfo   // Phase 3: Tension arc scoring
+                tensionArcInfo,  // Phase 3: Tension arc scoring
+                rhythmInfo       // Rhythmic Awareness: Duration suggestions
             );
         } else {
             // Fallback to basic recommendations for empty progression
@@ -325,7 +335,13 @@ export class RecommendationService {
                 borrowedFrom: rec.borrowedFrom || null,
                 // Phase 2: Section context details
                 sectionDetails: rec.sectionDetails || null,
-                sectionReasons: rec.sectionReasons || []
+                sectionReasons: rec.sectionReasons || [],
+                // Rhythmic Awareness: Duration suggestions
+                suggestedDuration: rec.suggestedDuration || null,
+                durationConfidence: rec.durationConfidence || null,
+                durationReason: rec.durationReason || null,
+                durationAlternatives: rec.durationAlternatives || null,
+                rhythmicContext: rec.rhythmicContext || null
             };
         });
     }
@@ -503,6 +519,25 @@ export class RecommendationService {
         }
 
         return this._sectionGenerator.generateSection(options);
+    }
+
+    /**
+     * Generate multiple distinct section options for user selection
+     *
+     * @param {Object} options - Section generation options
+     * @param {string} options.sectionType - Type of section
+     * @param {number} options.length - Number of chords
+     * @param {string} options.style - Musical style
+     * @param {number} options.count - Number of options (default: 5)
+     * @returns {Array} Array of section options or empty array
+     */
+    generateMultipleSections(options = {}) {
+        if (!this._phase5Enabled || !this._sectionGenerator) {
+            console.warn('[Phase 5] Section generator not available');
+            return [];
+        }
+
+        return this._sectionGenerator.generateMultipleOptions(options);
     }
 
     /**

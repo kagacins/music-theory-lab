@@ -5,7 +5,7 @@
  */
 
 import { autoHarmonize, applyHarmonizeSuggestions } from '../ai/autoHarmonize.js';
-import { CHORD_DEFINITIONS } from '../../data/music-data.js';
+import { CHORD_DEFINITIONS, INVERSION_NAMES } from '../../data/music-data.js';
 import {
     getSmartHarmonizer,
     MOTION_TYPES
@@ -620,12 +620,17 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
                 // Check for style-specific reasons
                 const hasStyleReason = suggestion.reasons && suggestion.reasons.some(r => r.includes('style') || r.includes('Style'));
 
+                // Check for inversion (non-root position)
+                const hasInversion = suggestion.inversion && suggestion.inversion > 0;
+                const inversionLabel = hasInversion ? INVERSION_NAMES[suggestion.inversion] : null;
+
                 // Create button with play button, info icon and optional badges
                 optionBtn.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <div style="flex: 1;">
                             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                                 <span style="font-weight: 600; font-size: 14px;">${chordName}</span>
+                                ${hasInversion ? `<span style="font-size: 9px; padding: 2px 5px; background-color: #f59e0b; color: white; border-radius: 3px; font-weight: 600;">${inversionLabel} INV</span>` : ''}
                                 ${isCurrentChord ? '<span class="current-badge" style="font-size: 9px; padding: 2px 5px; background-color: #10b981; color: white; border-radius: 3px; font-weight: 600;">CURRENT</span>' : ''}
                                 ${hasStyleReason ? '<span style="font-size: 9px; padding: 2px 5px; background-color: #8b5cf6; color: white; border-radius: 3px; font-weight: 600;">STYLE</span>' : ''}
                             </div>
@@ -688,7 +693,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
                         isPlayingWithMelody = true;
                         if (onPlayChordWithMelody) {
                             const measureMelodyNotes = notesByMeasure[measure.measureIndex] || [];
-                            onPlayChordWithMelody(suggestion.root, suggestion.type, measureMelodyNotes, 0, tempo);
+                            onPlayChordWithMelody(suggestion.root, suggestion.type, measureMelodyNotes, suggestion.inversion || 0, tempo);
                         }
                         return;
                     }
@@ -710,9 +715,9 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
                         updateButtonStyle(btn, idx === suggestionIndex);
                     });
 
-                    // Play chord preview
+                    // Play chord preview with the recommended inversion
                     if (onPlayChord) {
-                        onPlayChord(suggestion.root, suggestion.type, 0);
+                        onPlayChord(suggestion.root, suggestion.type, suggestion.inversion || 0);
                     }
                 };
 
@@ -965,10 +970,15 @@ function showHarmonizeTooltip(event, suggestion, chordName) {
     // Check if this is the current chord
     const isCurrentChord = suggestion.reasons && suggestion.reasons.includes('Current chord');
 
+    // Check for inversion
+    const hasInversion = suggestion.inversion && suggestion.inversion > 0;
+    const inversionLabel = hasInversion ? INVERSION_NAMES[suggestion.inversion] : null;
+
     tooltip.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                 <span style="font-weight: 600; font-size: 15px; color: #111827;">${chordName}</span>
+                ${hasInversion ? `<span style="font-size: 9px; padding: 2px 5px; background-color: #f59e0b; color: white; border-radius: 3px; font-weight: 600;">${inversionLabel} INV</span>` : ''}
                 ${isCurrentChord ? '<span style="font-size: 9px; padding: 2px 5px; background-color: #10b981; color: white; border-radius: 3px; font-weight: 600;">CURRENT</span>' : ''}
             </div>
             <button class="tooltip-close" style="

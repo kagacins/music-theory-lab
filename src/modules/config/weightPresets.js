@@ -479,35 +479,51 @@ export function normalizeWeights(weights) {
  * @returns {Object} Weight configuration
  */
 export function getSavedWeights(contextMode = false) {
+    const defaults = contextMode ? { ...DEFAULT_CONTEXT_WEIGHTS } : { ...DEFAULT_WEIGHTS };
+
     try {
         const saved = localStorage.getItem('chord-recommendation-weights');
+
         if (saved) {
             const parsed = JSON.parse(saved);
-            // Ensure all required keys exist
-            const required = contextMode ?
-                Object.keys(DEFAULT_CONTEXT_WEIGHTS) :
-                Object.keys(DEFAULT_WEIGHTS);
 
-            const hasAllKeys = required.every(key => key in parsed);
-            if (hasAllKeys) {
-                return normalizeWeights(parsed);
+            // Merge saved weights with defaults (saved takes precedence for existing keys)
+            // This allows sliders to work even if they don't have all context-mode keys
+            const merged = { ...defaults };
+            for (const key of Object.keys(parsed)) {
+                if (key in defaults) {
+                    merged[key] = parsed[key];
+                }
             }
+
+            return normalizeWeights(merged);
         }
     } catch (e) {
         console.error('Error loading saved weights:', e);
     }
 
-    return contextMode ? { ...DEFAULT_CONTEXT_WEIGHTS } : { ...DEFAULT_WEIGHTS };
+    return defaults;
 }
 
 /**
  * Save weights to localStorage
+ * Dispatches 'chord-weights-changed' event to notify UI components to refresh recommendations
  * @param {Object} weights - Weight configuration
+ * @param {boolean} dispatchEvent - Whether to dispatch change event (default: true)
  */
-export function saveWeights(weights) {
+export function saveWeights(weights, dispatchEvent = true) {
     try {
         const normalized = normalizeWeights(weights);
         localStorage.setItem('chord-recommendation-weights', JSON.stringify(normalized));
+
+        // Dispatch event to notify UI components (e.g., Unified Recommendations Modal)
+        // This triggers automatic refresh of chord and sequence recommendations
+        if (dispatchEvent && typeof document !== 'undefined') {
+            const event = new CustomEvent('chord-weights-changed', {
+                detail: { weights: normalized }
+            });
+            document.dispatchEvent(event);
+        }
     } catch (e) {
         console.error('Error saving weights:', e);
     }

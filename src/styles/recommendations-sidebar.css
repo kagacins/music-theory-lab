@@ -624,6 +624,244 @@
     margin-top: 4px;
 }
 
+/* ============================================
+   Score Description Tooltips - Enhanced Styling
+   ============================================ */
+
+/* Score breakdown row with description */
+.score-breakdown-row {
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #f3e8ff;
+}
+
+.score-breakdown-row:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.score-icon {
+    margin-right: 6px;
+    font-size: 12px;
+}
+
+.score-description {
+    font-size: 10px;
+    color: #6b7280;
+    line-height: 1.4;
+    margin-top: 6px;
+    padding: 6px 8px;
+    background: #faf5ff;
+    border-radius: 4px;
+    border-left: 2px solid #c4b5fd;
+}
+
+/* Total score section styling */
+.total-score-section {
+    border-top: 2px solid #e9d5ff;
+    padding-top: 12px;
+    margin-top: 12px;
+    background: linear-gradient(135deg, #faf5ff 0%, #f5f3ff 100%);
+    border-radius: 8px;
+    padding: 12px;
+    margin-left: -8px;
+    margin-right: -8px;
+    margin-bottom: -8px;
+}
+
+.total-score-row {
+    font-weight: 700;
+}
+
+.total-score-value {
+    font-size: 16px !important;
+    color: #7c3aed !important;
+}
+
+.total-score-bar {
+    height: 6px;
+    margin-top: 4px;
+}
+
+.total-score-bar .score-bar-fill {
+    background: linear-gradient(90deg, #7c3aed, #a855f7, #c084fc);
+}
+
+.total-description {
+    background: white;
+    font-weight: 500;
+}
+
+/* ============================================
+   Mini-Tooltips for Individual Score Elements
+   ============================================ */
+
+.score-mini-tooltip,
+.badge-mini-tooltip {
+    position: fixed;
+    z-index: 10002;
+    background: white;
+    border: 2px solid #8b5cf6;
+    border-radius: 10px;
+    padding: 14px;
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.25),
+                0 4px 12px rgba(0, 0, 0, 0.1);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.score-mini-tooltip {
+    width: 260px;
+}
+
+.badge-mini-tooltip {
+    width: 220px;
+}
+
+.score-mini-tooltip.show,
+.badge-mini-tooltip.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Mini-tooltip header */
+.mini-tooltip-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e9d5ff;
+}
+
+.mini-tooltip-icon {
+    font-size: 16px;
+    margin-right: 8px;
+}
+
+.mini-tooltip-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #7c3aed;
+}
+
+/* Mini-tooltip score display */
+.mini-tooltip-score {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.mini-tooltip-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.mini-tooltip-quality {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 12px;
+}
+
+/* Quality badge colors */
+.mini-tooltip-quality.quality-excellent,
+.mini-tooltip-quality.quality-highly-recommended {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.mini-tooltip-quality.quality-good,
+.mini-tooltip-quality.quality-good-choice {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.mini-tooltip-quality.quality-fair,
+.mini-tooltip-quality.quality-consider-alternatives {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.mini-tooltip-quality.quality-needs-work {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+/* Mini-tooltip progress bar */
+.mini-tooltip-bar {
+    height: 6px;
+    background: #e9d5ff;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.mini-tooltip-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+/* Mini-tooltip description */
+.mini-tooltip-description {
+    font-size: 11px;
+    color: #4b5563;
+    line-height: 1.5;
+}
+
+.mini-tooltip-hint {
+    font-size: 10px;
+    color: #8b5cf6;
+    text-align: center;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px dashed #e9d5ff;
+    font-style: italic;
+}
+
+/* Badge mini-tooltip */
+.badge-tooltip-text {
+    font-size: 11px;
+    color: #4b5563;
+    line-height: 1.5;
+    text-align: center;
+}
+
+/* ============================================
+   Interactive Score Elements
+   ============================================ */
+
+.voice-leading-indicator.has-score-tooltip,
+.score-badge.has-score-tooltip {
+    cursor: help;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.voice-leading-indicator.has-score-tooltip:hover {
+    transform: scale(1.3);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+.score-badge.has-score-tooltip:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+}
+
+/* Data-tooltip badges (chord function, inversion) */
+[data-tooltip] {
+    cursor: help;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+[data-tooltip]:hover {
+    transform: scale(1.05);
+}
+
 /* Loading State */
 .recommendations-loading {
     display: flex;

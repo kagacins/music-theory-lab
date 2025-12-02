@@ -2473,16 +2473,16 @@ function generateStaccatoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasur
     const fifth = findFifth(chord.root, chordNotes);
 
     // Staccato pattern: short note followed by rest
-    // Creates a punchy, detached feel
+    // Creates a punchy, detached feel with 8th notes
     const staccatoPattern = [
-        { pitch: root, beats: 0.25 },  // Sixteenth note
-        { pitch: null, beats: 0.75 },  // Rest
-        { pitch: fifth, beats: 0.25 }, // Sixteenth note
-        { pitch: null, beats: 0.75 },  // Rest
-        { pitch: root, beats: 0.25 },  // Sixteenth note
-        { pitch: null, beats: 0.75 },  // Rest
-        { pitch: root, beats: 0.25 },  // Sixteenth note
-        { pitch: null, beats: 0.75 },  // Rest
+        { pitch: root, beats: 0.5 },   // Eighth note
+        { pitch: null, beats: 0.5 },   // Eighth rest
+        { pitch: fifth, beats: 0.5 },  // Eighth note
+        { pitch: null, beats: 0.5 },   // Eighth rest
+        { pitch: root, beats: 0.5 },   // Eighth note
+        { pitch: null, beats: 0.5 },   // Eighth rest
+        { pitch: root, beats: 0.5 },   // Eighth note
+        { pitch: null, beats: 0.5 },   // Eighth rest
     ];
     let patternIndex = 0;
 

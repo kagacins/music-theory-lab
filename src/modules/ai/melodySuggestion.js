@@ -149,6 +149,26 @@ export const STYLE_RULES = {
         preferredIntervals: [0, 2, 3, 4, 5, 7], // Unison, 2nds, 3rds, 4ths, 5ths
         avoidIntervals: [6, 10, 11] // Tritone, 7ths
     },
+    balanced: {
+        // Same as 'any' - general-purpose balanced melody
+        chordToneBoost: 1.0,
+        scaleToneBoost: 1.0,
+        stepwiseBoost: 1.0,
+        approachToneBoost: 1.0,
+        tensionPenalty: 1.0,
+        preferredIntervals: [0, 2, 3, 4, 5, 7],
+        avoidIntervals: [6, 10, 11]
+    },
+    indie: {
+        // Indie/Alternative - more unexpected, creative choices
+        chordToneBoost: 0.9,
+        scaleToneBoost: 1.0,
+        stepwiseBoost: 0.8,
+        approachToneBoost: 1.2,
+        tensionPenalty: 0.7, // More tolerant of tension
+        preferredIntervals: [0, 2, 3, 4, 5, 7, 9], // Allows 6ths
+        avoidIntervals: [6] // Only avoid tritone
+    },
     pop: {
         chordToneBoost: 1.3,
         scaleToneBoost: 1.1,
@@ -185,6 +205,60 @@ export const STYLE_RULES = {
         preferredIntervals: [0, 3, 4, 5, 7], // Pentatonic-friendly
         avoidIntervals: [1, 6], // Chromatic, tritone (unless blue note)
         useBlueNotes: true
+    }
+};
+
+// -----------------------------------------------------------------------------
+// Mood-specific scoring modifiers
+// These apply additional bonuses/penalties based on the selected mood
+// -----------------------------------------------------------------------------
+
+export const MOOD_RULES = {
+    bright: {
+        // Happy/Bright - favor major intervals, higher register
+        majorIntervalBonus: 15,
+        minorIntervalPenalty: -10,
+        highRegisterBonus: 8, // per octave above 4
+        lowRegisterPenalty: -5,
+        preferMajorThird: true,
+        preferPerfectFifth: true
+    },
+    dark: {
+        // Melancholic/Dark - favor minor intervals, lower register
+        majorIntervalBonus: -5,
+        minorIntervalPenalty: 10, // Actually a bonus for dark
+        highRegisterBonus: -5,
+        lowRegisterPenalty: 0,
+        preferMinorThird: true,
+        preferMinorSixth: true
+    },
+    jazzy: {
+        // Jazzy/Complex - favor extensions, chromatic approach
+        tensionBonus: 15,
+        chromaticApproachBonus: 12,
+        extensionBonus: 10, // 9ths, 11ths, 13ths
+        preferSeventh: true
+    },
+    tense: {
+        // Tense/Dramatic - favor dissonance, wide leaps
+        tensionBonus: 20,
+        wideLeapBonus: 10, // Leaps > 5 semitones
+        tritoneBonus: 15,
+        stepwisePenalty: -8
+    },
+    calm: {
+        // Calm/Peaceful - favor stepwise motion, consonance
+        stepwiseBonus: 15,
+        wideLeapPenalty: -12,
+        consonanceBonus: 10,
+        dissonancePenalty: -15
+    },
+    energetic: {
+        // Energetic/Driving - favor rhythmic patterns, strong beats
+        chordToneBonus: 10,
+        leapBonus: 8,
+        repeatPenalty: -10, // Discourage repetition
+        rootBonus: 12
     }
 };
 
@@ -459,29 +533,148 @@ function scoreTension(note, chord, key, styleRules) {
 
 /**
  * Apply contour preference scoring
+ * Increased bonuses to make contour selection more impactful
+ * @param {string} note - The candidate note
+ * @param {string|null} previousNote - Previous note played (can be null)
+ * @param {string} contourPreset - The contour preference (ascending, descending, stepwise, etc.)
+ * @param {string} chordRoot - The chord root note (used as fallback reference when no previousNote)
+ * @param {number} targetOctave - The target octave for the melody
  */
-function scoreContour(note, previousNote, contourPreset) {
-    if (!previousNote || contourPreset === 'any') return 0;
+function scoreContour(note, previousNote, contourPreset, chordRoot = 'C', targetOctave = 4) {
+    if (contourPreset === 'any') return 0;
 
     const currentMidi = noteToMidi(note);
-    const prevMidi = noteToMidi(previousNote);
-    if (currentMidi === null || prevMidi === null) return 0;
+    if (currentMidi === null) return 0;
 
-    const direction = currentMidi - prevMidi;
+    // Use previousNote if available, otherwise use chord root at target octave as reference
+    let refMidi;
+    if (previousNote) {
+        refMidi = noteToMidi(previousNote);
+    } else {
+        // Use chord root at target octave as reference point
+        refMidi = noteToMidi(chordRoot + targetOctave);
+    }
+    if (refMidi === null) return 0;
+
+    const direction = currentMidi - refMidi;
 
     switch (contourPreset) {
         case 'ascending':
-            return direction > 0 ? 10 : direction < 0 ? -10 : 0;
+            return direction > 0 ? 25 : direction < 0 ? -20 : 0;
         case 'descending':
-            return direction < 0 ? 10 : direction > 0 ? -10 : 0;
+            return direction < 0 ? 25 : direction > 0 ? -20 : 0;
         case 'stepwise':
-            return Math.abs(direction) <= 2 ? 15 : -10;
+            return Math.abs(direction) <= 2 ? 30 : -15;
         case 'arch':
             // Favor ascending early, descending later (would need position context)
             return 0;
         default:
             return 0;
     }
+}
+
+/**
+ * Apply mood-based scoring to a note candidate
+ * @param {string} note - The candidate note
+ * @param {Object} chord - Current chord {root, type}
+ * @param {string} previousNote - Previous note played
+ * @param {string} mood - Selected mood (bright, dark, jazzy, tense, calm, energetic)
+ * @returns {number} Mood bonus/penalty score
+ */
+function scoreMood(note, chord, previousNote, mood) {
+    const moodRules = MOOD_RULES[mood];
+    if (!moodRules) return 0;
+
+    const noteMidi = noteToMidi(note);
+    if (noteMidi === null) return 0;
+
+    let moodScore = 0;
+    const notePc = getPitchClass(note);
+    const rootPc = getPitchClass(chord.root);
+    const interval = (notePc - rootPc + 12) % 12;
+    const octave = Math.floor(noteMidi / 12) - 1;
+
+    // Register bonuses/penalties
+    if (moodRules.highRegisterBonus && octave > 4) {
+        moodScore += moodRules.highRegisterBonus * (octave - 4);
+    }
+    if (moodRules.lowRegisterPenalty && octave < 4) {
+        moodScore += moodRules.lowRegisterPenalty * (4 - octave);
+    }
+
+    // Interval-based bonuses
+    if (moodRules.preferMajorThird && interval === 4) {
+        moodScore += 12;
+    }
+    if (moodRules.preferMinorThird && interval === 3) {
+        moodScore += 12;
+    }
+    if (moodRules.preferPerfectFifth && interval === 7) {
+        moodScore += 10;
+    }
+    if (moodRules.preferMinorSixth && interval === 8) {
+        moodScore += 10;
+    }
+    if (moodRules.preferSeventh && (interval === 10 || interval === 11)) {
+        moodScore += 10;
+    }
+
+    // Tension handling
+    if (moodRules.tensionBonus) {
+        // Tritone and 9ths get bonus for tense/jazzy moods
+        if (interval === 6 || interval === 1 || interval === 2) {
+            moodScore += moodRules.tensionBonus;
+        }
+    }
+    if (moodRules.consonanceBonus) {
+        // Perfect consonances get bonus for calm mood
+        if (interval === 0 || interval === 5 || interval === 7) {
+            moodScore += moodRules.consonanceBonus;
+        }
+    }
+    if (moodRules.dissonancePenalty) {
+        // Dissonances get penalty for calm mood
+        if (interval === 1 || interval === 6 || interval === 11) {
+            moodScore += moodRules.dissonancePenalty;
+        }
+    }
+
+    // Leap handling
+    if (previousNote) {
+        const prevMidi = noteToMidi(previousNote);
+        if (prevMidi !== null) {
+            const leapSize = Math.abs(noteMidi - prevMidi);
+
+            if (moodRules.wideLeapBonus && leapSize > 5) {
+                moodScore += moodRules.wideLeapBonus;
+            }
+            if (moodRules.wideLeapPenalty && leapSize > 5) {
+                moodScore += moodRules.wideLeapPenalty;
+            }
+            if (moodRules.stepwiseBonus && leapSize <= 2) {
+                moodScore += moodRules.stepwiseBonus;
+            }
+            if (moodRules.stepwisePenalty && leapSize <= 2) {
+                moodScore += moodRules.stepwisePenalty;
+            }
+            if (moodRules.leapBonus && leapSize >= 3 && leapSize <= 7) {
+                moodScore += moodRules.leapBonus;
+            }
+        }
+    }
+
+    // Chord tone bonus for energetic mood
+    if (moodRules.chordToneBonus) {
+        const chordTones = getChordTones(chord);
+        if (chordTones.includes(notePc)) {
+            moodScore += moodRules.chordToneBonus;
+        }
+    }
+    if (moodRules.rootBonus && interval === 0) {
+        moodScore += moodRules.rootBonus;
+    }
+
+    return moodScore;
 }
 
 // -----------------------------------------------------------------------------
@@ -597,6 +790,7 @@ export function generateMelodySuggestions({
     previousNote = null,
     styleId = 'any',
     contourId = 'any',
+    mood = 'bright', // Default mood
     octave = 4,
     range = 2,
     recentNotes = [],
@@ -699,8 +893,11 @@ export function generateMelodySuggestions({
                 }
             }
 
-            // Apply contour preference
-            const contourBonus = scoreContour(noteName, previousNote, contourId);
+            // Apply contour preference (use chord root as reference when no previousNote)
+            const contourBonus = scoreContour(noteName, previousNote, contourId, chord.root, octave);
+
+            // Apply mood-based scoring
+            const moodBonus = scoreMood(noteName, chord, previousNote, mood);
 
             // Apply pitch proximity bonus - favor notes closer to previous note or target range
             let proximityBonus = 0;
@@ -729,15 +926,16 @@ export function generateMelodySuggestions({
                 const currentMIDI = getMIDINumber(noteName);
                 const distanceFromCenter = Math.abs(currentMIDI - targetCenterMIDI);
 
-                // Favor notes within the target octave
+                // Strongly favor notes within the target octave (increased impact)
                 if (distanceFromCenter <= 6) {
-                    proximityBonus += 20; // Within target octave (±6 semitones from center)
+                    proximityBonus += 35; // Within target octave (±6 semitones from center)
                 } else if (distanceFromCenter <= 12) {
-                    proximityBonus += 8; // Within adjacent octaves
+                    proximityBonus += 15; // Within adjacent octaves
                 } else if (distanceFromCenter <= 18) {
-                    proximityBonus += 3; // Within 1.5 octaves
+                    proximityBonus += 5; // Within 1.5 octaves
+                } else {
+                    proximityBonus -= 10; // Penalty for notes too far from target range
                 }
-                // Penalty for notes too far from target range
             }
 
             // Calculate base harmonic score (without proximity)
@@ -748,6 +946,7 @@ export function generateMelodySuggestions({
                 harmonicScore = scores[0] + scores.slice(1).reduce((sum, s) => sum + s * 0.2, 0);
             }
             harmonicScore += contourBonus;
+            harmonicScore += moodBonus;
 
             // Apply recency/frequency penalty to harmonic score
             if (recentNotes && recentNotes.length > 0) {

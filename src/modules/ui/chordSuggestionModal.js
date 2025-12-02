@@ -323,6 +323,112 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     lookbackControl.appendChild(lookbackDropdown);
     controlsRow.appendChild(lookbackControl);
 
+    // Rhythm Awareness Toggle
+    const rhythmControl = document.createElement('div');
+    rhythmControl.style.display = 'flex';
+    rhythmControl.style.flexDirection = 'column';
+
+    const rhythmLabel = document.createElement('label');
+    rhythmLabel.textContent = 'Duration:';
+    rhythmLabel.style.fontSize = '11px';
+    rhythmLabel.style.fontWeight = '600';
+    rhythmLabel.style.color = '#374151';
+    rhythmLabel.style.display = 'block';
+    rhythmLabel.style.marginBottom = '4px';
+    rhythmControl.appendChild(rhythmLabel);
+
+    const rhythmToggleContainer = document.createElement('div');
+    rhythmToggleContainer.style.display = 'flex';
+    rhythmToggleContainer.style.alignItems = 'center';
+    rhythmToggleContainer.style.gap = '6px';
+    rhythmToggleContainer.style.height = '28px';
+
+    const rhythmCheckbox = document.createElement('input');
+    rhythmCheckbox.type = 'checkbox';
+    rhythmCheckbox.id = 'rhythm-awareness-toggle';
+    rhythmCheckbox.checked = localStorage.getItem('chord-suggestion-rhythm-awareness') !== 'false';
+    rhythmCheckbox.style.width = '16px';
+    rhythmCheckbox.style.height = '16px';
+    rhythmCheckbox.style.cursor = 'pointer';
+    rhythmCheckbox.style.accentColor = '#667eea';
+
+    const rhythmCheckboxLabel = document.createElement('label');
+    rhythmCheckboxLabel.htmlFor = 'rhythm-awareness-toggle';
+    rhythmCheckboxLabel.textContent = 'Suggest';
+    rhythmCheckboxLabel.style.fontSize = '11px';
+    rhythmCheckboxLabel.style.color = '#374151';
+    rhythmCheckboxLabel.style.cursor = 'pointer';
+    rhythmCheckboxLabel.style.userSelect = 'none';
+    rhythmCheckboxLabel.title = 'When enabled, suggestions include recommended chord durations based on harmonic rhythm analysis';
+
+    rhythmCheckbox.addEventListener('change', () => {
+        localStorage.setItem('chord-suggestion-rhythm-awareness', rhythmCheckbox.checked ? 'true' : 'false');
+        // Dispatch event so other components can react
+        window.dispatchEvent(new CustomEvent('rhythmAwarenessChanged', {
+            detail: { enabled: rhythmCheckbox.checked }
+        }));
+    });
+
+    rhythmToggleContainer.appendChild(rhythmCheckbox);
+    rhythmToggleContainer.appendChild(rhythmCheckboxLabel);
+    rhythmControl.appendChild(rhythmToggleContainer);
+    controlsRow.appendChild(rhythmControl);
+
+    // Rhythmic Context Info Panel (Phase 5.6) - shows current harmonic rhythm analysis
+    const rhythmInfoPanel = document.createElement('div');
+    rhythmInfoPanel.id = 'rhythm-context-info';
+    rhythmInfoPanel.style.cssText = 'display: none; padding: 8px 12px; background: #f5f3ff; border-radius: 6px; margin-left: auto; font-size: 11px; color: #4b5563; max-width: 220px;';
+
+    const updateRhythmInfo = () => {
+        if (!rhythmCheckbox.checked) {
+            rhythmInfoPanel.style.display = 'none';
+            return;
+        }
+
+        // Try to get rhythmic context from CompositionContext
+        if (window.getCompositionContext) {
+            try {
+                const ctx = window.getCompositionContext();
+                const rhythmicSnapshot = ctx.getRhythmicSnapshot ? ctx.getRhythmicSnapshot() : null;
+
+                if (rhythmicSnapshot && rhythmicSnapshot.totalChords > 0) {
+                    rhythmInfoPanel.style.display = 'block';
+                    const trendEmoji = {
+                        'accelerating': '⬇️',
+                        'decelerating': '⬆️',
+                        'steady': '➡️',
+                        'varied': '↔️',
+                        'unknown': '❓'
+                    };
+                    const trend = rhythmicSnapshot.harmonicRhythmTrend || 'unknown';
+                    rhythmInfoPanel.innerHTML = `
+                        <div style="font-weight: 600; margin-bottom: 4px; color: #6366f1;">⏱ Rhythmic Context</div>
+                        <div style="display: grid; gap: 2px;">
+                            <span>Avg: <strong>${rhythmicSnapshot.averageDuration || 4}</strong> beats</span>
+                            <span>Trend: ${trendEmoji[trend] || '❓'} <strong>${trend}</strong></span>
+                            ${rhythmicSnapshot.detectedPattern ? `<span>Pattern: <strong>${rhythmicSnapshot.detectedPattern.name}</strong></span>` : ''}
+                        </div>
+                    `;
+                } else {
+                    rhythmInfoPanel.style.display = 'block';
+                    rhythmInfoPanel.innerHTML = `
+                        <div style="font-weight: 600; color: #6366f1;">⏱ Rhythmic Context</div>
+                        <div style="color: #9ca3af;">No chords yet - using style defaults</div>
+                    `;
+                }
+            } catch (e) {
+                rhythmInfoPanel.style.display = 'none';
+            }
+        }
+    };
+
+    // Update rhythm info when toggle changes
+    rhythmCheckbox.addEventListener('change', updateRhythmInfo);
+    // Initial update
+    setTimeout(updateRhythmInfo, 100);
+
+    controlsRow.appendChild(rhythmInfoPanel);
+
     // Show All Details button (compact, inline, aligned with selectors)
     const showAllBtn = document.createElement('button');
     showAllBtn.textContent = '🔬 Show All';
@@ -748,7 +854,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
 
         // Use setTimeout to allow UI to update before heavy computation
         setTimeout(() => {
-            // Generate sequences
+            // Generate sequences (pass contextMode for weight calculation)
             const sequences = generateChordSequences(
                 currentRoot,
                 currentChordType,
@@ -759,8 +865,10 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
                 mood,
                 tensionDirection,
                 lookbackDepth,
-                3, // Generate 3-chord sequences
-                10 // Return top 10
+                3,    // Generate 3-chord sequences
+                10,   // Return top 10
+                null, // sectionInfo
+                getContextAwareMode()  // contextMode for weight calculation
             );
 
             // Clear loading screen

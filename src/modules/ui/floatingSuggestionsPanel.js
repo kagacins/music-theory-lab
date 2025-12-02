@@ -2,10 +2,14 @@
  * Floating Suggestions Panel
  * Manages a floating panel for chord and melody suggestions that appears near the mouse cursor
  * Phase 5: Added 'generate' mode for section generation and style profile
+ *
+ * NOTE: Tab key now opens the Unified Recommendation Modal instead of this panel.
+ * This panel is kept for backward compatibility and may be removed in the future.
  */
 
 import { initSectionIntentUI, refreshUI as refreshSectionIntentUI } from './sectionIntentUI.js';
 import { initGenerateTabUI, refreshUI as refreshGenerateTabUI } from './generateTabUI.js';
+import { showUnifiedRecommendationModal, closeUnifiedRecommendationModal } from './recommendations/UnifiedRecommendationModal.js';
 
 let panel = null;
 let isVisible = false;
@@ -101,28 +105,46 @@ function setupDragging() {
  */
 function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
-        // Tab key - toggle chord suggestions
+        // Tab key - open unified recommendation modal (chord tab)
         if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
             // Only handle if not in an input/textarea
             if (!isInputElement(e.target)) {
                 e.preventDefault();
-                togglePanel('chords');
+                // Check if unified modal is already open
+                const existingModal = document.getElementById('unified-recommendation-modal');
+                if (existingModal) {
+                    closeUnifiedRecommendationModal();
+                } else {
+                    showUnifiedRecommendationModal({ initialTab: 'chord' });
+                }
             }
         }
-        // Shift+Tab - toggle melody suggestions
+        // Shift+Tab - open unified recommendation modal (melody tab)
         else if (e.key === 'Tab' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
             // Only handle if not in an input/textarea
             if (!isInputElement(e.target)) {
                 e.preventDefault();
-                togglePanel('melody');
+                // Check if unified modal is already open
+                const existingModal = document.getElementById('unified-recommendation-modal');
+                if (existingModal) {
+                    closeUnifiedRecommendationModal();
+                } else {
+                    showUnifiedRecommendationModal({ initialTab: 'melody' });
+                }
             }
         }
-        // Ctrl+Tab - toggle generate panel (Phase 5)
+        // Ctrl+Tab - open unified recommendation modal (section tab)
         else if (e.key === 'Tab' && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
             // Only handle if not in an input/textarea
             if (!isInputElement(e.target)) {
                 e.preventDefault();
-                togglePanel('generate');
+                // Check if unified modal is already open
+                const existingModal = document.getElementById('unified-recommendation-modal');
+                if (existingModal) {
+                    closeUnifiedRecommendationModal();
+                } else {
+                    showUnifiedRecommendationModal({ initialTab: 'section' });
+                }
             }
         }
         // Escape - hide panel

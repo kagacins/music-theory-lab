@@ -2026,10 +2026,11 @@ window.showAutoHarmonize = function() {
                         ...progressionData[chord.measureIndex],
                         root: chord.root,
                         type: chord.type,
+                        inversion: chord.inversion || 0,
                         // CRITICAL: Clear notes so they are regenerated for the new chord
                         // properly in syncWithProgressionData. Otherwise old notes persist
                         // causing bass generation to use the wrong pitches.
-                        notes: [], 
+                        notes: [],
                         omittedNotes: [],
                         lhOmittedNotes: [],
                     };
@@ -2072,25 +2073,35 @@ window.showAutoHarmonize = function() {
             // Invalidate caches to ensure fresh data on next access
             invalidateProgressionDataCache();
 
-            // Update chord card display to show new chords
-            if (typeof renderProgressionDisplay === 'function') {
-                renderProgressionDisplay();
-            }
-
             // Force immediate render with a small delay to ensure state is fully updated
-            // Use the SAME approach as chord card changes:
-            // 1. syncProgressionToMelodyComposer() - syncs trainerState to compositionState
-            // 2. refreshNotationFromProgression() - renders from compositionState
+            // NOTE: We already synced the progression data directly via compositionState.syncWithProgressionData()
+            // so we skip syncProgressionToMelodyComposer() which would re-read from getProgressionData()
+            // and potentially overwrite our changes with stale cached data.
             setTimeout(() => {
-                // CRITICAL: Sync progression to compositionState first (same as chord card changes)
-                if (window.syncProgressionToMelodyComposer) {
-                    window.syncProgressionToMelodyComposer();
+                console.log('[AutoHarmonize] Starting post-apply refresh...');
+
+                // Invalidate cache AGAIN right before rendering to ensure absolutely fresh data
+                // This guards against any race conditions or intermediate cache rebuilds
+                invalidateProgressionDataCache();
+                console.log('[AutoHarmonize] Cache invalidated');
+
+                // Verify compositionState has the updated chords
+                const cs = window.getCompositionState ? window.getCompositionState() : null;
+                if (cs) {
+                    const chordInfo = [];
+                    for (let i = 0; i < cs.getMeasureCount(); i++) {
+                        const m = cs.getMeasure(i);
+                        chordInfo.push(`[${i}] ${m?.chord?.root || '?'}${m?.chord?.type || ''}`);
+                    }
+                    console.log('[AutoHarmonize] CompositionState chords:', chordInfo.join(', '));
                 }
 
-                // Then refresh notation from the synced state
+                // Refresh notation from the already-synced compositionState
                 if (window.refreshNotationFromProgression) {
+                    console.log('[AutoHarmonize] Calling refreshNotationFromProgression');
                     window.refreshNotationFromProgression();
                 } else {
+                    console.log('[AutoHarmonize] refreshNotationFromProgression not available, using fallback');
                     // Fallback to direct render if refreshNotationFromProgression not available
                     if (window.getNotationComposer) {
                         const notationComposer = window.getNotationComposer();
@@ -2099,7 +2110,27 @@ window.showAutoHarmonize = function() {
                         }
                     }
                 }
-            }, 50);
+
+                // Update chord card display AFTER render to ensure fresh data is used
+                // Update BOTH containers (main progression tab and melody tab)
+                console.log('[AutoHarmonize] About to render chord cards');
+                if (typeof renderProgressionDisplay === 'function') {
+                    // Log what getTrainerState returns before rendering
+                    const trainerState = window.getTrainerState ? window.getTrainerState() : null;
+                    if (trainerState) {
+                        const pdInfo = trainerState.progressionData.map((c, i) => `[${i}] ${c?.root || '?'}${c?.type || ''}`);
+                        console.log('[AutoHarmonize] TrainerState progressionData:', pdInfo.join(', '));
+                    }
+
+                    console.log('[AutoHarmonize] Rendering progression-visualization');
+                    renderProgressionDisplay('progression-visualization', true);
+                    console.log('[AutoHarmonize] Rendering melody-progression-visualization');
+                    renderProgressionDisplay('melody-progression-visualization', false);
+                    console.log('[AutoHarmonize] Chord card rendering complete');
+                } else {
+                    console.error('[AutoHarmonize] renderProgressionDisplay is not a function!');
+                }
+            }, 100);
 
             // Make sure we stay on the Melody Composer tab
             if (window.switchTab) {

@@ -537,8 +537,12 @@ function updateGenerateButtons() {
     buttonsInitialized = true;
 }
 
+// Store generated options for selection
+let generatedOptions = [];
+let selectedOptionIndex = 0;
+
 /**
- * Handle section generation
+ * Handle section generation - generates 5 options
  */
 function handleGenerateSection(sectionType) {
     // Store current section type for regeneration when options change
@@ -557,71 +561,113 @@ function handleGenerateSection(sectionType) {
         previewContainer.innerHTML = `
             <div class="preview-loading">
                 <div class="loading-spinner"></div>
-                <span>Generating ${capitalize(sectionType)}...</span>
+                <span>Generating 5 ${capitalize(sectionType)} options...</span>
             </div>
         `;
     }
 
-    // Generate the section
-    const result = recommendationService?.generateSection({
+    // Generate 5 different options using the new method that ensures variety
+    generatedOptions = [];
+    selectedOptionIndex = 0;
+
+    // Use the new generateMultipleSections method for truly distinct options
+    const results = recommendationService?.generateMultipleSections({
         sectionType,
         length,
         style,
-        mood: 'bright'
+        count: 5
     });
 
-    if (!result || !result.progression) {
+    if (results && results.length > 0) {
+        generatedOptions = results;
+    }
+
+    if (generatedOptions.length === 0) {
         previewContainer.innerHTML = `
             <div class="preview-error">
-                <span>Could not generate section. Try again.</span>
+                <span>Could not generate sections. Try again.</span>
             </div>
         `;
         return;
     }
 
-    // Show preview
-    const key = getCurrentKey() || 'C';
-    const progressionStr = result.progression.map(c => `${c.root}${c.type === 'Minor' ? 'm' : ''}`).join(' → ');
+    // Render the options list
+    renderGeneratedOptions(sectionType, previewContainer);
+}
 
-    // Show context info if available
-    const contextHtml = result.contextInfo ? `
+/**
+ * Render the list of generated options
+ */
+function renderGeneratedOptions(sectionType, container) {
+    const key = getCurrentKey() || 'C';
+    const styleSelect = document.getElementById('gen-style-select');
+    const lengthSelect = document.getElementById('gen-length-select');
+    const style = styleSelect?.value || 'pop';
+    const length = lengthSelect?.value || '4';
+
+    const optionsHtml = generatedOptions.map((option, index) => {
+        const progressionStr = option.progression.map(c => `${c.root}${c.type === 'Minor' ? 'm' : ''}`).join(' → ');
+        const isSelected = index === selectedOptionIndex;
+
+        return `
+            <div class="generated-option ${isSelected ? 'selected' : ''}" data-option-index="${index}">
+                <div class="option-header">
+                    <span class="option-number">#${index + 1}</span>
+                    <span class="option-mood">${option.moodLabel || 'Option'}</span>
+                    ${isSelected ? '<span class="selected-badge">✓ Selected</span>' : ''}
+                </div>
+                <div class="option-progression">${progressionStr}</div>
+                <div class="option-reasoning">${option.reasoning || ''}</div>
+            </div>
+        `;
+    }).join('');
+
+    // Context info from the first option (they all share context)
+    const contextHtml = generatedOptions[0]?.contextInfo ? `
         <div class="preview-context">
             <span class="context-icon">🎯</span>
-            <span class="context-text">${result.contextInfo}</span>
+            <span class="context-text">${generatedOptions[0].contextInfo}</span>
         </div>
     ` : '';
 
-    previewContainer.innerHTML = `
+    container.innerHTML = `
         <div class="preview-content">
             <div class="preview-header">
-                <span class="preview-title">${capitalize(sectionType)} Preview</span>
-                <span class="preview-key">Key: ${key}</span>
+                <span class="preview-title">${capitalize(sectionType)} Options</span>
+                <span class="preview-key">Key: ${key} • ${capitalize(style)} • ${length} chords</span>
             </div>
             ${contextHtml}
-            <div class="preview-progression">
-                <span class="progression-label">Progression:</span>
-                <span class="progression-chords">${progressionStr}</span>
+            <div class="options-instruction">
+                <span>Click an option to select it, then apply to your composition:</span>
             </div>
-            <div class="preview-reasoning">
-                ${result.reasoning || ''}
+            <div class="generated-options-list">
+                ${optionsHtml}
             </div>
             <div class="preview-actions">
                 <button id="apply-generated-section" class="apply-btn">
-                    Apply to Composition
+                    Apply Selected (#${selectedOptionIndex + 1})
                 </button>
                 <button id="regenerate-section" class="regenerate-btn">
-                    Regenerate
+                    Regenerate All
                 </button>
             </div>
         </div>
     `;
 
-    // Store result for apply action
-    previewContainer.dataset.generatedResult = JSON.stringify(result);
+    // Add click handlers for option selection
+    container.querySelectorAll('.generated-option').forEach(optionEl => {
+        optionEl.addEventListener('click', () => {
+            const index = parseInt(optionEl.dataset.optionIndex, 10);
+            selectedOptionIndex = index;
+            renderGeneratedOptions(sectionType, container);
+        });
+    });
 
-    // Add handlers
+    // Add handlers for buttons
     document.getElementById('apply-generated-section')?.addEventListener('click', () => {
-        applyGeneratedSection(result);
+        if (generatedOptions[selectedOptionIndex]) {
+            applyGeneratedSection(generatedOptions[selectedOptionIndex]);
+        }
     });
     document.getElementById('regenerate-section')?.addEventListener('click', () => {
         handleGenerateSection(sectionType);

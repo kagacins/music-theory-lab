@@ -357,8 +357,9 @@ export function getAdaptiveWeights(context, style = 'balanced', options = {}) {
         customOverrides = null
     } = options || {};
 
-    // Start with base weights
-    let weights = { ...BASE_WEIGHTS };
+    // Start with custom overrides if provided (user's saved slider weights), otherwise use base weights
+    // This ensures user's preferences are respected as the starting point
+    let weights = customOverrides ? { ...BASE_WEIGHTS, ...customOverrides } : { ...BASE_WEIGHTS };
 
     // Safety check: if context is null/undefined, return normalized base weights
     if (!context) {
@@ -405,14 +406,8 @@ export function getAdaptiveWeights(context, style = 'balanced', options = {}) {
         }
     }
 
-    // 5. Apply custom overrides if provided
-    if (customOverrides) {
-        for (const key in customOverrides) {
-            if (weights[key] !== undefined) {
-                weights[key] = customOverrides[key];
-            }
-        }
-    }
+    // Note: customOverrides are now applied at the START as the base weights
+    // This respects user's slider preferences while still allowing adaptive adjustments
 
     // Normalize to sum to 1.0
     return normalizeWeights(weights);

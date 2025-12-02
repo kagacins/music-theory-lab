@@ -29,9 +29,8 @@ export { GhostNoteRenderer } from './GhostNoteRenderer.js';
 export { KeyboardHandler } from './KeyboardHandler.js';
 
 // UI Components
-export { FloatingPalette } from './components/FloatingPalette.js';
-export { MelodyPalette } from './components/MelodyPalette.js';
-export { ChordPalette } from './components/ChordPalette.js';
+// Note: FloatingPalette, MelodyPalette, and ChordPalette have been removed.
+// Palette UI is now provided by UnifiedRecommendationModal.
 
 // Suggestion Engines
 export { MelodySuggestionEngine, MELODY_STYLE_PRESETS, MELODY_CONTOUR_PRESETS } from './engines/MelodySuggestionEngine.js';

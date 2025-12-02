@@ -46,6 +46,17 @@ import {
     CHORD_TENSION_SCORES
 } from '../analysis/TensionArcPlanner.js';
 
+// Rhythmic Context Analysis (Duration Awareness)
+import {
+    analyzeRhythmicContext,
+    quickDurationSuggestion,
+    getDurationForSectionPosition,
+    STYLE_HARMONIC_RHYTHM,
+    SECTION_DURATION_MODIFIERS,
+    HARMONIC_RHYTHM_TRENDS,
+    DEFAULT_DURATION
+} from './rhythmicContextAnalyzer.js';
+
 // Harmonic function definitions
 const HARMONIC_FUNCTIONS = {
     TONIC: 'tonic',           // I, iii, vi
@@ -404,7 +415,11 @@ function scoreModalInterchange(chordRoot, chordType, key, style, mood, context =
  * @param {Object} tensionArcInfo - Tension arc info (Phase 3)
  * @param {boolean} tensionArcInfo.enabled - Whether to use tension arc scoring
  * @param {number} tensionArcInfo.weight - Weight for tension arc scoring (0-1, default 0.15)
- * @returns {Array<{root:string, type:string, inversion:number, score:number, reason:string, confidence:number}>}
+ * @param {Object} rhythmInfo - Rhythmic context info (Duration Awareness)
+ * @param {boolean} rhythmInfo.enabled - Whether to include duration suggestions
+ * @param {Object} rhythmInfo.compositionState - Full composition state for rhythm analysis
+ * @param {number} rhythmInfo.insertAfterIndex - Index after which to insert (for position context)
+ * @returns {Array<{root:string, type:string, inversion:number, score:number, reason:string, confidence:number, suggestedDuration:number, durationReason:string, durationConfidence:number}>}
  */
 export function generateComprehensiveRecommendations(
     currentRoot,
@@ -421,7 +436,8 @@ export function generateComprehensiveRecommendations(
     customWeights = null,
     useEnhancedScoring = true,  // Phase 1 enhanced scoring (voice leading, harmonic relationships)
     sectionInfo = null,         // Phase 2 section context
-    tensionArcInfo = null       // Phase 3 tension arc scoring
+    tensionArcInfo = null,      // Phase 3 tension arc scoring
+    rhythmInfo = null           // Rhythmic context for duration suggestions
 ) {
     const recommendations = [];
 
@@ -546,6 +562,28 @@ export function generateComprehensiveRecommendations(
             tensionArcWeight = tensionArcInfo.weight || 0.15;
         } catch (e) {
             tensionArcPlanner = null;
+        }
+    }
+
+    // Rhythmic Context Analysis: Calculate duration suggestions
+    let rhythmicAnalysis = null;
+    if (rhythmInfo && rhythmInfo.enabled) {
+        try {
+            rhythmicAnalysis = analyzeRhythmicContext(
+                rhythmInfo.compositionState || { storedProgressionData: progressionData },
+                {
+                    style: style,
+                    currentChordIndex: sectionInfo?.currentChordIndex ?? (progressionData.length - 1),
+                    insertAfterIndex: rhythmInfo.insertAfterIndex ?? sectionInfo?.insertAfterIndex,
+                    sectionContext: sectionContext ? {
+                        type: sectionContext.sectionType,
+                        startIndex: sectionContext.sectionStart,
+                        endIndex: sectionContext.sectionEnd
+                    } : null
+                }
+            );
+        } catch (e) {
+            rhythmicAnalysis = null;
         }
     }
 
@@ -705,18 +743,31 @@ export function generateComprehensiveRecommendations(
                     }
                 }
 
-                // Get weights - use adaptive weights if enhanced scoring, otherwise standard
+                // Get weights - use saved weights as base, then apply adaptive adjustments if enhanced scoring
+                //
+                // IMPORTANT: This weight calculation approach should be mirrored in melody generation:
+                // 1. Always retrieve user's saved slider weights via getSavedWeights() or getSavedMelodyWeights()
+                // 2. Pass saved weights as customOverrides to getAdaptiveWeights() (or melody equivalent)
+                // 3. getAdaptiveWeights() uses saved weights as the STARTING POINT, then applies
+                //    style modifiers, position profiles, pattern adjustments, and tension adjustments
+                // 4. This ensures user slider preferences are respected while still benefiting from
+                //    context-aware adaptive adjustments
+                //
                 let weights;
+                // Always start with saved weights (user's slider preferences)
+                const savedWeights = customWeights || getSavedWeights(contextMode);
+
                 if (useEnhancedScoring && context) {
+                    // Apply adaptive adjustments on top of saved weights
                     weights = getAdaptiveWeights(context, style, {
                         usePositionProfile: true,
                         useStyleModifiers: true,
                         usePatternAdjustments: true,
                         useTensionAdjustments: true,
-                        customOverrides: customWeights
+                        customOverrides: savedWeights  // Use saved weights as the base
                     });
                 } else {
-                    weights = customWeights || getSavedWeights(contextMode);
+                    weights = savedWeights;
                 }
 
                 // Calculate total score (weighted combination using custom weights)
@@ -796,6 +847,16 @@ export function generateComprehensiveRecommendations(
                     sectionReasons  // Phase 2: Section-aware reasons
                 );
 
+                // Calculate chord-specific duration adjustments
+                // Some chord types/functions may warrant different durations
+                let chordDurationAdjustment = null;
+                if (rhythmicAnalysis) {
+                    chordDurationAdjustment = calculateChordDurationAdjustment(
+                        nextRoot, nextType, nextFunction, nextDegree,
+                        tensionDirection, rhythmicAnalysis, sectionContext
+                    );
+                }
+
                 recommendations.push({
                     root: nextRoot,
                     type: nextType,
@@ -821,7 +882,25 @@ export function generateComprehensiveRecommendations(
                     sectionReasons: sectionReasons,
                     // Phase 3 tension arc details
                     tensionArcScore: tensionArcScore,
-                    tensionArcDetails: tensionArcDetails
+                    tensionArcDetails: tensionArcDetails,
+                    // Rhythmic/Duration suggestions
+                    suggestedDuration: rhythmicAnalysis
+                        ? (chordDurationAdjustment?.duration ?? rhythmicAnalysis.suggestedDuration)
+                        : null,
+                    durationConfidence: rhythmicAnalysis
+                        ? (chordDurationAdjustment?.confidence ?? rhythmicAnalysis.durationConfidence)
+                        : null,
+                    durationReason: rhythmicAnalysis
+                        ? (chordDurationAdjustment?.reason ?? rhythmicAnalysis.reasoning[0]?.adjustment)
+                        : null,
+                    durationAlternatives: rhythmicAnalysis
+                        ? rhythmicAnalysis.alternativeDurations
+                        : null,
+                    rhythmicContext: rhythmicAnalysis ? {
+                        averageDuration: rhythmicAnalysis.averageDuration,
+                        harmonicRhythmTrend: rhythmicAnalysis.harmonicRhythmTrend,
+                        sectionPosition: rhythmicAnalysis.sectionPosition
+                    } : null
                 });
                 } catch (e) {
                     // Skip this chord if there's an error evaluating it
@@ -832,6 +911,28 @@ export function generateComprehensiveRecommendations(
 
     // Sort by total score (highest first)
     recommendations.sort((a, b) => b.score - a.score);
+
+    // Normalize scores to use a better 0-100 range for better differentiation
+    // This preserves relative ordering while spreading scores more evenly
+    if (recommendations.length > 1) {
+        const scores = recommendations.map(r => r.score);
+        const maxScore = Math.max(...scores);
+        const minScore = Math.min(...scores);
+        const range = maxScore - minScore;
+
+        if (range > 0) {
+            // Normalize to 15-100 range (keeping minimum at 15 so no chord appears completely "bad")
+            const normalizedMin = 15;
+            const normalizedRange = 100 - normalizedMin;
+
+            recommendations.forEach(rec => {
+                const normalizedScore = normalizedMin + ((rec.score - minScore) / range) * normalizedRange;
+                rec.originalScore = rec.score; // Keep original for debugging
+                rec.score = Math.round(normalizedScore);
+                rec.confidence = rec.score; // Update confidence to match
+            });
+        }
+    }
 
     // Return limited results (or all if limit is 0/null)
     if (limit && limit > 0) {
@@ -1366,3 +1467,153 @@ function generateTransitionAssessment(voiceLeading, harmony, secondaryDominant, 
 export function getChordTypeProfile(chordType) {
     return CHORD_TYPE_PROFILES[chordType] || null;
 }
+
+// ============================================================================
+// RHYTHMIC DURATION ADJUSTMENT FUNCTIONS
+// ============================================================================
+
+/**
+ * Calculate chord-specific duration adjustments based on harmonic function,
+ * chord type, and musical context.
+ *
+ * @param {string} chordRoot - Root note of the chord
+ * @param {string} chordType - Chord type (Major, Minor, etc.)
+ * @param {string} harmonicFunction - Harmonic function (tonic, dominant, subdominant)
+ * @param {number|null} scaleDegree - Scale degree (1-7) or null
+ * @param {string} tensionDirection - Tension direction (resolve, maintain, build)
+ * @param {Object} rhythmicAnalysis - Result from analyzeRhythmicContext
+ * @param {Object} sectionContext - Current section context
+ * @returns {Object|null} Adjusted duration suggestion or null for default
+ */
+function calculateChordDurationAdjustment(
+    chordRoot,
+    chordType,
+    harmonicFunction,
+    scaleDegree,
+    tensionDirection,
+    rhythmicAnalysis,
+    sectionContext
+) {
+    if (!rhythmicAnalysis) return null;
+
+    const baseDuration = rhythmicAnalysis.suggestedDuration;
+    const baseConfidence = rhythmicAnalysis.durationConfidence;
+    let adjustedDuration = baseDuration;
+    let adjustedConfidence = baseConfidence;
+    let reason = null;
+
+    // 1. Cadential chord adjustments
+    // V chord (dominant) often has specific rhythmic treatment
+    if (scaleDegree === 5 && harmonicFunction === HARMONIC_FUNCTIONS.DOMINANT) {
+        if (tensionDirection === 'resolve') {
+            // Pre-resolution dominant - typically shorter to create forward motion
+            adjustedDuration = Math.max(1, baseDuration * 0.75);
+            adjustedDuration = roundToMusicalDuration(adjustedDuration);
+            reason = 'Dominant chord before resolution - shorter for momentum';
+            adjustedConfidence = Math.min(90, baseConfidence + 10);
+        } else if (tensionDirection === 'build') {
+            // Building tension - hold the dominant longer
+            adjustedDuration = Math.min(8, baseDuration * 1.25);
+            adjustedDuration = roundToMusicalDuration(adjustedDuration);
+            reason = 'Building tension on dominant - extended duration';
+            adjustedConfidence = Math.min(85, baseConfidence + 5);
+        }
+    }
+
+    // 2. Tonic resolution adjustments
+    // I chord (tonic) at resolution points often gets longer duration
+    if (scaleDegree === 1 && harmonicFunction === HARMONIC_FUNCTIONS.TONIC) {
+        if (tensionDirection === 'resolve') {
+            // Resolution to tonic - give it weight
+            adjustedDuration = Math.min(8, baseDuration * 1.25);
+            adjustedDuration = roundToMusicalDuration(adjustedDuration);
+            reason = 'Resolution to tonic - satisfying arrival';
+            adjustedConfidence = Math.min(88, baseConfidence + 8);
+        }
+
+        // Final chord of section - even longer
+        if (sectionContext && rhythmicAnalysis.sectionPosition === 'final') {
+            adjustedDuration = Math.min(8, baseDuration * 1.5);
+            adjustedDuration = roundToMusicalDuration(adjustedDuration);
+            reason = 'Final tonic chord - section conclusion';
+            adjustedConfidence = Math.min(92, baseConfidence + 12);
+        }
+    }
+
+    // 3. Pre-cadential chord adjustments (IV, ii)
+    if (scaleDegree === 4 || scaleDegree === 2) {
+        if (rhythmicAnalysis.sectionPosition === 'approaching_cadence') {
+            // Subdominant approaching cadence - slight acceleration
+            adjustedDuration = Math.max(1, baseDuration * 0.85);
+            adjustedDuration = roundToMusicalDuration(adjustedDuration);
+            reason = 'Pre-cadential motion - building forward momentum';
+            adjustedConfidence = Math.min(80, baseConfidence + 5);
+        }
+    }
+
+    // 4. Chord type-specific adjustments
+    // Tension chords (diminished, augmented) often work better shorter
+    if (chordType === 'Diminished' || chordType === 'Diminished 7th' || chordType === 'Augmented') {
+        adjustedDuration = Math.max(1, Math.min(adjustedDuration, 2));
+        reason = reason || 'Tension chord - shorter duration maintains intensity';
+        adjustedConfidence = Math.min(85, adjustedConfidence);
+    }
+
+    // Suspended chords often lead to resolution - can be shorter
+    if (chordType === 'Sus4' || chordType === 'Sus2') {
+        adjustedDuration = Math.max(1, adjustedDuration * 0.85);
+        adjustedDuration = roundToMusicalDuration(adjustedDuration);
+        reason = reason || 'Suspended chord - anticipating resolution';
+    }
+
+    // 5. Jazz chord extensions often benefit from slightly longer durations
+    // to let the color notes ring
+    if (chordType.includes('9th') || chordType.includes('11th') || chordType.includes('13th')) {
+        if (adjustedDuration < 2) {
+            adjustedDuration = 2;
+            reason = reason || 'Extended chord - allowing colors to register';
+            adjustedConfidence = Math.min(80, adjustedConfidence);
+        }
+    }
+
+    // 6. Section position overrides
+    if (rhythmicAnalysis.sectionPosition === 'opening' && !reason) {
+        // Opening chords establish the feel - use base duration
+        return null; // Use default suggestion
+    }
+
+    // If no specific adjustment was made, return null to use default
+    if (adjustedDuration === baseDuration && !reason) {
+        return null;
+    }
+
+    return {
+        duration: adjustedDuration,
+        confidence: adjustedConfidence,
+        reason: reason,
+        baseWas: baseDuration,
+        adjustmentType: adjustedDuration < baseDuration ? 'shortened' : 'lengthened'
+    };
+}
+
+/**
+ * Round duration to nearest musical value
+ * @param {number} duration - Duration in beats
+ * @returns {number} Rounded duration
+ */
+function roundToMusicalDuration(duration) {
+    const musicalValues = [0.5, 1, 1.5, 2, 3, 4, 6, 8];
+    return musicalValues.reduce((prev, curr) =>
+        Math.abs(curr - duration) < Math.abs(prev - duration) ? curr : prev
+    );
+}
+
+/**
+ * Export rhythm-related utilities for external use
+ */
+export {
+    analyzeRhythmicContext,
+    quickDurationSuggestion,
+    STYLE_HARMONIC_RHYTHM,
+    HARMONIC_RHYTHM_TRENDS
+};

@@ -12,6 +12,47 @@ import { getCurrentKey } from '../state/trainerState.js';
 import { getStyleLabel, getMoodLabel } from '../features/unifiedChordSuggestions.js';
 
 /**
+ * Score descriptions - explains what each score measures
+ */
+const SCORE_DESCRIPTIONS = {
+    functionScore: {
+        label: 'Harmonic Function',
+        description: 'How well this chord fits its role in the key (tonic, subdominant, dominant). Higher scores indicate stronger harmonic relationships and smoother progressions.',
+        icon: '🎼'
+    },
+    voiceLeadingScore: {
+        label: 'Voice Leading',
+        description: 'How smoothly the notes move from the previous chord. Minimal movement between chord tones creates more pleasing transitions.',
+        icon: '🔗'
+    },
+    styleFit: {
+        label: 'Style Fit',
+        description: 'How well this chord matches your selected musical style (Pop, Jazz, Classical, etc.). Each style has characteristic chord preferences.',
+        icon: '🎨'
+    },
+    moodFit: {
+        label: 'Mood Fit',
+        description: 'How well this chord supports your desired emotional atmosphere (bright, dark, tense, calm). Chord qualities evoke different feelings.',
+        icon: '💫'
+    },
+    contextScore: {
+        label: 'Context',
+        description: 'How appropriate this chord is given your current progression and position in the song structure. Considers what came before.',
+        icon: '📍'
+    },
+    modalInterchangeScore: {
+        label: 'Modal Interchange',
+        description: 'Bonus points for borrowed chords from parallel modes. These add color and interest while maintaining harmonic sense.',
+        icon: '🌈'
+    },
+    totalScore: {
+        label: 'Total Score',
+        description: 'The overall recommendation strength, combining all factors with appropriate weights. Higher is better!',
+        icon: '⭐'
+    }
+};
+
+/**
  * Render a single chord recommendation item
  * @param {object} recommendation - Chord recommendation with score
  * @param {object} recommendation.chord - Chord data {root, type}
@@ -44,13 +85,23 @@ export function renderRecommendationItem(recommendation, index = -1) {
         ? `<span class="shortcut-badge">${index + 1}</span>`
         : '';
 
+    // Duration badge HTML (Phase 5) - compact format for sidebar
+    const durationBadge = recommendation.suggestedDuration
+        ? `<span class="sidebar-duration" title="${recommendation.durationReason || 'Suggested duration'}" style="font-size: 10px; color: #8b5cf6; background: #f5f3ff; padding: 1px 4px; border-radius: 2px; margin-left: 4px;">${recommendation.suggestedDuration}b</span>`
+        : '';
+
+    // Get quality labels based on scores
+    const vlQuality = getVoiceLeadingQuality(recommendation.voiceLeadingScore);
+    const scoreQuality = getScoreQuality(recommendation.totalScore);
+
     // Build HTML content - reorder so function (roman numeral) comes first, then inversion badge
     item.innerHTML = `
         ${shortcutBadge}
         <div class="chord-info">
             <span class="chord-symbol">${chordSymbol}</span>
-            ${recommendation.function ? `<span class="chord-function">${recommendation.function}</span>` : ''}
-            ${inversion > 0 ? `<span class="chord-inversion">${inversionText}</span>` : ''}
+            ${recommendation.function ? `<span class="chord-function" data-tooltip="Roman numeral analysis showing this chord's role in the key">${recommendation.function}</span>` : ''}
+            ${inversion > 0 ? `<span class="chord-inversion" data-tooltip="Chord inversion - ${inversionText} inversion places a different note in the bass">${inversionText}</span>` : ''}
+            ${durationBadge}
         </div>
         <div class="chord-score">
             <button class="chord-play-btn" data-chord-root="${recommendation.chord.root}"
@@ -61,9 +112,14 @@ export function renderRecommendationItem(recommendation, index = -1) {
                     <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"></path>
                 </svg>
             </button>
-            <div class="voice-leading-indicator vl-${vlClass}"
-                 title="Voice Leading: ${Math.round(recommendation.voiceLeadingScore)}%"></div>
-            <span class="score-badge score-${scoreClass}">${Math.round(recommendation.totalScore)}%</span>
+            <div class="voice-leading-indicator vl-${vlClass} has-score-tooltip"
+                 data-score-type="voiceLeading"
+                 data-score-value="${Math.round(recommendation.voiceLeadingScore)}"
+                 data-score-quality="${vlQuality}"></div>
+            <span class="score-badge score-${scoreClass} has-score-tooltip"
+                  data-score-type="total"
+                  data-score-value="${Math.round(recommendation.totalScore)}"
+                  data-score-quality="${scoreQuality}">${Math.round(recommendation.totalScore)}%</span>
         </div>
     `;
 
@@ -98,6 +154,32 @@ export function renderRecommendationItem(recommendation, index = -1) {
             clearTimeout(touchTimeout);
         }
     }, { passive: false });
+
+    // Add mini-tooltip handlers for score elements
+    const scoreElements = item.querySelectorAll('.has-score-tooltip');
+    scoreElements.forEach(el => {
+        el.addEventListener('mouseenter', (e) => {
+            e.stopPropagation();
+            showScoreMiniTooltip(e, el);
+        });
+        el.addEventListener('mouseleave', (e) => {
+            e.stopPropagation();
+            hideScoreMiniTooltip();
+        });
+    });
+
+    // Add mini-tooltip handlers for chord function and inversion badges
+    const badgeElements = item.querySelectorAll('[data-tooltip]');
+    badgeElements.forEach(el => {
+        el.addEventListener('mouseenter', (e) => {
+            e.stopPropagation();
+            showBadgeMiniTooltip(e, el);
+        });
+        el.addEventListener('mouseleave', (e) => {
+            e.stopPropagation();
+            hideBadgeMiniTooltip();
+        });
+    });
 
     return item;
 }
@@ -174,6 +256,29 @@ function getVoiceLeadingClass(score) {
     if (score >= 70) return 'good';
     if (score >= 50) return 'fair';
     return 'poor';
+}
+
+/**
+ * Get quality label for voice leading score
+ * @param {number} score - Voice leading score (0-100)
+ * @returns {string} Quality label
+ */
+function getVoiceLeadingQuality(score) {
+    if (score >= 85) return 'Excellent';
+    if (score >= 70) return 'Good';
+    if (score >= 50) return 'Fair';
+    return 'Needs Work';
+}
+
+/**
+ * Get quality label for total score
+ * @param {number} score - Total score (0-100)
+ * @returns {string} Quality label
+ */
+function getScoreQuality(score) {
+    if (score >= 85) return 'Highly Recommended';
+    if (score >= 70) return 'Good Choice';
+    return 'Consider Alternatives';
 }
 
 /**
@@ -682,25 +787,32 @@ function showRecommendationTooltip(event, recommendation, chordSymbol) {
             <div class="tooltip-section-title">Score Breakdown</div>
     `;
 
-    // Add score breakdown items with bars
+    // Add score breakdown items with bars and descriptions
     const scores = [
-        { label: 'Harmonic Function', value: breakdown.functionScore || 0 },
-        { label: 'Voice Leading', value: breakdown.voiceLeadingScore || 0 },
-        { label: 'Style Fit', value: breakdown.styleFit || 0 },
-        { label: 'Mood Fit', value: breakdown.moodFit || 0 },
-        { label: 'Context', value: breakdown.contextScore || 0 },
-        { label: 'Modal Interchange', value: breakdown.modalInterchangeScore || 0 }
+        { key: 'functionScore', value: breakdown.functionScore || 0 },
+        { key: 'voiceLeadingScore', value: breakdown.voiceLeadingScore || 0 },
+        { key: 'styleFit', value: breakdown.styleFit || 0 },
+        { key: 'moodFit', value: breakdown.moodFit || 0 },
+        { key: 'contextScore', value: breakdown.contextScore || 0 },
+        { key: 'modalInterchangeScore', value: breakdown.modalInterchangeScore || 0 }
     ];
 
     scores.forEach(score => {
         if (score.value > 0) {
+            const desc = SCORE_DESCRIPTIONS[score.key];
             content += `
-                <div class="score-breakdown-item">
-                    <span class="score-breakdown-label">${score.label}</span>
-                    <span class="score-breakdown-value">${Math.round(score.value)}%</span>
-                </div>
-                <div class="score-bar">
-                    <div class="score-bar-fill" style="width: ${score.value}%"></div>
+                <div class="score-breakdown-row">
+                    <div class="score-breakdown-item">
+                        <span class="score-breakdown-label">
+                            <span class="score-icon">${desc.icon}</span>
+                            ${desc.label}
+                        </span>
+                        <span class="score-breakdown-value">${Math.round(score.value)}%</span>
+                    </div>
+                    <div class="score-bar">
+                        <div class="score-bar-fill" style="width: ${score.value}%"></div>
+                    </div>
+                    <div class="score-description">${desc.description}</div>
                 </div>
             `;
         }
@@ -717,13 +829,21 @@ function showRecommendationTooltip(event, recommendation, chordSymbol) {
         `;
     }
 
-    // Add total score
+    // Add total score with description
+    const totalDesc = SCORE_DESCRIPTIONS.totalScore;
     content += `
-        <div class="tooltip-section">
-            <div class="score-breakdown-item" style="border-top: 1px solid #e9d5ff; padding-top: 8px; margin-top: 8px;">
-                <span class="score-breakdown-label" style="font-weight: 700;">Total Score</span>
-                <span class="score-breakdown-value" style="font-size: 13px;">${Math.round(recommendation.totalScore)}%</span>
+        <div class="tooltip-section total-score-section">
+            <div class="score-breakdown-item total-score-row">
+                <span class="score-breakdown-label">
+                    <span class="score-icon">${totalDesc.icon}</span>
+                    ${totalDesc.label}
+                </span>
+                <span class="score-breakdown-value total-score-value">${Math.round(recommendation.totalScore)}%</span>
             </div>
+            <div class="score-bar total-score-bar">
+                <div class="score-bar-fill" style="width: ${recommendation.totalScore}%"></div>
+            </div>
+            <div class="score-description total-description">${totalDesc.description}</div>
         </div>
     `;
 
@@ -764,6 +884,153 @@ function showRecommendationTooltip(event, recommendation, chordSymbol) {
  */
 function hideRecommendationTooltip() {
     const tooltip = document.getElementById('recommendation-tooltip');
+    if (tooltip) {
+        tooltip.classList.remove('show');
+    }
+}
+
+/**
+ * Show mini-tooltip for score elements (voice leading indicator, score badge)
+ * @param {MouseEvent} event - Mouse event
+ * @param {HTMLElement} element - The element being hovered
+ */
+function showScoreMiniTooltip(event, element) {
+    // Hide the main tooltip if showing
+    hideRecommendationTooltip();
+
+    // Get or create mini-tooltip element
+    let tooltip = document.getElementById('score-mini-tooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'score-mini-tooltip';
+        tooltip.className = 'score-mini-tooltip';
+        document.body.appendChild(tooltip);
+    }
+
+    const scoreType = element.dataset.scoreType;
+    const scoreValue = element.dataset.scoreValue;
+    const scoreQuality = element.dataset.scoreQuality;
+
+    let content = '';
+    if (scoreType === 'voiceLeading') {
+        const desc = SCORE_DESCRIPTIONS.voiceLeadingScore;
+        content = `
+            <div class="mini-tooltip-header">
+                <span class="mini-tooltip-icon">${desc.icon}</span>
+                <span class="mini-tooltip-title">${desc.label}</span>
+            </div>
+            <div class="mini-tooltip-score">
+                <span class="mini-tooltip-value">${scoreValue}%</span>
+                <span class="mini-tooltip-quality quality-${scoreQuality.toLowerCase().replace(/\s+/g, '-')}">${scoreQuality}</span>
+            </div>
+            <div class="mini-tooltip-bar">
+                <div class="mini-tooltip-bar-fill" style="width: ${scoreValue}%"></div>
+            </div>
+            <div class="mini-tooltip-description">${desc.description}</div>
+        `;
+    } else if (scoreType === 'total') {
+        const desc = SCORE_DESCRIPTIONS.totalScore;
+        content = `
+            <div class="mini-tooltip-header">
+                <span class="mini-tooltip-icon">${desc.icon}</span>
+                <span class="mini-tooltip-title">${desc.label}</span>
+            </div>
+            <div class="mini-tooltip-score">
+                <span class="mini-tooltip-value">${scoreValue}%</span>
+                <span class="mini-tooltip-quality quality-${scoreQuality.toLowerCase().replace(/\s+/g, '-')}">${scoreQuality}</span>
+            </div>
+            <div class="mini-tooltip-bar">
+                <div class="mini-tooltip-bar-fill" style="width: ${scoreValue}%"></div>
+            </div>
+            <div class="mini-tooltip-description">${desc.description}</div>
+            <div class="mini-tooltip-hint">Hover on card for full breakdown</div>
+        `;
+    }
+
+    tooltip.innerHTML = content;
+
+    // Position tooltip above the element
+    const rect = element.getBoundingClientRect();
+    const tooltipWidth = 260;
+
+    let left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+    let top = rect.top - 10;
+
+    // Keep on screen horizontally
+    if (left < 10) left = 10;
+    if (left + tooltipWidth > window.innerWidth - 10) {
+        left = window.innerWidth - tooltipWidth - 10;
+    }
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+    tooltip.style.transform = 'translateY(-100%)';
+
+    // Show tooltip
+    setTimeout(() => {
+        tooltip.classList.add('show');
+    }, 10);
+}
+
+/**
+ * Hide the score mini-tooltip
+ */
+function hideScoreMiniTooltip() {
+    const tooltip = document.getElementById('score-mini-tooltip');
+    if (tooltip) {
+        tooltip.classList.remove('show');
+    }
+}
+
+/**
+ * Show mini-tooltip for badge elements (chord function, inversion)
+ * @param {MouseEvent} event - Mouse event
+ * @param {HTMLElement} element - The element being hovered
+ */
+function showBadgeMiniTooltip(event, element) {
+    // Hide the main tooltip if showing
+    hideRecommendationTooltip();
+
+    // Get or create mini-tooltip element
+    let tooltip = document.getElementById('badge-mini-tooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'badge-mini-tooltip';
+        tooltip.className = 'badge-mini-tooltip';
+        document.body.appendChild(tooltip);
+    }
+
+    const tooltipText = element.dataset.tooltip;
+    tooltip.innerHTML = `<div class="badge-tooltip-text">${tooltipText}</div>`;
+
+    // Position tooltip above the element
+    const rect = element.getBoundingClientRect();
+    const tooltipWidth = 220;
+
+    let left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+    let top = rect.top - 10;
+
+    // Keep on screen horizontally
+    if (left < 10) left = 10;
+    if (left + tooltipWidth > window.innerWidth - 10) {
+        left = window.innerWidth - tooltipWidth - 10;
+    }
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+    tooltip.style.transform = 'translateY(-100%)';
+
+    // Show tooltip
+    setTimeout(() => {
+        tooltip.classList.add('show');
+    }, 10);
+}
+
+/**
+ * Hide the badge mini-tooltip
+ */
+function hideBadgeMiniTooltip() {
+    const tooltip = document.getElementById('badge-mini-tooltip');
     if (tooltip) {
         tooltip.classList.remove('show');
     }

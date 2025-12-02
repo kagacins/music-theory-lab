@@ -81,6 +81,15 @@ const VOICE_LEADING_SCORES = {
     largeLeap: -2        // Large leap (6th or more)
 };
 
+// Inversion scoring weights
+const INVERSION_WEIGHTS = {
+    bassMotion: 0.30,        // Prefer stepwise bass movement over large leaps
+    commonTones: 0.25,       // Reward inversions that maintain common tones
+    melodyAlignment: 0.20,   // Bonus if bass doesn't clash with melody
+    voiceCrossing: 0.15,     // Penalize if inversion causes voice crossing
+    cadentialPatterns: 0.10  // Recognize standard cadential bass patterns
+};
+
 // -----------------------------------------------------------------------------
 // Style-Aware Configuration (Phase 6)
 // -----------------------------------------------------------------------------
@@ -401,6 +410,175 @@ function calculateVoiceLeadingScore(chord1Notes, chord2Notes) {
     }
 
     return Math.max(0, Math.min(100, score));
+}
+
+// -----------------------------------------------------------------------------
+// Inversion Utility Functions
+// -----------------------------------------------------------------------------
+
+/**
+ * Get available inversions for a chord type
+ * @param {string} chordType - Chord type (e.g., 'Major', 'Dominant 7th')
+ * @returns {number[]} Array of available inversion numbers
+ */
+function getAvailableInversions(chordType) {
+    const is7thChord = chordType.includes('7') || chordType.includes('9') ||
+                       chordType.includes('11') || chordType.includes('13');
+    return is7thChord ? [0, 1, 2, 3] : [0, 1, 2];
+}
+
+/**
+ * Get bass note (chromatic index) for a chord in a specific inversion
+ * @param {string} root - Chord root note
+ * @param {string} type - Chord type
+ * @param {number} inversion - Inversion number (0 = root, 1 = 1st, etc.)
+ * @returns {number} Chromatic index of bass note (0-11)
+ */
+function getBassNoteForInversion(root, type, inversion) {
+    const chordNotes = getChordNotes(root, type);
+    if (chordNotes.length === 0) return noteToChromatic(root);
+    const safeInversion = Math.min(inversion, chordNotes.length - 1);
+    return chordNotes[safeInversion];
+}
+
+/**
+ * Calculate interval between two bass notes (in semitones, 0-11)
+ * @param {number} bass1 - First bass note chromatic index
+ * @param {number} bass2 - Second bass note chromatic index
+ * @returns {number} Interval in semitones (0-11)
+ */
+function getBassInterval(bass1, bass2) {
+    return Math.abs(bass2 - bass1) % 12;
+}
+
+/**
+ * Score voice leading quality for a specific inversion
+ * Evaluates how smooth the bass movement is from the previous chord
+ * @param {Object|null} prevChord - Previous chord {root, type, inversion}
+ * @param {string} currentRoot - Current chord root
+ * @param {string} currentType - Current chord type
+ * @param {number} inversion - Inversion to evaluate
+ * @param {Array} melodyNotes - Melody notes in current measure
+ * @returns {number} Voice leading score (0-100)
+ */
+function scoreInversionVoiceLeading(prevChord, currentRoot, currentType, inversion, melodyNotes) {
+    let score = 50; // Base score
+
+    // Get bass notes
+    const prevBass = prevChord
+        ? getBassNoteForInversion(prevChord.root, prevChord.type, prevChord.inversion || 0)
+        : null;
+    const currentBass = getBassNoteForInversion(currentRoot, currentType, inversion);
+
+    if (prevBass !== null) {
+        const interval = getBassInterval(prevBass, currentBass);
+
+        // Reward stepwise motion (1-2 semitones)
+        if (interval <= 2) {
+            score += 30;
+        }
+        // Small leaps okay (3-4 semitones - minor/major 3rd)
+        else if (interval <= 4) {
+            score += 20;
+        }
+        // Medium leaps (5-7 semitones - 4th/5th)
+        else if (interval <= 7) {
+            score += 10;
+        }
+        // Large leaps penalized
+        else {
+            score -= 10;
+        }
+
+        // Reward common tones between chords
+        const prevNotes = getChordNotes(prevChord.root, prevChord.type);
+        const currentNotes = getChordNotes(currentRoot, currentType);
+        const commonTones = prevNotes.filter(n => currentNotes.includes(n)).length;
+        score += commonTones * 8;
+    }
+
+    // Check melody alignment - penalize if bass = melody note (potential voice crossing)
+    if (melodyNotes && melodyNotes.length > 0) {
+        const melodyPitches = melodyNotes
+            .filter(n => n.pitch)
+            .map(n => noteToChromatic(n.pitch.replace(/\d+/, '')));
+        if (melodyPitches.includes(currentBass)) {
+            score -= 5; // Slight penalty for doubling melody in bass
+        }
+    }
+
+    // Bonus for root position on strong harmonic positions (stability)
+    if (inversion === 0) {
+        score += 5; // Slight preference for root position stability
+    }
+
+    // Bonus for first inversion (often smoother voice leading)
+    if (inversion === 1) {
+        score += 3; // Slight preference for first inversion flexibility
+    }
+
+    return Math.max(0, Math.min(100, score));
+}
+
+/**
+ * Calculate optimal inversion based on voice leading from previous chord
+ * @param {Object|null} prevChord - Previous chord {root, type, inversion}
+ * @param {Object} currentChord - Current chord {root, type}
+ * @param {Array} melodyNotes - Melody notes in current measure
+ * @returns {Object} Best inversion with score {inversion, voiceLeadingScore}
+ */
+function calculateOptimalInversion(prevChord, currentChord, melodyNotes) {
+    const inversions = getAvailableInversions(currentChord.type);
+    let bestInversion = 0;
+    let bestScore = 0;
+
+    for (const inv of inversions) {
+        const score = scoreInversionVoiceLeading(
+            prevChord,
+            currentChord.root,
+            currentChord.type,
+            inv,
+            melodyNotes
+        );
+        if (score > bestScore) {
+            bestScore = score;
+            bestInversion = inv;
+        }
+    }
+
+    return { inversion: bestInversion, voiceLeadingScore: bestScore };
+}
+
+/**
+ * Generate all inversion options for a chord with scores
+ * @param {Object} suggestion - Chord suggestion {root, type, score, reasons}
+ * @param {Object|null} prevChord - Previous chord {root, type, inversion}
+ * @param {Array} melodyNotes - Melody notes in current measure
+ * @returns {Array} Array of suggestions with different inversions, sorted by score
+ */
+function expandWithInversions(suggestion, prevChord, melodyNotes) {
+    const inversions = getAvailableInversions(suggestion.type);
+
+    return inversions.map(inv => {
+        const vlScore = scoreInversionVoiceLeading(
+            prevChord,
+            suggestion.root,
+            suggestion.type,
+            inv,
+            melodyNotes
+        );
+
+        // Blend original score with voice leading score
+        // 70% original chord quality, 30% voice leading for this inversion
+        const combinedScore = Math.round(suggestion.score * 0.7 + vlScore * 0.3);
+
+        return {
+            ...suggestion,
+            inversion: inv,
+            voiceLeadingScore: vlScore,
+            score: combinedScore
+        };
+    }).sort((a, b) => b.score - a.score);
 }
 
 /**
@@ -912,7 +1090,7 @@ function scoreChordForMelody(root, type, melodyPitches, prevChordNotes, key, wei
  * @param {string} key - Key signature
  * @param {number} numSuggestions - Number of suggestions to return
  * @param {Object} options - Phase 6 options (style, context)
- * @returns {Array} Array of chord suggestions with scores
+ * @returns {Array} Array of chord suggestions with scores and optimal inversions
  */
 function suggestChordsForMeasure(melodyNotes, prevChord, key, numSuggestions = 3, options = {}) {
     const analysis = analyzeMeasureMelody(melodyNotes);
@@ -925,6 +1103,8 @@ function suggestChordsForMeasure(melodyNotes, prevChord, key, numSuggestions = 3
         return [{
             root: keyRoot,
             type: isMinor ? 'Minor' : 'Major',
+            inversion: 0,
+            voiceLeadingScore: 50,
             score: 50,
             matchPercentage: 0,
             reasons: ['No melody - using tonic']
@@ -977,10 +1157,43 @@ function suggestChordsForMeasure(melodyNotes, prevChord, key, numSuggestions = 3
         }
     }
 
-    // Sort by score and return top suggestions
+    // Sort by score and get top candidates
     candidates.sort((a, b) => b.score - a.score);
+    const topCandidates = candidates.slice(0, numSuggestions);
 
-    return candidates.slice(0, numSuggestions);
+    // Calculate optimal inversion for each top candidate
+    const suggestionsWithInversions = topCandidates.map(suggestion => {
+        const { inversion, voiceLeadingScore } = calculateOptimalInversion(
+            prevChord,
+            { root: suggestion.root, type: suggestion.type },
+            melodyNotes
+        );
+
+        // Incorporate voice leading into overall score
+        // 70% original chord quality + 30% voice leading for inversion
+        const adjustedScore = Math.round(suggestion.score * 0.7 + voiceLeadingScore * 0.3);
+
+        // Add reason for inversion choice if not root position
+        const inversionReasons = [...suggestion.reasons];
+        if (inversion > 0) {
+            const inversionNames = ['Root', '1st', '2nd', '3rd'];
+            const bassNote = chromaticToNote(getBassNoteForInversion(suggestion.root, suggestion.type, inversion));
+            inversionReasons.push(`${inversionNames[inversion]} inversion (${bassNote} in bass)`);
+        }
+
+        return {
+            ...suggestion,
+            inversion,
+            voiceLeadingScore,
+            score: adjustedScore,
+            reasons: inversionReasons
+        };
+    });
+
+    // Re-sort by adjusted score after inversion calculation
+    suggestionsWithInversions.sort((a, b) => b.score - a.score);
+
+    return suggestionsWithInversions;
 }
 
 // -----------------------------------------------------------------------------
@@ -1063,7 +1276,12 @@ export function autoHarmonize(melodyNotes, key, options = {}) {
                     s => s.root === currentRoot && s.type === currentType
                 );
 
-                if (existingIndex > 0) {
+                if (existingIndex === 0) {
+                    // Already at first position - just add "Current chord" reason if not present
+                    if (!suggestions[0].reasons?.includes('Current chord')) {
+                        suggestions[0].reasons = ['Current chord', ...(suggestions[0].reasons || [])];
+                    }
+                } else if (existingIndex > 0) {
                     // Move current chord to first position
                     const [currentSuggestion] = suggestions.splice(existingIndex, 1);
                     currentSuggestion.reasons = ['Current chord', ...currentSuggestion.reasons];
@@ -1084,12 +1302,20 @@ export function autoHarmonize(melodyNotes, key, options = {}) {
                         key
                     );
 
+                    // Calculate optimal inversion for the current chord
+                    const { inversion, voiceLeadingScore } = calculateOptimalInversion(
+                        prevChord,
+                        { root: currentRoot, type: currentType },
+                        notes
+                    );
+
                     const currentSuggestion = {
                         root: currentRoot,
                         type: currentType,
+                        inversion,
                         score: Math.max(result.score, 40), // Minimum score of 40 for current chord
                         matchPercentage: result.matchPercentage,
-                        voiceLeadingScore: result.voiceLeadingScore,
+                        voiceLeadingScore: voiceLeadingScore,
                         reasons: ['Current chord', ...result.reasons]
                     };
 
@@ -1108,10 +1334,12 @@ export function autoHarmonize(melodyNotes, key, options = {}) {
         });
 
         // Use top suggestion as previous chord for next measure
+        // Include inversion for accurate voice leading calculation
         if (suggestions.length > 0) {
             prevChord = {
                 root: suggestions[0].root,
-                type: suggestions[0].type
+                type: suggestions[0].type,
+                inversion: suggestions[0].inversion || 0
             };
         }
     }
@@ -1123,7 +1351,7 @@ export function autoHarmonize(melodyNotes, key, options = {}) {
  * Apply auto-harmonize suggestions to create a chord progression
  * @param {Array} suggestions - Auto-harmonize results
  * @param {Array} selections - Array of selected indices (0, 1, or 2 for each measure)
- * @returns {Array} Chord progression array
+ * @returns {Array} Chord progression array with inversions
  */
 export function applyHarmonizeSuggestions(suggestions, selections) {
     return suggestions.map((measure, i) => {
@@ -1134,7 +1362,8 @@ export function applyHarmonizeSuggestions(suggestions, selections) {
             return {
                 measureIndex: measure.measureIndex,
                 root: 'C',
-                type: 'Major'
+                type: 'Major',
+                inversion: 0
             }; // Fallback
         }
 
@@ -1142,6 +1371,8 @@ export function applyHarmonizeSuggestions(suggestions, selections) {
             measureIndex: measure.measureIndex,
             root: chord.root,
             type: chord.type,
+            inversion: chord.inversion || 0,
+            voiceLeadingScore: chord.voiceLeadingScore,
             score: chord.score,
             matchPercentage: chord.matchPercentage
         };
@@ -1372,7 +1603,15 @@ export {
     suggestChordsForMeasure,
     getChordNotes,
     noteToChromatic,
+    chromaticToNote,
     calculateVoiceLeadingScore,
+    // Inversion exports
+    getAvailableInversions,
+    getBassNoteForInversion,
+    getBassInterval,
+    scoreInversionVoiceLeading,
+    calculateOptimalInversion,
+    expandWithInversions,
     // Phase 6 exports
     getStyleChordPreference,
     getStyleVoiceLeadingRules,

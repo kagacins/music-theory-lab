@@ -88,14 +88,44 @@ function generateBeamsWithTuplets(vexNotes, tupletGroups) {
     group.notes.forEach(n => tupletNoteSet.add(n));
   }
 
-  // Collect non-tuplet beamable notes
-  const nonTupletNotes = vexNotes.filter(n => !tupletNoteSet.has(n) && isBeamable(n));
+  // Group consecutive non-tuplet beamable notes, breaking at rests
+  // This ensures notes separated by rests are NOT beamed together
+  const beamGroups = [];
+  let currentGroup = [];
 
-  // Generate standard beams for non-tuplet notes
-  if (nonTupletNotes.length >= 2) {
+  for (const note of vexNotes) {
+    // Skip tuplet notes (already handled above)
+    if (tupletNoteSet.has(note)) {
+      // Tuplet note breaks the current beam group
+      if (currentGroup.length >= 2) {
+        beamGroups.push(currentGroup);
+      }
+      currentGroup = [];
+      continue;
+    }
+
+    // Check if this note is beamable
+    if (isBeamable(note)) {
+      currentGroup.push(note);
+    } else {
+      // Rest or non-beamable note breaks the current beam group
+      if (currentGroup.length >= 2) {
+        beamGroups.push(currentGroup);
+      }
+      currentGroup = [];
+    }
+  }
+
+  // Don't forget the last group
+  if (currentGroup.length >= 2) {
+    beamGroups.push(currentGroup);
+  }
+
+  // Generate beams for each group
+  for (const group of beamGroups) {
     try {
-      const standardBeams = generateBeams(nonTupletNotes);
-      beams.push(...standardBeams);
+      const groupBeams = generateBeams(group);
+      beams.push(...groupBeams);
     } catch (e) {
       console.warn('[generateBeamsWithTuplets] Error creating standard beams:', e);
     }
@@ -1170,16 +1200,23 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   const roundBeat = (beat) => Math.round((beat ?? 0) * 10000) / 10000;
 
   // Helper to convert beats to VexFlow duration string
+  // Handles both regular and dotted durations for proper tick alignment
   const beatsToDuration = (beats) => {
-    if (beats >= 4) return 'w';
-    if (beats >= 2) return 'h';
-    if (beats >= 1) return 'q';
-    if (beats >= 0.5) return '8';
-    if (beats >= 0.25) return '16';
-    if (beats >= 0.125) return '32';
-    // For tuplet subdivisions (e.g., 0.667, 0.333)
-    if (beats >= 0.6) return 'q';  // Approximate as quarter
-    if (beats >= 0.3) return '8';  // Approximate as eighth
+    // Handle dotted durations first (1.5x base duration)
+    if (beats >= 6) return 'wd';      // 6 beats = dotted whole
+    if (beats >= 4) return 'w';       // 4 beats = whole
+    if (beats >= 3) return 'hd';      // 3 beats = dotted half
+    if (beats >= 2) return 'h';       // 2 beats = half
+    if (beats >= 1.5) return 'qd';    // 1.5 beats = dotted quarter
+    if (beats >= 1) return 'q';       // 1 beat = quarter
+    if (beats >= 0.75) return '8d';   // 0.75 beats = dotted eighth
+    if (beats >= 0.5) return '8';     // 0.5 beats = eighth
+    if (beats >= 0.375) return '16d'; // 0.375 beats = dotted sixteenth
+    if (beats >= 0.25) return '16';   // 0.25 beats = sixteenth
+    if (beats >= 0.125) return '32';  // 0.125 beats = thirty-second
+    // For triplet subdivisions, approximate to nearest duration
+    if (beats >= 0.667) return 'q';   // Triplet quarter ≈ quarter
+    if (beats >= 0.333) return '8';   // Triplet eighth ≈ eighth
     return '16';
   };
 

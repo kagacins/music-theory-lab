@@ -949,6 +949,12 @@
     transform: translateY(0);
 }
 
+#floating-suggestions-panel .section-gen-btn.selected {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: rgba(16, 185, 129, 0.5);
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
 #floating-suggestions-panel .section-gen-btn .btn-icon {
     font-size: 20px;
 }
@@ -1156,6 +1162,113 @@
     padding: 16px;
     color: #ff6b6b;
     font-size: 13px;
+}
+
+/* Generated Options List (5 options) */
+#floating-suggestions-panel .options-instruction {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 11px;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+#floating-suggestions-panel .generated-options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 280px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+#floating-suggestions-panel .generated-option {
+    padding: 10px 12px;
+    background: rgba(100, 200, 255, 0.08);
+    border: 1px solid rgba(100, 200, 255, 0.2);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+#floating-suggestions-panel .generated-option:hover {
+    background: rgba(100, 200, 255, 0.15);
+    border-color: rgba(100, 200, 255, 0.4);
+}
+
+#floating-suggestions-panel .generated-option.selected {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.5);
+    box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.3);
+}
+
+#floating-suggestions-panel .generated-option .option-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+#floating-suggestions-panel .generated-option .option-number {
+    font-size: 12px;
+    font-weight: 700;
+    color: #64c8ff;
+    background: rgba(100, 200, 255, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+#floating-suggestions-panel .generated-option .option-mood {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: capitalize;
+}
+
+#floating-suggestions-panel .generated-option .selected-badge {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 600;
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.2);
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+#floating-suggestions-panel .generated-option .option-progression {
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+}
+
+#floating-suggestions-panel .generated-option .option-reasoning {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    line-height: 1.3;
+}
+
+#floating-suggestions-panel .generated-option.selected .option-number {
+    background: rgba(16, 185, 129, 0.3);
+    color: #10b981;
+}
+
+/* Scrollbar styling for options list */
+#floating-suggestions-panel .generated-options-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+#floating-suggestions-panel .generated-options-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+#floating-suggestions-panel .generated-options-list::-webkit-scrollbar-thumb {
+    background: rgba(100, 200, 255, 0.3);
+    border-radius: 3px;
+}
+
+#floating-suggestions-panel .generated-options-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 200, 255, 0.5);
 }
 
 /* Style Profile Container */

@@ -775,6 +775,22 @@ function rhythmValueToDuration(rhythmValue) {
 }
 
 /**
+ * Convert rhythm value to duration and dotted flag (for addNoteIntelligently)
+ * @param {number} rhythmValue - Relative rhythm value (1 = eighth, 2 = quarter, etc.)
+ * @returns {Object} { duration: string, dotted: boolean }
+ */
+function rhythmValueToDurationWithDotted(rhythmValue) {
+    if (rhythmValue <= 0.5) return { duration: '16n', dotted: false };  // sixteenth
+    if (rhythmValue <= 1) return { duration: '8n', dotted: false };     // eighth
+    if (rhythmValue <= 1.5) return { duration: '8n', dotted: true };    // dotted eighth
+    if (rhythmValue <= 2) return { duration: '4n', dotted: false };     // quarter
+    if (rhythmValue <= 3) return { duration: '4n', dotted: true };      // dotted quarter
+    if (rhythmValue <= 4) return { duration: '2n', dotted: false };     // half
+    if (rhythmValue <= 6) return { duration: '2n', dotted: true };      // dotted half
+    return { duration: '1n', dotted: false };                           // whole
+}
+
+/**
  * Convert rhythm value to display symbol
  * Uses simple visual representation that works across all browsers
  * @param {number} rhythmValue - Relative rhythm value
@@ -1008,16 +1024,18 @@ function appendPhraseAtEnd(phrase) {
     // Insert each note using the standard method
     phrase.notes.forEach((note, i) => {
         const rhythmValue = phrase.rhythm[i] || 1;
-        const duration = rhythmValue <= 0.5 ? '16n' :
-                        rhythmValue <= 1 ? '8n' :
-                        rhythmValue <= 2 ? '4n' : '2n';
+        // Use proper duration conversion that supports dotted notes
+        const { duration, dotted } = rhythmValueToDurationWithDotted(rhythmValue);
+
+        console.log(`[appendPhraseAtEnd] Note ${i}: ${note}, rhythmValue=${rhythmValue}, duration=${duration}, dotted=${dotted}`);
 
         if (window.addNoteIntelligently) {
-            window.addNoteIntelligently(note, duration, false, 'treble', false, null);
+            window.addNoteIntelligently(note, duration, dotted, 'treble', false, null);
         } else {
             compositionState.addNote(currentMeasureIndex, 'treble', 0, {
                 pitch: note,
                 duration: duration,
+                dotted: dotted,
                 velocity: 0.8
             });
         }
@@ -1062,11 +1080,12 @@ function insertPhraseWithShift(phrase, selectedInfo) {
 
     phrase.notes.forEach((note, i) => {
         const rhythmValue = phrase.rhythm[i] || 1;
-        const duration = rhythmValue <= 0.5 ? '16n' :
-                        rhythmValue <= 1 ? '8n' :
-                        rhythmValue <= 2 ? '4n' : '2n';
+        // Use proper duration conversion that supports dotted notes
+        const { duration, dotted } = rhythmValueToDurationWithDotted(rhythmValue);
 
-        const durationUnits = durationToUnitsLocal(duration);
+        const durationUnits = durationToUnitsLocal(duration, dotted);
+
+        console.log(`[insertPhraseWithShift] Note ${i}: ${note}, rhythmValue=${rhythmValue}, duration=${duration}, dotted=${dotted}, units=${durationUnits}`);
 
         // Use the composition state's shift method
         if (compositionState.insertTrebleNoteWithShift) {
@@ -1074,7 +1093,7 @@ function insertPhraseWithShift(phrase, selectedInfo) {
                 currentInsertUnit,
                 durationUnits,
                 [note],
-                { velocity: 0.8 }
+                { velocity: 0.8, dotted: dotted }
             );
             currentInsertUnit += durationUnits;
         }
@@ -1135,8 +1154,11 @@ function deleteNotesAfterPosition(measureIndex, noteIndex) {
 
 /**
  * Convert duration string to units (local helper)
+ * @param {string} duration - Duration string (e.g., '4n', '8n')
+ * @param {boolean} dotted - Whether the note is dotted
+ * @returns {number} Duration in units
  */
-function durationToUnitsLocal(duration) {
+function durationToUnitsLocal(duration, dotted = false) {
     const UNITS_PER_BEAT = 48;
     const durationMap = {
         '1n': 4 * UNITS_PER_BEAT,
@@ -1146,7 +1168,11 @@ function durationToUnitsLocal(duration) {
         '16n': 0.25 * UNITS_PER_BEAT,
         '32n': 0.125 * UNITS_PER_BEAT
     };
-    return durationMap[duration] || UNITS_PER_BEAT;
+    let units = durationMap[duration] || UNITS_PER_BEAT;
+    if (dotted) {
+        units *= 1.5; // Dotted notes are 1.5x duration
+    }
+    return units;
 }
 
 /**

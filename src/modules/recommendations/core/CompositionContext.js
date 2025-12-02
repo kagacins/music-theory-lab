@@ -24,6 +24,10 @@ import {
 } from '../../state/sectionIntentState.js';
 import { getHarmonyAnalyzer } from '../../analysis/harmonyAnalyzer.js';
 import { getTensionArcPlanner } from '../../analysis/TensionArcPlanner.js';
+import {
+    analyzeRhythmicContext,
+    HARMONIC_RHYTHM_TRENDS
+} from '../../features/rhythmicContextAnalyzer.js';
 
 /**
  * CompositionContext Class
@@ -58,6 +62,12 @@ class CompositionContext extends EventEmitter {
 
         // Track initialization
         this._isInitialized = false;
+
+        // Rhythmic analysis cache (Phase 4)
+        this._rhythmicCache = null;
+        this._rhythmicCacheKey = null;
+        this._rhythmAwarenessEnabled = localStorage.getItem('chord-suggestion-rhythm-awareness') !== 'false';
+        this._currentStyle = localStorage.getItem('chord-suggestion-style') || 'pop';
     }
 
     /**
@@ -95,6 +105,21 @@ class CompositionContext extends EventEmitter {
             window.addEventListener(eventName, (e) => {
                 this._scheduleUpdate(eventName, e.detail);
             });
+        });
+
+        // Listen for rhythm awareness setting changes (Phase 4)
+        window.addEventListener('rhythmAwarenessChanged', (e) => {
+            this._rhythmAwarenessEnabled = e.detail.enabled;
+            this._invalidateRhythmicCache();
+            this.emit('rhythmSettingChanged', e.detail);
+        });
+
+        // Listen for style changes that affect rhythm analysis
+        window.addEventListener('chord-suggestion-preference-changed', (e) => {
+            if (e.detail.style && e.detail.style !== this._currentStyle) {
+                this._currentStyle = e.detail.style;
+                this._invalidateRhythmicCache();
+            }
         });
     }
 
@@ -140,6 +165,16 @@ class CompositionContext extends EventEmitter {
             patternAnalysis: null,
             fingerprint: null
         };
+        // Also invalidate rhythmic cache when progression changes
+        this._invalidateRhythmicCache();
+    }
+
+    /**
+     * Invalidate rhythmic analysis cache (Phase 4)
+     */
+    _invalidateRhythmicCache() {
+        this._rhythmicCache = null;
+        this._rhythmicCacheKey = null;
     }
 
     /**
@@ -244,13 +279,23 @@ class CompositionContext extends EventEmitter {
 
     /**
      * Get the current state snapshot
+     * @param {Object} options - Options for snapshot
+     * @param {boolean} [options.includeRhythmic=false] - Include rhythmic context data
      * @returns {Object} Current composition context snapshot
      */
-    getSnapshot() {
+    getSnapshot(options = { includeRhythmic: false }) {
         if (!this._snapshot) {
             this.refresh();
         }
-        return { ...this._snapshot };
+
+        const base = { ...this._snapshot };
+
+        // Include rhythmic context if requested and enabled
+        if (options.includeRhythmic && this._rhythmAwarenessEnabled) {
+            base.rhythmicContext = this.getRhythmicSnapshot();
+        }
+
+        return base;
     }
 
     // =========================================================================
@@ -408,6 +453,112 @@ class CompositionContext extends EventEmitter {
         return snapshot.insertAfterIndex !== null
             ? snapshot.insertAfterIndex + 1
             : snapshot.progression.length;
+    }
+
+    // =========================================================================
+    // RHYTHMIC ANALYSIS (Phase 4)
+    // =========================================================================
+
+    /**
+     * Get rhythmic context snapshot for current composition state
+     * @param {Object} options - Analysis options
+     * @param {string} [options.style] - Musical style override
+     * @returns {Object} Rhythmic analysis snapshot
+     */
+    getRhythmicSnapshot(options = {}) {
+        const cacheKey = this._buildRhythmicCacheKey(options);
+
+        // Return cached result if valid
+        if (this._rhythmicCache && this._rhythmicCacheKey === cacheKey) {
+            return this._rhythmicCache;
+        }
+
+        // Compute new analysis
+        const analysis = this._computeRhythmicSnapshot(options);
+        this._rhythmicCache = analysis;
+        this._rhythmicCacheKey = cacheKey;
+
+        return analysis;
+    }
+
+    /**
+     * Build cache key for rhythmic analysis
+     * @private
+     */
+    _buildRhythmicCacheKey(options) {
+        const snapshot = this.getSnapshot();
+        const lastChord = snapshot.progression[snapshot.progression.length - 1];
+        return JSON.stringify({
+            progressionLength: snapshot.progression.length,
+            lastChordBeats: lastChord?.beats,
+            insertAfterIndex: snapshot.insertAfterIndex,
+            style: options.style || this._currentStyle,
+            fingerprint: snapshot.fingerprint
+        });
+    }
+
+    /**
+     * Compute rhythmic snapshot (internal)
+     * @private
+     */
+    _computeRhythmicSnapshot(options = {}) {
+        const snapshot = this.getSnapshot();
+        const sectionContext = this._getCurrentSectionContext();
+
+        return analyzeRhythmicContext(
+            { storedProgressionData: snapshot.progression },
+            {
+                style: options.style || this._currentStyle || 'pop',
+                currentChordIndex: snapshot.insertAfterIndex ?? (snapshot.progression.length - 1),
+                insertAfterIndex: snapshot.insertAfterIndex,
+                sectionContext: sectionContext
+            }
+        );
+    }
+
+    /**
+     * Get current section context for rhythm analysis
+     * @private
+     */
+    _getCurrentSectionContext() {
+        const snapshot = this.getSnapshot();
+        if (!snapshot.sections || snapshot.sections.length === 0) return null;
+
+        // Find section containing current chord
+        const currentIndex = snapshot.insertAfterIndex ?? (snapshot.progression.length - 1);
+        const currentSection = snapshot.sections.find(s => {
+            if (s.chordIndices && s.chordIndices.includes(currentIndex)) return true;
+            // Also check startIndex/endIndex if available
+            if (s.startIndex !== undefined && s.endIndex !== undefined) {
+                return currentIndex >= s.startIndex && currentIndex <= s.endIndex;
+            }
+            return false;
+        });
+
+        if (!currentSection) return null;
+
+        return {
+            type: currentSection.type,
+            startIndex: currentSection.startIndex ?? currentSection.chordIndices?.[0],
+            endIndex: currentSection.endIndex ?? currentSection.chordIndices?.[currentSection.chordIndices.length - 1],
+            targetLength: currentSection.targetLength
+        };
+    }
+
+    /**
+     * Check if rhythm awareness is enabled
+     * @returns {boolean}
+     */
+    isRhythmAwarenessEnabled() {
+        return this._rhythmAwarenessEnabled;
+    }
+
+    /**
+     * Get the current style setting
+     * @returns {string}
+     */
+    getCurrentStyle() {
+        return this._currentStyle;
     }
 }
 

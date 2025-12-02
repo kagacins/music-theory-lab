@@ -21,6 +21,15 @@ import { getCompositionContext } from '../core/CompositionContext.js';
 import { getUserPreferenceLearner } from './UserPreferenceLearner.js';
 import { ALL_NOTES } from '../../../data/music-data.js';
 
+// Rhythmic Context Analysis (Duration Awareness)
+import {
+    analyzeRhythmicContext,
+    getDurationForSectionPosition,
+    STYLE_HARMONIC_RHYTHM,
+    SECTION_DURATION_MODIFIERS,
+    DEFAULT_DURATION
+} from '../../features/rhythmicContextAnalyzer.js';
+
 /**
  * Common chord transitions that sound good
  * Maps ending degree to preferred starting degrees for next section
@@ -237,6 +246,105 @@ const BASS_PATTERNS = {
 };
 
 /**
+ * Duration arc profiles by section type
+ * Defines how chord durations should flow through a section
+ * Values are multipliers applied to base duration
+ */
+const DURATION_ARC_PROFILES = {
+    intro: {
+        name: 'Establishing',
+        description: 'Steady durations to establish groove',
+        // Pattern: consistent with slight lengthening at end
+        getArc: (length) => Array(length).fill(1.0).map((v, i) =>
+            i === length - 1 ? 1.2 : 1.0
+        ),
+        defaultBeats: 4,
+        allowAcceleration: false
+    },
+    verse: {
+        name: 'Narrative',
+        description: 'Gradual acceleration toward chorus',
+        // Pattern: steady then accelerate
+        getArc: (length) => Array(length).fill(0).map((_, i) => {
+            const progress = i / length;
+            if (progress < 0.5) return 1.0;
+            if (progress < 0.75) return 0.9;
+            return 0.8;
+        }),
+        defaultBeats: 4,
+        allowAcceleration: true
+    },
+    prechorus: {
+        name: 'Building',
+        description: 'Accelerating harmonic rhythm for momentum',
+        // Pattern: progressive acceleration
+        getArc: (length) => Array(length).fill(0).map((_, i) => {
+            const progress = i / length;
+            return 1.0 - (progress * 0.3); // 1.0 → 0.7
+        }),
+        defaultBeats: 2,
+        allowAcceleration: true
+    },
+    chorus: {
+        name: 'Energetic',
+        description: 'Consistent, driving harmonic rhythm',
+        // Pattern: steady with emphasis on downbeats
+        getArc: (length) => Array(length).fill(0).map((_, i) =>
+            i % 2 === 0 ? 1.0 : 0.9
+        ),
+        defaultBeats: 2,
+        allowAcceleration: false
+    },
+    bridge: {
+        name: 'Contrast',
+        description: 'Varied durations for contrast',
+        // Pattern: longer at start, varied in middle, accelerate to end
+        getArc: (length) => Array(length).fill(0).map((_, i) => {
+            const progress = i / length;
+            if (progress < 0.25) return 1.2;
+            if (progress < 0.75) return 1.0;
+            return 0.85;
+        }),
+        defaultBeats: 4,
+        allowAcceleration: true
+    },
+    outro: {
+        name: 'Resolving',
+        description: 'Gradually lengthening durations (ritardando effect)',
+        // Pattern: progressive deceleration
+        getArc: (length) => Array(length).fill(0).map((_, i) => {
+            const progress = i / length;
+            return 1.0 + (progress * 0.5); // 1.0 → 1.5
+        }),
+        defaultBeats: 4,
+        allowAcceleration: false
+    },
+    instrumental: {
+        name: 'Showcase',
+        description: 'Flexible durations for musical expression',
+        // Pattern: varied with periodic accents
+        getArc: (length) => Array(length).fill(0).map((_, i) =>
+            i % 4 === 0 ? 1.1 : (i % 2 === 0 ? 1.0 : 0.9)
+        ),
+        defaultBeats: 2,
+        allowAcceleration: true
+    }
+};
+
+/**
+ * Style-specific duration base values (beats per chord)
+ */
+const STYLE_BASE_DURATIONS = {
+    pop: 4,      // Whole notes typical
+    rock: 4,     // Power chord sustain
+    jazz: 2,     // Faster harmonic rhythm
+    blues: 4,    // Shuffle feel
+    ballad: 8,   // Very slow
+    latin: 2,    // Active rhythm
+    indie: 4     // Varied
+};
+
+/**
  * SectionGenerator Class
  */
 class SectionGenerator extends EventEmitter {
@@ -318,17 +426,32 @@ class SectionGenerator extends EventEmitter {
             compositionAnalysis
         );
 
+        // Step 2.5: Plan duration arc for the section (rhythmic awareness)
+        const durationArc = this._planDurationArc(
+            sectionType,
+            length,
+            style,
+            compositionAnalysis,
+            tensionArc
+        );
+
+        // Apply durations to progression chords
+        const progressionWithDurations = this._applyDurationsToProgression(
+            progressionResult.primary,
+            durationArc
+        );
+
         // Step 3: Generate melody contours aligned with tension
         const melodyPlan = this._generateMelodyPlan(
             sectionType,
-            progressionResult.primary,
+            progressionWithDurations,
             tensionArc,
             style
         );
 
         // Step 4: Generate bass line
         const bassLine = this._generateBassLine(
-            progressionResult.primary,
+            progressionWithDurations,
             style,
             sectionType,
             context.key
@@ -338,16 +461,25 @@ class SectionGenerator extends EventEmitter {
         const result = this._applyPreferences({
             sectionType,
             profile,
-            progression: progressionResult.primary,
-            alternatives: progressionResult.alternatives,
+            progression: progressionWithDurations,
+            alternatives: progressionResult.alternatives.map(alt =>
+                this._applyDurationsToProgression(alt, durationArc)
+            ),
             reasoning: progressionResult.reasoning,
             tensionArc,
+            durationArc,  // Include duration arc in result
             melodyPlan,
             bassLine,
             style,
             mood,
             key: context.key,
-            contextInfo: compositionAnalysis.summary
+            contextInfo: compositionAnalysis.summary,
+            rhythmicInfo: {
+                totalBeats: durationArc.totalBeats,
+                averageDuration: durationArc.averageDuration,
+                durationProfile: durationArc.profileName,
+                reasoning: durationArc.reasoning
+            }
         });
 
         this.emit('sectionGenerated', result);
@@ -537,6 +669,201 @@ class SectionGenerator extends EventEmitter {
         }
 
         return variations;
+    }
+
+    /**
+     * Generate multiple distinct section options (for UI selection)
+     * Each option uses a different template to ensure variety
+     *
+     * @param {Object} options - Generation options
+     * @param {string} options.sectionType - Type of section
+     * @param {number} options.length - Number of chords
+     * @param {string} options.style - Musical style
+     * @param {number} options.count - Number of options to generate (default: 5)
+     * @returns {Array} Array of distinct section options
+     */
+    generateMultipleOptions(options = {}) {
+        const sectionType = options.sectionType || 'verse';
+        const length = options.length || 4;
+        const style = options.style || 'pop';
+        const count = options.count || 5;
+
+        // Get full composition context
+        const context = this._context?.getSnapshot() || { key: 'C', progression: [], sections: [] };
+        const profile = this.getSectionProfile(sectionType);
+
+        // Analyze existing composition for context-aware generation
+        const compositionAnalysis = this._analyzeExistingComposition(context, style);
+
+        // Get all available templates for this section type
+        const styleTemplates = PROGRESSION_TEMPLATES[sectionType]?.[style] || [];
+        const popTemplates = PROGRESSION_TEMPLATES[sectionType]?.pop || [];
+        const rockTemplates = PROGRESSION_TEMPLATES[sectionType]?.rock || [];
+        const jazzTemplates = PROGRESSION_TEMPLATES[sectionType]?.jazz || [];
+
+        // Combine all unique templates
+        const allTemplates = [...styleTemplates];
+        popTemplates.forEach(t => {
+            if (!allTemplates.find(existing => existing.degrees.join('-') === t.degrees.join('-'))) {
+                allTemplates.push(t);
+            }
+        });
+        rockTemplates.forEach(t => {
+            if (!allTemplates.find(existing => existing.degrees.join('-') === t.degrees.join('-'))) {
+                allTemplates.push(t);
+            }
+        });
+        jazzTemplates.forEach(t => {
+            if (!allTemplates.find(existing => existing.degrees.join('-') === t.degrees.join('-'))) {
+                allTemplates.push(t);
+            }
+        });
+
+        // Shuffle templates for variety
+        const shuffled = [...allTemplates].sort(() => Math.random() - 0.5);
+
+        // Generate options from different templates
+        const results = [];
+        const usedPatterns = new Set();
+        const moodLabels = ['Classic', 'Alternative', 'Emotional', 'Driving', 'Experimental'];
+
+        for (let i = 0; i < Math.min(count, shuffled.length); i++) {
+            const template = shuffled[i];
+            const patternStr = template.degrees.join('-');
+
+            // Skip if we've already used this pattern
+            if (usedPatterns.has(patternStr)) continue;
+            usedPatterns.add(patternStr);
+
+            // Plan tension arc
+            const tensionArc = this._planTensionArc(
+                profile.tensionProfile,
+                length,
+                compositionAnalysis
+            );
+
+            // Plan duration arc
+            const durationArc = this._planDurationArc(
+                sectionType,
+                length,
+                style,
+                compositionAnalysis,
+                tensionArc
+            );
+
+            // Convert template to chords
+            const progression = this._degreesToChordsWithContext(
+                template.degrees,
+                context.key,
+                length,
+                compositionAnalysis
+            );
+
+            // Apply durations
+            const progressionWithDurations = this._applyDurationsToProgression(
+                progression,
+                durationArc
+            );
+
+            // Generate melody plan
+            const melodyPlan = this._generateMelodyPlan(
+                sectionType,
+                progressionWithDurations,
+                tensionArc,
+                style
+            );
+
+            // Generate bass line
+            const bassLine = this._generateBassLine(
+                progressionWithDurations,
+                style,
+                sectionType,
+                context.key
+            );
+
+            results.push({
+                sectionType,
+                profile,
+                progression: progressionWithDurations,
+                reasoning: template.description,
+                tensionArc,
+                durationArc,
+                melodyPlan,
+                bassLine,
+                style,
+                key: context.key,
+                contextInfo: compositionAnalysis.summary,
+                optionNumber: results.length + 1,
+                moodLabel: moodLabels[results.length % moodLabels.length]
+            });
+        }
+
+        // If we don't have enough options, generate variations of existing ones
+        while (results.length < count && results.length > 0) {
+            const baseResult = results[results.length % results.length];
+            const variedProgression = this._createProgressionVariation(
+                baseResult.progression,
+                context.key,
+                results.length
+            );
+
+            results.push({
+                ...baseResult,
+                progression: variedProgression,
+                reasoning: baseResult.reasoning + ' (variation)',
+                optionNumber: results.length + 1,
+                moodLabel: moodLabels[results.length % moodLabels.length]
+            });
+        }
+
+        return results;
+    }
+
+    /**
+     * Create a variation of a progression by modifying some chords
+     */
+    _createProgressionVariation(progression, key, seed) {
+        const varied = progression.map((chord, index) => {
+            // Randomly substitute some chords with related ones
+            if ((index + seed) % 3 === 0) {
+                // Substitute with relative minor/major or parallel chord
+                const substitutes = this._getChordSubstitutes(chord, key);
+                if (substitutes.length > 0) {
+                    const sub = substitutes[seed % substitutes.length];
+                    return { ...chord, ...sub };
+                }
+            }
+            return { ...chord };
+        });
+        return varied;
+    }
+
+    /**
+     * Get possible chord substitutes
+     */
+    _getChordSubstitutes(chord, key) {
+        const keyIndex = ALL_NOTES.indexOf(key);
+        const chordIndex = ALL_NOTES.indexOf(chord.root);
+        if (keyIndex === -1 || chordIndex === -1) return [];
+
+        const substitutes = [];
+
+        // Relative minor/major (3 semitones)
+        if (chord.type === 'Major') {
+            const relativeMinor = ALL_NOTES[(chordIndex + 9) % 12];
+            substitutes.push({ root: relativeMinor, type: 'Minor' });
+        } else if (chord.type === 'Minor') {
+            const relativeMajor = ALL_NOTES[(chordIndex + 3) % 12];
+            substitutes.push({ root: relativeMajor, type: 'Major' });
+        }
+
+        // Tritone substitute (for dominant chords)
+        if (chord.degree === 5) {
+            const tritone = ALL_NOTES[(chordIndex + 6) % 12];
+            substitutes.push({ root: tritone, type: 'Dominant7' });
+        }
+
+        return substitutes;
     }
 
     /**
@@ -832,6 +1159,137 @@ class SectionGenerator extends EventEmitter {
     }
 
     /**
+     * Plan duration arc for section - determines how long each chord should last
+     *
+     * @param {string} sectionType - Type of section (verse, chorus, etc.)
+     * @param {number} length - Number of chords in section
+     * @param {string} style - Musical style
+     * @param {Object} compositionAnalysis - Analysis of existing composition
+     * @param {Object} tensionArc - The tension arc for coordination
+     * @returns {Object} Duration arc with beat values and reasoning
+     */
+    _planDurationArc(sectionType, length, style, compositionAnalysis = {}, tensionArc = null) {
+        // Get the duration arc profile for this section type
+        const arcProfile = DURATION_ARC_PROFILES[sectionType] || DURATION_ARC_PROFILES.verse;
+
+        // Get style-specific base duration
+        const styleBaseDuration = STYLE_BASE_DURATIONS[style] || STYLE_BASE_DURATIONS.pop;
+
+        // Get the arc multipliers
+        const arcMultipliers = arcProfile.getArc(length);
+
+        // Calculate base duration considering existing composition's harmonic rhythm
+        let baseDuration = arcProfile.defaultBeats;
+
+        // If there's existing composition context, consider its rhythm
+        if (!compositionAnalysis.isEmpty && compositionAnalysis.lastChord) {
+            // Analyze existing rhythmic context
+            const existingProgression = this._context?.getSnapshot()?.progression || [];
+            if (existingProgression.length > 0) {
+                const existingDurations = existingProgression.map(c => c.beats || DEFAULT_DURATION);
+                const avgExisting = existingDurations.reduce((a, b) => a + b, 0) / existingDurations.length;
+
+                // Blend existing rhythm with section profile
+                baseDuration = (avgExisting + arcProfile.defaultBeats) / 2;
+            }
+        }
+
+        // Apply style modifier
+        const styleModifier = styleBaseDuration / 4; // Normalize around 4 beats
+        baseDuration *= styleModifier;
+
+        // Build the reasoning
+        const reasoning = [];
+        reasoning.push(`${arcProfile.name} profile for ${sectionType}`);
+
+        // Calculate actual beat values
+        const beatValues = arcMultipliers.map((multiplier, index) => {
+            let beats = baseDuration * multiplier;
+
+            // Coordinate with tension arc if available
+            if (tensionArc && tensionArc.values[index] !== undefined) {
+                const tension = tensionArc.values[index];
+                // Higher tension often correlates with faster harmonic rhythm
+                if (arcProfile.allowAcceleration && tension > 0.6) {
+                    beats *= 0.9; // Slight acceleration for high tension
+                } else if (tension < 0.3) {
+                    beats *= 1.1; // Slight deceleration for low tension
+                }
+            }
+
+            // Round to musical values
+            beats = this._roundToMusicalDuration(beats);
+
+            return beats;
+        });
+
+        // Calculate total beats
+        const totalBeats = beatValues.reduce((sum, b) => sum + b, 0);
+        const averageDuration = totalBeats / length;
+
+        // Add specific reasoning based on what happened
+        if (arcProfile.allowAcceleration) {
+            const firstHalf = beatValues.slice(0, Math.floor(length / 2));
+            const secondHalf = beatValues.slice(Math.floor(length / 2));
+            const avgFirst = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
+            const avgSecond = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
+
+            if (avgSecond < avgFirst * 0.9) {
+                reasoning.push('Accelerating toward section end');
+            } else if (avgSecond > avgFirst * 1.1) {
+                reasoning.push('Decelerating through section');
+            }
+        }
+
+        // Check coordination with tension
+        if (tensionArc) {
+            reasoning.push('Durations coordinated with tension arc');
+        }
+
+        return {
+            profileName: arcProfile.name,
+            description: arcProfile.description,
+            values: beatValues,
+            multipliers: arcMultipliers,
+            baseDuration,
+            totalBeats,
+            averageDuration: Math.round(averageDuration * 10) / 10,
+            reasoning,
+            style,
+            sectionType
+        };
+    }
+
+    /**
+     * Apply duration arc to progression chords
+     *
+     * @param {Array} progression - Array of chord objects
+     * @param {Object} durationArc - Duration arc from _planDurationArc
+     * @returns {Array} Progression with beats applied to each chord
+     */
+    _applyDurationsToProgression(progression, durationArc) {
+        return progression.map((chord, index) => ({
+            ...chord,
+            beats: durationArc.values[index] || DEFAULT_DURATION,
+            durationReason: index === 0
+                ? `${durationArc.profileName}: ${durationArc.description}`
+                : null
+        }));
+    }
+
+    /**
+     * Round duration to nearest musical value
+     * @param {number} duration - Duration in beats
+     * @returns {number} Rounded duration
+     */
+    _roundToMusicalDuration(duration) {
+        const musicalValues = [0.5, 1, 1.5, 2, 3, 4, 6, 8];
+        return musicalValues.reduce((prev, curr) =>
+            Math.abs(curr - duration) < Math.abs(prev - duration) ? curr : prev
+        );
+    }
+
+    /**
      * Generate melody plan for section
      */
     _generateMelodyPlan(sectionType, progression, tensionArc, style) {
@@ -939,7 +1397,12 @@ export function initializeSectionGenerator() {
     return generator;
 }
 
-// Export section profiles for external use
-export { SECTION_PROFILES, MELODY_CONTOURS };
+// Export section profiles and duration arc profiles for external use
+export {
+    SECTION_PROFILES,
+    MELODY_CONTOURS,
+    DURATION_ARC_PROFILES,
+    STYLE_BASE_DURATIONS
+};
 
 export default SectionGenerator;

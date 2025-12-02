@@ -45,16 +45,19 @@ let cachedMeasuresLength = 0;
 let cachedMeasuresHash = null;
 
 /**
- * Generate a simple hash of measures to detect changes
+ * Generate a hash of measures to detect changes
  * @param {Array} measures - Array of measures
  * @returns {string} Hash string
  */
 function generateMeasuresHash(measures) {
     if (!measures || measures.length === 0) return '0';
-    // Create a simple hash based on measure count and first/last chord info
-    const firstChord = measures[0]?.chord;
-    const lastChord = measures[measures.length - 1]?.chord;
-    return `${measures.length}-${firstChord?.root || ''}${firstChord?.type || ''}-${lastChord?.root || ''}${lastChord?.type || ''}`;
+    // Create a hash based on ALL chords to detect any chord change
+    // Previous version only checked first/last which missed middle chord changes
+    const chordParts = measures.map((m, i) => {
+        const chord = m?.chord;
+        return `${i}:${chord?.root || ''}${chord?.type || ''}${chord?.inversion || 0}`;
+    });
+    return `${measures.length}-${chordParts.join('|')}`;
 }
 
 export function getProgressionData() {
