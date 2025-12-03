@@ -1708,7 +1708,7 @@ function renderStaffNotation(chordIndex, canvas) {
             chord.lhType,
             chord.lhInversion,
             trainerState.currentKey,
-            chord.lhOctaveShift || -12,
+            chord.lhOctaveShift || 0,
             chord.type,
             getEnharmonicPreference()
         ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
@@ -2239,7 +2239,7 @@ export function renderChordStaffNotation(canvas, chordData, key) {
                 chordData.lhType,
                 chordData.lhInversion || 0,
                 key,
-                chordData.lhOctaveShift || -12,
+                chordData.lhOctaveShift || 0,
                 chordData.type,
                 getEnharmonicPreference()
             ).filter(n => !(chordData.lhOmittedNotes || []).includes(n)) : [];
@@ -3411,6 +3411,9 @@ function initializeSectionSortables(container) {
                 handle: '.section-drag-handle',
                 draggable: '.section-wrapper',
                 ghostClass: 'section-ghost',
+                // Exclude label and buttons from triggering drag (allow double-click rename)
+                filter: '.section-label, .section-menu-btn, .section-collapse-btn',
+                preventOnFilter: false, // Don't prevent events on filtered elements
                 onEnd: function(evt) {
                     handleSectionReorder(evt.oldIndex - 1, evt.newIndex - 1); // -1 to account for toolbar
                 }
@@ -3548,12 +3551,24 @@ window.showAddSectionMenu = function(event, containerId) {
 
     // Create menu
     const menu = document.createElement('div');
-    menu.className = 'section-type-menu absolute z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]';
+    menu.className = 'section-type-menu fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]';
 
-    // Position near the button
-    const rect = event.target.closest('button').getBoundingClientRect();
+    // Position near the button (getBoundingClientRect returns viewport-relative coords, use fixed positioning)
+    const button = event.target.closest('button') || event.target;
+    const rect = button.getBoundingClientRect();
     menu.style.left = `${rect.left}px`;
     menu.style.top = `${rect.bottom + 4}px`;
+
+    // Ensure menu stays within viewport
+    requestAnimationFrame(() => {
+        const menuRect = menu.getBoundingClientRect();
+        if (menuRect.right > window.innerWidth) {
+            menu.style.left = `${window.innerWidth - menuRect.width - 8}px`;
+        }
+        if (menuRect.bottom > window.innerHeight) {
+            menu.style.top = `${rect.top - menuRect.height - 4}px`;
+        }
+    });
 
     // Add menu items for each section type
     Object.entries(sectionTypes).forEach(([typeKey, typeInfo]) => {
@@ -3657,31 +3672,50 @@ window.toggleSectionCollapse = function(sectionId) {
 };
 
 /**
- * Edit section label inline
+ * Edit section label inline or via prompt dialog
  * @param {string} sectionId - Section ID
- * @param {HTMLElement} labelElement - Label element to edit
+ * @param {HTMLElement} [labelElement] - Label element to edit (optional - will use prompt if not provided)
  */
 window.editSectionLabel = function(sectionId, labelElement) {
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-    if (!compositionState) return;
+    if (!compositionState) {
+        console.warn('[editSectionLabel] No composition state');
+        return;
+    }
 
     const section = compositionState.getSection(sectionId);
-    if (!section) return;
+    if (!section) {
+        console.warn('[editSectionLabel] Section not found:', sectionId);
+        return;
+    }
 
     const currentLabel = section.label;
 
-    // Replace label with input
+    // If no label element provided or it's not in the DOM, use prompt dialog
+    if (!labelElement || !labelElement.parentNode) {
+        const newLabel = prompt('Enter new section name:', currentLabel);
+        if (newLabel !== null && newLabel.trim() !== '') {
+            compositionState.updateSection(sectionId, { label: newLabel.trim() });
+            renderProgressionDisplay('progression-visualization', true);
+            renderProgressionDisplay('melody-progression-visualization', false);
+        }
+        return;
+    }
+
+    // Inline editing - replace label with input
     const input = document.createElement('input');
     input.type = 'text';
     input.value = currentLabel;
     input.className = 'section-label-input text-sm font-semibold text-gray-700 bg-white border border-indigo-500 rounded px-1 py-0.5 outline-none';
     input.style.width = `${Math.max(currentLabel.length * 8 + 16, 80)}px`;
 
-    labelElement.replaceWith(input);
-    input.focus();
-    input.select();
+    // Track if we've already saved (prevent double-save on blur after Enter)
+    let saved = false;
 
     const saveLabel = () => {
+        if (saved) return;
+        saved = true;
+
         const newLabel = input.value.trim() || currentLabel;
         compositionState.updateSection(sectionId, { label: newLabel });
 
@@ -3690,16 +3724,31 @@ window.editSectionLabel = function(sectionId, labelElement) {
         renderProgressionDisplay('melody-progression-visualization', false);
     };
 
-    input.addEventListener('blur', saveLabel);
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            input.blur();
-        } else if (e.key === 'Escape') {
-            input.value = currentLabel;
-            input.blur();
+    try {
+        labelElement.replaceWith(input);
+        input.focus();
+        input.select();
+
+        input.addEventListener('blur', saveLabel);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                input.blur();
+            } else if (e.key === 'Escape') {
+                input.value = currentLabel;
+                input.blur();
+            }
+        });
+    } catch (err) {
+        console.warn('[editSectionLabel] Inline editing failed, using prompt:', err);
+        // Fallback to prompt
+        const newLabel = prompt('Enter new section name:', currentLabel);
+        if (newLabel !== null && newLabel.trim() !== '') {
+            compositionState.updateSection(sectionId, { label: newLabel.trim() });
+            renderProgressionDisplay('progression-visualization', true);
+            renderProgressionDisplay('melody-progression-visualization', false);
         }
-    });
+    }
 };
 
 /**
@@ -3745,13 +3794,12 @@ window.showSectionMenu = function(event, sectionId) {
 
     const menuItems = [
         { label: 'Rename', icon: 'M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z', action: () => {
-            const labelEl = document.querySelector(`[data-section-id="${sectionId}"] .section-label`);
-            if (labelEl) window.editSectionLabel(sectionId, labelEl);
+            // Call without labelElement to use prompt dialog (more reliable)
+            window.editSectionLabel(sectionId);
         }},
         { label: 'Duplicate', icon: 'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z', action: () => {
-            compositionState.duplicateSection(sectionId);
-            renderProgressionDisplay('progression-visualization', true);
-            renderProgressionDisplay('melody-progression-visualization', false);
+            // Show duplication options dialog
+            window.showDuplicateSectionDialog(sectionId, section.label, compositionState);
         }},
         { label: 'Delete Section', icon: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16', action: () => {
             if (confirm(`Delete "${section.label}"? Chords will become ungrouped.`)) {
@@ -3788,6 +3836,90 @@ window.showSectionMenu = function(event, sectionId) {
         }
     };
     setTimeout(() => document.addEventListener('click', closeMenu), 0);
+};
+
+/**
+ * Show dialog for section duplication options
+ * @param {string} sectionId - Section ID to duplicate
+ * @param {string} sectionLabel - Section label for display
+ * @param {Object} compositionState - Composition state instance
+ */
+window.showDuplicateSectionDialog = function(sectionId, sectionLabel, compositionState) {
+    // Remove existing dialog if any
+    const existingDialog = document.querySelector('.duplicate-section-dialog-overlay');
+    if (existingDialog) existingDialog.remove();
+
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'duplicate-section-dialog-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+
+    // Create dialog
+    const dialog = document.createElement('div');
+    dialog.className = 'bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4';
+    dialog.innerHTML = `
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Duplicate "${sectionLabel}"</h3>
+        <p class="text-sm text-gray-600 mb-4">Choose what to include in the duplicate:</p>
+
+        <div class="space-y-3 mb-6">
+            <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition">
+                <input type="radio" name="duplicateMode" value="bass" class="mt-1 text-indigo-600 focus:ring-indigo-500" checked>
+                <div>
+                    <div class="font-medium text-gray-900">Bass clef / Chords only</div>
+                    <div class="text-sm text-gray-500">Duplicate the chord progression and bass clef edits. The treble clef will be empty for new melody writing.</div>
+                </div>
+            </label>
+
+            <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition">
+                <input type="radio" name="duplicateMode" value="both" class="mt-1 text-indigo-600 focus:ring-indigo-500">
+                <div>
+                    <div class="font-medium text-gray-900">Both clefs</div>
+                    <div class="text-sm text-gray-500">Duplicate everything including treble clef notes and bass clef edits.</div>
+                </div>
+            </label>
+        </div>
+
+        <div class="flex justify-end gap-3">
+            <button class="cancel-btn px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+                Cancel
+            </button>
+            <button class="duplicate-btn px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition">
+                Duplicate
+            </button>
+        </div>
+    `;
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    // Handle cancel
+    const cancelBtn = dialog.querySelector('.cancel-btn');
+    cancelBtn.onclick = () => overlay.remove();
+
+    // Handle click outside dialog
+    overlay.onclick = (e) => {
+        if (e.target === overlay) overlay.remove();
+    };
+
+    // Handle escape key
+    const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+            overlay.remove();
+            document.removeEventListener('keydown', handleEscape);
+        }
+    };
+    document.addEventListener('keydown', handleEscape);
+
+    // Handle duplicate
+    const duplicateBtn = dialog.querySelector('.duplicate-btn');
+    duplicateBtn.onclick = () => {
+        const mode = dialog.querySelector('input[name="duplicateMode"]:checked').value;
+        overlay.remove();
+
+        // Perform duplication with selected mode
+        compositionState.duplicateSection(sectionId, { mode });
+        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', false);
+    };
 };
 
 /**
@@ -4132,7 +4264,7 @@ function createDetailedCardHTML(chord, index, key) {
     // Generate LH notes if missing and lhType is not 'off'
     if (chord.lhType !== 'off' && (!chord.lhNotes || chord.lhNotes.length === 0)) {
         const rhOctaveShift = chord.octaveShift || 0;
-        const lhRelativeShift = chord.lhOctaveShift || -12;
+        const lhRelativeShift = chord.lhOctaveShift || 0;
         const absoluteLHOctaveShift = rhOctaveShift + lhRelativeShift;
         const lhInversion = chord.lhInversion || 0;
         chord.lhNotes = getLHNotes(
@@ -4147,7 +4279,7 @@ function createDetailedCardHTML(chord, index, key) {
     }
 
     const lhNotes = chord.lhNotes || [];
-    const lhOctaveShift = chord.lhOctaveShift || -12;
+    const lhOctaveShift = chord.lhOctaveShift || 0;
     const lhInversion = chord.lhInversion || 0;
     const lhNoteCheckboxes = lhNotes.map(note => {
         const isChecked = !(chord.lhOmittedNotes || []).includes(note);
@@ -4306,8 +4438,8 @@ function createDetailedCardHTML(chord, index, key) {
                         <select class="lh-octave-select w-full px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
                             <option value="-36" ${lhOctaveShift === -36 ? 'selected' : ''}>-3 octaves</option>
                             <option value="-24" ${lhOctaveShift === -24 ? 'selected' : ''}>-2 octaves</option>
-                            <option value="-12" ${lhOctaveShift === -12 ? 'selected' : ''}>-1 octave (default)</option>
-                            <option value="0" ${lhOctaveShift === 0 ? 'selected' : ''}>Same as RH</option>
+                            <option value="-12" ${lhOctaveShift === -12 ? 'selected' : ''}>-1 octave</option>
+                            <option value="0" ${lhOctaveShift === 0 ? 'selected' : ''}>Default</option>
                             <option value="12" ${lhOctaveShift === 12 ? 'selected' : ''}>+1 octave</option>
                             <option value="24" ${lhOctaveShift === 24 ? 'selected' : ''}>+2 octaves</option>
                             <option value="36" ${lhOctaveShift === 36 ? 'selected' : ''}>+3 octaves</option>
@@ -5520,10 +5652,17 @@ function updateChordType(index, newType) {
         return;
     }
 
+    // Use roman numeral if available, otherwise fall back to root note
+    const romanOrRoot = chord.roman || chord.root;
+    if (!romanOrRoot) {
+        console.warn('[updateChordType] No roman numeral or root note available for chord');
+        return;
+    }
+
     // Regenerate chord notes with new type
     const chordInfo = getProgressionChordNotes(
         chord.key || trainerState.currentKey,
-        chord.roman,
+        romanOrRoot,
         newType,
         chord.inversion
     );
@@ -5561,6 +5700,11 @@ function updateChordType(index, newType) {
     // Update chord in compositionState
     compositionState.updateChordByIndex(index, updates);
 
+    // Also update trainerState.progressionData to keep in sync
+    if (trainerState.progressionData && trainerState.progressionData[index]) {
+        Object.assign(trainerState.progressionData[index], updates);
+    }
+
     // Update only this card and tension curve (type changes affect tension)
     updateSingleCard(index);
     updateTensionCurveIfVisible();
@@ -5571,7 +5715,7 @@ function updateChordType(index, newType) {
     // Play the chord with the new type
     const voicedNotes = updates.notes.filter(n => !(chord.omittedNotes || []).includes(n));
     const rhOctaveShift = chord.octaveShift || 0;
-    const lhRelativeShift = chord.lhOctaveShift || -12;
+    const lhRelativeShift = chord.lhOctaveShift || 0;
     const absoluteLHOctaveShift = rhOctaveShift + lhRelativeShift;
     const lhNotes = getLHNotes(
         chord.root,
@@ -5827,10 +5971,17 @@ function updateChordInversion(index, newInversion, shouldUpdateUI = true, should
         return;
     }
 
+    // Use roman numeral if available, otherwise fall back to root note
+    const romanOrRoot = chord.roman || chord.root;
+    if (!romanOrRoot) {
+        console.warn('[updateChordInversion] No roman numeral or root note available for chord');
+        return;
+    }
+
     // Regenerate chord notes with new inversion
     const chordInfo = getProgressionChordNotes(
         chord.key || trainerState.currentKey,
-        chord.roman,
+        romanOrRoot,
         chord.type,
         newInversion
     );
@@ -5866,6 +6017,11 @@ function updateChordInversion(index, newInversion, shouldUpdateUI = true, should
 
     // Update chord in compositionState
     compositionState.updateChordByIndex(index, updates);
+
+    // Also update trainerState.progressionData to keep in sync
+    if (trainerState.progressionData && trainerState.progressionData[index]) {
+        Object.assign(trainerState.progressionData[index], updates);
+    }
 
     // Update only this card and tension curve (inversions affect tension and voice leading)
     // Skip UI update if called from tooltip to prevent closing the tooltip
@@ -5909,7 +6065,7 @@ function updateChordLHPattern(index, newLHPattern) {
 
     // Regenerate LH notes with new pattern (using relative LH octave shift)
     const rhOctaveShift = chord.octaveShift || 0;
-    const lhRelativeShift = chord.lhOctaveShift || -12;
+    const lhRelativeShift = chord.lhOctaveShift || 0;
     const absoluteLHOctaveShift = rhOctaveShift + lhRelativeShift;
     chord.lhNotes = getLHNotes(
         chord.root,
@@ -5980,10 +6136,17 @@ function updateRHOctaveShift(index, shift) {
         return;
     }
 
+    // Use roman numeral if available, otherwise fall back to root note
+    const romanOrRoot = chord.roman || chord.root;
+    if (!romanOrRoot) {
+        console.warn('[updateRHOctaveShift] No roman numeral or root note available for chord');
+        return;
+    }
+
     // Regenerate notes with new octave
     const chordInfo = getProgressionChordNotes(
         chord.key || trainerState.currentKey,
-        chord.roman,
+        romanOrRoot,
         chord.type,
         chord.inversion
     );
@@ -6013,6 +6176,12 @@ function updateRHOctaveShift(index, shift) {
         notes: shiftedNotes
     });
 
+    // Also update trainerState.progressionData to keep in sync
+    if (trainerState.progressionData && trainerState.progressionData[index]) {
+        trainerState.progressionData[index].octaveShift = shift;
+        trainerState.progressionData[index].notes = shiftedNotes;
+    }
+
     // Update only this card
     updateSingleCard(index);
 
@@ -6022,7 +6191,7 @@ function updateRHOctaveShift(index, shift) {
     // Play the chord with the new octave (LH is relative to RH, so update LH too)
     const updatedChord = compositionState.getChord(index);
     const voicedNotes = updatedChord.notes.filter(n => !(updatedChord.omittedNotes || []).includes(n));
-    const lhRelativeShift = updatedChord.lhOctaveShift || -12;
+    const lhRelativeShift = updatedChord.lhOctaveShift || 0;
     const absoluteLHOctaveShift = shift + lhRelativeShift;
     const lhNotes = getLHNotes(
         updatedChord.root,
@@ -6077,6 +6246,12 @@ function updateLHOctaveShift(index, shift) {
         lhNotes: newLhNotes
     });
 
+    // Also update trainerState.progressionData to keep in sync
+    if (trainerState.progressionData && trainerState.progressionData[index]) {
+        trainerState.progressionData[index].lhOctaveShift = shift;
+        trainerState.progressionData[index].lhNotes = newLhNotes;
+    }
+
     // Update only this card
     updateSingleCard(index);
 
@@ -6111,7 +6286,7 @@ function updateLHInversion(index, newInversion, shouldUpdateUI = true, shouldSyn
 
     // Regenerate LH notes with new inversion (using relative LH octave shift)
     const rhOctaveShift = chord.octaveShift || 0;
-    const lhRelativeShift = chord.lhOctaveShift || -12;
+    const lhRelativeShift = chord.lhOctaveShift || 0;
     const absoluteLHOctaveShift = rhOctaveShift + lhRelativeShift;
     const newLhNotes = getLHNotes(
         chord.root,
@@ -6132,6 +6307,13 @@ function updateLHInversion(index, newInversion, shouldUpdateUI = true, shouldSyn
         lhNotes: newLhNotes,
         lhOmittedNotes: [] // Clear since note names change with inversion
     });
+
+    // Also update trainerState.progressionData to keep in sync
+    if (trainerState.progressionData && trainerState.progressionData[index]) {
+        trainerState.progressionData[index].lhInversion = newInversion;
+        trainerState.progressionData[index].lhNotes = newLhNotes;
+        trainerState.progressionData[index].lhOmittedNotes = [];
+    }
 
     // Update only this card (if requested)
     if (shouldUpdateUI) {
@@ -6179,6 +6361,11 @@ function toggleLHNote(index, note) {
     compositionState.updateChordByIndex(index, {
         lhOmittedNotes: lhOmittedNotes
     });
+
+    // Also update trainerState.progressionData to keep in sync
+    if (trainerState.progressionData && trainerState.progressionData[index]) {
+        trainerState.progressionData[index].lhOmittedNotes = lhOmittedNotes;
+    }
 
     // Update the grand staff notation
     updateChordAndRenderPreservingTrebleNotes(index);
@@ -8585,7 +8772,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         const lhOctaveSelect = document.createElement('select');
         lhOctaveSelect.className = 'w-full p-0.5 text-[10px] border border-gray-300 rounded';
         lhOctaveSelect.innerHTML = document.getElementById('builder-lh-octave-select').innerHTML;
-        lhOctaveSelect.value = chordData.lhOctaveShift || '-12';
+        lhOctaveSelect.value = chordData.lhOctaveShift || '0';
         lhOctaveSelect.onchange = (e) => {
             const wrapper = e.target.closest(`#${containerId} > div`);
             const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
@@ -9029,7 +9216,7 @@ export function loadProgression() {
             // Set default LH settings for newly loaded progressions
             chordData.lhType = 'off';
             chordData.lhInversion = 0;
-            chordData.lhOctaveShift = -12;
+            chordData.lhOctaveShift = 0;
             chordData.lhOmittedNotes = [];
             chordData.rhythmPattern = 'block';
             chordData.selectionMode = 'chord';
@@ -9238,6 +9425,12 @@ function calculateScaleNotes(key, octave = 4, octaveShift = 0) {
  * @returns {Object|null} Chord data object
  */
 export function getProgressionChordNotes(key, romanNumeral, selectedType, selectedInversion, octaveShift = 0) {
+    // Guard against null/undefined romanNumeral
+    if (!romanNumeral) {
+        console.warn('[getProgressionChordNotes] romanNumeral is null or undefined');
+        return null;
+    }
+
     let mapEntry = ROMAN_MAP_BASE[romanNumeral];
     let chordRootNote = '';
 
@@ -9614,7 +9807,7 @@ export function handleAutoPlayback() {
             chord.lhType,
             chord.lhInversion,
             trainerState.currentKey,
-            chord.lhOctaveShift || -12,
+            chord.lhOctaveShift || 0,
             chord.type,
             getEnharmonicPreference()
         );
@@ -10142,12 +10335,14 @@ export function startProgressionChord(index) {
         if (settings && settings.autoGenerateBass && compositionState.getMeasureCount() > index) {
             const measure = compositionState.getMeasure(index);
             if (measure && measure.notation && measure.notation.bass) {
-                const bassVoice = measure.notation.bass.voices && measure.notation.bass.voices[0];
-                if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
+                const bassVoices = measure.notation.bass.voices || [];
+                // MULTI-VOICE: Gather notes from ALL bass voices
+                const allBassNotes = bassVoices.flatMap(voice => voice?.notes || []);
+                if (allBassNotes.length > 0) {
                     // Use auto-generated bass notes (blue notes)
                     bassAutoFillActive = true;
                     // Extract pitch from bass notes, filter out rests and invalid pitches
-                    allLhNotes = bassVoice.notes
+                    allLhNotes = allBassNotes
                         .filter(note => note.type !== 'rest' && note.pitch)
                         .map(note => note.pitch)
                         .filter(pitch => {
@@ -10165,7 +10360,7 @@ export function startProgressionChord(index) {
     // If no auto-generated bass, use traditional LH chord notes
     if (!bassAutoFillActive) {
         // Calculate absolute LH octave shift (RH octave + relative LH shift)
-        const absoluteLHOctaveShift = octaveShift + (lhOctaveShift || -12);
+        const absoluteLHOctaveShift = octaveShift + (lhOctaveShift || 0);
         const rawLhNotes = getLHNotes(
         chord.root,
         lhType || 'off',
@@ -10316,12 +10511,14 @@ function playProgressionChord(index, advance = true) {
         if (settings && settings.autoGenerateBass && compositionState.getMeasureCount() > index) {
             const measure = compositionState.getMeasure(index);
             if (measure && measure.notation && measure.notation.bass) {
-                const bassVoice = measure.notation.bass.voices && measure.notation.bass.voices[0];
-                if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
+                const bassVoices = measure.notation.bass.voices || [];
+                // MULTI-VOICE: Gather notes from ALL bass voices
+                const allBassNotes = bassVoices.flatMap(voice => voice?.notes || []);
+                if (allBassNotes.length > 0) {
                     // Use auto-generated bass notes (blue notes)
                     bassAutoFillActive = true;
                     // Extract pitch from bass notes, filter out rests
-                    allLhNotes = bassVoice.notes
+                    allLhNotes = allBassNotes
                         .filter(note => note.type !== 'rest')
                         .map(note => note.pitch)
                         .filter(Boolean);
@@ -10806,7 +11003,7 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
     // Generate default LH notes (default pattern: 'off' - no LH by default for recommendations)
     const defaultLHType = 'off';
     const defaultLHInversion = 0;
-    const defaultLHRelativeShift = -12; // One octave below RH by default (for when LH is enabled later)
+    const defaultLHRelativeShift = 0; // No shift from LH base octave (octave 2) by default
     const rhOctaveShift = octaveShift; // Use the provided octave shift
     const absoluteLHOctaveShift = rhOctaveShift + defaultLHRelativeShift;
     const lhNotes = getLHNotes(
@@ -11306,10 +11503,17 @@ function updateProgressionChord(index, property, value) {
     if (isMinorKey) {
         keyForCalculation = keyForCalculation.replace(/m$/, '');
     }
-    
+
+    // Use roman numeral if available, otherwise fall back to root note
+    const romanOrRoot = chordState.roman || chordState.root;
+    if (!romanOrRoot) {
+        console.warn('[updateProgressionChord] No roman numeral or root note available for chord');
+        return;
+    }
+
     const newData = getProgressionChordNotes(
         keyForCalculation,
-        chordState.roman,
+        romanOrRoot,
         chordState.type,
         chordState.inversion,
         chordState.octaveShift
@@ -11422,7 +11626,7 @@ function updateProgressionChord(index, property, value) {
                     chordState.lhType,
                     chordState.lhInversion,
                     trainerState.currentKey,
-                    chordState.lhOctaveShift || -12,
+                    chordState.lhOctaveShift || 0,
                     chordState.type,
                     getEnharmonicPreference()
                 );
@@ -11433,7 +11637,7 @@ function updateProgressionChord(index, property, value) {
                     chordState.lhType,
                     chordState.lhInversion,
                     trainerState.currentKey,
-                    chordState.lhOctaveShift || -12,
+                    chordState.lhOctaveShift || 0,
                     newData.type,
                     getEnharmonicPreference()
                 );
@@ -12287,7 +12491,7 @@ export function importChordList(mode = 'replace') {
         // Generate default LH notes (1 octave below RH)
         const defaultLHType = 'rootOnly';
         const defaultRHOctaveShift = 0; // New chords start at default octave
-        const defaultLHRelativeShift = -12; // 1 octave below RH
+        const defaultLHRelativeShift = 0; // No shift from LH base octave (octave 2)
         const absoluteLHOctaveShift = defaultRHOctaveShift + defaultLHRelativeShift;
         const defaultLHNotes = getLHNotes(
             root,
@@ -12313,7 +12517,7 @@ export function importChordList(mode = 'replace') {
             octaveShift: octaveShift,
             lhType: defaultLHType,
             lhInversion: 0,
-            lhOctaveShift: -12,
+            lhOctaveShift: 0,
             lhNotes: defaultLHNotes,
             lhOmittedNotes: [],
             rhythmPattern: 'block',
@@ -12500,7 +12704,7 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
                 lhNotes: [],
                 lhOmittedNotes: [],
                 omittedNotes: [],
-                octaveShift: -12,
+                octaveShift: 0, // Base octave is now 3, no shift needed
                 key: currentKey,
                 beats: patternBeats ? patternBeats[index] : 4
             };

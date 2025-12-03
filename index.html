@@ -430,7 +430,8 @@
                                     <div class="flex-1">
                                         <label for="builder-lh-octave-select" class="block text-xs font-medium text-gray-600 mb-1">LH Octave</label>
                                         <select id="builder-lh-octave-select" title="Left-Hand Octave" onchange="updateBuilderDisplay(); if (document.getElementById('builder-lh-type-select').value !== 'off') { playBuilderChordWithDuration(); }" class="w-full p-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-800 focus:ring-amber-500 focus:border-amber-500 transition duration-150 text-sm">
-                                            <option value="-12" selected>Octave Below</option>
+                                            <option value="0" selected>Default</option>
+                                            <option value="-12">Octave Below</option>
                                             <option value="-24">2 Octaves Below</option>
                                             <option value="-36">3 Octaves Below</option>
                                         </select>

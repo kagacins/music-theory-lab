@@ -140,7 +140,9 @@ export function addNoteViaBridge(measureIndex, staff, note) {
     }
 
     // Add note to the staff
-    compositionState.addNote(measureIndex, staff, 0, note);
+    // MULTI-VOICE: Use current voice for the appropriate staff
+    const voiceIndex = compositionState.getActiveVoiceIndexForStaff(staff);
+    compositionState.addNote(measureIndex, staff, voiceIndex, note);
 }
 
 /**
@@ -244,11 +246,26 @@ function getRemainingBeats(measureIndex, staff) {
     if (!measure) return 4;
 
     const voiceKey = staff === 'treble' ? 'treble' : 'bass';
-    const notes = measure.notation[voiceKey].voices[0].notes;
+    // MULTI-VOICE: Use current voice for the appropriate staff
+    const voiceIndex = compositionState.getActiveVoiceIndexForStaff(staff);
+    const voices = measure.notation[voiceKey].voices;
+    const notes = voices[voiceIndex]?.notes || [];
+
+    // Tuplet ratios for notes with tuplet property
+    const tupletRatios = {
+        triplet: { actual: 3, normal: 2 },
+        quintuplet: { actual: 5, normal: 4 },
+        sextuplet: { actual: 6, normal: 4 },
+    };
 
     let usedBeats = 0;
     for (const note of notes) {
-        const noteBeats = durationToBeats(note.duration, note.dotted);
+        let noteBeats = durationToBeats(note.duration, note.dotted);
+        // Also handle tuplet property (in addition to duration suffix)
+        if (note.tuplet && note.tuplet.type && tupletRatios[note.tuplet.type]) {
+            const ratio = tupletRatios[note.tuplet.type];
+            noteBeats = noteBeats * (ratio.normal / ratio.actual);
+        }
         usedBeats += noteBeats;
     }
 
@@ -280,14 +297,6 @@ function getCurrentBeat(measureIndex, staff) {
 export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = false, accidental = null, articulation = null, tuplet = null) {
     if (!useCompositionState) return { success: false, measuresFilled: 0 };
 
-    // DEBUG: Track progressionData state at start of note addition
-    if (compositionState) {
-        const progressionData = compositionState.exportToProgressionData();
-        console.log('[addNoteIntelligently] START - progressionData:', progressionData.map((c, i) => `[${i}] ${c.root}${c.type}`).join(', '));
-        console.log('[addNoteIntelligently] START - progressionData length:', progressionData.length);
-        console.log('[addNoteIntelligently] START - compositionState measures:', compositionState.getMeasureCount());
-    }
-
     // Get selected measure from notation composer
     const notationComposer = window.getNotationComposer && window.getNotationComposer();
     let selectedMeasureIndex = notationComposer?.getSelectedMeasure() ?? -1;
@@ -312,7 +321,6 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
             // Calculate remaining beats in the building block
             const segmentEndBeat = segment.startBeat + segment.durationBeats;
             remainingBeats = segmentEndBeat - absoluteBeat;
-            console.log(`[addNoteIntelligently] Bass: Building block ${segment.chordIndex}, remaining=${remainingBeats} beats`);
         }
     }
 
@@ -345,7 +353,9 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
             noteData.tuplet = tuplet;
         }
 
-        compositionState.addNote(selectedMeasureIndex, staff, 0, noteData);
+        // MULTI-VOICE: Use current voice for the appropriate staff
+        const voiceIndex = compositionState.getActiveVoiceIndexForStaff(staff);
+        compositionState.addNote(selectedMeasureIndex, staff, voiceIndex, noteData);
 
         // Check if measure is now full and auto-advance
         const newRemainingBeats = getRemainingBeats(selectedMeasureIndex, staff);
@@ -383,15 +393,12 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
                 truncatedNote.tuplet = tuplet;
             }
 
-            compositionState.addNote(selectedMeasureIndex, staff, 0, truncatedNote);
-
-            if (truncatedBeats < noteBeats) {
-                console.log(`[addNoteIntelligently] Bass note truncated from ${noteBeats} to ${truncatedBeats} beats to fit building block`);
-            }
+            // MULTI-VOICE: Use current voice for the appropriate staff
+            const bassVoiceIndex = compositionState.getActiveVoiceIndexForStaff(staff);
+            compositionState.addNote(selectedMeasureIndex, staff, bassVoiceIndex, truncatedNote);
 
             return { success: true, measuresFilled: 1 };
         } else {
-            console.warn('[addNoteIntelligently] Building block is full, cannot add bass note');
             return { success: false, measuresFilled: 0 };
         }
     }
@@ -417,7 +424,9 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
             beat: beatPosition,
         };
 
-        compositionState.addNote(selectedMeasureIndex, staff, 0, firstPartNote);
+        // MULTI-VOICE: Use current voice for the appropriate staff
+        const voiceIndex = compositionState.getActiveVoiceIndexForStaff(staff);
+        compositionState.addNote(selectedMeasureIndex, staff, voiceIndex, firstPartNote);
         measuresFilled++;
     }
 
@@ -448,7 +457,9 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
             beat: beatPosition,
         };
 
-        compositionState.addNote(currentMeasureIndex, staff, 0, continuationNote);
+        // MULTI-VOICE: Use current voice for the appropriate staff
+        const contVoiceIndex = compositionState.getActiveVoiceIndexForStaff(staff);
+        compositionState.addNote(currentMeasureIndex, staff, contVoiceIndex, continuationNote);
 
         remainingNoteBeats -= beatsToAdd;
         currentMeasureIndex++;
@@ -596,7 +607,9 @@ export function addBassNote(measureIndex, note) {
         compositionState.addMeasure({});
     }
 
-    compositionState.addNote(measureIndex, 'bass', 0, note);
+    // MULTI-VOICE: Use current bass voice, not always voice 0
+    const voiceIndex = compositionState.getActiveVoiceIndexForStaff('bass');
+    compositionState.addNote(measureIndex, 'bass', voiceIndex, note);
 
     // Mark as not auto-generated
     const measure = compositionState.getMeasure(measureIndex);

@@ -222,6 +222,42 @@ export function noteToVexKey(noteStr) {
 }
 
 /**
+ * Calculate automatic stem direction based on note pitch and clef
+ * Standard convention:
+ * - Treble clef: Notes on B4 or above get stems down, below B4 get stems up
+ * - Bass clef: Notes on D3 or above get stems down, below D3 get stems up
+ * @param {string|string[]} pitch - Note pitch(es) like "C4", "F#5" or array of pitches
+ * @param {string} clef - 'treble' or 'bass'
+ * @returns {number} - 1 for stem up, -1 for stem down
+ */
+export function calculateAutoStemDirection(pitch, clef = 'treble') {
+  // For chords, use the average pitch or the middle note
+  let pitchToCheck = pitch;
+  if (Array.isArray(pitch)) {
+    // Use the middle pitch for stem direction calculation
+    const middleIndex = Math.floor(pitch.length / 2);
+    pitchToCheck = pitch[middleIndex];
+  }
+
+  const { noteName, octave } = parseNote(pitchToCheck);
+
+  // Convert to a numeric value for comparison (C=0, D=2, E=4, F=5, G=7, A=9, B=11)
+  const noteValues = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  const noteValue = noteValues[noteName] || 0;
+
+  // Calculate absolute pitch position (octave * 12 + note value)
+  const pitchPosition = octave * 12 + noteValue;
+
+  // Middle line references:
+  // Treble clef: B4 = 4 * 12 + 11 = 59
+  // Bass clef: D3 = 3 * 12 + 2 = 38
+  const middleLine = clef === 'bass' ? 38 : 59;
+
+  // Notes at or above middle line get stems down (-1), below get stems up (1)
+  return pitchPosition >= middleLine ? -1 : 1;
+}
+
+/**
  * Convert VexFlow key format back to note string
  * @param {string} vexKey - VexFlow key like "C/4", "F#/5"
  * @returns {string} - Note string like "C4", "F#5"
@@ -534,6 +570,7 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
     dotted = false,  // Is this dotted?
     accidental = null, // Explicit accidental override
     articulation = null, // Articulation: 'staccato', 'accent', 'tenuto', 'marcato'
+    stemDirection = null, // Optional stem direction: 1 (up), -1 (down), null (auto)
   } = noteData;
 
   // Convert duration if needed
@@ -567,7 +604,23 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
     noteConfig = { keys, duration: vexDuration, clef };
   }
 
+  // Determine stem direction for non-rest notes
+  let finalStemDirection = null;
+  if (!isRest) {
+    if (stemDirection !== null && stemDirection !== undefined) {
+      finalStemDirection = stemDirection;
+    } else {
+      // Calculate stem direction based on pitch position relative to middle line
+      finalStemDirection = calculateAutoStemDirection(pitch, clef);
+    }
+  }
+
   const staveNote = new VF.StaveNote(noteConfig);
+
+  // Set stem direction AFTER creation using setStemDirection() - config property gets ignored
+  if (finalStemDirection !== null && staveNote.setStemDirection) {
+    staveNote.setStemDirection(finalStemDirection);
+  }
 
   // Add accidentals for non-rest notes
   if (!isRest) {
@@ -618,7 +671,7 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
  * @param {string|Array|null} accidental - Explicit accidental override (string for all pitches, array for per-pitch)
  * @returns {Object} - VexFlow StaveNote with multiple keys
  */
-export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble', dotted = false, articulation = null, accidental = null) {
+export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble', dotted = false, articulation = null, accidental = null, stemDirection = null) {
   const VF = getVF();
   if (!VF || !pitches || pitches.length === 0) return null;
 
@@ -631,12 +684,29 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
   // Convert all pitches to VexFlow keys
   const keys = pitches.map(pitch => noteToVexKey(pitch));
 
-  // Create the chord note
-  const staveNote = new VF.StaveNote({
+  // Create the chord note config
+  const noteConfig = {
     keys,
     duration: vexDuration,
     clef,
-  });
+  };
+
+  // Determine stem direction
+  let finalStemDirection;
+  if (stemDirection !== null && stemDirection !== undefined) {
+    finalStemDirection = stemDirection;
+  } else {
+    // Calculate stem direction based on pitch position relative to middle line
+    finalStemDirection = calculateAutoStemDirection(pitches, clef);
+  }
+
+  // Create the chord note (don't pass stem_direction in config - it gets ignored)
+  const staveNote = new VF.StaveNote(noteConfig);
+
+  // Set stem direction AFTER creation using setStemDirection()
+  if (staveNote.setStemDirection) {
+    staveNote.setStemDirection(finalStemDirection);
+  }
 
   // Add accidentals for each pitch
   // Supports: string (applies to all), array (per-pitch), or null (auto-detect from key)
@@ -694,14 +764,84 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
  * Create a rest note
  * @param {string} duration - Duration of the rest
  * @param {string} clef - Clef for positioning
+ * @param {Object} options - Optional settings for rest appearance
+ * @param {boolean} options.isCue - If true, render as cue-sized (smaller) rest
+ * @param {boolean} options.hidden - If true, rest is hidden (for clean notation mode)
  * @returns {Object} - VexFlow StaveNote (rest)
  */
-export function createRest(duration = '4n', clef = 'treble') {
-  return createStaveNote({
+export function createRest(duration = '4n', clef = 'treble', options = {}) {
+  const { isCue = false, hidden = false } = options;
+
+  const restNote = createStaveNote({
     pitch: null,
     duration,
     isRest: true,
   }, 'C', clef);
+
+  if (!restNote) return null;
+
+  // Mark as hidden FIRST (takes priority - invisible spacer)
+  if (hidden) {
+    if (restNote.setStyle) {
+      restNote.setStyle({
+        fillStyle: 'transparent',
+        strokeStyle: 'transparent',
+      });
+    }
+    restNote._isHiddenRest = true;
+    restNote._isCueRest = isCue;
+    return restNote;
+  }
+
+  // Apply cue-sized styling (smaller rest) - only if NOT hidden
+  if (isCue) {
+    // Lighter color for secondary voice cue rests
+    if (restNote.setStyle) {
+      restNote.setStyle({
+        fillStyle: '#aaaaaa',
+        strokeStyle: '#aaaaaa',
+      });
+    }
+
+    // VexFlow 5.x: Scale the glyph using multiple approaches
+    // Use much smaller values for noticeable cue size (default is ~38)
+    const cueScale = 20; // Much smaller than default
+    const cueScaleRatio = 0.55; // 55% of normal size
+
+    // Approach 1: render_options.glyph_font_scale (VexFlow internal)
+    if (restNote.render_options) {
+      restNote.render_options.glyph_font_scale = cueScale;
+    }
+
+    // Approach 2: setRenderOptions if available
+    if (typeof restNote.setRenderOptions === 'function') {
+      restNote.setRenderOptions({ glyph_font_scale: cueScale });
+    }
+
+    // Approach 3: Direct glyph scale property (VexFlow 5.x)
+    if (restNote.glyph) {
+      restNote.glyph.scale = cueScaleRatio;
+    }
+
+    // Approach 4: Set font info for scaling
+    try {
+      if (restNote.fontInfo) {
+        restNote.fontInfo.size = cueScale;
+      }
+    } catch (e) {
+      // Font info access may fail
+    }
+
+    // Approach 5: Try setting scale on the note itself
+    if (typeof restNote.setFontSize === 'function') {
+      restNote.setFontSize(cueScale);
+    }
+
+    restNote._isCueSize = true;
+  }
+
+  restNote._isCueRest = isCue;
+  return restNote;
 }
 
 // ============================================================================
@@ -733,7 +873,13 @@ export function createVoice(notes, options = {}) {
     voice.setMode(VF.Voice.Mode.SOFT);
   }
 
-  voice.addTickables(notes);
+  // MULTI-VOICE FIX: Filter out any undefined notes to prevent VexFlow errors
+  const validNotes = notes.filter(note => note !== undefined && note !== null);
+  if (validNotes.length !== notes.length) {
+    console.warn('[createVoice] Filtered out', notes.length - validNotes.length, 'undefined notes');
+  }
+
+  voice.addTickables(validNotes);
   return voice;
 }
 

@@ -31,6 +31,7 @@ import {
 } from '../../state/sectionIntentState.js';
 import { getCompositionState } from '../../state/compositionState.js';
 import { getInvertedChordNotes, getChordNotes } from '../../utils/noteUtils.js';
+import { noteToRomanNumeral } from '../../utils/romanNumerals.js';
 import { analyzeRhythmicContext } from '../../features/rhythmicContextAnalyzer.js';
 
 // Melody suggestion imports
@@ -54,6 +55,23 @@ import { getSmartHarmonizer, MOTION_TYPES } from '../../recommendations/harmony/
 // Modal imports for note insertion dialog
 import { showChoiceDialog } from '../modals.js';
 
+// Undo/redo support for melody additions
+import { saveStateBeforeChange } from '../../features/progressionBuilder.js';
+
+// VexFlow renderer imports for polyphony preview
+import {
+    createRenderer,
+    createStave,
+    createStaveNote,
+    createChordNote,
+    createRest,
+    createVoice,
+    generateBeams,
+    drawBeams,
+    DURATION_MAP,
+    getVexFlowKeySignature
+} from '../../notation/vexFlowRenderer.js';
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -63,7 +81,8 @@ const TABS = {
     CHORD: 'chord',
     MELODY: 'melody',
     SECTION: 'section',
-    HARMONIZE: 'harmonize'
+    HARMONIZE: 'harmonize',
+    POLYPHONY: 'polyphony'
 };
 
 const CHORD_VIEWS = {
@@ -312,6 +331,12 @@ let modalState = {
     phraseRange: parseInt(localStorage.getItem('phrase-range') || '12', 10),
     phraseOctave: parseInt(localStorage.getItem('phrase-octave') || '4', 10),
     currentPhraseCandidates: [],
+    // Melody position mode: 'end' = add to end, 'section' = add for selected section/chord
+    melodyPositionMode: localStorage.getItem('melody-position-mode') || 'end',
+    // Selected chord range for section mode (-1 = none selected)
+    // Supports selecting multiple consecutive chords
+    melodySelectedChordStart: -1,
+    melodySelectedChordEnd: -1, // -1 means same as start (single chord)
     // Generate tab state
     generateSectionType: 'verse',
     generateStyle: 'pop',
@@ -695,6 +720,11 @@ export function showUnifiedRecommendationModal(options = {}) {
         }
     }
 
+    // Reset melody tab chord selection so it re-syncs with the current selection
+    // This ensures the quick progression selector shows the currently selected chord
+    modalState.melodySelectedChordStart = -1;
+    modalState.melodySelectedChordEnd = -1;
+
     // Create and show modal
     const modal = createModalStructure();
     document.body.appendChild(modal);
@@ -714,6 +744,10 @@ export function showUnifiedRecommendationModal(options = {}) {
             if (event.detail.style) modalState.style = event.detail.style;
             if (event.detail.mood) modalState.mood = event.detail.mood;
         }
+
+        // Clear cached melody phrases so they regenerate with new settings
+        modalState.currentPhraseCandidates = [];
+        modalState.currentMelodySuggestions = [];
 
         // Refresh the active tab to reflect new weights
         renderActiveTab();
@@ -894,7 +928,8 @@ function createTabNavigation() {
         { id: TABS.CHORD, label: 'Chords', icon: '🎹' },
         { id: TABS.MELODY, label: 'Melody', icon: '🎵' },
         { id: TABS.SECTION, label: 'Section', icon: '📝' },
-        { id: TABS.HARMONIZE, label: 'Harmonize', icon: '🎼', disabled: !hasMelodyNotes }
+        { id: TABS.HARMONIZE, label: 'Harmonize', icon: '🎼', disabled: !hasMelodyNotes },
+        { id: TABS.POLYPHONY, label: 'Texture', icon: '🎭' }
     ];
 
     tabs.forEach(tab => {
@@ -1296,6 +1331,9 @@ function renderActiveTab() {
             break;
         case TABS.HARMONIZE:
             renderHarmonizeTab(content);
+            break;
+        case TABS.POLYPHONY:
+            renderPolyphonyTab(content);
             break;
     }
 }
@@ -3256,6 +3294,311 @@ function renderMelodyNotesView(container, currentChord, key) {
 }
 
 function renderMelodyPhrasesView(container, currentChord, key) {
+    // CRITICAL: Clear container to prevent duplicate content on re-render
+    container.innerHTML = '';
+
+    // Get progression data for section mode
+    const progressionData = getProgressionData() || [];
+    const compositionState = getCompositionState();
+    const sections = compositionState?.getSections?.() || [];
+
+    const isEndMode = modalState.melodyPositionMode === 'end';
+    const isSectionMode = modalState.melodyPositionMode === 'section';
+
+    // In section mode, pre-select a chord only if nothing is selected yet
+    // Don't override user's manual selection in the modal
+    if (isSectionMode && progressionData.length > 0 && modalState.melodySelectedChordStart < 0) {
+        // Try to get the currently selected chord index from the composition
+        let currentSelectedIdx = -1;
+
+        // Method 1: Check modalState.selectedProgressionIndex (used by chord tab)
+        if (modalState.selectedProgressionIndex >= 0 && modalState.selectedProgressionIndex < progressionData.length) {
+            currentSelectedIdx = modalState.selectedProgressionIndex;
+        }
+
+        // Method 2: Try to get from composition state
+        if (currentSelectedIdx < 0 && compositionState?.getSelectedChordIndex) {
+            const compSelectedIdx = compositionState.getSelectedChordIndex();
+            if (compSelectedIdx >= 0 && compSelectedIdx < progressionData.length) {
+                currentSelectedIdx = compSelectedIdx;
+            }
+        }
+
+        // Method 3: Find matching chord in progression data
+        if (currentSelectedIdx < 0 && currentChord) {
+            for (let i = 0; i < progressionData.length; i++) {
+                const pd = progressionData[i];
+                if (pd.root === currentChord.root && pd.type === currentChord.type) {
+                    currentSelectedIdx = i;
+                    break;
+                }
+            }
+        }
+
+        // Method 4: Default to first chord if nothing else works
+        if (currentSelectedIdx < 0) {
+            currentSelectedIdx = 0;
+        }
+
+        // Set initial selection
+        modalState.melodySelectedChordStart = currentSelectedIdx;
+        modalState.melodySelectedChordEnd = -1; // Single chord selection
+    }
+
+    // Position Mode Toggle (Add to End vs Add for Section)
+    const positionModeSection = document.createElement('div');
+    positionModeSection.style.cssText = `
+        display: flex;
+        gap: 4px;
+        padding: 4px;
+        background: #e5e7eb;
+        border-radius: 8px;
+        margin-bottom: 12px;
+    `;
+
+    positionModeSection.innerHTML = `
+        <button id="melody-pos-end" class="melody-pos-btn" data-mode="end" style="
+            flex: 1;
+            padding: 10px 16px;
+            border: ${isEndMode ? '2px solid #3b82f6' : '2px solid transparent'};
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: ${isEndMode ? '600' : '500'};
+            cursor: pointer;
+            transition: all 0.15s ease;
+            background: ${isEndMode ? 'white' : 'transparent'};
+            color: ${isEndMode ? '#3b82f6' : '#6b7280'};
+            box-shadow: ${isEndMode ? '0 2px 4px rgba(59, 130, 246, 0.2)' : 'none'};
+        ">
+            Add to End
+        </button>
+        <button id="melody-pos-section" class="melody-pos-btn" data-mode="section" style="
+            flex: 1;
+            padding: 10px 16px;
+            border: ${isSectionMode ? '2px solid #3b82f6' : '2px solid transparent'};
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: ${isSectionMode ? '600' : '500'};
+            cursor: pointer;
+            transition: all 0.15s ease;
+            background: ${isSectionMode ? 'white' : 'transparent'};
+            color: ${isSectionMode ? '#3b82f6' : '#6b7280'};
+            box-shadow: ${isSectionMode ? '0 2px 4px rgba(59, 130, 246, 0.2)' : 'none'};
+        ">
+            Add for Section
+        </button>
+    `;
+    container.appendChild(positionModeSection);
+
+    // Section Mode: Show progression selector RIGHT AFTER the toggle
+    if (isSectionMode) {
+        const selectorWrapper = document.createElement('div');
+        selectorWrapper.style.cssText = `
+            margin-bottom: 12px;
+            padding: 12px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+        `;
+
+        const selectorLabel = document.createElement('div');
+        selectorLabel.style.cssText = 'font-size: 12px; font-weight: 600; color: #1e40af; margin-bottom: 4px;';
+        selectorLabel.textContent = 'Select chord(s) to add melody for:';
+        selectorWrapper.appendChild(selectorLabel);
+
+        const selectorHint = document.createElement('div');
+        selectorHint.style.cssText = 'font-size: 10px; color: #6b7280; margin-bottom: 8px;';
+        selectorHint.textContent = 'Click to select, Shift+Click to select a range of consecutive chords';
+        selectorWrapper.appendChild(selectorHint);
+
+        // Build chord selector chips
+        const chipsContainer = document.createElement('div');
+        chipsContainer.style.cssText = 'display: flex; gap: 4px; flex-wrap: wrap; align-items: center;';
+
+        // Helper to check if a chord index is in the selected range
+        const isChordInSelection = (idx) => {
+            if (modalState.melodySelectedChordStart < 0) return false;
+            const start = modalState.melodySelectedChordStart;
+            const end = modalState.melodySelectedChordEnd >= 0 ? modalState.melodySelectedChordEnd : start;
+            const minIdx = Math.min(start, end);
+            const maxIdx = Math.max(start, end);
+            return idx >= minIdx && idx <= maxIdx;
+        };
+
+        // Calculate total duration of selected chords
+        const getSelectedDuration = () => {
+            if (modalState.melodySelectedChordStart < 0) return 0;
+            const start = modalState.melodySelectedChordStart;
+            const end = modalState.melodySelectedChordEnd >= 0 ? modalState.melodySelectedChordEnd : start;
+            const minIdx = Math.min(start, end);
+            const maxIdx = Math.max(start, end);
+            let totalBeats = 0;
+            for (let i = minIdx; i <= maxIdx; i++) {
+                if (progressionData[i]) {
+                    totalBeats += progressionData[i].duration || 4; // Default 4 beats per chord
+                }
+            }
+            return totalBeats;
+        };
+
+        if (progressionData.length === 0) {
+            const emptyMsg = document.createElement('span');
+            emptyMsg.textContent = 'No chords in progression - add chords first';
+            emptyMsg.style.cssText = 'font-size: 11px; color: #6b7280; font-style: italic;';
+            chipsContainer.appendChild(emptyMsg);
+        } else {
+            // Build section lookup
+            const sectionStartMap = new Map();
+            const sectionChordMap = new Map();
+            sections.forEach(section => {
+                if (!section?.chordIndices || section.chordIndices.length === 0) return;
+                const startIdx = Math.min(...section.chordIndices);
+                if (!sectionStartMap.has(startIdx)) {
+                    sectionStartMap.set(startIdx, []);
+                }
+                sectionStartMap.get(startIdx).push(section);
+                section.chordIndices.forEach(idx => {
+                    if (!sectionChordMap.has(idx)) {
+                        sectionChordMap.set(idx, []);
+                    }
+                    sectionChordMap.get(idx).push(section);
+                });
+            });
+
+            progressionData.forEach((chord, idx) => {
+                // Add section badge if this is the start of a section
+                const sectionBadges = sectionStartMap.get(idx);
+                if (sectionBadges) {
+                    sectionBadges.forEach(section => {
+                        const badge = document.createElement('span');
+                        badge.textContent = section.label || section.type || 'Section';
+                        const color = section.color || '#c084fc';
+                        badge.style.cssText = `
+                            padding: 2px 6px;
+                            border-radius: 9999px;
+                            font-size: 10px;
+                            font-weight: 600;
+                            background: ${color}1A;
+                            color: ${color};
+                            border: 1px solid ${color}33;
+                        `;
+                        chipsContainer.appendChild(badge);
+                    });
+                }
+
+                const chordSections = sectionChordMap.get(idx);
+                const primarySection = chordSections?.[0];
+                const chordDef = CHORD_DEFINITIONS[chord.type];
+                const symbol = chordDef?.symbol || '';
+                const isSelected = isChordInSelection(idx);
+                const isRangeStart = modalState.melodySelectedChordStart === idx;
+                const isRangeEnd = modalState.melodySelectedChordEnd === idx;
+                const invLabel = getInversionLabel(chord.inversion);
+
+                const chip = document.createElement('button');
+                chip.textContent = `${chord.root}${symbol}${invLabel}`;
+                chip.title = `${chord.root} ${chord.type}${chord.inversion ? ` (${INVERSION_NAMES[chord.inversion]})` : ''} - Click to select, Shift+Click to extend range`;
+
+                let backgroundColor = isSelected ? '#dbeafe' : 'white';
+                let borderColor = isSelected ? '#3b82f6' : '#d1d5db';
+                let textColor = isSelected ? '#1e40af' : '#374151';
+
+                // Highlight range start/end more prominently
+                if (isRangeStart || isRangeEnd) {
+                    backgroundColor = '#3b82f6';
+                    textColor = 'white';
+                }
+
+                if (primarySection && !isSelected) {
+                    const sectionColor = primarySection.color || '#c084fc';
+                    backgroundColor = hexToRgba(sectionColor, 0.18);
+                    borderColor = sectionColor;
+                    textColor = sectionColor;
+                }
+
+                chip.style.cssText = `
+                    padding: 4px 8px;
+                    border: 2px solid ${borderColor};
+                    border-radius: 4px;
+                    background: ${backgroundColor};
+                    color: ${textColor};
+                    font-size: 11px;
+                    font-weight: ${isSelected ? '700' : '500'};
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                `;
+                chip.addEventListener('click', (e) => {
+                    if (e.shiftKey && modalState.melodySelectedChordStart >= 0) {
+                        // Shift+click: extend selection to this chord
+                        modalState.melodySelectedChordEnd = idx;
+                    } else {
+                        // Normal click: start new selection
+                        modalState.melodySelectedChordStart = idx;
+                        modalState.melodySelectedChordEnd = -1; // Reset end (single chord)
+                    }
+                    modalState.currentPhraseCandidates = []; // Clear to regenerate
+                    renderMelodyPhrasesView(container, progressionData[modalState.melodySelectedChordStart], key);
+                });
+                chipsContainer.appendChild(chip);
+            });
+        }
+
+        selectorWrapper.appendChild(chipsContainer);
+
+        // Show selected chord(s) info with duration
+        if (modalState.melodySelectedChordStart >= 0 && modalState.melodySelectedChordStart < progressionData.length) {
+            const start = modalState.melodySelectedChordStart;
+            const end = modalState.melodySelectedChordEnd >= 0 ? modalState.melodySelectedChordEnd : start;
+            const minIdx = Math.min(start, end);
+            const maxIdx = Math.max(start, end);
+            const numChords = maxIdx - minIdx + 1;
+            const totalDuration = getSelectedDuration();
+
+            const selectedSections = sections.filter(s => s.chordIndices?.includes(minIdx));
+            const selectedSection = selectedSections[0];
+
+            const infoDiv = document.createElement('div');
+            infoDiv.style.cssText = 'margin-top: 8px; font-size: 11px; color: #4b5563; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;';
+
+            let selectionText = '';
+            if (numChords === 1) {
+                const selectedChord = progressionData[minIdx];
+                selectionText = `<strong>Selected:</strong> ${selectedChord.root} ${selectedChord.type} (#${minIdx + 1})`;
+            } else {
+                const startChord = progressionData[minIdx];
+                const endChord = progressionData[maxIdx];
+                selectionText = `<strong>Selected:</strong> #${minIdx + 1} to #${maxIdx + 1} (${numChords} chords)`;
+            }
+
+            infoDiv.innerHTML = `
+                ${selectionText}
+                <span style="padding: 2px 8px; background: #10b981; color: white; border-radius: 4px; font-weight: 600;">
+                    ${totalDuration} beats
+                </span>
+                ${selectedSection ? `<span style="padding: 2px 6px; background: ${selectedSection.color || '#c084fc'}1A; color: ${selectedSection.color || '#c084fc'}; border-radius: 4px; font-weight: 600;">${selectedSection.label || selectedSection.type}</span>` : ''}
+            `;
+            selectorWrapper.appendChild(infoDiv);
+        }
+
+        container.appendChild(selectorWrapper);
+    }
+
+    // Set up position mode toggle listeners AFTER the section selector is added
+    positionModeSection.querySelectorAll('.melody-pos-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            modalState.melodyPositionMode = btn.dataset.mode;
+            localStorage.setItem('melody-position-mode', btn.dataset.mode);
+            modalState.currentPhraseCandidates = []; // Clear cached phrases
+            // Reset selection when switching to "Add to End" mode
+            if (btn.dataset.mode === 'end') {
+                modalState.melodySelectedChordStart = -1;
+                modalState.melodySelectedChordEnd = -1;
+            }
+            // Re-render with the same container
+            renderMelodyPhrasesView(container, currentChord, key);
+        });
+    });
+
     // Build the controls section for phrases - organized in rows
     const controlsSection = document.createElement('div');
     controlsSection.style.cssText = `
@@ -3321,19 +3664,54 @@ function renderMelodyPhrasesView(container, currentChord, key) {
     ];
 
     const selectStyle = `padding: 5px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; background: white; min-width: 80px;`;
+    const disabledSelectStyle = `padding: 5px 8px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; background: #f3f4f6; min-width: 80px; color: #9ca3af; cursor: not-allowed;`;
     const labelStyle = `font-size: 12px; color: #6b7280; white-space: nowrap;`;
     const controlGroupStyle = `display: flex; align-items: center; gap: 6px;`;
+
+    // Determine if duration should be fixed (section mode with chord(s) selected)
+    const startIdx = modalState.melodySelectedChordStart;
+    const endIdx = modalState.melodySelectedChordEnd >= 0 ? modalState.melodySelectedChordEnd : startIdx;
+    const minChordIdx = Math.min(startIdx, endIdx);
+    const maxChordIdx = Math.max(startIdx, endIdx);
+    const isSectionModeWithChord = isSectionMode && minChordIdx >= 0 && minChordIdx < progressionData.length;
+
+    // Calculate fixed duration from selected chord(s) if in section mode
+    let fixedDurationBeats = null;
+    let sectionDurationInfo = '';
+    if (isSectionModeWithChord) {
+        // Sum durations of all selected chords
+        fixedDurationBeats = 0;
+        for (let i = minChordIdx; i <= maxChordIdx && i < progressionData.length; i++) {
+            fixedDurationBeats += progressionData[i].duration || 4; // Default 4 beats per chord
+        }
+        const numChords = maxChordIdx - minChordIdx + 1;
+        if (numChords === 1) {
+            sectionDurationInfo = `${fixedDurationBeats} beats`;
+        } else {
+            sectionDurationInfo = `${fixedDurationBeats} beats (${numChords} chords)`;
+        }
+    }
+
+    // Auto-detect section type from first selected chord's section
+    let autoDetectedSectionType = null;
+    if (isSectionModeWithChord) {
+        const selectedSections = sections.filter(s => s.chordIndices?.includes(minChordIdx));
+        if (selectedSections[0]) {
+            autoDetectedSectionType = selectedSections[0].type || selectedSections[0].label?.toLowerCase();
+        }
+    }
 
     controlsSection.innerHTML = `
         <!-- Row 1: Section Type, Contour Shape, Number of Beats -->
         <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
             <div style="${controlGroupStyle}">
                 <label style="${labelStyle}">Section:</label>
-                <select id="phrase-section-select" style="${selectStyle}">
+                <select id="phrase-section-select" style="${selectStyle}" ${autoDetectedSectionType ? 'title="Auto-detected from selected chord"' : ''}>
                     ${sectionTypes.map(s => `
-                        <option value="${s.id}" ${s.id === modalState.phraseSectionType ? 'selected' : ''}>${s.label}</option>
+                        <option value="${s.id}" ${s.id === (autoDetectedSectionType || modalState.phraseSectionType) ? 'selected' : ''}>${s.label}</option>
                     `).join('')}
                 </select>
+                ${autoDetectedSectionType ? '<span style="font-size: 10px; color: #10b981; margin-left: 2px;" title="Auto-detected">*</span>' : ''}
             </div>
             <div style="${controlGroupStyle}">
                 <label style="${labelStyle}">Contour:</label>
@@ -3343,13 +3721,19 @@ function renderMelodyPhrasesView(container, currentChord, key) {
                     `).join('')}
                 </select>
             </div>
-            <div style="${controlGroupStyle}">
-                <label style="${labelStyle}">Beats:</label>
-                <select id="phrase-length-select" style="${selectStyle}">
-                    ${lengthOptions.map(p => `
-                        <option value="${p.id}" ${p.id === modalState.phraseLengthId ? 'selected' : ''}>${p.label}</option>
-                    `).join('')}
-                </select>
+            <div style="${controlGroupStyle}" ${isSectionModeWithChord ? 'title="Duration is determined by the selected chord/section"' : ''}>
+                <label style="${labelStyle}">${isSectionModeWithChord ? 'Duration:' : 'Beats:'}</label>
+                ${isSectionModeWithChord ? `
+                    <span style="padding: 5px 8px; background: #e5e7eb; border-radius: 6px; font-size: 12px; color: #4b5563; min-width: 80px; display: inline-block; text-align: center;">
+                        ${sectionDurationInfo}
+                    </span>
+                ` : `
+                    <select id="phrase-length-select" style="${selectStyle}">
+                        ${lengthOptions.map(p => `
+                            <option value="${p.id}" ${p.id === modalState.phraseLengthId ? 'selected' : ''}>${p.label}</option>
+                        `).join('')}
+                    </select>
+                `}
             </div>
             <div style="${controlGroupStyle}">
                 <label style="${labelStyle}">Rhythm:</label>
@@ -3528,6 +3912,69 @@ function generateAndDisplayPhrases(container, chord, key) {
     `;
 
     try {
+        // Get context for section-aware generation
+        const progressionData = getProgressionData() || [];
+        const compositionState = getCompositionState();
+        const sections = compositionState?.getSections?.() || [];
+        const isSectionMode = modalState.melodyPositionMode === 'section';
+
+        // Handle chord range selection (supports multiple consecutive chords)
+        const startIdx = modalState.melodySelectedChordStart;
+        const endIdx = modalState.melodySelectedChordEnd >= 0 ? modalState.melodySelectedChordEnd : startIdx;
+        const minChordIdx = Math.min(startIdx, endIdx);
+        const maxChordIdx = Math.max(startIdx, endIdx);
+        const isSectionModeWithChord = isSectionMode && minChordIdx >= 0 && minChordIdx < progressionData.length;
+
+        // Determine target beats and section context
+        let targetBeats = null;
+        let sectionContext = null;
+        let effectiveSectionType = modalState.phraseSectionType;
+        let chordSequence = null; // For multi-chord phrases
+
+        if (isSectionModeWithChord) {
+            // Calculate total duration from all selected chords
+            targetBeats = 0;
+            chordSequence = [];
+            for (let i = minChordIdx; i <= maxChordIdx && i < progressionData.length; i++) {
+                const chordDuration = progressionData[i].duration || 4; // Default 4 beats
+                targetBeats += chordDuration;
+                chordSequence.push({
+                    chord: progressionData[i],
+                    duration: chordDuration,
+                    index: i
+                });
+            }
+
+            // Auto-detect section type from first selected chord's section
+            const selectedSections = sections.filter(s => s.chordIndices?.includes(minChordIdx));
+            if (selectedSections[0]) {
+                const sectionType = selectedSections[0].type || selectedSections[0].label?.toLowerCase();
+                if (sectionType) {
+                    effectiveSectionType = sectionType;
+                }
+            }
+
+            // Build section context for context-aware generation
+            // Get previous melody notes (if any)
+            const previousMelody = compositionState?.getMelodyNotesBeforeChord?.(minChordIdx) || [];
+
+            // Get next chords for look-ahead (after the selection)
+            const nextChords = progressionData.slice(maxChordIdx + 1, maxChordIdx + 3);
+
+            sectionContext = {
+                previousMelody: previousMelody.slice(-8), // Last 8 notes for context
+                nextChords: nextChords,
+                sectionType: effectiveSectionType,
+                chordIndex: minChordIdx,
+                chordEndIndex: maxChordIdx,
+                totalChords: progressionData.length,
+                chordSequence: chordSequence
+            };
+
+            // Use the first selected chord as the primary chord
+            chord = progressionData[minChordIdx];
+        }
+
         // Map section type to style (section type affects melodic character)
         const sectionStyleMap = {
             verse: 'pop',
@@ -3537,7 +3984,12 @@ function generateAndDisplayPhrases(container, chord, key) {
             outro: 'pop',
             prechorus: 'pop'
         };
-        const styleId = sectionStyleMap[modalState.phraseSectionType] || 'any';
+        const styleId = sectionStyleMap[effectiveSectionType] || 'any';
+
+        // Log target beats for debugging
+        if (isSectionModeWithChord) {
+            console.log(`Generating phrases for ${maxChordIdx - minChordIdx + 1} chord(s), targetBeats: ${targetBeats}`);
+        }
 
         const candidates = generatePhraseCandidates({
             chord,
@@ -3548,8 +4000,21 @@ function generateAndDisplayPhrases(container, chord, key) {
             styleId: styleId,
             octave: modalState.phraseOctave,
             range: modalState.phraseRange,
-            densityMultiplier: modalState.phraseDensity
+            densityMultiplier: modalState.phraseDensity,
+            targetBeats: targetBeats, // Pass custom target beats for section mode
+            sectionContext: sectionContext // Pass section context
         }, 5);
+
+        // Verify phrase durations match target (should already be correct from generator)
+        if (isSectionModeWithChord && targetBeats !== null) {
+            candidates.forEach((phrase, idx) => {
+                if (!phrase.rhythm) return;
+                const actualBeats = phrase.rhythm.reduce((sum, r) => sum + r, 0);
+                if (Math.abs(actualBeats - targetBeats) > 0.01) {
+                    console.warn(`Phrase ${idx + 1}: expected ${targetBeats} beats, got ${actualBeats.toFixed(2)}`);
+                }
+            });
+        }
 
         modalState.currentPhraseCandidates = candidates;
         displayPhraseCandidates(container, candidates);
@@ -3621,6 +4086,11 @@ function createPhraseCard(phrase, index) {
     const scoreColor = score >= 80 ? '#10b981' : score >= 60 ? '#f59e0b' : '#6b7280';
     const quality = getScoreQualityLabel(score);
 
+    // Calculate total duration in beats
+    const rhythm = phrase.rhythm || notes.map(() => 1);
+    const totalBeats = rhythm.reduce((sum, r) => sum + r, 0);
+    const beatsDisplay = totalBeats % 1 === 0 ? totalBeats : totalBeats.toFixed(1);
+
     card.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <div style="display: flex; align-items: center; gap: 8px;">
@@ -3637,8 +4107,16 @@ function createPhraseCard(phrase, index) {
                     color: #4b5563;
                 ">${index + 1}</span>
                 <span style="font-size: 13px; color: #6b7280;">
-                    ${phrase.contour || 'arch'} | ${phrase.length || 'medium'} | ${phrase.rhythmPattern || 'steady'}
+                    ${phrase.contour || 'arch'} | ${phrase.rhythmPattern || 'steady'}
                 </span>
+                <span style="
+                    padding: 2px 6px;
+                    background: #dbeafe;
+                    color: #1e40af;
+                    border-radius: 4px;
+                    font-size: 11px;
+                    font-weight: 600;
+                " title="Total duration: ${beatsDisplay} beats (${notes.length} notes)">${beatsDisplay}b</span>
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
                 <button class="play-phrase-btn" data-index="${index}" style="
@@ -3659,6 +4137,7 @@ function createPhraseCard(phrase, index) {
                     data-length="${phrase.length || 'medium'}"
                     data-rhythm="${phrase.rhythmPattern || 'steady'}"
                     data-note-count="${notes.length}"
+                    data-total-beats="${beatsDisplay}"
                     style="
                     padding: 4px 8px;
                     background: ${scoreColor}20;
@@ -3806,21 +4285,32 @@ function playPhrase(phrase) {
         }
         if (window.initAudio) window.initAudio();
 
-        // Get rhythm values or use default
+        // Get rhythm values from the phrase - these are the actual note durations in beats
+        // Each value represents how many beats that note lasts (e.g., 1 = quarter, 0.5 = eighth, 2 = half)
         const rhythm = phrase.rhythm || notes.map(() => 1);
+
+        // Use composition tempo if available, otherwise default to 120 BPM
+        const compositionState = getCompositionState();
+        const tempo = compositionState?.getTempo?.() || window.compositionTempo || 120;
+        const beatDuration = 60 / tempo; // Duration of one beat in seconds
+
         const baseTime = window.Tone?.now?.() || 0;
-        const tempo = 120; // BPM
-        const beatDuration = 60 / tempo;
+
+        // Log rhythm for debugging
+        console.log('Playing phrase with rhythm:', rhythm.map(r => r.toFixed(2)).join(', '), `@ ${tempo} BPM`);
 
         let currentTime = baseTime;
         notes.forEach((note, i) => {
-            const duration = (rhythm[i] || 1) * beatDuration * 0.9;
+            const rhythmValue = rhythm[i] || 1;
+            // Note sounds for 90% of its duration (slight gap for articulation)
+            const noteDuration = rhythmValue * beatDuration * 0.9;
             try {
-                instrument.triggerAttackRelease(note, duration, currentTime);
+                instrument.triggerAttackRelease(note, noteDuration, currentTime);
             } catch (e) {
                 // Ignore individual note errors
             }
-            currentTime += (rhythm[i] || 1) * beatDuration;
+            // Advance time by the full rhythm value
+            currentTime += rhythmValue * beatDuration;
         });
 
     } catch (e) {
@@ -3867,23 +4357,163 @@ function beatsToDuration(beats) {
 }
 
 function applyPhrase(phrase) {
-    // Check if there are existing notes after the insertion point
+    // Save state for undo BEFORE making any changes
+    // This allows user to undo if they accidentally overwrote a melody they liked
+    try {
+        saveStateBeforeChange();
+    } catch (e) {
+        console.warn('[applyPhrase] Could not save state for undo:', e);
+    }
+
     const compositionState = getCompositionState();
+    const progressionData = getProgressionData() || [];
+    const isSectionMode = modalState.melodyPositionMode === 'section';
+
+    // Get selected chord range
+    const startIdx = modalState.melodySelectedChordStart;
+    const endIdx = modalState.melodySelectedChordEnd >= 0 ? modalState.melodySelectedChordEnd : startIdx;
+    const minChordIdx = Math.min(startIdx, endIdx);
+    const maxChordIdx = Math.max(startIdx, endIdx);
+    const isSectionModeWithChord = isSectionMode && minChordIdx >= 0 && minChordIdx < progressionData.length;
+
+    // Calculate insertion position and max duration for section mode
+    let insertAtBeat = null;
+    let maxDuration = null;
+    if (isSectionModeWithChord) {
+        // Calculate the beat position where the selected chord(s) start
+        insertAtBeat = 0;
+        for (let i = 0; i < minChordIdx; i++) {
+            insertAtBeat += progressionData[i].duration || 4;
+        }
+
+        // Calculate max duration (sum of selected chords' durations)
+        maxDuration = 0;
+        for (let i = minChordIdx; i <= maxChordIdx && i < progressionData.length; i++) {
+            maxDuration += progressionData[i].duration || 4;
+        }
+    }
+
+    // Check if there are existing notes at/after the insertion point
     const hasExistingNotes = compositionState?.hasNotesAfterCursor?.() ||
                               compositionState?.getNoteCount?.() > 0 ||
                               (compositionState?.notes && compositionState.notes.length > 0);
 
     const doApply = (insertMode) => {
-        // Get the notes and rhythm from the phrase
-        const notes = phrase.notes || [];
-        const rhythm = phrase.rhythm || notes.map(() => 1); // Default to quarter notes
+        // Get COPIES of notes and rhythm from the phrase (to avoid modifying original)
+        let notes = [...(phrase.notes || [])];
+        let rhythm = [...(phrase.rhythm || notes.map(() => 1))]; // Default to quarter notes
 
+        // Standard durations for any adjustments
+        const standardDurations = [4, 3, 2, 1.5, 1, 0.75, 0.5, 0.25];
+
+        // If in section mode, enforce max duration by truncating
+        if (isSectionModeWithChord && maxDuration !== null) {
+            let totalPhraseBeats = rhythm.reduce((sum, r) => sum + r, 0);
+
+            // If phrase exceeds max, truncate notes to fit
+            if (totalPhraseBeats > maxDuration + 0.01) {
+                console.log(`Truncating phrase from ${totalPhraseBeats} to ${maxDuration} beats`);
+
+                let accumulatedBeats = 0;
+                let truncateIndex = 0;
+
+                for (let i = 0; i < notes.length; i++) {
+                    const noteBeats = rhythm[i] || 1;
+                    if (accumulatedBeats + noteBeats > maxDuration + 0.01) {
+                        // Find largest standard duration that fits in remaining space
+                        const remainingSpace = maxDuration - accumulatedBeats;
+                        let fitDuration = 0;
+                        for (const std of standardDurations) {
+                            if (std <= remainingSpace + 0.01) {
+                                fitDuration = std;
+                                break;
+                            }
+                        }
+                        if (fitDuration >= 0.25) {
+                            rhythm[i] = fitDuration;
+                            truncateIndex = i + 1;
+                        } else {
+                            truncateIndex = i;
+                        }
+                        break;
+                    }
+                    accumulatedBeats += noteBeats;
+                    truncateIndex = i + 1;
+                }
+
+                notes = notes.slice(0, truncateIndex);
+                rhythm = rhythm.slice(0, truncateIndex);
+            }
+        }
+
+        // Units per beat constant (must match buildingBlock.js)
+        const UNITS_PER_BEAT = 48;
+
+        // In section mode, use direct unit positioning to place notes at exact beat positions
+        if (isSectionModeWithChord && insertAtBeat !== null && maxDuration !== null) {
+            const totalPhraseBeats = rhythm.reduce((sum, r) => sum + r, 0);
+            console.log(`Applying phrase to section: ${notes.length} notes, ${totalPhraseBeats} beats at beat ${insertAtBeat}`);
+
+            // Use addTrebleNoteAtUnit to place notes directly at specific positions
+            if (compositionState?.addTrebleNoteAtUnit) {
+                // First, clear the entire section to remove any old notes
+                // This ensures clean replacement even if new melody is shorter
+                if (compositionState.clearTrebleBeatRange) {
+                    compositionState.clearTrebleBeatRange(insertAtBeat, maxDuration);
+                }
+                let currentBeat = insertAtBeat;
+                let addedCount = 0;
+
+                for (let i = 0; i < notes.length; i++) {
+                    const noteName = notes[i];
+                    const beats = rhythm[i] || 1;
+                    const startUnit = Math.round(currentBeat * UNITS_PER_BEAT);
+                    const durationUnits = Math.round(beats * UNITS_PER_BEAT);
+
+                    // Add note at specific unit position
+                    compositionState.addTrebleNoteAtUnit(startUnit, durationUnits, [noteName], {});
+                    addedCount++;
+                    currentBeat += beats;
+                }
+
+                // Re-render to update the display
+                if (compositionState.renderTrebleBlocksToMeasures) {
+                    compositionState.renderTrebleBlocksToMeasures();
+                }
+
+                // Trigger UI update
+                if (window.renderNotation) {
+                    window.renderNotation();
+                }
+
+                console.log(`Applied phrase: ${addedCount}/${notes.length} notes (${totalPhraseBeats.toFixed(1)} beats)`);
+
+                // Visual feedback
+                const cards = document.querySelectorAll('.phrase-card');
+                cards.forEach((card, idx) => {
+                    const applyBtn = card.querySelector('.apply-phrase-btn');
+                    if (modalState.currentPhraseCandidates[idx] === phrase && applyBtn) {
+                        applyBtn.textContent = `Applied ${addedCount} notes!`;
+                        applyBtn.style.background = '#059669';
+                        setTimeout(() => {
+                            applyBtn.textContent = 'Apply Phrase';
+                            applyBtn.style.background = '#10b981';
+                        }, 1500);
+                    }
+                });
+                return;
+            }
+        }
+
+        // Fallback for add-to-end mode: use addNoteIntelligently
         if (!window.addNoteIntelligently) {
             console.warn('addNoteIntelligently function not available');
             return;
         }
 
-        // Add each note from the phrase
+        const totalPhraseBeats = rhythm.reduce((sum, r) => sum + r, 0);
+        console.log(`Applying phrase (add-to-end): ${notes.length} notes, ${totalPhraseBeats} beats total`);
+
         let addedCount = 0;
         for (let i = 0; i < notes.length; i++) {
             const noteName = notes[i];
@@ -3895,8 +4525,8 @@ function applyPhrase(phrase) {
                 duration,
                 dotted,
                 'treble',
-                false, // isRest
-                null   // accidental
+                false,
+                null
             );
 
             if (result) {
@@ -3904,7 +4534,8 @@ function applyPhrase(phrase) {
             }
         }
 
-        console.log(`Applied phrase: ${addedCount}/${notes.length} notes added`);
+        const totalBeats = rhythm.reduce((sum, r) => sum + r, 0);
+        console.log(`Applied phrase: ${addedCount}/${notes.length} notes (${totalBeats.toFixed(1)} beats)`);
 
         // Visual feedback on the apply button
         const cards = document.querySelectorAll('.phrase-card');
@@ -3921,22 +4552,30 @@ function applyPhrase(phrase) {
         });
     };
 
-    // If there are existing notes, ask what to do
+    // In section mode, we automatically clear existing notes in that section, so just apply directly
+    if (isSectionModeWithChord) {
+        doApply('replace');
+        return;
+    }
+
+    // In add-to-end mode, check for existing notes and ask what to do
     if (hasExistingNotes) {
+        const dialogMessage = `This phrase has <strong>${phrase.notes?.length || 0} notes</strong>.`;
         showChoiceDialog({
             title: 'Insert Phrase',
-            message: `This phrase has <strong>${phrase.notes?.length || 0} notes</strong>. How would you like to handle existing notes after the insertion point?`,
+            message: dialogMessage + ' How would you like to handle existing notes?',
             choices: [
+                {
+                    id: 'replace',
+                    label: 'Replace notes',
+                    description: 'The phrase will overwrite any notes at the cursor position.',
+                    primary: false
+                },
                 {
                     id: 'shift',
                     label: 'Shift downstream notes',
                     description: 'All following notes will be pushed forward to make room for the phrase.',
                     primary: true
-                },
-                {
-                    id: 'replace',
-                    label: 'Replace notes',
-                    description: 'The phrase will overwrite any notes at the insertion point.'
                 }
             ],
             onChoice: (choice) => {
@@ -4403,6 +5042,13 @@ function showMelodyInsertFeedback(suggestion) {
 }
 
 function handleMelodyNoteSelection(suggestion) {
+    // Save state for undo BEFORE making any changes
+    try {
+        saveStateBeforeChange();
+    } catch (e) {
+        console.warn('[handleMelodyNoteSelection] Could not save state for undo:', e);
+    }
+
     // Get the selected note info
     const selectedInfo = getSelectedNoteInfo();
 
@@ -5847,11 +6493,14 @@ function renderHarmonizeTab(container) {
                         ? `${chord.root}${CHORD_DEFINITIONS[chord.type].symbol}`
                         : `${chord.root || ''}${chord.type ? ` ${chord.type}` : ''}`;
                     const resolvedNotes = chordInfo?.specificNotes || [];
+                    // Calculate roman numeral for the chord
+                    const roman = noteToRomanNumeral(chord.root, progressionKey, chord.type) || chord.root || '';
                     newProgressionData[chord.measureIndex] = {
                         ...newProgressionData[chord.measureIndex],
                         root: chord.root,
                         type: chord.type,
                         inversion: chord.inversion || 0,
+                        roman: roman,
                         name: chordInfo?.name || `${chord.root || ''} ${chord.type || ''}`.trim(),
                         simpleName: chordInfo?.simpleName || fallbackSymbol.trim(),
                         notes: resolvedNotes,
@@ -5920,6 +6569,1216 @@ function renderHarmonizeTab(container) {
 }
 
 // ============================================================================
+// POLYPHONY/TEXTURE TAB
+// ============================================================================
+
+// Texture types for adding complementary voices
+const TEXTURE_TYPES = {
+    PARALLEL_THIRDS: {
+        id: 'parallel_thirds',
+        name: 'Parallel Thirds',
+        description: 'Follows melody a third below - classic warm harmony',
+        icon: '🎵'
+    },
+    PARALLEL_SIXTHS: {
+        id: 'parallel_sixths',
+        name: 'Parallel Sixths',
+        description: 'Follows melody a sixth below - rich, full sound',
+        icon: '🎶'
+    },
+    CONTRARY_MOTION: {
+        id: 'contrary',
+        name: 'Contrary Motion',
+        description: 'Moves opposite to melody - creates interesting counterpoint',
+        icon: '↕️'
+    },
+    PEDAL_ROOT: {
+        id: 'pedal_root',
+        name: 'Pedal Tone (Root)',
+        description: 'Sustained chord root - grounding effect',
+        icon: '🔊'
+    },
+    PEDAL_FIFTH: {
+        id: 'pedal_fifth',
+        name: 'Pedal Tone (Fifth)',
+        description: 'Sustained fifth - adds depth without dissonance',
+        icon: '🎹'
+    },
+    RHYTHMIC_COMPLEMENT: {
+        id: 'rhythmic',
+        name: 'Rhythmic Complement',
+        description: 'Fills gaps where main voice has rests',
+        icon: '🥁'
+    },
+    COUNTER_MELODY: {
+        id: 'counter',
+        name: 'Counter-Melody',
+        description: 'Independent complementary line with rhythmic interest',
+        icon: '🎼'
+    }
+};
+
+// Style-specific texture preferences
+const STYLE_TEXTURE_PREFERENCES = {
+    pop: {
+        preferredTextures: ['parallel_thirds', 'parallel_sixths', 'pedal_root'],
+        intervalBias: 'consonant',      // Prefer 3rds, 6ths
+        rhythmDensity: 'moderate',
+        chromaticism: 'low',
+        voiceLeadingStrictness: 'relaxed'
+    },
+    rock: {
+        preferredTextures: ['pedal_root', 'pedal_fifth', 'parallel_thirds'],
+        intervalBias: 'power',          // Prefer 5ths, octaves
+        rhythmDensity: 'driving',
+        chromaticism: 'low',
+        voiceLeadingStrictness: 'relaxed'
+    },
+    jazz: {
+        preferredTextures: ['contrary', 'counter', 'parallel_sixths'],
+        intervalBias: 'colorful',       // Include 7ths, 9ths
+        rhythmDensity: 'syncopated',
+        chromaticism: 'high',
+        voiceLeadingStrictness: 'strict'
+    },
+    classical: {
+        preferredTextures: ['contrary', 'parallel_thirds', 'parallel_sixths'],
+        intervalBias: 'balanced',       // Traditional intervals
+        rhythmDensity: 'varied',
+        chromaticism: 'moderate',
+        voiceLeadingStrictness: 'strict'
+    },
+    folk: {
+        preferredTextures: ['parallel_thirds', 'pedal_root', 'rhythmic'],
+        intervalBias: 'simple',         // Diatonic intervals
+        rhythmDensity: 'sparse',
+        chromaticism: 'none',
+        voiceLeadingStrictness: 'relaxed'
+    },
+    rnbSoul: {
+        preferredTextures: ['parallel_thirds', 'parallel_sixths', 'counter'],
+        intervalBias: 'smooth',         // Smooth voice leading
+        rhythmDensity: 'groovy',
+        chromaticism: 'moderate',
+        voiceLeadingStrictness: 'moderate'
+    },
+    gospel: {
+        preferredTextures: ['parallel_thirds', 'parallel_sixths', 'contrary'],
+        intervalBias: 'rich',           // Full harmonies
+        rhythmDensity: 'expressive',
+        chromaticism: 'moderate',
+        voiceLeadingStrictness: 'moderate'
+    },
+    blues: {
+        preferredTextures: ['pedal_root', 'parallel_thirds', 'rhythmic'],
+        intervalBias: 'bluesy',         // Blue notes, b3, b7
+        rhythmDensity: 'shuffle',
+        chromaticism: 'bluenotes',
+        voiceLeadingStrictness: 'relaxed'
+    }
+};
+
+// Mood adjustments for texture generation
+const MOOD_TEXTURE_ADJUSTMENTS = {
+    bright: {
+        intervalOffset: 0,              // No change
+        preferMajor: true,
+        dynamicBias: 'forte',
+        registerBias: 'higher'
+    },
+    dark: {
+        intervalOffset: -1,             // Slightly lower
+        preferMajor: false,
+        dynamicBias: 'piano',
+        registerBias: 'lower'
+    },
+    tense: {
+        intervalOffset: 0,
+        preferDissonance: true,
+        dynamicBias: 'crescendo',
+        registerBias: 'compressed'
+    },
+    calm: {
+        intervalOffset: 0,
+        preferConsonance: true,
+        dynamicBias: 'piano',
+        registerBias: 'middle'
+    }
+};
+
+// Polyphony tab state
+let polyphonyState = {
+    selectedStaff: 'treble',        // Which staff to add texture to
+    targetVoice: 2,                 // Always voice 2 for texture
+    selectedTextureType: 'parallel_thirds',
+    selectedChordIndex: 0,          // Which chord/building block
+    selectedStyle: 'pop',           // Musical style
+    selectedMood: 'bright',         // Current mood
+    generatedSuggestions: [],       // Array of generated notes
+    previewCanvas: null             // VexFlow preview canvas
+};
+
+function renderPolyphonyTab(container) {
+    container.innerHTML = '';
+
+    // Get composition context
+    const compositionState = getCompositionState();
+    const progressionData = getProgressionData() || [];
+    const currentKey = getCurrentKey();
+
+    if (!compositionState || progressionData.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #6b7280;">
+                <div style="font-size: 48px; margin-bottom: 16px;">🎭</div>
+                <h3 style="margin: 0 0 8px 0; color: #374151;">Add Texture to Your Composition</h3>
+                <p style="margin: 0;">Add chords to your progression first to generate texture recommendations.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Header section
+    const header = document.createElement('div');
+    header.style.cssText = 'padding: 16px; border-bottom: 1px solid #e5e7eb; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;';
+    header.innerHTML = `
+        <h3 style="margin: 0 0 4px 0; font-size: 18px;">Add Texture & Harmony</h3>
+        <p style="margin: 0; font-size: 13px; opacity: 0.9;">Add a second voice to complement your existing melody or bass line</p>
+    `;
+    container.appendChild(header);
+
+    // Main content
+    const content = document.createElement('div');
+    content.style.cssText = 'padding: 16px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; max-height: 500px;';
+
+    // 1. Style & Mood Selector (affects texture recommendations)
+    const styleMoodSelector = createStyleMoodSelector();
+    content.appendChild(styleMoodSelector);
+
+    // 2. Building Block / Chord Selector
+    const chordSelector = createPolyphonyChordSelector(progressionData, currentKey);
+    content.appendChild(chordSelector);
+
+    // 3. Staff & Texture Type Selector
+    const textureSelector = createTextureTypeSelector();
+    content.appendChild(textureSelector);
+
+    // 3. VexFlow Preview with dual colors
+    const previewSection = createPolyphonyPreview();
+    content.appendChild(previewSection);
+
+    // 4. Generated Suggestions
+    const suggestionsSection = document.createElement('div');
+    suggestionsSection.id = 'polyphony-suggestions';
+    suggestionsSection.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;';
+    suggestionsSection.innerHTML = `
+        <div style="color: #6b7280; text-align: center; padding: 20px;">
+            Select a chord and texture type to generate suggestions
+        </div>
+    `;
+    content.appendChild(suggestionsSection);
+
+    container.appendChild(content);
+
+    // Apply button
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = 'padding: 16px; border-top: 1px solid #e5e7eb; display: flex; gap: 12px; justify-content: flex-end;';
+
+    const generateBtn = document.createElement('button');
+    generateBtn.textContent = 'Generate Suggestions';
+    generateBtn.style.cssText = `
+        padding: 10px 20px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+    `;
+    generateBtn.addEventListener('click', () => generatePolyphonySuggestions());
+    buttonContainer.appendChild(generateBtn);
+
+    const applyBtn = document.createElement('button');
+    applyBtn.textContent = 'Apply to Voice 2';
+    applyBtn.style.cssText = `
+        padding: 10px 20px;
+        background: #10b981;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+    `;
+    applyBtn.addEventListener('click', () => applyPolyphonySuggestions());
+    buttonContainer.appendChild(applyBtn);
+
+    container.appendChild(buttonContainer);
+
+    // Initialize preview
+    updatePolyphonyPreview();
+}
+
+function createStyleMoodSelector() {
+    const section = document.createElement('div');
+    section.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; background: linear-gradient(135deg, #f8f9ff 0%, #fff 100%);';
+
+    // Get current style preferences and highlight recommended textures
+    const stylePrefs = STYLE_TEXTURE_PREFERENCES[polyphonyState.selectedStyle];
+    const recommendedTextures = stylePrefs?.preferredTextures?.slice(0, 3) || [];
+
+    section.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 12px; color: #374151; display: flex; align-items: center; gap: 8px;">
+            <span>🎨</span> Style & Mood
+            <span style="font-weight: normal; font-size: 11px; color: #6b7280;">(affects texture recommendations)</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div>
+                <label style="font-size: 12px; color: #6b7280; display: block; margin-bottom: 4px;">Musical Style</label>
+                <select id="polyphony-style-select" style="
+                    width: 100%;
+                    padding: 8px 12px;
+                    border: 1px solid #d1d5db;
+                    border-radius: 6px;
+                    font-size: 13px;
+                    background: white;
+                    cursor: pointer;
+                ">
+                    ${Object.entries(HARMONY_STYLES).map(([id, style]) => `
+                        <option value="${id}" ${polyphonyState.selectedStyle === id ? 'selected' : ''}>
+                            ${style.name}
+                        </option>
+                    `).join('')}
+                </select>
+            </div>
+            <div>
+                <label style="font-size: 12px; color: #6b7280; display: block; margin-bottom: 4px;">Mood</label>
+                <select id="polyphony-mood-select" style="
+                    width: 100%;
+                    padding: 8px 12px;
+                    border: 1px solid #d1d5db;
+                    border-radius: 6px;
+                    font-size: 13px;
+                    background: white;
+                    cursor: pointer;
+                ">
+                    <option value="bright" ${polyphonyState.selectedMood === 'bright' ? 'selected' : ''}>☀️ Bright</option>
+                    <option value="dark" ${polyphonyState.selectedMood === 'dark' ? 'selected' : ''}>🌙 Dark</option>
+                    <option value="tense" ${polyphonyState.selectedMood === 'tense' ? 'selected' : ''}>⚡ Tense</option>
+                    <option value="calm" ${polyphonyState.selectedMood === 'calm' ? 'selected' : ''}>🌊 Calm</option>
+                </select>
+            </div>
+        </div>
+        <div id="style-recommendations" style="margin-top: 12px; padding: 8px; background: #f0f4ff; border-radius: 6px; font-size: 12px;">
+            <strong style="color: #667eea;">Recommended for ${HARMONY_STYLES[polyphonyState.selectedStyle]?.name || 'Pop'}:</strong>
+            <span style="color: #6b7280;">
+                ${recommendedTextures.map(t => {
+                    const texture = Object.values(TEXTURE_TYPES).find(tx => tx.id === t);
+                    return texture ? `${texture.icon} ${texture.name}` : t;
+                }).join(', ')}
+            </span>
+        </div>
+    `;
+
+    // Add event listeners after DOM insertion
+    setTimeout(() => {
+        const styleSelect = document.getElementById('polyphony-style-select');
+        const moodSelect = document.getElementById('polyphony-mood-select');
+
+        if (styleSelect) {
+            styleSelect.addEventListener('change', (e) => {
+                polyphonyState.selectedStyle = e.target.value;
+                // Update recommendations display
+                const recsDiv = document.getElementById('style-recommendations');
+                if (recsDiv) {
+                    const newPrefs = STYLE_TEXTURE_PREFERENCES[polyphonyState.selectedStyle];
+                    const newRecs = newPrefs?.preferredTextures?.slice(0, 3) || [];
+                    recsDiv.innerHTML = `
+                        <strong style="color: #667eea;">Recommended for ${HARMONY_STYLES[polyphonyState.selectedStyle]?.name || 'Pop'}:</strong>
+                        <span style="color: #6b7280;">
+                            ${newRecs.map(t => {
+                                const texture = Object.values(TEXTURE_TYPES).find(tx => tx.id === t);
+                                return texture ? `${texture.icon} ${texture.name}` : t;
+                            }).join(', ')}
+                        </span>
+                    `;
+                }
+                // Highlight recommended texture types in the texture selector
+                updateTextureRecommendations();
+            });
+        }
+
+        if (moodSelect) {
+            moodSelect.addEventListener('change', (e) => {
+                polyphonyState.selectedMood = e.target.value;
+            });
+        }
+    }, 0);
+
+    return section;
+}
+
+function updateTextureRecommendations() {
+    const stylePrefs = STYLE_TEXTURE_PREFERENCES[polyphonyState.selectedStyle];
+    const recommendedTextures = stylePrefs?.preferredTextures || [];
+
+    document.querySelectorAll('.texture-type-option').forEach(option => {
+        const textureId = option.dataset.type;
+        const isRecommended = recommendedTextures.includes(textureId);
+        const isSelected = textureId === polyphonyState.selectedTextureType;
+
+        // Add a "recommended" badge if this texture is recommended for the style
+        let badge = option.querySelector('.recommended-badge');
+        if (isRecommended && !badge) {
+            badge = document.createElement('span');
+            badge.className = 'recommended-badge';
+            badge.style.cssText = `
+                position: absolute;
+                top: 4px;
+                right: 4px;
+                background: #667eea;
+                color: white;
+                font-size: 9px;
+                padding: 2px 6px;
+                border-radius: 10px;
+            `;
+            badge.textContent = '★';
+            option.style.position = 'relative';
+            option.appendChild(badge);
+        } else if (!isRecommended && badge) {
+            badge.remove();
+        }
+    });
+}
+
+function createPolyphonyChordSelector(progressionData, currentKey) {
+    const section = document.createElement('div');
+    section.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;';
+
+    section.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 12px; color: #374151;">
+            Select Building Block / Chord
+        </div>
+        <div id="polyphony-chord-selector" style="display: flex; flex-wrap: wrap; gap: 8px;">
+        </div>
+    `;
+
+    const selectorContainer = section.querySelector('#polyphony-chord-selector');
+
+    progressionData.forEach((chord, index) => {
+        const chordBtn = document.createElement('button');
+        const isSelected = index === polyphonyState.selectedChordIndex;
+        chordBtn.textContent = `${chord.root}${chord.type || ''}`;
+        chordBtn.style.cssText = `
+            padding: 8px 16px;
+            border: 2px solid ${isSelected ? '#667eea' : '#e5e7eb'};
+            border-radius: 6px;
+            background: ${isSelected ? '#667eea' : 'white'};
+            color: ${isSelected ? 'white' : '#374151'};
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        `;
+        chordBtn.addEventListener('click', () => {
+            polyphonyState.selectedChordIndex = index;
+            // Re-render chord selector
+            const parent = section.parentElement;
+            const newSection = createPolyphonyChordSelector(progressionData, currentKey);
+            parent.replaceChild(newSection, section);
+            updatePolyphonyPreview();
+        });
+        selectorContainer.appendChild(chordBtn);
+    });
+
+    return section;
+}
+
+function createTextureTypeSelector() {
+    const section = document.createElement('div');
+    section.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;';
+
+    // Staff selector
+    const staffOptions = `
+        <div style="margin-bottom: 12px;">
+            <label style="font-weight: 600; color: #374151; display: block; margin-bottom: 8px;">Target Staff</label>
+            <select id="polyphony-staff-select" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; width: 100%;">
+                <option value="treble" ${polyphonyState.selectedStaff === 'treble' ? 'selected' : ''}>Treble Clef</option>
+                <option value="bass" ${polyphonyState.selectedStaff === 'bass' ? 'selected' : ''}>Bass Clef</option>
+            </select>
+        </div>
+    `;
+
+    // Texture type grid
+    const textureOptions = Object.values(TEXTURE_TYPES).map(type => `
+        <div class="texture-type-option" data-type="${type.id}" style="
+            padding: 12px;
+            border: 2px solid ${polyphonyState.selectedTextureType === type.id ? '#667eea' : '#e5e7eb'};
+            border-radius: 8px;
+            background: ${polyphonyState.selectedTextureType === type.id ? '#f0f4ff' : 'white'};
+            cursor: pointer;
+            transition: all 0.2s;
+        ">
+            <div style="font-size: 20px; margin-bottom: 4px;">${type.icon}</div>
+            <div style="font-weight: 600; font-size: 13px; color: #374151;">${type.name}</div>
+            <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">${type.description}</div>
+        </div>
+    `).join('');
+
+    section.innerHTML = `
+        ${staffOptions}
+        <div style="font-weight: 600; margin-bottom: 8px; color: #374151;">Texture Type</div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+            ${textureOptions}
+        </div>
+    `;
+
+    // Add event listeners after DOM insertion
+    setTimeout(() => {
+        const staffSelect = document.getElementById('polyphony-staff-select');
+        if (staffSelect) {
+            staffSelect.addEventListener('change', (e) => {
+                polyphonyState.selectedStaff = e.target.value;
+                updatePolyphonyPreview();
+            });
+        }
+
+        document.querySelectorAll('.texture-type-option').forEach(option => {
+            option.addEventListener('click', () => {
+                polyphonyState.selectedTextureType = option.dataset.type;
+                // Update selection visual
+                document.querySelectorAll('.texture-type-option').forEach(opt => {
+                    const isSelected = opt.dataset.type === polyphonyState.selectedTextureType;
+                    opt.style.borderColor = isSelected ? '#667eea' : '#e5e7eb';
+                    opt.style.background = isSelected ? '#f0f4ff' : 'white';
+                });
+            });
+        });
+    }, 0);
+
+    return section;
+}
+
+function createPolyphonyPreview() {
+    const section = document.createElement('div');
+    section.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;';
+
+    section.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 8px; color: #374151; display: flex; align-items: center; justify-content: space-between;">
+            <span>Preview</span>
+            <div style="display: flex; gap: 16px; font-size: 12px; font-weight: normal;">
+                <span style="display: flex; align-items: center; gap: 4px;">
+                    <span style="width: 12px; height: 12px; background: #000000; border-radius: 2px;"></span>
+                    Current notes
+                </span>
+                <span style="display: flex; align-items: center; gap: 4px;">
+                    <span style="width: 12px; height: 12px; background: #667eea; border-radius: 2px;"></span>
+                    Suggested notes
+                </span>
+            </div>
+        </div>
+        <div id="polyphony-preview-container" style="
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 8px;
+            min-height: 140px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        ">
+            <canvas id="polyphony-preview-canvas" width="560" height="130"></canvas>
+        </div>
+    `;
+
+    return section;
+}
+
+function updatePolyphonyPreview() {
+    const canvas = document.getElementById('polyphony-preview-canvas');
+    if (!canvas) return;
+
+    // Get VexFlow
+    const VF = window.VexFlow || (window.Vex ? window.Vex.Flow : null);
+    if (!VF) {
+        // Fallback to text if VexFlow not available
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#6b7280';
+        ctx.font = '14px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('VexFlow not available', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+
+    // Get current notes for the selected chord
+    const compositionState = getCompositionState();
+    if (!compositionState) return;
+
+    const progressionData = getProgressionData() || [];
+    const chord = progressionData[polyphonyState.selectedChordIndex];
+    if (!chord) return;
+
+    const currentKey = getCurrentKey() || 'C';
+    const clef = polyphonyState.selectedStaff === 'treble' ? 'treble' : 'bass';
+
+    // Gather current voice 1 notes for the selected chord
+    const gatherMethod = clef === 'treble'
+        ? compositionState.gatherTrebleNotesForChord
+        : compositionState.gatherBassNotesForChord;
+
+    const currentNotes = gatherMethod
+        ? gatherMethod.call(compositionState, polyphonyState.selectedChordIndex)
+        : [];
+
+    // Filter to voice 1 only (existing notes)
+    const voice1Notes = currentNotes.filter(n => (n.voiceIndex || 0) === 0);
+
+    // Get generated suggestions (voice 2)
+    const voice2Notes = polyphonyState.generatedSuggestions || [];
+
+    // If no notes to show, display message
+    if (voice1Notes.length === 0 && voice2Notes.length === 0) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#6b7280';
+        ctx.font = '14px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText(`No notes in ${chord.root}${chord.type || ''} - add melody to see preview`, canvas.width / 2, canvas.height / 2);
+        return;
+    }
+
+    // Create VexFlow renderer
+    const rendererResult = createRenderer(canvas, canvas.width, canvas.height);
+    if (!rendererResult) return;
+
+    const { context } = rendererResult;
+
+    // Create stave
+    const staveY = clef === 'treble' ? 30 : 30;
+    const stave = createStave({
+        x: 10,
+        y: staveY,
+        width: canvas.width - 30,
+        clef: clef,
+        keySignature: currentKey,
+        showClef: true,
+        showKeySignature: true,
+        showTimeSignature: false
+    });
+
+    if (!stave) return;
+
+    // Convert notes to VexFlow StaveNotes - Voice 1 (black)
+    const vexVoice1Notes = [];
+    voice1Notes.forEach(note => {
+        let vexNote;
+        if (note.isRest || note.type === 'rest') {
+            vexNote = createRest(note.duration || '4n', clef);
+        } else if (note.pitches && note.pitches.length > 1) {
+            vexNote = createChordNote(
+                note.pitches,
+                note.duration || '4n',
+                currentKey,
+                clef,
+                note.dotted || false,
+                null,
+                null,
+                1 // stems up for voice 1
+            );
+        } else {
+            const pitch = note.pitch || note.pitches?.[0];
+            if (pitch) {
+                vexNote = createStaveNote({
+                    pitch: pitch,
+                    duration: note.duration || '4n',
+                    isRest: false,
+                    dotted: note.dotted || false,
+                    stemDirection: 1 // stems up for voice 1
+                }, currentKey, clef);
+            }
+        }
+        if (vexNote) {
+            // Voice 1 notes in black (default)
+            vexNote.setStyle({ fillStyle: '#000000', strokeStyle: '#000000' });
+            vexVoice1Notes.push(vexNote);
+        }
+    });
+
+    // Convert notes to VexFlow StaveNotes - Voice 2 (purple)
+    const vexVoice2Notes = [];
+    voice2Notes.forEach(note => {
+        let vexNote;
+        if (note.isRest || note.type === 'rest') {
+            vexNote = createRest(note.duration || '4n', clef);
+        } else if (note.pitches && note.pitches.length > 1) {
+            vexNote = createChordNote(
+                note.pitches,
+                note.duration || '4n',
+                currentKey,
+                clef,
+                note.dotted || false,
+                null,
+                null,
+                -1 // stems down for voice 2
+            );
+        } else {
+            const pitch = note.pitch || note.pitches?.[0];
+            if (pitch) {
+                vexNote = createStaveNote({
+                    pitch: pitch,
+                    duration: note.duration || '4n',
+                    isRest: false,
+                    dotted: note.dotted || false,
+                    stemDirection: -1 // stems down for voice 2
+                }, currentKey, clef);
+            }
+        }
+        if (vexNote) {
+            // Voice 2 notes in purple
+            vexNote.setStyle({ fillStyle: '#667eea', strokeStyle: '#667eea' });
+            vexVoice2Notes.push(vexNote);
+        }
+    });
+
+    // Handle empty voices with whole rest
+    if (vexVoice1Notes.length === 0 && vexVoice2Notes.length > 0) {
+        const wholeRest = createRest('1n', clef);
+        if (wholeRest) {
+            wholeRest.setStyle({ fillStyle: 'transparent', strokeStyle: 'transparent' });
+            vexVoice1Notes.push(wholeRest);
+        }
+    }
+    if (vexVoice2Notes.length === 0 && vexVoice1Notes.length > 0) {
+        const wholeRest = createRest('1n', clef);
+        if (wholeRest) {
+            wholeRest.setStyle({ fillStyle: 'transparent', strokeStyle: 'transparent' });
+            vexVoice2Notes.push(wholeRest);
+        }
+    }
+
+    // Create voices
+    const voices = [];
+
+    if (vexVoice1Notes.length > 0) {
+        const voice1 = createVoice(vexVoice1Notes, { numBeats: 4, beatValue: 4 });
+        if (voice1) voices.push(voice1);
+    }
+
+    if (vexVoice2Notes.length > 0) {
+        const voice2 = createVoice(vexVoice2Notes, { numBeats: 4, beatValue: 4 });
+        if (voice2) voices.push(voice2);
+    }
+
+    if (voices.length === 0) return;
+
+    try {
+        // Format voices
+        const formatter = new VF.Formatter();
+        formatter.joinVoices(voices);
+        const staveWidth = stave.getWidth() - (stave.getNoteStartX ? stave.getNoteStartX() - stave.getX() : 40);
+        formatter.format(voices, staveWidth);
+
+        // Draw stave
+        stave.setContext(context).draw();
+
+        // Draw voices
+        voices.forEach(voice => {
+            voice.draw(context, stave);
+        });
+
+        // Generate and draw beams for voice 1 (filter out rests)
+        const beamableVoice1 = vexVoice1Notes.filter(n => !n.isRest?.() && n.getDuration?.() !== 'w' && n.getDuration?.() !== 'h');
+        if (beamableVoice1.length > 0) {
+            try {
+                const beams1 = generateBeams(beamableVoice1, { stemDirection: 1 });
+                beams1.forEach(beam => {
+                    beam.setStyle({ fillStyle: '#000000', strokeStyle: '#000000' });
+                    beam.setContext(context).draw();
+                });
+            } catch (e) {
+                // Beaming errors are non-critical
+            }
+        }
+
+        // Generate and draw beams for voice 2 (filter out rests)
+        const beamableVoice2 = vexVoice2Notes.filter(n => !n.isRest?.() && n.getDuration?.() !== 'w' && n.getDuration?.() !== 'h');
+        if (beamableVoice2.length > 0) {
+            try {
+                const beams2 = generateBeams(beamableVoice2, { stemDirection: -1 });
+                beams2.forEach(beam => {
+                    beam.setStyle({ fillStyle: '#667eea', strokeStyle: '#667eea' });
+                    beam.setContext(context).draw();
+                });
+            } catch (e) {
+                // Beaming errors are non-critical
+            }
+        }
+
+    } catch (e) {
+        console.warn('[PolyphonyPreview] Error rendering VexFlow:', e);
+        // Fallback to text display
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#6b7280';
+        ctx.font = '14px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Preview: ${voice1Notes.length} current + ${voice2Notes.length} suggested notes`, canvas.width / 2, canvas.height / 2);
+    }
+}
+
+function generatePolyphonySuggestions() {
+    const compositionState = getCompositionState();
+    const progressionData = getProgressionData() || [];
+    const currentKey = getCurrentKey();
+
+    if (!compositionState || progressionData.length === 0) return;
+
+    const chord = progressionData[polyphonyState.selectedChordIndex];
+    if (!chord) return;
+
+    // Get notes from the selected chord's measures
+    const chordNotes = compositionState.gatherTrebleNotesForChord
+        ? compositionState.gatherTrebleNotesForChord(polyphonyState.selectedChordIndex)
+        : [];
+
+    // Generate suggestions based on texture type
+    const suggestions = generateTextureNotes(
+        chordNotes,
+        chord,
+        currentKey,
+        polyphonyState.selectedTextureType,
+        polyphonyState.selectedStaff
+    );
+
+    polyphonyState.generatedSuggestions = suggestions;
+
+    // Update suggestions display
+    const suggestionsContainer = document.getElementById('polyphony-suggestions');
+    if (suggestionsContainer) {
+        if (suggestions.length === 0) {
+            suggestionsContainer.innerHTML = `
+                <div style="color: #6b7280; text-align: center; padding: 20px;">
+                    No notes found in the selected chord. Add melody notes first.
+                </div>
+            `;
+        } else {
+            const textureType = Object.values(TEXTURE_TYPES).find(t => t.id === polyphonyState.selectedTextureType);
+            suggestionsContainer.innerHTML = `
+                <div style="font-weight: 600; margin-bottom: 8px; color: #374151;">
+                    ${textureType?.icon || ''} Generated ${textureType?.name || 'Texture'}
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                    ${suggestions.map(note => `
+                        <span style="
+                            padding: 4px 8px;
+                            background: #f0f4ff;
+                            border: 1px solid #667eea;
+                            border-radius: 4px;
+                            font-size: 12px;
+                            color: #667eea;
+                        ">${note.pitch || note.pitches?.[0] || 'rest'} (${note.duration})</span>
+                    `).join('')}
+                </div>
+                <div style="margin-top: 8px; font-size: 12px; color: #6b7280;">
+                    ${suggestions.length} notes will be added to Voice 2 of the ${polyphonyState.selectedStaff} clef
+                </div>
+            `;
+        }
+    }
+
+    // Update preview
+    updatePolyphonyPreview();
+}
+
+function generateTextureNotes(melodyNotes, chord, key, textureType, staff) {
+    if (!melodyNotes || melodyNotes.length === 0) return [];
+
+    const chordRoot = chord.root;
+    const suggestions = [];
+
+    // Get style and mood preferences
+    const stylePrefs = STYLE_TEXTURE_PREFERENCES[polyphonyState.selectedStyle] || STYLE_TEXTURE_PREFERENCES.pop;
+    const moodAdj = MOOD_TEXTURE_ADJUSTMENTS[polyphonyState.selectedMood] || MOOD_TEXTURE_ADJUSTMENTS.bright;
+
+    // Calculate interval adjustments based on style and mood
+    const getStyleAdjustedInterval = (baseInterval) => {
+        let adjusted = baseInterval;
+
+        // Mood offset
+        adjusted += moodAdj.intervalOffset || 0;
+
+        // Style-specific adjustments
+        if (stylePrefs.intervalBias === 'power' && Math.abs(baseInterval) < 5) {
+            // Rock style: prefer power intervals (5ths, octaves)
+            adjusted = baseInterval < 0 ? -7 : 7; // Jump to fifth
+        } else if (stylePrefs.intervalBias === 'colorful' && Math.abs(baseInterval) <= 4) {
+            // Jazz style: add color, could use 7th or 9th
+            adjusted = baseInterval + (Math.random() > 0.5 ? -2 : 2);
+        } else if (stylePrefs.intervalBias === 'bluesy') {
+            // Blues: occasional blue note (b3, b7)
+            if (Math.random() > 0.7) {
+                adjusted = baseInterval - 1; // Flatten by a half step
+            }
+        }
+
+        // Dark mood: lower register
+        if (moodAdj.registerBias === 'lower' && adjusted > -5) {
+            adjusted -= 12; // Drop an octave
+        }
+        // Bright mood: higher register
+        if (moodAdj.registerBias === 'higher' && adjusted < 0) {
+            adjusted += 12; // Raise an octave
+        }
+
+        return adjusted;
+    };
+
+    // Calculate chromatic adjustments
+    const applyChromatic = (pitch) => {
+        if (stylePrefs.chromaticism === 'high' && Math.random() > 0.8) {
+            // Jazz: occasional chromatic passing tone
+            return transposePitch(pitch, Math.random() > 0.5 ? 1 : -1);
+        }
+        if (stylePrefs.chromaticism === 'bluenotes' && Math.random() > 0.7) {
+            // Blues: blue notes (flatten by half step)
+            return transposePitch(pitch, -1);
+        }
+        return pitch;
+    };
+
+    switch (textureType) {
+        case 'parallel_thirds':
+            // Transpose each melody note down a third (style-adjusted)
+            melodyNotes.forEach(note => {
+                if (note.isRest || note.type === 'rest') {
+                    suggestions.push({ ...note, voiceIndex: 1 });
+                } else {
+                    const pitch = note.pitch || note.pitches?.[0];
+                    if (pitch) {
+                        const interval = getStyleAdjustedInterval(-3); // Minor third = 3 semitones
+                        let transposed = transposePitch(pitch, interval);
+                        transposed = applyChromatic(transposed);
+                        suggestions.push({
+                            ...note,
+                            pitch: transposed,
+                            pitches: [transposed],
+                            voiceIndex: 1
+                        });
+                    }
+                }
+            });
+            break;
+
+        case 'parallel_sixths':
+            // Transpose each melody note down a sixth (style-adjusted)
+            melodyNotes.forEach(note => {
+                if (note.isRest || note.type === 'rest') {
+                    suggestions.push({ ...note, voiceIndex: 1 });
+                } else {
+                    const pitch = note.pitch || note.pitches?.[0];
+                    if (pitch) {
+                        const interval = getStyleAdjustedInterval(-8); // Minor sixth = 8 semitones
+                        let transposed = transposePitch(pitch, interval);
+                        transposed = applyChromatic(transposed);
+                        suggestions.push({
+                            ...note,
+                            pitch: transposed,
+                            pitches: [transposed],
+                            voiceIndex: 1
+                        });
+                    }
+                }
+            });
+            break;
+
+        case 'contrary':
+            // Move in opposite direction to melody (style-aware)
+            // Classical/Jazz: stricter voice leading; Pop/Rock: more relaxed
+            const contraryMultiplier = stylePrefs.voiceLeadingStrictness === 'strict' ? 1 : 2;
+            melodyNotes.forEach((note, i) => {
+                if (note.isRest || note.type === 'rest' || i === 0) {
+                    suggestions.push({ ...note, voiceIndex: 1 });
+                } else {
+                    const prevPitch = melodyNotes[i - 1].pitch || melodyNotes[i - 1].pitches?.[0];
+                    const currPitch = note.pitch || note.pitches?.[0];
+                    if (prevPitch && currPitch) {
+                        const direction = comparePitches(currPitch, prevPitch);
+                        let interval = -direction * contraryMultiplier;
+                        interval = getStyleAdjustedInterval(interval);
+                        let transposed = transposePitch(currPitch, interval);
+                        transposed = applyChromatic(transposed);
+                        suggestions.push({
+                            ...note,
+                            pitch: transposed,
+                            pitches: [transposed],
+                            voiceIndex: 1
+                        });
+                    } else {
+                        suggestions.push({ ...note, voiceIndex: 1 });
+                    }
+                }
+            });
+            break;
+
+        case 'pedal_root':
+            // Sustained root note - octave based on mood
+            const pedalOctave = moodAdj.registerBias === 'lower' ? 2 :
+                               moodAdj.registerBias === 'higher' ? 4 : 3;
+            // Duration based on style rhythm density
+            const pedalDuration = stylePrefs.rhythmDensity === 'sparse' ? 'w' :
+                                 stylePrefs.rhythmDensity === 'driving' ? 'h' : 'w';
+            suggestions.push({
+                type: 'note',
+                pitch: `${chordRoot}${pedalOctave}`,
+                pitches: [`${chordRoot}${pedalOctave}`],
+                duration: pedalDuration,
+                beat: 0,
+                voiceIndex: 1
+            });
+            break;
+
+        case 'pedal_fifth':
+            // Sustained fifth - octave based on mood
+            const fifthOctave = moodAdj.registerBias === 'lower' ? 2 :
+                               moodAdj.registerBias === 'higher' ? 4 : 3;
+            const fifth = getFifthFromRoot(chordRoot);
+            const fifthDuration = stylePrefs.rhythmDensity === 'sparse' ? 'w' :
+                                 stylePrefs.rhythmDensity === 'driving' ? 'h' : 'w';
+            suggestions.push({
+                type: 'note',
+                pitch: `${fifth}${fifthOctave}`,
+                pitches: [`${fifth}${fifthOctave}`],
+                duration: fifthDuration,
+                beat: 0,
+                voiceIndex: 1
+            });
+            break;
+
+        case 'rhythmic':
+            // Fill gaps where melody has rests - chord tone selection based on style
+            const chordTones = getChordTonesForStyle(chordRoot, chord.type, stylePrefs);
+            let chordToneIndex = 0;
+            melodyNotes.forEach(note => {
+                if (note.isRest || note.type === 'rest') {
+                    // Cycle through chord tones for variety
+                    const tone = chordTones[chordToneIndex % chordTones.length];
+                    const octave = moodAdj.registerBias === 'lower' ? 3 :
+                                  moodAdj.registerBias === 'higher' ? 5 : 4;
+                    suggestions.push({
+                        type: 'note',
+                        pitch: `${tone}${octave}`,
+                        pitches: [`${tone}${octave}`],
+                        duration: note.duration,
+                        beat: note.beat,
+                        voiceIndex: 1
+                    });
+                    chordToneIndex++;
+                }
+            });
+            break;
+
+        case 'counter':
+            // Independent counter-melody - complexity based on style
+            const counterComplexity = stylePrefs.intervalBias === 'colorful' ? 'complex' :
+                                     stylePrefs.intervalBias === 'simple' ? 'simple' : 'moderate';
+            melodyNotes.forEach((note, i) => {
+                if (note.isRest || note.type === 'rest') {
+                    // For jazz/complex styles, add notes on rests
+                    if (counterComplexity === 'complex') {
+                        const octave = moodAdj.registerBias === 'lower' ? 3 : 4;
+                        suggestions.push({
+                            type: 'note',
+                            pitch: `${chordRoot}${octave}`,
+                            pitches: [`${chordRoot}${octave}`],
+                            duration: note.duration,
+                            beat: note.beat,
+                            voiceIndex: 1
+                        });
+                    } else {
+                        suggestions.push({ ...note, voiceIndex: 1 });
+                    }
+                } else {
+                    // Interval pattern based on complexity
+                    let interval;
+                    if (counterComplexity === 'complex') {
+                        // Jazz: more varied intervals (3rds, 6ths, occasional 7ths)
+                        const intervals = [-3, -4, -8, -9, -10];
+                        interval = intervals[i % intervals.length];
+                    } else if (counterComplexity === 'simple') {
+                        // Folk/Pop: stick to 3rds and 6ths
+                        interval = i % 2 === 0 ? -3 : -8;
+                    } else {
+                        // Moderate: alternating pattern
+                        interval = i % 2 === 0 ? -3 : -1;
+                    }
+                    interval = getStyleAdjustedInterval(interval);
+                    const pitch = note.pitch || note.pitches?.[0];
+                    if (pitch) {
+                        let transposed = transposePitch(pitch, interval);
+                        transposed = applyChromatic(transposed);
+                        suggestions.push({
+                            ...note,
+                            pitch: transposed,
+                            pitches: [transposed],
+                            voiceIndex: 1
+                        });
+                    }
+                }
+            });
+            break;
+
+        default:
+            break;
+    }
+
+    return suggestions;
+}
+
+// Helper: Transpose a pitch by semitones
+function transposePitch(pitch, semitones) {
+    if (!pitch) return pitch;
+
+    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const match = pitch.match(/^([A-G]#?)(\d+)$/);
+    if (!match) return pitch;
+
+    const [, noteName, octaveStr] = match;
+    let octave = parseInt(octaveStr, 10);
+    let noteIndex = noteNames.indexOf(noteName);
+
+    if (noteIndex === -1) return pitch;
+
+    noteIndex += semitones;
+    while (noteIndex < 0) {
+        noteIndex += 12;
+        octave--;
+    }
+    while (noteIndex >= 12) {
+        noteIndex -= 12;
+        octave++;
+    }
+
+    return `${noteNames[noteIndex]}${octave}`;
+}
+
+// Helper: Compare two pitches (returns 1 if second is higher, -1 if lower, 0 if same)
+function comparePitches(pitch1, pitch2) {
+    const noteValues = { 'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5, 'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11 };
+
+    const match1 = pitch1.match(/^([A-G]#?)(\d+)$/);
+    const match2 = pitch2.match(/^([A-G]#?)(\d+)$/);
+    if (!match1 || !match2) return 0;
+
+    const val1 = parseInt(match1[2], 10) * 12 + (noteValues[match1[1]] || 0);
+    const val2 = parseInt(match2[2], 10) * 12 + (noteValues[match2[1]] || 0);
+
+    if (val1 > val2) return 1;
+    if (val1 < val2) return -1;
+    return 0;
+}
+
+// Helper: Get the fifth from a root note
+function getFifthFromRoot(root) {
+    const fifths = {
+        'C': 'G', 'C#': 'G#', 'D': 'A', 'D#': 'A#', 'E': 'B', 'F': 'C',
+        'F#': 'C#', 'G': 'D', 'G#': 'D#', 'A': 'E', 'A#': 'F', 'B': 'F#'
+    };
+    return fifths[root] || 'G';
+}
+
+// Helper: Get the third from a root note (major or minor based on chord type)
+function getThirdFromRoot(root, chordType) {
+    const majorThirds = {
+        'C': 'E', 'C#': 'F', 'D': 'F#', 'D#': 'G', 'E': 'G#', 'F': 'A',
+        'F#': 'A#', 'G': 'B', 'G#': 'C', 'A': 'C#', 'A#': 'D', 'B': 'D#'
+    };
+    const minorThirds = {
+        'C': 'D#', 'C#': 'E', 'D': 'F', 'D#': 'F#', 'E': 'G', 'F': 'G#',
+        'F#': 'A', 'G': 'A#', 'G#': 'B', 'A': 'C', 'A#': 'C#', 'B': 'D'
+    };
+
+    const isMinor = chordType && (chordType.includes('m') || chordType.includes('min'));
+    return isMinor ? (minorThirds[root] || 'E') : (majorThirds[root] || 'E');
+}
+
+// Helper: Get the seventh from a root note
+function getSeventhFromRoot(root, isMajorSeventh = false) {
+    const majorSevenths = {
+        'C': 'B', 'C#': 'C', 'D': 'C#', 'D#': 'D', 'E': 'D#', 'F': 'E',
+        'F#': 'F', 'G': 'F#', 'G#': 'G', 'A': 'G#', 'A#': 'A', 'B': 'A#'
+    };
+    const dominantSevenths = {
+        'C': 'A#', 'C#': 'B', 'D': 'C', 'D#': 'C#', 'E': 'D', 'F': 'D#',
+        'F#': 'E', 'G': 'F', 'G#': 'F#', 'A': 'G', 'A#': 'G#', 'B': 'A'
+    };
+
+    return isMajorSeventh ? (majorSevenths[root] || 'B') : (dominantSevenths[root] || 'Bb');
+}
+
+// Helper: Get chord tones based on style preferences
+function getChordTonesForStyle(root, chordType, stylePrefs) {
+    const third = getThirdFromRoot(root, chordType);
+    const fifth = getFifthFromRoot(root);
+    const seventh = getSeventhFromRoot(root, chordType?.includes('maj7'));
+
+    switch (stylePrefs.intervalBias) {
+        case 'colorful':
+            // Jazz: include 7ths, maybe 9ths
+            return [root, third, fifth, seventh];
+        case 'power':
+            // Rock: root and fifth primarily
+            return [root, fifth, root];
+        case 'rich':
+            // Gospel: full triads with some extensions
+            return [root, third, fifth, seventh];
+        case 'bluesy':
+            // Blues: root, flatted third, fifth, flatted seventh
+            return [root, third, fifth, seventh];
+        case 'simple':
+        case 'consonant':
+        default:
+            // Pop/Folk: basic triad
+            return [root, third, fifth];
+    }
+}
+
+function applyPolyphonySuggestions() {
+    const compositionState = getCompositionState();
+    if (!compositionState || polyphonyState.generatedSuggestions.length === 0) {
+        console.log('[Polyphony] No suggestions to apply');
+        return;
+    }
+
+    // Find the measures that belong to the selected chord
+    const chordIndex = polyphonyState.selectedChordIndex;
+    const staff = polyphonyState.selectedStaff;
+
+    // Add each suggestion to voice 2 of the target staff
+    polyphonyState.generatedSuggestions.forEach(suggestion => {
+        const sourceMeasure = suggestion.sourceMeasure || 0;
+        compositionState.ensureVoiceExists(sourceMeasure, staff, 1); // Voice index 1 = Voice 2
+
+        compositionState.addNoteToVoice(sourceMeasure, staff, 1, {
+            type: suggestion.type || 'note',
+            pitch: suggestion.pitch,
+            pitches: suggestion.pitches,
+            duration: suggestion.duration,
+            beat: suggestion.beat || 0,
+            voiceIndex: 1
+        });
+    });
+
+    console.log(`[Polyphony] Applied ${polyphonyState.generatedSuggestions.length} notes to Voice 2 of ${staff} clef`);
+
+    // Emit event to trigger re-render
+    if (compositionState.events) {
+        compositionState.events.emit('compositionChanged');
+    }
+
+    // Close modal
+    closeUnifiedRecommendationModal();
+}
+
+// ============================================================================
 // KEYBOARD HANDLING
 // ============================================================================
 
@@ -5954,7 +7813,7 @@ function handleKeydown(e) {
 
     // Arrow keys to switch tabs
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        const tabOrder = [TABS.CHORD, TABS.MELODY, TABS.SECTION, TABS.HARMONIZE];
+        const tabOrder = [TABS.CHORD, TABS.MELODY, TABS.SECTION, TABS.HARMONIZE, TABS.POLYPHONY];
         const currentIdx = tabOrder.indexOf(modalState.activeTab);
         let newIdx;
         if (e.key === 'ArrowLeft') {
@@ -6409,7 +8268,7 @@ function injectTooltipStyles() {
         }
         .modal-score-tooltip.show {
             opacity: 1;
-            pointer-events: auto;
+            pointer-events: none;
         }
         .tooltip-header-row {
             display: flex;

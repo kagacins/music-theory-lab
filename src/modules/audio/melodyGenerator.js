@@ -1594,17 +1594,20 @@ export function clearInteractiveMelody() {
         const compositionState = getCompositionState();
         const measureCount = compositionState.getMeasureCount();
         
-        // Clear all treble clef notes from all measures
+        // Clear all treble clef notes from all measures (all voices)
         for (let i = 0; i < measureCount; i++) {
             const measure = compositionState.getMeasure(i);
             if (measure && measure.notation && measure.notation.treble) {
-                // Clear all notes from the treble clef (voice 0)
-                if (measure.notation.treble.voices && measure.notation.treble.voices[0]) {
-                    const noteCount = measure.notation.treble.voices[0].notes.length;
-                    measure.notation.treble.voices[0].notes = [];
-                    // Emit events for each note that was removed (in reverse order to maintain indices)
-                    for (let j = noteCount - 1; j >= 0; j--) {
-                        compositionState.events.emit('noteRemoved', i, 'treble', 0, j);
+                // Clear notes from ALL voices in the treble clef
+                const voices = measure.notation.treble.voices || [];
+                for (let voiceIndex = 0; voiceIndex < voices.length; voiceIndex++) {
+                    if (voices[voiceIndex] && voices[voiceIndex].notes) {
+                        const noteCount = voices[voiceIndex].notes.length;
+                        voices[voiceIndex].notes = [];
+                        // Emit events for each note that was removed (in reverse order to maintain indices)
+                        for (let j = noteCount - 1; j >= 0; j--) {
+                            compositionState.events.emit('noteRemoved', i, 'treble', voiceIndex, j);
+                        }
                     }
                 }
             }
@@ -2112,12 +2115,14 @@ function playNotesInBeat(canvas, measure, beat, clickedType) {
                 if (settings && settings.autoGenerateBass && compositionState.getMeasureCount() > chordIndex) {
                     const measureData = compositionState.getMeasure(chordIndex);
                     if (measureData && measureData.notation && measureData.notation.bass) {
-                        const bassVoice = measureData.notation.bass.voices && measureData.notation.bass.voices[0];
-                        if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
+                        const bassVoices = measureData.notation.bass.voices || [];
+                        // MULTI-VOICE: Gather notes from ALL bass voices
+                        const allBassNotes = bassVoices.flatMap(voice => voice?.notes || []);
+                        if (allBassNotes.length > 0) {
                             // Use auto-generated bass notes (blue notes)
                             bassAutoFillActive = true;
                             // Bass notes from CompositionState - handle both pitch and pitches
-                            lhNotes = bassVoice.notes
+                            lhNotes = allBassNotes
                                 .filter(note => note.type !== 'rest') // Exclude rests
                                 .flatMap(note => getNotePitches(note)) // Handle polyphony
                                 .filter(Boolean);
@@ -2133,7 +2138,7 @@ function playNotesInBeat(canvas, measure, beat, clickedType) {
                     chord.lhType,
                     chord.lhInversion,
                     interactiveMelody.key,
-                    chord.lhOctaveShift || -12,
+                    chord.lhOctaveShift || 0,
                     chord.type,
                     getEnharmonicPreference()
                 ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
@@ -2196,12 +2201,14 @@ function playNotesInBeat(canvas, measure, beat, clickedType) {
                     if (settings && settings.autoGenerateBass && compositionState.getMeasureCount() > chordIndex) {
                         const measureData = compositionState.getMeasure(chordIndex);
                         if (measureData && measureData.notation && measureData.notation.bass) {
-                            const bassVoice = measureData.notation.bass.voices && measureData.notation.bass.voices[0];
-                            if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
+                            const bassVoices = measureData.notation.bass.voices || [];
+                            // MULTI-VOICE: Gather notes from ALL bass voices
+                            const allBassNotes = bassVoices.flatMap(voice => voice?.notes || []);
+                            if (allBassNotes.length > 0) {
                                 // Use auto-generated bass notes (blue notes)
                                 bassAutoFillActive = true;
                                 // Bass notes from CompositionState - handle both pitch and pitches
-                                lhNotes = bassVoice.notes
+                                lhNotes = allBassNotes
                                     .filter(note => note.type !== 'rest') // Exclude rests
                                     .flatMap(note => getNotePitches(note)) // Handle polyphony
                                     .filter(Boolean);
@@ -2217,7 +2224,7 @@ function playNotesInBeat(canvas, measure, beat, clickedType) {
                         chord.lhType,
                         chord.lhInversion,
                         interactiveMelody.key,
-                        chord.lhOctaveShift || -12,
+                        chord.lhOctaveShift || 0,
                         chord.type,
                         getEnharmonicPreference()
                     ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
@@ -2367,11 +2374,13 @@ function startMeasurePlayback(canvas, measureIndex) {
         if (settings && settings.autoGenerateBass && compositionState.getMeasureCount() > measureIndex) {
             const measure = compositionState.getMeasure(measureIndex);
             if (measure && measure.notation && measure.notation.bass) {
-                const bassVoice = measure.notation.bass.voices && measure.notation.bass.voices[0];
-                if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
+                const bassVoices = measure.notation.bass.voices || [];
+                // MULTI-VOICE: Gather notes from ALL bass voices
+                const allBassNotes = bassVoices.flatMap(voice => voice?.notes || []);
+                if (allBassNotes.length > 0) {
                     // Use auto-generated bass notes with full data
                     bassAutoFillActive = true;
-                    bassNoteData = bassVoice.notes.filter(note => note.type !== 'rest');
+                    bassNoteData = allBassNotes.filter(note => note.type !== 'rest');
                 }
             }
         }
@@ -2384,7 +2393,7 @@ function startMeasurePlayback(canvas, measureIndex) {
             chord.lhType,
             chord.lhInversion,
             interactiveMelody.key,
-            chord.lhOctaveShift || -12,
+            chord.lhOctaveShift || 0,
             chord.type,
             getEnharmonicPreference()
         ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
@@ -3043,7 +3052,7 @@ export function playFromSelectedMeasure() {
             chord.lhType,
             chord.lhInversion,
             interactiveMelody.key,
-            chord.lhOctaveShift || -12,
+            chord.lhOctaveShift || 0,
             chord.type,
             getEnharmonicPreference()
         ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
@@ -3229,9 +3238,11 @@ export function playMeasure(measureIndex) {
         if (compositionState.getMeasureCount() > measureIndex) {
             const measure = compositionState.getMeasure(measureIndex);
             if (measure && measure.notation && measure.notation.bass) {
-                const bassVoice = measure.notation.bass.voices && measure.notation.bass.voices[0];
-                if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
-                    bassNoteData = bassVoice.notes.filter(note => note.type !== 'rest');
+                const bassVoices = measure.notation.bass.voices || [];
+                // MULTI-VOICE: Gather notes from ALL bass voices
+                const allBassNotes = bassVoices.flatMap(voice => voice?.notes || []);
+                if (allBassNotes.length > 0) {
+                    bassNoteData = allBassNotes.filter(note => note.type !== 'rest');
                 }
             }
         }
@@ -4094,9 +4105,11 @@ export function playAllMelody() {
             if (compositionState.getMeasureCount() > measureIndex) {
                 const measureData = compositionState.getMeasure(measureIndex);
                 if (measureData && measureData.notation && measureData.notation.bass) {
-                    const bassVoice = measureData.notation.bass.voices && measureData.notation.bass.voices[0];
-                    if (bassVoice && bassVoice.notes && bassVoice.notes.length > 0) {
-                        bassNoteData = bassVoice.notes.filter(note => note.type !== 'rest');
+                    const bassVoices = measureData.notation.bass.voices || [];
+                    // MULTI-VOICE: Gather notes from ALL bass voices
+                    const allBassNotes = bassVoices.flatMap(voice => voice?.notes || []);
+                    if (allBassNotes.length > 0) {
+                        bassNoteData = allBassNotes.filter(note => note.type !== 'rest');
                         console.log(`[PlayAll] Playing ${bassNoteData.length} bass notes from compositionState for measure ${measureIndex}`);
                     }
                 }
@@ -4228,45 +4241,53 @@ export function playAllMelody() {
             // Iterate through all measures and schedule each bass note individually
             for (let measureIndex = 0; measureIndex < measureCount; measureIndex++) {
                 const measureData = compositionState.getMeasure(measureIndex);
-                const bassVoice = measureData?.notation?.bass?.voices?.[0];
+                const bassVoices = measureData?.notation?.bass?.voices || [];
 
-                if (!bassVoice || !bassVoice.notes || bassVoice.notes.length === 0) {
+                if (bassVoices.length === 0) {
                     continue;
                 }
 
                 // Get the chord for this measure (for chord release tracking)
                 const chord = measureData.chord || {};
 
-                // Schedule each bass note in this measure
-                bassVoice.notes.forEach((note, noteIndex) => {
-                    // Skip rests
-                    if (note.type === 'rest' || note.isRest) {
+                // MULTI-VOICE: Schedule bass notes from ALL voices
+                bassVoices.forEach((bassVoice, voiceIndex) => {
+                    if (!bassVoice || !bassVoice.notes || bassVoice.notes.length === 0) {
                         return;
                     }
 
-                    // Skip tied notes - they are continuations, not new attacks
-                    if (note.isTied) {
-                        return;
-                    }
+                    // Schedule each bass note in this voice
+                    bassVoice.notes.forEach((note, noteIndex) => {
+                        // Skip rests
+                        if (note.type === 'rest' || note.isRest) {
+                            return;
+                        }
 
-                    // Calculate absolute time for this note
-                    const measureStartBeat = measureIndex * beatsPerMeasure;
-                    const noteBeat = note.beat || 0;
-                    const absoluteBeat = measureStartBeat + noteBeat;
-                    const noteTime = absoluteBeat * beatDuration;
-                    const safeTime = Math.max(0, noteTime);
+                        // Skip tied notes - they are continuations, not new attacks
+                        if (note.isTied) {
+                            return;
+                        }
 
-                    // Clone note and add source measure for highlighting
-                    const specificNote = {
-                        ...note,
-                        sourceMeasureIndex: measureIndex
-                    };
+                        // Calculate absolute time for this note
+                        const measureStartBeat = measureIndex * beatsPerMeasure;
+                        const noteBeat = note.beat || 0;
+                        const absoluteBeat = measureStartBeat + noteBeat;
+                        const noteTime = absoluteBeat * beatDuration;
+                        const safeTime = Math.max(0, noteTime);
 
-                    events.push({
-                        time: safeTime,
-                        chord,
-                        measureIndex,
-                        specificNote
+                        // Clone note and add source measure for highlighting
+                        const specificNote = {
+                            ...note,
+                            sourceMeasureIndex: measureIndex,
+                            voiceIndex: voiceIndex
+                        };
+
+                        events.push({
+                            time: safeTime,
+                            chord,
+                            measureIndex,
+                            specificNote
+                        });
                     });
                 });
             }

@@ -106,11 +106,11 @@ export function getNoteKeyId(note) {
  * @param {string} rootNoteName - Root note name (e.g., "C")
  * @param {string} chordType - Chord type from CHORD_DEFINITIONS
  * @param {string} key - Key signature for enharmonic resolution
- * @param {number} octave - Base octave (default 4)
+ * @param {number} octave - Base octave (default 3 for LH chord voicing)
  * @returns {Object} Object with baseNotes (without octave) and specificNotes (with octave)
  * @requires enharmonicPreference - global state variable
  */
-export function getChordNotes(rootNoteName, chordType, key, octave = 4, enharmonicPreference = 'sharp') {
+export function getChordNotes(rootNoteName, chordType, key, octave = 3, enharmonicPreference = 'sharp') {
     const chordDef = CHORD_DEFINITIONS[chordType];
     if (!chordDef) { return { baseNotes: [], specificNotes: [] }; }
 
@@ -235,7 +235,7 @@ export function getChordNotes(rootNoteName, chordType, key, octave = 4, enharmon
  * @param {string|Object} chordType - Chord type string or temporary definition object
  * @param {number} inversion - Inversion number (0 = root position)
  * @param {string} key - Key signature for enharmonic resolution
- * @param {number} octaveShift - Octave shift from base octave 4
+ * @param {number} octaveShift - Octave shift in semitones from base octave 3
  * @returns {Object} Object with name, simpleName, and specificNotes
  * @requires enharmonicPreference, notationPreference - global state variables
  */
@@ -245,8 +245,8 @@ export function getInvertedChordNotes(rootNote, chordType, inversion, key, octav
     const chordDef = isStringLookup ? CHORD_DEFINITIONS[chordType] : chordType;
 
     // Convert octaveShift from semitones to octaves (12 semitones = 1 octave)
-    // Clamp to valid MIDI range (0-8)
-    const baseOctave = Math.max(0, Math.min(8, 4 + Math.floor(octaveShift / 12)));
+    // Base octave is 3 (LH chord voicing range), clamp to valid MIDI range (0-8)
+    const baseOctave = Math.max(0, Math.min(8, 3 + Math.floor(octaveShift / 12)));
     // Pass the correct definition to getChordNotes
     const baseChord = getChordNotes(rootNote, isStringLookup ? chordType : chordDef, key, baseOctave, enharmonicPreference);
 
@@ -306,7 +306,7 @@ export function getInvertedChordNotes(rootNote, chordType, inversion, key, octav
  * Get the notes of an interval
  * @param {string} rootNote - Root note name (e.g., "C")
  * @param {string} intervalType - Interval type from INTERVAL_DEFINITIONS
- * @param {number} octaveShift - Octave shift from base octave 4
+ * @param {number} octaveShift - Octave shift in semitones from base octave 3
  * @returns {Object} Object with name and specificNotes
  * @requires enharmonicPreference - global state variable
  */
@@ -314,7 +314,8 @@ export function getIntervalNotes(rootNote, intervalType, octaveShift = 0, enharm
     const definition = INTERVAL_DEFINITIONS[intervalType];
     if (!definition) return { name: "N/A", specificNotes: [] };
 
-    const baseOctave = 4 + octaveShift;
+    // Base octave is 3 (LH chord voicing range)
+    const baseOctave = 3 + octaveShift;
     const rootMidi = noteToMidi(`${rootNote}${baseOctave}`);
 
     const specificNotes = definition.intervals.map(interval => {
@@ -342,7 +343,8 @@ export function getLHNotes(rootNote, lhType, lhInversion = 0, key, lhOctaveShift
         return [];
     }
 
-    const baseOctave = 4; // A consistent starting point for calculation.
+    // Base octave is 2 for bass accompaniment (one octave below LH chord voicing at octave 3)
+    const baseOctave = 2;
     const rootMidi = noteToMidi(`${rootNote}${baseOctave}`) + lhOctaveShift;
 
     let intervals = [];

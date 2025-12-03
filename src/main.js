@@ -1801,9 +1801,9 @@ window.startChordPreview = function(root, type, inversion = 0) {
         return;
     }
 
-    // Get chord notes centered around C3 (octaveShift = -12 semitones from C4)
+    // Get chord notes at base octave 3 (no shift needed since base is now 3)
     const key = getCurrentKey();
-    const chordData = getInvertedChordNotes(root, type, inversion, key, -12);
+    const chordData = getInvertedChordNotes(root, type, inversion, key, 0);
 
     if (chordData && chordData.specificNotes && chordData.specificNotes.length > 0) {
         activePreviewNotes = chordData.specificNotes;
@@ -1861,9 +1861,9 @@ window.playChordWithMelody = function(root, type, melodyNotes, inversion = 0, te
         return;
     }
 
-    // Get chord notes centered around C3 (octaveShift = -12 semitones from C4)
+    // Get chord notes at base octave 3 (no shift needed since base is now 3)
     const key = getCurrentKey();
-    const chordData = getInvertedChordNotes(root, type, inversion, key, -12);
+    const chordData = getInvertedChordNotes(root, type, inversion, key, 0);
 
     // Calculate note durations in seconds for Tone.js scheduling
     const beatDuration = 60 / tempo; // seconds per quarter note

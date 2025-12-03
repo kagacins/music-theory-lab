@@ -133,7 +133,11 @@ export function createProjectData(compositionState) {
 
         // Building block sequences (full musical notation data)
         bassBlockSequence: bassBlockSequence,
-        trebleBlockSequence: trebleBlockSequence
+        trebleBlockSequence: trebleBlockSequence,
+
+        // Full measures data (preserves multi-voice notation - Voice 1 & Voice 2)
+        // This is needed because BuildingBlockSequence cannot represent simultaneous voices
+        measures: compositionState.measures ? JSON.parse(JSON.stringify(compositionState.measures)) : []
     };
 }
 
@@ -369,12 +373,56 @@ export function applyProjectToState(projectData, compositionState, trainerState,
             }
         }
 
-        // 7. Trigger notation refresh
+        // 7. Restore multi-voice notation data from saved measures
+        // The BuildingBlockSequence cannot represent simultaneous voices (Voice 1 & Voice 2)
+        // so we need to restore Voice 2 data directly from the saved measures
+        if (projectData.measures && Array.isArray(projectData.measures)) {
+            console.log('[projectManager] Restoring multi-voice notation data from saved measures');
+
+            for (let i = 0; i < projectData.measures.length && i < compositionState.measures.length; i++) {
+                const savedMeasure = projectData.measures[i];
+                const currentMeasure = compositionState.measures[i];
+
+                // Restore treble Voice 2 if present
+                if (savedMeasure.notation?.treble?.voices?.length > 1) {
+                    // Ensure voices array exists
+                    if (!currentMeasure.notation.treble.voices) {
+                        currentMeasure.notation.treble.voices = [{ notes: [] }];
+                    }
+                    // Add Voice 2 data
+                    while (currentMeasure.notation.treble.voices.length < savedMeasure.notation.treble.voices.length) {
+                        currentMeasure.notation.treble.voices.push({ notes: [] });
+                    }
+                    // Copy Voice 2+ notes
+                    for (let v = 1; v < savedMeasure.notation.treble.voices.length; v++) {
+                        currentMeasure.notation.treble.voices[v] = JSON.parse(JSON.stringify(savedMeasure.notation.treble.voices[v]));
+                    }
+                }
+
+                // Restore bass Voice 2 if present
+                if (savedMeasure.notation?.bass?.voices?.length > 1) {
+                    // Ensure voices array exists
+                    if (!currentMeasure.notation.bass.voices) {
+                        currentMeasure.notation.bass.voices = [{ notes: [] }];
+                    }
+                    // Add Voice 2 data
+                    while (currentMeasure.notation.bass.voices.length < savedMeasure.notation.bass.voices.length) {
+                        currentMeasure.notation.bass.voices.push({ notes: [] });
+                    }
+                    // Copy Voice 2+ notes
+                    for (let v = 1; v < savedMeasure.notation.bass.voices.length; v++) {
+                        currentMeasure.notation.bass.voices[v] = JSON.parse(JSON.stringify(savedMeasure.notation.bass.voices[v]));
+                    }
+                }
+            }
+        }
+
+        // 8. Trigger notation refresh
         if (callbacks.onNotationRefresh) {
             callbacks.onNotationRefresh();
         }
 
-        // 8. Update UI elements (tempo, key display, etc.)
+        // 9. Update UI elements (tempo, key display, etc.)
         if (callbacks.onMetadataUpdated) {
             callbacks.onMetadataUpdated(projectData.metadata);
         }

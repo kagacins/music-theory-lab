@@ -209,15 +209,32 @@ export function generatePhrase({
     densityMultiplier = 1.0,
     // Chord sequence for multi-chord phrases
     // Array of { chord, noteIndices } or null to use single chord
-    chordSequence = null
+    chordSequence = null,
+    // Optional: override target beats (for section-aware generation)
+    // If provided, this overrides the beats from phraseLength
+    targetBeats = null,
+    // Optional: context for section-aware generation
+    sectionContext = null // { previousMelody, nextChords, sectionType }
 } = {}) {
     const contour = CONTOUR_SHAPES[contourId] || CONTOUR_SHAPES.arch;
     const phraseLength = PHRASE_LENGTHS[lengthId] || PHRASE_LENGTHS.medium;
     const rhythmPattern = RHYTHM_PATTERNS[rhythmId] || RHYTHM_PATTERNS.steady;
 
+    // Use targetBeats if provided, otherwise use phraseLength.beats
+    const effectiveTargetBeats = targetBeats !== null ? targetBeats : phraseLength.beats;
+
+    // Calculate appropriate note count based on target beats
+    // More beats = more notes (roughly 1.5-2 notes per beat for medium density)
+    let baseNoteCount;
+    if (targetBeats !== null) {
+        // Calculate note count from target beats (approx 1.5 notes per beat at normal density)
+        baseNoteCount = Math.round(effectiveTargetBeats * 1.5);
+    } else {
+        baseNoteCount = phraseLength.notes;
+    }
+
     // Apply density multiplier to note count
     // Clamp between 2 notes minimum and 24 notes maximum
-    const baseNoteCount = phraseLength.notes;
     const noteCount = Math.max(2, Math.min(24, Math.round(baseNoteCount * densityMultiplier)));
     const notes = [];
     const noteDetails = [];
@@ -392,23 +409,103 @@ export function generatePhrase({
         currentNote = selected.note;
     }
 
-    // Generate rhythm
-    let rhythm = rhythmPattern.getPattern(noteCount);
+    // ==========================================================================
+    // RHYTHM GENERATION - Use rhythm patterns with standard note durations
+    // ==========================================================================
+    const standardDurations = [4, 3, 2, 1.5, 1, 0.75, 0.5, 0.25];
 
-    // Apply density-based rhythm scaling:
-    // - Sparse (density < 1.0): Longer notes (multiply rhythm values)
-    // - Dense (density > 1.0): Shorter notes (divide rhythm values)
-    // This ensures "Sparse" produces quarter/half notes, not 16th notes
-    if (densityMultiplier !== 1.0) {
-        // Inverse relationship: lower density = longer notes
-        // densityMultiplier 0.5 (sparse) → rhythm multiplier 2.0 (double length)
-        // densityMultiplier 1.5 (dense) → rhythm multiplier 0.67 (shorter)
-        const rhythmMultiplier = 1 / densityMultiplier;
-        rhythm = rhythm.map(r => {
-            const scaled = r * rhythmMultiplier;
-            // Clamp to reasonable range: 0.5 (16th) to 4 (half note)
-            return Math.max(0.5, Math.min(4, scaled));
-        });
+    // Helper to snap a value to the nearest standard duration
+    const snapToStandard = (value) => {
+        let closest = 0.5;
+        let minDiff = Infinity;
+        for (const std of standardDurations) {
+            const diff = Math.abs(value - std);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closest = std;
+            }
+        }
+        return closest;
+    };
+
+    // Get the raw rhythm pattern (relative values like [2, 1, 2, 1] for longShort)
+    let rawPattern = rhythmPattern.getPattern(noteCount);
+
+    // Calculate the sum of raw pattern values
+    const rawSum = rawPattern.reduce((sum, r) => sum + r, 0);
+
+    // Scale factor to make pattern fit target beats
+    const scaleFactor = effectiveTargetBeats / rawSum;
+
+    // Convert raw pattern to actual beat durations, snapping to standard values
+    let rhythm = rawPattern.map(r => {
+        const scaled = r * scaleFactor;
+        return snapToStandard(scaled);
+    });
+
+    // Calculate total after snapping
+    let totalBeats = rhythm.reduce((sum, r) => sum + r, 0);
+
+    // Adjust to match target exactly by modifying the last note
+    if (Math.abs(totalBeats - effectiveTargetBeats) > 0.01) {
+        const lastIdx = rhythm.length - 1;
+        const currentLast = rhythm[lastIdx];
+        const needed = currentLast + (effectiveTargetBeats - totalBeats);
+
+        // Find best standard duration for the last note
+        let bestLast = currentLast;
+        let bestDiff = Math.abs(effectiveTargetBeats - totalBeats);
+
+        for (const std of standardDurations) {
+            const wouldTotal = totalBeats - currentLast + std;
+            const diff = Math.abs(wouldTotal - effectiveTargetBeats);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                bestLast = std;
+            }
+        }
+        rhythm[lastIdx] = bestLast;
+        totalBeats = rhythm.reduce((sum, r) => sum + r, 0);
+    }
+
+    // If still not exact, try adjusting second-to-last note too
+    if (Math.abs(totalBeats - effectiveTargetBeats) > 0.01 && rhythm.length >= 2) {
+        const lastIdx = rhythm.length - 1;
+        const secondLastIdx = rhythm.length - 2;
+
+        for (const std1 of standardDurations) {
+            for (const std2 of standardDurations) {
+                const wouldTotal = totalBeats - rhythm[lastIdx] - rhythm[secondLastIdx] + std1 + std2;
+                if (Math.abs(wouldTotal - effectiveTargetBeats) < 0.01) {
+                    rhythm[secondLastIdx] = std1;
+                    rhythm[lastIdx] = std2;
+                    totalBeats = wouldTotal;
+                    break;
+                }
+            }
+            if (Math.abs(totalBeats - effectiveTargetBeats) < 0.01) break;
+        }
+    }
+
+    // Final safety: if we're over, remove notes; if under, extend last note
+    while (totalBeats > effectiveTargetBeats + 0.01 && rhythm.length > 1) {
+        rhythm.pop();
+        notes.pop();
+        noteDetails.pop();
+        totalBeats = rhythm.reduce((sum, r) => sum + r, 0);
+    }
+
+    if (totalBeats < effectiveTargetBeats - 0.01 && rhythm.length > 0) {
+        const deficit = effectiveTargetBeats - totalBeats;
+        const lastIdx = rhythm.length - 1;
+        const needed = rhythm[lastIdx] + deficit;
+        for (const std of standardDurations) {
+            if (std >= needed - 0.01 && std <= 4) {
+                rhythm[lastIdx] = std;
+                break;
+            }
+        }
+        totalBeats = rhythm.reduce((sum, r) => sum + r, 0);
     }
 
     // Calculate overall phrase score
@@ -430,6 +527,7 @@ export function generatePhrase({
         chordsUsed,
         noteCount,
         densityMultiplier,
+        targetBeats: effectiveTargetBeats, // Include for reference
         context: {
             chord,
             key,
@@ -546,16 +644,10 @@ function calculatePhraseScore(noteDetails, contour, chord, key) {
 export function generatePhraseCandidates(options, count = 5) {
     const candidates = [];
 
-    // Generate with requested contour
-    for (let i = 0; i < Math.ceil(count / 2); i++) {
+    // Generate ALL candidates with the requested contour
+    // Variety comes from inherent randomness in note selection within the contour shape
+    for (let i = 0; i < count; i++) {
         candidates.push(generatePhrase(options));
-    }
-
-    // Generate with complementary contours for variety
-    const complementaryContours = getComplementaryContours(options.contourId);
-    for (let i = 0; i < Math.floor(count / 2); i++) {
-        const contourId = complementaryContours[i % complementaryContours.length];
-        candidates.push(generatePhrase({ ...options, contourId }));
     }
 
     // Sort by score (highest first)

@@ -105,7 +105,7 @@ function setupDragging() {
  */
 function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
-        // Tab key - open unified recommendation modal (chord tab)
+        // Tab key - open unified recommendation modal (last used tab from localStorage)
         if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
             // Only handle if not in an input/textarea
             if (!isInputElement(e.target)) {
@@ -115,7 +115,8 @@ function setupKeyboardShortcuts() {
                 if (existingModal) {
                     closeUnifiedRecommendationModal();
                 } else {
-                    showUnifiedRecommendationModal({ initialTab: 'chord' });
+                    // Don't specify initialTab - let modal use localStorage value
+                    showUnifiedRecommendationModal({});
                 }
             }
         }

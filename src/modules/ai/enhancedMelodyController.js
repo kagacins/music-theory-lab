@@ -1123,17 +1123,19 @@ function insertPhraseWithDelete(phrase, selectedInfo) {
 }
 
 /**
- * Delete all treble notes after a given position
+ * Delete all treble notes after a given position (in the active voice)
  */
 function deleteNotesAfterPosition(measureIndex, noteIndex) {
     if (!compositionState) return;
 
     const measureCount = compositionState.getMeasureCount();
+    // Use active voice instead of hardcoded voice 0
+    const voiceIndex = compositionState.getActiveVoiceIndex ? compositionState.getActiveVoiceIndex() : 0;
 
     // Delete notes in current measure after noteIndex
     const currentMeasure = compositionState.measures[measureIndex];
-    if (currentMeasure?.notation?.treble?.voices?.[0]?.notes) {
-        const notes = currentMeasure.notation.treble.voices[0].notes;
+    if (currentMeasure?.notation?.treble?.voices?.[voiceIndex]?.notes) {
+        const notes = currentMeasure.notation.treble.voices[voiceIndex].notes;
         // Keep notes up to and including noteIndex, remove the rest
         notes.splice(noteIndex + 1);
     }
@@ -1141,8 +1143,8 @@ function deleteNotesAfterPosition(measureIndex, noteIndex) {
     // Delete all notes in subsequent measures
     for (let m = measureIndex + 1; m < measureCount; m++) {
         const measure = compositionState.measures[m];
-        if (measure?.notation?.treble?.voices?.[0]?.notes) {
-            measure.notation.treble.voices[0].notes = [];
+        if (measure?.notation?.treble?.voices?.[voiceIndex]?.notes) {
+            measure.notation.treble.voices[voiceIndex].notes = [];
         }
     }
 

@@ -196,6 +196,32 @@ export class NotationComposer {
             this.updateToolbarSelectionState();
           }
         },
+        onVoiceChange: (voiceNumber) => {
+          // Update composition state with new active voice for the current staff
+          if (this.compositionState) {
+            // MULTI-VOICE FIX: Set voice for BOTH staves to ensure consistency
+            // This allows the user to select a voice and then click on either staff
+            this.compositionState.setActiveVoiceForStaff('treble', voiceNumber);
+            this.compositionState.setActiveVoiceForStaff('bass', voiceNumber);
+          }
+          // Update note editor with new voice number
+          if (this.noteEditor) {
+            this.noteEditor.setCurrentVoice(voiceNumber);
+          }
+          // Re-render to show voice-specific highlighting if needed
+          this.render();
+        },
+        onRestDisplayModeChange: (settings) => {
+          // Update composition state with new rest display settings
+          if (this.compositionState) {
+            this.compositionState.updateSettings({
+              restDisplayMode: settings.restDisplayMode,
+              cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice,
+            });
+          }
+          // Re-render to apply new rest display mode
+          this.render();
+        },
       });
       this.toolbar.create(this.config.toolbarContainer);
     }
@@ -411,28 +437,38 @@ export class NotationComposer {
         } : null,
       };
 
-      // Convert treble clef notes from notation voices
+      // Convert treble clef notes from ALL notation voices
+      // Multi-voice support: gather notes from each voice with voice index
       const trebleVoices = measure.notation.treble.voices;
-      if (trebleVoices && trebleVoices[0] && trebleVoices[0].notes.length > 0) {
-        measureData.trebleNotes = trebleVoices[0].notes
-          .filter(note => {
-            // Keep rests
-            if (note.isRest) return true;
-            // For non-rests, require valid pitch or pitches array
-            if (note.pitches && Array.isArray(note.pitches) && note.pitches.length > 0) return true;
-            if (note.pitch && typeof note.pitch === 'string' && note.pitch.match(/^[A-G][#b]?\d+$/)) return true;
-            // Filter out notes with null/undefined pitch
-            return false;
-          })
-          .map(note => ({
-            pitch: note.pitch,
-            pitches: note.pitches,
-            duration: note.duration || '4n',
-            isRest: note.isRest || false,
-            dotted: note.dotted || false,
-            accidental: note.accidental || null,
-            tuplet: note.tuplet || null,
-          }));
+      measureData.trebleNotes = [];
+
+      if (trebleVoices) {
+        trebleVoices.forEach((voice, voiceIndex) => {
+          if (voice && voice.notes && voice.notes.length > 0) {
+            const voiceNotes = voice.notes
+              .filter(note => {
+                // Keep rests
+                if (note.isRest) return true;
+                // For non-rests, require valid pitch or pitches array
+                if (note.pitches && Array.isArray(note.pitches) && note.pitches.length > 0) return true;
+                if (note.pitch && typeof note.pitch === 'string' && note.pitch.match(/^[A-G][#b]?\d+$/)) return true;
+                // Filter out notes with null/undefined pitch
+                return false;
+              })
+              .map(note => ({
+                pitch: note.pitch,
+                pitches: note.pitches,
+                duration: note.duration || '4n',
+                isRest: note.isRest || false,
+                dotted: note.dotted || false,
+                accidental: note.accidental || null,
+                tuplet: note.tuplet || null,
+                voiceIndex: voiceIndex, // Track which voice this note belongs to
+                beat: note.beat || 0,   // Include beat position for proper voice alignment
+              }));
+            measureData.trebleNotes.push(...voiceNotes);
+          }
+        });
       }
       // NOTE: Fallback to interactiveMelody.melodyNotes REMOVED
       // This was causing deleted notes to reappear because keyboard recording
@@ -442,31 +478,38 @@ export class NotationComposer {
       // The interactiveMelody.melodyNotes array is still used for playback and other
       // legacy features, but NOT for rendering.
 
-      // Convert bass clef notes from notation voices
+      // Convert bass clef notes from notation voices - MULTI-VOICE SUPPORT
       const bassVoices = measure.notation.bass.voices;
-      if (bassVoices && bassVoices[0] && bassVoices[0].notes.length > 0) {
-        console.log(`[composerIntegration OLD PATH] Measure ${i} bass notes:`, bassVoices[0].notes.map(n => ({ beat: n.beat, isTied: n.isTied })));
-        measureData.bassNotes = bassVoices[0].notes.map(note => {
-          // Handle both single notes and chords
-          if (note.pitches && Array.isArray(note.pitches)) {
-            return {
-              pitches: note.pitches,
-              duration: note.duration || '1n',
-              beat: note.beat || 0,
-              dotted: note.dotted || false,
-              isTied: note.isTied,  // CRITICAL: Preserve isTied for cross-measure ties
-              tuplet: note.tuplet || null,
-            };
+      if (bassVoices && bassVoices.length > 0) {
+        // Gather notes from ALL voices, not just voice 0
+        bassVoices.forEach((voice, voiceIndex) => {
+          if (voice && voice.notes && voice.notes.length > 0) {
+            const voiceNotes = voice.notes.map(note => {
+              // Handle both single notes and chords
+              if (note.pitches && Array.isArray(note.pitches)) {
+                return {
+                  pitches: note.pitches,
+                  duration: note.duration || '1n',
+                  beat: note.beat || 0,
+                  dotted: note.dotted || false,
+                  isTied: note.isTied,  // CRITICAL: Preserve isTied for cross-measure ties
+                  tuplet: note.tuplet || null,
+                  voiceIndex: voiceIndex,  // CRITICAL: Track voice for multi-voice rendering
+                };
+              }
+              return {
+                pitch: note.pitch,
+                duration: note.duration || '1n',
+                beat: note.beat || 0,
+                isRest: note.isRest || false,
+                dotted: note.dotted || false,
+                isTied: note.isTied,  // CRITICAL: Preserve isTied for cross-measure ties
+                tuplet: note.tuplet || null,
+                voiceIndex: voiceIndex,  // CRITICAL: Track voice for multi-voice rendering
+              };
+            });
+            measureData.bassNotes.push(...voiceNotes);
           }
-          return {
-            pitch: note.pitch,
-            duration: note.duration || '1n',
-            beat: note.beat || 0,
-            isRest: note.isRest || false,
-            dotted: note.dotted || false,
-            isTied: note.isTied,  // CRITICAL: Preserve isTied for cross-measure ties
-            tuplet: note.tuplet || null,
-          };
         });
       }
 
@@ -771,27 +814,30 @@ export class NotationComposer {
 
     const measures = hasCompositionState
       ? this.compositionState.measures.map(m => ({
-          trebleNotes: m.notation.treble.voices[0].notes
-            .map(note => {
-              return {
-                pitch: note.pitch,
-                pitches: note.pitches,
-                duration: note.duration || '4n',
-                dotted: note.dotted || false,
-                accidental: note.accidental || null,
-                beat: note.beat || 0,
-                tie: note.tie,  // CRITICAL: Preserve tie property for cross-measure notes
-                tied: note.tied,  // CRITICAL: For same-measure ties
-                isTied: note.isTied,  // CRITICAL: For cross-measure ties (continuation notes)
-                articulation: note.articulation || null,  // CRITICAL: Articulations (staccato, accent, etc.)
-                velocity: note.velocity,
-                isChordTone: note.isChordTone,
-                isRest: note.isRest || note.type === 'rest',  // CRITICAL: Include rests
-                tuplet: note.tuplet || null  // CRITICAL: Preserve tuplet grouping for rendering
-              };
-            }),
-          bassNotes: m.notation.bass.voices[0].notes
-            .map(note => ({
+          // Gather notes from ALL voices, not just voice 0
+          trebleNotes: (m.notation.treble.voices || []).flatMap((voice, voiceIndex) =>
+            (voice?.notes || []).map(note => ({
+              pitch: note.pitch,
+              pitches: note.pitches,
+              duration: note.duration || '4n',
+              dotted: note.dotted || false,
+              accidental: note.accidental || null,
+              beat: note.beat || 0,
+              tie: note.tie,  // CRITICAL: Preserve tie property for cross-measure notes
+              tied: note.tied,  // CRITICAL: For same-measure ties
+              isTied: note.isTied,  // CRITICAL: For cross-measure ties (continuation notes)
+              articulation: note.articulation || null,  // CRITICAL: Articulations (staccato, accent, etc.)
+              velocity: note.velocity,
+              isChordTone: note.isChordTone,
+              isRest: note.isRest || note.type === 'rest',  // CRITICAL: Include rests
+              tuplet: note.tuplet || null,  // CRITICAL: Preserve tuplet grouping for rendering
+              voiceIndex: voiceIndex,  // CRITICAL: Track which voice this note belongs to
+              _restDisplay: note._restDisplay,  // CRITICAL: Preserve cue/hidden rest styling for multi-voice
+            }))
+          ),
+          // MULTI-VOICE: Gather bass notes from ALL voices, not just voice 0
+          bassNotes: (m.notation.bass.voices || []).flatMap((voice, voiceIndex) =>
+            (voice?.notes || []).map(note => ({
               pitch: note.pitch,
               pitches: note.pitches,
               duration: note.duration || '4n',
@@ -805,8 +851,11 @@ export class NotationComposer {
               velocity: note.velocity,
               isChordTone: note.isChordTone,
               isRest: note.isRest || note.type === 'rest',  // CRITICAL: Include rests
-              tuplet: note.tuplet || null  // CRITICAL: Preserve tuplet grouping
-            })),
+              tuplet: note.tuplet || null,  // CRITICAL: Preserve tuplet grouping
+              voiceIndex: voiceIndex,  // CRITICAL: Track which voice this note belongs to
+              _restDisplay: note._restDisplay,  // CRITICAL: Preserve cue/hidden rest styling for multi-voice
+            }))
+          ),
           keySignature: m.keySignature || this.compositionState.metadata.key,
           timeSignature: m.timeSignature
             ? `${m.timeSignature.num}/${m.timeSignature.denom}`
@@ -875,6 +924,9 @@ export class NotationComposer {
         enableHarmonicColoring: this.config.enableHarmonicColoring,
         // Chord span settings
         showChordSpans: showChordSpans,
+        // Multi-voice rest display settings
+        restDisplayMode: settings.restDisplayMode || 'clean',
+        cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice !== false,
       });
     }
 
@@ -1077,6 +1129,9 @@ export class NotationComposer {
         enableHarmonicColoring: this.config.enableHarmonicColoring,
         // Chord span settings
         showChordSpans: settings.showChordSpans !== false, // Default to true
+        // Multi-voice rest display settings
+        restDisplayMode: settings.restDisplayMode || 'clean',
+        cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice !== false,
       });
 
       // Collect rendered measures (adjust indices back to global)
@@ -1220,6 +1275,9 @@ export class NotationComposer {
       enableHarmonicColoring: this.config.enableHarmonicColoring,
       // Chord span settings
       showChordSpans: settings.showChordSpans !== false, // Default to true
+      // Multi-voice rest display settings
+      restDisplayMode: settings.restDisplayMode || 'clean',
+      cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice !== false,
     });
 
     const allRenderedMeasures = [];
@@ -1757,10 +1815,25 @@ export class NotationComposer {
         this.compositionState.addMeasure({});
       }
 
-      this.compositionState.addNote(measureIndex, staff, 0, noteData);
+      // Respect active voice when working in either staff (voice 1 or 2)
+      // MULTI-VOICE: Use staff-aware voice method for both treble and bass
+      const voiceIndex = this.compositionState.getActiveVoiceIndexForStaff?.(staff) ??
+        (staff === 'treble' ? this.noteEditor?.getCurrentVoiceIndex?.() : 0) ??
+        0;
+
+      const noteWithVoice = {
+        ...noteData,
+        voiceIndex,
+      };
+
+      this.compositionState.addNote(measureIndex, staff, voiceIndex, noteWithVoice);
+
+      // Notify listeners with full note data (including voice info)
+      this.onNoteAdded(measureIndex, staff, noteWithVoice);
+    } else {
+      this.onNoteAdded(measureIndex, staff, noteData);
     }
 
-    this.onNoteAdded(measureIndex, staff, noteData);
     this.render();
   }
 
@@ -1806,23 +1879,48 @@ export class NotationComposer {
     if (!this.toolbar || !this.noteEditor || !this.compositionState) return;
 
     const selectedNoteObjects = [];
+    const selectedVoices = new Set();
+
     for (const noteId of this.noteEditor.selectedNotes) {
       const parts = noteId.split('-');
       const measureIndex = parseInt(parts[0]);
       const staff = parts[1];
-      const noteIndex = parseInt(parts[2]);
+      // Note ID format: measureIndex-staff-voiceIndex-noteIndex[-pitchIndex]
+      const voiceIndex = parseInt(parts[2]) || 0;
+      const noteIndex = parseInt(parts[3]) || parseInt(parts[2]); // Fallback for legacy 3-part IDs
+
+      // Track which voices are selected
+      selectedVoices.add(voiceIndex);
 
       const measure = this.compositionState.getMeasure(measureIndex);
       if (measure) {
-        const note = measure.notation[staff]?.voices[0]?.notes[noteIndex];
+        // Use the correct voice index from the note ID
+        const note = measure.notation[staff]?.voices[voiceIndex]?.notes[noteIndex];
         if (note) {
           selectedNoteObjects.push({
             ...note,
             measureIndex,
             staff,
+            voiceIndex,
             noteIndex,
           });
         }
+      }
+    }
+
+    // Update the voice selector to reflect the selected note's voice
+    // Only update if all selected notes are from the same voice
+    if (selectedVoices.size === 1) {
+      const selectedVoice = [...selectedVoices][0];
+      // Voice selector uses 1-based index (Voice 1, Voice 2), but internal is 0-based
+      this.toolbar.setVoiceDisplay(selectedVoice + 1);
+
+      // Also sync the compositionState's active voice for the selected staff
+      const selectedStaffs = new Set(selectedNoteObjects.map(n => n.staff));
+      if (selectedStaffs.size === 1 && this.compositionState.setActiveVoiceForStaff) {
+        const staff = [...selectedStaffs][0];
+        this.compositionState.setActiveVoiceForStaff(staff, selectedVoice + 1);
+        this.selectedStaff = staff; // Update selectedStaff to match selection
       }
     }
 

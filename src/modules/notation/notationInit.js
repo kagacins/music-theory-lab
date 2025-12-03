@@ -243,8 +243,6 @@ export function initEnhancedNotation(options = {}) {
     composerIntegration: notationComposer, // For selected measure access
     pageManager: notationComposer.pageManager, // Multi-page support
     onNoteAdd: (data) => {
-      console.log('[NotationInit] onNoteAdd called:', data);
-
       // Use addNoteIntelligently for proper measure-filling and overflow handling
       // This works for both notes AND rests
       if (window.addNoteIntelligently) {
@@ -254,7 +252,7 @@ export function initEnhancedNotation(options = {}) {
         }
 
         const pitch = data.note.pitch || 'B4'; // Default pitch for rests (won't be used if isRest is true)
-        const result = window.addNoteIntelligently(
+        window.addNoteIntelligently(
           pitch,
           data.note.duration,
           data.note.dotted || false,
@@ -264,19 +262,44 @@ export function initEnhancedNotation(options = {}) {
           data.note.articulation,  // Pass articulation from toolbar
           data.note.tuplet  // Pass tuplet attribute for tuplet insert mode
         );
-
-        console.log('[NotationInit] addNoteIntelligently result:', result);
       } else {
-        // Fallback: Add directly to compositionState (old behavior)
+        // Fallback: Add directly to compositionState with beat validation
         if (notationComposer.compositionState) {
           const measure = notationComposer.compositionState.getMeasure(data.measureIndex);
-          console.log('[NotationInit] CompositionState measure:', measure);
           if (measure) {
             const voiceKey = data.staff === 'treble' ? 'treble' : 'bass';
-            const voice = measure.notation[voiceKey].voices[0];
-            console.log('[NotationInit] Voice before add:', voice?.notes);
+            // MULTI-VOICE: Use current voice for the appropriate staff
+            const voiceIndex = notationComposer.compositionState.getActiveVoiceIndexForStaff(data.staff);
+            // Ensure voice exists
+            while (measure.notation[voiceKey].voices.length <= voiceIndex) {
+              measure.notation[voiceKey].voices.push({ notes: [] });
+            }
+            const voice = measure.notation[voiceKey].voices[voiceIndex];
 
             if (voice) {
+              // Calculate used beats in this voice
+              const durationToBeats = (dur) => {
+                const map = { '1n': 4, '2n': 2, '4n': 1, '8n': 0.5, '16n': 0.25, '32n': 0.125 };
+                return map[dur] || 1;
+              };
+              let usedBeats = 0;
+              for (const note of voice.notes) {
+                let beats = durationToBeats(note.duration || '4n');
+                if (note.dotted) beats *= 1.5;
+                usedBeats += beats;
+              }
+
+              // Calculate beats for new note
+              let noteBeats = durationToBeats(data.note.duration || '4n');
+              if (data.note.dotted) noteBeats *= 1.5;
+
+              // Check if adding would exceed 4 beats (4/4 time)
+              const maxBeats = 4;
+              if (usedBeats + noteBeats > maxBeats + 0.01) {
+                console.warn(`[onNoteAdd] Cannot add note - would exceed ${maxBeats} beats (used: ${usedBeats}, adding: ${noteBeats})`);
+                return;
+              }
+
               voice.notes.push({
                 type: data.note.type || (data.note.isRest ? 'rest' : 'note'),
                 pitch: data.note.pitch,
@@ -288,7 +311,6 @@ export function initEnhancedNotation(options = {}) {
                 beat: data.note.beat,
                 tuplet: data.note.tuplet, // Preserve tuplet attributes
               });
-              console.log('[NotationInit] Voice after add:', voice.notes);
             }
           }
         }
@@ -324,7 +346,10 @@ export function initEnhancedNotation(options = {}) {
           const measure = notationComposer.compositionState.getMeasure(move.measureIndex);
           if (measure) {
             const voiceKey = move.staff === 'treble' ? 'treble' : 'bass';
-            const note = measure.notation[voiceKey]?.voices[0]?.notes[move.noteIndex];
+            // Use voiceIndex from move if available, otherwise use active voice for the staff
+            const voiceIndex = move.voiceIndex !== undefined ? move.voiceIndex :
+                (notationComposer.compositionState.getActiveVoiceIndexForStaff ? notationComposer.compositionState.getActiveVoiceIndexForStaff(move.staff) : 0);
+            const note = measure.notation[voiceKey]?.voices[voiceIndex]?.notes[move.noteIndex];
 
             if (note && move.steps !== 0) {
               if (isPitchSpecific && note.pitches && note.pitches.length > 1) {
@@ -390,7 +415,10 @@ export function initEnhancedNotation(options = {}) {
           if (move.staff === 'treble') {
             const measure = notationComposer.compositionState.getMeasure(move.measureIndex);
             if (measure) {
-              const note = measure.notation.treble?.voices[0]?.notes[move.noteIndex];
+              // Use voiceIndex from move if available, otherwise use active voice for the staff
+              const voiceIndex = move.voiceIndex !== undefined ? move.voiceIndex :
+                  (notationComposer.compositionState.getActiveVoiceIndexForStaff ? notationComposer.compositionState.getActiveVoiceIndexForStaff('treble') : 0);
+              const note = measure.notation.treble?.voices[voiceIndex]?.notes[move.noteIndex];
               if (note) {
                 const pitches = note.pitches || (note.pitch ? [note.pitch] : []);
                 notationComposer.compositionState.syncTreblePitchOnly(move.measureIndex, move.noteIndex, pitches);
@@ -432,27 +460,35 @@ export function initEnhancedNotation(options = {}) {
       if (notationComposer && notationComposer.toolbar) {
         // Get full note objects from composition state
         const selectedNoteObjects = [];
+        const selectedVoices = new Set();
 
         if (notationComposer.compositionState) {
           noteIds.forEach(noteId => {
-            // Parse note ID: "measureIndex-staff-noteIndex" or "measureIndex-staff-noteIndex-pitchIndex"
+            // Parse note ID: "measureIndex-staff-voiceIndex-noteIndex" or "measureIndex-staff-voiceIndex-noteIndex-pitchIndex"
             const parts = noteId.split('-');
             const measureIndex = parseInt(parts[0]);
             const staff = parts[1];
-            const noteIndex = parseInt(parts[2]);
-            const pitchIndex = parts.length > 3 ? parseInt(parts[3]) : null;
+            // Voice index is at position 2 (0-based index internally)
+            const voiceIndex = parseInt(parts[2]) || 0;
+            const noteIndex = parseInt(parts[3]) || parseInt(parts[2]); // Fallback for legacy 3-part IDs
+            const pitchIndex = parts.length > 4 ? parseInt(parts[4]) : null;
+
+            // Track which voices are selected
+            selectedVoices.add(voiceIndex);
 
             const measure = notationComposer.compositionState.getMeasure(measureIndex);
 
             if (measure) {
               const voiceKey = staff;
-              const note = measure.notation[voiceKey]?.voices[0]?.notes[noteIndex];
+              // Use the correct voice index from the note ID
+              const note = measure.notation[voiceKey]?.voices[voiceIndex]?.notes[noteIndex];
               if (note) {
                 // Create note object for toolbar
                 const noteObj = {
                   ...note,
                   measureIndex,
                   staff,
+                  voiceIndex,
                   noteIndex,
                   pitchIndex
                 };
@@ -473,6 +509,14 @@ export function initEnhancedNotation(options = {}) {
           });
         }
 
+        // Update the voice selector to match the selected note's voice
+        // Only update if all selected notes are from the same voice
+        if (selectedVoices.size === 1) {
+          const selectedVoice = [...selectedVoices][0];
+          // Voice selector uses 1-based index (Voice 1, Voice 2), but internal is 0-based
+          notationComposer.toolbar.setVoiceDisplay(selectedVoice + 1);
+        }
+
         notationComposer.toolbar.updateSelectionState(selectedNoteObjects);
       }
 
@@ -484,15 +528,79 @@ export function initEnhancedNotation(options = {}) {
       }
     },
     onNoteDelete: (deletion) => {
+      // Get voice index from deletion (default to 0 for backward compatibility)
+      const voiceIndex = deletion.voiceIndex ?? 0;
+      console.log(`[onNoteDelete] Deleting note: measureIndex=${deletion.measureIndex}, staff=${deletion.staff}, voiceIndex=${voiceIndex}, noteIndex=${deletion.noteIndex}`);
+
+      // Handle auto-generated rest deletion (noteIndex === -1)
+      // These rests don't exist in compositionState - they're created by fillGapsWithRests during rendering
+      // When deleted, we shift all succeeding notes backward to fill the gap
+      if (deletion.noteIndex === -1) {
+        if (deletion.isAutoGenerated && deletion.beat !== undefined && deletion.duration) {
+          console.log(`[onNoteDelete] Auto-generated rest deletion: shifting notes at beat > ${deletion.beat} backward by ${deletion.duration}`);
+
+          // Helper to convert duration to beats
+          const durationToBeats = (duration) => {
+            if (!duration) return 1;
+            const baseDuration = duration.replace(/[dn.]/g, '');
+            const isDotted = duration.includes('d') || duration.includes('.');
+            let beats = 1;
+            switch (baseDuration) {
+              case '1': case 'w': case '1n': beats = 4; break;
+              case '2': case 'h': case '2n': beats = 2; break;
+              case '4': case 'q': case '4n': beats = 1; break;
+              case '8': case '8n': beats = 0.5; break;
+              case '16': case '16n': beats = 0.25; break;
+              case '32': case '32n': beats = 0.125; break;
+              default: beats = 1;
+            }
+            return isDotted ? beats * 1.5 : beats;
+          };
+
+          const restBeats = durationToBeats(deletion.duration);
+          const restBeat = deletion.beat;
+
+          // Shift succeeding notes backward in compositionState
+          if (notationComposer.compositionState) {
+            const measure = notationComposer.compositionState.getMeasure(deletion.measureIndex);
+            if (measure) {
+              const voiceKey = deletion.staff === 'treble' ? 'treble' : 'bass';
+              const notes = measure.notation[voiceKey]?.voices[voiceIndex]?.notes;
+              if (notes) {
+                let shifted = 0;
+                for (const note of notes) {
+                  if ((note.beat ?? 0) > restBeat) {
+                    note.beat = (note.beat ?? 0) - restBeats;
+                    shifted++;
+                  }
+                }
+                console.log(`[onNoteDelete] Shifted ${shifted} notes backward by ${restBeats} beats`);
+                measure.notation[voiceKey].autoGenerated = false;
+              }
+            }
+          }
+
+          // Sync and re-render
+          if (deletion.staff === 'treble' && notationComposer.compositionState?.trebleBlockSequence?.blocks?.length > 0) {
+            notationComposer.compositionState.syncMeasuresToTrebleBlock();
+          }
+          notationComposer.render();
+          return;
+        } else {
+          console.log(`[onNoteDelete] Skipping - auto-generated rest without beat/duration info`);
+          return;
+        }
+      }
+
       // Helper to clear isTied flag on the next note when deleting the first note of a tie
-      const clearTieOnNextNote = (measureIndex, staff, noteIndex) => {
+      const clearTieOnNextNote = (measureIndex, staff, vIdx, noteIndex) => {
         if (!notationComposer.compositionState) return;
 
         const measure = notationComposer.compositionState.getMeasure(measureIndex);
         if (!measure) return;
 
         const voiceKey = staff === 'treble' ? 'treble' : 'bass';
-        const notes = measure.notation[voiceKey]?.voices[0]?.notes;
+        const notes = measure.notation[voiceKey]?.voices[vIdx]?.notes;
         if (!notes) return;
 
         // If there's a note after the one being deleted, clear its isTied flag
@@ -507,7 +615,7 @@ export function initEnhancedNotation(options = {}) {
           // Deleted note was the last in this measure - check first note of next measure
           const nextMeasure = notationComposer.compositionState.getMeasure(measureIndex + 1);
           if (nextMeasure) {
-            const nextNotes = nextMeasure.notation[voiceKey]?.voices[0]?.notes;
+            const nextNotes = nextMeasure.notation[voiceKey]?.voices[vIdx]?.notes;
             if (nextNotes && nextNotes.length > 0) {
               const firstNextNote = nextNotes[0];
               if (firstNextNote && (firstNextNote.isTied || firstNextNote.tied)) {
@@ -520,7 +628,7 @@ export function initEnhancedNotation(options = {}) {
       };
 
       // Clear tie on next note before replacing with rest (must happen before the conversion)
-      clearTieOnNextNote(deletion.measureIndex, deletion.staff, deletion.noteIndex);
+      clearTieOnNextNote(deletion.measureIndex, deletion.staff, voiceIndex, deletion.noteIndex);
 
       // Replace note with rest(s) of the same total duration (preserves rhythmic structure)
       // Dotted durations need to be split into multiple rests since VexFlow doesn't support dotted rests well
@@ -582,7 +690,8 @@ export function initEnhancedNotation(options = {}) {
       };
 
       // Helper to split a dotted duration into multiple non-dotted rests
-      const splitDottedDuration = (duration, startBeat) => {
+      // voiceIdx parameter ensures rests stay in the correct voice for multi-voice notation
+      const splitDottedDuration = (duration, startBeat, voiceIdx) => {
         const totalBeats = durationToBeats(duration);
         const rests = [];
 
@@ -593,23 +702,39 @@ export function initEnhancedNotation(options = {}) {
           const baseDuration = duration.slice(0, -1); // Remove the dot
           const baseBeats = durationToBeats(baseDuration);
           const dotBeats = baseBeats / 2;
+          // For Voice 2 (voiceIdx === 1), mark as cue rest for multi-voice notation
+          const isCueRest = voiceIdx === 1;
 
           rests.push({
+            type: 'rest',
             isRest: true,
             duration: baseDuration,
             beat: startBeat,
+            voiceIndex: voiceIdx, // Preserve voice for multi-voice support
+            _userCreated: true, // Mark as user-created (from deletion) to distinguish from auto-generated
+            _restDisplay: isCueRest ? { hidden: false, isCue: true } : undefined, // Apply cue styling for Voice 2
           });
           rests.push({
+            type: 'rest',
             isRest: true,
             duration: beatsToDuration(dotBeats),
             beat: startBeat + baseBeats,
+            voiceIndex: voiceIdx, // Preserve voice for multi-voice support
+            _userCreated: true,
+            _restDisplay: isCueRest ? { hidden: false, isCue: true } : undefined, // Apply cue styling for Voice 2
           });
         } else {
           // Non-dotted duration - just create a single rest
+          // For Voice 2 (voiceIdx === 1), mark as cue rest for multi-voice notation
+          const isCueRest = voiceIdx === 1;
           rests.push({
+            type: 'rest',
             isRest: true,
             duration: duration,
             beat: startBeat,
+            voiceIndex: voiceIdx, // Preserve voice for multi-voice support
+            _userCreated: true, // Mark as user-created (from deletion) to distinguish from auto-generated
+            _restDisplay: isCueRest ? { hidden: false, isCue: true } : undefined, // Apply cue styling for Voice 2
           });
         }
 
@@ -622,10 +747,14 @@ export function initEnhancedNotation(options = {}) {
         const measure = notationComposer.compositionState.getMeasure(deletion.measureIndex);
         if (measure) {
           const voiceKey = deletion.staff === 'treble' ? 'treble' : 'bass';
-          const notes = measure.notation[voiceKey]?.voices[0]?.notes;
+          const notes = measure.notation[voiceKey]?.voices[voiceIndex]?.notes;
+          console.log(`[onNoteDelete] Checking voice ${voiceIndex}: notes array length=${notes?.length}, noteIndex=${deletion.noteIndex}`);
           if (notes && deletion.noteIndex < notes.length) {
             const originalNote = notes[deletion.noteIndex];
             isAlreadyRest = originalNote.isRest || originalNote.type === 'rest';
+            console.log(`[onNoteDelete] Note at index ${deletion.noteIndex}:`, { isRest: originalNote.isRest, type: originalNote.type, beat: originalNote.beat, isAlreadyRest });
+          } else {
+            console.log(`[onNoteDelete] Note index ${deletion.noteIndex} out of bounds or notes array missing`);
           }
         }
       }
@@ -635,19 +764,36 @@ export function initEnhancedNotation(options = {}) {
         const measure = notationComposer.compositionState.getMeasure(deletion.measureIndex);
         if (measure) {
           const voiceKey = deletion.staff === 'treble' ? 'treble' : 'bass';
-          const notes = measure.notation[voiceKey]?.voices[0]?.notes;
+          const notes = measure.notation[voiceKey]?.voices[voiceIndex]?.notes;
           if (notes && deletion.noteIndex < notes.length) {
             if (isAlreadyRest) {
-              // Deleting a rest - just remove it entirely
+              // Deleting a rest - remove it and shift succeeding notes backward
+              const deletedRest = notes[deletion.noteIndex];
+              const restBeat = deletedRest.beat ?? 0;
+              const restDuration = deletedRest.duration || '4n';
+              const restBeats = durationToBeats(restDuration);
+
+              console.log(`[onNoteDelete] Removing rest at index ${deletion.noteIndex}, beat=${restBeat}, duration=${restDuration} (${restBeats} beats)`);
               notes.splice(deletion.noteIndex, 1);
+
+              // Shift succeeding notes backward to fill the gap
+              let shifted = 0;
+              for (const note of notes) {
+                if ((note.beat ?? 0) > restBeat) {
+                  note.beat = (note.beat ?? 0) - restBeats;
+                  shifted++;
+                }
+              }
+              console.log(`[onNoteDelete] Shifted ${shifted} notes backward by ${restBeats} beats, notes after: ${notes.length}`);
             } else {
               // Deleting a note - replace with rest(s) to preserve rhythmic structure
               const originalNote = notes[deletion.noteIndex];
               const duration = originalNote.duration || '4n';
               const startBeat = originalNote.beat || 0;
 
-              // Get the replacement rests
-              const replacementRests = splitDottedDuration(duration, startBeat);
+              // Get the replacement rests - pass voiceIndex to preserve voice for multi-voice notation
+              const replacementRests = splitDottedDuration(duration, startBeat, voiceIndex);
+              console.log(`[onNoteDelete] Replacing note with ${replacementRests.length} rest(s):`, replacementRests.map(r => ({beat: r.beat, duration: r.duration, voiceIndex: r.voiceIndex})));
 
               // Replace the single note with possibly multiple rests
               notes.splice(deletion.noteIndex, 1, ...replacementRests);
@@ -665,8 +811,19 @@ export function initEnhancedNotation(options = {}) {
 
           if (measure[notesArray] && deletion.noteIndex < measure[notesArray].length) {
             if (isAlreadyRest) {
-              // Deleting a rest - just remove it entirely
+              // Deleting a rest - remove it and shift succeeding notes backward
+              const deletedRest = measure[notesArray][deletion.noteIndex];
+              const restBeat = deletedRest.beat ?? 0;
+              const restBeats = durationToBeats(deletedRest.duration || '4n');
+
               measure[notesArray].splice(deletion.noteIndex, 1);
+
+              // Shift succeeding notes backward to fill the gap
+              for (const note of measure[notesArray]) {
+                if ((note.beat ?? 0) > restBeat) {
+                  note.beat = (note.beat ?? 0) - restBeats;
+                }
+              }
             } else {
               // Deleting a note - replace with rest(s) to preserve rhythmic structure
               const originalNote = measure[notesArray][deletion.noteIndex];
@@ -706,14 +863,19 @@ export function initEnhancedNotation(options = {}) {
     },
     onPolyphonyAdd: (data) => {
       // Add pitch to existing note to create chord - update both data sources
+      // Get voice index from data (default to 0 for backward compatibility)
+      const voiceIndex = data.voiceIndex ?? 0;
+
       // 1. Update compositionState
       if (notationComposer.compositionState) {
         const measure = notationComposer.compositionState.getMeasure(data.measureIndex);
         if (measure) {
           const voiceKey = data.staff === 'treble' ? 'treble' : 'bass';
-          const note = measure.notation[voiceKey]?.voices[0]?.notes[data.noteIndex];
+          // Use the correct voice index from the selected note
+          const note = measure.notation[voiceKey]?.voices[voiceIndex]?.notes[data.noteIndex];
 
           if (note) {
+            console.log(`[onPolyphonyAdd] Adding pitch ${data.pitch} to voice ${voiceIndex}, note ${data.noteIndex}`);
             if (note.pitches && Array.isArray(note.pitches)) {
               if (!note.pitches.includes(data.pitch)) {
                 note.pitches.push(data.pitch);
@@ -727,8 +889,8 @@ export function initEnhancedNotation(options = {}) {
         }
       }
 
-      // 2. Update measureManager
-      if (notationComposer.measureManager?.measures) {
+      // 2. Update measureManager (legacy - uses flat arrays, voice 0 only)
+      if (voiceIndex === 0 && notationComposer.measureManager?.measures) {
         const measure = notationComposer.measureManager.measures[data.measureIndex];
         if (measure) {
           const notesArray = data.staff === 'treble' ? 'trebleNotes' : 'bassNotes';
@@ -862,6 +1024,36 @@ export function initEnhancedNotation(options = {}) {
       if (noteEditor.selectedNotes.size > 0) {
         // Also toggle rest mode on selected notes
         noteEditor.toggleRestOnSelected();
+
+        // Refresh toolbar selection state after toggling rest
+        // This ensures the rest button reflects the new state of the notes
+        const selectedNoteObjects = [];
+        if (notationComposer.compositionState) {
+          for (const noteId of noteEditor.selectedNotes) {
+            const parts = noteId.split('-');
+            const measureIndex = parseInt(parts[0]);
+            const staff = parts[1];
+            const voiceIndex = parseInt(parts[2]) || 0;
+            const noteIndex = parseInt(parts[3]) || parseInt(parts[2]);
+            const pitchIndex = parts.length > 4 ? parseInt(parts[4]) : null;
+
+            const measure = notationComposer.compositionState.getMeasure(measureIndex);
+            if (measure) {
+              const note = measure.notation[staff]?.voices[voiceIndex]?.notes[noteIndex];
+              if (note) {
+                selectedNoteObjects.push({
+                  ...note,
+                  measureIndex,
+                  staff,
+                  voiceIndex,
+                  noteIndex,
+                  pitchIndex
+                });
+              }
+            }
+          }
+        }
+        notationComposer.toolbar.updateSelectionState(selectedNoteObjects);
       }
     };
 

@@ -1299,7 +1299,8 @@ export function startBuilderChord() {
     }
 
     const rootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[getBuilderRootIndex()];
-    const baseOctave = 4 + getBuilderOctaveShift();
+    // Base octave is 3 for LH chord voicing, adjusted by octave shift
+    const baseOctave = 3 + getBuilderOctaveShift();
 
     if (getBuilderSelectionMode() === 'chord') {
         const chordResult = getInvertedChordNotes(
@@ -1307,7 +1308,7 @@ export function startBuilderChord() {
             getBuilderChordType(),
             getBuilderInversion(),
             rootNote,
-            getBuilderOctaveShift(),
+            getBuilderOctaveShift() * 12, // Convert whole octaves to semitones
             getEnharmonicPreference(),
             getNotationPreference()
         );
@@ -1364,7 +1365,7 @@ export function startBuilderChord() {
             setBuilderChordNotes(getBuilderChordNotes().concat(lhNotes));
         }
     } else { // 'interval'
-        const intervalResult = getIntervalNotes(rootNote, getBuilderIntervalType(), getBuilderOctaveShift(), getEnharmonicPreference());
+        const intervalResult = getIntervalNotes(rootNote, getBuilderIntervalType(), getBuilderOctaveShift() * 12, getEnharmonicPreference()); // Convert whole octaves to semitones
         const voicedNotes = intervalResult.specificNotes.filter(note => !getBuilderOmittedNotes().includes(note));
 
         setBuilderChordNotes(voicedNotes);
@@ -1493,13 +1494,13 @@ function playBuilderChordOnce(notes) {
                 getBuilderChordType(),
                 getBuilderInversion(),
                 rootNote,
-                getBuilderOctaveShift(),
+                getBuilderOctaveShift() * 12, // Convert whole octaves to semitones
                 getEnharmonicPreference(),
                 getNotationPreference()
             );
             rhNotes = chordResult.specificNotes;
         } else {
-            const intervalResult = getIntervalNotes(rootNote, getBuilderIntervalType(), getBuilderOctaveShift(), getEnharmonicPreference());
+            const intervalResult = getIntervalNotes(rootNote, getBuilderIntervalType(), getBuilderOctaveShift() * 12, getEnharmonicPreference()); // Convert whole octaves to semitones
             rhNotes = intervalResult.specificNotes;
         }
         
@@ -1522,7 +1523,7 @@ export function playBuilderChordWithDuration() {
             getBuilderChordType(),
             getBuilderInversion(),
             rootNote,
-            getBuilderOctaveShift(),
+            getBuilderOctaveShift() * 12, // Convert whole octaves to semitones
             getEnharmonicPreference(),
             getNotationPreference()
         );
@@ -1536,7 +1537,7 @@ export function playBuilderChordWithDuration() {
         const lhNotes = allLhNotes.filter(note => !getBuilderLHOmittedNotes().includes(note));
         allNotes = allNotes.concat(lhNotes);
     } else {
-        const intervalResult = getIntervalNotes(rootNote, getBuilderIntervalType(), getBuilderOctaveShift(), getEnharmonicPreference());
+        const intervalResult = getIntervalNotes(rootNote, getBuilderIntervalType(), getBuilderOctaveShift() * 12, getEnharmonicPreference()); // Convert whole octaves to semitones
         const voicedNotes = intervalResult.specificNotes.filter(note => !getBuilderOmittedNotes().includes(note));
         allNotes = [...voicedNotes];
         
@@ -1587,7 +1588,7 @@ export function updateBuilderDisplay() {
             chordType,
             getBuilderInversion(),
             rootNote,
-            getBuilderOctaveShift(),
+            getBuilderOctaveShift() * 12, // Convert whole octaves to semitones
             getEnharmonicPreference(),
             getNotationPreference()
         );
@@ -1597,7 +1598,7 @@ export function updateBuilderDisplay() {
         document.getElementById('builder-lh-inversion-select').disabled = false;
         document.getElementById('builder-lh-octave-select').disabled = false;
     } else { // 'interval'
-        result = getIntervalNotes(rootNote, getBuilderIntervalType(), getBuilderOctaveShift(), getEnharmonicPreference());
+        result = getIntervalNotes(rootNote, getBuilderIntervalType(), getBuilderOctaveShift() * 12, getEnharmonicPreference()); // Convert whole octaves to semitones
         notesForHighlight = result.specificNotes;
         document.getElementById('builder-inversion-selector').style.opacity = 0.3;
         document.getElementById('builder-lh-type-select').disabled = false;
@@ -1644,7 +1645,7 @@ export function updateBuilderDisplay() {
                 getBuilderChordType(),
                 getBuilderInversion(),
                 rootNote,
-                getBuilderOctaveShift(),
+                getBuilderOctaveShift() * 12, // Convert whole octaves to semitones
                 getEnharmonicPreference(),
                 getNotationPreference()
             );
@@ -1658,7 +1659,7 @@ export function updateBuilderDisplay() {
             const lhNotes = allLhNotes.filter(note => !getBuilderLHOmittedNotes().includes(note));
             allNotes = allNotes.concat(lhNotes);
         } else {
-            const intervalResult = getIntervalNotes(rootNote, getBuilderIntervalType(), getBuilderOctaveShift(), getEnharmonicPreference());
+            const intervalResult = getIntervalNotes(rootNote, getBuilderIntervalType(), getBuilderOctaveShift() * 12, getEnharmonicPreference()); // Convert whole octaves to semitones
             const voicedNotes = intervalResult.specificNotes.filter(note => !getBuilderOmittedNotes().includes(note));
             allNotes = [...voicedNotes];
             
@@ -2829,7 +2830,7 @@ export function addChordToProgression(switchToTrainer = false, playShutterSound 
     const lhOctaveShift = parseInt(document.getElementById('builder-lh-octave-select').value, 10);
     const omittedNotes = [...getBuilderOmittedNotes()]; // Capture current voicing
     const lhOmittedNotes = [...getBuilderLHOmittedNotes()]; // Capture LH voicing
-    const octaveShift = getBuilderOctaveShift(); // Capture current octave shift
+    const octaveShift = getBuilderOctaveShift() * 12; // Convert whole octaves to semitones
 
     let newChordData;
 
@@ -2992,8 +2993,8 @@ export function addSpecificChordToProgression(chordType, inversion, playShutterS
     const lhOctaveShift = parseInt(document.getElementById('builder-lh-octave-select').value, 10);
     const omittedNotes = [...getBuilderOmittedNotes()]; // Capture current voicing
     const lhOmittedNotes = [...getBuilderLHOmittedNotes()]; // Capture LH voicing
-    const octaveShift = getBuilderOctaveShift(); // Capture current octave shift
-    
+    const octaveShift = getBuilderOctaveShift() * 12; // Convert whole octaves to semitones
+
     const trainerState = getTrainerState();
     const result = getInvertedChordNotes(
         rootNote,
@@ -3168,7 +3169,7 @@ export function capturePlayedChord(notes, type = 'Major', inversion = 0) {
 
         if (newChordData) {
             newChordData.lhSetting = 'off';
-            newChordData.lhOctaveShift = -12;
+            newChordData.lhOctaveShift = 0; // Base octave is now 2 for LH
             window.addToProgressionData(newChordData);
 
             if (window.renderProgressionDisplay) {

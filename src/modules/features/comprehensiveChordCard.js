@@ -67,7 +67,7 @@ export function createComprehensiveDetailedCardHTML(chord, index, key, harmonyAn
 
     // LH: Generate notes based on pattern
     const lhNotes = chord.lhNotes || [];
-    const lhOctaveShift = chord.lhOctaveShift || -12;
+    const lhOctaveShift = chord.lhOctaveShift || 0; // Base octave is now 2 for LH
     const lhInversion = chord.lhInversion || 0;
     const lhNoteCheckboxes = lhNotes.map(note => {
         const isChecked = !(chord.lhOmittedNotes || []).includes(note);

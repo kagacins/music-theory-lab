@@ -106,6 +106,11 @@ export class NotationToolbar {
     // Interaction mode: 'noteEntry' = Alt+click always adds note, 'select' = clicking on notes selects them
     this.interactionMode = localStorage.getItem('notation-interaction-mode') || 'select';
     this.onInteractionModeChange = options.onInteractionModeChange || (() => {});
+
+    // Multi-voice rest display settings
+    this.restDisplayMode = localStorage.getItem('notation-rest-display-mode') || 'clean'; // 'clean' or 'explicit'
+    this.cueRestsForSecondaryVoice = localStorage.getItem('notation-cue-rests') !== 'false'; // default true
+    this.onRestDisplayModeChange = options.onRestDisplayModeChange || (() => {});
   }
 
   /**
@@ -361,6 +366,31 @@ export class NotationToolbar {
             `).join('')}
           </select>
         </div>
+
+        <!-- Multi-Voice Rest Display Section -->
+        <div class="toolbar-section rest-display-section">
+          <span class="section-label">Rests</span>
+          <div class="button-group rest-display-buttons">
+            <button
+              class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'clean' ? 'active' : ''}"
+              data-rest-mode="clean"
+              title="Clean Notation: Hide redundant rests when another voice has a note on the same beat"
+            >
+              Clean
+            </button>
+            <button
+              class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'explicit' ? 'active' : ''}"
+              data-rest-mode="explicit"
+              title="Explicit Notation: Show all rests in all voices"
+            >
+              All
+            </button>
+          </div>
+          <label class="cue-rest-toggle" title="Use smaller (cue-sized) rests for secondary voice">
+            <input type="checkbox" class="cue-rest-checkbox" ${this.cueRestsForSecondaryVoice ? 'checked' : ''}>
+            <span class="cue-rest-label">Cue</span>
+          </label>
+        </div>
       </div>
     `;
 
@@ -529,6 +559,47 @@ export class NotationToolbar {
         padding: 0 12px;
         font-size: 12px;
         font-weight: 600;
+      }
+
+      /* Rest display mode section */
+      .rest-display-section {
+        border-left: 1px solid var(--bg-tertiary, #444);
+        padding-left: 12px;
+      }
+
+      .rest-display-btn {
+        width: auto;
+        padding: 0 10px;
+        font-size: 11px;
+        font-weight: 500;
+      }
+
+      .cue-rest-toggle {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 4px;
+        background: var(--bg-tertiary, #333);
+        font-size: 11px;
+        color: var(--text-primary, #fff);
+        transition: background 0.15s ease;
+      }
+
+      .cue-rest-toggle:hover {
+        background: var(--bg-hover, #444);
+      }
+
+      .cue-rest-checkbox {
+        width: 14px;
+        height: 14px;
+        cursor: pointer;
+      }
+
+      .cue-rest-label {
+        font-size: 11px;
+        color: var(--text-muted, #888);
       }
 
       @media (max-width: 768px) {
@@ -716,6 +787,21 @@ export class NotationToolbar {
       }
     });
 
+    // Rest display mode buttons
+    this.container.querySelectorAll('.rest-display-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const mode = e.currentTarget.dataset.restMode;
+        if (mode) {
+          this.setRestDisplayMode(mode);
+        }
+      });
+    });
+
+    // Cue rest checkbox
+    this.container.querySelector('.cue-rest-checkbox')?.addEventListener('change', (e) => {
+      this.setCueRestsEnabled(e.target.checked);
+    });
+
     // Keyboard shortcuts
     document.addEventListener('keydown', this.handleKeyDown.bind(this));
   }
@@ -804,6 +890,24 @@ export class NotationToolbar {
       e.preventDefault();
       this.onTie();
     }
+
+    // Voice switching
+    // V - Cycle through voices
+    if (!hasModifier && (e.key === 'v' || e.key === 'V')) {
+      e.preventDefault();
+      this.cycleVoice();
+    }
+
+    // Alt+1 and Alt+2 for direct voice selection
+    if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      if (e.key === '1') {
+        e.preventDefault();
+        this.setVoice(1);
+      } else if (e.key === '2') {
+        e.preventDefault();
+        this.setVoice(2);
+      }
+    }
   }
 
   /**
@@ -852,6 +956,56 @@ export class NotationToolbar {
     if (!this.container) return;
     this.container.querySelectorAll('.interaction-mode-btn').forEach(btn => {
       const isActive = btn.dataset.interactionMode === this.interactionMode;
+      btn.classList.toggle('active', isActive);
+    });
+  }
+
+  /**
+   * Set rest display mode for multi-voice notation
+   * @param {string} mode - 'clean' (smart omission) or 'explicit' (show all)
+   */
+  setRestDisplayMode(mode) {
+    if (mode !== 'clean' && mode !== 'explicit') return;
+    this.restDisplayMode = mode;
+    localStorage.setItem('notation-rest-display-mode', mode);
+    this.updateRestDisplayButtons();
+    this.onRestDisplayModeChange({
+      restDisplayMode: this.restDisplayMode,
+      cueRestsForSecondaryVoice: this.cueRestsForSecondaryVoice,
+    });
+  }
+
+  /**
+   * Set cue rests enabled for secondary voice
+   * @param {boolean} enabled - Whether to use cue-sized rests
+   */
+  setCueRestsEnabled(enabled) {
+    this.cueRestsForSecondaryVoice = enabled;
+    localStorage.setItem('notation-cue-rests', enabled ? 'true' : 'false');
+    this.onRestDisplayModeChange({
+      restDisplayMode: this.restDisplayMode,
+      cueRestsForSecondaryVoice: this.cueRestsForSecondaryVoice,
+    });
+  }
+
+  /**
+   * Get current rest display settings
+   * @returns {Object} - { restDisplayMode, cueRestsForSecondaryVoice }
+   */
+  getRestDisplaySettings() {
+    return {
+      restDisplayMode: this.restDisplayMode,
+      cueRestsForSecondaryVoice: this.cueRestsForSecondaryVoice,
+    };
+  }
+
+  /**
+   * Update rest display mode button states
+   */
+  updateRestDisplayButtons() {
+    if (!this.container) return;
+    this.container.querySelectorAll('.rest-display-btn').forEach(btn => {
+      const isActive = btn.dataset.restMode === this.restDisplayMode;
       btn.classList.toggle('active', isActive);
     });
   }
@@ -982,6 +1136,47 @@ export class NotationToolbar {
     this.container.querySelectorAll('.articulation-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.articulation === this.currentArticulation);
     });
+  }
+
+  /**
+   * Set the active voice
+   * @param {number} voiceNumber - Voice number (1 or 2)
+   */
+  setVoice(voiceNumber) {
+    this.voiceNumber = Math.max(1, Math.min(2, voiceNumber));
+    this.updateVoiceSelector();
+    this.onVoiceChange(this.voiceNumber);
+    console.log('[NotationToolbar] Voice set to:', this.voiceNumber);
+  }
+
+  /**
+   * Set the voice display without triggering callbacks
+   * Used when selecting notes to reflect which voice they belong to
+   * @param {number} voiceNumber - Voice number (1 or 2)
+   */
+  setVoiceDisplay(voiceNumber) {
+    this.voiceNumber = Math.max(1, Math.min(2, voiceNumber));
+    this.updateVoiceSelector();
+    console.log('[NotationToolbar] Voice display updated to:', this.voiceNumber);
+  }
+
+  /**
+   * Cycle through voices (1 -> 2 -> 1 -> ...)
+   */
+  cycleVoice() {
+    const newVoice = this.voiceNumber === 1 ? 2 : 1;
+    this.setVoice(newVoice);
+  }
+
+  /**
+   * Update voice selector UI to reflect current voice
+   */
+  updateVoiceSelector() {
+    if (!this.container) return;
+    const select = this.container.querySelector('.voice-select');
+    if (select) {
+      select.value = this.voiceNumber.toString();
+    }
   }
 
   /**
