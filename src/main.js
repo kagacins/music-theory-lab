@@ -3204,15 +3204,9 @@ import { getRecommendationService } from './modules/integration/recommendationSe
 import { getRecommendationsSidebarController } from './modules/ui/recommendationsSidebarController.js';
 import { initStyleMoodDisplay, updateStyleMoodDisplay } from './modules/ui/recommendationsSidebar.js';
 
-// Phase 4.1: Import melody suggestion modules
-import {
-    initMelodySuggestionController,
-    refreshSuggestions as refreshMelodySuggestions,
-    setCurrentMeasure as setMelodySuggestionMeasure,
-    setStyle as setMelodySuggestionStyle,
-    setOctave as setMelodySuggestionOctave,
-    insertNote as insertSuggestedNote
-} from './modules/ai/melodySuggestionController.js';
+// Phase 4.1: Melody suggestion modules REMOVED - use Recommendations Modal instead
+// The floating melody suggestion panel has been deprecated in favor of the
+// unified Recommendations Modal (UnifiedRecommendationModal.js)
 
 // Phase 4: Import enhanced melody generation modules
 import {
@@ -3234,7 +3228,6 @@ import {
 // Global instances for recommendations (singleton pattern)
 let recommendationService = null;
 let recommendationsSidebarController = null;
-let melodySuggestionControllerInitialized = false;
 let enhancedMelodyControllerInitialized = false;
 
 /**
@@ -3270,72 +3263,37 @@ window.initializeRecommendationsSidebar = function() {
 };
 
 /**
- * Initialize the melody suggestions controller
- * Called when the Melody Composer tab is first loaded
+ * Initialize the melody suggestions controller - DEPRECATED
+ * The floating melody panel has been replaced by the Recommendations Modal
+ * This stub function exists for backwards compatibility
  */
 window.initMelodySuggestionController = function(options = {}) {
-    // Only initialize once
-    if (melodySuggestionControllerInitialized) {
-        // Just refresh suggestions if already initialized
-        refreshMelodySuggestions();
-        return;
-    }
-
-    try {
-        // Initialize the controller
-        initMelodySuggestionController(options);
-        melodySuggestionControllerInitialized = true;
-
-        // Set up style selector event listener - auto-refreshes on change
-        // This is set up in the controller's setupEventListeners() function
-
-        // Set up panel toggle
-        window.toggleMelodySuggestionsPanel = function() {
-            const panel = document.getElementById('melody-suggestions-panel');
-            const chevron = document.getElementById('melody-suggestions-chevron');
-
-            if (panel) {
-                const listEl = document.getElementById('melody-suggestions-list');
-                const contextEl = document.getElementById('melody-suggestion-context');
-                const styleEl = panel.querySelector('.style-selector');
-
-                [listEl, contextEl, styleEl].forEach(el => {
-                    if (el) el.classList.toggle('hidden');
-                });
-
-                if (chevron) {
-                    chevron.classList.toggle('rotate-180');
+    // DEPRECATED: Use Recommendations Modal instead
+    // Initialize enhanced melody controller if not already done
+    if (!enhancedMelodyControllerInitialized) {
+        try {
+            initEnhancedMelodyController({
+                onPhraseSelected: (phrase) => {
+                    console.log('Phrase inserted:', phrase.notes.length, 'notes');
+                },
+                onMotifDetected: (analysis) => {
+                    console.log('Motifs detected:', analysis.totalDetected);
                 }
-            }
-        };
-
-        // Phase 4: Initialize enhanced melody controller
-        if (!enhancedMelodyControllerInitialized) {
-            try {
-                initEnhancedMelodyController({
-                    onPhraseSelected: (phrase) => {
-                        console.log('✅ Phrase inserted:', phrase.notes.length, 'notes');
-                    },
-                    onMotifDetected: (analysis) => {
-                        console.log('🎵 Motifs detected:', analysis.totalDetected);
-                    }
-                });
-                enhancedMelodyControllerInitialized = true;
-            } catch (err) {
-                console.warn('Enhanced melody controller initialization deferred');
-            }
+            });
+            enhancedMelodyControllerInitialized = true;
+        } catch (err) {
+            console.warn('Enhanced melody controller initialization deferred');
         }
-    } catch (error) {
-        // Error initializing melody suggestion controller
     }
 };
 
-// Expose melody suggestion functions to window
-window.refreshMelodySuggestions = refreshMelodySuggestions;
-window.setMelodySuggestionMeasure = setMelodySuggestionMeasure;
-window.setMelodySuggestionStyle = setMelodySuggestionStyle;
-window.setMelodySuggestionOctave = setMelodySuggestionOctave;
-window.insertSuggestedNote = insertSuggestedNote;
+// Deprecated melody suggestion functions - stubs for backwards compatibility
+window.refreshMelodySuggestions = function() { /* Deprecated - use Recommendations Modal */ };
+window.setMelodySuggestionMeasure = function() { /* Deprecated */ };
+window.setMelodySuggestionStyle = function() { /* Deprecated */ };
+window.setMelodySuggestionOctave = function() { /* Deprecated */ };
+window.insertSuggestedNote = function() { /* Deprecated */ };
+window.toggleMelodySuggestionsPanel = function() { /* Deprecated */ };
 
 // Phase 4: Expose enhanced melody generation functions to window
 window.setEnhancedSectionType = setEnhancedSectionType;
@@ -3353,11 +3311,6 @@ window.SECTION_MELODY_PROFILE_LIST = SECTION_MELODY_PROFILE_LIST;
 // Phase 4: Handler for treble note selection changes
 // Called from notationInit.js when treble clef notes are selected
 window.onTrebleNoteSelectionChanged = function(trebleNoteIds) {
-    // Update single note suggestions based on new selection
-    if (melodySuggestionControllerInitialized) {
-        refreshMelodySuggestions();
-    }
-
     // Update phrase suggestions based on new selection
     if (enhancedMelodyControllerInitialized) {
         regeneratePhrases();
@@ -3505,17 +3458,11 @@ window.openSuggestionWeights = function() {
 };
 
 /**
- * Refresh melody suggestions (called after weights are saved)
+ * Refresh melody suggestions - DEPRECATED
+ * The floating melody panel has been replaced by the Recommendations Modal
  */
 window.refreshMelodySuggestions = function() {
-    // Import refreshSuggestions from controller if available
-    if (window.melodySuggestionController && window.melodySuggestionController.refreshSuggestions) {
-        window.melodySuggestionController.refreshSuggestions();
-    } else {
-        // Fallback: click the refresh button
-        const refreshBtn = document.getElementById('refresh-melody-suggestions-btn');
-        if (refreshBtn) refreshBtn.click();
-    }
+    // Deprecated - use Recommendations Modal for melody suggestions
 };
 
 /**

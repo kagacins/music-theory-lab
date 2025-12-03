@@ -30,7 +30,7 @@ import {
     refreshInsertContext
 } from '../../state/sectionIntentState.js';
 import { getCompositionState } from '../../state/compositionState.js';
-import { getInvertedChordNotes, getChordNotes } from '../../utils/noteUtils.js';
+import { getInvertedChordNotes, getChordNotes, getEnharmonicPreferenceForKey, spellNoteInKey } from '../../utils/noteUtils.js';
 import { noteToRomanNumeral } from '../../utils/romanNumerals.js';
 import { analyzeRhythmicContext } from '../../features/rhythmicContextAnalyzer.js';
 
@@ -71,6 +71,9 @@ import {
     DURATION_MAP,
     getVexFlowKeySignature
 } from '../../notation/vexFlowRenderer.js';
+
+// Grand staff rendering for polyphony preview
+import { renderGrandStaffMeasure } from '../../notation/grandStaff.js';
 
 // ============================================================================
 // CONSTANTS
@@ -331,6 +334,8 @@ let modalState = {
     phraseRange: parseInt(localStorage.getItem('phrase-range') || '12', 10),
     phraseOctave: parseInt(localStorage.getItem('phrase-octave') || '4', 10),
     currentPhraseCandidates: [],
+    // Phrase view mode: 'graph' or 'staff' - persists across regenerations
+    phraseViewMode: 'graph',
     // Melody position mode: 'end' = add to end, 'section' = add for selected section/chord
     melodyPositionMode: localStorage.getItem('melody-position-mode') || 'end',
     // Selected chord range for section mode (-1 = none selected)
@@ -1177,6 +1182,8 @@ function createStyleMoodControls() {
     styleSelect.addEventListener('change', () => {
         modalState.style = styleSelect.value;
         localStorage.setItem('chord-suggestion-style', styleSelect.value);
+        // Clear cached phrase candidates so they regenerate with new style
+        modalState.currentPhraseCandidates = [];
         window.dispatchEvent(new CustomEvent('chord-suggestion-preference-changed', {
             detail: { style: styleSelect.value, mood: modalState.mood }
         }));
@@ -1210,6 +1217,8 @@ function createStyleMoodControls() {
     moodSelect.addEventListener('change', () => {
         modalState.mood = moodSelect.value;
         localStorage.setItem('chord-suggestion-mood', moodSelect.value);
+        // Clear cached phrase candidates so they regenerate with new mood
+        modalState.currentPhraseCandidates = [];
         window.dispatchEvent(new CustomEvent('chord-suggestion-preference-changed', {
             detail: { style: modalState.style, mood: moodSelect.value }
         }));
@@ -1753,9 +1762,10 @@ function createProgressionSelector(progressionData, key) {
             const chordDef = CHORD_DEFINITIONS[chord.type];
             const symbol = chordDef?.symbol || '';
             const isSelected = modalState.selectedProgressionIndex === idx;
+            const spelledRoot = spellNoteInKey(chord.root, key);
 
-            chip.textContent = `${chord.root}${symbol}`;
-            chip.title = `${chord.root} ${chord.type}${chord.inversion ? ` (${INVERSION_NAMES[chord.inversion]})` : ''}`;
+            chip.textContent = `${spelledRoot}${symbol}`;
+            chip.title = `${spelledRoot} ${chord.type}${chord.inversion ? ` (${INVERSION_NAMES[chord.inversion]})` : ''}`;
             chip.style.cssText = `
                 padding: 4px 8px;
                 border: 2px solid ${isSelected ? '#667eea' : '#d1d5db'};
@@ -1905,10 +1915,11 @@ function createCompactProgressionSelector(progressionData, key, onRender) {
             const symbol = chordDef?.symbol || '';
             const isSelected = modalState.selectedProgressionIndex === idx;
             const invLabel = getInversionLabel(chord.inversion);
+            const spelledRoot = spellNoteInKey(chord.root, key);
 
             const chip = document.createElement('button');
-            chip.textContent = `${chord.root}${symbol}${invLabel}`;
-            chip.title = `${chord.root} ${chord.type}${chord.inversion ? ` (${INVERSION_NAMES[chord.inversion]})` : ''} - Click to select`;
+            chip.textContent = `${spelledRoot}${symbol}${invLabel}`;
+            chip.title = `${spelledRoot} ${chord.type}${chord.inversion ? ` (${INVERSION_NAMES[chord.inversion]})` : ''} - Click to select`;
             let backgroundColor = isSelected ? '#eef2ff' : 'white';
             let borderColor = isSelected ? '#667eea' : '#d1d5db';
             let textColor = isSelected ? '#667eea' : '#374151';
@@ -2038,9 +2049,13 @@ function createRecommendationCard(rec, index, rhythmicContext) {
     const chordDef = CHORD_DEFINITIONS[rec.type];
     const symbol = chordDef?.symbol || '';
 
+    // Get current key for proper enharmonic spelling
+    const currentKey = getCurrentKey() || 'C';
+    const spelledRoot = spellNoteInKey(rec.root, currentKey);
+
     info.innerHTML = `
         <div style="font-weight: 600; color: #1f2937; font-size: 15px;">
-            ${rec.root}${symbol}
+            ${spelledRoot}${symbol}
             <span style="color: #6b7280; font-weight: 400; font-size: 13px; margin-left: 4px;">(${invName})</span>
         </div>
         <div style="font-size: 12px; color: #6b7280; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
@@ -2511,10 +2526,11 @@ function renderExplorerView(container) {
             row.addEventListener('mouseenter', () => row.style.background = '#eef2ff');
             row.addEventListener('mouseleave', () => row.style.background = idx % 2 === 0 ? '#f9fafb' : '');
 
-            // Root
+            // Root - spell according to key
             const tdRoot = document.createElement('td');
             tdRoot.style.cssText = 'padding: 8px 6px; font-weight: 600;';
-            tdRoot.textContent = rec.root;
+            const explorerKey = getCurrentKey() || 'C';
+            tdRoot.textContent = spellNoteInKey(rec.root, explorerKey);
             row.appendChild(tdRoot);
 
             // Type
@@ -2775,7 +2791,8 @@ function renderSequencesView(container) {
         color: #92400e;
         font-size: 12px;
     `;
-    info.innerHTML = `Sequences starting from <strong>${currentChord.root}${currentSymbol}${currentInvLabel}</strong>`;
+    const spelledCurrentRoot = spellNoteInKey(currentChord.root, key);
+    info.innerHTML = `Sequences starting from <strong>${spelledCurrentRoot}${currentSymbol}${currentInvLabel}</strong>`;
     controlsRow.appendChild(info);
 
     // Sequence length selector
@@ -2949,8 +2966,9 @@ function renderSequencesView(container) {
             transition: all 0.15s;
         `;
         const currentInvLabel = getInversionLabel(currentChord.inversion);
-        currentChip.innerHTML = `<span style="font-size: 10px; opacity: 0.8;">Current</span><span>${currentChord.root}${currentSymbol}${currentInvLabel}</span>`;
-        currentChip.title = currentChord.inversion ? `Hold to play ${currentChord.root} ${currentChord.type} (${INVERSION_NAMES[currentChord.inversion]} inversion)` : 'Hold to play current chord';
+        const spelledCurrRoot = spellNoteInKey(currentChord.root, key);
+        currentChip.innerHTML = `<span style="font-size: 10px; opacity: 0.8;">Current</span><span>${spelledCurrRoot}${currentSymbol}${currentInvLabel}</span>`;
+        currentChip.title = currentChord.inversion ? `Hold to play ${spelledCurrRoot} ${currentChord.type} (${INVERSION_NAMES[currentChord.inversion]} inversion)` : 'Hold to play current chord';
         setupHoldToPlay(currentChip, currentChord);
         chordsRow.appendChild(currentChip);
         allChips.push(currentChip);
@@ -2978,8 +2996,9 @@ function renderSequencesView(container) {
                 transition: all 0.15s;
             `;
             const invLabel = getInversionLabel(chord.inversion);
-            chip.textContent = `${chord.root}${symbol}${invLabel}`;
-            chip.title = chord.inversion ? `Hold to play ${chord.root} ${chord.type} (${INVERSION_NAMES[chord.inversion]} inversion)` : 'Hold to play chord';
+            const spelledChordRoot = spellNoteInKey(chord.root, key);
+            chip.textContent = `${spelledChordRoot}${symbol}${invLabel}`;
+            chip.title = chord.inversion ? `Hold to play ${spelledChordRoot} ${chord.type} (${INVERSION_NAMES[chord.inversion]} inversion)` : 'Hold to play chord';
             setupHoldToPlay(chip, chord);
             chip.addEventListener('mouseenter', () => {
                 if (!chip.dataset.playing) chip.style.background = '#c7d2fe';
@@ -3171,11 +3190,12 @@ function renderMelodyTab(container) {
         margin-bottom: 16px;
         font-size: 13px;
     `;
+    const melodySpelledRoot = currentChord ? spellNoteInKey(currentChord.root, key) : null;
     contextSection.innerHTML = `
         <div>
             <span style="color: #6b7280;">Chord:</span>
             <span style="font-weight: 600; color: #374151; margin-left: 4px;">
-                ${currentChord ? `${currentChord.root} ${currentChord.type}` : 'None selected'}
+                ${currentChord ? `${melodySpelledRoot} ${currentChord.type}` : 'None selected'}
             </span>
         </div>
         <div>
@@ -3494,10 +3514,11 @@ function renderMelodyPhrasesView(container, currentChord, key) {
                 const isRangeStart = modalState.melodySelectedChordStart === idx;
                 const isRangeEnd = modalState.melodySelectedChordEnd === idx;
                 const invLabel = getInversionLabel(chord.inversion);
+                const phraseSpelledRoot = spellNoteInKey(chord.root, key);
 
                 const chip = document.createElement('button');
-                chip.textContent = `${chord.root}${symbol}${invLabel}`;
-                chip.title = `${chord.root} ${chord.type}${chord.inversion ? ` (${INVERSION_NAMES[chord.inversion]})` : ''} - Click to select, Shift+Click to extend range`;
+                chip.textContent = `${phraseSpelledRoot}${symbol}${invLabel}`;
+                chip.title = `${phraseSpelledRoot} ${chord.type}${chord.inversion ? ` (${INVERSION_NAMES[chord.inversion]})` : ''} - Click to select, Shift+Click to extend range`;
 
                 let backgroundColor = isSelected ? '#dbeafe' : 'white';
                 let borderColor = isSelected ? '#3b82f6' : '#d1d5db';
@@ -3648,11 +3669,12 @@ function renderMelodyPhrasesView(container, currentChord, key) {
     ];
 
     const densityOptions = [
-        { value: 0.5, label: 'Sparse' },
-        { value: 0.75, label: 'Light' },
-        { value: 1.0, label: 'Normal' },
-        { value: 1.25, label: 'Dense' },
-        { value: 1.5, label: 'Very Dense' }
+        { value: 0.5, label: 'Sparse' },       // Half notes (2 notes per 4 beats)
+        { value: 0.75, label: 'Light' },       // Mix of half/quarter (3 notes per 4 beats)
+        { value: 1.0, label: 'Normal' },       // Quarter notes (4 notes per 4 beats)
+        { value: 1.5, label: 'Dense' },        // Mix of quarter/eighth (6 notes per 4 beats)
+        { value: 2.0, label: 'Very Dense' },   // Eighth notes (8 notes per 4 beats)
+        { value: 3.0, label: 'Rapid' }         // Mix with 16ths (12 notes per 4 beats)
     ];
 
     const rangeOptions = [
@@ -3770,22 +3792,6 @@ function renderMelodyPhrasesView(container, currentChord, key) {
                     `).join('')}
                 </select>
             </div>
-            <button id="generate-phrases-btn" style="
-                padding: 6px 14px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                border: none;
-                border-radius: 6px;
-                font-size: 12px;
-                font-weight: 600;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                gap: 4px;
-                margin-left: auto;
-            ">
-                Regenerate
-            </button>
         </div>
     `;
     container.appendChild(controlsSection);
@@ -3828,7 +3834,6 @@ function setupPhraseControlListeners(currentChord, key, phrasesContainer) {
     const densitySelect = document.getElementById('phrase-density-select');
     const rangeSelect = document.getElementById('phrase-range-select');
     const octaveSelect = document.getElementById('phrase-octave-select');
-    const generateBtn = document.getElementById('generate-phrases-btn');
 
     // Helper to update state and auto-regenerate
     const updateAndRegenerate = () => {
@@ -3890,14 +3895,6 @@ function setupPhraseControlListeners(currentChord, key, phrasesContainer) {
             modalState.phraseOctave = parseInt(octaveSelect.value, 10);
             localStorage.setItem('phrase-octave', octaveSelect.value);
             updateAndRegenerate();
-        });
-    }
-
-    if (generateBtn) {
-        generateBtn.addEventListener('click', () => {
-            if (currentChord) {
-                generateAndDisplayPhrases(phrasesContainer, currentChord, key);
-            }
         });
     }
 }
@@ -3975,7 +3972,7 @@ function generateAndDisplayPhrases(container, chord, key) {
             chord = progressionData[minChordIdx];
         }
 
-        // Map section type to style (section type affects melodic character)
+        // Use the global style from modal state, falling back to section-based style
         const sectionStyleMap = {
             verse: 'pop',
             chorus: 'pop',
@@ -3984,7 +3981,11 @@ function generateAndDisplayPhrases(container, chord, key) {
             outro: 'pop',
             prechorus: 'pop'
         };
-        const styleId = sectionStyleMap[effectiveSectionType] || 'any';
+        // Prefer the user-selected style, fall back to section-based mapping
+        const styleId = modalState.style || sectionStyleMap[effectiveSectionType] || 'any';
+
+        // Log style and mood for debugging
+        console.log(`[Melody Tab] Generating phrases with styleId: ${styleId}, mood: ${modalState.mood}`);
 
         // Log target beats for debugging
         if (isSectionModeWithChord) {
@@ -3998,6 +3999,7 @@ function generateAndDisplayPhrases(container, chord, key) {
             lengthId: modalState.phraseLengthId,
             rhythmId: modalState.phraseRhythmId,
             styleId: styleId,
+            mood: modalState.mood, // Pass mood for style-aware generation
             octave: modalState.phraseOctave,
             range: modalState.phraseRange,
             densityMultiplier: modalState.phraseDensity,
@@ -4017,7 +4019,7 @@ function generateAndDisplayPhrases(container, chord, key) {
         }
 
         modalState.currentPhraseCandidates = candidates;
-        displayPhraseCandidates(container, candidates);
+        displayPhraseCandidates(container, candidates, key);
 
     } catch (error) {
         console.error('Error generating phrases:', error);
@@ -4029,7 +4031,7 @@ function generateAndDisplayPhrases(container, chord, key) {
     }
 }
 
-function displayPhraseCandidates(container, candidates) {
+function displayPhraseCandidates(container, candidates, key) {
     container.innerHTML = '';
 
     if (!candidates || candidates.length === 0) {
@@ -4041,15 +4043,19 @@ function displayPhraseCandidates(container, candidates) {
         return;
     }
 
+    // Get key for proper enharmonic spelling
+    const currentKey = key || getCurrentKey() || 'C';
+
     candidates.forEach((phrase, index) => {
-        const phraseCard = createPhraseCard(phrase, index);
+        const phraseCard = createPhraseCard(phrase, index, currentKey);
         container.appendChild(phraseCard);
     });
 }
 
-function createPhraseCard(phrase, index) {
+function createPhraseCard(phrase, index, key) {
     const card = document.createElement('div');
     card.className = 'phrase-card';
+    const phraseKey = key || getCurrentKey() || 'C';
     card.style.cssText = `
         padding: 16px;
         background: white;
@@ -4059,11 +4065,12 @@ function createPhraseCard(phrase, index) {
         transition: all 0.15s ease;
     `;
 
-    // Build note display
+    // Build note display with key-aware spelling
     const notes = phrase.notes || [];
     const noteDisplay = notes.map(n => {
         const match = n.match(/^([A-G][#b]?)(\d+)$/);
         if (match) {
+            const spelledNote = spellNoteInKey(match[1], phraseKey);
             return `<span style="
                 display: inline-block;
                 padding: 4px 8px;
@@ -4073,7 +4080,7 @@ function createPhraseCard(phrase, index) {
                 font-family: monospace;
                 font-size: 13px;
                 margin: 2px;
-            ">${match[1]}<sub style="font-size: 10px;">${match[2]}</sub></span>`;
+            ">${spelledNote}<sub style="font-size: 10px;">${match[2]}</sub></span>`;
         }
         return `<span style="padding: 4px 8px; background: #f3f4f6; border-radius: 4px; margin: 2px;">${n}</span>`;
     }).join('');
@@ -4150,13 +4157,36 @@ function createPhraseCard(phrase, index) {
                 ">${score}%</span>
             </div>
         </div>
-        <div style="margin-bottom: 12px;">
+        <div class="phrase-contour-view" style="margin-bottom: 12px; display: ${modalState.phraseViewMode === 'staff' ? 'none' : 'block'};">
             ${contourSvg}
+        </div>
+        <div class="phrase-staff-view" style="margin-bottom: 12px; display: ${modalState.phraseViewMode === 'staff' ? 'block' : 'none'};">
+            <div class="phrase-staff-container" style="
+                background: white;
+                border: 1px solid #e5e7eb;
+                border-radius: 6px;
+                padding: 8px;
+                height: 180px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            "></div>
         </div>
         <div style="display: flex; flex-wrap: wrap; gap: 4px;">
             ${noteDisplay}
         </div>
         <div style="margin-top: 12px; display: flex; gap: 8px;">
+            <button class="toggle-view-btn" data-index="${index}" style="
+                padding: 8px 12px;
+                background: white;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                font-size: 12px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            " title="Toggle between line graph and grand staff view">${modalState.phraseViewMode === 'staff' ? '📈 Graph' : '🎼 Staff'}</button>
             <button class="apply-phrase-btn" data-index="${index}" style="
                 flex: 1;
                 padding: 8px 16px;
@@ -4211,6 +4241,56 @@ function createPhraseCard(phrase, index) {
             hidePhraseScoreTooltip();
         });
     }
+
+    // Toggle view button (line graph vs grand staff)
+    const toggleBtn = card.querySelector('.toggle-view-btn');
+    const contourView = card.querySelector('.phrase-contour-view');
+    const staffView = card.querySelector('.phrase-staff-view');
+
+    // If starting in staff view mode, render the staff immediately
+    if (modalState.phraseViewMode === 'staff') {
+        const staffContainer = card.querySelector('.phrase-staff-container');
+        if (staffContainer && !staffContainer.dataset.rendered) {
+            renderPhraseGrandStaff(staffContainer, phrase);
+            staffContainer.dataset.rendered = 'true';
+        }
+    }
+
+    toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Toggle the global view mode
+        const newMode = modalState.phraseViewMode === 'staff' ? 'graph' : 'staff';
+        modalState.phraseViewMode = newMode;
+
+        // Update ALL phrase cards to reflect the new mode
+        document.querySelectorAll('.phrase-card').forEach(phraseCard => {
+            const cardContourView = phraseCard.querySelector('.phrase-contour-view');
+            const cardStaffView = phraseCard.querySelector('.phrase-staff-view');
+            const cardToggleBtn = phraseCard.querySelector('.toggle-view-btn');
+
+            if (newMode === 'staff') {
+                if (cardContourView) cardContourView.style.display = 'none';
+                if (cardStaffView) cardStaffView.style.display = 'block';
+                if (cardToggleBtn) cardToggleBtn.innerHTML = '📈 Graph';
+
+                // Render grand staff if not already rendered
+                const staffContainer = phraseCard.querySelector('.phrase-staff-container');
+                if (staffContainer && !staffContainer.dataset.rendered) {
+                    // Get phrase data from the card's index
+                    const cardIndex = parseInt(phraseCard.querySelector('.toggle-view-btn')?.dataset.index || '0');
+                    const phraseData = modalState.currentPhraseCandidates[cardIndex];
+                    if (phraseData) {
+                        renderPhraseGrandStaff(staffContainer, phraseData);
+                        staffContainer.dataset.rendered = 'true';
+                    }
+                }
+            } else {
+                if (cardContourView) cardContourView.style.display = 'block';
+                if (cardStaffView) cardStaffView.style.display = 'none';
+                if (cardToggleBtn) cardToggleBtn.innerHTML = '🎼 Staff';
+            }
+        });
+    });
 
     // Apply button
     const applyBtn = card.querySelector('.apply-phrase-btn');
@@ -4270,6 +4350,85 @@ function createContourVisualization(phrase) {
             }).join('')}
         </svg>
     `;
+}
+
+function renderPhraseGrandStaff(container, phrase) {
+    const notes = phrase.notes || [];
+    const rhythm = phrase.rhythm || notes.map(() => 1); // Default to quarter notes
+
+    if (notes.length === 0) {
+        container.innerHTML = '<div style="color: #6b7280; text-align: center;">No notes to display</div>';
+        return;
+    }
+
+    // Get VexFlow
+    const VF = window.VexFlow || (window.Vex ? window.Vex.Flow : null);
+    if (!VF) {
+        container.innerHTML = '<div style="color: #6b7280; text-align: center;">VexFlow not available</div>';
+        return;
+    }
+
+    // Convert phrase notes to the format expected by renderGrandStaffMeasure
+    let beat = 0;
+    const trebleNotes = notes.map((note, i) => {
+        const duration = rhythm[i] || 1;
+        const durationStr = duration >= 4 ? 'w' : duration >= 2 ? 'h' : duration >= 1 ? 'q' : duration >= 0.5 ? '8' : '16';
+        const noteData = {
+            type: 'note',
+            pitch: note,
+            pitches: [note],
+            duration: durationStr,
+            beat: beat,
+            voiceIndex: 0
+        };
+        beat += duration;
+        return noteData;
+    });
+
+    // Clear container and create canvas
+    container.innerHTML = '';
+    const canvas = document.createElement('canvas');
+    canvas.width = 450;
+    canvas.height = 170;
+    canvas.style.cssText = 'max-width: 100%; height: auto;';
+    container.appendChild(canvas);
+
+    // Create renderer
+    const rendererResult = createRenderer(canvas, canvas.width, canvas.height);
+    if (!rendererResult) {
+        container.innerHTML = '<div style="color: #6b7280; text-align: center;">Could not create renderer</div>';
+        return;
+    }
+
+    const { context } = rendererResult;
+    const currentKey = getCurrentKey() || 'C';
+
+    // Use renderGrandStaffMeasure
+    try {
+        renderGrandStaffMeasure(context, {
+            trebleNotes: trebleNotes,
+            bassNotes: []  // Empty bass clef
+        }, {
+            x: 10,
+            y: 5,
+            width: 430,
+            staffSpacing: 35,
+            keySignature: currentKey,
+            timeSignature: '4/4',
+            showClef: true,
+            showKeySignature: true,
+            showTimeSignature: false,
+            showBrace: true,
+            showBarlines: true,
+            isFirstInSystem: true,
+            isLastInSystem: true,
+            measureIndex: 0,
+            enableHarmonicColoring: false
+        });
+    } catch (e) {
+        console.warn('[Phrase Staff] Render error:', e);
+        container.innerHTML = `<div style="color: #6b7280; text-align: center; padding: 20px;">${notes.length} notes</div>`;
+    }
 }
 
 function playPhrase(phrase) {
@@ -4653,7 +4812,7 @@ function generateAndDisplayMelodySuggestions(container, chord, key) {
 
         // Render each suggestion
         modalState.currentMelodySuggestions.forEach((suggestion, index) => {
-            const item = createMelodySuggestionItem(suggestion, index);
+            const item = createMelodySuggestionItem(suggestion, index, key);
             container.appendChild(item);
         });
 
@@ -4667,11 +4826,15 @@ function generateAndDisplayMelodySuggestions(container, chord, key) {
     }
 }
 
-function createMelodySuggestionItem(suggestion, index) {
+function createMelodySuggestionItem(suggestion, index, key) {
     const item = document.createElement('div');
     item.className = 'melody-suggestion-item';
     item.dataset.note = suggestion.note;
     item.dataset.index = index;
+
+    // Get current key for proper enharmonic spelling
+    const currentKey = key || getCurrentKey() || 'C';
+    const spelledPitch = spellNoteInKey(suggestion.pitch, currentKey);
 
     const colors = MELODY_CATEGORY_COLORS[suggestion.category] || MELODY_CATEGORY_COLORS.scaleTone;
     const scoreClass = suggestion.totalScore >= 85 ? 'excellent' :
@@ -4713,7 +4876,7 @@ function createMelodySuggestionItem(suggestion, index) {
                     color: #4b5563;
                 ">${index + 1}</span>` : ''}
                 <span style="font-size: 16px; font-weight: 600; color: #1e293b;">
-                    ${suggestion.pitch}<sub style="font-size: 11px; color: #6b7280;">${suggestion.octave}</sub>
+                    ${spelledPitch}<sub style="font-size: 11px; color: #6b7280;">${suggestion.octave}</sub>
                 </span>
                 <span style="
                     padding: 3px 8px;
@@ -5702,11 +5865,12 @@ function displaySectionOptionsPreview(container, options, key, style, length, se
 
     const sectionInfo = SECTION_TYPES.find(s => s.id === sectionType) || { icon: '📄', name: sectionType };
 
-    // Build options HTML
+    // Build options HTML with key-aware spelling
     const optionsHtml = options.map((option, index) => {
         const progressionStr = option.progression.map(c => {
             const suffix = c.type === 'Minor' ? 'm' : c.type === 'Diminished' ? 'dim' : c.type === 'Dominant7' ? '7' : c.type === 'Major7' ? 'maj7' : c.type === 'Minor7' ? 'm7' : '';
-            return `${c.root}${suffix}`;
+            const spelledRoot = spellNoteInKey(c.root, key);
+            return `${spelledRoot}${suffix}`;
         }).join(' → ');
         const isSelected = index === modalState.selectedOptionIndex;
 
@@ -6606,9 +6770,15 @@ const TEXTURE_TYPES = {
     },
     RHYTHMIC_COMPLEMENT: {
         id: 'rhythmic',
-        name: 'Rhythmic Complement',
+        name: 'Rhythmic Fill',
         description: 'Fills gaps where main voice has rests',
         icon: '🥁'
+    },
+    HARMONIC_ACCOMPANIMENT: {
+        id: 'harmonic_accompaniment',
+        name: 'Harmonic Accompaniment',
+        description: 'Chord tones following the melody rhythm',
+        icon: '🎹'
     },
     COUNTER_MELODY: {
         id: 'counter',
@@ -6779,25 +6949,12 @@ function renderPolyphonyTab(container) {
 
     container.appendChild(content);
 
-    // Apply button
+    // Apply button only (Generate is automatic now)
     const buttonContainer = document.createElement('div');
     buttonContainer.style.cssText = 'padding: 16px; border-top: 1px solid #e5e7eb; display: flex; gap: 12px; justify-content: flex-end;';
 
-    const generateBtn = document.createElement('button');
-    generateBtn.textContent = 'Generate Suggestions';
-    generateBtn.style.cssText = `
-        padding: 10px 20px;
-        background: #667eea;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        font-weight: 500;
-        cursor: pointer;
-    `;
-    generateBtn.addEventListener('click', () => generatePolyphonySuggestions());
-    buttonContainer.appendChild(generateBtn);
-
     const applyBtn = document.createElement('button');
+    applyBtn.id = 'polyphony-apply-btn';
     applyBtn.textContent = 'Apply to Voice 2';
     applyBtn.style.cssText = `
         padding: 10px 20px;
@@ -6813,8 +6970,10 @@ function renderPolyphonyTab(container) {
 
     container.appendChild(buttonContainer);
 
-    // Initialize preview
-    updatePolyphonyPreview();
+    // Auto-generate suggestions on initial load
+    setTimeout(() => {
+        generatePolyphonySuggestions();
+    }, 100);
 }
 
 function createStyleMoodSelector() {
@@ -6903,12 +7062,16 @@ function createStyleMoodSelector() {
                 }
                 // Highlight recommended texture types in the texture selector
                 updateTextureRecommendations();
+                // Auto-regenerate suggestions when style changes
+                generatePolyphonySuggestions();
             });
         }
 
         if (moodSelect) {
             moodSelect.addEventListener('change', (e) => {
                 polyphonyState.selectedMood = e.target.value;
+                // Auto-regenerate suggestions when mood changes
+                generatePolyphonySuggestions();
             });
         }
     }, 0);
@@ -6966,7 +7129,8 @@ function createPolyphonyChordSelector(progressionData, currentKey) {
     progressionData.forEach((chord, index) => {
         const chordBtn = document.createElement('button');
         const isSelected = index === polyphonyState.selectedChordIndex;
-        chordBtn.textContent = `${chord.root}${chord.type || ''}`;
+        const spelledPolyRoot = spellNoteInKey(chord.root, currentKey);
+        chordBtn.textContent = `${spelledPolyRoot}${chord.type || ''}`;
         chordBtn.style.cssText = `
             padding: 8px 16px;
             border: 2px solid ${isSelected ? '#667eea' : '#e5e7eb'};
@@ -6983,7 +7147,8 @@ function createPolyphonyChordSelector(progressionData, currentKey) {
             const parent = section.parentElement;
             const newSection = createPolyphonyChordSelector(progressionData, currentKey);
             parent.replaceChild(newSection, section);
-            updatePolyphonyPreview();
+            // Auto-regenerate suggestions when chord changes
+            generatePolyphonySuggestions();
         });
         selectorContainer.appendChild(chordBtn);
     });
@@ -7009,23 +7174,27 @@ function createTextureTypeSelector() {
     // Texture type grid
     const textureOptions = Object.values(TEXTURE_TYPES).map(type => `
         <div class="texture-type-option" data-type="${type.id}" style="
-            padding: 12px;
+            padding: 8px 10px;
             border: 2px solid ${polyphonyState.selectedTextureType === type.id ? '#667eea' : '#e5e7eb'};
-            border-radius: 8px;
+            border-radius: 6px;
             background: ${polyphonyState.selectedTextureType === type.id ? '#f0f4ff' : 'white'};
             cursor: pointer;
             transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         ">
-            <div style="font-size: 20px; margin-bottom: 4px;">${type.icon}</div>
-            <div style="font-weight: 600; font-size: 13px; color: #374151;">${type.name}</div>
-            <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">${type.description}</div>
+            <span style="font-size: 16px;">${type.icon}</span>
+            <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 600; font-size: 12px; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${type.name}</div>
+            </div>
         </div>
     `).join('');
 
     section.innerHTML = `
         ${staffOptions}
         <div style="font-weight: 600; margin-bottom: 8px; color: #374151;">Texture Type</div>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
             ${textureOptions}
         </div>
     `;
@@ -7036,7 +7205,8 @@ function createTextureTypeSelector() {
         if (staffSelect) {
             staffSelect.addEventListener('change', (e) => {
                 polyphonyState.selectedStaff = e.target.value;
-                updatePolyphonyPreview();
+                // Auto-regenerate suggestions when staff changes
+                generatePolyphonySuggestions();
             });
         }
 
@@ -7049,6 +7219,8 @@ function createTextureTypeSelector() {
                     opt.style.borderColor = isSelected ? '#667eea' : '#e5e7eb';
                     opt.style.background = isSelected ? '#f0f4ff' : 'white';
                 });
+                // Auto-regenerate suggestions when texture type changes
+                generatePolyphonySuggestions();
             });
         });
     }, 0);
@@ -7063,13 +7235,24 @@ function createPolyphonyPreview() {
     section.innerHTML = `
         <div style="font-weight: 600; margin-bottom: 8px; color: #374151; display: flex; align-items: center; justify-content: space-between;">
             <span>Preview</span>
-            <div style="display: flex; gap: 16px; font-size: 12px; font-weight: normal;">
+            <div style="display: flex; gap: 16px; font-size: 12px; font-weight: normal; align-items: center;">
+                <button id="polyphony-play-btn" style="
+                    padding: 4px 10px;
+                    background: white;
+                    border: 1px solid #d1d5db;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 12px;
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                ">&#9654; Play</button>
                 <span style="display: flex; align-items: center; gap: 4px;">
                     <span style="width: 12px; height: 12px; background: #000000; border-radius: 2px;"></span>
                     Current notes
                 </span>
                 <span style="display: flex; align-items: center; gap: 4px;">
-                    <span style="width: 12px; height: 12px; background: #667eea; border-radius: 2px;"></span>
+                    <span style="width: 12px; height: 12px; background: #10B981; border-radius: 2px;"></span>
                     Suggested notes
                 </span>
             </div>
@@ -7079,33 +7262,34 @@ function createPolyphonyPreview() {
             border: 1px solid #e5e7eb;
             border-radius: 6px;
             padding: 8px;
-            min-height: 140px;
+            height: 210px;
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
         ">
-            <canvas id="polyphony-preview-canvas" width="560" height="130"></canvas>
         </div>
     `;
+
+    // Set up play button listener
+    setTimeout(() => {
+        const playBtn = document.getElementById('polyphony-play-btn');
+        if (playBtn) {
+            playBtn.addEventListener('click', () => playPolyphonyPreview());
+        }
+    }, 0);
 
     return section;
 }
 
 function updatePolyphonyPreview() {
-    const canvas = document.getElementById('polyphony-preview-canvas');
-    if (!canvas) return;
+    const container = document.getElementById('polyphony-preview-container');
+    if (!container) return;
 
     // Get VexFlow
     const VF = window.VexFlow || (window.Vex ? window.Vex.Flow : null);
     if (!VF) {
-        // Fallback to text if VexFlow not available
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#6b7280';
-        ctx.font = '14px system-ui';
-        ctx.textAlign = 'center';
-        ctx.fillText('VexFlow not available', canvas.width / 2, canvas.height / 2);
+        container.innerHTML = '<div style="color: #6b7280; text-align: center; padding: 20px;">VexFlow not available</div>';
         return;
     }
 
@@ -7118,210 +7302,87 @@ function updatePolyphonyPreview() {
     if (!chord) return;
 
     const currentKey = getCurrentKey() || 'C';
-    const clef = polyphonyState.selectedStaff === 'treble' ? 'treble' : 'bass';
+    const staff = polyphonyState.selectedStaff; // 'treble' or 'bass'
 
     // Gather current voice 1 notes for the selected chord
-    const gatherMethod = clef === 'treble'
-        ? compositionState.gatherTrebleNotesForChord
-        : compositionState.gatherBassNotesForChord;
+    const gatherTreble = compositionState.gatherTrebleNotesForChord;
+    const gatherBass = compositionState.gatherBassNotesForChord;
 
-    const currentNotes = gatherMethod
-        ? gatherMethod.call(compositionState, polyphonyState.selectedChordIndex)
+    const trebleNotes = gatherTreble
+        ? gatherTreble.call(compositionState, polyphonyState.selectedChordIndex)
+        : [];
+    const bassNotes = gatherBass
+        ? gatherBass.call(compositionState, polyphonyState.selectedChordIndex)
         : [];
 
     // Filter to voice 1 only (existing notes)
-    const voice1Notes = currentNotes.filter(n => (n.voiceIndex || 0) === 0);
+    let voice1Treble = trebleNotes.filter(n => (n.voiceIndex || 0) === 0);
+    let voice1Bass = bassNotes.filter(n => (n.voiceIndex || 0) === 0);
 
-    // Get generated suggestions (voice 2)
+    // Get generated suggestions (voice 2) and add them to the appropriate staff
     const voice2Notes = polyphonyState.generatedSuggestions || [];
 
+    // Mark voice 2 notes with voiceIndex=1 for proper rendering
+    const voice2WithIndex = voice2Notes.map(n => ({ ...n, voiceIndex: 1 }));
+
+    // Combine voice 1 and voice 2 notes for the target staff
+    let combinedTreble = [...voice1Treble];
+    let combinedBass = [...voice1Bass];
+
+    if (staff === 'treble') {
+        combinedTreble = [...voice1Treble, ...voice2WithIndex];
+    } else {
+        combinedBass = [...voice1Bass, ...voice2WithIndex];
+    }
+
     // If no notes to show, display message
-    if (voice1Notes.length === 0 && voice2Notes.length === 0) {
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#6b7280';
-        ctx.font = '14px system-ui';
-        ctx.textAlign = 'center';
-        ctx.fillText(`No notes in ${chord.root}${chord.type || ''} - add melody to see preview`, canvas.width / 2, canvas.height / 2);
+    if (combinedTreble.length === 0 && combinedBass.length === 0) {
+        const spelledPreviewRoot = spellNoteInKey(chord.root, currentKey);
+        container.innerHTML = `<div style="color: #6b7280; text-align: center; padding: 20px;">No notes in ${spelledPreviewRoot}${chord.type || ''} - add melody to see preview</div>`;
         return;
     }
 
-    // Create VexFlow renderer
+    // Clear container and create canvas
+    container.innerHTML = '';
+    const canvas = document.createElement('canvas');
+    canvas.width = 500;
+    canvas.height = 200;
+    canvas.style.cssText = 'max-width: 100%; height: auto;';
+    container.appendChild(canvas);
+
+    // Create renderer
     const rendererResult = createRenderer(canvas, canvas.width, canvas.height);
     if (!rendererResult) return;
 
     const { context } = rendererResult;
 
-    // Create stave
-    const staveY = clef === 'treble' ? 30 : 30;
-    const stave = createStave({
-        x: 10,
-        y: staveY,
-        width: canvas.width - 30,
-        clef: clef,
-        keySignature: currentKey,
-        showClef: true,
-        showKeySignature: true,
-        showTimeSignature: false
-    });
-
-    if (!stave) return;
-
-    // Convert notes to VexFlow StaveNotes - Voice 1 (black)
-    const vexVoice1Notes = [];
-    voice1Notes.forEach(note => {
-        let vexNote;
-        if (note.isRest || note.type === 'rest') {
-            vexNote = createRest(note.duration || '4n', clef);
-        } else if (note.pitches && note.pitches.length > 1) {
-            vexNote = createChordNote(
-                note.pitches,
-                note.duration || '4n',
-                currentKey,
-                clef,
-                note.dotted || false,
-                null,
-                null,
-                1 // stems up for voice 1
-            );
-        } else {
-            const pitch = note.pitch || note.pitches?.[0];
-            if (pitch) {
-                vexNote = createStaveNote({
-                    pitch: pitch,
-                    duration: note.duration || '4n',
-                    isRest: false,
-                    dotted: note.dotted || false,
-                    stemDirection: 1 // stems up for voice 1
-                }, currentKey, clef);
-            }
-        }
-        if (vexNote) {
-            // Voice 1 notes in black (default)
-            vexNote.setStyle({ fillStyle: '#000000', strokeStyle: '#000000' });
-            vexVoice1Notes.push(vexNote);
-        }
-    });
-
-    // Convert notes to VexFlow StaveNotes - Voice 2 (purple)
-    const vexVoice2Notes = [];
-    voice2Notes.forEach(note => {
-        let vexNote;
-        if (note.isRest || note.type === 'rest') {
-            vexNote = createRest(note.duration || '4n', clef);
-        } else if (note.pitches && note.pitches.length > 1) {
-            vexNote = createChordNote(
-                note.pitches,
-                note.duration || '4n',
-                currentKey,
-                clef,
-                note.dotted || false,
-                null,
-                null,
-                -1 // stems down for voice 2
-            );
-        } else {
-            const pitch = note.pitch || note.pitches?.[0];
-            if (pitch) {
-                vexNote = createStaveNote({
-                    pitch: pitch,
-                    duration: note.duration || '4n',
-                    isRest: false,
-                    dotted: note.dotted || false,
-                    stemDirection: -1 // stems down for voice 2
-                }, currentKey, clef);
-            }
-        }
-        if (vexNote) {
-            // Voice 2 notes in purple
-            vexNote.setStyle({ fillStyle: '#667eea', strokeStyle: '#667eea' });
-            vexVoice2Notes.push(vexNote);
-        }
-    });
-
-    // Handle empty voices with whole rest
-    if (vexVoice1Notes.length === 0 && vexVoice2Notes.length > 0) {
-        const wholeRest = createRest('1n', clef);
-        if (wholeRest) {
-            wholeRest.setStyle({ fillStyle: 'transparent', strokeStyle: 'transparent' });
-            vexVoice1Notes.push(wholeRest);
-        }
-    }
-    if (vexVoice2Notes.length === 0 && vexVoice1Notes.length > 0) {
-        const wholeRest = createRest('1n', clef);
-        if (wholeRest) {
-            wholeRest.setStyle({ fillStyle: 'transparent', strokeStyle: 'transparent' });
-            vexVoice2Notes.push(wholeRest);
-        }
-    }
-
-    // Create voices
-    const voices = [];
-
-    if (vexVoice1Notes.length > 0) {
-        const voice1 = createVoice(vexVoice1Notes, { numBeats: 4, beatValue: 4 });
-        if (voice1) voices.push(voice1);
-    }
-
-    if (vexVoice2Notes.length > 0) {
-        const voice2 = createVoice(vexVoice2Notes, { numBeats: 4, beatValue: 4 });
-        if (voice2) voices.push(voice2);
-    }
-
-    if (voices.length === 0) return;
-
+    // Use renderGrandStaffMeasure with the combined notes
     try {
-        // Format voices
-        const formatter = new VF.Formatter();
-        formatter.joinVoices(voices);
-        const staveWidth = stave.getWidth() - (stave.getNoteStartX ? stave.getNoteStartX() - stave.getX() : 40);
-        formatter.format(voices, staveWidth);
-
-        // Draw stave
-        stave.setContext(context).draw();
-
-        // Draw voices
-        voices.forEach(voice => {
-            voice.draw(context, stave);
+        renderGrandStaffMeasure(context, {
+            trebleNotes: combinedTreble,
+            bassNotes: combinedBass
+        }, {
+            x: 10,
+            y: 10,
+            width: 480,
+            staffSpacing: 40,
+            keySignature: currentKey,
+            timeSignature: '4/4',
+            showClef: true,
+            showKeySignature: true,
+            showTimeSignature: false,
+            showBrace: true,
+            showBarlines: true,
+            isFirstInSystem: true,
+            isLastInSystem: true,
+            measureIndex: 0,
+            chord: chord,
+            enableHarmonicColoring: false,
+            colorSuggestedNotes: true  // Color voice 2 notes green in preview
         });
-
-        // Generate and draw beams for voice 1 (filter out rests)
-        const beamableVoice1 = vexVoice1Notes.filter(n => !n.isRest?.() && n.getDuration?.() !== 'w' && n.getDuration?.() !== 'h');
-        if (beamableVoice1.length > 0) {
-            try {
-                const beams1 = generateBeams(beamableVoice1, { stemDirection: 1 });
-                beams1.forEach(beam => {
-                    beam.setStyle({ fillStyle: '#000000', strokeStyle: '#000000' });
-                    beam.setContext(context).draw();
-                });
-            } catch (e) {
-                // Beaming errors are non-critical
-            }
-        }
-
-        // Generate and draw beams for voice 2 (filter out rests)
-        const beamableVoice2 = vexVoice2Notes.filter(n => !n.isRest?.() && n.getDuration?.() !== 'w' && n.getDuration?.() !== 'h');
-        if (beamableVoice2.length > 0) {
-            try {
-                const beams2 = generateBeams(beamableVoice2, { stemDirection: -1 });
-                beams2.forEach(beam => {
-                    beam.setStyle({ fillStyle: '#667eea', strokeStyle: '#667eea' });
-                    beam.setContext(context).draw();
-                });
-            } catch (e) {
-                // Beaming errors are non-critical
-            }
-        }
-
     } catch (e) {
-        console.warn('[PolyphonyPreview] Error rendering VexFlow:', e);
-        // Fallback to text display
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#6b7280';
-        ctx.font = '14px system-ui';
-        ctx.textAlign = 'center';
-        ctx.fillText(`Preview: ${voice1Notes.length} current + ${voice2Notes.length} suggested notes`, canvas.width / 2, canvas.height / 2);
+        console.warn('[Polyphony Preview] Render error:', e);
+        container.innerHTML = `<div style="color: #6b7280; text-align: center; padding: 20px;">Preview: ${voice1Treble.length + voice1Bass.length} current + ${voice2Notes.length} suggested notes</div>`;
     }
 }
 
@@ -7335,10 +7396,24 @@ function generatePolyphonySuggestions() {
     const chord = progressionData[polyphonyState.selectedChordIndex];
     if (!chord) return;
 
-    // Get notes from the selected chord's measures
-    const chordNotes = compositionState.gatherTrebleNotesForChord
-        ? compositionState.gatherTrebleNotesForChord(polyphonyState.selectedChordIndex)
-        : [];
+    // Get notes from the selected chord's measures based on selected staff
+    const staff = polyphonyState.selectedStaff;
+    let chordNotes = [];
+
+    if (staff === 'treble' && compositionState.gatherTrebleNotesForChord) {
+        chordNotes = compositionState.gatherTrebleNotesForChord(polyphonyState.selectedChordIndex);
+    } else if (staff === 'bass' && compositionState.gatherBassNotesForChord) {
+        chordNotes = compositionState.gatherBassNotesForChord(polyphonyState.selectedChordIndex);
+    }
+
+    // Filter to voice 1 only (we're generating voice 2 suggestions)
+    chordNotes = chordNotes.filter(n => (n.voiceIndex || 0) === 0);
+
+    // Debug logging
+    console.log('[Polyphony] Selected chord index:', polyphonyState.selectedChordIndex);
+    console.log('[Polyphony] Staff:', staff);
+    console.log('[Polyphony] Chord:', chord?.root, chord?.type);
+    console.log('[Polyphony] Notes gathered:', chordNotes.length, chordNotes.map(n => n.pitch || n.pitches?.[0]));
 
     // Generate suggestions based on texture type
     const suggestions = generateTextureNotes(
@@ -7367,7 +7442,10 @@ function generatePolyphonySuggestions() {
                     ${textureType?.icon || ''} Generated ${textureType?.name || 'Texture'}
                 </div>
                 <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                    ${suggestions.map(note => `
+                    ${suggestions.map(note => {
+                        const rawPitch = note.pitch || note.pitches?.[0] || 'rest';
+                        const spelledNotePitch = rawPitch !== 'rest' ? spellNoteInKey(rawPitch, currentKey) : 'rest';
+                        return `
                         <span style="
                             padding: 4px 8px;
                             background: #f0f4ff;
@@ -7375,8 +7453,8 @@ function generatePolyphonySuggestions() {
                             border-radius: 4px;
                             font-size: 12px;
                             color: #667eea;
-                        ">${note.pitch || note.pitches?.[0] || 'rest'} (${note.duration})</span>
-                    `).join('')}
+                        ">${spelledNotePitch} (${note.duration})</span>`;
+                    }).join('')}
                 </div>
                 <div style="margin-top: 8px; font-size: 12px; color: #6b7280;">
                     ${suggestions.length} notes will be added to Voice 2 of the ${polyphonyState.selectedStaff} clef
@@ -7400,10 +7478,11 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff) {
     const moodAdj = MOOD_TEXTURE_ADJUSTMENTS[polyphonyState.selectedMood] || MOOD_TEXTURE_ADJUSTMENTS.bright;
 
     // Calculate interval adjustments based on style and mood
-    const getStyleAdjustedInterval = (baseInterval) => {
+    const getStyleAdjustedInterval = (baseInterval, preserveDirection = false) => {
         let adjusted = baseInterval;
+        const originalSign = baseInterval < 0 ? -1 : 1;
 
-        // Mood offset
+        // Mood offset (small adjustment)
         adjusted += moodAdj.intervalOffset || 0;
 
         // Style-specific adjustments
@@ -7412,7 +7491,8 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff) {
             adjusted = baseInterval < 0 ? -7 : 7; // Jump to fifth
         } else if (stylePrefs.intervalBias === 'colorful' && Math.abs(baseInterval) <= 4) {
             // Jazz style: add color, could use 7th or 9th
-            adjusted = baseInterval + (Math.random() > 0.5 ? -2 : 2);
+            // Only adjust in the same direction to avoid flipping
+            adjusted = baseInterval + (baseInterval < 0 ? -2 : 2);
         } else if (stylePrefs.intervalBias === 'bluesy') {
             // Blues: occasional blue note (b3, b7)
             if (Math.random() > 0.7) {
@@ -7420,13 +7500,24 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff) {
             }
         }
 
-        // Dark mood: lower register
-        if (moodAdj.registerBias === 'lower' && adjusted > -5) {
-            adjusted -= 12; // Drop an octave
+        // Register bias adjustments - but ONLY if we're not preserving direction
+        // For parallel thirds/sixths, we want to stay BELOW the melody
+        if (!preserveDirection) {
+            // Dark mood: lower register
+            if (moodAdj.registerBias === 'lower' && adjusted > -5) {
+                adjusted -= 12; // Drop an octave
+            }
+            // Bright mood: higher register
+            if (moodAdj.registerBias === 'higher' && adjusted < 0) {
+                adjusted += 12; // Raise an octave
+            }
         }
-        // Bright mood: higher register
-        if (moodAdj.registerBias === 'higher' && adjusted < 0) {
-            adjusted += 12; // Raise an octave
+
+        // When preserveDirection is true, ensure we don't flip the sign
+        // This keeps parallel motion BELOW the melody (negative interval stays negative)
+        if (preserveDirection && originalSign < 0 && adjusted >= 0) {
+            // If we accidentally flipped to positive, force it back to negative
+            adjusted = -Math.abs(adjusted) || baseInterval;
         }
 
         return adjusted;
@@ -7447,14 +7538,16 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff) {
 
     switch (textureType) {
         case 'parallel_thirds':
-            // Transpose each melody note down a third (style-adjusted)
+            // Transpose each melody note down a third (always below melody)
+            // Use diatonic third (3-4 semitones) - typically minor third for simplicity
             melodyNotes.forEach(note => {
                 if (note.isRest || note.type === 'rest') {
                     suggestions.push({ ...note, voiceIndex: 1 });
                 } else {
                     const pitch = note.pitch || note.pitches?.[0];
                     if (pitch) {
-                        const interval = getStyleAdjustedInterval(-3); // Minor third = 3 semitones
+                        // preserveDirection=true keeps the harmony BELOW the melody
+                        const interval = getStyleAdjustedInterval(-3, true); // Minor third = 3 semitones down
                         let transposed = transposePitch(pitch, interval);
                         transposed = applyChromatic(transposed);
                         suggestions.push({
@@ -7469,15 +7562,19 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff) {
             break;
 
         case 'parallel_sixths':
-            // Transpose each melody note down a sixth (style-adjusted)
+            // Transpose each melody note down a sixth (always below melody)
+            // Minor sixth = 8 semitones, Major sixth = 9 semitones
+            // Using minor sixth for classic sound
             melodyNotes.forEach(note => {
                 if (note.isRest || note.type === 'rest') {
                     suggestions.push({ ...note, voiceIndex: 1 });
                 } else {
                     const pitch = note.pitch || note.pitches?.[0];
                     if (pitch) {
-                        const interval = getStyleAdjustedInterval(-8); // Minor sixth = 8 semitones
+                        // preserveDirection=true keeps the harmony BELOW the melody
+                        const interval = getStyleAdjustedInterval(-8, true); // Minor sixth = 8 semitones down
                         let transposed = transposePitch(pitch, interval);
+                        console.log(`[Texture] Parallel sixth: ${pitch} - 8 semitones = ${transposed} (interval=${interval})`);
                         transposed = applyChromatic(transposed);
                         suggestions.push({
                             ...note,
@@ -7491,21 +7588,32 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff) {
             break;
 
         case 'contrary':
-            // Move in opposite direction to melody (style-aware)
-            // Classical/Jazz: stricter voice leading; Pop/Rock: more relaxed
-            const contraryMultiplier = stylePrefs.voiceLeadingStrictness === 'strict' ? 1 : 2;
-            melodyNotes.forEach((note, i) => {
-                if (note.isRest || note.type === 'rest' || i === 0) {
-                    suggestions.push({ ...note, voiceIndex: 1 });
-                } else {
-                    const prevPitch = melodyNotes[i - 1].pitch || melodyNotes[i - 1].pitches?.[0];
+            // Contrary motion: counter-voice moves opposite to melody motion
+            // Start a third below the first melody note, then track motion independently
+            {
+                // Initial interval: start a third (3 semitones) below melody
+                const initialInterval = moodAdj.registerBias === 'lower' ? -5 : -3; // fifth vs third
+                let counterVoicePitch = null;
+                let prevMelodyPitch = null;
+
+                melodyNotes.forEach((note, i) => {
+                    if (note.isRest || note.type === 'rest') {
+                        suggestions.push({ ...note, voiceIndex: 1 });
+                        return;
+                    }
+
                     const currPitch = note.pitch || note.pitches?.[0];
-                    if (prevPitch && currPitch) {
-                        const direction = comparePitches(currPitch, prevPitch);
-                        let interval = -direction * contraryMultiplier;
-                        interval = getStyleAdjustedInterval(interval);
-                        let transposed = transposePitch(currPitch, interval);
+                    if (!currPitch) {
+                        suggestions.push({ ...note, voiceIndex: 1 });
+                        return;
+                    }
+
+                    if (i === 0 || !prevMelodyPitch || !counterVoicePitch) {
+                        // First note: start counter-voice at initial interval below melody
+                        let transposed = transposePitch(currPitch, initialInterval);
                         transposed = applyChromatic(transposed);
+                        counterVoicePitch = transposed;
+                        prevMelodyPitch = currPitch;
                         suggestions.push({
                             ...note,
                             pitch: transposed,
@@ -7513,10 +7621,30 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff) {
                             voiceIndex: 1
                         });
                     } else {
-                        suggestions.push({ ...note, voiceIndex: 1 });
+                        // Calculate melody motion in semitones
+                        const melodyMotion = getPitchDifference(currPitch, prevMelodyPitch);
+
+                        // Counter-voice moves in opposite direction
+                        // For strict voice leading, move by same amount; for relaxed, scale it down
+                        const multiplier = stylePrefs.voiceLeadingStrictness === 'strict' ? 1.0 : 0.5;
+                        const counterMotion = Math.round(-melodyMotion * multiplier);
+
+                        // Apply the motion to the counter-voice
+                        let newCounterPitch = transposePitch(counterVoicePitch, counterMotion);
+                        newCounterPitch = applyChromatic(newCounterPitch);
+
+                        counterVoicePitch = newCounterPitch;
+                        prevMelodyPitch = currPitch;
+
+                        suggestions.push({
+                            ...note,
+                            pitch: newCounterPitch,
+                            pitches: [newCounterPitch],
+                            voiceIndex: 1
+                        });
                     }
-                }
-            });
+                });
+            }
             break;
 
         case 'pedal_root':
@@ -7555,25 +7683,72 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff) {
 
         case 'rhythmic':
             // Fill gaps where melody has rests - chord tone selection based on style
-            const chordTones = getChordTonesForStyle(chordRoot, chord.type, stylePrefs);
-            let chordToneIndex = 0;
-            melodyNotes.forEach(note => {
-                if (note.isRest || note.type === 'rest') {
-                    // Cycle through chord tones for variety
-                    const tone = chordTones[chordToneIndex % chordTones.length];
-                    const octave = moodAdj.registerBias === 'lower' ? 3 :
-                                  moodAdj.registerBias === 'higher' ? 5 : 4;
-                    suggestions.push({
-                        type: 'note',
-                        pitch: `${tone}${octave}`,
-                        pitches: [`${tone}${octave}`],
-                        duration: note.duration,
-                        beat: note.beat,
-                        voiceIndex: 1
-                    });
-                    chordToneIndex++;
-                }
-            });
+            {
+                const chordTones = getChordTonesForStyle(chordRoot, chord.type, stylePrefs);
+                let chordToneIndex = 0;
+                melodyNotes.forEach(note => {
+                    if (note.isRest || note.type === 'rest') {
+                        // Cycle through chord tones for variety
+                        const tone = chordTones[chordToneIndex % chordTones.length];
+                        const octave = moodAdj.registerBias === 'lower' ? 3 :
+                                      moodAdj.registerBias === 'higher' ? 5 : 4;
+                        suggestions.push({
+                            type: 'note',
+                            pitch: `${tone}${octave}`,
+                            pitches: [`${tone}${octave}`],
+                            duration: note.duration,
+                            beat: note.beat,
+                            voiceIndex: 1
+                        });
+                        chordToneIndex++;
+                    }
+                });
+            }
+            break;
+
+        case 'harmonic_accompaniment':
+            // Full harmonic accompaniment - chord tones following melody rhythm
+            // Unlike 'rhythmic', this adds notes for ALL melody notes, not just rests
+            {
+                const accompChordTones = getChordTonesForStyle(chordRoot, chord.type, stylePrefs);
+                let accompToneIndex = 0;
+                melodyNotes.forEach(note => {
+                    if (note.isRest || note.type === 'rest') {
+                        // Keep rests as rests in accompaniment
+                        suggestions.push({ ...note, voiceIndex: 1 });
+                    } else {
+                        const melodyPitch = note.pitch || note.pitches?.[0];
+                        // Find a chord tone that's below the melody note
+                        const baseOctave = moodAdj.registerBias === 'lower' ? 3 :
+                                          moodAdj.registerBias === 'higher' ? 4 : 3;
+
+                        // Cycle through chord tones, picking ones that harmonize well
+                        const tone = accompChordTones[accompToneIndex % accompChordTones.length];
+                        let accompPitch = `${tone}${baseOctave}`;
+
+                        // Ensure accompaniment is below melody - adjust octave if needed
+                        if (melodyPitch) {
+                            const melodyValue = getPitchValue(melodyPitch);
+                            let accompValue = getPitchValue(accompPitch);
+                            while (accompValue >= melodyValue && baseOctave > 2) {
+                                accompPitch = `${tone}${parseInt(accompPitch.match(/\d+/)[0]) - 1}`;
+                                accompValue = getPitchValue(accompPitch);
+                            }
+                        }
+
+                        suggestions.push({
+                            type: 'note',
+                            pitch: accompPitch,
+                            pitches: [accompPitch],
+                            duration: note.duration,
+                            beat: note.beat,
+                            voiceIndex: 1,
+                            sourceMeasure: note.sourceMeasure
+                        });
+                        accompToneIndex++;
+                    }
+                });
+            }
             break;
 
         case 'counter':
@@ -7597,20 +7772,21 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff) {
                         suggestions.push({ ...note, voiceIndex: 1 });
                     }
                 } else {
-                    // Interval pattern based on complexity
+                    // Interval pattern based on complexity - always below melody
                     let interval;
                     if (counterComplexity === 'complex') {
-                        // Jazz: more varied intervals (3rds, 6ths, occasional 7ths)
+                        // Jazz: more varied intervals (3rds, 6ths, occasional 7ths) - all below
                         const intervals = [-3, -4, -8, -9, -10];
                         interval = intervals[i % intervals.length];
                     } else if (counterComplexity === 'simple') {
-                        // Folk/Pop: stick to 3rds and 6ths
+                        // Folk/Pop: stick to 3rds and 6ths below
                         interval = i % 2 === 0 ? -3 : -8;
                     } else {
-                        // Moderate: alternating pattern
-                        interval = i % 2 === 0 ? -3 : -1;
+                        // Moderate: alternating pattern below
+                        interval = i % 2 === 0 ? -3 : -5;
                     }
-                    interval = getStyleAdjustedInterval(interval);
+                    // Use preserveDirection=true to ensure counter melody stays BELOW the melody
+                    interval = getStyleAdjustedInterval(interval, true);
                     const pitch = note.pitch || note.pitches?.[0];
                     if (pitch) {
                         let transposed = transposePitch(pitch, interval);
@@ -7638,11 +7814,21 @@ function transposePitch(pitch, semitones) {
     if (!pitch) return pitch;
 
     const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const match = pitch.match(/^([A-G]#?)(\d+)$/);
+    // Map flats to their sharp equivalents
+    const flatToSharp = { 'Db': 'C#', 'Eb': 'D#', 'Fb': 'E', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#', 'Cb': 'B' };
+
+    // Match both sharps and flats
+    const match = pitch.match(/^([A-G][#b]?)(\d+)$/);
     if (!match) return pitch;
 
-    const [, noteName, octaveStr] = match;
+    let [, noteName, octaveStr] = match;
     let octave = parseInt(octaveStr, 10);
+
+    // Convert flats to sharps for index lookup
+    if (noteName.includes('b')) {
+        noteName = flatToSharp[noteName] || noteName;
+    }
+
     let noteIndex = noteNames.indexOf(noteName);
 
     if (noteIndex === -1) return pitch;
@@ -7674,6 +7860,31 @@ function comparePitches(pitch1, pitch2) {
     if (val1 > val2) return 1;
     if (val1 < val2) return -1;
     return 0;
+}
+
+// Helper: Get the semitone difference between two pitches (pitch1 - pitch2)
+function getPitchDifference(pitch1, pitch2) {
+    const noteValues = { 'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11 };
+
+    const match1 = pitch1.match(/^([A-G][#b]?)(\d+)$/);
+    const match2 = pitch2.match(/^([A-G][#b]?)(\d+)$/);
+    if (!match1 || !match2) return 0;
+
+    const val1 = parseInt(match1[2], 10) * 12 + (noteValues[match1[1]] || 0);
+    const val2 = parseInt(match2[2], 10) * 12 + (noteValues[match2[1]] || 0);
+
+    return val1 - val2;
+}
+
+// Helper: Get the absolute MIDI-like value of a pitch (for comparison)
+function getPitchValue(pitch) {
+    if (!pitch) return 0;
+    const noteValues = { 'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3, 'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11 };
+
+    const match = pitch.match(/^([A-G][#b]?)(\d+)$/);
+    if (!match) return 0;
+
+    return parseInt(match[2], 10) * 12 + (noteValues[match[1]] || 0);
 }
 
 // Helper: Get the fifth from a root note
@@ -7741,6 +7952,85 @@ function getChordTonesForStyle(root, chordType, stylePrefs) {
     }
 }
 
+function playPolyphonyPreview() {
+    const compositionState = getCompositionState();
+    if (!compositionState) return;
+
+    const progressionData = getProgressionData() || [];
+    const chord = progressionData[polyphonyState.selectedChordIndex];
+    if (!chord) return;
+
+    const staff = polyphonyState.selectedStaff;
+
+    // Gather current voice 1 notes
+    let voice1Notes = [];
+    if (staff === 'treble' && compositionState.gatherTrebleNotesForChord) {
+        voice1Notes = compositionState.gatherTrebleNotesForChord(polyphonyState.selectedChordIndex);
+    } else if (staff === 'bass' && compositionState.gatherBassNotesForChord) {
+        voice1Notes = compositionState.gatherBassNotesForChord(polyphonyState.selectedChordIndex);
+    }
+    voice1Notes = voice1Notes.filter(n => (n.voiceIndex || 0) === 0 && !n.isRest && n.type !== 'rest');
+
+    // Get suggested voice 2 notes
+    const voice2Notes = (polyphonyState.generatedSuggestions || []).filter(n => !n.isRest && n.type !== 'rest');
+
+    // Combine all notes and sort by beat
+    const allNotes = [...voice1Notes, ...voice2Notes].sort((a, b) => (a.beat || 0) - (b.beat || 0));
+
+    if (allNotes.length === 0) {
+        console.log('[Polyphony] No notes to play');
+        return;
+    }
+
+    // Use Tone.js instrument (same approach as playPhrase)
+    try {
+        const instrument = window.getInstrument && window.getInstrument();
+        if (!instrument) {
+            console.warn('[Polyphony] Instrument not available');
+            return;
+        }
+
+        // Ensure Tone.js context is running
+        if (window.Tone && window.Tone.context.state !== 'running') {
+            window.Tone.start();
+        }
+
+        // Get tempo from composition state
+        const tempo = compositionState.metadata?.tempo || 120;
+        const beatDuration = 60 / tempo; // seconds per beat
+
+        const baseTime = window.Tone?.now?.() || 0;
+
+        // Schedule all notes with their correct beat positions
+        allNotes.forEach(note => {
+            const pitch = note.pitch || note.pitches?.[0];
+            if (!pitch) return;
+
+            const noteBeat = note.beat || 0;
+            const startTime = baseTime + noteBeat * beatDuration;
+            const durationBeats = getDurationInBeats(note.duration || 'q');
+            const noteDuration = durationBeats * beatDuration * 0.9; // 90% for articulation
+
+            try {
+                instrument.triggerAttackRelease(pitch, noteDuration, startTime);
+            } catch (e) {
+                // Ignore individual note errors
+            }
+        });
+    } catch (e) {
+        console.warn('[Polyphony] Could not play preview:', e);
+    }
+}
+
+// Helper to get duration in beats
+function getDurationInBeats(duration) {
+    const durationMap = {
+        'w': 4, 'h': 2, 'q': 1, '8': 0.5, '16': 0.25, '32': 0.125,
+        'hd': 3, 'qd': 1.5, '8d': 0.75, '16d': 0.375
+    };
+    return durationMap[duration] || 1;
+}
+
 function applyPolyphonySuggestions() {
     const compositionState = getCompositionState();
     if (!compositionState || polyphonyState.generatedSuggestions.length === 0) {
@@ -7752,19 +8042,50 @@ function applyPolyphonySuggestions() {
     const chordIndex = polyphonyState.selectedChordIndex;
     const staff = polyphonyState.selectedStaff;
 
+    console.log('[Polyphony] Applying suggestions:');
+    polyphonyState.generatedSuggestions.forEach((s, i) => {
+        console.log(`  [${i}] pitch=${s.pitch}, duration=${s.duration}, beat=${s.beat}, sourceMeasure=${s.sourceMeasure}`);
+    });
+
+    // Collect unique measures that will be affected
+    const affectedMeasures = new Set();
+    polyphonyState.generatedSuggestions.forEach(suggestion => {
+        affectedMeasures.add(suggestion.sourceMeasure || 0);
+    });
+
+    // Clear existing Voice 2 notes in affected measures before adding new ones
+    // This prevents duplicate notes when re-applying texture to the same measure
+    affectedMeasures.forEach(measureIndex => {
+        compositionState.ensureVoiceExists(measureIndex, staff, 1);
+        if (compositionState.clearVoice) {
+            console.log(`[Polyphony] Clearing existing Voice 2 in measure ${measureIndex}`);
+            compositionState.clearVoice(measureIndex, staff, 1);
+        } else {
+            // Fallback: manually clear the voice notes
+            const measure = compositionState.getMeasure(measureIndex);
+            if (measure?.notation?.[staff]?.voices?.[1]) {
+                console.log(`[Polyphony] Clearing existing Voice 2 in measure ${measureIndex} (fallback)`);
+                measure.notation[staff].voices[1].notes = [];
+            }
+        }
+    });
+
     // Add each suggestion to voice 2 of the target staff
     polyphonyState.generatedSuggestions.forEach(suggestion => {
         const sourceMeasure = suggestion.sourceMeasure || 0;
         compositionState.ensureVoiceExists(sourceMeasure, staff, 1); // Voice index 1 = Voice 2
 
-        compositionState.addNoteToVoice(sourceMeasure, staff, 1, {
+        const noteToAdd = {
             type: suggestion.type || 'note',
             pitch: suggestion.pitch,
             pitches: suggestion.pitches,
             duration: suggestion.duration,
             beat: suggestion.beat || 0,
             voiceIndex: 1
-        });
+        };
+
+        console.log(`[Polyphony] Adding to measure ${sourceMeasure}:`, noteToAdd);
+        compositionState.addNoteToVoice(sourceMeasure, staff, 1, noteToAdd);
     });
 
     console.log(`[Polyphony] Applied ${polyphonyState.generatedSuggestions.length} notes to Voice 2 of ${staff} clef`);

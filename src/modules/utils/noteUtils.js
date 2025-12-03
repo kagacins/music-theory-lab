@@ -17,6 +17,104 @@ import {
 // - notationPreference: 'full' or 'symbol' for chord name display
 // These will need to be passed as parameters or accessed via a state management system
 
+// Keys that use flats in their key signature
+const FLAT_KEYS = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb', 'Dm', 'Gm', 'Cm', 'Fm', 'Bbm', 'Ebm', 'Abm'];
+// Keys that use sharps in their key signature
+const SHARP_KEYS = ['G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'Em', 'Bm', 'F#m', 'C#m', 'G#m', 'D#m', 'A#m'];
+// C major and A minor are neutral (no sharps or flats)
+const NEUTRAL_KEYS = ['C', 'Am'];
+
+/**
+ * Determine the appropriate enharmonic preference (sharp or flat) based on the key
+ * @param {string} key - Key signature (e.g., "F", "Bb", "G", "F# Minor")
+ * @returns {string} 'sharp' or 'flat'
+ */
+export function getEnharmonicPreferenceForKey(key) {
+    if (!key) return 'sharp';
+
+    // Normalize the key - extract the root and check for major/minor
+    const normalizedKey = key.trim();
+
+    // Check for minor keys
+    const isMinor = normalizedKey.toLowerCase().includes('minor') ||
+                    normalizedKey.toLowerCase().includes('min') ||
+                    normalizedKey.endsWith('m');
+
+    // Extract just the root note
+    let root = normalizedKey
+        .replace(/\s*(major|minor|min|m)$/i, '')
+        .replace(/\s+/g, '')
+        .trim();
+
+    // Handle enharmonic equivalents - normalize to a consistent form
+    const enharmonicRoots = {
+        'Db': 'Db', 'C#': 'Db',
+        'Eb': 'Eb', 'D#': 'Eb',
+        'Gb': 'Gb', 'F#': 'F#',
+        'Ab': 'Ab', 'G#': 'Ab',
+        'Bb': 'Bb', 'A#': 'Bb'
+    };
+
+    // Check if the root itself contains a flat - that's a strong signal
+    if (root.includes('b')) {
+        return 'flat';
+    }
+
+    // For keys with sharps in their name, prefer sharps
+    if (root.includes('#')) {
+        return 'sharp';
+    }
+
+    // Build the full key name to check against our lists
+    const fullKey = isMinor ? root + 'm' : root;
+
+    if (FLAT_KEYS.includes(fullKey) || FLAT_KEYS.includes(root)) {
+        return 'flat';
+    }
+
+    if (SHARP_KEYS.includes(fullKey) || SHARP_KEYS.includes(root)) {
+        return 'sharp';
+    }
+
+    // Default to sharp for neutral keys like C major, A minor
+    return 'sharp';
+}
+
+/**
+ * Spell a note correctly for a given key
+ * Uses the key's enharmonic preference to choose between sharp and flat spellings
+ * @param {string} note - Note name (with or without octave, e.g., "C#" or "C#4")
+ * @param {string} key - Key signature for context
+ * @returns {string} Correctly spelled note for the key
+ */
+export function spellNoteInKey(note, key) {
+    if (!note) return note;
+
+    const preference = getEnharmonicPreferenceForKey(key);
+
+    // Check if note has octave
+    const hasOctave = /\d$/.test(note);
+    const notePart = hasOctave ? note.slice(0, -1) : note;
+    const octavePart = hasOctave ? note.slice(-1) : '';
+
+    // Find the note index
+    let noteIndex = ALL_NOTES.indexOf(notePart);
+    if (noteIndex === -1) {
+        // Try finding via enharmonic map
+        const sharpName = ENHARMONIC_MAP[notePart];
+        if (sharpName) {
+            noteIndex = ALL_NOTES.indexOf(sharpName);
+        }
+    }
+
+    if (noteIndex === -1) return note; // Can't resolve, return original
+
+    // Get the correctly spelled note based on preference
+    const spelledNote = preference === 'flat' ? FLAT_NOTES[noteIndex] : SHARP_NOTES[noteIndex];
+
+    return spelledNote + octavePart;
+}
+
 /**
  * Convert a note name with octave to MIDI number
  * @param {string} note - Note name with octave (e.g., "C4")

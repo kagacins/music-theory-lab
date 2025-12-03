@@ -240,7 +240,7 @@ function generateFirstChordBass(chord, chordNotes, pattern, timeSignature, beats
     }
 
     if (pattern === 'arpeggio' && timeSignature.num === 4) {
-        return generateArpeggioPattern(chordNotes, timeSignature);
+        return generateArpeggioPattern(chordNotes, timeSignature, null, chord.root);
     }
 
     if (pattern === 'alberti' && timeSignature.num === 4) {
@@ -336,7 +336,7 @@ function generateVoiceLedBass(chord, chordNotes, previousChord, pattern, timeSig
 
     if (pattern === 'arpeggio') {
         // Arpeggio should start from the root and ascend through chord tones
-        return generateArpeggioPattern(chordNotes, timeSignature);
+        return generateArpeggioPattern(chordNotes, timeSignature, null, chord.root);
     }
 
     if (pattern === 'alberti') {
@@ -429,6 +429,47 @@ function generateSimpleBass(chord, chordNotes, pattern, timeSignature, beatsInMe
 }
 
 /**
+ * Find the third of a chord in the bass register
+ * Correctly handles major vs minor chords
+ * @param {string} root - Root note name (e.g., 'C', 'D#')
+ * @param {Object} chord - Chord object with type property
+ * @param {number} octave - Target octave (default 2)
+ * @returns {string} Third note name
+ */
+function findThird(root, chord, octave = 2) {
+    const chordType = (chord?.type || 'Major').toLowerCase();
+    // Minor third = 3 semitones, Major third = 4 semitones
+    const isMinor = chordType.includes('minor') || chordType.includes('min') ||
+                    chordType === 'm' || chordType === 'm7' || chordType === 'm9' ||
+                    chordType.includes('dim') || chordType.startsWith('m');
+    const thirdInterval = isMinor ? 3 : 4;
+    const rootMidi = noteToMidi(`${root}${octave}`);
+    const thirdMidi = rootMidi + thirdInterval;
+    return midiToNoteName(thirdMidi);
+}
+
+/**
+ * Find the sixth of a chord in the bass register
+ * Correctly handles major vs minor chords
+ * @param {string} root - Root note name (e.g., 'C', 'D#')
+ * @param {Object} chord - Chord object with type property
+ * @param {number} octave - Target octave (default 2)
+ * @returns {string} Sixth note name
+ */
+function findSixth(root, chord, octave = 2) {
+    const chordType = (chord?.type || 'Major').toLowerCase();
+    // Minor 6th = 8 semitones, Major 6th = 9 semitones
+    // Use minor 6th for minor chords to stay diatonic
+    const isMinor = chordType.includes('minor') || chordType.includes('min') ||
+                    chordType === 'm' || chordType === 'm7' || chordType === 'm9' ||
+                    chordType.includes('dim') || chordType.startsWith('m');
+    const sixthInterval = isMinor ? 8 : 9;
+    const rootMidi = noteToMidi(`${root}${octave}`);
+    const sixthMidi = rootMidi + sixthInterval;
+    return midiToNoteName(sixthMidi);
+}
+
+/**
  * Find the fifth of a chord in the bass register
  * @param {string} root - Root note name (e.g., 'C', 'D#')
  * @param {array} chordNotes - Available chord notes
@@ -469,18 +510,55 @@ function findClosestNote(noteNames, targetMidi) {
 }
 
 /**
- * Generate arpeggio pattern (ascending chord tones)
+ * Reorder chord notes to start from the root note
+ * For arpeggio patterns that should begin on the root (R-3-5-R)
+ * @param {array} chordNotes - Pitch-sorted chord notes
+ * @param {string} root - Root note name (e.g., 'F', 'Bb')
+ * @returns {array} Notes reordered to start from root
+ */
+function reorderFromRoot(chordNotes, root) {
+    if (!chordNotes || chordNotes.length === 0) return chordNotes;
+
+    // Find the first note that matches the root (ignoring octave)
+    const rootIndex = chordNotes.findIndex(note => {
+        const noteName = note.replace(/\d+$/, '');
+        return noteName === root ||
+               // Handle enharmonic equivalents
+               (noteName === 'A#' && root === 'Bb') ||
+               (noteName === 'Bb' && root === 'A#') ||
+               (noteName === 'C#' && root === 'Db') ||
+               (noteName === 'Db' && root === 'C#') ||
+               (noteName === 'D#' && root === 'Eb') ||
+               (noteName === 'Eb' && root === 'D#') ||
+               (noteName === 'F#' && root === 'Gb') ||
+               (noteName === 'Gb' && root === 'F#') ||
+               (noteName === 'G#' && root === 'Ab') ||
+               (noteName === 'Ab' && root === 'G#');
+    });
+
+    if (rootIndex <= 0) return chordNotes; // Already starts with root or not found
+
+    // Reorder: root and notes after it, then wrap around
+    return [...chordNotes.slice(rootIndex), ...chordNotes.slice(0, rootIndex)];
+}
+
+/**
+ * Generate arpeggio pattern (ascending chord tones starting from root)
  * @param {array} chordNotes - Chord notes
  * @param {object} timeSignature - Time signature
  * @param {string|null} startNote - Optional starting note for voice leading
+ * @param {string|null} root - Root note name for proper arpeggio ordering
  * @returns {object} Bass voicing
  */
-function generateArpeggioPattern(chordNotes, timeSignature, startNote = null) {
+function generateArpeggioPattern(chordNotes, timeSignature, startNote = null, root = null) {
     const { num } = timeSignature;
 
+    // Reorder notes to start from root for proper arpeggio (R-3-5-R)
+    const orderedNotes = root ? reorderFromRoot(chordNotes, root) : chordNotes;
+
     if (num === 4) {
-        // Quarter note arpeggio: C - E - G - C
-        const notes = chordNotes.slice(0, 4);
+        // Quarter note arpeggio: R - 3 - 5 - R (e.g., F - A - C - F)
+        const notes = orderedNotes.slice(0, 4);
         return {
             notes: notes.map((pitch, idx) => ({
                 type: 'note',
@@ -493,8 +571,8 @@ function generateArpeggioPattern(chordNotes, timeSignature, startNote = null) {
     }
 
     if (num === 3) {
-        // Quarter note arpeggio in 3/4: C - E - G
-        const notes = chordNotes.slice(0, 3);
+        // Quarter note arpeggio in 3/4: R - 3 - 5
+        const notes = orderedNotes.slice(0, 3);
         return {
             notes: notes.map((pitch, idx) => ({
                 type: 'note',
@@ -506,11 +584,11 @@ function generateArpeggioPattern(chordNotes, timeSignature, startNote = null) {
         };
     }
 
-    // Fallback: whole note
+    // Fallback: whole note on root
     return {
         notes: [{
             type: 'note',
-            pitch: chordNotes[0],
+            pitch: orderedNotes[0],
             duration: '1n',
             beat: 0,
             dotted: false
@@ -789,7 +867,7 @@ export function generateBuildingBlockBass(chord, previousChord = null, totalBeat
             return generateRootFifthBlockBass(bassNote, fifth, totalBeats, beatsPerMeasure);
 
         case 'arpeggio':
-            return generateArpeggioBlockBass(chordNotes, totalBeats, beatsPerMeasure);
+            return generateArpeggioBlockBass(chordNotes, totalBeats, beatsPerMeasure, chord.root);
 
         case 'alberti':
             return generateAlbertiBlockBass(chordNotes, totalBeats, beatsPerMeasure);
@@ -1009,16 +1087,23 @@ function generateRootFifthBlockBass(root, fifth, totalBeats, beatsPerMeasure) {
 
 /**
  * Generate arpeggio pattern for a building block
- * Quarter notes cycling through chord tones
+ * Quarter notes cycling through chord tones, starting from root
+ * @param {array} chordNotes - Chord notes (pitch-sorted)
+ * @param {number} totalBeats - Total beats to fill
+ * @param {number} beatsPerMeasure - Beats per measure
+ * @param {string|null} root - Root note name for proper ordering
  */
-function generateArpeggioBlockBass(chordNotes, totalBeats, beatsPerMeasure) {
+function generateArpeggioBlockBass(chordNotes, totalBeats, beatsPerMeasure, root = null) {
     const notes = [];
     let currentBeat = 0;
     let noteIndex = 0;
 
+    // Reorder to start from root for proper arpeggio (R-3-5-R)
+    const orderedNotes = root ? reorderFromRoot(chordNotes, root) : chordNotes;
+
     while (currentBeat < totalBeats) {
         const remainingBeats = totalBeats - currentBeat;
-        const pitch = chordNotes[noteIndex % chordNotes.length];
+        const pitch = orderedNotes[noteIndex % orderedNotes.length];
 
         // Each arpeggio note is 1 beat (quarter note)
         const noteBeats = Math.min(1, remainingBeats);
@@ -1324,16 +1409,17 @@ function generateBoogieBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure)
     const root = `${chord.root}2`;
     const rootMidi = noteToMidi(root);
     const fifth = findFifth(chord.root, chordNotes);
-    const sixth = midiToNoteName(rootMidi + 9); // Major 6th
+    const third = findThird(chord.root, chord, 2); // Chord-quality-aware third
+    const sixth = findSixth(chord.root, chord, 2); // Chord-quality-aware sixth
 
     // Boogie pattern: root-3rd-5th-6th-5th-3rd (ascending/descending)
     const boogiePattern = [
         root,
-        midiToNoteName(rootMidi + 4), // Major 3rd
+        third,
         fifth,
         sixth,
         fifth,
-        midiToNoteName(rootMidi + 4), // Major 3rd
+        third,
         root,
         midiToNoteName(rootMidi - 1), // Leading tone below
     ];
@@ -2344,7 +2430,7 @@ function generateMotownBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure)
     const root = `${chord.root}2`;
     const rootMidi = noteToMidi(root);
     const fifth = findFifth(chord.root, chordNotes);
-    const third = midiToNoteName(rootMidi + 4); // Major third
+    const third = findThird(chord.root, chord, 2); // Chord-quality-aware third
     const octave = midiToNoteName(rootMidi + 12);
 
     // Motown pattern: melodic with syncopation
@@ -2533,9 +2619,8 @@ function generateCallResponseBlockBass(chord, chordNotes, totalBeats, beatsPerMe
     let currentBeat = 0;
 
     const root = `${chord.root}2`;
-    const rootMidi = noteToMidi(root);
     const fifth = findFifth(chord.root, chordNotes);
-    const third = midiToNoteName(rootMidi + 4);
+    const third = findThird(chord.root, chord, 3); // Use octave 3 for the third
 
     // Call-response pattern: "call" phrase then rest for "response"
     // Pattern: root-third-fifth (call), rest, root-fifth (response), rest
@@ -2678,15 +2763,16 @@ function generateGospelBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure)
 
     const root = `${chord.root}2`;
     const rootMidi = noteToMidi(root);
-    const third = midiToNoteName(rootMidi + 4);
+    const third = findThird(chord.root, chord, 2); // Chord-quality-aware third
     const fifth = findFifth(chord.root, chordNotes);
-    const sixth = midiToNoteName(rootMidi + 9);
+    const sixth = findSixth(chord.root, chord, 2); // Chord-quality-aware sixth
+    const passingNote = midiToNoteName(rootMidi + 2); // Whole step above root
 
     // Gospel pattern: root-third, passing chord, fifth-root
-    // Uses major 6th for typical gospel sound
+    // Uses chord-appropriate sixth for diatonic gospel sound
     const gospelPattern = [
         { pitches: [root, third], beats: 1 },
-        { pitches: [midiToNoteName(rootMidi + 2), fifth], beats: 1 },  // Passing chord
+        { pitches: [passingNote, fifth], beats: 1 },  // Passing chord
         { pitches: [root, sixth], beats: 1 },
         { pitches: [root, fifth], beats: 1 },
     ];

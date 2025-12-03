@@ -19,6 +19,7 @@ import {
     CHORD_INTERVALS,
     STYLE_RULES
 } from './melodySuggestion.js';
+import { getEnharmonicPreferenceForKey } from '../utils/noteUtils.js';
 
 // -----------------------------------------------------------------------------
 // Contour Shape Definitions
@@ -174,6 +175,17 @@ export const RHYTHM_PATTERNS = {
 const CHROMATIC_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const FLAT_NOTES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
+/**
+ * Get correctly spelled note name based on key
+ * @param {number} pitchClass - 0-11 pitch class index
+ * @param {string} key - Key signature for enharmonic preference
+ * @returns {string} Note name with correct spelling for the key
+ */
+function getSpelledNoteName(pitchClass, key) {
+    const preference = getEnharmonicPreferenceForKey(key);
+    return preference === 'flat' ? FLAT_NOTES[pitchClass] : CHROMATIC_NOTES[pitchClass];
+}
+
 // -----------------------------------------------------------------------------
 // Phrase Generation Functions
 // -----------------------------------------------------------------------------
@@ -224,11 +236,12 @@ export function generatePhrase({
     const effectiveTargetBeats = targetBeats !== null ? targetBeats : phraseLength.beats;
 
     // Calculate appropriate note count based on target beats
-    // More beats = more notes (roughly 1.5-2 notes per beat for medium density)
+    // Base note count = 1 note per beat (e.g., 4 beats = 4 notes at normal density)
+    // Density multiplier adjusts this: 0.5 = half notes, 1.0 = quarters, 2.0 = eighths
     let baseNoteCount;
     if (targetBeats !== null) {
-        // Calculate note count from target beats (approx 1.5 notes per beat at normal density)
-        baseNoteCount = Math.round(effectiveTargetBeats * 1.5);
+        // One note per beat as baseline
+        baseNoteCount = effectiveTargetBeats;
     } else {
         baseNoteCount = phraseLength.notes;
     }
@@ -412,7 +425,15 @@ export function generatePhrase({
     // ==========================================================================
     // RHYTHM GENERATION - Use rhythm patterns with standard note durations
     // ==========================================================================
-    const standardDurations = [4, 3, 2, 1.5, 1, 0.75, 0.5, 0.25];
+
+    // Full set of standard durations (includes dotted values)
+    const allStandardDurations = [4, 3, 2, 1.5, 1, 0.75, 0.5, 0.25];
+
+    // Simple durations for "steady" rhythm - no dotted values for even feel
+    const simpleDurations = [4, 2, 1, 0.5, 0.25];
+
+    // Use simple durations for steady rhythm, full set for others
+    const standardDurations = rhythmId === 'steady' ? simpleDurations : allStandardDurations;
 
     // Helper to snap a value to the nearest standard duration
     const snapToStandard = (value) => {
@@ -550,7 +571,8 @@ function getCandidatesAroundTarget(targetMidi, chord, key, scaleNotes, chordTone
     for (let midi = targetMidi - searchRange; midi <= targetMidi + searchRange; midi++) {
         const pitchClass = midi % 12;
         const octave = Math.floor(midi / 12) - 1;
-        const noteName = CHROMATIC_NOTES[pitchClass] + octave;
+        const spelledPitch = getSpelledNoteName(pitchClass, key);
+        const noteName = spelledPitch + octave;
 
         candidates.push({
             note: noteName,

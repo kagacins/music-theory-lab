@@ -6725,14 +6725,9 @@ function handleCardDragWithinSection(evt, originalSectionId) {
         compositionState.updateSection(section.id, { chordIndices: newIndices.filter(idx => idx >= 0) });
     });
 
-    // Update trainer state
+    // Update trainer state (setProgressionData internally calls syncWithProgressionData)
     setProgressionData(newProgressionData);
     setProgressionRomans(newProgressionRomans);
-
-    // Sync to compositionState
-    if (typeof compositionState.syncWithProgressionData === 'function') {
-        compositionState.syncWithProgressionData(newProgressionData);
-    }
 
     // Re-render
     renderProgressionDisplay('progression-visualization', true);
@@ -6787,14 +6782,9 @@ function handleSectionDragEnd(container, sectionEl, evt) {
         compositionState.updateSection(sec.id, { chordIndices: newIndices.filter(idx => idx >= 0) });
     });
 
-    // Update trainer state
+    // Update trainer state (setProgressionData internally calls syncWithProgressionData)
     setProgressionData(newProgressionData);
     setProgressionRomans(newProgressionRomans);
-
-    // Sync to compositionState
-    if (compositionState && typeof compositionState.syncWithProgressionData === 'function') {
-        compositionState.syncWithProgressionData(newProgressionData);
-    }
 
     // Re-render
     renderProgressionDisplay('progression-visualization', true);
@@ -11282,23 +11272,11 @@ export function removeChordFromProgression(index) {
     saveStateBeforeChange();
 
     // IMPORTANT: progressionData is now delegated to compositionState
-    // We need to remove from compositionState properly
+    // Use compositionState.removeChord() which properly syncs edits before removing
     if (window.getCompositionState) {
         const compositionState = window.getCompositionState();
-        const progressionData = [...trainerState.progressionData]; // Get current data
-
-        progressionData.splice(index, 1); // Remove the chord
-
-
-        // Sync back to compositionState
-        compositionState.syncWithProgressionData(progressionData, {
-            key: trainerState.currentKey,
-            timeSignature: { num: 4, denom: 4 }
-        });
-
-
-        // Verify the deletion worked by exporting again
-        const verifyData = compositionState.exportToProgressionData();
+        // removeChord() handles syncMeasuresToBuildingBlocks internally to preserve edits
+        compositionState.removeChord(index);
     } else {
         // Fallback for legacy code
         trainerState.progressionData.splice(index, 1);

@@ -4,6 +4,7 @@
  */
 
 import { getSavedMelodyWeights } from '../config/weightPresets.js';
+import { getEnharmonicPreferenceForKey } from '../utils/noteUtils.js';
 
 // -----------------------------------------------------------------------------
 // Public preset metadata
@@ -73,6 +74,17 @@ const NOTE_CATEGORIES = {
 
 const CHROMATIC_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const FLAT_NOTES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+/**
+ * Get correctly spelled note name based on key
+ * @param {number} pitchClass - 0-11 pitch class index
+ * @param {string} key - Key signature for enharmonic preference
+ * @returns {string} Note name with correct spelling for the key
+ */
+function getSpelledNoteName(pitchClass, key) {
+    const preference = getEnharmonicPreferenceForKey(key);
+    return preference === 'flat' ? FLAT_NOTES[pitchClass] : CHROMATIC_NOTES[pitchClass];
+}
 
 /**
  * Convert note name to MIDI number for pitch distance calculations
@@ -827,7 +839,8 @@ export function generateMelodySuggestions({
 
     for (let oct = startOctave; oct <= endOctave; oct++) {
         for (let pc = 0; pc < 12; pc++) {
-            const noteName = CHROMATIC_NOTES[pc] + oct;
+            const spelledPitch = getSpelledNoteName(pc, key);
+            const noteName = spelledPitch + oct;
             const scores = [];
             const reasons = [];
             const categories = [];
@@ -951,7 +964,10 @@ export function generateMelodySuggestions({
             // Apply recency/frequency penalty to harmonic score
             if (recentNotes && recentNotes.length > 0) {
                 // Get pitch class without octave for matching (e.g., 'C4' -> 'C')
-                const pitchClass = CHROMATIC_NOTES[pc];
+                // Use spelled pitch to match against recent notes which may be spelled either way
+                const pitchClass = spelledPitch;
+                // Also check the enharmonic equivalent for matching
+                const altPitchClass = CHROMATIC_NOTES[pc] === spelledPitch ? FLAT_NOTES[pc] : CHROMATIC_NOTES[pc];
 
                 // Count occurrences and find most recent position
                 let occurrenceCount = 0;
@@ -960,7 +976,8 @@ export function generateMelodySuggestions({
                 recentNotes.forEach((recentNote, idx) => {
                     // Extract pitch class from recent note
                     const recentPitchClass = recentNote.replace(/\d+$/, '');
-                    if (recentPitchClass === pitchClass) {
+                    // Match against both spellings (e.g., "A#" and "Bb" are the same pitch)
+                    if (recentPitchClass === pitchClass || recentPitchClass === altPitchClass) {
                         occurrenceCount++;
                         if (mostRecentPosition === -1 || idx < mostRecentPosition) {
                             mostRecentPosition = idx;
@@ -1000,7 +1017,7 @@ export function generateMelodySuggestions({
 
                 candidates.push({
                     note: noteName,
-                    pitch: CHROMATIC_NOTES[pc],
+                    pitch: spelledPitch,
                     octave: oct,
                     totalScore: Math.round(totalScore),
                     category: primaryCategory,
@@ -1080,7 +1097,7 @@ export function getQuickSuggestions(options) {
 /**
  * Get chord tone suggestions only
  */
-export function getChordToneSuggestions({ chord, octave = 4, range = 2 }) {
+export function getChordToneSuggestions({ chord, octave = 4, range = 2, key = 'C' }) {
     const chordTones = getChordTones(chord);
     const suggestions = [];
 
@@ -1089,10 +1106,11 @@ export function getChordToneSuggestions({ chord, octave = 4, range = 2 }) {
 
     for (let oct = startOctave; oct <= endOctave; oct++) {
         for (const pc of chordTones) {
-            const noteName = CHROMATIC_NOTES[pc] + oct;
+            const spelledPitch = getSpelledNoteName(pc, key);
+            const noteName = spelledPitch + oct;
             suggestions.push({
                 note: noteName,
-                pitch: CHROMATIC_NOTES[pc],
+                pitch: spelledPitch,
                 octave: oct,
                 chordDegree: getChordDegree(noteName, chord),
                 isRoot: pc === getPitchClass(chord.root)

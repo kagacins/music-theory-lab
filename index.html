@@ -1510,14 +1510,14 @@
                             <!-- Suggestions Group -->
                             <div class="controls-group">
                                 <span class="controls-group-label">Suggestions:</span>
-                                <button onclick="window.togglePanel && window.togglePanel('chords')" class="notation-header-btn btn-blue" title="Chord Suggestions">
+                                <button onclick="window.showUnifiedRecommendationModal && window.showUnifiedRecommendationModal({ initialTab: 'chord' })" class="notation-header-btn btn-blue" title="Chord Suggestions">
                                     <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                                         <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"></path>
                                         <path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z"></path>
                                     </svg>
                                     <span>Chords</span>
                                 </button>
-                                <button onclick="window.togglePanel && window.togglePanel('melody')" class="notation-header-btn btn-pink" title="Melody Suggestions">
+                                <button onclick="window.showUnifiedRecommendationModal && window.showUnifiedRecommendationModal({ initialTab: 'melody' })" class="notation-header-btn btn-pink" title="Melody Suggestions">
                                     <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                                         <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path>
                                     </svg>
@@ -2374,9 +2374,7 @@
                 <button id="suggestions-mode-chords" class="active" onclick="window.switchSuggestionMode && window.switchSuggestionMode('chords')">
                     Chords
                 </button>
-                <button id="suggestions-mode-melody" onclick="window.switchSuggestionMode && window.switchSuggestionMode('melody')">
-                    Melody
-                </button>
+                <!-- Melody button removed - use Recommendations Modal (R key) instead -->
                 <button id="suggestions-mode-generate" onclick="window.switchSuggestionMode && window.switchSuggestionMode('generate')">
                     Generate
                 </button>
@@ -2521,46 +2519,10 @@
                 </div>
             </div>
 
-            <!-- MELODY SUGGESTIONS SECTION -->
-            <div id="melody-suggestions-section" class="hidden">
-                <!-- Compact Context + Style Row -->
-                <div id="melody-context-row" class="flex items-center justify-between gap-2 mb-2 text-xs">
-                    <div id="melody-suggestion-context" class="flex items-center gap-3 text-gray-300">
-                        <span><strong class="text-gray-400">Chord:</strong> <span id="ctx-chord">-</span></span>
-                        <span><strong class="text-gray-400">Key:</strong> <span id="ctx-key">C</span></span>
-                        <span><strong class="text-gray-400">Prev:</strong> <span id="ctx-prev">-</span></span>
-                    </div>
-                    <select id="floating-melody-style-select" class="text-xs px-2 py-1 border border-gray-600 rounded bg-gray-700 text-white" style="min-width: 90px;">
-                        <option value="any">Balanced</option>
-                        <option value="pop" selected>Pop / Top 40</option>
-                        <option value="jazz">Jazz</option>
-                        <option value="classical">Classical</option>
-                        <option value="rock">Rock / Blues</option>
-                    </select>
-                </div>
-
-                <!-- Mode Toggle: One Note / Phrases -->
-                <div id="melody-mode-toggle" class="flex rounded-lg overflow-hidden border border-gray-600 mb-3">
-                    <button id="mode-one-note" class="flex-1 px-3 py-1.5 text-xs font-medium bg-indigo-600 text-white transition-colors">
-                        One Note
-                    </button>
-                    <button id="mode-phrases" class="flex-1 px-3 py-1.5 text-xs font-medium bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors">
-                        Phrases
-                    </button>
-                </div>
-
-                <!-- One Note Section -->
-                <div id="one-note-section">
-                    <!-- Suggestions List -->
-                    <div id="melody-suggestions-list" class="suggestions-list space-y-2">
-                        <p class="suggestions-empty">Please select a chord to see suggestions</p>
-                    </div>
-                </div>
-
-                <!-- Phrases Section (hidden by default, populated by enhancedMelodyController) -->
-                <div id="phrases-section" class="hidden">
-                    <!-- Phrase generation controls will be injected here by enhancedMelodyController -->
-                </div>
+            <!-- MELODY SUGGESTIONS SECTION - DEPRECATED -->
+            <!-- Use Recommendations Modal (R key) for melody suggestions instead -->
+            <div id="melody-suggestions-section" class="hidden" style="display: none !important;">
+                <!-- Deprecated - kept for backwards compatibility -->
             </div>
 
             <!-- GENERATE SECTION (Phase 5) -->

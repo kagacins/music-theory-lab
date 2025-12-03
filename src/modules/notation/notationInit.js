@@ -25,29 +25,40 @@ import { initializeIntegratedSuggestions, FeatureFlags } from '../canvas/suggest
  * @param {string} staff - 'treble' or 'bass' for clef context
  * @returns {string} - New pitch
  */
-function transposePitchBySteps(pitch, steps, staff) {
-  // Chromatic scale
-  const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+function transposePitchBySteps(pitch, steps, staff, keySignature = 'C') {
+  // Keys that use flats (major and their relative minors)
+  const flatKeys = ['F', 'Dm', 'Bb', 'Gm', 'Eb', 'Cm', 'Ab', 'Fm', 'Db', 'Bbm', 'Gb', 'Ebm', 'Cb', 'Abm'];
+  const useFlats = flatKeys.includes(keySignature);
 
-  // Parse pitch
-  const match = pitch.match(/^([A-G]#?)(\d+)$/);
+  // Chromatic scale with sharps
+  const sharpNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  // Chromatic scale with flats
+  const flatNotes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+  // Use appropriate scale based on key
+  const notes = useFlats ? flatNotes : sharpNotes;
+
+  // Parse pitch - handle both sharps and flats in input
+  const match = pitch.match(/^([A-G][#b]?)(\d+)$/);
   if (!match) return pitch;
 
   const [, noteName, octave] = match;
   const octaveNum = parseInt(octave, 10);
 
-  // Find note index
-  let noteIndex = notes.indexOf(noteName);
+  // Find note index - try sharp scale first, then flat scale
+  let noteIndex = sharpNotes.indexOf(noteName);
   if (noteIndex === -1) {
-    // Try flat notation
-    const flats = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
-    const sharp = flats[noteName];
-    if (sharp) noteIndex = notes.indexOf(sharp);
+    noteIndex = flatNotes.indexOf(noteName);
+  }
+  if (noteIndex === -1) {
+    // Handle enharmonic equivalents
+    const enharmonics = { 'Db': 1, 'Eb': 3, 'Gb': 6, 'Ab': 8, 'Bb': 10, 'C#': 1, 'D#': 3, 'F#': 6, 'G#': 8, 'A#': 10 };
+    noteIndex = enharmonics[noteName];
   }
 
-  if (noteIndex === -1) return pitch;
+  if (noteIndex === undefined || noteIndex === -1) return pitch;
 
-  // Calculate new position (steps are half-steps for now)
+  // Calculate new position (steps are half-steps)
   let newIndex = noteIndex + steps;
   let newOctave = octaveNum;
 
@@ -341,6 +352,12 @@ export function initEnhancedNotation(options = {}) {
       moves.forEach(move => {
         const isPitchSpecific = move.pitchIndex !== null && move.pitchIndex !== undefined;
 
+        // BASS TRANSPOSITION DEBUG LOGGING
+        if (move.staff === 'bass') {
+          console.log('[BASS TRANSPOSE] === START ===');
+          console.log('[BASS TRANSPOSE] Move request:', { measureIndex: move.measureIndex, noteIndex: move.noteIndex, steps: move.steps, pitchIndex: move.pitchIndex });
+        }
+
         // 1. Update compositionState
         if (notationComposer.compositionState) {
           const measure = notationComposer.compositionState.getMeasure(move.measureIndex);
@@ -351,11 +368,20 @@ export function initEnhancedNotation(options = {}) {
                 (notationComposer.compositionState.getActiveVoiceIndexForStaff ? notationComposer.compositionState.getActiveVoiceIndexForStaff(move.staff) : 0);
             const note = measure.notation[voiceKey]?.voices[voiceIndex]?.notes[move.noteIndex];
 
+            // BASS DEBUG: Log state before transposition
+            if (move.staff === 'bass') {
+              console.log('[BASS TRANSPOSE] Note BEFORE:', JSON.stringify({ pitch: note?.pitch, pitches: note?.pitches }));
+              console.log('[BASS TRANSPOSE] Measure chord:', measure.chord?.name, 'chordIndex:', measure.chord?.chordIndex);
+            }
+
             if (note && move.steps !== 0) {
+              // Get key signature for proper accidental spelling (sharps vs flats)
+              const keySignature = notationComposer.compositionState?.metadata?.key || 'C';
+
               if (isPitchSpecific && note.pitches && note.pitches.length > 1) {
                 // Pitch-specific transposition: only transpose the selected pitch within the chord
                 const currentPitch = note.pitches[move.pitchIndex];
-                const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff);
+                const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff, keySignature);
                 console.log('[NotationInit] Transposing single pitch in chord from', currentPitch, 'to', newPitch, 'at index', move.pitchIndex);
                 note.pitches[move.pitchIndex] = newPitch;
                 // Update pitch property to the transposed pitch (for playback highlighting)
@@ -363,44 +389,78 @@ export function initEnhancedNotation(options = {}) {
               } else {
                 // Whole note/chord transposition: transpose all pitches
                 const currentPitch = note.pitch || note.pitches?.[0] || 'C4';
-                const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff);
+                const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff, keySignature);
                 console.log('[NotationInit] Transposing whole note/chord from', currentPitch, 'to', newPitch);
 
                 if (note.pitches) {
-                  note.pitches = note.pitches.map(p => transposePitchBySteps(p, move.steps, move.staff));
+                  note.pitches = note.pitches.map(p => transposePitchBySteps(p, move.steps, move.staff, keySignature));
                 }
                 // CRITICAL: Always update pitch property for playback
                 note.pitch = newPitch;
+              }
+
+              // BASS DEBUG: Log state after transposition
+              if (move.staff === 'bass') {
+                console.log('[BASS TRANSPOSE] Note AFTER:', JSON.stringify({ pitch: note?.pitch, pitches: note?.pitches }));
+                // Verify the note object is the same as measure.notation.bass.voices[0].notes[0]
+                const measureNote = measure.notation.bass?.voices?.[0]?.notes?.[move.noteIndex];
+                console.log('[BASS TRANSPOSE] measureNote AFTER:', JSON.stringify({ pitch: measureNote?.pitch, pitches: measureNote?.pitches }));
+                console.log('[BASS TRANSPOSE] Same object?', note === measureNote);
+                // Log IMMEDIATELY after to catch any mutation
+                setTimeout(() => {
+                  console.log('[BASS TRANSPOSE] 0ms later - measureNote:', JSON.stringify({ pitch: measureNote?.pitch, pitches: measureNote?.pitches }));
+                }, 0);
               }
             }
           }
         }
 
-        // 2. Update measureManager
+        // 2. Update measureManager - SKIP if this is the same note object as compositionState
+        // (they share references, so transposing again would double-transpose!)
         if (notationComposer.measureManager?.measures) {
-          const measure = notationComposer.measureManager.measures[move.measureIndex];
-          if (measure) {
+          const mmMeasure = notationComposer.measureManager.measures[move.measureIndex];
+          if (mmMeasure) {
             const notesArray = move.staff === 'treble' ? 'trebleNotes' : 'bassNotes';
-            const note = measure[notesArray]?.[move.noteIndex];
+            const mmNote = mmMeasure[notesArray]?.[move.noteIndex];
 
-            if (note && move.steps !== 0) {
-              if (isPitchSpecific && note.pitches && note.pitches.length > 1) {
+            // Get the compositionState note to check if it's the same object
+            const csMeasure = notationComposer.compositionState?.getMeasure(move.measureIndex);
+            const voicesKey = move.staff === 'treble' ? 'treble' : 'bass';
+            const csNote = csMeasure?.notation?.[voicesKey]?.voices?.[0]?.notes?.[move.noteIndex];
+
+            // Check if the pitches arrays are the same reference
+            const sameArray = mmNote?.pitches === csNote?.pitches;
+
+            if (move.staff === 'bass') {
+              console.log('[BASS TRANSPOSE] measureManager note pitches:', JSON.stringify(mmNote?.pitches));
+              console.log('[BASS TRANSPOSE] compositionState note pitches:', JSON.stringify(csNote?.pitches));
+              console.log('[BASS TRANSPOSE] Same pitches array?', sameArray);
+            }
+
+            // ONLY transpose if the arrays are different (not shared references)
+            if (mmNote && move.steps !== 0 && !sameArray) {
+              // Get key signature for proper accidental spelling (sharps vs flats)
+              const keySignature = notationComposer.compositionState?.metadata?.key || 'C';
+
+              if (isPitchSpecific && mmNote.pitches && mmNote.pitches.length > 1) {
                 // Pitch-specific transposition
-                const currentPitch = note.pitches[move.pitchIndex];
-                const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff);
-                note.pitches[move.pitchIndex] = newPitch;
-                note.pitch = note.pitches[0];
+                const currentPitch = mmNote.pitches[move.pitchIndex];
+                const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff, keySignature);
+                mmNote.pitches[move.pitchIndex] = newPitch;
+                mmNote.pitch = mmNote.pitches[0];
               } else {
                 // Whole note/chord transposition
-                const currentPitch = note.pitch || note.pitches?.[0] || 'C4';
-                const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff);
+                const currentPitch = mmNote.pitch || mmNote.pitches?.[0] || 'C4';
+                const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff, keySignature);
 
-                if (note.pitches) {
-                  note.pitches = note.pitches.map(p => transposePitchBySteps(p, move.steps, move.staff));
+                if (mmNote.pitches) {
+                  mmNote.pitches = mmNote.pitches.map(p => transposePitchBySteps(p, move.steps, move.staff, keySignature));
                 }
                 // CRITICAL: Always update pitch property for playback
-                note.pitch = newPitch;
+                mmNote.pitch = newPitch;
               }
+            } else if (sameArray && move.staff === 'bass') {
+              console.log('[BASS TRANSPOSE] SKIPPING measureManager transposition - same array reference!');
             }
           }
         }
@@ -437,14 +497,52 @@ export function initEnhancedNotation(options = {}) {
             if (measure && measure.notation?.bass) {
               // Mark as user-edited (not auto-generated)
               measure.notation.bass.autoGenerated = false;
+
+              // BASS DEBUG: Log what's in the measure BEFORE saving
+              const bassNotes = measure.notation.bass.voices?.[0]?.notes || [];
+              console.log('[BASS TRANSPOSE] Measure', move.measureIndex, 'bass notes BEFORE save:', JSON.stringify(bassNotes.map(n => ({ pitch: n.pitch, pitches: n.pitches }))));
+
               // Save the entire building block for this chord
               notationComposer.compositionState.saveEditedBassNotesForMeasure(move.measureIndex);
+
+              // BASS DEBUG: Log what's in the building block AFTER saving
+              const chordIndex = measure.chord?.chordIndex;
+              if (chordIndex !== undefined) {
+                const block = notationComposer.compositionState.bassBlockSequence?.blocks?.[chordIndex];
+                if (block) {
+                  const blockNotes = block.getNotes ? block.getNotes() : [];
+                  console.log('[BASS TRANSPOSE] Building block', chordIndex, 'notes AFTER save:', blockNotes.map(n => ({ pitches: n.pitches, startUnit: n.startUnit })));
+                }
+              }
             }
+          }
+        });
+
+        // BASS DEBUG: Log final state before render
+        console.log('[BASS TRANSPOSE] === BEFORE RENDER ===');
+        moves.forEach(move => {
+          if (move.staff === 'bass') {
+            const measure = notationComposer.compositionState.getMeasure(move.measureIndex);
+            const bassNotes = measure?.notation?.bass?.voices?.[0]?.notes || [];
+            console.log('[BASS TRANSPOSE] Final measure', move.measureIndex, 'bass:', bassNotes.map(n => ({ pitch: n.pitch, pitches: n.pitches })));
           }
         });
       }
 
       notationComposer.render();
+
+      // BASS DEBUG: Log what got rendered
+      if (hasBassMoves && notationComposer.compositionState) {
+        console.log('[BASS TRANSPOSE] === AFTER RENDER ===');
+        moves.forEach(move => {
+          if (move.staff === 'bass') {
+            const measure = notationComposer.compositionState.getMeasure(move.measureIndex);
+            const bassNotes = measure?.notation?.bass?.voices?.[0]?.notes || [];
+            console.log('[BASS TRANSPOSE] Rendered measure', move.measureIndex, 'bass:', bassNotes.map(n => ({ pitch: n.pitch, pitches: n.pitches })));
+          }
+        });
+        console.log('[BASS TRANSPOSE] === END ===');
+      }
 
       // Update note regions after move
       if (notationComposer.noteRegions) {

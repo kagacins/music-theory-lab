@@ -1122,6 +1122,7 @@ export class NotationComposer {
         timeSignature: timeSig,
         showMeasureNumbers: this.config.showMeasureNumbers,
         startMeasureNumber: startMeasure + 1, // Measure numbers are 1-based
+        globalMeasureOffset: startMeasure, // For chord bracket positioning on multi-page
         // Highlighting options
         selectedMeasureIndex: this.selectedMeasureIndex - startMeasure, // Adjust for page offset
         activeMeasureIndex: this.activeMeasureIndex - startMeasure, // Adjust for page offset
@@ -1268,6 +1269,7 @@ export class NotationComposer {
       timeSignature: timeSig,
       showMeasureNumbers: this.config.showMeasureNumbers,
       startMeasureNumber: startMeasure + 1, // Measure numbers are 1-based
+      globalMeasureOffset: startMeasure, // For chord bracket positioning on multi-page
       // Highlighting options
       selectedMeasureIndex: this.selectedMeasureIndex - startMeasure, // Adjust for page offset
       activeMeasureIndex: this.activeMeasureIndex - startMeasure, // Adjust for page offset

@@ -596,6 +596,7 @@ export class BuildingBlock {
      * @param {Object} attributes - All musical attributes (see Unit class for options)
      */
     setNote(startUnit, durationUnits, pitches, attributes = {}) {
+        console.log('[BuildingBlock.setNote] startUnit:', startUnit, 'pitches:', JSON.stringify(pitches));
         const endUnit = Math.min(startUnit + durationUnits, this.units.length);
 
         // First unit is the note start - gets all attributes
@@ -658,7 +659,7 @@ export class BuildingBlock {
                         break;
                     }
                 }
-                console.log(`[BuildingBlock.getNotes]   Note at startUnit=${startUnit}, durationUnits=${durationUnits} (${durationUnits/UNITS_PER_BEAT} beats)`);
+                console.log(`[BuildingBlock.getNotes]   Note at startUnit=${startUnit}, durationUnits=${durationUnits}, pitches=${JSON.stringify(unit.pitches)}`);
 
                 // Build note object with all attributes from the start unit
                 const note = {

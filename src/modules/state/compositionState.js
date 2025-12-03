@@ -862,12 +862,14 @@ export class CompositionState {
      * for multi-voice bass notation support.
      */
     renderBassBlocksToMeasures() {
+        console.log('[renderBassBlocksToMeasures] === CALLED ===');
         if (this.bassBlockSequence.blocks.length === 0) {
             return;
         }
 
         // Get rendered measures from the sequence
         const renderedMeasures = this.bassBlockSequence.renderToMeasures();
+        console.log('[renderBassBlocksToMeasures] Rendered from blocks:', renderedMeasures.map((m, i) => ({ measureIndex: i, pitches: m.bassNotes.map(n => n.pitches) })));
 
         // Ensure we have enough measures
         while (this.measures.length < renderedMeasures.length) {
@@ -891,7 +893,8 @@ export class CompositionState {
                 // MULTI-VOICE: Only update voices[0], preserve voices[1+]
                 measure.notation.bass.voices[0].notes = renderedMeasure.bassNotes.map(note => ({
                     type: note.isRest ? 'rest' : 'note',
-                    pitches: note.pitches,
+                    pitch: note.pitches?.[0] || null, // Keep pitch in sync with pitches[0]
+                    pitches: note.pitches ? [...note.pitches] : [], // CRITICAL: Copy array to avoid shared reference with building block
                     duration: note.duration,
                     beat: note.beat,
                     dotted: note.duration?.includes('.') || false,
@@ -959,6 +962,7 @@ export class CompositionState {
      * IMPORTANT: Call this BEFORE reordering blocks to capture current edits
      */
     syncMeasuresToBuildingBlocks() {
+        console.log('[syncMeasuresToBuildingBlocks] === CALLED ===');
         if (this.bassBlockSequence.blocks.length === 0) {
             return;
         }
@@ -1007,8 +1011,10 @@ export class CompositionState {
                 const beatInChord = absoluteNoteBeat - chordStart;
 
 
+                const pitchesToSave = note.pitches || (note.pitch ? [note.pitch] : []);
+                console.log('[syncMeasuresToBuildingBlocks] Collecting note from measure', measureIndex, '- chordIndex:', noteChordIndex, 'pitches:', JSON.stringify(pitchesToSave), 'note.pitch:', note.pitch);
                 chordNotes.get(noteChordIndex).push({
-                    pitches: note.pitches || (note.pitch ? [note.pitch] : []),
+                    pitches: pitchesToSave,
                     duration: note.duration || '4n',
                     beat: beatInChord,
                     isRest: note.isRest || note.type === 'rest',
@@ -1182,6 +1188,7 @@ export class CompositionState {
                     // Note fits in current measure - no split needed
                     const noteToAdd = {
                         type: noteEntry.type || 'note',
+                        pitch: noteEntry.pitches?.[0] || null, // Keep pitch in sync with pitches[0]
                         pitches: [...noteEntry.pitches],
                         duration: noteEntry.duration,
                         beat: beatInMeasure,
@@ -1203,6 +1210,7 @@ export class CompositionState {
                     const firstPartDuration = beatsToDuration(remainingInMeasure);
                     const firstNote = {
                         type: noteEntry.type || 'note',
+                        pitch: noteEntry.pitches?.[0] || null, // Keep pitch in sync with pitches[0]
                         pitches: [...noteEntry.pitches],
                         duration: firstPartDuration,
                         beat: beatInMeasure,
@@ -1226,6 +1234,7 @@ export class CompositionState {
                     const secondPartDuration = beatsToDuration(secondPartBeats);
                     const secondNote = {
                         type: noteEntry.type || 'note',
+                        pitch: noteEntry.pitches?.[0] || null, // Keep pitch in sync with pitches[0]
                         pitches: [...noteEntry.pitches],
                         duration: secondPartDuration,
                         beat: 0,
@@ -3068,10 +3077,17 @@ export class CompositionState {
     syncWithProgressionData(progressionData, options = {}) {
         // Prevent recursive calls
         if (this._isSyncing) {
+            console.log('[syncWithProgressionData] BLOCKED - already syncing');
             return;
         }
 
         this._isSyncing = true;
+
+        // Log caller info to help debug unnecessary calls
+        const caller = new Error().stack?.split('\n')[2]?.trim() || 'unknown';
+        const chordCount = progressionData?.length || 0;
+        const existingCount = this.storedProgressionData?.length || 0;
+        console.log(`[syncWithProgressionData] Called with ${chordCount} chords (was ${existingCount}). Caller: ${caller}`);
 
         try {
             // Update metadata if provided
@@ -3256,15 +3272,17 @@ export class CompositionState {
 
         // Detect if this is a completely new progression (different chord count or different roots)
         // In that case, we need to reinitialize the bass blocks from scratch
-        const needsReinitialize = this.bassBlockSequence.blocks.length === 0 ||
-            this.bassBlockSequence.blocks.length !== progressionData.length ||
-            progressionData.some((chord, i) => {
-                const block = this.bassBlockSequence.blocks[i];
-                // If roots don't match, it's a new progression
-                return block && block.chord && chord.root !== block.chord.root;
-            });
+        const blockCountDiffers = this.bassBlockSequence.blocks.length !== progressionData.length;
+        const rootsDiffer = progressionData.some((chord, i) => {
+            const block = this.bassBlockSequence.blocks[i];
+            return block && block.chord && chord.root !== block.chord.root;
+        });
+        const needsReinitialize = this.bassBlockSequence.blocks.length === 0 || blockCountDiffers || rootsDiffer;
+
+        console.log(`[syncWithProgressionData] needsReinitialize=${needsReinitialize} (blockCount: ${this.bassBlockSequence.blocks.length}->${progressionData.length}, rootsDiffer=${rootsDiffer})`);
 
         if (needsReinitialize) {
+            console.log('[syncWithProgressionData] REINITIALIZING bass blocks - edits may be lost unless preserved in lhNotes');
             // Clear existing blocks and reinitialize from progression
             this.bassBlockSequence.blocks = [];
             this.initializeBassBlockSequence(progressionData);
@@ -3753,6 +3771,11 @@ export class CompositionState {
             return false;
         }
 
+        // Sync any edits from measures back to blocks before structural change
+        if (this.bassBlockSequence?.blocks?.length > 0) {
+            this.syncMeasuresToBuildingBlocks();
+        }
+
         // Insert the new chord
         progressionData.splice(atIndex, 0, { ...chordData });
 
@@ -3781,6 +3804,11 @@ export class CompositionState {
         // Validate index
         if (atIndex < 0 || atIndex >= progressionData.length) {
             return false;
+        }
+
+        // Sync any edits from measures back to blocks before structural change
+        if (this.bassBlockSequence?.blocks?.length > 0) {
+            this.syncMeasuresToBuildingBlocks();
         }
 
         // Remove the chord
@@ -3813,7 +3841,8 @@ export class CompositionState {
         const endBeat = startBeat + segment.durationBeats;
 
         let currentBeat = 0;
-        for (const measure of this.measures) {
+        for (let measureIndex = 0; measureIndex < this.measures.length; measureIndex++) {
+            const measure = this.measures[measureIndex];
             // Gather from ALL treble voices
             const voices = measure.notation.treble.voices || [];
             voices.forEach((voice, voiceIndex) => {
@@ -3827,6 +3856,7 @@ export class CompositionState {
                         trebleNotes.push({
                             ...note,
                             voiceIndex,
+                            sourceMeasure: measureIndex, // Track which measure this note is from
                             absoluteBeat: noteBeat,
                             relativeBeat: noteBeat - startBeat, // Beat within segment
                         });
