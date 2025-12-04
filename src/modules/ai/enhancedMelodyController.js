@@ -557,6 +557,7 @@ function handleGeneratePhrases() {
 /**
  * Build chord sequence for phrase generation
  * Maps note indices to their landing chords based on rhythm and chord timeline
+ * Now includes duration information for each chord segment
  */
 function buildChordSequenceForPhrase(measureIndex, noteIndex) {
     const timeline = buildChordTimeline();
@@ -577,31 +578,39 @@ function buildChordSequenceForPhrase(measureIndex, noteIndex) {
     const rhythm = rhythmPattern.getPattern(phraseLength.notes);
 
     // Map each note index to its chord
-    const chordSequence = [];
     let currentBeat = startBeat;
     const baseTime = 0.5; // rhythm value 1 = half beat
 
-    // Group note indices by chord
+    // Group note indices by chord, preserving timeline entry info including duration
     const chordGroups = new Map();
 
     for (let i = 0; i < rhythm.length; i++) {
-        // Find chord at this beat
-        let chordAtBeat = null;
+        // Find chord at this beat - get the full timeline entry with duration
+        let timelineEntry = null;
         for (const entry of timeline) {
             if (currentBeat >= entry.startBeat && currentBeat < entry.endBeat) {
-                chordAtBeat = entry.chord;
+                timelineEntry = entry;
                 break;
             }
         }
         // If past end, use last chord
-        if (!chordAtBeat && timeline.length > 0) {
-            chordAtBeat = timeline[timeline.length - 1].chord;
+        if (!timelineEntry && timeline.length > 0) {
+            timelineEntry = timeline[timeline.length - 1];
         }
 
-        if (chordAtBeat) {
-            const chordKey = `${chordAtBeat.root}-${chordAtBeat.type}`;
+        if (timelineEntry && timelineEntry.chord) {
+            const chordAtBeat = timelineEntry.chord;
+            const chordKey = `${chordAtBeat.root}-${chordAtBeat.type}-${timelineEntry.startBeat}`;
             if (!chordGroups.has(chordKey)) {
-                chordGroups.set(chordKey, { chord: chordAtBeat, noteIndices: [] });
+                chordGroups.set(chordKey, {
+                    chord: chordAtBeat,
+                    noteIndices: [],
+                    // Include duration info from the timeline entry
+                    duration: timelineEntry.durationBeats || timelineEntry.duration || (timelineEntry.endBeat - timelineEntry.startBeat) || 4,
+                    beats: timelineEntry.durationBeats || timelineEntry.duration || (timelineEntry.endBeat - timelineEntry.startBeat) || 4,
+                    startBeat: timelineEntry.startBeat,
+                    endBeat: timelineEntry.endBeat
+                });
             }
             chordGroups.get(chordKey).noteIndices.push(i);
         }

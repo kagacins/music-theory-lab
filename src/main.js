@@ -31,6 +31,10 @@ import { initWhyThisWorksPanel } from './modules/ui/whyThisWorksPanel.js';
 import { openManualChordEntryModal, closeManualChordEntryModal } from './modules/ui/manualChordEntryModal.js';
 import { showAutoHarmonizeModal } from './modules/ui/autoHarmonizeModal.js';
 import { showTensionOptimizerModal } from './modules/ui/tensionOptimizerModal.js';
+// Phase 1.3 & Phase 2: Interactive Learning Tools
+import { showChordComparisonModal } from './modules/ui/chordComparisonModal.js';
+import { showWhatIfSandbox } from './modules/ui/whatIfSandbox.js';
+import { initChordFunctionLegend, showLegend as showChordFunctionLegend, hideLegend as hideChordFunctionLegend, toggleLegend as toggleChordFunctionLegend } from './modules/ui/chordFunctionLegend.js';
 import { initCircleOfFifths, toggleCircleOfFifthsPanel, openCircleOfFifthsPanel, closeCircleOfFifthsPanel } from './modules/features/circleOfFifths.js';
 import { initGuitarFretboard, toggleGuitarFretboardPanel, openGuitarFretboardPanel, closeGuitarFretboardPanel, updateGuitarFretboard } from './modules/features/guitarFretboard.js';
 import {
@@ -1024,6 +1028,13 @@ window.toggleDisplayPanel = toggleDisplayPanel;
 window.handleOctaveRangeChange = handleOctaveRangeChange;
 window.updateRecommendations = updateUnifiedSuggestions;
 window.updateUnifiedSuggestions = updateUnifiedSuggestions;
+
+// Phase 1.3 & Phase 2: Interactive Learning Tools
+window.showChordComparisonModal = showChordComparisonModal;
+window.showWhatIfSandbox = showWhatIfSandbox;
+window.showChordFunctionLegend = showChordFunctionLegend;
+window.hideChordFunctionLegend = hideChordFunctionLegend;
+window.toggleChordFunctionLegend = toggleChordFunctionLegend;
 
 // Drag & Drop helpers (shock/refresh)
 function refreshDragDrop() {
@@ -2714,6 +2725,8 @@ window.onload = () => {
         initUnifiedSuggestionsPanel();
         // Initialize Why This Works panel (educational explanations)
         initWhyThisWorksPanel();
+        // Phase 1.3: Initialize Chord Function Color Legend
+        initChordFunctionLegend();
     }, 200);
 
     // Restore panel states FIRST, before initializing sidebar system

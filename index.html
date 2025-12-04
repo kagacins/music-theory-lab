@@ -727,10 +727,21 @@
                                     </button>
                                 </div>
                             </div>
-                            <button onclick="window.showFullAnalysisModal && window.showFullAnalysisModal()"
-                                    class="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded transition ml-2">
-                                Details
-                            </button>
+                            <!-- Interactive Learning Tools (Phase 2) -->
+                            <div class="flex items-center gap-1.5">
+                                <button onclick="window.showWhatIfSandbox && window.showWhatIfSandbox()"
+                                        class="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded transition flex items-center gap-1" title="What If Lab - Experiment with transformations">
+                                    <span>What If</span>
+                                </button>
+                                <button onclick="window.toggleChordFunctionLegend && window.toggleChordFunctionLegend()"
+                                        class="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded transition flex items-center gap-1" title="Toggle chord function color legend">
+                                    <span>Colors</span>
+                                </button>
+                                <button onclick="window.showFullAnalysisModal && window.showFullAnalysisModal()"
+                                        class="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded transition">
+                                    Details
+                                </button>
+                            </div>
                         </div>
 
 

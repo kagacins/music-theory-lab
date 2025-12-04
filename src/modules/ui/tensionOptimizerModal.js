@@ -5,6 +5,7 @@
 
 import { getTensionOptimizer, EXTENSION_TYPES } from '../analysis/TensionOptimizer.js';
 import { getTensionArcPlanner, TENSION_ARC_TEMPLATES } from '../analysis/TensionArcPlanner.js';
+import { getTensionArcUI } from './TensionArcUI.js';
 import { getProgressionData, setProgressionData, getCurrentKey } from '../state/trainerState.js';
 import { saveState, pushToUndoStack } from '../utils/undoRedo.js';
 import { getInvertedChordNotes } from '../utils/noteUtils.js';
@@ -280,6 +281,11 @@ function updateTemplateDescription(templateKey) {
  * @returns {Object} Options object
  */
 function getOptionsFromUI() {
+    // Get expected length from the TensionArcUI to ensure consistency
+    // between the UI curve display and the optimizer calculations
+    const tensionUI = getTensionArcUI();
+    const expectedLength = tensionUI?.expectedLength || null;
+
     return {
         optimizeInversions: modalElement.querySelector('#opt-inversions').checked,
         suggestExtensions: modalElement.querySelector('#opt-extensions').checked,
@@ -290,7 +296,8 @@ function getOptionsFromUI() {
             allowDiminished: modalElement.querySelector('#ext-diminished').checked,
             allowChromatic: modalElement.querySelector('#ext-chromatic').checked
         },
-        toleranceThreshold: 0.15
+        toleranceThreshold: 0.15,
+        expectedLength: expectedLength // Pass expected length for consistent position calculation
     };
 }
 
@@ -344,11 +351,17 @@ function buildAlternatives(mod, index) {
     const chord = progression[index];
     const key = getCurrentKey() || 'C';
     const planner = getTensionArcPlanner();
+    const tensionUI = getTensionArcUI();
+
+    // Use expected length from UI for consistent position calculation with the displayed curve
+    const expectedLength = tensionUI?.expectedLength || progression.length;
 
     // Get context for tension calculation
+    // Use expectedLength in the context so tension calculations match the target curve
     const context = {
         positionInProgression: index,
-        totalChords: progression.length
+        totalChords: progression.length,
+        expectedLength: expectedLength // For position-based calculations
     };
 
     // Add inversion alternatives

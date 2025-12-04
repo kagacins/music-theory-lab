@@ -209,39 +209,66 @@ function getChordFunction(roman) {
 
 /**
  * Get color classes for roman numeral based on harmonic function
- * PHASE 3.3: Color-coded harmonic analysis
+ * Per INTERACTIVE_LEARNING_PLAN.md Section 1.3:
+ *   🟢 GREEN = "Home Base" (Tonic) - I, vi, iii
+ *   🔵 BLUE = "Journey" (Subdominant) - IV, ii
+ *   🔴 RED = "Tension" (Dominant) - V, vii°
+ *   🟣 PURPLE = Borrowed/Modal Interchange
  * @param {string} roman - Roman numeral
- * @returns {object} Object with romanColor and functionColor CSS classes
+ * @returns {object} Object with romanColor, functionColor, bgColor, borderColor, function, hexColor
  */
 function getFunctionColors(roman) {
     const func = getChordFunction(roman);
 
+    // Check if it's a borrowed chord (has flat or sharp prefix)
+    const isBorrowed = roman && (roman.includes('♭') || roman.includes('#') || roman.includes('b'));
+
     const colorMap = {
         'Tonic': {
-            romanColor: 'text-blue-600 dark:text-blue-400',
-            functionColor: 'text-blue-500 dark:text-blue-400',
-            bgColor: 'bg-blue-100 dark:bg-blue-900',
-            borderColor: 'border-blue-300 dark:border-blue-700'
+            function: 'Tonic',
+            romanColor: 'text-emerald-600 dark:text-emerald-400',
+            functionColor: 'text-emerald-500 dark:text-emerald-400',
+            bgColor: 'bg-emerald-100 dark:bg-emerald-900/50',
+            borderColor: 'border-emerald-400 dark:border-emerald-600',
+            hexColor: '#10b981' // emerald-500
         },
         'Dominant': {
+            function: 'Dominant',
             romanColor: 'text-red-600 dark:text-red-400',
             functionColor: 'text-red-500 dark:text-red-400',
-            bgColor: 'bg-red-100 dark:bg-red-900',
-            borderColor: 'border-red-300 dark:border-red-700'
+            bgColor: 'bg-red-100 dark:bg-red-900/50',
+            borderColor: 'border-red-400 dark:border-red-600',
+            hexColor: '#ef4444' // red-500
         },
         'Subdominant': {
-            romanColor: 'text-green-600 dark:text-green-400',
-            functionColor: 'text-green-500 dark:text-green-400',
-            bgColor: 'bg-green-100 dark:bg-green-900',
-            borderColor: 'border-green-300 dark:border-green-700'
+            function: 'Subdominant',
+            romanColor: 'text-blue-600 dark:text-blue-400',
+            functionColor: 'text-blue-500 dark:text-blue-400',
+            bgColor: 'bg-blue-100 dark:bg-blue-900/50',
+            borderColor: 'border-blue-400 dark:border-blue-600',
+            hexColor: '#3b82f6' // blue-500
         }
     };
 
+    // Borrowed/Modal interchange chords get purple
+    if (isBorrowed) {
+        return {
+            function: 'Borrowed',
+            romanColor: 'text-purple-600 dark:text-purple-400',
+            functionColor: 'text-purple-500 dark:text-purple-400',
+            bgColor: 'bg-purple-100 dark:bg-purple-900/50',
+            borderColor: 'border-purple-400 dark:border-purple-600',
+            hexColor: '#8b5cf6' // purple-500
+        };
+    }
+
     return colorMap[func] || {
-        romanColor: 'text-indigo-700 dark:text-indigo-300',
-        functionColor: 'text-indigo-500 dark:text-indigo-400',
-        bgColor: 'bg-indigo-100 dark:bg-indigo-900',
-        borderColor: 'border-indigo-300 dark:border-indigo-700'
+        function: 'Unknown',
+        romanColor: 'text-gray-600 dark:text-gray-400',
+        functionColor: 'text-gray-500 dark:text-gray-400',
+        bgColor: 'bg-gray-100 dark:bg-gray-800',
+        borderColor: 'border-gray-400 dark:border-gray-600',
+        hexColor: '#6b7280' // gray-500
     };
 }
 
@@ -4002,6 +4029,13 @@ function createSimplifiedCardStructure(chord, index, key) {
                 <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/>
             </svg>
         </button>
+        <!-- Compare Options Button (Phase 2.1) -->
+        <button class="compare-btn bg-blue-500 hover:bg-blue-600 border-2 border-blue-400 rounded px-2 py-1.5 transition flex items-center justify-center shadow-md" title="Compare Options - Hear the Difference" data-card-index="${index}">
+            <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
+                <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path>
+            </svg>
+        </button>
     `;
 
     // Create card element - the HTML now includes the card wrapper and duration controls
@@ -4143,11 +4177,17 @@ function createSimplifiedCardHTML(chord, index, key) {
     const wholeBeats = Math.floor(totalBeats);
     const fractionalBeats = totalBeats - wholeBeats;
 
+    // Get function-based border color
+    const functionBorderStyle = colors.hexColor ? `border-color: ${colors.hexColor};` : '';
+    const functionTopBorderStyle = colors.hexColor ? `background: linear-gradient(to right, ${colors.hexColor}, ${colors.hexColor});` : '';
+
     return `
         <div class="relative inline-block">
-            <div class="simplified-card bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-700 rounded-xl overflow-hidden hover:border-indigo-500 transition-all shadow-lg relative" style="min-height: 80px;">
+            <div class="simplified-card bg-gradient-to-br from-gray-800 to-gray-900 border-2 rounded-xl overflow-hidden hover:shadow-xl transition-all shadow-lg relative" style="min-height: 80px; ${functionBorderStyle}">
+                <!-- Function color indicator bar at top -->
+                <div class="absolute top-0 left-0 right-0 h-1" style="${functionTopBorderStyle}"></div>
                 <!-- Inversion indicator (top-left corner) -->
-                ${inversionText ? `<div class="absolute top-1 left-1 text-xl text-red-400 font-bold">${inversionText}</div>` : ''}
+                ${inversionText ? `<div class="absolute top-2 left-1 text-xl text-red-400 font-bold">${inversionText}</div>` : ''}
 
                 <!-- Info icon (bottom-left corner) for touchscreen devices -->
                 <button class="info-tooltip-btn absolute bottom-1 left-1 w-5 h-5 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold transition" title="Show chord info">
@@ -4519,6 +4559,17 @@ function attachCardEventListeners(wrapper, index) {
             e.stopPropagation();
             if (window.showProgressionChordSuggestions) {
                 window.showProgressionChordSuggestions(index);
+            }
+        });
+    }
+
+    // Compare button (Phase 2.1: A/B Comparison)
+    const compareBtn = wrapper.querySelector('.compare-btn');
+    if (compareBtn) {
+        compareBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (window.showChordComparisonModal) {
+                window.showChordComparisonModal(index);
             }
         });
     }

@@ -4642,14 +4642,18 @@ function generateAndDisplayPhrases(container, chord, key) {
 
         if (isSectionModeWithChord) {
             // Calculate total duration from all selected chords
+            // Check for 'beats' (trainer state), 'duration', or 'durationBeats' (composition state)
             targetBeats = 0;
             chordSequence = [];
             for (let i = minChordIdx; i <= maxChordIdx && i < progressionData.length; i++) {
-                const chordDuration = progressionData[i].duration || 4; // Default 4 beats
+                const chordData = progressionData[i];
+                // Support multiple duration property names and fractional beats
+                const chordDuration = chordData.beats ?? chordData.duration ?? chordData.durationBeats ?? 4;
                 targetBeats += chordDuration;
                 chordSequence.push({
-                    chord: progressionData[i],
+                    chord: chordData,
                     duration: chordDuration,
+                    beats: chordDuration,
                     index: i
                 });
             }

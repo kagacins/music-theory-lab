@@ -536,11 +536,15 @@ export function generatePhrase({
     // Build chord timing map: for each chord, calculate which beat range it covers
     // This allows us to map note indices to chords based on their position in time
     let chordTimingMap = null;
+    let totalChordBeats = 0; // Track actual total beats from chord sequence
     if (chordSequence && chordSequence.length > 0) {
         chordTimingMap = [];
         let beatOffset = 0;
         for (const entry of chordSequence) {
-            const chordDuration = entry.duration || entry.beats || 4; // Default 4 beats
+            // Get duration from multiple possible sources, supporting fractional beats
+            const chordDuration = entry.duration || entry.beats || entry.durationBeats ||
+                                  (entry.endBeat !== undefined && entry.startBeat !== undefined ?
+                                   entry.endBeat - entry.startBeat : 4);
             chordTimingMap.push({
                 chord: entry.chord || entry,
                 startBeat: beatOffset,
@@ -549,7 +553,11 @@ export function generatePhrase({
             });
             beatOffset += chordDuration;
         }
+        totalChordBeats = beatOffset;
     }
+
+    // Use the actual total beats from chord sequence if available, otherwise use effectiveTargetBeats
+    const actualTotalBeats = totalChordBeats > 0 ? totalChordBeats : effectiveTargetBeats;
 
     // Helper to get chord for a specific note index
     // Maps note index to a beat position, then finds which chord covers that beat
@@ -558,9 +566,10 @@ export function generatePhrase({
             return chord; // Fall back to single chord
         }
 
-        // Calculate which beat this note falls on (evenly distributed across target beats)
+        // Calculate which beat this note falls on (evenly distributed across actual total beats)
         // Note index 0 = beat 0, note index (noteCount-1) = last beat
-        const beatPosition = (noteIndex / Math.max(1, noteCount - 1)) * effectiveTargetBeats;
+        // Use actualTotalBeats to properly map notes across chords of varying durations
+        const beatPosition = (noteIndex / Math.max(1, noteCount - 1)) * actualTotalBeats;
 
         // Find which chord covers this beat position
         for (const timing of chordTimingMap) {

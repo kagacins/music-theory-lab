@@ -252,7 +252,8 @@ export class TensionOptimizer {
             optimizeInversions = true,
             suggestExtensions = false,
             extensionOptions = {},
-            toleranceThreshold = 0.15 // Acceptable deviation from target
+            toleranceThreshold = 0.15, // Acceptable deviation from target
+            expectedLength = null // If set, use this for position calculation instead of progression.length
         } = options;
 
         if (!progression || progression.length === 0) {
@@ -265,10 +266,16 @@ export class TensionOptimizer {
             };
         }
 
+        // Use expectedLength if provided, otherwise use current progression length
+        // This ensures the optimizer uses the same position calculation as the UI curve
+        const effectiveLength = expectedLength || progression.length;
+
         const modifications = [];
         const optimizedProgression = progression.map((chord, index) => {
-            const normalizedPosition = progression.length > 1
-                ? index / (progression.length - 1)
+            // Calculate normalized position based on effective length
+            // This matches how TensionArcUI calculates positions for the target curve
+            const normalizedPosition = effectiveLength > 1
+                ? index / (effectiveLength - 1)
                 : 0;
 
             const targetTension = this.tensionPlanner.getTargetTensionAt(normalizedPosition);
