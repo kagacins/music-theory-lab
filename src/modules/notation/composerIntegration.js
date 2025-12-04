@@ -1060,6 +1060,11 @@ export class NotationComposer {
    * Render empty state
    */
   renderEmptyState() {
+    // Clear all pages if using multi-page rendering
+    if (this.pageManager) {
+      this.pageManager.clearAllPages();
+    }
+
     const container = this.config.container;
     if (!container) return;
 

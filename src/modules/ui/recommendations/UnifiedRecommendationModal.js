@@ -7,7 +7,17 @@
  */
 
 import { generateComprehensiveRecommendations } from '../../features/comprehensiveChordRecommendations.js';
-import { generateChordSequences, describeSequence, generateSequenceReason } from '../../features/chordSequences.js';
+import {
+    generateChordSequences,
+    generateSequencesWithRoot,
+    describeSequence,
+    generateSequenceReason,
+    TENSION_ARC_SHAPES,
+    generateTensionArcSequences,
+    suggestTensionArcForSection,
+    verifyMelodyCompatibility,
+    calculateMelodyAlignmentScore
+} from '../../features/chordSequences.js';
 import { SUGGESTION_STYLES, SUGGESTION_MOODS } from '../../features/unifiedChordSuggestions.js';
 import { CHORD_DEFINITIONS, INVERSION_NAMES, ALL_NOTES } from '../../../data/music-data.js';
 import {
@@ -316,6 +326,10 @@ let modalState = {
     rhythmAwarenessEnabled: localStorage.getItem('chord-suggestion-rhythm-awareness') !== 'false',
     lookbackDepth: parseInt(localStorage.getItem('chord-suggestion-lookback') || '4', 10),
     sequenceLength: parseInt(localStorage.getItem('chord-suggestion-sequence-length') || '4', 10),
+    // Tension arc shape for sequence generation (Enhancement H)
+    tensionArcShape: localStorage.getItem('chord-suggestion-tension-arc') || 'auto',
+    // Melody awareness toggle (Enhancement B)
+    melodyAwarenessEnabled: localStorage.getItem('chord-suggestion-melody-awareness') !== 'false',
     currentChordType: 'Major',
     currentRoot: 'C',
     selectedProgressionIndex: -1, // -1 = add after last chord
@@ -764,6 +778,41 @@ export function showUnifiedRecommendationModal(options = {}) {
     // This ensures sequence recommendations update when user saves weight settings
     document.addEventListener('chord-weights-changed', handlePreferenceChange);
 
+    // Listen for progression updates (when chords are cleared or modified)
+    // This ensures the modal re-renders when the underlying progression changes
+    const handleProgressionUpdate = (event) => {
+        // Only refresh if the modal is still in the DOM
+        if (!document.getElementById(MODAL_ID)) {
+            return;
+        }
+
+        // Update the modal state with new progression context
+        const progressionData = getProgressionData() || [];
+        if (progressionData.length === 0) {
+            // Reset to defaults when progression is cleared
+            modalState.selectedProgressionIndex = -1;
+            modalState.currentRoot = 'C';
+            modalState.currentChordType = 'Major';
+            modalState.activeInversion = 0;
+        } else if (modalState.selectedProgressionIndex >= progressionData.length) {
+            // Selected index is now out of bounds, reset to last chord
+            modalState.selectedProgressionIndex = progressionData.length - 1;
+            const lastChord = progressionData[modalState.selectedProgressionIndex];
+            modalState.currentRoot = lastChord.root;
+            modalState.currentChordType = lastChord.type;
+            modalState.activeInversion = lastChord.inversion || 0;
+        }
+
+        // Clear cached data
+        modalState.currentPhraseCandidates = [];
+        modalState.currentMelodySuggestions = [];
+
+        // Refresh the active tab
+        renderActiveTab();
+    };
+
+    window.addEventListener('progressionUpdated', handleProgressionUpdate);
+
     // Clean up event listeners when modal is removed
     const observer = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
@@ -771,6 +820,7 @@ export function showUnifiedRecommendationModal(options = {}) {
                 if (node === modal || node.contains?.(modal)) {
                     document.removeEventListener('chord-suggestion-preference-changed', handlePreferenceChange);
                     document.removeEventListener('chord-weights-changed', handlePreferenceChange);
+                    window.removeEventListener('progressionUpdated', handleProgressionUpdate);
                     observer.disconnect();
                     return;
                 }
@@ -2831,47 +2881,226 @@ function renderSequencesView(container) {
 
     container.appendChild(controlsRow);
 
-    // Generate sequences - determine tension direction from mood AND section intent
-    let tensionDirection = 'maintain';
-    if (modalState.mood === 'bright' || modalState.mood === 'calm') {
-        tensionDirection = 'resolve';
-    } else if (modalState.mood === 'tense' || modalState.mood === 'energetic') {
-        tensionDirection = 'build';
+    // Second row: Tension arc and melody awareness controls
+    const advancedControlsRow = document.createElement('div');
+    advancedControlsRow.style.cssText = `
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 10px;
+        background: #f3f4f6;
+        border-radius: 6px;
+    `;
+
+    // Tension Arc selector (Enhancement H)
+    const tensionArcControl = document.createElement('div');
+    tensionArcControl.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+
+    const tensionLabel = document.createElement('span');
+    tensionLabel.textContent = 'Tension Arc:';
+    tensionLabel.style.cssText = 'font-size: 12px; color: #6b7280;';
+    tensionArcControl.appendChild(tensionLabel);
+
+    const tensionSelect = document.createElement('select');
+    tensionSelect.style.cssText = `
+        padding: 4px 8px;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        font-size: 12px;
+        background: white;
+    `;
+
+    // Tension arc options
+    const tensionOptions = [
+        { value: 'auto', label: 'Auto (from section)' },
+        { value: 'flat', label: 'Flat (steady)' },
+        { value: 'ascending', label: 'Ascending (build)' },
+        { value: 'descending', label: 'Descending (release)' },
+        { value: 'arch', label: 'Arch (build & resolve)' },
+        { value: 'wave', label: 'Wave (varied)' },
+        { value: 'dramatic', label: 'Dramatic (peaks)' }
+    ];
+
+    tensionOptions.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.value;
+        option.textContent = opt.label;
+        if (opt.value === modalState.tensionArcShape) option.selected = true;
+        tensionSelect.appendChild(option);
+    });
+
+    tensionSelect.addEventListener('change', () => {
+        modalState.tensionArcShape = tensionSelect.value;
+        localStorage.setItem('chord-suggestion-tension-arc', tensionSelect.value);
+        showLoadingSplash(container);
+        setTimeout(() => renderSequencesView(container), 50);
+    });
+    tensionArcControl.appendChild(tensionSelect);
+    advancedControlsRow.appendChild(tensionArcControl);
+
+    // Melody Awareness toggle (Enhancement B)
+    const melodyAwarenessControl = document.createElement('div');
+    melodyAwarenessControl.style.cssText = 'display: flex; align-items: center; gap: 6px;';
+
+    const melodyCheckbox = document.createElement('input');
+    melodyCheckbox.type = 'checkbox';
+    melodyCheckbox.id = 'melody-awareness-checkbox';
+    melodyCheckbox.checked = modalState.melodyAwarenessEnabled;
+    melodyCheckbox.style.cssText = 'cursor: pointer;';
+
+    const melodyLabel = document.createElement('label');
+    melodyLabel.htmlFor = 'melody-awareness-checkbox';
+    melodyLabel.style.cssText = 'font-size: 12px; color: #6b7280; cursor: pointer;';
+
+    // Check if there's melody to be aware of
+    const hasMelody = compositionState?.getAllMelodyNotes?.()?.length > 0;
+    melodyLabel.textContent = hasMelody ? 'Match Melody' : 'Match Melody (no melody)';
+    melodyCheckbox.disabled = !hasMelody;
+    if (!hasMelody) {
+        melodyLabel.style.color = '#9ca3af';
     }
 
-    // Override tension direction based on section intent subMode
-    if (intent.mode === INTENT_MODES.CONTINUE) {
-        if (intent.subMode === CONTINUE_SUBMODES.FINAL || intent.subMode === CONTINUE_SUBMODES.CONCLUDING) {
+    melodyCheckbox.addEventListener('change', () => {
+        modalState.melodyAwarenessEnabled = melodyCheckbox.checked;
+        localStorage.setItem('chord-suggestion-melody-awareness', melodyCheckbox.checked ? 'true' : 'false');
+        showLoadingSplash(container);
+        setTimeout(() => renderSequencesView(container), 50);
+    });
+
+    melodyAwarenessControl.appendChild(melodyCheckbox);
+    melodyAwarenessControl.appendChild(melodyLabel);
+    advancedControlsRow.appendChild(melodyAwarenessControl);
+
+    container.appendChild(advancedControlsRow);
+
+    // Create a container for the sequence cards (will be populated async)
+    const sequencesContainer = document.createElement('div');
+    sequencesContainer.id = 'sequences-results-container';
+    container.appendChild(sequencesContainer);
+
+    // Show loading indicator immediately
+    sequencesContainer.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; color: #6b7280;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                <span style="font-size: 24px; animation: pulse 1.5s ease-in-out infinite;">🎵</span>
+                <span style="font-size: 24px; animation: pulse 1.5s ease-in-out infinite 0.2s;">🎶</span>
+                <span style="font-size: 24px; animation: pulse 1.5s ease-in-out infinite 0.4s;">🎵</span>
+            </div>
+            <div style="font-size: 14px; font-weight: 500;">Loading Recommendations...</div>
+            <div style="font-size: 12px; margin-top: 4px;">Please wait</div>
+        </div>
+        <style>
+            @keyframes pulse {
+                0%, 100% { opacity: 0.4; transform: scale(1); }
+                50% { opacity: 1; transform: scale(1.1); }
+            }
+        </style>
+    `;
+
+    // Generate sequences asynchronously to not block UI
+    setTimeout(() => {
+        // Determine tension direction from mood AND section intent
+        let tensionDirection = 'maintain';
+        if (modalState.mood === 'bright' || modalState.mood === 'calm') {
             tensionDirection = 'resolve';
-        } else if (intent.subMode === CONTINUE_SUBMODES.BUILDING) {
+        } else if (modalState.mood === 'tense' || modalState.mood === 'energetic') {
             tensionDirection = 'build';
         }
-    }
 
-    const sequences = generateChordSequences(
-        modalState.currentRoot,
-        modalState.currentChordType,
-        modalState.activeInversion,
-        progressionData,
-        key,
-        modalState.style,
-        modalState.mood,
-        tensionDirection,
-        modalState.lookbackDepth,
-        modalState.sequenceLength,
-        10,             // limit - show 10 sequences
-        sectionInfo,    // pass section intent for scoring
-        getContextAwareMode()  // pass context mode for weight calculation
-    );
+        // Override tension direction based on section intent subMode
+        if (intent.mode === INTENT_MODES.CONTINUE) {
+            if (intent.subMode === CONTINUE_SUBMODES.FINAL || intent.subMode === CONTINUE_SUBMODES.CONCLUDING) {
+                tensionDirection = 'resolve';
+            } else if (intent.subMode === CONTINUE_SUBMODES.BUILDING) {
+                tensionDirection = 'build';
+            }
+        }
 
-    if (!sequences || sequences.length === 0) {
-        const emptyMsg = document.createElement('div');
-        emptyMsg.style.cssText = 'text-align: center; color: #6b7280; padding: 24px;';
-        emptyMsg.textContent = 'No sequence recommendations available. Try adjusting style or mood.';
-        container.appendChild(emptyMsg);
-        return;
-    }
+        // Enhancement B: Build melody options if melody awareness is enabled
+        let melodyOptions = null;
+        const hasMelodyNotes = compositionState?.getAllMelodyNotes?.()?.length > 0;
+        if (modalState.melodyAwarenessEnabled && hasMelodyNotes) {
+            const allMelodyNotes = compositionState.getAllMelodyNotes();
+            // Calculate the starting measure for the sequence (where the new chords will go)
+            const startMeasure = progressionData.length;
+            melodyOptions = {
+                melodyData: allMelodyNotes,
+                startMeasure: startMeasure
+            };
+        }
 
+        // Enhancement H: Use tension arc sequences if a specific arc is selected
+        let sequences;
+        if (modalState.tensionArcShape !== 'auto' && TENSION_ARC_SHAPES[modalState.tensionArcShape]) {
+            // Generate target tension arc based on selected shape
+            const targetArc = TENSION_ARC_SHAPES[modalState.tensionArcShape](modalState.sequenceLength);
+
+            sequences = generateTensionArcSequences(
+                modalState.currentRoot,
+                modalState.currentChordType,
+                modalState.activeInversion,
+                progressionData,
+                key,
+                targetArc,
+                {
+                    style: modalState.style,
+                    mood: modalState.mood,
+                    topN: 10,
+                    sectionInfo: sectionInfo,
+                    contextMode: getContextAwareMode(),
+                    melodyOptions: melodyOptions
+                }
+            );
+        } else {
+            // Use standard generation (auto mode uses section-suggested arc internally)
+            sequences = generateChordSequences(
+                modalState.currentRoot,
+                modalState.currentChordType,
+                modalState.activeInversion,
+                progressionData,
+                key,
+                modalState.style,
+                modalState.mood,
+                tensionDirection,
+                modalState.lookbackDepth,
+                modalState.sequenceLength,
+                10,             // limit - show 10 sequences
+                sectionInfo,    // pass section intent for scoring
+                getContextAwareMode(),  // pass context mode for weight calculation
+                melodyOptions   // Enhancement B: pass melody options
+            );
+        }
+
+        // Clear loading indicator
+        sequencesContainer.innerHTML = '';
+
+        if (!sequences || sequences.length === 0) {
+            sequencesContainer.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 24px;">No sequence recommendations available. Try adjusting style or mood.</div>';
+            return;
+        }
+
+        // Enhancement F: Calculate melody compatibility for each sequence if we have melody
+        if (hasMelodyNotes) {
+            const allMelodyNotes = compositionState.getAllMelodyNotes();
+            const startMeasure = progressionData.length;
+            sequences.forEach(seq => {
+                const compatibility = verifyMelodyCompatibility(seq.chords, allMelodyNotes, startMeasure, key);
+                seq.melodyCompatibility = compatibility;
+            });
+        }
+
+        // Render sequence cards
+        renderSequenceCards(sequencesContainer, sequences, currentChord, currentSymbol, key, progressionData, tensionDirection, sectionInfo, hasMelodyNotes);
+    }, 50);
+}
+
+/**
+ * Render sequence cards into the container
+ */
+function renderSequenceCards(container, sequences, currentChord, currentSymbol, key, progressionData, tensionDirection, sectionInfo, hasMelody = false) {
     sequences.forEach((seq, idx) => {
         const seqCard = document.createElement('div');
         seqCard.style.cssText = `
@@ -2891,10 +3120,62 @@ function renderSequencesView(container) {
             margin-bottom: 12px;
         `;
 
+        // Left side: title and melody compatibility indicator
+        const headerLeft = document.createElement('div');
+        headerLeft.style.cssText = 'display: flex; align-items: center; gap: 10px;';
+
         const titleSpan = document.createElement('span');
         titleSpan.style.cssText = 'font-weight: 600; color: #1f2937;';
         titleSpan.textContent = `Sequence ${idx + 1}`;
-        header.appendChild(titleSpan);
+        headerLeft.appendChild(titleSpan);
+
+        // Enhancement F: Melody compatibility indicator
+        if (hasMelody && seq.melodyCompatibility) {
+            const compat = seq.melodyCompatibility;
+            const melodyBadge = document.createElement('span');
+            const compatScore = Math.round(compat.score || 0);
+
+            // Color based on compatibility
+            let badgeColor, badgeText, badgeIcon;
+            if (compatScore >= 80) {
+                badgeColor = '#10b981'; // green
+                badgeText = 'Great fit';
+                badgeIcon = '🎵';
+            } else if (compatScore >= 60) {
+                badgeColor = '#f59e0b'; // amber
+                badgeText = 'Good fit';
+                badgeIcon = '🎵';
+            } else if (compatScore >= 40) {
+                badgeColor = '#f97316'; // orange
+                badgeText = 'Fair fit';
+                badgeIcon = '🎶';
+            } else {
+                badgeColor = '#ef4444'; // red
+                badgeText = 'Poor fit';
+                badgeIcon = '⚠️';
+            }
+
+            melodyBadge.style.cssText = `
+                padding: 2px 8px;
+                background: ${badgeColor}20;
+                color: ${badgeColor};
+                border: 1px solid ${badgeColor}40;
+                border-radius: 12px;
+                font-size: 11px;
+                font-weight: 500;
+                cursor: help;
+            `;
+            melodyBadge.textContent = `${badgeIcon} ${compatScore}% melody`;
+            melodyBadge.title = `Melody Compatibility: ${badgeText}\n` +
+                `${compatScore}% of melody notes are chord tones\n` +
+                (compat.problemChords?.length > 0
+                    ? `⚠️ ${compat.problemChords.length} chord(s) may need adjustment`
+                    : '✓ All chords harmonize well');
+
+            headerLeft.appendChild(melodyBadge);
+        }
+
+        header.appendChild(headerLeft);
 
         // Score badge with enhanced interactive tooltip (capped at 100%)
         const scoreBadge = document.createElement('span');
@@ -3094,8 +3375,274 @@ function renderSequencesView(container) {
         });
         buttonsRow.appendChild(addAllBtn);
 
+        // Expand button - shows more alternatives with same starting root
+        const firstChordRoot = seq.chords[0]?.root || '?';
+        const expandBtn = document.createElement('button');
+        expandBtn.innerHTML = `⋯ More with ${firstChordRoot}`;
+        expandBtn.style.cssText = `
+            padding: 8px 16px;
+            background: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        `;
+        expandBtn.title = `Show more sequences starting with ${firstChordRoot}`;
+
+        // Container for expanded alternatives (initially hidden)
+        const expandedContainer = document.createElement('div');
+        expandedContainer.style.cssText = `
+            display: none;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed #e5e7eb;
+        `;
+
+        let isExpanded = false;
+        expandBtn.addEventListener('click', () => {
+            isExpanded = !isExpanded;
+
+            if (isExpanded) {
+                expandBtn.innerHTML = `⋯ Hide ${firstChordRoot} Alternatives`;
+                expandBtn.style.background = '#4f46e5';
+                expandedContainer.style.display = 'block';
+
+                // Generate alternatives if not already generated
+                if (!expandedContainer.dataset.loaded) {
+                    expandedContainer.innerHTML = '<div style="color: #6b7280; font-size: 13px; padding: 8px;">Loading alternatives...</div>';
+
+                    // Get the starting root from this sequence's first chord
+                    const startingRoot = seq.chords[0]?.root;
+
+                    // Generate alternatives with the same starting root
+                    // Pass the primary sequence to exclude it from alternatives
+                    setTimeout(() => {
+                        const alternatives = generateSequencesWithRoot(
+                            startingRoot,
+                            modalState.currentRoot,
+                            modalState.currentChordType,
+                            modalState.activeInversion,
+                            progressionData,
+                            key,
+                            modalState.style,
+                            modalState.mood,
+                            tensionDirection,
+                            modalState.lookbackDepth,
+                            modalState.sequenceLength,
+                            5,  // Generate 5 alternatives
+                            sectionInfo,
+                            getContextAwareMode(),
+                            null,  // melodyOptions
+                            seq.chords  // excludeSequence - filter out the primary
+                        );
+
+                        renderExpandedAlternatives(expandedContainer, alternatives, currentChord, key, sectionInfo);
+                        expandedContainer.dataset.loaded = 'true';
+                    }, 50);
+                }
+            } else {
+                expandBtn.innerHTML = `⋯ More with ${firstChordRoot}`;
+                expandBtn.style.background = '#6366f1';
+                expandedContainer.style.display = 'none';
+            }
+        });
+        buttonsRow.appendChild(expandBtn);
+
         seqCard.appendChild(buttonsRow);
+        seqCard.appendChild(expandedContainer);
         container.appendChild(seqCard);
+    });
+}
+
+/**
+ * Render expanded alternatives for a sequence
+ */
+function renderExpandedAlternatives(container, alternatives, currentChord, key, sectionInfo) {
+    container.innerHTML = '';
+
+    if (!alternatives || alternatives.length === 0) {
+        container.innerHTML = '<div style="color: #6b7280; font-size: 13px; padding: 8px;">No additional alternatives found.</div>';
+        return;
+    }
+
+    const header = document.createElement('div');
+    header.style.cssText = 'font-size: 12px; color: #6b7280; margin-bottom: 8px; font-weight: 500;';
+    header.textContent = `${alternatives.length} Alternative${alternatives.length > 1 ? 's' : ''} with same starting root:`;
+    container.appendChild(header);
+
+    const currentSymbol = CHORD_DEFINITIONS[currentChord.type]?.symbol || '';
+
+    alternatives.forEach((alt, altIdx) => {
+        const altRow = document.createElement('div');
+        altRow.style.cssText = `
+            padding: 10px 12px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        `;
+
+        // Chords row
+        const chordsRow = document.createElement('div');
+        chordsRow.style.cssText = 'display: flex; gap: 6px; flex-wrap: wrap; align-items: center;';
+
+        const altChips = [];
+
+        // Current chord chip (smaller) - with hold-to-play
+        const currChip = document.createElement('span');
+        const currInvLabel = getInversionLabel(currentChord.inversion);
+        const spelledCurrRoot = spellNoteInKey(currentChord.root, key);
+        currChip.style.cssText = `
+            padding: 4px 8px;
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #f59e0b;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        `;
+        currChip.textContent = `${spelledCurrRoot}${currentSymbol}${currInvLabel}`;
+        currChip.title = currentChord.inversion ? `Hold to play ${spelledCurrRoot} ${currentChord.type} (${INVERSION_NAMES[currentChord.inversion]} inversion)` : 'Hold to play current chord';
+        setupHoldToPlay(currChip, currentChord);
+        currChip.addEventListener('mouseenter', () => {
+            if (!currChip.dataset.playing) currChip.style.background = '#fde68a';
+        });
+        currChip.addEventListener('mouseleave', () => {
+            if (!currChip.dataset.playing) currChip.style.background = '#fef3c7';
+        });
+        chordsRow.appendChild(currChip);
+        altChips.push(currChip);
+
+        // Arrow
+        const arrow1 = document.createElement('span');
+        arrow1.textContent = '→';
+        arrow1.style.cssText = 'color: #9ca3af; font-size: 12px;';
+        chordsRow.appendChild(arrow1);
+
+        // Sequence chords - with hold-to-play
+        alt.chords.forEach((chord, chordIdx) => {
+            const chordDef = CHORD_DEFINITIONS[chord.type];
+            const symbol = chordDef?.symbol || '';
+            const invLabel = getInversionLabel(chord.inversion);
+            const spelledRoot = spellNoteInKey(chord.root, key);
+
+            const chip = document.createElement('span');
+            chip.style.cssText = `
+                padding: 4px 8px;
+                background: #eef2ff;
+                color: #4338ca;
+                border: 1px solid #c7d2fe;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.15s ease;
+            `;
+            chip.textContent = `${spelledRoot}${symbol}${invLabel}`;
+            chip.title = chord.inversion ? `Hold to play ${spelledRoot} ${chord.type} (${INVERSION_NAMES[chord.inversion]} inversion)` : 'Hold to play chord';
+            setupHoldToPlay(chip, chord);
+            chip.addEventListener('mouseenter', () => {
+                if (!chip.dataset.playing) chip.style.background = '#c7d2fe';
+            });
+            chip.addEventListener('mouseleave', () => {
+                if (!chip.dataset.playing) chip.style.background = '#eef2ff';
+            });
+            chordsRow.appendChild(chip);
+            altChips.push(chip);
+
+            if (chordIdx < alt.chords.length - 1) {
+                const arrow = document.createElement('span');
+                arrow.textContent = '→';
+                arrow.style.cssText = 'color: #9ca3af; font-size: 12px;';
+                chordsRow.appendChild(arrow);
+            }
+        });
+
+        // Score badge
+        const scoreValue = Math.min(100, Math.round(alt.totalScore || alt.score || 70));
+        const scoreBadge = document.createElement('span');
+        scoreBadge.style.cssText = `
+            padding: 2px 6px;
+            background: ${getScoreColor(scoreValue)};
+            color: white;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: auto;
+        `;
+        scoreBadge.textContent = `${scoreValue}%`;
+        chordsRow.appendChild(scoreBadge);
+
+        altRow.appendChild(chordsRow);
+
+        // Action buttons row
+        const actionsRow = document.createElement('div');
+        actionsRow.style.cssText = 'display: flex; gap: 8px;';
+
+        // Play button
+        const playAltBtn = document.createElement('button');
+        playAltBtn.innerHTML = '▶';
+        playAltBtn.title = 'Play this sequence';
+        playAltBtn.style.cssText = `
+            padding: 4px 10px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        `;
+        let stopAltPlayback = null;
+        playAltBtn.addEventListener('click', () => {
+            if (stopAltPlayback) {
+                stopAltPlayback();
+                stopAltPlayback = null;
+                playAltBtn.innerHTML = '▶';
+                return;
+            }
+            const fullSeq = [currentChord, ...alt.chords];
+            stopAltPlayback = playChordSequence(fullSeq, altChips);
+            playAltBtn.innerHTML = '⏹';
+            setTimeout(() => {
+                stopAltPlayback = null;
+                playAltBtn.innerHTML = '▶';
+            }, fullSeq.length * 1300 + 500);
+        });
+        actionsRow.appendChild(playAltBtn);
+
+        // Add All button
+        const addAltBtn = document.createElement('button');
+        addAltBtn.innerHTML = '➕ Add All';
+        addAltBtn.style.cssText = `
+            padding: 4px 10px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        `;
+        addAltBtn.addEventListener('click', () => {
+            const totalChords = alt.chords.length;
+            alt.chords.forEach((chord, idx) => {
+                const isLast = idx === totalChords - 1;
+                addChordToProgression(chord, null, {
+                    isFirstOfNewSection: idx === 0,
+                    skipRender: !isLast
+                });
+            });
+        });
+        actionsRow.appendChild(addAltBtn);
+
+        altRow.appendChild(actionsRow);
+        container.appendChild(altRow);
     });
 }
 
@@ -3321,6 +3868,10 @@ function renderMelodyPhrasesView(container, currentChord, key) {
     const progressionData = getProgressionData() || [];
     const compositionState = getCompositionState();
     const sections = compositionState?.getSections?.() || [];
+
+    // Check if we're in "New Section" mode - user should be able to set duration
+    const intent = getSectionIntent();
+    const isNewSectionMode = intent.mode === INTENT_MODES.NEW_SECTION;
 
     const isEndMode = modalState.melodyPositionMode === 'end';
     const isSectionMode = modalState.melodyPositionMode === 'section';
@@ -3691,13 +4242,19 @@ function renderMelodyPhrasesView(container, currentChord, key) {
     const controlGroupStyle = `display: flex; align-items: center; gap: 6px;`;
 
     // Determine if duration should be fixed (section mode with chord(s) selected)
+    // BUT: In "New Section" mode, user should always be able to set duration
     const startIdx = modalState.melodySelectedChordStart;
     const endIdx = modalState.melodySelectedChordEnd >= 0 ? modalState.melodySelectedChordEnd : startIdx;
     const minChordIdx = Math.min(startIdx, endIdx);
     const maxChordIdx = Math.max(startIdx, endIdx);
-    const isSectionModeWithChord = isSectionMode && minChordIdx >= 0 && minChordIdx < progressionData.length;
+    const hasChordSelected = minChordIdx >= 0 && minChordIdx < progressionData.length;
 
-    // Calculate fixed duration from selected chord(s) if in section mode
+    // Duration is editable in: end mode, new section mode, or when no chord selected
+    // Duration is fixed only in: section mode with chord selected AND NOT in new section mode
+    const isDurationEditable = isEndMode || isNewSectionMode || !hasChordSelected;
+    const isSectionModeWithChord = isSectionMode && hasChordSelected && !isNewSectionMode;
+
+    // Calculate fixed duration from selected chord(s) if in section mode (not new section)
     let fixedDurationBeats = null;
     let sectionDurationInfo = '';
     if (isSectionModeWithChord) {
@@ -3743,9 +4300,9 @@ function renderMelodyPhrasesView(container, currentChord, key) {
                     `).join('')}
                 </select>
             </div>
-            <div style="${controlGroupStyle}" ${isSectionModeWithChord ? 'title="Duration is determined by the selected chord/section"' : ''}>
-                <label style="${labelStyle}">${isSectionModeWithChord ? 'Duration:' : 'Beats:'}</label>
-                ${isSectionModeWithChord ? `
+            <div style="${controlGroupStyle}" ${!isDurationEditable ? 'title="Duration is determined by the selected chord/section"' : (isNewSectionMode ? 'title="Set duration for the new section"' : '')}>
+                <label style="${labelStyle}">${!isDurationEditable ? 'Duration:' : 'Beats:'}</label>
+                ${!isDurationEditable ? `
                     <span style="padding: 5px 8px; background: #e5e7eb; border-radius: 6px; font-size: 12px; color: #4b5563; min-width: 80px; display: inline-block; text-align: center;">
                         ${sectionDurationInfo}
                     </span>
@@ -3755,6 +4312,7 @@ function renderMelodyPhrasesView(container, currentChord, key) {
                             <option value="${p.id}" ${p.id === modalState.phraseLengthId ? 'selected' : ''}>${p.label}</option>
                         `).join('')}
                     </select>
+                    ${isNewSectionMode ? '<span style="font-size: 10px; color: #6366f1; margin-left: 2px;" title="New section - set your desired duration">✨</span>' : ''}
                 `}
             </div>
             <div style="${controlGroupStyle}">

@@ -314,6 +314,703 @@ const SECTION_HARMONY_PROFILES = {
 };
 
 // -----------------------------------------------------------------------------
+// Extended Look-Back Configuration (Enhancement C)
+// -----------------------------------------------------------------------------
+
+/**
+ * Configuration for extended chord history analysis
+ * Considers 2-3 previous chords instead of just 1 for better pattern detection
+ */
+const EXTENDED_LOOKBACK_CONFIG = {
+    // How many previous chords to consider
+    historyDepth: 3,
+
+    // Penalty for creating repetitive patterns
+    patternPenalties: {
+        // Same two-chord pattern repeated (e.g., I-IV-I-IV)
+        twoChordRepeat: -15,
+        // Same chord appearing 3+ times in last 4 chords
+        frequentRoot: -12,
+        // Pendulum motion (back-and-forth between two chords)
+        pendulum: -10,
+        // Static harmony (same chord for 2+ measures)
+        static: -8
+    },
+
+    // Bonuses for good patterns
+    patternBonuses: {
+        // Circle of fifths motion maintained
+        circleOfFifths: 12,
+        // Consistent stepwise motion
+        stepwise: 10,
+        // Building toward cadence
+        cadentialApproach: 15,
+        // Good variety of roots
+        rootVariety: 8
+    }
+};
+
+/**
+ * Analyze chord history for patterns and compute adjustments
+ * @param {Array} chordHistory - Array of previous chord objects (most recent last)
+ * @param {Object} candidateChord - Chord being evaluated
+ * @param {string} key - Musical key
+ * @returns {Object} Analysis with score adjustment and reasons
+ */
+function analyzeChordHistory(chordHistory, candidateChord, key) {
+    const config = EXTENDED_LOOKBACK_CONFIG;
+    let scoreAdjustment = 0;
+    const reasons = [];
+    const patterns = [];
+
+    if (!chordHistory || chordHistory.length === 0) {
+        return { scoreAdjustment: 0, reasons: [], patterns: [] };
+    }
+
+    // Get roots for analysis
+    const historyRoots = chordHistory.map(c => c.root);
+    const candidateRoot = candidateChord.root;
+    const allRoots = [...historyRoots, candidateRoot];
+
+    // 1. Check for repetitive two-chord pattern (I-IV-I-IV)
+    if (chordHistory.length >= 3) {
+        const lastThree = historyRoots.slice(-3);
+        // Check if adding this chord creates A-B-A-B pattern
+        if (lastThree.length >= 3 &&
+            lastThree[0] === lastThree[2] &&
+            lastThree[1] === candidateRoot &&
+            lastThree[0] !== lastThree[1]) {
+            scoreAdjustment += config.patternPenalties.twoChordRepeat;
+            reasons.push('Avoids repetitive alternation');
+            patterns.push('two-chord-repeat');
+        }
+    }
+
+    // 2. Check for pendulum motion (back-and-forth)
+    if (chordHistory.length >= 2) {
+        const prev = chordHistory[chordHistory.length - 1];
+        const prevPrev = chordHistory[chordHistory.length - 2];
+
+        if (prevPrev && prevPrev.root === candidateRoot && prev.root !== candidateRoot) {
+            scoreAdjustment += config.patternPenalties.pendulum;
+            reasons.push('Avoids pendulum motion');
+            patterns.push('pendulum');
+        }
+    }
+
+    // 3. Check for frequent root usage
+    const rootCounts = {};
+    allRoots.forEach(root => {
+        rootCounts[root] = (rootCounts[root] || 0) + 1;
+    });
+
+    if (rootCounts[candidateRoot] >= 3) {
+        scoreAdjustment += config.patternPenalties.frequentRoot;
+        reasons.push('Root overused in recent history');
+        patterns.push('frequent-root');
+    }
+
+    // 4. Check for static harmony (same chord repeated)
+    if (chordHistory.length >= 1) {
+        const lastChord = chordHistory[chordHistory.length - 1];
+        if (lastChord.root === candidateRoot && lastChord.type === candidateChord.type) {
+            scoreAdjustment += config.patternPenalties.static;
+            reasons.push('Static harmony');
+            patterns.push('static');
+        }
+    }
+
+    // 5. Bonus for circle of fifths motion
+    if (chordHistory.length >= 1) {
+        const lastRoot = chordHistory[chordHistory.length - 1].root;
+        const lastIndex = noteToChromatic(lastRoot);
+        const candidateIndex = noteToChromatic(candidateRoot);
+
+        if (lastIndex >= 0 && candidateIndex >= 0) {
+            const interval = (candidateIndex - lastIndex + 12) % 12;
+            // Perfect 4th up (5) or Perfect 5th down (7) = circle of fifths
+            if (interval === 5 || interval === 7) {
+                // Check if this continues a pattern from before
+                if (chordHistory.length >= 2) {
+                    const prevPrevRoot = chordHistory[chordHistory.length - 2].root;
+                    const prevPrevIndex = noteToChromatic(prevPrevRoot);
+                    const prevInterval = (lastIndex - prevPrevIndex + 12) % 12;
+                    if (prevInterval === 5 || prevInterval === 7) {
+                        scoreAdjustment += config.patternBonuses.circleOfFifths;
+                        reasons.push('Circle of fifths motion');
+                        patterns.push('circle-of-fifths');
+                    }
+                }
+            }
+
+            // Bonus for stepwise motion continued
+            if ((interval >= 1 && interval <= 2) || (interval >= 10 && interval <= 11)) {
+                if (chordHistory.length >= 2) {
+                    const prevPrevRoot = chordHistory[chordHistory.length - 2].root;
+                    const prevPrevIndex = noteToChromatic(prevPrevRoot);
+                    const prevInterval = (lastIndex - prevPrevIndex + 12) % 12;
+                    if ((prevInterval >= 1 && prevInterval <= 2) || (prevInterval >= 10 && prevInterval <= 11)) {
+                        scoreAdjustment += config.patternBonuses.stepwise;
+                        reasons.push('Consistent stepwise motion');
+                        patterns.push('stepwise');
+                    }
+                }
+            }
+        }
+    }
+
+    // 6. Bonus for root variety
+    const uniqueRoots = new Set(allRoots);
+    if (uniqueRoots.size >= allRoots.length - 1 && allRoots.length >= 3) {
+        scoreAdjustment += config.patternBonuses.rootVariety;
+        reasons.push('Good root variety');
+        patterns.push('variety');
+    }
+
+    // 7. Check for cadential approach (ii-V-I, IV-V-I)
+    if (chordHistory.length >= 2 && key) {
+        const keyIndex = noteToChromatic(key.replace(' Major', '').replace(' Minor', ''));
+        if (keyIndex >= 0) {
+            const candidateInterval = (noteToChromatic(candidateRoot) - keyIndex + 12) % 12;
+            const lastInterval = (noteToChromatic(historyRoots[historyRoots.length - 1]) - keyIndex + 12) % 12;
+            const prevLastInterval = chordHistory.length >= 2
+                ? (noteToChromatic(historyRoots[historyRoots.length - 2]) - keyIndex + 12) % 12
+                : null;
+
+            // Check for V-I resolution
+            if (lastInterval === 7 && candidateInterval === 0) {
+                // Check if preceded by ii or IV
+                if (prevLastInterval === 2 || prevLastInterval === 5) {
+                    scoreAdjustment += config.patternBonuses.cadentialApproach;
+                    reasons.push('Cadential resolution');
+                    patterns.push('cadence');
+                }
+            }
+        }
+    }
+
+    return {
+        scoreAdjustment,
+        reasons: reasons.filter(r => r),
+        patterns
+    };
+}
+
+/**
+ * Enhanced suggestion scoring with extended look-back
+ * @param {Array} suggestions - Original chord suggestions
+ * @param {Array} chordHistory - Recent chord history (2-3 chords)
+ * @param {string} key - Musical key
+ * @returns {Array} Re-scored suggestions with history-aware adjustments
+ */
+function applyExtendedLookback(suggestions, chordHistory, key) {
+    if (!chordHistory || chordHistory.length === 0) {
+        return suggestions;
+    }
+
+    return suggestions.map(suggestion => {
+        const analysis = analyzeChordHistory(chordHistory, suggestion, key);
+
+        // Apply score adjustment
+        const adjustedScore = Math.max(0, Math.min(100,
+            suggestion.score + analysis.scoreAdjustment
+        ));
+
+        // Add history-based reasons
+        const allReasons = [...(suggestion.reasons || []), ...analysis.reasons];
+
+        return {
+            ...suggestion,
+            score: adjustedScore,
+            originalScore: suggestion.score,
+            historyAdjustment: analysis.scoreAdjustment,
+            reasons: allReasons,
+            patterns: analysis.patterns
+        };
+    }).sort((a, b) => b.score - a.score);
+}
+
+// -----------------------------------------------------------------------------
+// Look-Ahead Configuration (Enhancement D)
+// -----------------------------------------------------------------------------
+
+/**
+ * Configuration for look-ahead melody analysis
+ * Considers upcoming melody notes when choosing current chord
+ */
+const LOOKAHEAD_CONFIG = {
+    // How many measures ahead to consider
+    lookaheadDepth: 2,
+
+    // Weight of look-ahead vs current measure analysis
+    lookaheadWeight: 0.25,  // 25% influence from upcoming measures
+
+    // Bonuses for preparing voice leading
+    preparationBonuses: {
+        // Current chord prepares for upcoming leading tone resolution
+        leadingTonePrep: 8,
+        // Current chord shares common tone with likely next chord
+        commonTonePrep: 6,
+        // Current chord sets up smooth bass motion
+        bassLinePrep: 5,
+        // Current chord prepares for upcoming tension peak/release
+        tensionPrep: 7
+    }
+};
+
+/**
+ * Analyze upcoming melody and score how well current chord prepares for it
+ * @param {Object} currentChord - Chord being evaluated
+ * @param {Object} notesByMeasure - All notes grouped by measure
+ * @param {number} currentMeasureIndex - Current measure index
+ * @param {string} key - Musical key
+ * @returns {Object} Look-ahead analysis with score adjustment
+ */
+function analyzeLookAhead(currentChord, notesByMeasure, currentMeasureIndex, key) {
+    const config = LOOKAHEAD_CONFIG;
+    let scoreAdjustment = 0;
+    const reasons = [];
+
+    // Get upcoming measures
+    const upcomingMeasures = [];
+    for (let i = 1; i <= config.lookaheadDepth; i++) {
+        const upcomingNotes = notesByMeasure[currentMeasureIndex + i];
+        if (upcomingNotes && upcomingNotes.length > 0) {
+            upcomingMeasures.push({
+                measureIndex: currentMeasureIndex + i,
+                notes: upcomingNotes
+            });
+        }
+    }
+
+    if (upcomingMeasures.length === 0) {
+        return { scoreAdjustment: 0, reasons: [] };
+    }
+
+    const currentChordNotes = getChordNotes(currentChord.root, currentChord.type);
+    const keyIndex = noteToChromatic(key?.replace(' Major', '').replace(' Minor', ''));
+
+    // Analyze each upcoming measure
+    upcomingMeasures.forEach((upcoming, idx) => {
+        const distanceWeight = 1 / (idx + 1); // Closer measures matter more
+
+        // Get prominent melody pitches from upcoming measure
+        const upcomingAnalysis = analyzeMeasureMelody(upcoming.notes);
+        const upcomingPitches = upcomingAnalysis.prominentPitches;
+
+        if (upcomingPitches.length === 0) return;
+
+        // 1. Check for common tones between current chord and upcoming melody
+        const commonTones = currentChordNotes.filter(note =>
+            upcomingPitches.includes(note)
+        );
+
+        if (commonTones.length > 0) {
+            scoreAdjustment += config.preparationBonuses.commonTonePrep * distanceWeight;
+            if (idx === 0) {
+                reasons.push('Prepares upcoming melody');
+            }
+        }
+
+        // 2. Check if current chord contains leading tones for upcoming pitches
+        // Leading tone = semitone below a target pitch
+        if (keyIndex >= 0) {
+            const leadingToneToTonic = (keyIndex + 11) % 12; // B in C major
+            if (currentChordNotes.includes(leadingToneToTonic)) {
+                // Check if upcoming melody resolves to tonic
+                if (upcomingPitches.includes(keyIndex)) {
+                    scoreAdjustment += config.preparationBonuses.leadingTonePrep * distanceWeight;
+                    if (idx === 0) {
+                        reasons.push('Sets up resolution');
+                    }
+                }
+            }
+        }
+
+        // 3. Analyze tension trajectory
+        // If upcoming melody has more chromatic notes, current chord should be building tension
+        const upcomingChromaticCount = upcomingPitches.filter(p => {
+            if (keyIndex < 0) return false;
+            const majorScaleIntervals = [0, 2, 4, 5, 7, 9, 11];
+            const interval = (p - keyIndex + 12) % 12;
+            return !majorScaleIntervals.includes(interval);
+        }).length;
+
+        if (upcomingChromaticCount > 0) {
+            // Upcoming has tension - prefer current chord with some tension too
+            const currentTension = calculateChordTension(currentChord.root, currentChord.type, key);
+            if (currentTension > 0.4) {
+                scoreAdjustment += config.preparationBonuses.tensionPrep * distanceWeight * 0.5;
+            }
+        }
+    });
+
+    return {
+        scoreAdjustment: Math.round(scoreAdjustment * config.lookaheadWeight * 10) / 10,
+        reasons
+    };
+}
+
+/**
+ * Apply look-ahead scoring to suggestions
+ * @param {Array} suggestions - Original chord suggestions
+ * @param {Object} notesByMeasure - All notes grouped by measure
+ * @param {number} currentMeasureIndex - Current measure index
+ * @param {string} key - Musical key
+ * @returns {Array} Re-scored suggestions with look-ahead adjustments
+ */
+function applyLookAhead(suggestions, notesByMeasure, currentMeasureIndex, key) {
+    return suggestions.map(suggestion => {
+        const analysis = analyzeLookAhead(suggestion, notesByMeasure, currentMeasureIndex, key);
+
+        const adjustedScore = Math.max(0, Math.min(100,
+            suggestion.score + analysis.scoreAdjustment
+        ));
+
+        const allReasons = [...(suggestion.reasons || []), ...analysis.reasons];
+
+        return {
+            ...suggestion,
+            score: adjustedScore,
+            lookaheadAdjustment: analysis.scoreAdjustment,
+            reasons: allReasons
+        };
+    }).sort((a, b) => b.score - a.score);
+}
+
+// -----------------------------------------------------------------------------
+// Bidirectional Harmonization (Enhancement G)
+// -----------------------------------------------------------------------------
+
+/**
+ * Configuration for bidirectional harmonization
+ * Performs forward pass then backward pass to optimize voice leading
+ */
+const BIDIRECTIONAL_CONFIG = {
+    // Enable by default for high-quality harmonization
+    enabled: true,
+
+    // Maximum iterations for convergence
+    maxIterations: 3,
+
+    // Minimum score improvement to continue iterating
+    minImprovement: 2,
+
+    // Weights for backward pass adjustments
+    backwardWeights: {
+        voiceLeading: 0.4,      // Smooth voice leading from next chord
+        tensionResolution: 0.3, // Does current chord resolve tension properly
+        harmonicRhythm: 0.2,    // Consistent harmonic rhythm
+        preparation: 0.1        // Does current chord prepare next chord
+    },
+
+    // Voice leading interval preferences (semitones)
+    preferredIntervals: {
+        common: [0],            // Common tone (no movement)
+        step: [1, 2, 10, 11],   // Stepwise motion
+        third: [3, 4, 8, 9],    // Third motion
+        fourth: [5, 7]          // Fourth/fifth motion
+    }
+};
+
+/**
+ * Perform bidirectional harmonization pass
+ * Forward pass generates initial suggestions, backward pass optimizes
+ *
+ * @param {Array} forwardResults - Results from forward pass
+ * @param {Object} notesByMeasure - All melody notes by measure
+ * @param {string} key - Musical key
+ * @param {Object} options - Harmonization options
+ * @returns {Array} Optimized harmonization results
+ */
+export function bidirectionalHarmonize(forwardResults, notesByMeasure, key, options = {}) {
+    if (!forwardResults || forwardResults.length === 0) {
+        return forwardResults;
+    }
+
+    const config = BIDIRECTIONAL_CONFIG;
+    let currentResults = JSON.parse(JSON.stringify(forwardResults)); // Deep copy
+    let previousScore = calculateTotalHarmonizationScore(currentResults);
+
+    // Iterate until convergence or max iterations
+    for (let iteration = 0; iteration < config.maxIterations; iteration++) {
+        // Backward pass: starting from end, optimize each chord
+        const backwardOptimized = performBackwardPass(currentResults, notesByMeasure, key, options);
+
+        // Calculate new total score
+        const newScore = calculateTotalHarmonizationScore(backwardOptimized);
+
+        // Check for convergence
+        const improvement = newScore - previousScore;
+        if (improvement < config.minImprovement) {
+            break;
+        }
+
+        currentResults = backwardOptimized;
+        previousScore = newScore;
+    }
+
+    // Mark results as bidirectionally optimized
+    currentResults.forEach(result => {
+        result.bidirectionalOptimized = true;
+    });
+
+    return currentResults;
+}
+
+/**
+ * Perform backward optimization pass
+ * Starting from the end, adjust chord choices based on what follows
+ *
+ * @param {Array} results - Current harmonization results
+ * @param {Object} notesByMeasure - Melody notes by measure
+ * @param {string} key - Musical key
+ * @param {Object} options - Options
+ * @returns {Array} Backward-optimized results
+ */
+function performBackwardPass(results, notesByMeasure, key, options) {
+    const optimized = JSON.parse(JSON.stringify(results));
+    const config = BIDIRECTIONAL_CONFIG;
+
+    // Process from second-to-last to first (last chord stays fixed)
+    for (let i = optimized.length - 2; i >= 0; i--) {
+        const currentMeasure = optimized[i];
+        const nextMeasure = optimized[i + 1];
+
+        if (!currentMeasure.suggestions || currentMeasure.suggestions.length === 0) {
+            continue;
+        }
+
+        // Get the selected chord from next measure (top suggestion)
+        const nextChord = nextMeasure.suggestions[0];
+        if (!nextChord) continue;
+
+        // Re-score current measure's suggestions based on backward context
+        const rescoredSuggestions = currentMeasure.suggestions.map(suggestion => {
+            const backwardScore = calculateBackwardScore(
+                suggestion,
+                nextChord,
+                notesByMeasure[currentMeasure.measureIndex],
+                key,
+                config
+            );
+
+            return {
+                ...suggestion,
+                backwardScore,
+                score: Math.round(suggestion.score * 0.6 + backwardScore * 0.4), // Blend forward and backward
+                backwardOptimized: true
+            };
+        });
+
+        // Re-sort by new blended score
+        rescoredSuggestions.sort((a, b) => b.score - a.score);
+        optimized[i].suggestions = rescoredSuggestions;
+    }
+
+    return optimized;
+}
+
+/**
+ * Calculate backward optimization score for a chord
+ * Based on how well it leads TO the next chord
+ *
+ * @param {Object} currentChord - Current chord being evaluated
+ * @param {Object} nextChord - The chord that follows
+ * @param {Array} melodyNotes - Melody notes in current measure
+ * @param {string} key - Musical key
+ * @param {Object} config - Configuration
+ * @returns {number} Backward score (0-100)
+ */
+function calculateBackwardScore(currentChord, nextChord, melodyNotes, key, config) {
+    let score = 50; // Base score
+    const weights = config.backwardWeights;
+
+    // 1. Voice leading TO next chord (most important)
+    const voiceLeadingScore = calculateVoiceLeadingToNext(currentChord, nextChord);
+    score += (voiceLeadingScore - 50) * weights.voiceLeading;
+
+    // 2. Tension resolution appropriateness
+    const tensionScore = calculateTensionResolutionScore(currentChord, nextChord, key);
+    score += (tensionScore - 50) * weights.tensionResolution;
+
+    // 3. Harmonic preparation
+    const prepScore = calculatePreparationScore(currentChord, nextChord, key);
+    score += (prepScore - 50) * weights.preparation;
+
+    return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+/**
+ * Calculate voice leading quality TO the next chord
+ * @returns {number} Score 0-100
+ */
+function calculateVoiceLeadingToNext(currentChord, nextChord) {
+    const config = BIDIRECTIONAL_CONFIG;
+    const currentNotes = getChordNotes(currentChord.root, currentChord.type);
+    const nextNotes = getChordNotes(nextChord.root, nextChord.type);
+
+    if (currentNotes.length === 0 || nextNotes.length === 0) {
+        return 50;
+    }
+
+    let score = 50;
+
+    // Check common tones
+    const commonTones = currentNotes.filter(n => nextNotes.includes(n));
+    score += commonTones.length * 8; // Bonus for common tones
+
+    // Check bass motion
+    const currentBass = noteToChromatic(currentChord.root);
+    const nextBass = noteToChromatic(nextChord.root);
+
+    if (currentBass >= 0 && nextBass >= 0) {
+        const bassInterval = Math.abs(nextBass - currentBass);
+        const normalizedInterval = Math.min(bassInterval, 12 - bassInterval);
+
+        // Prefer stepwise or fourth/fifth bass motion
+        if (normalizedInterval <= 2) {
+            score += 15; // Stepwise
+        } else if (normalizedInterval === 5 || normalizedInterval === 7) {
+            score += 12; // Fourth/fifth
+        } else if (normalizedInterval === 3 || normalizedInterval === 4) {
+            score += 8; // Third
+        }
+    }
+
+    // Penalize parallel fifths/octaves (if we had full voicing)
+    // For now, just check root motion
+    const rootInterval = (nextBass - currentBass + 12) % 12;
+    if (rootInterval === 0 && currentChord.type === nextChord.type) {
+        score -= 10; // Same chord repeated
+    }
+
+    return Math.max(0, Math.min(100, score));
+}
+
+/**
+ * Calculate tension resolution appropriateness
+ * @returns {number} Score 0-100
+ */
+function calculateTensionResolutionScore(currentChord, nextChord, key) {
+    let score = 50;
+
+    const currentTension = estimateChordTensionLevel(currentChord);
+    const nextTension = estimateChordTensionLevel(nextChord);
+
+    // High tension should resolve
+    if (currentTension > 0.7) {
+        // Current chord is tense - next should be less tense
+        if (nextTension < currentTension) {
+            score += 20; // Good resolution
+        } else {
+            score -= 10; // Tension not resolved
+        }
+    }
+
+    // Dominant should resolve to tonic
+    if (currentChord.type === 'Dominant 7th' || currentChord.type?.includes('Dominant')) {
+        const keyRoot = key?.replace(' Major', '').replace(' Minor', '');
+        if (keyRoot && nextChord.root === keyRoot) {
+            score += 25; // V7 -> I resolution
+        }
+    }
+
+    // Diminished should resolve
+    if (currentChord.type === 'Diminished' || currentChord.type?.includes('Diminished')) {
+        if (nextTension < currentTension) {
+            score += 15;
+        }
+    }
+
+    return Math.max(0, Math.min(100, score));
+}
+
+/**
+ * Calculate how well current chord prepares the next
+ * @returns {number} Score 0-100
+ */
+function calculatePreparationScore(currentChord, nextChord, key) {
+    let score = 50;
+
+    const keyRoot = key?.replace(' Major', '').replace(' Minor', '');
+    if (!keyRoot) return score;
+
+    const keyIndex = noteToChromatic(keyRoot);
+    const currentIndex = noteToChromatic(currentChord.root);
+    const nextIndex = noteToChromatic(nextChord.root);
+
+    if (keyIndex < 0 || currentIndex < 0 || nextIndex < 0) return score;
+
+    const currentDegree = (currentIndex - keyIndex + 12) % 12;
+    const nextDegree = (nextIndex - keyIndex + 12) % 12;
+
+    // Common progressions get bonuses
+    // ii -> V
+    if (currentDegree === 2 && nextDegree === 7) {
+        score += 20;
+    }
+    // IV -> V
+    if (currentDegree === 5 && nextDegree === 7) {
+        score += 18;
+    }
+    // V -> I
+    if (currentDegree === 7 && nextDegree === 0) {
+        score += 25;
+    }
+    // vi -> IV (deceptive motion preparation)
+    if (currentDegree === 9 && nextDegree === 5) {
+        score += 12;
+    }
+    // I -> IV
+    if (currentDegree === 0 && nextDegree === 5) {
+        score += 15;
+    }
+
+    return Math.max(0, Math.min(100, score));
+}
+
+/**
+ * Estimate tension level of a chord (0-1)
+ */
+function estimateChordTensionLevel(chord) {
+    const tensionMap = {
+        'Major': 0.2,
+        'Minor': 0.3,
+        'Dominant 7th': 0.7,
+        'Major 7th': 0.35,
+        'Minor 7th': 0.4,
+        'Diminished': 0.85,
+        'Diminished 7th': 0.9,
+        'Half-Diminished 7th': 0.8,
+        'Augmented': 0.75,
+        'Sus4': 0.5,
+        'Sus2': 0.45
+    };
+
+    return tensionMap[chord.type] || 0.4;
+}
+
+/**
+ * Calculate total harmonization score for all measures
+ */
+function calculateTotalHarmonizationScore(results) {
+    if (!results || results.length === 0) return 0;
+
+    let totalScore = 0;
+    let count = 0;
+
+    results.forEach(measure => {
+        if (measure.suggestions && measure.suggestions.length > 0) {
+            totalScore += measure.suggestions[0].score;
+            count++;
+        }
+    });
+
+    return count > 0 ? totalScore / count : 0;
+}
+
+// -----------------------------------------------------------------------------
 // Helper Functions
 // -----------------------------------------------------------------------------
 
@@ -1217,7 +1914,9 @@ export function autoHarmonize(melodyNotes, key, options = {}) {
         harmonyStyle = null,        // 'jazz', 'classical', 'pop', 'rock', etc.
         sectionType = null,         // 'intro', 'verse', 'chorus', etc.
         targetTensionCurve = null,  // Array of tension values [0-1] for each measure
-        generateVoices = false      // Whether to generate SATB voicings
+        generateVoices = false,     // Whether to generate SATB voicings
+        // Enhancement G: Bidirectional optimization
+        bidirectional = true        // Whether to apply backward optimization pass
     } = options;
 
     if (!melodyNotes || melodyNotes.length === 0) {
@@ -1244,6 +1943,10 @@ export function autoHarmonize(melodyNotes, key, options = {}) {
     let prevChord = null;
     const totalMeasures = maxMeasure - minMeasure + 1;
 
+    // Enhancement C: Maintain extended chord history for pattern detection
+    const chordHistory = [];
+    const historyDepth = EXTENDED_LOOKBACK_CONFIG.historyDepth;
+
     for (let i = minMeasure; i <= maxMeasure; i++) {
         const notes = notesByMeasure[i] || [];
         const measureIndex = i - minMeasure;
@@ -1260,9 +1963,22 @@ export function autoHarmonize(melodyNotes, key, options = {}) {
             notes,
             prevChord,
             key,
-            numSuggestions,
+            numSuggestions * 2, // Request more to allow for history-based reranking
             { style: harmonyStyle, context: measureContext }
         );
+
+        // Enhancement C: Apply extended look-back analysis
+        // Re-score suggestions based on chord history patterns
+        if (chordHistory.length > 0) {
+            suggestions = applyExtendedLookback(suggestions, chordHistory, key);
+        }
+
+        // Enhancement D: Apply look-ahead analysis
+        // Re-score suggestions based on upcoming melody notes
+        suggestions = applyLookAhead(suggestions, notesByMeasure, i, key);
+
+        // Trim back to requested number of suggestions
+        suggestions = suggestions.slice(0, numSuggestions);
 
         // If there's a current chord for this measure, prioritize it
         if (currentProgression && currentProgression[i]) {
@@ -1341,7 +2057,29 @@ export function autoHarmonize(melodyNotes, key, options = {}) {
                 type: suggestions[0].type,
                 inversion: suggestions[0].inversion || 0
             };
+
+            // Enhancement C: Update chord history for extended look-back
+            chordHistory.push({
+                root: suggestions[0].root,
+                type: suggestions[0].type,
+                inversion: suggestions[0].inversion || 0
+            });
+
+            // Keep only the most recent chords (sliding window)
+            while (chordHistory.length > historyDepth) {
+                chordHistory.shift();
+            }
         }
+    }
+
+    // Enhancement G: Apply bidirectional optimization if enabled
+    // This performs a backward pass to optimize voice leading across the entire progression
+    if (bidirectional && results.length > 1) {
+        const optimizedResults = bidirectionalHarmonize(results, notesByMeasure, key, {
+            harmonyStyle,
+            sectionType
+        });
+        return optimizedResults;
     }
 
     return results;

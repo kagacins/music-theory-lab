@@ -48,7 +48,12 @@ export function syncProgressionToMelodyComposer() {
     const progressionData = getProgressionData();
     const currentKey = getCurrentKey();
 
+    // Handle empty progression - clear composition state
     if (!progressionData || progressionData.length === 0) {
+        const state = compositionState || getCompositionState();
+        if (state && typeof state.clear === 'function') {
+            state.clear();
+        }
         return;
     }
 

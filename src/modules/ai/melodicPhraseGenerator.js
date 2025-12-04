@@ -169,6 +169,145 @@ export const RHYTHM_PATTERNS = {
 };
 
 // -----------------------------------------------------------------------------
+// Section Type Profiles for Melody Generation
+// -----------------------------------------------------------------------------
+
+/**
+ * Section type profiles define melodic characteristics for different song sections.
+ * These influence note selection, density preferences, and range usage.
+ */
+export const SECTION_MELODY_PROFILES = {
+    verse: {
+        id: 'verse',
+        label: 'Verse',
+        description: 'Conversational, narrative - moderate movement and range',
+        // Scoring adjustments
+        chordToneBonus: 1.0,        // Normal chord tone preference
+        stepwiseBonus: 1.2,         // Prefer stepwise motion (conversational)
+        leapPenalty: 1.0,           // Normal leap penalty
+        rangeMultiplier: 0.85,      // Slightly narrower range
+        densityMultiplier: 0.9,     // Slightly less dense
+        // Preferred contours for this section
+        preferredContours: ['arch', 'wave', 'static', 'question'],
+        // Position preferences (0=low, 1=high relative to range)
+        preferredRangeCenter: 0.45, // Slightly below center
+        // Repetition tolerance (verses often have melodic motifs)
+        repetitionBonus: 8,
+        // Ending preference
+        endingPreference: 'open'    // Doesn't need strong resolution
+    },
+    chorus: {
+        id: 'chorus',
+        label: 'Chorus',
+        description: 'Memorable hook - wider intervals, higher energy',
+        chordToneBonus: 1.3,        // Strong chord tone preference (memorable)
+        stepwiseBonus: 0.8,         // Allow more leaps
+        leapPenalty: 0.7,           // Reduced leap penalty (hooks use leaps)
+        rangeMultiplier: 1.15,      // Wider range
+        densityMultiplier: 1.0,     // Normal density
+        preferredContours: ['arch', 'plateau', 'ascending'],
+        preferredRangeCenter: 0.6,  // Higher in range
+        repetitionBonus: 15,        // Choruses thrive on repetition
+        endingPreference: 'strong'  // Strong resolution
+    },
+    bridge: {
+        id: 'bridge',
+        label: 'Bridge',
+        description: 'Contrast and departure - explore different territory',
+        chordToneBonus: 0.9,        // Slightly less chord-focused
+        stepwiseBonus: 1.0,         // Normal
+        leapPenalty: 0.8,           // Allow some unexpected leaps
+        rangeMultiplier: 1.1,       // Slightly wider
+        densityMultiplier: 1.0,     // Normal
+        preferredContours: ['ascending', 'ramp', 'wave', 'invertedArch'],
+        preferredRangeCenter: 0.55, // Slightly higher
+        repetitionBonus: -5,        // Avoid repetition (contrast)
+        endingPreference: 'tension' // Can end with tension
+    },
+    intro: {
+        id: 'intro',
+        label: 'Intro',
+        description: 'Establishing mood - simple, clear, sets expectations',
+        chordToneBonus: 1.4,        // Very chord-focused (clear tonality)
+        stepwiseBonus: 1.1,         // Prefer smooth motion
+        leapPenalty: 1.2,           // Avoid jarring leaps
+        rangeMultiplier: 0.8,       // Narrow range
+        densityMultiplier: 0.7,     // Sparse
+        preferredContours: ['ascending', 'arch', 'static'],
+        preferredRangeCenter: 0.4,  // Lower register
+        repetitionBonus: 10,        // Simple motifs work well
+        endingPreference: 'open'    // Leads into song
+    },
+    outro: {
+        id: 'outro',
+        label: 'Outro',
+        description: 'Conclusion and resolution - winding down',
+        chordToneBonus: 1.3,        // Chord-focused (resolution)
+        stepwiseBonus: 1.2,         // Smooth descent
+        leapPenalty: 1.1,           // Avoid surprises
+        rangeMultiplier: 0.85,      // Narrowing down
+        densityMultiplier: 0.8,     // Slowing down
+        preferredContours: ['descending', 'cascade', 'answer'],
+        preferredRangeCenter: 0.35, // Lower, settling
+        repetitionBonus: 12,        // Fading repetition works
+        endingPreference: 'resolved' // Must resolve
+    },
+    prechorus: {
+        id: 'prechorus',
+        label: 'Pre-Chorus',
+        description: 'Building anticipation - rising energy toward chorus',
+        chordToneBonus: 1.1,        // Slightly chord-focused
+        stepwiseBonus: 0.9,         // Allow building motion
+        leapPenalty: 0.9,           // Some leaps OK
+        rangeMultiplier: 1.0,       // Normal
+        densityMultiplier: 1.1,     // Slightly busier
+        preferredContours: ['ascending', 'ramp', 'arch'],
+        preferredRangeCenter: 0.5,  // Building upward
+        repetitionBonus: 5,         // Some repetition OK
+        endingPreference: 'tension' // End with anticipation
+    },
+    solo: {
+        id: 'solo',
+        label: 'Solo',
+        description: 'Expressive freedom - wider range, varied motion',
+        chordToneBonus: 0.8,        // More freedom from chord tones
+        stepwiseBonus: 0.7,         // Free to leap
+        leapPenalty: 0.5,           // Leaps encouraged
+        rangeMultiplier: 1.3,       // Wide range
+        densityMultiplier: 1.2,     // Can be dense
+        preferredContours: ['wave', 'arch', 'ramp', 'cascade'],
+        preferredRangeCenter: 0.5,  // Full range usage
+        repetitionBonus: -10,       // Avoid repetition
+        endingPreference: 'strong'  // End with impact
+    },
+    breakdown: {
+        id: 'breakdown',
+        label: 'Breakdown',
+        description: 'Stripped back - minimal, rhythmic focus',
+        chordToneBonus: 1.5,        // Very chord-focused
+        stepwiseBonus: 1.3,         // Minimal movement
+        leapPenalty: 1.5,           // Strong leap penalty
+        rangeMultiplier: 0.6,       // Very narrow
+        densityMultiplier: 0.6,     // Sparse
+        preferredContours: ['static', 'plateau'],
+        preferredRangeCenter: 0.4,  // Lower/mid
+        repetitionBonus: 20,        // Repetition is key
+        endingPreference: 'open'    // Builds back up
+    }
+};
+
+/**
+ * Get section profile with fallback to default
+ * @param {string} sectionType - Section type identifier
+ * @returns {Object} Section profile
+ */
+function getSectionProfile(sectionType) {
+    if (!sectionType) return null;
+    const normalized = sectionType.toLowerCase().replace(/[^a-z]/g, '');
+    return SECTION_MELODY_PROFILES[normalized] || null;
+}
+
+// -----------------------------------------------------------------------------
 // Chromatic notes for MIDI conversion
 // -----------------------------------------------------------------------------
 
@@ -232,6 +371,10 @@ export function generatePhrase({
     const phraseLength = PHRASE_LENGTHS[lengthId] || PHRASE_LENGTHS.medium;
     const rhythmPattern = RHYTHM_PATTERNS[rhythmId] || RHYTHM_PATTERNS.steady;
 
+    // Get section profile for section-aware adjustments
+    const sectionType = sectionContext?.sectionType;
+    const sectionProfile = getSectionProfile(sectionType);
+
     // Use targetBeats if provided, otherwise use phraseLength.beats
     const effectiveTargetBeats = targetBeats !== null ? targetBeats : phraseLength.beats;
 
@@ -246,9 +389,13 @@ export function generatePhrase({
         baseNoteCount = phraseLength.notes;
     }
 
+    // Apply section-aware density adjustment
+    const sectionDensityMultiplier = sectionProfile?.densityMultiplier || 1.0;
+    const effectiveDensityMultiplier = densityMultiplier * sectionDensityMultiplier;
+
     // Apply density multiplier to note count
     // Clamp between 2 notes minimum and 24 notes maximum
-    const noteCount = Math.max(2, Math.min(24, Math.round(baseNoteCount * densityMultiplier)));
+    const noteCount = Math.max(2, Math.min(24, Math.round(baseNoteCount * effectiveDensityMultiplier)));
     const notes = [];
     const noteDetails = [];
 
@@ -275,10 +422,19 @@ export function generatePhrase({
     // Initial chord tones (for first note)
     const chordTones = getChordTones(chord);
 
-    // Calculate range bounds
-    const baseMidi = 60 + (octave - 4) * 12; // C4 = 60
-    const lowBound = baseMidi - Math.floor(range / 2);
-    const highBound = baseMidi + Math.ceil(range / 2);
+    // Apply section-aware range adjustment
+    const sectionRangeMultiplier = sectionProfile?.rangeMultiplier || 1.0;
+    const effectiveRange = Math.round(range * sectionRangeMultiplier);
+
+    // Apply section-aware range center preference
+    const rangeCenterOffset = sectionProfile?.preferredRangeCenter
+        ? Math.round((sectionProfile.preferredRangeCenter - 0.5) * 6) // ±3 semitones max
+        : 0;
+
+    // Calculate range bounds with section adjustments
+    const baseMidi = 60 + (octave - 4) * 12 + rangeCenterOffset; // C4 = 60, adjusted for section
+    const lowBound = baseMidi - Math.floor(effectiveRange / 2);
+    const highBound = baseMidi + Math.ceil(effectiveRange / 2);
 
     let currentNote = previousNote;
 
@@ -312,15 +468,20 @@ export function generatePhrase({
         const scoredCandidates = candidates.map(candidate => {
             let score = 100;
 
+            // Get section-aware multipliers (default to 1.0 if no profile)
+            const sectionChordToneBonus = sectionProfile?.chordToneBonus || 1.0;
+            const sectionStepwiseBonus = sectionProfile?.stepwiseBonus || 1.0;
+            const sectionLeapPenalty = sectionProfile?.leapPenalty || 1.0;
+
             // Distance from target pitch (contour adherence)
             const distanceFromTarget = Math.abs(candidate.midi - targetMidi);
             score -= distanceFromTarget * 3;
 
             // Chord tone bonus - now using the chord for THIS note position
-            // Apply style-specific chordToneBoost
+            // Apply both style-specific and section-specific chordToneBoost
             const isChordToneOfNoteChord = noteChordTones.includes(candidate.midi % 12);
             if (isChordToneOfNoteChord) {
-                score += Math.round(20 * styleRules.chordToneBoost);
+                score += Math.round(20 * styleRules.chordToneBoost * sectionChordToneBonus);
                 // Root and 5th get extra bonus at phrase boundaries
                 if (i === 0 || i === noteCount - 1) {
                     const rootPc = getPitchClass(noteChord.root);
@@ -345,11 +506,11 @@ export function generatePhrase({
                 const prevMidi = noteToMidi(currentNote);
                 if (prevMidi !== null) {
                     const interval = Math.abs(candidate.midi - prevMidi);
-                    // Apply style-specific stepwiseBoost
-                    if (interval <= 2) score += Math.round(15 * styleRules.stepwiseBoost); // Stepwise
+                    // Apply both style-specific and section-specific stepwiseBoost
+                    if (interval <= 2) score += Math.round(15 * styleRules.stepwiseBoost * sectionStepwiseBonus); // Stepwise
                     else if (interval <= 4) score += 10; // Small leap
-                    else if (interval <= 7) score += 5; // Medium leap
-                    else if (interval > 12) score -= 10; // Large leap penalty
+                    else if (interval <= 7) score += Math.round(5 / sectionLeapPenalty); // Medium leap - reduced by section penalty
+                    else if (interval > 12) score -= Math.round(10 * sectionLeapPenalty); // Large leap penalty - amplified by section
 
                     // Apply preferred/avoided intervals
                     if (styleRules.preferredIntervals && styleRules.preferredIntervals.includes(interval)) {
@@ -387,12 +548,28 @@ export function generatePhrase({
                 if (isChordToneOfNoteChord) score += 10;
             }
             if (i === noteCount - 1) {
-                // Last note - prefer resolution (root or 5th of the FINAL chord)
+                // Last note - section-aware ending preference
                 const finalChord = getChordForNoteIndex(noteCount - 1);
                 const rootPc = getPitchClass(finalChord.root);
                 const notePc = candidate.midi % 12;
-                if (notePc === rootPc) score += 20;
-                if ((notePc - rootPc + 12) % 12 === 7) score += 10;
+                const endingPref = sectionProfile?.endingPreference || 'strong';
+
+                if (endingPref === 'resolved' || endingPref === 'strong') {
+                    // Strong resolution - strongly prefer root, then 5th
+                    if (notePc === rootPc) score += 25;
+                    else if ((notePc - rootPc + 12) % 12 === 7) score += 15; // 5th
+                    else if (isChordToneOfNoteChord) score += 8; // Other chord tones
+                } else if (endingPref === 'open') {
+                    // Open ending - any chord tone is fine, slight root preference
+                    if (notePc === rootPc) score += 12;
+                    else if (isChordToneOfNoteChord) score += 10;
+                } else if (endingPref === 'tension') {
+                    // Tension ending - prefer non-root chord tones or scale tones
+                    if (notePc === rootPc) score += 5; // Slight root preference still
+                    else if ((notePc - rootPc + 12) % 12 === 7) score += 12; // 5th creates mild tension
+                    else if (isChordToneOfNoteChord) score += 15; // 3rd or 7th = good tension
+                    else if (candidate.isScaleTone) score += 8; // Scale tone tension
+                }
             }
 
             return { ...candidate, score, landingChord: noteChord };
