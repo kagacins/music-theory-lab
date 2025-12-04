@@ -11840,7 +11840,28 @@ export function addToProgressionData(chordData, options = {}) {
         saveStateBeforeChange();
     }
 
-    trainerState.progressionData.push(chordData);
+    // Phase 2.1: Check for position-based insertion
+    const insertAfterIndex = getInsertAfterIndex();
+    const usePositionBasedInsert = insertAfterIndex !== null &&
+                                   insertAfterIndex >= 0 &&
+                                   insertAfterIndex < trainerState.progressionData.length;
+
+    if (usePositionBasedInsert) {
+        // Insert after the selected chord
+        const targetIndex = insertAfterIndex + 1;
+        trainerState.progressionData.splice(targetIndex, 0, chordData);
+
+        // Update compositionState if available to keep it in sync
+        const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+        if (compositionState && typeof compositionState.insertChordAt === 'function') {
+            // If compositionState has an insertChordAt method, use it
+            // Otherwise the sync will happen via setProgressionData
+        }
+    } else {
+        // Default: append to end
+        trainerState.progressionData.push(chordData);
+    }
+
     if (chordData.roman && !trainerState.progressionRomans.includes(chordData.roman)) {
         trainerState.progressionRomans.push(chordData.roman);
     }

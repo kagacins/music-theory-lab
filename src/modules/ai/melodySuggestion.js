@@ -227,13 +227,15 @@ export const STYLE_RULES = {
 
 export const MOOD_RULES = {
     bright: {
-        // Happy/Bright - favor major intervals, higher register
+        // Happy/Bright - favor major intervals, higher register, avoid dissonance
         majorIntervalBonus: 15,
         minorIntervalPenalty: -10,
         highRegisterBonus: 8, // per octave above 4
         lowRegisterPenalty: -5,
         preferMajorThird: true,
-        preferPerfectFifth: true
+        preferPerfectFifth: true,
+        dissonancePenalty: -12, // Bright/happy melodies should avoid dissonance
+        chordToneBonus: 8 // Slight preference for chord tones in bright melodies
     },
     dark: {
         // Melancholic/Dark - favor minor intervals, lower register
@@ -356,7 +358,43 @@ function getChordTones(chord) {
     const rootPc = getPitchClass(chord.root);
     if (rootPc === null) return [];
 
-    const intervals = CHORD_INTERVALS[chord.type] || CHORD_INTERVALS['Major'];
+    // Try to find the chord type in CHORD_INTERVALS
+    let intervals = CHORD_INTERVALS[chord.type];
+
+    // If not found, try common aliases and patterns
+    if (!intervals && chord.type) {
+        const type = chord.type.toLowerCase();
+
+        // Map common variations to canonical names
+        if (type === 'm' || type === 'min' || type.includes('minor') && !type.includes('7')) {
+            intervals = CHORD_INTERVALS['Minor'];
+        } else if (type === 'm7' || type === 'min7' || type === '-7' || type.includes('minor 7')) {
+            intervals = CHORD_INTERVALS['Minor 7th'];
+        } else if (type === 'maj7' || type === 'M7' || type.includes('major 7')) {
+            intervals = CHORD_INTERVALS['Major 7th'];
+        } else if (type === '7' || type === 'dom7' || type.includes('dominant')) {
+            intervals = CHORD_INTERVALS['Dominant 7th'];
+        } else if (type === 'dim' || type.includes('diminish') && !type.includes('7')) {
+            intervals = CHORD_INTERVALS['Diminished'];
+        } else if (type === 'dim7' || type === 'o7' || type.includes('diminished 7')) {
+            intervals = CHORD_INTERVALS['Diminished 7th'];
+        } else if (type === 'm7b5' || type === 'ø7' || type.includes('half-dim') || type.includes('half dim')) {
+            intervals = CHORD_INTERVALS['Half-Diminished 7th'];
+        } else if (type === 'aug' || type === '+' || type.includes('augment') && !type.includes('7')) {
+            intervals = CHORD_INTERVALS['Augmented'];
+        } else if (type.includes('sus2')) {
+            intervals = CHORD_INTERVALS['Sus2'];
+        } else if (type.includes('sus4') || type === 'sus') {
+            intervals = CHORD_INTERVALS['Sus4'];
+        }
+    }
+
+    // Ultimate fallback with warning
+    if (!intervals) {
+        console.warn(`[getChordTones] Unknown chord type "${chord.type}" for root ${chord.root}, falling back to Major. This may cause dissonant melody suggestions!`);
+        intervals = CHORD_INTERVALS['Major'];
+    }
+
     return intervals.map(interval => (rootPc + interval) % 12);
 }
 

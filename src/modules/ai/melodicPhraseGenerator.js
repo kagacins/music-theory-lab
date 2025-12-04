@@ -17,8 +17,113 @@ import {
     getScaleNotes,
     SCALES,
     CHORD_INTERVALS,
-    STYLE_RULES
+    STYLE_RULES,
+    MOOD_RULES
 } from './melodySuggestion.js';
+import { getSavedMelodyWeights } from '../config/weightPresets.js';
+
+// -----------------------------------------------------------------------------
+// Mood scoring function for phrase generation
+// Adapted from melodySuggestion.js scoreMood for use in phrase candidate scoring
+// -----------------------------------------------------------------------------
+
+/**
+ * Apply mood-based scoring to a note candidate in phrase generation
+ * @param {number} noteMidi - MIDI number of the candidate note
+ * @param {number} notePc - Pitch class (0-11) of the candidate note
+ * @param {Object} chord - Current chord {root, type}
+ * @param {Array} chordTones - Pitch classes of chord tones
+ * @param {number|null} prevMidi - MIDI of previous note (null if first note)
+ * @param {string} mood - Selected mood (bright, dark, jazzy, tense, calm, energetic)
+ * @returns {number} Mood bonus/penalty score
+ */
+function scoreMoodForPhrase(noteMidi, notePc, chord, chordTones, prevMidi, mood) {
+    const moodRules = MOOD_RULES[mood];
+    if (!moodRules) return 0;
+
+    let moodScore = 0;
+    const rootPc = getPitchClass(chord.root);
+    const interval = (notePc - rootPc + 12) % 12;
+    const octave = Math.floor(noteMidi / 12) - 1;
+
+    // Register bonuses/penalties
+    if (moodRules.highRegisterBonus && octave > 4) {
+        moodScore += moodRules.highRegisterBonus * (octave - 4);
+    }
+    if (moodRules.lowRegisterPenalty && octave < 4) {
+        moodScore += moodRules.lowRegisterPenalty * (4 - octave);
+    }
+
+    // Interval-based bonuses
+    if (moodRules.preferMajorThird && interval === 4) {
+        moodScore += 12;
+    }
+    if (moodRules.preferMinorThird && interval === 3) {
+        moodScore += 12;
+    }
+    if (moodRules.preferPerfectFifth && interval === 7) {
+        moodScore += 10;
+    }
+    if (moodRules.preferMinorSixth && interval === 8) {
+        moodScore += 10;
+    }
+    if (moodRules.preferSeventh && (interval === 10 || interval === 11)) {
+        moodScore += 10;
+    }
+
+    // Tension handling
+    if (moodRules.tensionBonus) {
+        // Tritone and 9ths get bonus for tense/jazzy moods
+        if (interval === 6 || interval === 1 || interval === 2) {
+            moodScore += moodRules.tensionBonus;
+        }
+    }
+    if (moodRules.consonanceBonus) {
+        // Perfect consonances get bonus for calm mood
+        if (interval === 0 || interval === 5 || interval === 7) {
+            moodScore += moodRules.consonanceBonus;
+        }
+    }
+    if (moodRules.dissonancePenalty) {
+        // Dissonances get penalty for calm mood
+        if (interval === 1 || interval === 6 || interval === 11) {
+            moodScore += moodRules.dissonancePenalty;
+        }
+    }
+
+    // Leap handling (if we have a previous note)
+    if (prevMidi !== null) {
+        const leapSize = Math.abs(noteMidi - prevMidi);
+
+        if (moodRules.wideLeapBonus && leapSize > 5) {
+            moodScore += moodRules.wideLeapBonus;
+        }
+        if (moodRules.wideLeapPenalty && leapSize > 5) {
+            moodScore += moodRules.wideLeapPenalty;
+        }
+        if (moodRules.stepwiseBonus && leapSize <= 2) {
+            moodScore += moodRules.stepwiseBonus;
+        }
+        if (moodRules.stepwisePenalty && leapSize <= 2) {
+            moodScore += moodRules.stepwisePenalty;
+        }
+        if (moodRules.leapBonus && leapSize >= 3 && leapSize <= 7) {
+            moodScore += moodRules.leapBonus;
+        }
+    }
+
+    // Chord tone bonus for energetic mood
+    if (moodRules.chordToneBonus) {
+        if (chordTones.includes(notePc)) {
+            moodScore += moodRules.chordToneBonus;
+        }
+    }
+    if (moodRules.rootBonus && interval === 0) {
+        moodScore += moodRules.rootBonus;
+    }
+
+    return moodScore;
+}
 import { getEnharmonicPreferenceForKey } from '../utils/noteUtils.js';
 
 // -----------------------------------------------------------------------------
@@ -339,6 +444,7 @@ function getSpelledNoteName(pitchClass, key) {
  * @param {string} options.lengthId - Phrase length ID (short, medium, long, extended)
  * @param {string} options.rhythmId - Rhythm pattern ID
  * @param {string} options.styleId - Style preset ID (pop, jazz, classical, rock)
+ * @param {string} options.mood - Mood preset ID (bright, dark, jazzy, tense, calm, energetic)
  * @param {string} options.previousNote - Last note before phrase (for voice leading)
  * @param {number} options.octave - Target octave (default 4)
  * @param {number} options.range - Range in semitones (default 12)
@@ -353,6 +459,7 @@ export function generatePhrase({
     lengthId = 'medium',
     rhythmId = 'steady',
     styleId = 'any',
+    mood = 'bright', // Mood preset for emotional character
     previousNote = null,
     octave = 4,
     range = 12,
@@ -394,8 +501,11 @@ export function generatePhrase({
     const effectiveDensityMultiplier = densityMultiplier * sectionDensityMultiplier;
 
     // Apply density multiplier to note count
-    // Clamp between 2 notes minimum and 24 notes maximum
-    const noteCount = Math.max(2, Math.min(24, Math.round(baseNoteCount * effectiveDensityMultiplier)));
+    // Clamp between 2 notes minimum and a dynamic maximum based on target beats
+    // For short phrases (4 beats), max ~16 notes (sixteenths)
+    // For longer selections, scale proportionally: max = targetBeats * 4 (allowing up to 16th notes throughout)
+    const dynamicMaxNotes = Math.max(24, Math.round(effectiveTargetBeats * 4));
+    const noteCount = Math.max(2, Math.min(dynamicMaxNotes, Math.round(baseNoteCount * effectiveDensityMultiplier)));
     const notes = [];
     const noteDetails = [];
 
@@ -404,19 +514,67 @@ export function generatePhrase({
     const keyRoot = key.replace('m', '');
     const scaleNotes = getScaleNotes(keyRoot, scaleType);
 
+    // Get user's custom melody weights and apply them as multipliers to style rules
+    // This matches the behavior in melodySuggestion.js for consistency
+    const userWeights = getSavedMelodyWeights();
+    const baseStyleRules = STYLE_RULES[styleId] || STYLE_RULES.any;
+    const styleRules = {
+        chordToneBoost: baseStyleRules.chordToneBoost * userWeights.chordTone,
+        scaleToneBoost: baseStyleRules.scaleToneBoost * userWeights.scaleTone,
+        stepwiseBoost: baseStyleRules.stepwiseBoost * userWeights.voiceLeading,
+        approachToneBoost: baseStyleRules.approachToneBoost * userWeights.approachTone,
+        tensionPenalty: baseStyleRules.tensionPenalty / userWeights.tensionTolerance, // Inverse relationship
+        preferredIntervals: baseStyleRules.preferredIntervals,
+        avoidIntervals: baseStyleRules.avoidIntervals,
+        useBlueNotes: baseStyleRules.useBlueNotes
+    };
+    const recencyPenaltyMultiplier = userWeights.recencyPenalty;
+
+    // Track recently used pitch classes for recency penalty (within this phrase)
+    const recentPitchClasses = [];
+
+    // Build chord timing map: for each chord, calculate which beat range it covers
+    // This allows us to map note indices to chords based on their position in time
+    let chordTimingMap = null;
+    if (chordSequence && chordSequence.length > 0) {
+        chordTimingMap = [];
+        let beatOffset = 0;
+        for (const entry of chordSequence) {
+            const chordDuration = entry.duration || entry.beats || 4; // Default 4 beats
+            chordTimingMap.push({
+                chord: entry.chord || entry,
+                startBeat: beatOffset,
+                endBeat: beatOffset + chordDuration,
+                duration: chordDuration
+            });
+            beatOffset += chordDuration;
+        }
+    }
+
     // Helper to get chord for a specific note index
+    // Maps note index to a beat position, then finds which chord covers that beat
     const getChordForNoteIndex = (noteIndex) => {
-        if (!chordSequence || chordSequence.length === 0) {
+        if (!chordTimingMap || chordTimingMap.length === 0) {
             return chord; // Fall back to single chord
         }
-        // Find which chord this note index falls under
-        for (const entry of chordSequence) {
-            if (entry.noteIndices && entry.noteIndices.includes(noteIndex)) {
-                return entry.chord;
+
+        // Calculate which beat this note falls on (evenly distributed across target beats)
+        // Note index 0 = beat 0, note index (noteCount-1) = last beat
+        const beatPosition = (noteIndex / Math.max(1, noteCount - 1)) * effectiveTargetBeats;
+
+        // Find which chord covers this beat position
+        for (const timing of chordTimingMap) {
+            if (beatPosition >= timing.startBeat && beatPosition < timing.endBeat) {
+                return timing.chord;
             }
         }
-        // Default to first chord in sequence or provided chord
-        return chordSequence[0]?.chord || chord;
+
+        // Edge case: if beatPosition equals the total (last note), use the last chord
+        if (chordTimingMap.length > 0) {
+            return chordTimingMap[chordTimingMap.length - 1].chord;
+        }
+
+        return chord; // Ultimate fallback
     };
 
     // Initial chord tones (for first note)
@@ -449,15 +607,14 @@ export function generatePhrase({
         const noteChord = getChordForNoteIndex(i);
         const noteChordTones = getChordTones(noteChord);
 
-        // Get style rules for scoring
-        const styleRules = STYLE_RULES[styleId] || STYLE_RULES.any;
+        // styleRules already computed above with user weights applied
 
         // Get candidates around target, using the note's chord context
         const candidates = getCandidatesAroundTarget(targetMidi, noteChord, key, scaleNotes, noteChordTones, styleId);
 
         // Look ahead: get next chord if available (for anticipation on last notes of current chord)
         let nextChord = null;
-        if (chordSequence && chordSequence.length > 0) {
+        if (chordTimingMap && chordTimingMap.length > 1) {
             const nextNoteChord = getChordForNoteIndex(i + 1);
             if (nextNoteChord && nextNoteChord.root !== noteChord.root) {
                 nextChord = nextNoteChord;
@@ -479,15 +636,21 @@ export function generatePhrase({
 
             // Chord tone bonus - now using the chord for THIS note position
             // Apply both style-specific and section-specific chordToneBoost
+            // INCREASED from 20 to 35 to prioritize chord tones over contour adherence
             const isChordToneOfNoteChord = noteChordTones.includes(candidate.midi % 12);
             if (isChordToneOfNoteChord) {
-                score += Math.round(20 * styleRules.chordToneBoost * sectionChordToneBonus);
+                score += Math.round(35 * styleRules.chordToneBoost * sectionChordToneBonus);
                 // Root and 5th get extra bonus at phrase boundaries
                 if (i === 0 || i === noteCount - 1) {
                     const rootPc = getPitchClass(noteChord.root);
                     const notePc = candidate.midi % 12;
-                    if (notePc === rootPc) score += 15; // Root
-                    if ((notePc - rootPc + 12) % 12 === 7) score += 10; // 5th
+                    if (notePc === rootPc) score += 20; // Root (increased)
+                    if ((notePc - rootPc + 12) % 12 === 7) score += 15; // 5th (increased)
+                }
+                // 3rd also gets bonus as it defines chord quality
+                const thirdInterval = noteChordTones.length > 1 ? noteChordTones[1] : null;
+                if (thirdInterval !== null && candidate.midi % 12 === thirdInterval) {
+                    score += 10; // 3rd bonus
                 }
             }
 
@@ -499,6 +662,76 @@ export function generatePhrase({
             // Tension penalty for non-scale, non-chord tones
             if (!candidate.isScaleTone && !isChordToneOfNoteChord) {
                 score -= Math.round(15 * styleRules.tensionPenalty);
+            }
+
+            // === APPROACH TONE SCORING ===
+            // Chromatic approach tones (half-step to chord tone) get a bonus ONLY when:
+            // 1. NOT on phrase boundaries (first/last note)
+            // 2. NOT on strong beats (first note of a chord)
+            // 3. The style supports approach tones
+            // Approach tones are passing notes that resolve - they shouldn't land on downbeats
+            const candidatePc = candidate.midi % 12;
+            let isApproachTone = false;
+            let approachToneTargetPc = null;
+
+            // Only consider approach tones for middle notes in the phrase, not boundaries
+            const isPhraseBoundary = (i === 0 || i === noteCount - 1);
+            // Check if this is likely a strong beat (first note in the chord's duration)
+            // We approximate this by checking if we're at the start of the phrase or
+            // if we just changed chords
+            const isStrongBeat = (i === 0) || (i > 0 && noteChord !== getChordForNoteIndex(i - 1));
+
+            if (!isChordToneOfNoteChord && !isPhraseBoundary && !isStrongBeat) {
+                for (const chordTonePc of noteChordTones) {
+                    // Check if candidate is a half-step above or below a chord tone
+                    if ((candidatePc + 1) % 12 === chordTonePc || (candidatePc + 11) % 12 === chordTonePc) {
+                        isApproachTone = true;
+                        approachToneTargetPc = chordTonePc;
+                        break;
+                    }
+                }
+                if (isApproachTone) {
+                    score += Math.round(12 * styleRules.approachToneBoost);
+                }
+            }
+
+            // === CRITICAL: Penalty for notes that CLASH with chord tones ===
+            // These are notes a half-step away from chord tones - they create harsh dissonance
+            // This penalty applies ALWAYS for phrase boundaries and strong beats
+            // For weak beats, approach tones are exempt (they resolve to chord tones)
+            const notePc = candidatePc; // Reuse the already computed value
+            let hasClash = false;
+            const shouldPenalizeClash = !isApproachTone || isPhraseBoundary || isStrongBeat;
+            if (shouldPenalizeClash) {
+                for (const chordTonePc of noteChordTones) {
+                    const distance = Math.abs(notePc - chordTonePc);
+                    // Half-step clash (1 semitone or 11 semitones which is enharmonic)
+                    if (distance === 1 || distance === 11) {
+                        hasClash = true;
+                        // Heavier penalty on phrase boundaries and strong beats
+                        const clashPenalty = (isPhraseBoundary || isStrongBeat) ? 45 : 35;
+                        score -= clashPenalty;
+                        break;
+                    }
+                }
+            }
+
+            // === Penalty for "avoid notes" - the 4th over a major chord ===
+            // The natural 4th (5 semitones above root) clashes with the major 3rd
+            const rootPc = getPitchClass(noteChord.root);
+            if (rootPc !== null) {
+                const intervalFromRoot = (notePc - rootPc + 12) % 12;
+                // Perfect 4th (5 semitones) over major/dominant chords is an avoid note
+                const chordType = (noteChord.type || 'Major').toLowerCase();
+                const isMajorType = chordType.includes('major') || chordType === 'dominant 7th' ||
+                                   (!chordType.includes('minor') && !chordType.includes('dim') && !chordType.includes('m'));
+                if (intervalFromRoot === 5 && isMajorType) {
+                    score -= 25; // 4th over major chord - avoid note
+                }
+                // Tritone (6 semitones) is very dissonant unless it's part of the chord (like in dom7)
+                if (intervalFromRoot === 6 && !noteChordTones.includes(notePc)) {
+                    score -= 20; // Tritone not in chord
+                }
             }
 
             // Voice leading from previous note
@@ -572,6 +805,57 @@ export function generatePhrase({
                 }
             }
 
+            // === MOOD-BASED SCORING ===
+            // Apply mood rules (bright, dark, jazzy, tense, calm, energetic)
+            // This was previously missing - mood selection had no effect on phrase generation!
+            const prevMidi = currentNote ? noteToMidi(currentNote) : null;
+            const moodBonus = scoreMoodForPhrase(
+                candidate.midi,
+                candidate.midi % 12,
+                noteChord,
+                noteChordTones,
+                prevMidi,
+                mood
+            );
+            score += moodBonus;
+
+            // === RECENCY PENALTY ===
+            // Penalize notes that have been used recently in this phrase
+            // This matches the behavior in melodySuggestion.js for consistency
+            if (recentPitchClasses.length > 0) {
+                const candidatePc = candidate.midi % 12;
+
+                // Count occurrences and find most recent position
+                let occurrenceCount = 0;
+                let mostRecentPosition = -1;
+
+                recentPitchClasses.forEach((recentPc, idx) => {
+                    if (recentPc === candidatePc) {
+                        occurrenceCount++;
+                        // idx 0 is oldest, so most recent is highest idx
+                        if (mostRecentPosition === -1 || idx > mostRecentPosition) {
+                            mostRecentPosition = idx;
+                        }
+                    }
+                });
+
+                if (occurrenceCount > 0) {
+                    // Penalty increases with frequency
+                    const frequencyPenalty = occurrenceCount * 8; // -8 points per occurrence
+
+                    // Penalty increases with recency (higher position = more recent)
+                    // Max penalty 15 for most recent, decreasing for older notes
+                    const recencyFromEnd = recentPitchClasses.length - 1 - mostRecentPosition;
+                    const recencyPenalty = recencyFromEnd < 5
+                        ? (5 - recencyFromEnd) * 3
+                        : 0;
+
+                    // Apply user's recency penalty multiplier
+                    const totalPenalty = (frequencyPenalty + recencyPenalty) * recencyPenaltyMultiplier;
+                    score -= totalPenalty;
+                }
+            }
+
             return { ...candidate, score, landingChord: noteChord };
         });
 
@@ -597,6 +881,13 @@ export function generatePhrase({
         });
 
         currentNote = selected.note;
+
+        // Track this pitch class for recency penalty on future notes
+        // Keep only last 8 pitch classes to match melodySuggestion.js behavior
+        recentPitchClasses.push(selected.midi % 12);
+        if (recentPitchClasses.length > 8) {
+            recentPitchClasses.shift();
+        }
     }
 
     // ==========================================================================
@@ -730,6 +1021,7 @@ export function generatePhrase({
             chord,
             key,
             styleId,
+            mood, // Include mood in context for reference
             octave,
             range,
             densityMultiplier,

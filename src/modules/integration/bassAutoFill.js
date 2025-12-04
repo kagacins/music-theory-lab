@@ -8,25 +8,71 @@
  */
 
 // Intervals for different chord types (in semitones from root)
+// Includes both canonical names (with spaces) and common aliases
 const CHORD_INTERVALS = {
     'Major': [0, 4, 7],
     'Minor': [0, 3, 7],
     'Diminished': [0, 3, 6],
     'Augmented': [0, 4, 8],
+    'Major 7th': [0, 4, 7, 11],
     'Major7': [0, 4, 7, 11],
+    'Minor 7th': [0, 3, 7, 10],
     'Minor7': [0, 3, 7, 10],
+    'Dominant 7th': [0, 4, 7, 10],
     'Dominant7': [0, 4, 7, 10],
+    'Diminished 7th': [0, 3, 6, 9],
     'Diminished7': [0, 3, 6, 9],
+    'Half-Diminished 7th': [0, 3, 6, 10],
     'HalfDiminished7': [0, 3, 6, 10],
     'Sus2': [0, 2, 7],
     'Sus4': [0, 5, 7],
     'Add9': [0, 4, 7, 14],
+    'Major 6th': [0, 4, 7, 9],
     'Major6': [0, 4, 7, 9],
+    'Minor 6th': [0, 3, 7, 9],
     'Minor6': [0, 3, 7, 9],
+    'Major 9th': [0, 4, 7, 11, 14],
     'Major9': [0, 4, 7, 11, 14],
+    'Minor 9th': [0, 3, 7, 10, 14],
     'Minor9': [0, 3, 7, 10, 14],
+    'Dominant 9th': [0, 4, 7, 10, 14],
     'Dominant9': [0, 4, 7, 10, 14]
 };
+
+/**
+ * Get chord intervals with robust fallback handling
+ */
+function getChordIntervalsRobust(chordType) {
+    let intervals = CHORD_INTERVALS[chordType];
+
+    if (!intervals && chordType) {
+        const type = chordType.toLowerCase();
+        if (type === 'm' || type === 'min' || (type.includes('minor') && !type.includes('7'))) {
+            intervals = CHORD_INTERVALS['Minor'];
+        } else if (type === 'm7' || type === 'min7' || type.includes('minor 7')) {
+            intervals = CHORD_INTERVALS['Minor 7th'];
+        } else if (type === 'maj7' || type.includes('major 7')) {
+            intervals = CHORD_INTERVALS['Major 7th'];
+        } else if (type === '7' || type.includes('dominant 7')) {
+            intervals = CHORD_INTERVALS['Dominant 7th'];
+        } else if (type === 'dim' || (type.includes('diminish') && !type.includes('7'))) {
+            intervals = CHORD_INTERVALS['Diminished'];
+        } else if (type === 'dim7' || type.includes('diminished 7')) {
+            intervals = CHORD_INTERVALS['Diminished 7th'];
+        } else if (type === 'm7b5' || type.includes('half-dim') || type.includes('half dim')) {
+            intervals = CHORD_INTERVALS['Half-Diminished 7th'];
+        } else if (type === 'aug' || type === '+' || type.includes('augment')) {
+            intervals = CHORD_INTERVALS['Augmented'];
+        }
+    }
+
+    if (!intervals) {
+        console.warn(`[bassAutoFill] Unknown chord type "${chordType}", falling back to Major`);
+        intervals = CHORD_INTERVALS['Major'];
+    }
+
+    return intervals;
+}
 
 // Note names for calculation
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -54,7 +100,7 @@ function getBassNoteForChord(chord, bassFollowsInversion, octave = 2) {
     }
 
     // Get intervals for this chord type
-    const intervals = CHORD_INTERVALS[chord.type] || CHORD_INTERVALS['Major'];
+    const intervals = getChordIntervalsRobust(chord.type);
 
     // Get the interval index for this inversion (clamped to available intervals)
     const inversionIndex = Math.min(chord.inversion, intervals.length - 1);

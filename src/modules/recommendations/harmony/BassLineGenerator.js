@@ -520,7 +520,33 @@ class BassLineGenerator {
      * @returns {Array}
      */
     _getChordTones(rootPitchClass, chordType) {
-        const intervals = CHORD_INTERVALS[chordType] || CHORD_INTERVALS['Major'];
+        let intervals = CHORD_INTERVALS[chordType];
+
+        // Handle common aliases if not found
+        if (!intervals && chordType) {
+            const type = chordType.toLowerCase();
+            if (type === 'm' || type === 'min' || type.includes('minor') && !type.includes('7')) {
+                intervals = CHORD_INTERVALS['Minor'];
+            } else if (type === 'm7' || type === 'min7' || type.includes('minor 7')) {
+                intervals = CHORD_INTERVALS['Minor 7th'];
+            } else if (type === 'maj7' || type.includes('major 7')) {
+                intervals = CHORD_INTERVALS['Major 7th'];
+            } else if (type === '7' || type.includes('dominant')) {
+                intervals = CHORD_INTERVALS['Dominant 7th'];
+            } else if (type === 'dim' || type.includes('diminish') && !type.includes('7')) {
+                intervals = CHORD_INTERVALS['Diminished'];
+            } else if (type === 'dim7' || type.includes('diminished 7')) {
+                intervals = CHORD_INTERVALS['Diminished 7th'];
+            } else if (type === 'm7b5' || type.includes('half-dim')) {
+                intervals = CHORD_INTERVALS['Half-Diminished 7th'];
+            }
+        }
+
+        if (!intervals) {
+            console.warn(`[BassLineGenerator] Unknown chord type "${chordType}", falling back to Major`);
+            intervals = CHORD_INTERVALS['Major'];
+        }
+
         return intervals.map(i => (rootPitchClass + i) % 12);
     }
 

@@ -573,9 +573,39 @@ export function analyzeMeasureNotes(notes, chord, key = 'C') {
 export function getChordTones(chord) {
     const chordRoot = chord.root;
     const chordType = chord.type || 'Major';
-    const chordDef = CHORD_DEFINITIONS[chordType];
 
-    if (!chordRoot || !chordDef) return [];
+    // Try direct lookup first
+    let chordDef = CHORD_DEFINITIONS[chordType];
+
+    // If not found, try common aliases
+    if (!chordDef && chordType) {
+        const type = chordType.toLowerCase();
+        if (type === 'm' || type === 'min' || (type.includes('minor') && !type.includes('7'))) {
+            chordDef = CHORD_DEFINITIONS['Minor'];
+        } else if (type === 'm7' || type === 'min7' || type.includes('minor 7')) {
+            chordDef = CHORD_DEFINITIONS['Minor 7th'];
+        } else if (type === 'maj7' || type.includes('major 7')) {
+            chordDef = CHORD_DEFINITIONS['Major 7th'];
+        } else if (type === '7' || type.includes('dominant 7')) {
+            chordDef = CHORD_DEFINITIONS['Dominant 7th'];
+        } else if (type === 'dim' || (type.includes('diminish') && !type.includes('7'))) {
+            chordDef = CHORD_DEFINITIONS['Diminished'];
+        } else if (type === 'dim7' || type.includes('diminished 7')) {
+            chordDef = CHORD_DEFINITIONS['Diminished 7th'];
+        } else if (type === 'm7b5' || type.includes('half-dim') || type.includes('half dim')) {
+            chordDef = CHORD_DEFINITIONS['Half-Diminished 7th'];
+        } else if (type === 'aug' || type === '+' || type.includes('augment')) {
+            chordDef = CHORD_DEFINITIONS['Augmented'];
+        }
+    }
+
+    // Ultimate fallback with warning
+    if (!chordDef) {
+        console.warn(`[chordToneAnalyzer] Unknown chord type "${chordType}" for root ${chordRoot}, falling back to Major`);
+        chordDef = CHORD_DEFINITIONS['Major'];
+    }
+
+    if (!chordRoot) return [];
 
     const rootIndex = normalizeToPitchClass(chordRoot);
     if (rootIndex === -1) return [];

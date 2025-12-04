@@ -110,9 +110,11 @@ export function noteToRomanNumeral(noteName, key, chordType) {
 
     // Determine the base quality for finding the roman numeral
     // For extended chords, we need to find the base triad (Major, Minor, Diminished)
+    // Sus chords use uppercase roman numerals (like Major)
     let baseQuality = chordType;
     if (chordType.includes('Major') || chordType === 'Dominant 7th' || chordType === 'Add9' ||
-        chordType.includes('6th') && !chordType.includes('Minor')) {
+        chordType.includes('6th') && !chordType.includes('Minor') ||
+        chordType === 'Sus2' || chordType === 'Sus4' || chordType === 'Power Chord') {
         baseQuality = 'Major';
     } else if (chordType.includes('Minor') || chordType === 'Half-Diminished 7th') {
         baseQuality = 'Minor';
@@ -127,12 +129,27 @@ export function noteToRomanNumeral(noteName, key, chordType) {
         ROMAN_MAP_BASE[key].quality === baseQuality
     );
 
-    // Fallback: find by scale degree only if no exact match
-    const fallbackKey = romanKeys.find(key =>
-        ROMAN_MAP_BASE[key].index === scaleDegreeIndex
-    );
+    // If no exact match found, DON'T fall back to a different quality.
+    // Instead, construct the roman numeral based on the quality we have.
+    // This ensures D Major gets "II" not "ii"
+    let baseRoman = foundKey;
 
-    let baseRoman = foundKey || fallbackKey || null;
+    if (!baseRoman && scaleDegreeIndex !== -1) {
+        // Construct the roman numeral from scale degree and quality
+        const romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+        const baseNumeral = romanNumerals[scaleDegreeIndex];
+
+        if (baseQuality === 'Major') {
+            baseRoman = baseNumeral; // Uppercase for major
+        } else if (baseQuality === 'Minor') {
+            baseRoman = baseNumeral.toLowerCase(); // Lowercase for minor
+        } else if (baseQuality === 'Diminished') {
+            baseRoman = baseNumeral.toLowerCase() + '°'; // Lowercase + degree symbol
+        } else if (baseQuality === 'Augmented') {
+            baseRoman = baseNumeral + '+'; // Uppercase + plus symbol
+        }
+    }
+
     if (!baseRoman) return null;
 
     // Add chord quality suffix for extended chords
@@ -145,11 +162,19 @@ export function noteToRomanNumeral(noteName, key, chordType) {
  * Get the quality suffix for a chord type to append to roman numeral
  * @param {string} chordType - Chord type from CHORD_DEFINITIONS
  * @param {string} baseRoman - Base roman numeral (e.g., "I", "ii", "V")
- * @returns {string} Quality suffix (e.g., "maj7", "7", "°7")
+ * @returns {string} Quality suffix (e.g., "maj7", "7", "°7", "sus2", "sus4")
  */
 function getChordQualitySuffix(chordType, baseRoman) {
-    // Basic triads - no suffix needed (include aliases Sus2/Sus4)
-    if (['Major', 'Minor', 'Augmented', 'Sus2', 'Sus4', 'Power Chord'].includes(chordType)) {
+    // Sus chords need their suffix
+    if (chordType === 'Sus2') {
+        return 'sus2';
+    }
+    if (chordType === 'Sus4') {
+        return 'sus4';
+    }
+
+    // Basic triads - no suffix needed
+    if (['Major', 'Minor', 'Augmented', 'Power Chord'].includes(chordType)) {
         return '';
     }
 

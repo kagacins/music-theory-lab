@@ -178,6 +178,38 @@ export class RecommendationsSidebarController {
                     return;
                 }
 
+                // Check if "Why?" button was clicked
+                const whyBtn = e.target.closest('.chord-why-btn');
+                if (whyBtn) {
+                    e.stopPropagation(); // Prevent recommendation item click
+                    const root = whyBtn.dataset.chordRoot;
+                    const type = whyBtn.dataset.chordType;
+                    const romanNumeral = whyBtn.dataset.chordFunction;
+                    const confidence = parseInt(whyBtn.dataset.chordScore || 0);
+
+                    // Get the full recommendation data from the item
+                    const item = whyBtn.closest('.chord-recommendation-item');
+                    const reasons = item ? this.getRecommendationReasons(item) : [];
+
+                    // Get previous chord's roman numeral from progression
+                    const progression = getProgressionData();
+                    const progressionRomans = window.getProgressionRomans ? window.getProgressionRomans() : [];
+                    const prevChord = progressionRomans.length > 0 ? progressionRomans[progressionRomans.length - 1] : null;
+
+                    // Show "Why This Works" panel
+                    if (window.showWhyThisWorks) {
+                        window.showWhyThisWorks({
+                            chord: root,
+                            type: type,
+                            romanNumeral: romanNumeral,
+                            prevChord: prevChord,
+                            confidence: confidence,
+                            reasons: reasons
+                        });
+                    }
+                    return;
+                }
+
                 // Find the clicked recommendation item
                 const item = e.target.closest('.chord-recommendation-item');
                 if (item) {
@@ -338,6 +370,87 @@ export class RecommendationsSidebarController {
 
         // Insert the chord into the progression
         this.insertChordFromRecommendation(chordRoot, chordType);
+    }
+
+    /**
+     * Get reasons from the stored recommendation data
+     * Since tooltips store the full recommendation data, we can access it from cached recommendations
+     * @param {HTMLElement} item - The recommendation item element
+     * @returns {Array} Array of reason objects
+     */
+    getRecommendationReasons(item) {
+        // Try to get from cached recommendations in the service
+        if (this.service && this.service.cachedRecommendations) {
+            const root = item.dataset.chordRoot;
+            const type = item.dataset.chordType;
+
+            const cached = this.service.cachedRecommendations.find(rec =>
+                rec.chord && rec.chord.root === root && rec.chord.type === type
+            );
+
+            if (cached && cached.reasons) {
+                return cached.reasons;
+            }
+
+            // Also check for scoreBreakdown which can be converted to reasons
+            if (cached && cached.scoreBreakdown) {
+                return this.convertBreakdownToReasons(cached.scoreBreakdown, cached.reason);
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Convert score breakdown to reason objects for display
+     * @param {Object} breakdown - Score breakdown object
+     * @param {string} reason - Overall reason string
+     * @returns {Array} Array of reason objects
+     */
+    convertBreakdownToReasons(breakdown, reason) {
+        const reasons = [];
+
+        if (reason) {
+            reasons.push({
+                category: 'recommendation',
+                explanation: reason,
+                commonTalk: reason
+            });
+        }
+
+        if (breakdown.functionScore > 0) {
+            reasons.push({
+                category: 'harmonic_function',
+                explanation: `Strong harmonic function score: ${Math.round(breakdown.functionScore)}%`,
+                commonTalk: 'This chord fits well within the key'
+            });
+        }
+
+        if (breakdown.voiceLeadingScore > 70) {
+            reasons.push({
+                category: 'voice_leading',
+                explanation: `Smooth voice leading: ${Math.round(breakdown.voiceLeadingScore)}%`,
+                commonTalk: 'Notes move smoothly from the previous chord'
+            });
+        }
+
+        if (breakdown.styleFit > 0) {
+            reasons.push({
+                category: 'style_fit',
+                explanation: `Matches your style preference: ${Math.round(breakdown.styleFit)}%`,
+                commonTalk: 'Fits the musical style you selected'
+            });
+        }
+
+        if (breakdown.moodFit > 0) {
+            reasons.push({
+                category: 'mood_fit',
+                explanation: `Matches your mood preference: ${Math.round(breakdown.moodFit)}%`,
+                commonTalk: 'Evokes the emotional feeling you want'
+            });
+        }
+
+        return reasons;
     }
 
     /**

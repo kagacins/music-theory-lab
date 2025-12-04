@@ -1040,6 +1040,43 @@ function noteToChromatic(noteName) {
 }
 
 /**
+ * Get chord intervals with robust fallback handling
+ * @param {string} chordType - Chord type name
+ * @returns {number[]} Array of intervals in semitones
+ */
+function getChordIntervalsRobust(chordType) {
+    let intervals = CHORD_INTERVALS[chordType];
+
+    if (!intervals && chordType) {
+        const type = chordType.toLowerCase();
+        if (type === 'm' || type === 'min' || (type.includes('minor') && !type.includes('7'))) {
+            intervals = CHORD_INTERVALS['Minor'];
+        } else if (type === 'm7' || type === 'min7' || type.includes('minor 7')) {
+            intervals = CHORD_INTERVALS['Minor 7th'];
+        } else if (type === 'maj7' || type.includes('major 7')) {
+            intervals = CHORD_INTERVALS['Major 7th'];
+        } else if (type === '7' || type.includes('dominant')) {
+            intervals = CHORD_INTERVALS['Dominant 7th'];
+        } else if (type === 'dim' || (type.includes('diminish') && !type.includes('7'))) {
+            intervals = CHORD_INTERVALS['Diminished'];
+        } else if (type === 'dim7' || type.includes('diminished 7')) {
+            intervals = CHORD_INTERVALS['Diminished 7th'];
+        } else if (type === 'm7b5' || type.includes('half-dim')) {
+            intervals = CHORD_INTERVALS['Half-Diminished 7th'];
+        } else if (type === 'aug' || type === '+' || type.includes('augment')) {
+            intervals = CHORD_INTERVALS['Augmented'];
+        }
+    }
+
+    if (!intervals) {
+        console.warn(`[autoHarmonize] Unknown chord type "${chordType}", falling back to Major`);
+        intervals = CHORD_INTERVALS['Major'];
+    }
+
+    return intervals;
+}
+
+/**
  * Get chord notes for a given root and type
  * @param {string} root - Root note (e.g., 'C', 'F#')
  * @param {string} type - Chord type (e.g., 'Major', 'Minor 7th')
@@ -1049,7 +1086,7 @@ function getChordNotes(root, type) {
     const rootIndex = noteToChromatic(root);
     if (rootIndex === -1) return [];
 
-    const intervals = CHORD_INTERVALS[type] || CHORD_INTERVALS['Major'];
+    const intervals = getChordIntervalsRobust(type);
     return intervals.map(interval => (rootIndex + interval) % 12);
 }
 
@@ -2141,7 +2178,7 @@ export function generateVoicing(root, type, prevVoicing = null, options = {}) {
         return null;
     }
 
-    const intervals = CHORD_INTERVALS[type] || CHORD_INTERVALS['Major'];
+    const intervals = getChordIntervalsRobust(type);
     const chordTones = intervals.map(i => (rootIndex + i) % 12);
 
     // Start with bass

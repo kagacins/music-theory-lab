@@ -27,7 +27,8 @@ import {
     setContextAwareMode,
     getProgressionLookback,
     setProgressionLookback,
-    getSelectedChordIndex
+    getSelectedChordIndex,
+    setSelectedChordIndex
 } from '../../state/trainerState.js';
 import {
     getSectionIntent,
@@ -2173,6 +2174,85 @@ function createRecommendationCard(rec, index, rhythmicContext) {
 
     card.appendChild(scoreBadge);
 
+    // Why button - opens theory explanation panel
+    const whyBtn = document.createElement('button');
+    whyBtn.innerHTML = '?';
+    whyBtn.title = 'Why this chord works';
+    whyBtn.style.cssText = `
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #8b5cf6;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 700;
+        flex-shrink: 0;
+        transition: background 0.15s;
+    `;
+    whyBtn.addEventListener('mouseenter', () => {
+        whyBtn.style.background = '#7c3aed';
+    });
+    whyBtn.addEventListener('mouseleave', () => {
+        whyBtn.style.background = '#8b5cf6';
+    });
+    whyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Get the current key for roman numeral conversion
+        const currentKey = getCurrentKey() || 'C';
+        const spelledRoot = spellNoteInKey(rec.root, currentKey);
+        const numeral = noteToRomanNumeral(rec.root, currentKey, rec.type);
+
+        // Get previous chord context for transition explanations
+        const progressionData = getProgressionData() || [];
+        const selectedIndex = getSelectedChordIndex();
+        let prevChordData = null;
+        let prevRomanNumeral = null;
+        let nextChordData = null;
+        let nextRomanNumeral = null;
+
+        if (selectedIndex >= 0 && progressionData.length > 0) {
+            // Previous chord (the selected chord that this recommendation follows)
+            prevChordData = progressionData[selectedIndex];
+            if (prevChordData) {
+                prevRomanNumeral = noteToRomanNumeral(prevChordData.root, currentKey, prevChordData.type);
+            }
+            // Next chord (if any)
+            if (selectedIndex + 1 < progressionData.length) {
+                nextChordData = progressionData[selectedIndex + 1];
+                if (nextChordData) {
+                    nextRomanNumeral = noteToRomanNumeral(nextChordData.root, currentKey, nextChordData.type);
+                }
+            }
+        }
+
+        console.log('[Why Button] Clicked for chord:', numeral, spelledRoot);
+        console.log('[Why Button] Context - key:', currentKey, 'prev:', prevRomanNumeral, 'next:', nextRomanNumeral);
+
+        // Show the Why This Works panel with full context
+        if (typeof window.showWhyThisWorks === 'function') {
+            window.showWhyThisWorks({
+                romanNumeral: numeral,
+                chord: spelledRoot,
+                type: rec.type,
+                reason: rec.reason,
+                // Enhanced context for key-aware explanations
+                key: currentKey,
+                prevChord: prevRomanNumeral,
+                prevChordData: prevChordData,
+                nextChord: nextRomanNumeral,
+                nextChordData: nextChordData,
+                // For building note-specific explanations
+                root: rec.root
+            });
+        } else {
+            // Fallback if function not available - show basic alert
+            alert(`Why "${spelledRoot}" (${numeral}) works:\n\n${rec.reason || 'This chord fits well in the current harmonic context.'}`);
+        }
+    });
+    card.appendChild(whyBtn);
+
     // Play button
     const playBtn = document.createElement('button');
     playBtn.innerHTML = '▶';
@@ -2315,6 +2395,10 @@ function addChordToProgression(rec, rhythmicContext, options = {}) {
     // So subsequent adds will be inserted after the new chord
     if (modalState.selectedProgressionIndex >= 0) {
         modalState.selectedProgressionIndex += 1;
+        // Also update the global insert position so the next chord knows where to go
+        setInsertAfterIndex(modalState.selectedProgressionIndex);
+        // Update the global selected chord index so the progression display stays in sync
+        setSelectedChordIndex(modalState.selectedProgressionIndex);
     }
 
     // Only render if not skipping (for batch operations like "Add All")
@@ -2701,6 +2785,34 @@ function renderExplorerView(container) {
                 }, null);
             });
             tdActions.appendChild(addBtn);
+
+            // Why This Works button
+            const whyBtn = document.createElement('button');
+            whyBtn.innerHTML = '?';
+            whyBtn.title = 'Why this works';
+            whyBtn.style.cssText = `
+                padding: 4px 8px;
+                background: #8b5cf6;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: bold;
+            `;
+            whyBtn.addEventListener('click', () => {
+                const numeral = noteToRomanNumeral(rec.root, currentKey, rec.type);
+                const spelledRoot = spellNoteInKey(rec.root, currentKey);
+                window.showWhyThisWorks({
+                    romanNumeral: numeral,
+                    chord: spelledRoot,
+                    type: rec.type,
+                    reason: rec.reason,
+                    key: currentKey,
+                    root: rec.root
+                });
+            });
+            tdActions.appendChild(whyBtn);
             row.appendChild(tdActions);
 
             tbody.appendChild(row);
@@ -3051,7 +3163,8 @@ function renderSequencesView(container) {
                     topN: 10,
                     sectionInfo: sectionInfo,
                     contextMode: getContextAwareMode(),
-                    melodyOptions: melodyOptions
+                    melodyOptions: melodyOptions,
+                    tensionArcShape: modalState.tensionArcShape
                 }
             );
         } else {
@@ -3289,6 +3402,43 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
             });
             chordsRow.appendChild(chip);
             allChips.push(chip);
+
+            // Small "?" button for Why This Works
+            const whyBtn = document.createElement('button');
+            whyBtn.innerHTML = '?';
+            whyBtn.title = 'Why this works';
+            whyBtn.style.cssText = `
+                padding: 2px 6px;
+                background: #8b5cf6;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 10px;
+                font-weight: bold;
+                margin-left: 2px;
+                align-self: center;
+            `;
+            whyBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const numeral = noteToRomanNumeral(chord.root, key, chord.type);
+                const spelledRoot = spellNoteInKey(chord.root, key);
+                // Get previous chord context
+                const prevChord = chordIdx === 0 ? currentChord : seq.chords[chordIdx - 1];
+                const prevNumeral = noteToRomanNumeral(prevChord.root, key, prevChord.type);
+                const prevSpelledRoot = spellNoteInKey(prevChord.root, key);
+                window.showWhyThisWorks({
+                    romanNumeral: numeral,
+                    chord: spelledRoot,
+                    type: chord.type,
+                    reason: seq.reason,
+                    key: key,
+                    root: chord.root,
+                    prevChord: prevNumeral,
+                    prevChordData: { root: prevChord.root, type: prevChord.type, spelled: prevSpelledRoot }
+                });
+            });
+            chordsRow.appendChild(whyBtn);
 
             // Arrow between chords (but not after the last one)
             if (chordIdx < seq.chords.length - 1) {
@@ -3565,7 +3715,7 @@ function renderExpandedAlternatives(container, alternatives, currentChord, key, 
             }
         });
 
-        // Score badge
+        // Score badge with tooltip
         const scoreValue = Math.min(100, Math.round(alt.totalScore || alt.score || 70));
         const scoreBadge = document.createElement('span');
         scoreBadge.style.cssText = `
@@ -3576,8 +3726,12 @@ function renderExpandedAlternatives(container, alternatives, currentChord, key, 
             font-size: 11px;
             font-weight: 600;
             margin-left: auto;
+            cursor: help;
         `;
         scoreBadge.textContent = `${scoreValue}%`;
+        // Add tooltip with reason/breakdown
+        const tooltipText = alt.reason || 'Score based on harmonic analysis';
+        scoreBadge.title = `Score: ${scoreValue}%\n${tooltipText}`;
         chordsRow.appendChild(scoreBadge);
 
         altRow.appendChild(chordsRow);
@@ -4562,7 +4716,8 @@ function generateAndDisplayPhrases(container, chord, key) {
             range: modalState.phraseRange,
             densityMultiplier: modalState.phraseDensity,
             targetBeats: targetBeats, // Pass custom target beats for section mode
-            sectionContext: sectionContext // Pass section context
+            sectionContext: sectionContext, // Pass section context
+            chordSequence: chordSequence // Pass chord sequence for multi-chord phrases
         }, 5);
 
         // Verify phrase durations match target (should already be correct from generator)

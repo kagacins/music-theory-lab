@@ -6,7 +6,56 @@
  */
 
 // ===========================================
-// CORE MODULES
+// IMPORTS (needed for local use in this file)
+// ===========================================
+
+import {
+  theoryConcepts,
+  getConcept,
+  getConceptsByCategory,
+  getExplanation,
+  searchConcepts,
+  CONCEPT_CATEGORIES
+} from './concepts.js';
+
+import {
+  chordFunctions,
+  chordTransitions,
+  getChordFunction,
+  getTransition,
+  getChordsByFunction,
+  getFunctionColor,
+  getCommonNextChords,
+  FUNCTION_TYPES,
+  FUNCTION_COLORS
+} from './chordFunctions.js';
+
+import {
+  progressionPatterns,
+  getProgression,
+  getProgressionsByCategory,
+  getProgressionsByDifficulty,
+  getProgressionsByGenre,
+  getKeyExample,
+  searchProgressions,
+  PROGRESSION_CATEGORIES,
+  PROGRESSION_DIFFICULTIES
+} from './progressionPatterns.js';
+
+import {
+  glossary,
+  getTerm,
+  getSimpleDefinition,
+  getTechnicalDefinition,
+  searchGlossary,
+  getRelatedTerms,
+  getTermsByCategory,
+  allTerms,
+  termCount
+} from './glossary.js';
+
+// ===========================================
+// RE-EXPORTS (for consumers of this module)
 // ===========================================
 
 // Concept definitions with multi-level explanations
@@ -17,7 +66,7 @@ export {
   getExplanation,
   searchConcepts,
   CONCEPT_CATEGORIES
-} from './concepts.js';
+};
 
 // Chord function explanations (why chords work in context)
 export {
@@ -30,7 +79,7 @@ export {
   getCommonNextChords,
   FUNCTION_TYPES,
   FUNCTION_COLORS
-} from './chordFunctions.js';
+};
 
 // Common progression patterns with examples
 export {
@@ -43,7 +92,7 @@ export {
   searchProgressions,
   PROGRESSION_CATEGORIES,
   PROGRESSION_DIFFICULTIES
-} from './progressionPatterns.js';
+};
 
 // Glossary terms for tooltips and definitions
 export {
@@ -56,7 +105,7 @@ export {
   getTermsByCategory,
   allTerms,
   termCount
-} from './glossary.js';
+};
 
 
 // ===========================================
@@ -150,11 +199,69 @@ export function getExplanationAtLevel(type, id, level = 'simple') {
  * @returns {Object} Explanation object with title, explanation, and suggestions
  */
 export function getWhyThisWorks(chordNumeral, prevChord = null, nextChord = null, level = 'simple') {
-  const chord = chordFunctions[chordNumeral];
+  // Try exact match first (e.g., "ii7", "V7", "II", "Imaj7")
+  let chord = chordFunctions[chordNumeral];
+  let usedNumeral = chordNumeral;
+
   if (!chord) {
+    // Extract the base numeral and suffix for smarter lookup
+    // Handle suffixes: maj7, m7, ø7, °7, 7, 9, 11, 13, add9, sus4, sus2, 6/9, 6
+    const suffixMatch = chordNumeral.match(/(maj7|ø7|°7|m7|7|9|11|13|add9|sus[24]|6\/9|6)$/i);
+    const suffix = suffixMatch ? suffixMatch[1] : '';
+    const baseNumeral = suffix ? chordNumeral.slice(0, -suffix.length) : chordNumeral;
+
+    // Determine if original chord is major or minor based on case
+    // Uppercase (I, II, III, IV, V, VI, VII) = Major
+    // Lowercase (i, ii, iii, iv, v, vi, vii) = Minor
+    const isMajorNumeral = baseNumeral === baseNumeral.toUpperCase();
+
+    // Try these lookups in order of specificity:
+    // 1. Base numeral with 7 suffix (for 7th chord variants like ii7 -> ii7, II7 -> II7)
+    // 2. Base numeral without suffix (ii7 -> ii, V7 -> V)
+    // 3. If uppercase non-diatonic (like II), we already have that entry now
+
+    const lookupAttempts = [];
+
+    // For extended chords (9, 11, 13), try the 7th version first
+    if (['9', '11', '13'].includes(suffix)) {
+      lookupAttempts.push(baseNumeral + '7');
+    }
+
+    // Try base numeral
+    lookupAttempts.push(baseNumeral);
+
+    // For uppercase numerals that might be secondary dominants, check both forms
+    // e.g., II (major) is different from ii (minor)
+    // But we should NOT fall back from II to ii - they're different chords!
+
+    for (const attempt of lookupAttempts) {
+      if (chordFunctions[attempt]) {
+        chord = chordFunctions[attempt];
+        usedNumeral = attempt;
+        break;
+      }
+    }
+
+    // If still no match and it's a diminished or half-diminished chord,
+    // try the vii° entry
+    if (!chord && (suffix === '°7' || suffix === 'ø7')) {
+      const dimBase = baseNumeral.replace(/°$/, '');
+      if (chordFunctions[dimBase + '°']) {
+        chord = chordFunctions[dimBase + '°'];
+        usedNumeral = dimBase + '°';
+      }
+    }
+  }
+
+  if (!chord) {
+    // Provide a more helpful message based on what we know
+    const isMajor = chordNumeral === chordNumeral.toUpperCase();
     return {
-      title: "Unknown Chord",
-      explanation: "This chord isn't in our standard database.",
+      title: `${chordNumeral} Chord`,
+      explanation: `This ${isMajor ? 'major' : 'minor'} chord adds color and movement to your progression. ` +
+        `While we don't have specific theory notes for this exact chord yet, ` +
+        `it can create interesting harmonic variety.`,
+      function: isMajor ? 'chromatic' : 'chromatic',
       suggestions: []
     };
   }

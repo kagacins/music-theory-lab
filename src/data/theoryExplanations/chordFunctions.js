@@ -405,6 +405,430 @@ export const chordFunctions = {
     commonNextChords: ["♭VI", "IV", "♭VII"],
     commonPrevChords: ["I", "V"],
     famousSongs: ["'Space Oddity'", "'Creep' intro (B to C)"]
+  },
+
+  // ===========================================
+  // 7TH CHORD VARIANTS
+  // ===========================================
+
+  "I7": {
+    numeral: "I7",
+    name: "Tonic Dominant 7th",
+    function: "tonic",
+    color: "#22c55e",
+
+    simple: {
+      title: "Home with a Bluesy Edge",
+      explanation: "This is your home chord with a dominant 7th added - common in blues and jazz! It adds a slightly unstable, bluesy color while still feeling like home.",
+      feeling: "Stable but with bluesy tension, funky",
+      whenToUse: "Use in blues progressions, funk, and jazz when you want home base to have more color and movement."
+    },
+
+    intermediate: {
+      title: "The Blues Tonic (I7)",
+      explanation: "The I7 adds a minor 7th to the tonic, creating the characteristic blues sound. In blues, every chord is often a dominant 7th, blurring traditional function. This chord both resolves AND creates motion.",
+      function: "Tonic function with added tension. Characteristic of blues harmony.",
+      extensions: "I9, I13 add more color while maintaining the blues tonic feel."
+    },
+
+    advanced: {
+      title: "Dominant 7th on Tonic",
+      explanation: "The I7 defies traditional harmony where dominant 7ths resolve. In blues, the minor 7th on I creates a 'constant tension' aesthetic. The tritone (3-♭7) doesn't resolve but becomes part of the tonic color.",
+      voiceLeading: "The ♭7 (Bb in C7) creates voice-leading motion even on tonic. Can move chromatically to major 7th for color.",
+      substitutes: "Imaj7 for jazz contexts. I6 or I6/9 for softer tonic extensions."
+    },
+
+    commonNextChords: ["IV", "IV7", "V", "V7"],
+    commonPrevChords: ["V", "V7", "IV", "IV7"],
+    famousSongs: ["Every blues song ever", "'Johnny B. Goode'", "'Pride and Joy'"]
+  },
+
+  "Imaj7": {
+    numeral: "Imaj7",
+    name: "Tonic Major 7th",
+    function: "tonic",
+    color: "#22c55e",
+
+    simple: {
+      title: "Home with Jazz Elegance",
+      explanation: "This is your home chord with a dreamy, sophisticated major 7th added. It's still home, but with an elegant, jazzy, slightly floating quality.",
+      feeling: "Dreamy, sophisticated, elegant home",
+      whenToUse: "Use for a sophisticated, jazzy sound. Great for bossa nova, smooth jazz, and romantic ballads."
+    },
+
+    intermediate: {
+      title: "The Jazz Tonic (Imaj7)",
+      explanation: "The Imaj7 adds the major 7th (leading tone) to the tonic triad. Unlike the dominant 7th, the major 7th creates a sweet, consonant sound that maintains full tonic stability.",
+      function: "Full tonic function with added color. The standard jazz tonic chord.",
+      extensions: "Imaj9, Imaj13, I6/9 all extend this sound while keeping tonic function."
+    },
+
+    advanced: {
+      title: "Major 7th Tonic Voicing",
+      explanation: "The Imaj7 adds the leading tone as a chord member, but harmonized against the root creates a major 7th interval - one of the most consonant extensions. The chord is fully stable, unlike I7.",
+      voiceLeading: "The major 7th (B in Cmaj7) is the leading tone, giving subtle upward tendency while the chord remains stable.",
+      substitutes: "I6 for more vintage sound. iii7 can substitute (shares 3 tones). Imaj9 for more color."
+    },
+
+    commonNextChords: ["ii7", "IV", "IVmaj7", "vi7"],
+    commonPrevChords: ["ii7", "V7", "IV"],
+    famousSongs: ["'Girl from Ipanema'", "'Misty'", "'Autumn Leaves'"]
+  },
+
+  "ii7": {
+    numeral: "ii7",
+    name: "Supertonic Minor 7th",
+    function: "subdominant",
+    color: "#3b82f6",
+
+    simple: {
+      title: "The Jazz Bridge Chord",
+      explanation: "This is the bridge chord with a 7th added - THE essential jazz chord! The ii7-V7-I progression is the foundation of jazz harmony.",
+      feeling: "Smooth, sophisticated, forward-moving",
+      whenToUse: "Use before V7 for the classic jazz ii-V-I. This is THE sound of jazz and sophisticated pop."
+    },
+
+    intermediate: {
+      title: "The ii7 Chord",
+      explanation: "The minor 7th chord built on the 2nd scale degree. Adding the 7th to ii creates even smoother voice leading to V7 - the 7th of ii7 becomes the 3rd of V7. ii7-V7-I is the most common progression in jazz.",
+      function: "Pre-dominant function. Essential part of the ii-V-I cadence.",
+      extensions: "ii9, ii11 add more color. The 9th of ii7 becomes the 13th of V7."
+    },
+
+    advanced: {
+      title: "ii7 Voice Leading Mastery",
+      explanation: "The ii7 chord (D-F-A-C in C major) shares the tritone with V7 (G-B-D-F), as the 3rd and 7th of ii7 become the 7th and 3rd of V7. This tritone continuity is why ii7-V7 is so smooth.",
+      voiceLeading: "3rd of ii7 (F) → 7th of V7 (F). 7th of ii7 (C) → 3rd of V7 (B). The guide tones stay connected.",
+      substitutes: "IV can substitute (both pre-dominant). ♭II7 (tritone sub of V7) can replace ii7-V7 entirely."
+    },
+
+    commonNextChords: ["V7", "V"],
+    commonPrevChords: ["I", "Imaj7", "vi7", "iii7"],
+    famousSongs: ["Every jazz standard", "'All of Me'", "'Take the A Train'"]
+  },
+
+  "V7": {
+    numeral: "V7",
+    name: "Dominant 7th",
+    function: "dominant",
+    color: "#ef4444",
+
+    simple: {
+      title: "The Tension Chord with Extra Pull",
+      explanation: "This is the tension chord supercharged! The 7th adds even MORE pull toward home. When V7 goes to I, it's one of the most satisfying sounds in all of music!",
+      feeling: "Strong tension, demanding resolution, powerful pull",
+      whenToUse: "Use before I for a strong cadence. The 7th makes the resolution even more satisfying than plain V."
+    },
+
+    intermediate: {
+      title: "The Dominant 7th (V7)",
+      explanation: "V7 contains a tritone - the interval between the 3rd (leading tone) and ♭7th (4th scale degree). This tritone is unstable and wants to resolve inward to the tonic chord. It's why V7→I is the strongest resolution.",
+      function: "Maximum dominant function. The tritone creates irresistible pull to tonic.",
+      extensions: "V9, V13 add color. V7alt (♭9, ♯9, ♭5, ♯5) intensifies tension in jazz."
+    },
+
+    advanced: {
+      title: "Tritone Resolution and Dominant Function",
+      explanation: "The V7 contains the defining tritone (B-F in G7). This interval, exactly half an octave, is maximally unstable. It resolves by half-steps: B→C (leading tone resolution) and F→E (♭7 to 3rd of I). This voice leading defines tonal music.",
+      voiceLeading: "Leading tone (7) → tonic (1). Chord 7th (4) → mediant (3). This contrary motion resolves the tritone.",
+      substitutes: "vii°7 shares the same tritone. ♭II7 (tritone sub) shares the same tritone (enharmonically). These are functionally equivalent."
+    },
+
+    commonNextChords: ["I", "Imaj7", "vi", "vi7"],
+    commonPrevChords: ["ii7", "ii", "IV", "IVmaj7"],
+    famousSongs: ["The backbone of all Western music", "'Fly Me to the Moon'", "Every jazz standard"]
+  },
+
+  "IV7": {
+    numeral: "IV7",
+    name: "Subdominant Dominant 7th",
+    function: "subdominant",
+    color: "#3b82f6",
+
+    simple: {
+      title: "The Journey Chord Goes Blues",
+      explanation: "This is the journey chord (IV) with a bluesy dominant 7th. It's essential in blues - the move from I7 to IV7 is THE classic blues sound!",
+      feeling: "Bluesy journey, soulful traveling",
+      whenToUse: "Essential for blues! The I7-IV7 move is the heart of 12-bar blues. Also great in gospel and soul."
+    },
+
+    intermediate: {
+      title: "The Blues IV7",
+      explanation: "In blues, IV7 maintains subdominant function while adding the characteristic dominant 7th color. Unlike classical harmony, blues treats every chord as potentially a dominant 7th for color.",
+      function: "Subdominant function with blues coloring. Essential in 12-bar blues.",
+      extensions: "IV9 adds more soul. IV7#9 adds funk edge."
+    },
+
+    advanced: {
+      title: "IV7 and Blues Harmony",
+      explanation: "The IV7 creates a non-functional dominant 7th - it doesn't resolve like a V7 would. The tritone exists but resolves deceptively or not at all. This 'frozen tension' is central to blues aesthetics.",
+      voiceLeading: "The tritone in IV7 (in C blues: A-E♭ in F7) doesn't resolve traditionally. Blues embraces this unresolved tension.",
+      substitutes: "iv7 for minor blues. IVmaj7 for jazz/soul crossover."
+    },
+
+    commonNextChords: ["I7", "I", "V7", "V"],
+    commonPrevChords: ["I7", "I", "V7"],
+    famousSongs: ["'Sweet Home Chicago'", "Every 12-bar blues", "'The Thrill Is Gone'"]
+  },
+
+  "vi7": {
+    numeral: "vi7",
+    name: "Submediant Minor 7th",
+    function: "tonic",
+    color: "#22c55e",
+
+    simple: {
+      title: "The Emotional Cousin with Depth",
+      explanation: "This is the emotional chord (vi) with a 7th that adds even more depth and sophistication. It's the starting point of many beautiful jazz and R&B progressions.",
+      feeling: "Deep emotion, sophisticated sadness, soulful",
+      whenToUse: "Great for emotional jazz and R&B. The vi7-ii7-V7-I is a classic turnaround."
+    },
+
+    intermediate: {
+      title: "The vi7 Chord",
+      explanation: "Adding the 7th to vi creates a minor 7th chord that leads beautifully to ii7 (roots move by 4th/5th). The vi7-ii7-V7-I progression is a cornerstone of jazz harmony.",
+      function: "Tonic substitute function. Starting point for circle-of-fifths progressions.",
+      extensions: "vi9 and vi11 add more color while keeping the emotional quality."
+    },
+
+    advanced: {
+      title: "vi7 in Jazz Harmony",
+      explanation: "The vi7 chord can begin a chain of descending fifths: vi7-ii7-V7-I. Each chord is a ii-V of the next. This 'chaining' of ii-V relationships is how jazz extends and elaborates harmony.",
+      voiceLeading: "7th of vi7 (in Am7: G) → 3rd of ii7 (in Dm7: F). Smooth voice leading through the chain.",
+      substitutes: "IV can substitute (both lead to ii). ♭VImaj7 (borrowed) adds chromatic color."
+    },
+
+    commonNextChords: ["ii7", "IV", "IVmaj7", "V7"],
+    commonPrevChords: ["I", "Imaj7", "iii7", "V7"],
+    famousSongs: ["'Autumn Leaves'", "'All The Things You Are'", "Every rhythm changes tune"]
+  },
+
+  "iii7": {
+    numeral: "iii7",
+    name: "Mediant Minor 7th",
+    function: "tonic",
+    color: "#22c55e",
+
+    simple: {
+      title: "The Floating 7th",
+      explanation: "This dreamy chord adds a 7th to the mysterious iii chord. It has a floating, ethereal quality and often moves to vi7 in jazz progressions.",
+      feeling: "Dreamy, floating, ethereal",
+      whenToUse: "Use for a mysterious, floating quality. Works beautifully moving to vi7 or as a tonic substitute."
+    },
+
+    intermediate: {
+      title: "The iii7 Chord",
+      explanation: "Adding the 7th to iii creates a minor 7th chord that can substitute for Imaj7 (they share 3 notes). In jazz, iii7-vi7-ii7-V7-I is an extended circle-of-fifths progression.",
+      function: "Weak tonic function. Often starts circle-of-fifths chains to vi7.",
+      extensions: "iii9 adds more color while maintaining the floating quality."
+    },
+
+    advanced: {
+      title: "iii7 as Tonic Substitute",
+      explanation: "The iii7 (Em7 in C: E-G-B-D) shares three notes with Imaj7 (Cmaj7: C-E-G-B), enabling tonic substitution. It can also begin an extended ii-V chain: iii7-vi7-ii7-V7-I (each pair is a ii-V of the next).",
+      voiceLeading: "The 3rd and 7th of iii7 become guide tones through the cycle. Smooth step-wise motion throughout.",
+      substitutes: "Imaj7 substitutes directly. iii7 can replace I in some contexts for added motion."
+    },
+
+    commonNextChords: ["vi7", "vi", "IV", "IVmaj7"],
+    commonPrevChords: ["I", "Imaj7", "V7"],
+    famousSongs: ["Jazz turnarounds", "'All The Things You Are'", "Extended ii-V sequences"]
+  },
+
+  "IVmaj7": {
+    numeral: "IVmaj7",
+    name: "Subdominant Major 7th",
+    function: "subdominant",
+    color: "#3b82f6",
+
+    simple: {
+      title: "The Dreamy Journey",
+      explanation: "This is the journey chord with an elegant major 7th. It's sophisticated and beautiful, common in jazz, bossa nova, and R&B.",
+      feeling: "Elegant, dreamy, sophisticated journey",
+      whenToUse: "Use for a sophisticated, lush sound. Beautiful in jazz and R&B progressions."
+    },
+
+    intermediate: {
+      title: "The IVmaj7 Chord",
+      explanation: "The major 7th on IV creates a lush, sophisticated chord. Unlike IV7 (bluesy), IVmaj7 is smooth and jazzy. It's standard in bossa nova and smooth jazz.",
+      function: "Subdominant function with added elegance. Common in jazz and sophisticated pop.",
+      extensions: "IV6/9 is another common extension with similar function."
+    },
+
+    advanced: {
+      title: "Lydian Color on IV",
+      explanation: "IVmaj7 often implies Lydian mode (raised 4th) in jazz contexts. The major 7th (C in Fmaj7) is the natural 7th of Lydian and creates no avoid notes, making IVmaj7 one of the most stable extended chords.",
+      voiceLeading: "The major 7th provides smooth connection to V or back to I. IVmaj7 → V7 is a classic jazz pre-dominant motion.",
+      substitutes: "IV6 for a more vintage sound. ii7 is the primary pre-dominant alternative."
+    },
+
+    commonNextChords: ["V7", "V", "iii7", "I", "Imaj7"],
+    commonPrevChords: ["I", "Imaj7", "vi7", "iii7"],
+    famousSongs: ["'Girl from Ipanema'", "'Alfie'", "Bossa nova standards"]
+  },
+
+  // ===========================================
+  // NON-DIATONIC / SECONDARY DOMINANTS
+  // ===========================================
+
+  "II": {
+    numeral: "II",
+    name: "Major Supertonic",
+    function: "dominant",
+    color: "#f59e0b", // Amber - secondary dominant
+
+    simple: {
+      title: "The Surprise Major",
+      explanation: "This is a D major chord when you'd expect D minor! It's usually acting as the 'V of V' - it creates extra tension that wants to resolve to V, then to I.",
+      feeling: "Bright surprise, strong pull forward",
+      whenToUse: "Use when you want to really emphasize the V chord. II → V → I is a powerful extended cadence."
+    },
+
+    intermediate: {
+      title: "Secondary Dominant (V/V)",
+      explanation: "The major II chord is typically the 'dominant of the dominant' (V/V). It has a leading tone that pulls to V, just like V pulls to I. This creates an extended, intensified cadence.",
+      function: "Secondary dominant function. Tonicizes V temporarily.",
+      extensions: "II7 (dominant 7th) is even more common and adds the characteristic dominant pull."
+    },
+
+    advanced: {
+      title: "V/V and Applied Dominants",
+      explanation: "The II chord temporarily tonicizes V by providing its leading tone (F♯ in C major). This is the most common 'applied' or 'secondary' dominant. The chromatic pitch creates momentary tension before resolving to V.",
+      voiceLeading: "The raised 4th (F♯ in C major) is the leading tone of V and resolves up to G. This chromatic voice leading intensifies the cadence.",
+      substitutes: "vii°/V (F♯dim) has similar function. ♭VI can approach V from the other side."
+    },
+
+    commonNextChords: ["V", "V7"],
+    commonPrevChords: ["I", "IV", "vi"],
+    famousSongs: ["Common in classical cadences", "'Circle of Life'", "Many gospel songs"]
+  },
+
+  "II7": {
+    numeral: "II7",
+    name: "Secondary Dominant 7th",
+    function: "dominant",
+    color: "#f59e0b",
+
+    simple: {
+      title: "Extra Pull to V",
+      explanation: "This dominant 7th chord on the 2nd degree really wants to go to V! It's like a preview of the tension - creating a chain of resolutions: II7 → V7 → I.",
+      feeling: "Strong forward motion, anticipatory tension",
+      whenToUse: "Use to really emphasize your V chord. Creates a powerful double-resolution effect."
+    },
+
+    intermediate: {
+      title: "V7/V - Dominant of the Dominant",
+      explanation: "The II7 is the dominant 7th of V - it contains F♯ (leading tone to G) and C (which resolves to B, the 3rd of G). The tritone in II7 resolves to V just as V7's tritone resolves to I.",
+      function: "Secondary dominant with full tritone tension. Intensifies the approach to V.",
+      extensions: "II9, II13 add color. II7♭9 adds intensity in jazz contexts."
+    },
+
+    advanced: {
+      title: "Applied Dominant Chains",
+      explanation: "II7 is the prototypical applied dominant. Its tritone (F♯-C in D7) resolves to the root and 3rd of V (G-B). This enables chains: VI7-II7-V7-I, where each dominant resolves to the next.",
+      voiceLeading: "F♯→G (leading tone resolution). C→B (7th resolves down). The tritone contracts to V.",
+      substitutes: "♭VI7 (tritone sub of II7) offers chromatic bass motion to V. vii°7/V shares the tritone."
+    },
+
+    commonNextChords: ["V", "V7"],
+    commonPrevChords: ["I", "vi", "IV"],
+    famousSongs: ["Standard jazz turnarounds", "'I Got Rhythm' bridge"]
+  },
+
+  "III": {
+    numeral: "III",
+    name: "Major Mediant",
+    function: "dominant",
+    color: "#f59e0b",
+
+    simple: {
+      title: "The Dramatic Surprise",
+      explanation: "This is E major when you'd expect E minor! It's usually acting as V/vi - it creates strong pull toward the vi chord, adding drama and intensity.",
+      feeling: "Dramatic, intense, surprising",
+      whenToUse: "Use before vi for dramatic effect. III → vi → IV → V is a powerful, emotional sequence."
+    },
+
+    intermediate: {
+      title: "Secondary Dominant to vi (V/vi)",
+      explanation: "The major III chord is the dominant of vi. It contains G♯ (leading tone to A), creating a strong pull to the relative minor. This is very common in emotional, dramatic music.",
+      function: "Secondary dominant function targeting vi. Tonicizes the relative minor.",
+      extensions: "III7 adds full dominant tension toward vi."
+    },
+
+    advanced: {
+      title: "V/vi and Minor Tonicization",
+      explanation: "III (E major in C) temporarily tonicizes vi (A minor) by providing its leading tone (G♯). This momentary shift toward the relative minor creates emotional intensity without full modulation.",
+      voiceLeading: "G♯ resolves to A (leading tone to vi). The chromatic alteration creates expressive tension.",
+      substitutes: "vii°/vi (G♯dim) has similar function. vi itself often follows without the applied dominant."
+    },
+
+    commonNextChords: ["vi", "vi7"],
+    commonPrevChords: ["I", "IV", "ii"],
+    famousSongs: ["'Bohemian Rhapsody'", "'Yesterday' - Beatles", "Many dramatic pop songs"]
+  },
+
+  "III7": {
+    numeral: "III7",
+    name: "Secondary Dominant 7th to vi",
+    function: "dominant",
+    color: "#f59e0b",
+
+    simple: {
+      title: "Full Pull to the Emotional Chord",
+      explanation: "This dominant 7th really pulls hard toward vi (the emotional chord). When III7 resolves to vi, it creates a powerful, dramatic moment.",
+      feeling: "Intense pull, dramatic tension, emotional resolution coming",
+      whenToUse: "Use for maximum drama before vi. Common in gospel, soul, and dramatic pop."
+    },
+
+    intermediate: {
+      title: "V7/vi - Full Secondary Dominant",
+      explanation: "III7 adds the full tritone tension pointing at vi. The G♯ and D create a tritone that resolves to A and C (the root and 3rd of Am). This is the strongest pull to vi possible.",
+      function: "Complete secondary dominant with tritone tension. Maximum pull to vi.",
+      extensions: "III7♭9 (E7♭9) adds even more intensity in jazz and gospel."
+    },
+
+    advanced: {
+      title: "Applied V7 to Relative Minor",
+      explanation: "The III7 (E7 in C) contains the tritone G♯-D, which resolves to A-C (root and minor 3rd of vi). This is the exact mechanism of V7-I, applied to the relative minor relationship.",
+      voiceLeading: "G♯→A, D→C (or D→E). The tritone contracts to the root and 3rd of vi (Am).",
+      substitutes: "♭VII7 (tritone sub) approaches vi from above. vii°7/vi shares the tritone."
+    },
+
+    commonNextChords: ["vi", "vi7"],
+    commonPrevChords: ["I", "IV", "ii"],
+    famousSongs: ["'Creep' - Radiohead", "'Space Oddity' - Bowie", "Gospel turnarounds"]
+  },
+
+  "VII": {
+    numeral: "VII",
+    name: "Major Subtonic",
+    function: "dominant",
+    color: "#f59e0b",
+
+    simple: {
+      title: "The Secondary Pull to iii",
+      explanation: "This is B major when you'd expect B diminished! It's acting as V/iii - creating pull toward the mysterious iii chord.",
+      feeling: "Unexpected brightness, forward pull",
+      whenToUse: "Rare but effective before iii. Creates an unusual chromatic moment."
+    },
+
+    intermediate: {
+      title: "V/iii - Dominant of the Mediant",
+      explanation: "The VII chord is the dominant of iii. It contains D♯ (leading tone to E), creating a secondary dominant relationship with the mediant chord.",
+      function: "Secondary dominant targeting iii. Temporarily tonicizes the mediant.",
+      extensions: "VII7 adds tritone tension."
+    },
+
+    advanced: {
+      title: "Applied Dominant to iii",
+      explanation: "VII (B major in C) tonicizes iii (E minor) by providing D♯ as a leading tone. This is less common than other secondary dominants because iii itself has weak tonal function.",
+      voiceLeading: "D♯ resolves to E. The chromatic alteration creates voice-leading intensity.",
+      substitutes: "iii can be approached diatonically from I or vi instead."
+    },
+
+    commonNextChords: ["iii"],
+    commonPrevChords: ["I", "IV"],
+    famousSongs: ["Rare in pop, more common in classical sequences"]
   }
 };
 

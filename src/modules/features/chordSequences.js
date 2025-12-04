@@ -1399,6 +1399,79 @@ export function calculateTensionArcMatch(sequence, targetTensionArc, key) {
 }
 
 /**
+ * Generate a descriptive reason for a tension arc sequence match
+ *
+ * @param {Object} seq - Sequence object with tensionArcMatch data
+ * @param {string} tensionArcShape - The selected tension arc shape (flat, ascending, etc.)
+ * @returns {string} Descriptive reason
+ */
+function generateTensionArcReason(seq, tensionArcShape) {
+    const match = seq.tensionArcMatch;
+    if (!match || !tensionArcShape) {
+        return `${seq.tensionMatchQuality || 'good'} tension arc match`;
+    }
+
+    const quality = seq.tensionMatchQuality || match.matchQuality || 'good';
+    const qualityPrefix = quality === 'excellent' ? 'Excellent' :
+                         quality === 'good' ? 'Good' :
+                         quality === 'acceptable' ? 'Reasonable' : 'Approximate';
+
+    // Shape-specific descriptions
+    const shapeDescriptions = {
+        flat: {
+            base: 'steady tension flow',
+            excellent: 'maintains consistent emotional intensity throughout',
+            good: 'keeps tension level mostly stable',
+            detail: 'for stable, grounded progressions'
+        },
+        ascending: {
+            base: 'tension build',
+            excellent: 'creates compelling crescendo toward climax',
+            good: 'builds energy progressively through the sequence',
+            detail: 'building toward a high point'
+        },
+        descending: {
+            base: 'tension release',
+            excellent: 'provides satisfying resolution and relaxation',
+            good: 'gradually releases tension toward resolution',
+            detail: 'winding down from high energy'
+        },
+        arch: {
+            base: 'build and resolve arc',
+            excellent: 'creates perfect dramatic arc with natural resolution',
+            good: 'builds tension then resolves smoothly',
+            detail: 'complete emotional journey'
+        },
+        wave: {
+            base: 'varied tension flow',
+            excellent: 'creates dynamic ebb and flow of emotional intensity',
+            good: 'alternates between tension and release',
+            detail: 'for dynamic, engaging progressions'
+        },
+        dramatic: {
+            base: 'dramatic tension peaks',
+            excellent: 'delivers powerful emotional peaks and valleys',
+            good: 'creates dramatic contrast with tension peaks',
+            detail: 'for bold, impactful moments'
+        }
+    };
+
+    const desc = shapeDescriptions[tensionArcShape];
+    if (!desc) {
+        return `${qualityPrefix} ${quality} tension arc match`;
+    }
+
+    // Choose description based on quality
+    if (quality === 'excellent') {
+        return `${qualityPrefix} ${desc.base} — ${desc.excellent}`;
+    } else if (quality === 'good') {
+        return `${qualityPrefix} ${desc.base} — ${desc.good}`;
+    } else {
+        return `${qualityPrefix} ${desc.base} — ${desc.detail}`;
+    }
+}
+
+/**
  * Generate chord sequences that follow a target tension arc
  * Uses the existing sequence generation but adds tension arc scoring
  *
@@ -1426,7 +1499,8 @@ export function generateTensionArcSequences(
         topN = 5,
         sectionInfo = null,
         contextMode = false,
-        melodyOptions = null
+        melodyOptions = null,
+        tensionArcShape = null
     } = options;
 
     // Generate sequences using standard method
@@ -1485,7 +1559,8 @@ export function generateTensionArcSequences(
             }
             seq.score = Math.round(normalizedScore);
             seq.totalScore = seq.score;
-            seq.reason = `${seq.tensionMatchQuality} tension arc match`;
+            // Generate detailed reason based on tension arc shape and how well sequence matches
+            seq.reason = generateTensionArcReason(seq, tensionArcShape);
         });
     }
 
@@ -2018,6 +2093,9 @@ export function generateSequencesWithRoot(
             seq.totalScore = seq.score;
             seq.reason = generateSequenceReason(seq.chords, seq.score, key);
         });
+
+        // Sort by score descending
+        sequences.sort((a, b) => b.score - a.score);
     }
 
     return sequences;

@@ -7,11 +7,20 @@ const FLAT_NOTES =  ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb",
 const MAJOR_SCALE_STEPS = [0, 2, 4, 5, 7, 9, 11];
 
 const ROMAN_MAP_BASE = {
+    // Diatonic major key chords
     'I': { index: 0, quality: 'Major' }, 'ii': { index: 1, quality: 'Minor' },
     'iii': { index: 2, quality: 'Minor' }, 'IV': { index: 3, quality: 'Major' },
     'V': { index: 4, quality: 'Major' }, 'vi': { index: 5, quality: 'Minor' },
     'vii°': { index: 6, quality: 'Diminished' },
+    // Diatonic minor key chords
     'i': { index: 0, quality: 'Minor' }, 'iv': { index: 3, quality: 'Minor' },
+    // Non-diatonic / Secondary dominant variants (major on normally minor degrees)
+    'II': { index: 1, quality: 'Major' },   // V/V - secondary dominant
+    'III': { index: 2, quality: 'Major' },  // V/vi - secondary dominant
+    'VI': { index: 5, quality: 'Major' },   // V/ii - secondary dominant
+    'VII': { index: 6, quality: 'Major' },  // V/iii - secondary dominant (subtonic)
+    // Non-diatonic minor variants (minor on normally major degrees)
+    'v': { index: 4, quality: 'Minor' },    // Minor dominant (modal)
 };
 
 const COMMON_PROGRESSIONS = {

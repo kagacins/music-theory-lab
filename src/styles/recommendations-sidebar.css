@@ -404,6 +404,38 @@
     height: 12px;
 }
 
+/* "Why?" Button - Theory Explanation */
+.chord-why-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    background: #ecfdf5;
+    border: 1px solid #6ee7b7;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+    margin-right: 4px;
+    color: #059669;
+}
+
+.chord-why-btn:hover {
+    background: #d1fae5;
+    border-color: #10b981;
+    color: #047857;
+}
+
+.chord-why-btn:active {
+    background: #a7f3d0;
+    transform: scale(0.95);
+}
+
+.chord-why-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
 /* Sidebar Header */
 .sidebar-header {
     font-size: 14px;

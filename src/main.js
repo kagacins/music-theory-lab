@@ -19,7 +19,7 @@ window.GOOGLE_SEARCH_ENGINE_ID = '6233b4a886ca64ede';
 import { switchTab, refreshAllTabs } from './modules/ui/tabs.js';
 import { initAllSectionDragDrop } from './modules/ui/sectionDragDrop.js';
 import { initAllSectionSidebars, triggerSectionSidebarUpdate } from './modules/ui/sectionSidebar.js';
-import { initFloatingSuggestionsPanel } from './modules/ui/floatingSuggestionsPanel.js';
+// REMOVED: import { initFloatingSuggestionsPanel } from './modules/ui/floatingSuggestionsPanel.js';
 import { showModal, hideModal } from './modules/ui/modals.js';
 import { renderKeyboard, updateKeyboardLabels, updateKeyNames, clearHighlights, g_KeyboardKeys } from './modules/ui/keyboard.js';
 import { updateKeySignatureDisplay, setupResponsiveTitle } from './modules/ui/header.js';
@@ -27,6 +27,7 @@ import { toggleSidebar } from './modules/ui/sidebar.js';
 import { showSettingsModal, showChordWeightsModal, showMelodyWeightsModal } from './modules/ui/settingsModal.js';
 import { initPresetUI, togglePresetPanel, openPresetPanel, closePresetPanel } from './modules/ui/presetUI.js';
 import { initUnifiedSuggestionsPanel, updateUnifiedSuggestions } from './modules/ui/unifiedSuggestionsPanel.js';
+import { initWhyThisWorksPanel } from './modules/ui/whyThisWorksPanel.js';
 import { openManualChordEntryModal, closeManualChordEntryModal } from './modules/ui/manualChordEntryModal.js';
 import { showAutoHarmonizeModal } from './modules/ui/autoHarmonizeModal.js';
 import { showTensionOptimizerModal } from './modules/ui/tensionOptimizerModal.js';
@@ -2711,6 +2712,8 @@ window.onload = () => {
     // Initialize Unified Smart Suggestions Panel (replaces old recommendations + style/mood)
     setTimeout(() => {
         initUnifiedSuggestionsPanel();
+        // Initialize Why This Works panel (educational explanations)
+        initWhyThisWorksPanel();
     }, 200);
 
     // Restore panel states FIRST, before initializing sidebar system
@@ -2731,8 +2734,8 @@ window.onload = () => {
     // This ensures the sidebar sees the restored states, not HTML defaults
     setTimeout(() => {
         initAllSectionSidebars();
-        // Initialize floating suggestions panel
-        initFloatingSuggestionsPanel();
+        // REMOVED: Floating suggestions panel
+        // initFloatingSuggestionsPanel();
     }, 200);
 
     // Setup responsive title abbreviation
@@ -3201,8 +3204,9 @@ function showToast(message, type = 'info') {
 
 // Import recommendation modules
 import { getRecommendationService } from './modules/integration/recommendationService.js';
-import { getRecommendationsSidebarController } from './modules/ui/recommendationsSidebarController.js';
-import { initStyleMoodDisplay, updateStyleMoodDisplay } from './modules/ui/recommendationsSidebar.js';
+// REMOVED: Recommendations sidebar
+// import { getRecommendationsSidebarController } from './modules/ui/recommendationsSidebarController.js';
+// import { initStyleMoodDisplay, updateStyleMoodDisplay } from './modules/ui/recommendationsSidebar.js';
 
 // Phase 4.1: Melody suggestion modules REMOVED - use Recommendations Modal instead
 // The floating melody suggestion panel has been deprecated in favor of the
@@ -3227,38 +3231,33 @@ import {
 
 // Global instances for recommendations (singleton pattern)
 let recommendationService = null;
-let recommendationsSidebarController = null;
+// REMOVED: let recommendationsSidebarController = null;
 let enhancedMelodyControllerInitialized = false;
 
 /**
- * Initialize the chord recommendations sidebar
- * Called when the Melody Composer tab is first loaded
+ * Initialize the chord recommendations service
+ * REMOVED: Sidebar controller - now using Recommendations Modal instead
  */
 window.initializeRecommendationsSidebar = function() {
     // Only initialize once
-    if (recommendationService && recommendationsSidebarController) {
+    if (recommendationService) {
         return;
     }
 
     try {
-        // Get singleton instances
+        // Get singleton instance
         recommendationService = getRecommendationService();
-        recommendationsSidebarController = getRecommendationsSidebarController();
 
         // Initialize service (sets up event listeners for progression changes)
         recommendationService.initialize();
 
-        // Initialize controller (sets up UI event listeners and initial render)
-        recommendationsSidebarController.initialize();
-
-        // Initialize style/mood display from saved settings
-        initStyleMoodDisplay();
-
-        // Expose services globally for undo/redo and other integrations
+        // Expose service globally for undo/redo and other integrations
         window.recommendationService = recommendationService;
-        window.updateStyleMoodDisplay = updateStyleMoodDisplay;
+
+        // REMOVED: Sidebar controller and style/mood display
+        // Use Recommendations Modal (UnifiedRecommendationModal.js) instead
     } catch (error) {
-        // Error initializing recommendations sidebar
+        // Error initializing recommendations service
     }
 };
 
@@ -3469,13 +3468,9 @@ window.refreshMelodySuggestions = function() {
  * Refresh chord recommendations (called after weights are saved)
  */
 window.refreshChordRecommendations = function() {
-    // Use the sidebar controller's refresh method
-    if (window.recommendationsSidebarController && window.recommendationsSidebarController.refresh) {
-        window.recommendationsSidebarController.refresh();
-    } else {
-        // Fallback: click the refresh button
-        const refreshBtn = document.getElementById('refresh-recommendations-btn');
-        if (refreshBtn) refreshBtn.click();
+    // REMOVED: Sidebar controller - use recommendation service directly
+    if (window.recommendationService && window.recommendationService.refresh) {
+        window.recommendationService.refresh();
     }
 };
 
@@ -3525,8 +3520,57 @@ document.addEventListener('keydown', function(e) {
             const selected = document.querySelector('#melody-suggestions-list .melody-suggestion-item.selected');
             if (selected) selected.classList.remove('selected');
         }
-        // Chords mode handled by RecommendationsSidebarController
+        // Chords mode handled by Recommendations Modal
         return;
+    }
+});
+
+// Tab keyboard shortcut for Recommendations Modal
+document.addEventListener('keydown', function(e) {
+    // Helper to check if element is an input
+    const isInputElement = (element) => {
+        const tagName = element.tagName.toLowerCase();
+        return tagName === 'input' ||
+               tagName === 'textarea' ||
+               tagName === 'select' ||
+               element.isContentEditable;
+    };
+
+    // Tab key - open/close unified recommendation modal
+    if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        if (!isInputElement(e.target)) {
+            e.preventDefault();
+            const existingModal = document.getElementById('unified-recommendation-modal');
+            if (existingModal) {
+                window.closeUnifiedRecommendationModal && window.closeUnifiedRecommendationModal();
+            } else {
+                window.showUnifiedRecommendationModal && window.showUnifiedRecommendationModal({});
+            }
+        }
+    }
+    // Shift+Tab - open unified recommendation modal (melody tab)
+    else if (e.key === 'Tab' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        if (!isInputElement(e.target)) {
+            e.preventDefault();
+            const existingModal = document.getElementById('unified-recommendation-modal');
+            if (existingModal) {
+                window.closeUnifiedRecommendationModal && window.closeUnifiedRecommendationModal();
+            } else {
+                window.showUnifiedRecommendationModal && window.showUnifiedRecommendationModal({ initialTab: 'melody' });
+            }
+        }
+    }
+    // Ctrl+Tab - open unified recommendation modal (section tab)
+    else if (e.key === 'Tab' && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
+        if (!isInputElement(e.target)) {
+            e.preventDefault();
+            const existingModal = document.getElementById('unified-recommendation-modal');
+            if (existingModal) {
+                window.closeUnifiedRecommendationModal && window.closeUnifiedRecommendationModal();
+            } else {
+                window.showUnifiedRecommendationModal && window.showUnifiedRecommendationModal({ initialTab: 'section' });
+            }
+        }
     }
 });
 
