@@ -26,17 +26,17 @@ export const EXTENSION_TYPES = {
         description: '9th chords'
     },
     DOMINANT: {
-        types: ['Dominant 7th', 'Dominant 9th', 'Dominant 7th #9', 'Dominant 7th b9'],
+        types: ['Dominant 7th', 'Dominant 9th', '7#9', '7b9'],
         tensionRange: [0.65, 0.85],
         description: 'Dominant alterations'
     },
     DIMINISHED: {
-        types: ['Diminished', 'Diminished 7th', 'Half Diminished 7th'],
+        types: ['Diminished', 'Diminished 7th', 'Half-Diminished 7th'],
         tensionRange: [0.75, 0.90],
         description: 'Diminished chords'
     },
     CHROMATIC: {
-        types: ['Augmented', 'Dominant 7th #5', 'Dominant 7th b5'],
+        types: ['Augmented', '7#5', '7b5'],
         tensionRange: [0.75, 0.85],
         description: 'Chromatic alterations'
     }
@@ -203,23 +203,23 @@ export class TensionOptimizer {
         // Major chords can become Major 7th, Dominant 7th, Major 9th, etc.
         if (originalType === 'Major') {
             return ['Major 7th', 'Dominant 7th', 'Major 9th', 'Dominant 9th',
-                    'Add9', 'Major 6th', 'Augmented', 'Dominant 7th #9',
-                    'Dominant 7th b9', 'Dominant 7th #5', 'Dominant 7th b5',
-                    'Sus2', 'Sus4'].includes(newType);
+                    'Add9', 'Major 6th', 'Augmented', '7#9',
+                    '7b9', '7#5', '7b5',
+                    'Suspended 2nd', 'Suspended 4th'].includes(newType);
         }
 
         // Minor chords can become Minor 7th, Minor 9th, etc.
         if (originalType === 'Minor') {
             return ['Minor 7th', 'Minor 9th', 'Minor 11th', 'Minor 13th',
-                    'Minor 6th', 'Minor Major 7th', 'Half Diminished 7th',
+                    'Minor 6th', 'Minor-Major 7th', 'Half-Diminished 7th',
                     'Diminished', 'Diminished 7th'].includes(newType);
         }
 
         // Dominant 7th can become other dominant extensions
         if (originalType === 'Dominant 7th') {
             return ['Dominant 9th', 'Dominant 11th', 'Dominant 13th',
-                    'Dominant 7th #9', 'Dominant 7th b9',
-                    'Dominant 7th #5', 'Dominant 7th b5'].includes(newType);
+                    '7#9', '7b9',
+                    '7#5', '7b5'].includes(newType);
         }
 
         // Other chord types - allow similar types

@@ -47,6 +47,9 @@ import {
 
 import { getTrainerState, getCurrentKey } from '../state/trainerState.js';
 
+// Import guided mode event dispatcher for lesson integration
+import { dispatchBuilderEvent, isGuidedModeActive } from '../ui/lessonGuidedMode.js';
+
 // Import comprehensive chord recommendation engine (evaluates all roots, types, inversions)
 import { generateComprehensiveRecommendations } from './comprehensiveChordRecommendations.js';
 
@@ -1011,6 +1014,9 @@ function showChordSuggestionsModal(chordType, inversion) {
 // =========================================================================
 
 export function toggleChordSetupPanel() {
+    // Don't allow panel toggling during guided mode (scroll is locked)
+    if (isGuidedModeActive()) return;
+
     const panel = document.getElementById('chord-setup-panel');
     const chevron = document.getElementById('chord-setup-chevron');
     if (!panel || !chevron) return;
@@ -1023,7 +1029,7 @@ export function toggleChordSetupPanel() {
         panel.classList.add('hidden');
         chevron.classList.remove('rotate-180');
     }
-    
+
     // Save panel state
     if (window.savePanelState) {
         window.savePanelState('chord-setup-panel', !isHidden);
@@ -1031,6 +1037,9 @@ export function toggleChordSetupPanel() {
 }
 
 export function toggleChordLibraryPanel() {
+    // Don't allow panel toggling during guided mode (scroll is locked)
+    if (isGuidedModeActive()) return;
+
     const panel = document.getElementById('chord-library-panel');
     const chevron = document.getElementById('chord-library-chevron');
     if (!panel || !chevron) return;
@@ -1062,6 +1071,9 @@ export function toggleChordLibraryMode(isDiatonic) {
 }
 
 export function toggleChordIntervalsPanel() {
+    // Don't allow panel toggling during guided mode (scroll is locked)
+    if (isGuidedModeActive()) return;
+
     const panel = document.getElementById('chord-intervals-panel');
     const chevron = document.getElementById('chord-intervals-chevron');
     if (!panel || !chevron) return;
@@ -1092,6 +1104,9 @@ let builderDetailedView = false;
  * Toggle the Current Chord Progression panel in Chord Builder
  */
 export function toggleBuilderProgressionPanel() {
+    // Don't allow panel toggling during guided mode (scroll is locked)
+    if (isGuidedModeActive()) return;
+
     const panel = document.getElementById('builder-progression-panel');
     const chevron = document.getElementById('builder-progression-chevron');
     if (!panel || !chevron) return;
@@ -1416,6 +1431,18 @@ export function startBuilderChord() {
             }
             setBuilderChordNotes(getBuilderChordNotes().concat(lhNotes));
         }
+    }
+
+    // Dispatch event for guided lesson mode (after chord is played)
+    if (isGuidedModeActive()) {
+        const rootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[getBuilderRootIndex()];
+        const chordType = getBuilderSelectionMode() === 'chord' ? getBuilderChordType() : getBuilderIntervalType();
+        dispatchBuilderEvent('builderChordPlayed', {
+            root: rootNote,
+            type: chordType,
+            inversion: getBuilderInversion(),
+            mode: getBuilderSelectionMode()
+        });
     }
 }
 
@@ -1868,6 +1895,11 @@ export function selectBuilderRootNote(index, playAudio = true) {
 
     updateIntervalButtonCaptions();
     if (playAudio) startBuilderChord();
+
+    // Dispatch event for guided lesson mode
+    if (isGuidedModeActive()) {
+        dispatchBuilderEvent('builderRootSelected', { root: rootNote, index });
+    }
 }
 
 /**
@@ -1887,6 +1919,11 @@ export function selectBuilderChordType(chordType, playAudio = true, resetVoicing
     updateChordSuggestions();
     updateChordTypeButtonCaptions(); // Redraw captions after selection
     if (playAudio) startBuilderChord();
+
+    // Dispatch event for guided lesson mode
+    if (isGuidedModeActive()) {
+        dispatchBuilderEvent('builderTypeSelected', { chordType });
+    }
 }
 
 /**
@@ -1920,6 +1957,11 @@ export function selectBuilderInversion(inversion, playAudio = true, resetVoicing
     updateButtonSelection('#builder-inversion-selector', 'inversion', inversion.toString(), 'bg-amber-500', 'text-white');
     updateBuilderDisplay();
     if (playAudio) startBuilderChord();
+
+    // Dispatch event for guided lesson mode
+    if (isGuidedModeActive()) {
+        dispatchBuilderEvent('builderInversionSelected', { inversion });
+    }
 }
 
 /**

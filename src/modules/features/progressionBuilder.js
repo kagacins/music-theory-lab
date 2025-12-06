@@ -70,6 +70,9 @@ import {
     getNotationPreference
 } from '../state/globalState.js';
 
+// Import guided mode event dispatcher for lesson integration
+import { dispatchBuilderEvent, isGuidedModeActive, validateProgressionChord } from '../ui/lessonGuidedMode.js';
+
 // Import audio utilities
 import {
     getPiano,
@@ -603,6 +606,9 @@ function refreshStyleMoodInsights(force = false) {
 }
 
 export function toggleStyleMoodInsightsPanel() {
+    // Don't allow panel toggling during guided mode (scroll is locked)
+    if (isGuidedModeActive()) return;
+
     const panel = document.getElementById('style-mood-insights-panel');
     const section = panel?.closest('.trainer-section-item');
     const chevron = document.getElementById('style-mood-insights-chevron');
@@ -618,12 +624,12 @@ export function toggleStyleMoodInsightsPanel() {
         panel.classList.add('hidden');
         chevron.classList.remove('rotate-180');
     }
-    
+
     // Save panel state
     if (window.savePanelState) {
         window.savePanelState('style-mood-insights-panel', !isHidden);
     }
-    
+
     // Manually trigger sidebar update with a small delay to ensure DOM is updated
     if (window.triggerSectionSidebarUpdate) {
         setTimeout(() => {
@@ -633,6 +639,9 @@ export function toggleStyleMoodInsightsPanel() {
 }
 
 export function toggleProgressionControlsPanel() {
+    // Don't allow panel toggling during guided mode (scroll is locked)
+    if (isGuidedModeActive()) return;
+
     const panel = document.getElementById('progression-controls-panel');
     const chevron = document.getElementById('progression-controls-chevron');
     if (!panel || !chevron) return;
@@ -645,7 +654,7 @@ export function toggleProgressionControlsPanel() {
         panel.classList.add('hidden');
         chevron.classList.remove('rotate-180');
     }
-    
+
     // Save panel state
     if (window.savePanelState) {
         window.savePanelState('progression-controls-panel', !isHidden);
@@ -653,6 +662,9 @@ export function toggleProgressionControlsPanel() {
 }
 
 export function toggleProgressionCardsPanel() {
+    // Don't allow panel toggling during guided mode (scroll is locked)
+    if (isGuidedModeActive()) return;
+
     const panel = document.getElementById('progression-visualization-panel');
     const chevron = document.getElementById('progression-visualization-chevron');
     if (!panel || !chevron) return;
@@ -665,7 +677,7 @@ export function toggleProgressionCardsPanel() {
         panel.classList.add('hidden');
         chevron.classList.remove('rotate-180');
     }
-    
+
     // Save panel state
     if (window.savePanelState) {
         window.savePanelState('progression-visualization-panel', !isHidden);
@@ -892,6 +904,30 @@ export function quickAddChordFromForm(formId = 'quick-add-chord-form') {
         if (!validOptions.includes(chordType)) {
             alert('Please select a valid chord or interval from the dropdown list.');
             typeInput.focus();
+            return;
+        }
+    }
+
+    // Validate chord during guided mode (before adding)
+    if (isGuidedModeActive()) {
+        // Map root index to note name (using simple names for validation)
+        const rootNotes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const rootNote = rootNotes[rootIndex] || 'C';
+        const chordName = `${rootNote} ${chordType}`;
+
+        const validation = validateProgressionChord(chordName);
+        if (!validation.valid) {
+            // Show error feedback
+            const form = document.getElementById(formId);
+            if (form) {
+                form.style.borderColor = '#ef4444'; // Red
+                form.style.boxShadow = '0 0 0 2px rgba(239, 68, 68, 0.3)';
+                setTimeout(() => {
+                    form.style.borderColor = '';
+                    form.style.boxShadow = '';
+                }, 1500);
+            }
+            alert(validation.message);
             return;
         }
     }
@@ -4563,12 +4599,19 @@ function attachCardEventListeners(wrapper, index) {
         });
     }
 
-    // Compare button (Phase 2.1: A/B Comparison)
+    // Compare button (Phase 2.1: A/B Comparison) - now opens unified hub at Compare intent
     const compareBtn = wrapper.querySelector('.compare-btn');
     if (compareBtn) {
         compareBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (window.showChordComparisonModal) {
+            // Open unified recommendation modal at Compare intent
+            if (window.showUnifiedRecommendationModal) {
+                window.showUnifiedRecommendationModal({
+                    initialIntent: 'compare',
+                    selectedChordIndex: index
+                });
+            } else if (window.showChordComparisonModal) {
+                // Fallback to standalone modal
                 window.showChordComparisonModal(index);
             }
         });
@@ -9315,6 +9358,13 @@ export function loadProgression() {
     if (window.refreshNotationFromProgression) {
         window.refreshNotationFromProgression();
     }
+
+    // Dispatch event for guided lesson mode
+    if (isGuidedModeActive()) {
+        dispatchBuilderEvent('progressionKeyChanged', {
+            key: freshTrainerState.currentKey
+        });
+    }
 }
 
 /**
@@ -9665,7 +9715,7 @@ export function handleAutoPlayback() {
     }
 
     // Get fresh state - always read from getter, not cached variable
-    const trainerState = getTrainerState();
+    let trainerState = getTrainerState();
 
     // Check isPlaying from fresh state - also check window.trainerState for consistency
     const isCurrentlyPlaying = trainerState.isPlaying || (window.trainerState && window.trainerState.isPlaying);
@@ -9857,28 +9907,16 @@ export function handleAutoPlayback() {
 
         // Get chord duration in beats (default to 4 beats if not specified)
         const chordBeats = chord.beats !== undefined ? chord.beats : 4;
-        const chordDurationBeats = `${chordBeats}n`; // Convert to Tone.js notation (e.g., "4n" for 4 beats)
+        // Convert beats to measures for Tone.js notation (4 beats = 1 measure in 4/4 time)
+        const chordDurationMeasures = `${chordBeats / 4}m`;
 
         // Generate events at the current cumulative beat position
-        allEvents.push(...generateRhythmicEvents(rhNotes, lhNotes, cumulativeBeats / 4, chord.rhythmPattern || 'block', chordDurationBeats));
+        allEvents.push(...generateRhythmicEvents(rhNotes, lhNotes, cumulativeBeats / 4, chord.rhythmPattern || 'block', chordDurationMeasures));
 
         // Schedule visual updates at the cumulative beat position
         // Store the callback ID so we can cancel it if needed
+        // NOTE: Audio release is handled by the Tone.Part callback - this is only for visuals
         const callbackId = Tone.Transport.scheduleOnce(time => {
-            // Stop previous chord IMMEDIATELY at the start of the new chord to prevent overlap
-            Tone.Draw.schedule(() => {
-                stopTrainerChord();
-                // Also release all notes to ensure clean stop
-                const instrument = getInstrument();
-                if (instrument && getAudioIsReady()) {
-                    try {
-                        instrument.releaseAll(time);
-                    } catch (e) {
-                        // Ignore errors
-                    }
-                }
-            }, time);
-
             Tone.Draw.schedule(() => {
                 document.getElementById('progression-chord-notes-display').textContent = `${chord.roman} (${chord.name})`;
                 highlightTrainer(trainerState.scaleNotes, rhNotes.concat(lhNotes));
@@ -9901,34 +9939,36 @@ export function handleAutoPlayback() {
 
     const transportPart = new Tone.Part((time, event) => {
         const notes = Array.isArray(event.note) ? event.note : [event.note];
-        
-        // Stop any previous notes IMMEDIATELY before playing new ones to prevent overlap
         const instrument = getInstrument();
-        if (instrument) {
-            // Release ALL currently playing notes at the exact time the new chord starts
-            try {
-                instrument.releaseAll(time);
-                setTrainerChordNotes([]);
-            } catch (e) {
-                // Ignore errors
-            }
-        }
-        
-        // For PluckSynth (guitar), trigger each note individually
-        // For Sampler (piano), we can pass the array
         const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
-        if (isGuitar) {
-            notes.forEach(note => {
-                instrument.triggerAttackRelease(note, event.duration, time, event.velocity);
-            });
-        } else {
-            instrument.triggerAttackRelease(notes, event.duration, time, event.velocity);
-        }
-        
-        // Store notes being played for this event (for block chords that span full measure)
-        if (notes.length > 0 && (event.duration.includes('m') || event.duration.includes('s'))) {
-            // This is a chord spanning a duration - store it for potential release
+
+        // For block chords (sustained notes), use triggerAttack only - release happens when next chord starts
+        // This creates seamless transitions with no gap between chords
+        const isBlockChord = event.duration.includes('m') || parseFloat(event.duration) > 0.5;
+
+        if (isBlockChord) {
+            // Play all notes with triggerAttackRelease using the full chord duration
+            // The slight overlap from the release envelope of the previous chord
+            // blending with the attack of the new chord creates seamless transitions
+            if (isGuitar) {
+                notes.forEach(note => {
+                    instrument.triggerAttackRelease(note, event.duration, time, event.velocity);
+                });
+            } else {
+                instrument.triggerAttackRelease(notes, event.duration, time, event.velocity);
+            }
+
+            // Store notes being played for tracking
             setTrainerChordNotes(notes);
+        } else {
+            // For short notes (arpeggios, etc.), use triggerAttackRelease as before
+            if (isGuitar) {
+                notes.forEach(note => {
+                    instrument.triggerAttackRelease(note, event.duration, time, event.velocity);
+                });
+            } else {
+                instrument.triggerAttackRelease(notes, event.duration, time, event.velocity);
+            }
         }
 
         // Schedule visual flash for rhythmic events
@@ -10044,6 +10084,13 @@ export function handleAutoPlayback() {
         highlightTrainer(finalState.scaleNotes, null); // Clear highlights at the end
         Tone.Transport.stop();
         Tone.Transport.cancel();
+
+        // Dispatch event for guided lesson mode when playback completes
+        if (isGuidedModeActive()) {
+            dispatchBuilderEvent('progressionPlayComplete', {
+                timestamp: Date.now()
+            });
+        }
     }, totalDuration);
     
     // Store cleanup callback ID for potential cancellation
@@ -10068,9 +10115,8 @@ function generateRhythmicEvents(rhNotes, lhNotes, measure, pattern, measureDurat
     const events = [];
     const time = (beats) => `${measure}:${beats}`;
     
-    // Calculate chord duration to prevent overlap - use 90% of measure duration to ensure clean stop
-    const measureDurationSeconds = Tone.Time(measureDuration).toSeconds();
-    const chordDuration = `${measureDurationSeconds * 0.9}s`; // 90% of measure to prevent overlap
+    // Use full measure duration - notes will be cut off when next chord starts via releaseAll()
+    const chordDuration = measureDuration;
 
     switch (pattern) {
         case 'arpeggioUp':
@@ -10859,7 +10905,7 @@ export function showProgressionChordSuggestions(chordIndex) {
         }
     };
 
-    // Show the unified recommendation modal (chord tab, quick suggestions view)
+    // Show the unified recommendation modal (chord tab, suggest intent)
     showUnifiedRecommendationModal({
         currentChordType: currentType,
         currentRoot: currentRoot,
@@ -10868,7 +10914,9 @@ export function showProgressionChordSuggestions(chordIndex) {
         onPlayChord: onPlayChord,
         onStopChord: onStopChord,
         initialTab: 'chord',
-        initialView: 'quick'
+        initialIntent: 'suggest',
+        initialView: 'quick',
+        selectedChordIndex: chordIndex
     });
 }
 
@@ -11170,6 +11218,18 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
             key: trainerState.currentKey
         }
     }));
+
+    // Dispatch event for guided lesson mode
+    if (isGuidedModeActive()) {
+        dispatchBuilderEvent('progressionChordAdded', {
+            chord: `${root} ${chordType}`,
+            root,
+            type: chordType,
+            inversion,
+            position: insertedIndex,
+            key: trainerState.currentKey
+        });
+    }
 
     // Phase 2.1: Select the newly inserted chord
     selectChordCard(insertedIndex);
@@ -11917,6 +11977,18 @@ export function addToProgressionData(chordData, options = {}) {
         trainerState.progressionRomans.push(chordData.roman);
     }
     setProgressionData(trainerState.progressionData);
+
+    // Dispatch event for guided lesson mode
+    if (isGuidedModeActive()) {
+        dispatchBuilderEvent('progressionChordAdded', {
+            chord: `${chordData.root} ${chordData.type}`,
+            root: chordData.root,
+            type: chordData.type,
+            inversion: chordData.inversion,
+            position: trainerState.progressionData.length - 1,
+            key: trainerState.currentKey
+        });
+    }
 
     // Skip all rendering if in batch mode
     if (options.skipRender) {
@@ -13069,4 +13141,5 @@ if (typeof window !== 'undefined') {
     window.unhighlightAllTensionPoints = unhighlightAllTensionPoints;
     window.highlightChordCard = highlightChordCard;
     window.unhighlightAllChordCards = unhighlightAllChordCards;
+    window.expandChordCard = expandChordCard;
 }

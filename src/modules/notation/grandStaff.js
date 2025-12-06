@@ -25,6 +25,7 @@ import {
   applyOctaveShift,
   CLEF_RANGES,
   getDurationBeats,
+  createMeasureAccidentalTracker,
 } from './vexFlowRenderer.js';
 
 import { analyzeChordTone, CHORD_TONE_COLORS } from '../analysis/chordToneAnalyzer.js';
@@ -2263,6 +2264,10 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature, options =
   const tupletGroups = {}; // Track tuplet groups: { groupId: { notes: [], info: {} } }
   let currentBracket = null;
 
+  // Create measure-level accidental tracker to handle cases like F# followed by F natural
+  // in the same measure - the natural needs to be shown explicitly
+  const accidentalTracker = createMeasureAccidentalTracker();
+
   for (let i = 0; i < notes.length; i++) {
     const note = notes[i];
 
@@ -2308,9 +2313,13 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature, options =
     } else if (note.pitches && Array.isArray(note.pitches)) {
       // Chord - apply ottava adjustment
       const { adjustedPitches, ottavaLabel } = applyOttavaAdjustment(note.pitches, clef);
-      // Support per-pitch accidentals (note.accidentals array) or single accidental for all (note.accidental)
-      const accidentalArg = note.accidentals || note.accidental || null;
-      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false, note.articulation || null, accidentalArg, stemDirection);
+      // Use measure-level accidental tracker for each pitch in the chord
+      // This handles cases like F# followed by F natural in the same measure
+      const measureAccidentals = adjustedPitches.map(pitch =>
+        accidentalTracker.getAccidentalForNote(pitch, keySignature)
+      );
+      // Use computed measure-aware accidentals (overrides any provided accidentals for correct notation)
+      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false, note.articulation || null, measureAccidentals, stemDirection);
       if (!chordNote) {
         console.warn('[createNotesForStaff] createChordNote returned null for note:', JSON.stringify(note), 'adjustedPitches:', adjustedPitches);
         continue;
@@ -2368,7 +2377,10 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature, options =
     } else if (note.pitch) {
       // Single note - apply ottava adjustment
       const { adjustedPitches, ottavaLabel } = applyOttavaAdjustment([note.pitch], clef);
-      const adjustedNote = { ...note, pitch: adjustedPitches[0], stemDirection };
+      // Use measure-level accidental tracker for proper accidental display
+      // This handles cases like F# followed by F natural in the same measure
+      const measureAccidental = accidentalTracker.getAccidentalForNote(adjustedPitches[0], keySignature);
+      const adjustedNote = { ...note, pitch: adjustedPitches[0], stemDirection, accidental: measureAccidental };
       const staveNote = createStaveNote(adjustedNote, keySignature, clef);
       if (!staveNote) {
         console.warn('[createNotesForStaff] createStaveNote returned null for note:', JSON.stringify(note));

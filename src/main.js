@@ -16,7 +16,7 @@ window.GOOGLE_SEARCH_API_KEY = 'AIzaSyCKMAccLd1yCc9tuTWmCBItpnB7QxtZiWo';
 window.GOOGLE_SEARCH_ENGINE_ID = '6233b4a886ca64ede';
 
 // Import all necessary modules
-import { switchTab, refreshAllTabs } from './modules/ui/tabs.js';
+import { switchTab, refreshAllTabs, initTabHistory } from './modules/ui/tabs.js';
 import { initAllSectionDragDrop } from './modules/ui/sectionDragDrop.js';
 import { initAllSectionSidebars, triggerSectionSidebarUpdate } from './modules/ui/sectionSidebar.js';
 // REMOVED: import { initFloatingSuggestionsPanel } from './modules/ui/floatingSuggestionsPanel.js';
@@ -35,6 +35,8 @@ import { showTensionOptimizerModal } from './modules/ui/tensionOptimizerModal.js
 import { showChordComparisonModal } from './modules/ui/chordComparisonModal.js';
 import { showWhatIfSandbox } from './modules/ui/whatIfSandbox.js';
 import { initChordFunctionLegend, showLegend as showChordFunctionLegend, hideLegend as hideChordFunctionLegend, toggleLegend as toggleChordFunctionLegend } from './modules/ui/chordFunctionLegend.js';
+// Phase 3: Guided Learning Journeys
+import { initLearnTab } from './modules/ui/learnTabController.js';
 import { initCircleOfFifths, toggleCircleOfFifthsPanel, openCircleOfFifthsPanel, closeCircleOfFifthsPanel } from './modules/features/circleOfFifths.js';
 import { initGuitarFretboard, toggleGuitarFretboardPanel, openGuitarFretboardPanel, closeGuitarFretboardPanel, updateGuitarFretboard } from './modules/features/guitarFretboard.js';
 import {
@@ -321,6 +323,14 @@ import {
     getNotationComposer,
     isNotationInitialized
 } from './modules/notation/notationInit.js';
+
+// Audio analysis for chord detection from uploaded songs
+import {
+    initSongAnalyzer,
+    openAudioAnalyzerModal,
+    startAudioAnalysis,
+    importDetectedChords
+} from './modules/features/songAnalyzer.js';
 
 import {
     ENHARMONIC_MAP,
@@ -1172,7 +1182,7 @@ if (typeof window.importChordList !== 'function') {
 // Add chord from recommendation (used by Smart Suggestions panel)
 window.addChordFromRecommendation = function(root, type, inversion) {
     // Import the necessary functions
-    import('./modules/state/chordBuilderState.js').then(module => {
+    import('./modules/state/builderState.js').then(module => {
         const { setBuilderRootIndex, setBuilderChordType, setBuilderInversion } = module;
         import('./data/music-data.js').then(dataModule => {
             const { ALL_NOTES } = dataModule;
@@ -1483,6 +1493,11 @@ window.searchSongChords = searchSongChords;
 window.importSongProgression = importSongProgression;
 window.openUltimateGuitarSearch = openUltimateGuitarSearch;
 window.importInternetSongProgression = importInternetSongProgression;
+
+// Song Analyzer functions (audio chord detection)
+window.openAudioAnalyzerModal = openAudioAnalyzerModal;
+window.startAudioAnalysis = startAudioAnalysis;
+window.importDetectedChords = importDetectedChords;
 
 // Theory Tools functions
 window.toggleTheoryPanel = toggleTheoryPanel;
@@ -2408,6 +2423,10 @@ window.onload = () => {
     window.enharmonicPreference = getEnharmonicPreference();
     window.isRomanNumeralEngineOn = getIsRomanNumeralEngineOn();
     window.isKeyNamesOn = getIsKeyNamesOn();
+
+    // Initialize browser history support for tab navigation
+    // This allows the back button to return to previous tabs/lessons
+    initTabHistory();
     
     // Initialize toggle states to match initial preferences
     // enharmonic: initial preference is 'sharp', so toggle should be unchecked (false = sharp)
@@ -2719,6 +2738,9 @@ window.onload = () => {
 
     // Initialize Theory Tools
     initTheoryTools();
+
+    // Initialize Song Analyzer (for audio chord detection)
+    initSongAnalyzer();
 
     // Initialize Unified Smart Suggestions Panel (replaces old recommendations + style/mood)
     setTimeout(() => {

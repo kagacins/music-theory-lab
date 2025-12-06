@@ -420,6 +420,100 @@ export function getRequiredAccidental(noteStr, key) {
 }
 
 /**
+ * Create a measure-level accidental tracker
+ * Tracks which accidentals have been shown in the current measure
+ * so we can properly show naturals when an accidental is cancelled
+ * @returns {Object} - Tracker object with methods
+ */
+export function createMeasureAccidentalTracker() {
+  // Map: note letter (A-G) -> current accidental state in this measure
+  // null = use key signature default, '#' = sharp shown, 'b' = flat shown, 'n' = natural shown
+  const activeAccidentals = new Map();
+
+  return {
+    /**
+     * Determine what accidental to show for a note, considering measure context
+     * @param {string} noteStr - Note string like "C4", "F#5", "Bb3"
+     * @param {string} key - Key signature
+     * @returns {string|null} - Accidental to show: '#', 'b', 'n', or null
+     */
+    getAccidentalForNote(noteStr, key) {
+      const { noteName, accidental } = parseNote(noteStr);
+      const keyAccidentals = KEY_SIGNATURES[key] || [];
+
+      // What's the key signature default for this note?
+      const sharpInKey = keyAccidentals.includes(noteName + '#');
+      const flatInKey = keyAccidentals.includes(noteName + 'b');
+      const keyDefault = sharpInKey ? '#' : flatInKey ? 'b' : null;
+
+      // What's currently active in this measure for this note letter?
+      const measureActive = activeAccidentals.get(noteName);
+
+      // What does the current note want?
+      const noteWants = accidental || null; // '#', 'b', or null (natural)
+
+      // Determine if we need to show an accidental
+      let showAccidental = null;
+
+      if (measureActive !== undefined) {
+        // Something was already shown in this measure for this note letter
+        if (noteWants !== measureActive) {
+          // Note wants something different than what's active
+          if (noteWants === null) {
+            // Note wants natural, but measure has sharp/flat active
+            // Show natural if key signature doesn't already have it natural
+            if (keyDefault !== null) {
+              showAccidental = 'n';
+            } else {
+              // Key is already natural, measure had accidental, need to cancel it
+              showAccidental = 'n';
+            }
+          } else {
+            // Note wants sharp or flat, different from measure active
+            showAccidental = noteWants;
+          }
+        }
+        // else: note wants same as measure active, no accidental needed
+      } else {
+        // First occurrence of this note letter in the measure
+        // Compare against key signature
+        if (noteWants !== keyDefault) {
+          if (noteWants === null && keyDefault !== null) {
+            // Note is natural but key has accidental - show natural
+            showAccidental = 'n';
+          } else if (noteWants !== null) {
+            // Note has accidental not in key - show it
+            showAccidental = noteWants;
+          }
+        }
+        // else: matches key signature, no accidental needed
+      }
+
+      // Update the active state for this note letter
+      activeAccidentals.set(noteName, noteWants);
+
+      return showAccidental;
+    },
+
+    /**
+     * Reset the tracker (call at start of each measure)
+     */
+    reset() {
+      activeAccidentals.clear();
+    },
+
+    /**
+     * Get current active accidental for a note letter (for debugging)
+     * @param {string} noteName - Note letter (A-G)
+     * @returns {string|null|undefined} - Active accidental or undefined if not set
+     */
+    getActive(noteName) {
+      return activeAccidentals.get(noteName);
+    }
+  };
+}
+
+/**
  * Get VexFlow key signature string from key name
  * @param {string} key - Key name like "C Major", "G", "Am"
  * @returns {string} - VexFlow key signature like "C", "G", "Am"
@@ -714,8 +808,9 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
     let requiredAccidental;
 
     if (Array.isArray(accidental)) {
-      // Per-pitch accidentals array
-      requiredAccidental = accidental[index] || getRequiredAccidental(pitch, key);
+      // Per-pitch accidentals array - use undefined check, not truthiness
+      // (null means "no accidental needed" from measure tracker, don't fall back)
+      requiredAccidental = accidental[index] !== undefined ? accidental[index] : getRequiredAccidental(pitch, key);
     } else if (typeof accidental === 'string' && pitches.length === 1) {
       // Single accidental for single-note chord
       requiredAccidental = accidental;

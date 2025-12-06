@@ -23,6 +23,7 @@ import { CHORD_DEFINITIONS, INVERSION_NAMES, ALL_NOTES } from '../../../data/mus
 import {
     getCurrentKey,
     getProgressionData,
+    setProgressionData,
     getContextAwareMode,
     setContextAwareMode,
     getProgressionLookback,
@@ -103,6 +104,15 @@ const CHORD_VIEWS = {
     QUICK: 'quick',
     EXPLORER: 'explorer',
     SEQUENCES: 'sequences'
+};
+
+// Intent-based sub-tabs for the Chord Hub
+const CHORD_INTENTS = {
+    SUGGEST: 'suggest',      // What chord comes next? (Quick + Explorer)
+    COMPARE: 'compare',      // Compare alternatives for a position
+    TRANSFORM: 'transform',  // Transform the whole progression
+    OPTIMIZE: 'optimize',    // Optimize for tension curve
+    SEQUENCE: 'sequence'     // Build multi-chord sequences
 };
 
 function hexToRgba(hex, alpha = 0.15) {
@@ -321,6 +331,8 @@ function formatScoreContribution(rawScore, weight) {
 let modalState = {
     activeTab: localStorage.getItem('unified-modal-active-tab') || TABS.CHORD,
     chordView: localStorage.getItem('unified-modal-chord-view') || CHORD_VIEWS.QUICK,
+    // Intent-based chord hub navigation
+    chordIntent: localStorage.getItem('unified-modal-chord-intent') || CHORD_INTENTS.SUGGEST,
     style: localStorage.getItem('chord-suggestion-style') || 'balanced',
     mood: localStorage.getItem('chord-suggestion-mood') || 'bright',
     activeInversion: 0,
@@ -688,7 +700,9 @@ function playChordSequence(sequence, chips = null, gap = 500) {
  * @param {Function} options.onPlayChord - Callback for chord preview
  * @param {Function} options.onStopChord - Callback to stop preview
  * @param {string} [options.initialTab] - Tab to open to (chord, melody, section)
- * @param {string} [options.initialView] - Initial view within chord tab
+ * @param {string} [options.initialView] - Initial view within chord tab (quick, explorer)
+ * @param {string} [options.initialIntent] - Initial intent for chord tab (suggest, compare, transform, optimize, sequence)
+ * @param {number} [options.selectedChordIndex] - Index of chord to select (-1 for add mode)
  */
 export function showUnifiedRecommendationModal(options = {}) {
     // Remove existing modal
@@ -717,26 +731,47 @@ export function showUnifiedRecommendationModal(options = {}) {
     if (options.initialView && Object.values(CHORD_VIEWS).includes(options.initialView)) {
         modalState.chordView = options.initialView;
     }
+    // Set initial intent for chord hub if specified
+    if (options.initialIntent && Object.values(CHORD_INTENTS).includes(options.initialIntent)) {
+        modalState.chordIntent = options.initialIntent;
+        // Also switch to chord tab when intent is specified
+        modalState.activeTab = TABS.CHORD;
+    }
 
-    // Initialize selectedProgressionIndex from the currently selected chord card
-    const currentlySelectedIndex = getSelectedChordIndex();
+    // Initialize selectedProgressionIndex
     const progressionData = getProgressionData() || [];
-    if (currentlySelectedIndex !== null && currentlySelectedIndex >= 0 && currentlySelectedIndex < progressionData.length) {
-        modalState.selectedProgressionIndex = currentlySelectedIndex;
-        // Also sync currentRoot, currentChordType, and activeInversion to match the selected chord
-        const selectedChord = progressionData[currentlySelectedIndex];
-        modalState.currentRoot = selectedChord.root;
-        modalState.currentChordType = selectedChord.type;
-        modalState.activeInversion = selectedChord.inversion || 0;
+
+    // Check if explicit selectedChordIndex was provided
+    if (options.selectedChordIndex !== undefined) {
+        if (options.selectedChordIndex >= 0 && options.selectedChordIndex < progressionData.length) {
+            modalState.selectedProgressionIndex = options.selectedChordIndex;
+            const selectedChord = progressionData[options.selectedChordIndex];
+            modalState.currentRoot = selectedChord.root;
+            modalState.currentChordType = selectedChord.type;
+            modalState.activeInversion = selectedChord.inversion || 0;
+        } else {
+            modalState.selectedProgressionIndex = -1;
+        }
     } else {
-        // Default to adding after last chord
-        modalState.selectedProgressionIndex = -1;
-        // When adding after last chord, use the last chord's context if available
-        if (progressionData.length > 0) {
-            const lastChord = progressionData[progressionData.length - 1];
-            modalState.currentRoot = lastChord.root;
-            modalState.currentChordType = lastChord.type;
-            modalState.activeInversion = lastChord.inversion || 0;
+        // Fall back to currently selected chord card
+        const currentlySelectedIndex = getSelectedChordIndex();
+        if (currentlySelectedIndex !== null && currentlySelectedIndex >= 0 && currentlySelectedIndex < progressionData.length) {
+            modalState.selectedProgressionIndex = currentlySelectedIndex;
+            // Also sync currentRoot, currentChordType, and activeInversion to match the selected chord
+            const selectedChord = progressionData[currentlySelectedIndex];
+            modalState.currentRoot = selectedChord.root;
+            modalState.currentChordType = selectedChord.type;
+            modalState.activeInversion = selectedChord.inversion || 0;
+        } else {
+            // Default to adding after last chord
+            modalState.selectedProgressionIndex = -1;
+            // When adding after last chord, use the last chord's context if available
+            if (progressionData.length > 0) {
+                const lastChord = progressionData[progressionData.length - 1];
+                modalState.currentRoot = lastChord.root;
+                modalState.currentChordType = lastChord.type;
+                modalState.activeInversion = lastChord.inversion || 0;
+            }
         }
     }
 
@@ -896,6 +931,10 @@ function createModalStructure() {
     const header = createHeader();
     modal.appendChild(header);
 
+    // Persistent Progression Context Bar (always visible across all tabs)
+    const progressionBar = createPersistentProgressionBar();
+    modal.appendChild(progressionBar);
+
     // Tab navigation
     const tabNav = createTabNavigation();
     modal.appendChild(tabNav);
@@ -965,6 +1004,227 @@ function createHeader() {
     header.appendChild(title);
     header.appendChild(closeBtn);
     return header;
+}
+
+/**
+ * Create persistent progression context bar that shows across all tabs
+ * This provides constant visual context of the current progression
+ */
+function createPersistentProgressionBar() {
+    const bar = document.createElement('div');
+    bar.id = 'persistent-progression-bar';
+    bar.style.cssText = `
+        padding: 10px 16px;
+        background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    `;
+
+    // Render the progression chips
+    updatePersistentProgressionBar(bar);
+
+    return bar;
+}
+
+/**
+ * Update the persistent progression bar content
+ */
+function updatePersistentProgressionBar(bar) {
+    if (!bar) {
+        bar = document.getElementById('persistent-progression-bar');
+    }
+    if (!bar) return;
+
+    bar.innerHTML = '';
+
+    const key = getCurrentKey() || 'C';
+    const progressionData = getProgressionData() || [];
+
+    // Label with context icon
+    const label = document.createElement('div');
+    label.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #374151;
+        white-space: nowrap;
+    `;
+    label.innerHTML = `<span style="font-size: 14px;">📍</span> Context <span style="color: #6b7280; font-weight: normal;">(${key})</span>`;
+    bar.appendChild(label);
+
+    // Separator
+    const sep = document.createElement('div');
+    sep.style.cssText = 'width: 1px; height: 20px; background: #d1d5db; margin: 0 4px;';
+    bar.appendChild(sep);
+
+    // Build section lookup for chord coloring
+    const compositionState = getCompositionState();
+    const sections = compositionState?.getSections?.() || [];
+    const sectionStartMap = new Map();
+    const sectionChordMap = new Map();
+    sections.forEach(section => {
+        if (!section?.chordIndices || section.chordIndices.length === 0) return;
+        const startIdx = Math.min(...section.chordIndices);
+        if (!sectionStartMap.has(startIdx)) {
+            sectionStartMap.set(startIdx, []);
+        }
+        sectionStartMap.get(startIdx).push(section);
+        section.chordIndices.forEach(idx => {
+            if (!sectionChordMap.has(idx)) {
+                sectionChordMap.set(idx, []);
+            }
+            sectionChordMap.get(idx).push(section);
+        });
+    });
+
+    // Chord chips container
+    const chipsContainer = document.createElement('div');
+    chipsContainer.style.cssText = 'display: flex; gap: 4px; flex-wrap: wrap; align-items: center; flex: 1;';
+
+    if (progressionData.length === 0) {
+        const emptyMsg = document.createElement('span');
+        emptyMsg.textContent = 'No chords yet - add some to get recommendations';
+        emptyMsg.style.cssText = 'font-size: 11px; color: #9ca3af; font-style: italic;';
+        chipsContainer.appendChild(emptyMsg);
+    } else {
+        progressionData.forEach((chord, idx) => {
+            // Section badge at start of section
+            const sectionBadges = sectionStartMap.get(idx);
+            if (sectionBadges) {
+                sectionBadges.forEach(section => {
+                    const badge = document.createElement('span');
+                    const sectionLabel = section.label || section.type || 'Section';
+                    badge.textContent = sectionLabel;
+                    const color = section.color || '#c084fc';
+                    badge.style.cssText = `
+                        padding: 2px 6px;
+                        border-radius: 9999px;
+                        font-size: 9px;
+                        font-weight: 600;
+                        background: ${color}1A;
+                        color: ${color};
+                        border: 1px solid ${color}33;
+                    `;
+                    chipsContainer.appendChild(badge);
+                });
+            }
+
+            const chordSections = sectionChordMap.get(idx);
+            const primarySection = chordSections?.[0];
+            const chordDef = CHORD_DEFINITIONS[chord.type];
+            const symbol = chordDef?.symbol || '';
+            const isSelected = modalState.selectedProgressionIndex === idx;
+            const invLabel = getInversionLabel(chord.inversion);
+            const spelledRoot = spellNoteInKey(chord.root, key);
+
+            const chip = document.createElement('button');
+            chip.textContent = `${spelledRoot}${symbol}${invLabel}`;
+            chip.title = `${spelledRoot} ${chord.type}${chord.inversion ? ` (${INVERSION_NAMES[chord.inversion]})` : ''} - Click to select`;
+
+            let backgroundColor = isSelected ? '#667eea' : 'white';
+            let borderColor = isSelected ? '#667eea' : '#d1d5db';
+            let textColor = isSelected ? 'white' : '#374151';
+            let fontWeight = isSelected ? '600' : '500';
+
+            if (primarySection && !isSelected) {
+                const sectionColor = primarySection.color || '#c084fc';
+                backgroundColor = hexToRgba(sectionColor, 0.18);
+                borderColor = sectionColor;
+                textColor = sectionColor;
+            }
+
+            chip.style.cssText = `
+                padding: 3px 8px;
+                border: 1px solid ${borderColor};
+                border-radius: 4px;
+                background: ${backgroundColor};
+                color: ${textColor};
+                font-size: 11px;
+                font-weight: ${fontWeight};
+                cursor: pointer;
+                transition: all 0.15s;
+            `;
+
+            chip.addEventListener('click', () => {
+                modalState.selectedProgressionIndex = idx;
+                modalState.currentRoot = chord.root;
+                modalState.currentChordType = chord.type;
+                modalState.activeInversion = chord.inversion || 0;
+                updatePersistentProgressionBar();
+                renderActiveTab();
+            });
+
+            chip.addEventListener('mouseenter', () => {
+                if (!isSelected) {
+                    chip.style.transform = 'scale(1.05)';
+                    chip.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                }
+            });
+            chip.addEventListener('mouseleave', () => {
+                chip.style.transform = '';
+                chip.style.boxShadow = '';
+            });
+
+            chipsContainer.appendChild(chip);
+        });
+    }
+
+    // "Add after" button
+    const addBtn = document.createElement('button');
+    const isAddSelected = modalState.selectedProgressionIndex === -1;
+    addBtn.innerHTML = '+ Add';
+    addBtn.title = 'Add chord after last position';
+    addBtn.style.cssText = `
+        padding: 3px 8px;
+        border: 1px dashed ${isAddSelected ? '#10b981' : '#d1d5db'};
+        border-radius: 4px;
+        background: ${isAddSelected ? '#ecfdf5' : 'transparent'};
+        color: ${isAddSelected ? '#10b981' : '#6b7280'};
+        font-size: 11px;
+        font-weight: ${isAddSelected ? '600' : '400'};
+        cursor: pointer;
+        transition: all 0.15s;
+    `;
+    addBtn.addEventListener('click', () => {
+        modalState.selectedProgressionIndex = -1;
+        if (progressionData.length > 0) {
+            const lastChord = progressionData[progressionData.length - 1];
+            modalState.currentRoot = lastChord.root;
+            modalState.currentChordType = lastChord.type;
+            modalState.activeInversion = lastChord.inversion || 0;
+        }
+        updatePersistentProgressionBar();
+        renderActiveTab();
+    });
+    chipsContainer.appendChild(addBtn);
+
+    bar.appendChild(chipsContainer);
+
+    // Current selection indicator
+    const selectionIndicator = document.createElement('div');
+    selectionIndicator.style.cssText = `
+        font-size: 11px;
+        color: #6b7280;
+        white-space: nowrap;
+        padding: 4px 8px;
+        background: white;
+        border-radius: 4px;
+        border: 1px solid #e5e7eb;
+    `;
+    if (modalState.selectedProgressionIndex === -1) {
+        selectionIndicator.innerHTML = `<strong style="color: #10b981;">Adding</strong> after #${progressionData.length || 0}`;
+    } else {
+        const selectedChord = progressionData[modalState.selectedProgressionIndex];
+        const chordDef = CHORD_DEFINITIONS[selectedChord?.type];
+        const symbol = chordDef?.symbol || '';
+        selectionIndicator.innerHTML = `<strong style="color: #667eea;">Selected:</strong> ${selectedChord?.root}${symbol} (#${modalState.selectedProgressionIndex + 1})`;
+    }
+    bar.appendChild(selectionIndicator);
 }
 
 function createTabNavigation() {
@@ -1399,26 +1659,1371 @@ function renderActiveTab() {
 }
 
 // ============================================================================
-// CHORD TAB
+// CHORD TAB - Intent-Based Hub
 // ============================================================================
 
 function renderChordTab(container) {
     // Clear container first to prevent duplicate elements
     container.innerHTML = '';
 
-    // View selector
-    const viewSelector = createChordViewSelector();
-    container.appendChild(viewSelector);
+    // Intent-based sub-tabs (the Chord Hub)
+    const intentNav = createChordIntentNav();
+    container.appendChild(intentNav);
 
-    // View content
-    const viewContent = document.createElement('div');
-    viewContent.id = 'chord-view-content';
-    viewContent.style.cssText = 'margin-top: 16px;';
-    container.appendChild(viewContent);
+    // Intent content area
+    const intentContent = document.createElement('div');
+    intentContent.id = 'chord-intent-content';
+    intentContent.style.cssText = 'margin-top: 16px;';
+    container.appendChild(intentContent);
 
-    renderChordView();
+    renderChordIntentContent();
 }
 
+/**
+ * Create intent-based navigation for the Chord Hub
+ * Intent tabs: Suggest, Compare, Transform, Optimize, Sequence
+ */
+function createChordIntentNav() {
+    const nav = document.createElement('div');
+    nav.id = 'chord-intent-nav';
+    nav.style.cssText = `
+        display: flex;
+        gap: 6px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #e5e7eb;
+        flex-wrap: wrap;
+    `;
+
+    const intents = [
+        {
+            id: CHORD_INTENTS.SUGGEST,
+            label: 'Suggest',
+            icon: '💡',
+            description: 'What chord comes next?'
+        },
+        {
+            id: CHORD_INTENTS.COMPARE,
+            label: 'Compare',
+            icon: '⚖️',
+            description: 'Compare alternatives'
+        },
+        {
+            id: CHORD_INTENTS.TRANSFORM,
+            label: 'Transform',
+            icon: '🎭',
+            description: 'Transform progression'
+        },
+        {
+            id: CHORD_INTENTS.OPTIMIZE,
+            label: 'Optimize',
+            icon: '📈',
+            description: 'Optimize for tension'
+        },
+        {
+            id: CHORD_INTENTS.SEQUENCE,
+            label: 'Sequence',
+            icon: '🔗',
+            description: 'Build chord sequences'
+        }
+    ];
+
+    intents.forEach(intent => {
+        const btn = document.createElement('button');
+        btn.dataset.intent = intent.id;
+        btn.title = intent.description;
+        btn.innerHTML = `${intent.icon} ${intent.label}`;
+        const isActive = intent.id === modalState.chordIntent;
+        btn.style.cssText = `
+            padding: 10px 16px;
+            border: 2px solid ${isActive ? '#667eea' : '#e5e7eb'};
+            border-radius: 8px;
+            background: ${isActive ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'white'};
+            color: ${isActive ? 'white' : '#374151'};
+            font-size: 13px;
+            cursor: pointer;
+            font-weight: ${isActive ? '600' : '500'};
+            transition: all 0.2s;
+            flex: 1;
+            min-width: 100px;
+            text-align: center;
+        `;
+
+        btn.addEventListener('mouseenter', () => {
+            if (!isActive) {
+                btn.style.borderColor = '#667eea';
+                btn.style.background = '#f5f3ff';
+            }
+        });
+        btn.addEventListener('mouseleave', () => {
+            if (!isActive) {
+                btn.style.borderColor = '#e5e7eb';
+                btn.style.background = 'white';
+            }
+        });
+
+        btn.addEventListener('click', () => {
+            modalState.chordIntent = intent.id;
+            localStorage.setItem('unified-modal-chord-intent', intent.id);
+            renderChordTab(document.getElementById('unified-modal-content'));
+        });
+        nav.appendChild(btn);
+    });
+
+    return nav;
+}
+
+/**
+ * Render content for the current chord intent
+ */
+function renderChordIntentContent() {
+    const container = document.getElementById('chord-intent-content');
+    if (!container) return;
+    container.innerHTML = '';
+
+    switch (modalState.chordIntent) {
+        case CHORD_INTENTS.SUGGEST:
+            renderSuggestIntent(container);
+            break;
+        case CHORD_INTENTS.COMPARE:
+            renderCompareIntent(container);
+            break;
+        case CHORD_INTENTS.TRANSFORM:
+            renderTransformIntent(container);
+            break;
+        case CHORD_INTENTS.OPTIMIZE:
+            renderOptimizeIntent(container);
+            break;
+        case CHORD_INTENTS.SEQUENCE:
+            renderSequenceIntent(container);
+            break;
+        default:
+            renderSuggestIntent(container);
+    }
+}
+
+/**
+ * Suggest Intent: Quick suggestions + Explorer toggle
+ * Combines the existing Quick and Explorer views
+ */
+function renderSuggestIntent(container) {
+    // View toggle: Quick vs All Chords (Explorer)
+    const viewToggle = document.createElement('div');
+    viewToggle.style.cssText = `
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+    `;
+
+    const views = [
+        { id: CHORD_VIEWS.QUICK, label: 'Top Picks', icon: '⚡' },
+        { id: CHORD_VIEWS.EXPLORER, label: 'Explore All', icon: '🔍' }
+    ];
+
+    views.forEach(view => {
+        const btn = document.createElement('button');
+        btn.innerHTML = `${view.icon} ${view.label}`;
+        const isActive = view.id === modalState.chordView;
+        btn.style.cssText = `
+            padding: 6px 14px;
+            border: 1px solid ${isActive ? '#667eea' : '#d1d5db'};
+            border-radius: 20px;
+            background: ${isActive ? '#eef2ff' : 'white'};
+            color: ${isActive ? '#667eea' : '#6b7280'};
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: ${isActive ? '600' : '400'};
+            transition: all 0.15s;
+        `;
+        btn.addEventListener('click', () => {
+            modalState.chordView = view.id;
+            localStorage.setItem('unified-modal-chord-view', view.id);
+            renderSuggestIntent(container);
+        });
+        viewToggle.appendChild(btn);
+    });
+
+    container.appendChild(viewToggle);
+
+    // Content area for the selected view
+    const viewContent = document.createElement('div');
+    viewContent.id = 'chord-view-content';
+    container.appendChild(viewContent);
+
+    // Render based on current view
+    if (modalState.chordView === CHORD_VIEWS.EXPLORER) {
+        renderExplorerView(viewContent);
+    } else {
+        renderQuickSuggestionsView(viewContent);
+    }
+}
+
+/**
+ * Sequence Intent: Build multi-chord sequences
+ * Uses the existing sequences view
+ */
+function renderSequenceIntent(container) {
+    renderSequencesView(container);
+}
+
+/**
+ * Compare Intent: Compare the selected chord with alternatives
+ * Integrates functionality from chordComparisonModal.js
+ */
+function renderCompareIntent(container) {
+    // Clear container first to prevent duplicate content
+    container.innerHTML = '';
+
+    const progressionData = getProgressionData() || [];
+    const key = getCurrentKey() || 'C';
+
+    // Need a chord selected to compare
+    if (progressionData.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
+                <div style="font-size: 48px; margin-bottom: 16px;">⚖️</div>
+                <h3 style="margin: 0 0 8px 0; font-size: 16px; color: #374151;">No Chords to Compare</h3>
+                <p style="margin: 0; font-size: 14px;">Add some chords to your progression first, then select one to compare alternatives.</p>
+            </div>
+        `;
+        return;
+    }
+
+    if (modalState.selectedProgressionIndex === -1) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
+                <div style="font-size: 48px; margin-bottom: 16px;">⚖️</div>
+                <h3 style="margin: 0 0 8px 0; font-size: 16px; color: #374151;">Select a Chord to Compare</h3>
+                <p style="margin: 0; font-size: 14px;">Click on a chord in the progression bar above to compare it with alternatives.</p>
+            </div>
+        `;
+        return;
+    }
+
+    const chordIndex = modalState.selectedProgressionIndex;
+    const currentChord = progressionData[chordIndex];
+    const prevChord = chordIndex > 0 ? progressionData[chordIndex - 1] : null;
+    const chordDef = CHORD_DEFINITIONS[currentChord.type];
+    const symbol = chordDef?.symbol || '';
+    const spelledRoot = spellNoteInKey(currentChord.root, key);
+
+    // Build display names for play buttons
+    const currentDisplay = `${spelledRoot}${symbol}`;
+    const prevDisplay = prevChord ? `${spellNoteInKey(prevChord.root, key)}${CHORD_DEFINITIONS[prevChord.type]?.symbol || ''}` : null;
+
+    // Explanation banner
+    const banner = document.createElement('div');
+    banner.style.cssText = `
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        font-size: 13px;
+        color: #1e40af;
+    `;
+    banner.innerHTML = `
+        <strong>Compare alternatives for position #${chordIndex + 1}</strong><br>
+        <span style="color: #3b82f6;">These chords would replace <strong>${currentDisplay}</strong> in your progression.</span>
+    `;
+    container.appendChild(banner);
+
+    // Header showing current chord with play button
+    const header = document.createElement('div');
+    header.style.cssText = `
+        background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+        padding: 16px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        border: 2px solid #86efac;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+    `;
+
+    const headerLeft = document.createElement('div');
+    headerLeft.style.cssText = 'display: flex; align-items: center; gap: 16px;';
+    headerLeft.innerHTML = `
+        <div style="
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+        ">${spelledRoot}${symbol}</div>
+        <div>
+            <div style="font-size: 18px; font-weight: 700; color: #166534;">Current: ${spelledRoot} ${currentChord.type}</div>
+            <div style="font-size: 13px; color: #15803d;">Position #${chordIndex + 1} - Your current choice</div>
+        </div>
+    `;
+    header.appendChild(headerLeft);
+
+    // Play current button with explicit label
+    const playCurrentBtn = document.createElement('button');
+    const playLabel = prevDisplay ? `▶ Hear: ${prevDisplay} → ${currentDisplay}` : `▶ Hear: ${currentDisplay}`;
+    playCurrentBtn.innerHTML = playLabel;
+    playCurrentBtn.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 10px 16px;
+        background: #22c55e;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 500;
+        font-size: 12px;
+        white-space: nowrap;
+    `;
+    playCurrentBtn.addEventListener('click', async () => {
+        await playCompareChordSequence(prevChord, currentChord);
+    });
+    header.appendChild(playCurrentBtn);
+
+    container.appendChild(header);
+
+    // Divider
+    const divider = document.createElement('div');
+    divider.style.cssText = 'display: flex; align-items: center; gap: 12px; margin-bottom: 16px;';
+    divider.innerHTML = `
+        <div style="flex: 1; height: 1px; background: #e5e7eb;"></div>
+        <span style="color: #6b7280; font-size: 13px; font-weight: 500;">Replace with one of these alternatives</span>
+        <div style="flex: 1; height: 1px; background: #e5e7eb;"></div>
+    `;
+    container.appendChild(divider);
+
+    // Generate alternatives using the recommendation engine
+    // Uses the same style, mood, and weight settings as other intents
+    const recommendations = generateComprehensiveRecommendations(
+        currentChord.root,
+        currentChord.type,
+        modalState.activeInversion,
+        key,
+        modalState.style,            // style
+        modalState.mood,             // mood
+        'resolve',                   // tensionDirection - alternatives typically resolve
+        10,                          // limit
+        progressionData,             // progressionData
+        true,                        // contextMode - enable context awareness
+        modalState.lookbackDepth,    // lookbackDepth
+        modalState.customWeights     // customWeights from sliders
+    );
+
+    // Filter to get alternatives (different from current chord)
+    const alternatives = recommendations
+        .filter(rec => rec.root !== currentChord.root || rec.type !== currentChord.type)
+        .slice(0, 6);
+
+    if (alternatives.length === 0) {
+        const noAlts = document.createElement('div');
+        noAlts.style.cssText = 'text-align: center; padding: 20px; color: #6b7280;';
+        noAlts.textContent = 'No significant alternatives found for this position.';
+        container.appendChild(noAlts);
+        return;
+    }
+
+    // Alternatives grid
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;';
+
+    alternatives.forEach((alt) => {
+        const altType = alt.type;
+        const altChordDef = CHORD_DEFINITIONS[altType];
+        const altSymbol = altChordDef?.symbol || '';
+        const altSpelled = spellNoteInKey(alt.root, key);
+        const altDisplay = `${altSpelled}${altSymbol}`;
+        const score = Math.round(alt.score || alt.totalScore || 70);
+
+        const card = document.createElement('div');
+        card.style.cssText = `
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            transition: all 0.2s;
+        `;
+        card.addEventListener('mouseenter', () => {
+            card.style.borderColor = '#667eea';
+            card.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.15)';
+        });
+        card.addEventListener('mouseleave', () => {
+            card.style.borderColor = '#e5e7eb';
+            card.style.boxShadow = 'none';
+        });
+
+        // Build play button label
+        const altPlayLabel = prevDisplay ? `▶ ${prevDisplay} → ${altDisplay}` : `▶ ${altDisplay}`;
+
+        // Get roman numeral for Why This Works
+        const altRoman = noteToRomanNumeral(alt.root, key, altType) || '';
+
+        card.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                <div style="
+                    width: 44px;
+                    height: 44px;
+                    border-radius: 8px;
+                    background: ${hexToRgba(getScoreColor(score), 0.15)};
+                    border: 2px solid ${getScoreColor(score)};
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: ${getScoreColor(score)};
+                    font-weight: bold;
+                    font-size: 13px;
+                ">${altDisplay}</div>
+                <div style="flex: 1;">
+                    <div style="font-weight: 600; color: #374151;">${altSpelled} ${altType}</div>
+                    <div style="font-size: 12px; color: #6b7280;">${altRoman}</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button class="compare-why-btn" style="
+                        padding: 4px 8px;
+                        background: #8b5cf6;
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 11px;
+                        font-weight: 600;
+                    " title="Why this chord works">?</button>
+                    <div style="
+                        padding: 4px 8px;
+                        border-radius: 12px;
+                        background: ${hexToRgba(getScoreColor(score), 0.15)};
+                        color: ${getScoreColor(score)};
+                        font-size: 12px;
+                        font-weight: 600;
+                    ">${score}%</div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button class="compare-play-btn" style="
+                    flex: 1;
+                    padding: 8px;
+                    border: 1px solid #3b82f6;
+                    border-radius: 6px;
+                    background: #3b82f6;
+                    color: white;
+                    cursor: pointer;
+                    font-size: 11px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 4px;
+                    font-weight: 500;
+                ">${altPlayLabel}</button>
+                <button class="compare-apply-btn" style="
+                    flex: 1;
+                    padding: 8px;
+                    border: none;
+                    border-radius: 6px;
+                    background: #10b981;
+                    color: white;
+                    cursor: pointer;
+                    font-size: 12px;
+                    font-weight: 500;
+                ">✓ Replace</button>
+            </div>
+        `;
+
+        // Why button - opens Why This Works modal
+        const whyBtn = card.querySelector('.compare-why-btn');
+        whyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof window.showWhyThisWorks === 'function') {
+                window.showWhyThisWorks({
+                    romanNumeral: altRoman,
+                    chord: altSpelled,
+                    type: altType,
+                    reason: alt.reason || alt.explanation,
+                    key: key,
+                    root: alt.root,
+                    prevChord: currentChord ? noteToRomanNumeral(currentChord.root, key, currentChord.type) : null,
+                    prevChordData: currentChord
+                });
+            }
+        });
+
+        // Play button - plays previous chord then this alternative
+        const playBtn = card.querySelector('.compare-play-btn');
+        playBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await playCompareChordSequence(prevChord, { root: alt.root, type: altType, inversion: alt.inversion || 0 });
+        });
+
+        // Apply button - properly replace the chord
+        const applyBtn = card.querySelector('.compare-apply-btn');
+        applyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            applyCompareReplacement(chordIndex, currentChord, alt.root, altType, alt.inversion || 0, container);
+        });
+
+        grid.appendChild(card);
+    });
+
+    container.appendChild(grid);
+}
+
+/**
+ * Apply a chord replacement from Compare intent
+ * Properly updates progression, notation, and all UI components
+ */
+function applyCompareReplacement(chordIndex, currentChord, newRoot, newType, newInversion, container) {
+    const progressionData = getProgressionData() || [];
+    if (chordIndex < 0 || chordIndex >= progressionData.length) return;
+
+    const key = getCurrentKey() || 'C';
+
+    // Calculate the Roman numeral for the new chord
+    const newRoman = noteToRomanNumeral(newRoot, key, newType) || newRoot;
+
+    // Build the new chord object
+    // IMPORTANT: We must update 'roman' field too, because updateChordInversion
+    // uses `chord.roman || chord.root` and would pick up the old roman value
+    const newChord = {
+        ...currentChord,
+        root: newRoot,
+        type: newType,
+        inversion: newInversion,
+        roman: newRoman,
+        simpleName: `${newRoot}${CHORD_DEFINITIONS[newType]?.symbol || ''}`,
+        notes: [] // Will be recalculated
+    };
+
+    // Get notes for the new chord
+    try {
+        const notesResult = getInvertedChordNotes(newRoot, newType, newInversion, key, 0);
+        newChord.notes = notesResult?.specificNotes || [];
+    } catch (e) {
+        console.warn('[Compare] Could not compute notes for new chord');
+    }
+
+    // Save state for undo
+    if (window.saveStateBeforeChange) {
+        window.saveStateBeforeChange();
+    }
+
+    // Update the progression
+    const newProgression = [...progressionData];
+    newProgression[chordIndex] = newChord;
+
+    // Update progression data
+    setProgressionData(newProgression);
+
+    // Trigger full UI refresh
+    if (window.renderProgressionDisplay) {
+        window.renderProgressionDisplay();
+    }
+
+    // Dispatch events for other components (notation, etc.)
+    window.dispatchEvent(new CustomEvent('progressionUpdated'));
+    document.dispatchEvent(new CustomEvent('progression-changed', {
+        detail: { action: 'replace', index: chordIndex, chord: newChord }
+    }));
+
+    // Update the persistent progression bar in the modal
+    updatePersistentProgressionBar();
+
+    // Update modal state to reflect the new chord
+    modalState.currentRoot = newRoot;
+    modalState.currentChordType = newType;
+    modalState.activeInversion = newInversion;
+
+    // Re-render compare intent with updated data
+    renderCompareIntent(container);
+}
+
+/**
+ * Play a chord sequence for A/B comparison (previous chord -> target chord)
+ */
+async function playCompareChordSequence(prevChord, targetChord) {
+    try {
+        const piano = window.getPiano ? window.getPiano() : (window.getInstrument ? window.getInstrument() : null);
+        if (!piano || typeof Tone === 'undefined') {
+            console.warn('[Compare] Piano or Tone.js not available');
+            return;
+        }
+
+        // Ensure audio context is started
+        if (Tone.context.state !== 'running') {
+            await Tone.start();
+        }
+
+        const chordDuration = 0.9;
+        const now = Tone.now();
+        let timeOffset = 0;
+
+        // Play previous chord first (if exists) for context
+        if (prevChord) {
+            const prevNotes = getChordNotesForPlayback(prevChord.root, prevChord.type, prevChord.inversion || 0);
+            if (prevNotes.length > 0) {
+                piano.triggerAttackRelease(prevNotes, chordDuration * 0.9, now + timeOffset);
+                timeOffset += chordDuration;
+            }
+        }
+
+        // Play target chord
+        const targetNotes = getChordNotesForPlayback(targetChord.root, targetChord.type, targetChord.inversion || 0);
+        if (targetNotes.length > 0) {
+            piano.triggerAttackRelease(targetNotes, chordDuration * 0.9, now + timeOffset);
+        }
+    } catch (err) {
+        console.error('[Compare] Error playing sequence:', err);
+    }
+}
+
+/**
+ * Get chord notes for playback
+ */
+function getChordNotesForPlayback(root, type, inversion) {
+    try {
+        const result = getInvertedChordNotes(root, type, inversion, getCurrentKey() || 'C', 0);
+        return result?.specificNotes || [];
+    } catch (e) {
+        console.warn('[Compare] Could not get notes for', root, type);
+        return [];
+    }
+}
+
+/**
+ * Transform Intent: Apply transformations to the whole progression
+ * Integrates functionality from whatIfSandbox.js
+ */
+function renderTransformIntent(container) {
+    // Clear container first to prevent duplicate content
+    container.innerHTML = '';
+
+    const progressionData = getProgressionData() || [];
+    const key = getCurrentKey() || 'C';
+
+    if (progressionData.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
+                <div style="font-size: 48px; margin-bottom: 16px;">🎭</div>
+                <h3 style="margin: 0 0 8px 0; font-size: 16px; color: #374151;">No Progression to Transform</h3>
+                <p style="margin: 0; font-size: 14px;">Add some chords first, then transform them with these quick presets.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Helper to format chord for display
+    const formatChord = (chord) => {
+        const def = CHORD_DEFINITIONS[chord.type];
+        return `${chord.root}${def?.symbol || ''}`;
+    };
+
+    // Helper to format progression for display
+    const formatProgression = (prog) => prog.map(formatChord).join(' → ');
+
+    // Analyze current progression for dynamic descriptions
+    const majorChords = progressionData.filter(c => c.type === 'Major');
+    const minorChords = progressionData.filter(c => c.type === 'Minor' || c.type === 'Minor 7th');
+    const extendedChords = progressionData.filter(c =>
+        c.type.includes('7') || c.type.includes('9') || c.type.includes('11') || c.type.includes('13')
+    );
+    const simpleChords = progressionData.filter(c =>
+        c.type === 'Major' || c.type === 'Minor'
+    );
+
+    // Find potential borrowed chord candidates (for bVII, bVI, iv in major key)
+    const keyRoot = key.replace('m', ''); // Get root without minor indicator
+    const isMinorKey = key.includes('m');
+
+    // Calculate borrowed chord roots based on key
+    const keyIndex = ALL_NOTES.indexOf(keyRoot);
+    const bVIIRoot = ALL_NOTES[(keyIndex + 10) % 12]; // flat 7th
+    const bVIRoot = ALL_NOTES[(keyIndex + 8) % 12];   // flat 6th
+    const ivRoot = ALL_NOTES[(keyIndex + 5) % 12];    // 4th (for minor iv)
+
+    // Header with current progression display
+    const header = document.createElement('div');
+    header.style.cssText = 'margin-bottom: 20px;';
+    header.innerHTML = `
+        <h3 style="margin: 0 0 8px 0; font-size: 16px; color: #374151;">What if you transformed...</h3>
+        <div style="
+            background: #f9fafb;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            color: #374151;
+            border: 1px solid #e5e7eb;
+        ">${formatProgression(progressionData)}</div>
+    `;
+    container.appendChild(header);
+
+    // Build transformation presets with dynamic descriptions
+    const transformations = [];
+
+    // Make it Sad - only if there are major chords to convert
+    if (majorChords.length > 0) {
+        const majorNames = majorChords.map(c => c.root).join(', ');
+        const transformed = progressionData.map(c => c.type === 'Major' ? { ...c, type: 'Minor' } : c);
+        const changedChords = majorChords.map(c => `${c.root} → ${c.root}m`).join(', ');
+
+        transformations.push({
+            id: 'makeItSad',
+            label: 'Make it Sad',
+            icon: '😢',
+            description: `Change ${majorNames} to minor for a melancholy feel`,
+            preview: formatProgression(transformed),
+            insight: `Converting ${changedChords} adds emotional weight`,
+            transform: (prog) => prog.map(chord =>
+                chord.type === 'Major' ? { ...chord, type: 'Minor' } : chord
+            )
+        });
+    }
+
+    // Brighten - only if there are minor chords to convert
+    if (minorChords.length > 0) {
+        const minorNames = minorChords.map(c => c.root).join(', ');
+        const transformed = progressionData.map(c => {
+            if (c.type === 'Minor' || c.type === 'Minor 7th') {
+                return { ...c, type: c.type.replace('Minor', 'Major') };
+            }
+            return c;
+        });
+
+        transformations.push({
+            id: 'brighten',
+            label: 'Brighten',
+            icon: '☀️',
+            description: `Change ${minorNames} to major for an uplifting feel`,
+            preview: formatProgression(transformed),
+            insight: `Major chords create optimism and resolution`,
+            transform: (prog) => prog.map(chord => {
+                if (chord.type === 'Minor' || chord.type === 'Minor 7th') {
+                    return { ...chord, type: chord.type.replace('Minor', 'Major') };
+                }
+                return chord;
+            })
+        });
+    }
+
+    // Add Jazz Color - only if there are simple triads
+    if (simpleChords.length > 0) {
+        const transformed = progressionData.map(chord => {
+            if (chord.type === 'Major') return { ...chord, type: 'Major 7th' };
+            if (chord.type === 'Minor') return { ...chord, type: 'Minor 7th' };
+            return chord;
+        });
+        const changes = simpleChords.map(c =>
+            `${c.root} → ${c.root}${c.type === 'Major' ? 'maj7' : 'm7'}`
+        ).slice(0, 3).join(', ');
+
+        transformations.push({
+            id: 'addJazzColor',
+            label: 'Add Jazz Color',
+            icon: '🎷',
+            description: `Add 7th extensions to ${simpleChords.length} chord${simpleChords.length > 1 ? 's' : ''}`,
+            preview: formatProgression(transformed),
+            insight: `${changes}${simpleChords.length > 3 ? '...' : ''} adds sophistication`,
+            transform: (prog) => prog.map(chord => {
+                if (chord.type === 'Major') return { ...chord, type: 'Major 7th' };
+                if (chord.type === 'Minor') return { ...chord, type: 'Minor 7th' };
+                return chord;
+            })
+        });
+    }
+
+    // Simplify - only if there are extended chords
+    if (extendedChords.length > 0) {
+        const transformed = progressionData.map(chord => {
+            if (chord.type.includes('7') || chord.type.includes('9') || chord.type.includes('11') || chord.type.includes('13')) {
+                if (chord.type.includes('Minor') || chord.type.includes('m')) {
+                    return { ...chord, type: 'Minor' };
+                }
+                return { ...chord, type: 'Major' };
+            }
+            return chord;
+        });
+
+        transformations.push({
+            id: 'simplify',
+            label: 'Simplify',
+            icon: '✨',
+            description: `Strip extensions from ${extendedChords.length} chord${extendedChords.length > 1 ? 's' : ''}`,
+            preview: formatProgression(transformed),
+            insight: `Back to basic triads for a cleaner, more direct sound`,
+            transform: (prog) => prog.map(chord => {
+                if (chord.type.includes('7') || chord.type.includes('9') || chord.type.includes('11') || chord.type.includes('13')) {
+                    if (chord.type.includes('Minor') || chord.type.includes('m')) {
+                        return { ...chord, type: 'Minor' };
+                    }
+                    return { ...chord, type: 'Major' };
+                }
+                return chord;
+            })
+        });
+    }
+
+    // Add Suspense - only if there are triads and more than one chord
+    if (simpleChords.length > 0 && progressionData.length > 1) {
+        const transformed = progressionData.map((chord, i) => {
+            if (i < progressionData.length - 1 && (chord.type === 'Major' || chord.type === 'Minor')) {
+                return { ...chord, type: 'Suspended 4th' };
+            }
+            return chord;
+        });
+        const lastChord = progressionData[progressionData.length - 1];
+
+        transformations.push({
+            id: 'addSuspense',
+            label: 'Add Suspense',
+            icon: '😰',
+            description: `Convert to sus4 chords, resolving to ${formatChord(lastChord)}`,
+            preview: formatProgression(transformed),
+            insight: `Suspensions create anticipation before the final ${lastChord.root} resolution`,
+            transform: (prog) => prog.map((chord, i) => {
+                if (i < prog.length - 1 && (chord.type === 'Major' || chord.type === 'Minor')) {
+                    return { ...chord, type: 'Suspended 4th' };
+                }
+                return chord;
+            })
+        });
+    }
+
+    // Borrowed Chords - add bVII or bVI from parallel minor (only for major keys)
+    if (!isMinorKey && progressionData.length >= 2) {
+        // Find a good place to insert borrowed chord (before last chord, replacing a subdominant)
+        const insertIndex = Math.max(0, progressionData.length - 2);
+        const originalChord = progressionData[insertIndex];
+
+        const transformed = progressionData.map((chord, i) => {
+            if (i === insertIndex) {
+                return { ...chord, root: bVIRoot, type: 'Major' };
+            }
+            return chord;
+        });
+
+        transformations.push({
+            id: 'borrowedChords',
+            label: 'Borrowed Chords',
+            icon: '🎭',
+            description: `Replace ${formatChord(originalChord)} with ${bVIRoot} (borrowed from ${key}m)`,
+            preview: formatProgression(transformed),
+            insight: `The ${bVIRoot} is "borrowed" from ${key} minor — it adds an unexpected emotional shift`,
+            transform: (prog) => prog.map((chord, i) => {
+                if (i === insertIndex) {
+                    return { ...chord, root: bVIRoot, type: 'Major' };
+                }
+                return chord;
+            })
+        });
+    }
+
+    // Make it More Dramatic - add tension before resolution
+    if (progressionData.length >= 2) {
+        const lastChord = progressionData[progressionData.length - 1];
+        const secondToLast = progressionData[progressionData.length - 2];
+
+        // Calculate the dominant of the last chord for a stronger resolution
+        const lastChordIndex = ALL_NOTES.indexOf(lastChord.root);
+        const dominantRoot = ALL_NOTES[(lastChordIndex + 7) % 12]; // V of the last chord
+
+        // Insert a ii chord before the dominant for ii-V-I feel
+        const iiRoot = ALL_NOTES[(lastChordIndex + 2) % 12];
+
+        let transformed;
+        let insight;
+
+        if (progressionData.length === 2) {
+            // Short progression: just make the first chord a dominant 7th
+            transformed = progressionData.map((chord, i) => {
+                if (i === 0) {
+                    return { ...chord, root: dominantRoot, type: 'Dominant 7th' };
+                }
+                return chord;
+            });
+            insight = `Adding ${dominantRoot}7 creates strong pull toward ${lastChord.root}`;
+        } else {
+            // Longer progression: replace second-to-last with ii-V setup
+            transformed = [...progressionData];
+            transformed[progressionData.length - 2] = {
+                ...secondToLast,
+                root: iiRoot,
+                type: 'Minor 7th'
+            };
+            // Insert dominant 7th before last
+            transformed.splice(progressionData.length - 1, 0, {
+                ...lastChord,
+                root: dominantRoot,
+                type: 'Dominant 7th'
+            });
+            insight = `${iiRoot}m7 → ${dominantRoot}7 → ${lastChord.root} creates a powerful cadence`;
+        }
+
+        transformations.push({
+            id: 'moreDramatic',
+            label: 'More Dramatic',
+            icon: '🎬',
+            description: `Build tension before the final ${formatChord(lastChord)}`,
+            preview: formatProgression(transformed),
+            insight: insight,
+            transform: (prog) => {
+                const last = prog[prog.length - 1];
+                const lastIdx = ALL_NOTES.indexOf(last.root);
+                const domRoot = ALL_NOTES[(lastIdx + 7) % 12];
+                const iiRt = ALL_NOTES[(lastIdx + 2) % 12];
+
+                if (prog.length === 2) {
+                    return prog.map((chord, i) => {
+                        if (i === 0) {
+                            return { ...chord, root: domRoot, type: 'Dominant 7th' };
+                        }
+                        return chord;
+                    });
+                } else {
+                    const result = [...prog];
+                    result[prog.length - 2] = { ...prog[prog.length - 2], root: iiRt, type: 'Minor 7th' };
+                    result.splice(prog.length - 1, 0, { ...last, root: domRoot, type: 'Dominant 7th' });
+                    return result;
+                }
+            }
+        });
+    }
+
+    // Power Chords - always available
+    {
+        const transformed = progressionData.map(chord => ({ ...chord, type: 'Power Chord' }));
+
+        transformations.push({
+            id: 'powerChords',
+            label: 'Power Chords',
+            icon: '🎸',
+            description: `Convert all ${progressionData.length} chords to power chords`,
+            preview: formatProgression(transformed),
+            insight: `Root + 5th only — perfect for rock and punk energy`,
+            transform: (prog) => prog.map(chord => ({ ...chord, type: 'Power Chord' }))
+        });
+    }
+
+    // Check if any transformations are available
+    if (transformations.length === 0) {
+        container.innerHTML += `
+            <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
+                <div style="font-size: 32px; margin-bottom: 12px;">🤔</div>
+                <p style="margin: 0; font-size: 14px;">No transformations available for this progression type.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Grid of transformation cards
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;';
+
+    transformations.forEach(tf => {
+        const card = document.createElement('div');
+        card.style.cssText = `
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        `;
+        card.addEventListener('mouseenter', () => {
+            card.style.borderColor = '#667eea';
+            card.style.transform = 'translateY(-2px)';
+            card.style.boxShadow = '0 8px 20px rgba(102, 126, 234, 0.15)';
+        });
+        card.addEventListener('mouseleave', () => {
+            card.style.borderColor = '#e5e7eb';
+            card.style.transform = '';
+            card.style.boxShadow = '';
+        });
+
+        card.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                <span style="font-size: 28px;">${tf.icon}</span>
+                <div>
+                    <div style="font-weight: 600; color: #374151; font-size: 14px;">${tf.label}</div>
+                    <div style="font-size: 11px; color: #6b7280; line-height: 1.3;">${tf.description}</div>
+                </div>
+            </div>
+            <div style="
+                background: #f0f4ff;
+                padding: 8px 10px;
+                border-radius: 6px;
+                font-family: monospace;
+                font-size: 12px;
+                color: #4338ca;
+                margin-bottom: 8px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            ">→ ${tf.preview}</div>
+            <div style="
+                font-size: 11px;
+                color: #059669;
+                line-height: 1.4;
+                padding-left: 4px;
+                border-left: 2px solid #10b981;
+            ">💡 ${tf.insight}</div>
+        `;
+
+        card.addEventListener('click', () => {
+            const transformed = tf.transform([...progressionData]);
+            // Show preview before applying
+            showTransformPreview(container, progressionData, transformed, tf, key);
+        });
+
+        grid.appendChild(card);
+    });
+
+    container.appendChild(grid);
+}
+
+/**
+ * Show preview of transformation before applying
+ */
+function showTransformPreview(container, original, transformed, transformation, key) {
+    container.innerHTML = '';
+
+    // Back button
+    const backBtn = document.createElement('button');
+    backBtn.innerHTML = '← Back to Transformations';
+    backBtn.style.cssText = `
+        padding: 8px 16px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: white;
+        cursor: pointer;
+        font-size: 13px;
+        margin-bottom: 20px;
+    `;
+    backBtn.addEventListener('click', () => renderTransformIntent(container));
+    container.appendChild(backBtn);
+
+    // Preview header
+    const header = document.createElement('div');
+    header.style.cssText = `
+        background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
+        padding: 16px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    `;
+    header.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: ${transformation.insight ? '12px' : '0'};">
+            <span style="font-size: 32px;">${transformation.icon}</span>
+            <div>
+                <div style="font-weight: 600; font-size: 16px; color: #374151;">${transformation.label}</div>
+                <div style="font-size: 13px; color: #6b7280;">${transformation.description}</div>
+            </div>
+        </div>
+        ${transformation.insight ? `
+        <div style="
+            font-size: 13px;
+            color: #059669;
+            line-height: 1.4;
+            padding: 10px 12px;
+            background: rgba(16, 185, 129, 0.1);
+            border-radius: 6px;
+            border-left: 3px solid #10b981;
+        ">💡 ${transformation.insight}</div>
+        ` : ''}
+    `;
+    container.appendChild(header);
+
+    // Before/After comparison
+    const comparison = document.createElement('div');
+    comparison.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;';
+
+    // Track chips for sequence playback highlighting
+    const beforeChipElements = [];
+    const afterChipElements = [];
+
+    // Before column
+    const beforeCol = document.createElement('div');
+
+    // Before header with play button
+    const beforeHeader = document.createElement('div');
+    beforeHeader.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 8px;';
+    beforeHeader.innerHTML = `<span style="font-weight: 600; color: #6b7280; font-size: 12px;">BEFORE</span>`;
+
+    const playBeforeBtn = document.createElement('button');
+    playBeforeBtn.innerHTML = '▶ Play';
+    playBeforeBtn.style.cssText = `
+        padding: 4px 10px;
+        border: 1px solid #9ca3af;
+        border-radius: 4px;
+        background: white;
+        cursor: pointer;
+        font-size: 11px;
+        color: #6b7280;
+        transition: all 0.15s;
+    `;
+    playBeforeBtn.addEventListener('mouseenter', () => {
+        playBeforeBtn.style.background = '#f3f4f6';
+        playBeforeBtn.style.borderColor = '#6b7280';
+    });
+    playBeforeBtn.addEventListener('mouseleave', () => {
+        playBeforeBtn.style.background = 'white';
+        playBeforeBtn.style.borderColor = '#9ca3af';
+    });
+    playBeforeBtn.addEventListener('click', () => {
+        playChordSequence(original, beforeChipElements, 300);
+    });
+    beforeHeader.appendChild(playBeforeBtn);
+    beforeCol.appendChild(beforeHeader);
+
+    const beforeChips = document.createElement('div');
+    beforeChips.style.cssText = 'display: flex; gap: 6px; flex-wrap: wrap;';
+    original.forEach(chord => {
+        const chordDef = CHORD_DEFINITIONS[chord.type];
+        const symbol = chordDef?.symbol || '';
+        const chip = document.createElement('span');
+        chip.textContent = `${chord.root}${symbol}`;
+        chip.style.cssText = `
+            padding: 6px 10px;
+            background: #f3f4f6;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s;
+            user-select: none;
+        `;
+        // Hold-to-play for individual chord
+        setupHoldToPlay(chip, chord);
+        beforeChips.appendChild(chip);
+        beforeChipElements.push(chip);
+    });
+    beforeCol.appendChild(beforeChips);
+    comparison.appendChild(beforeCol);
+
+    // After column
+    const afterCol = document.createElement('div');
+
+    // After header with play button
+    const afterHeader = document.createElement('div');
+    afterHeader.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 8px;';
+    afterHeader.innerHTML = `<span style="font-weight: 600; color: #667eea; font-size: 12px;">AFTER</span>`;
+
+    const playAfterBtn = document.createElement('button');
+    playAfterBtn.innerHTML = '▶ Play';
+    playAfterBtn.style.cssText = `
+        padding: 4px 10px;
+        border: 1px solid #667eea;
+        border-radius: 4px;
+        background: white;
+        cursor: pointer;
+        font-size: 11px;
+        color: #667eea;
+        transition: all 0.15s;
+    `;
+    playAfterBtn.addEventListener('mouseenter', () => {
+        playAfterBtn.style.background = '#eef2ff';
+    });
+    playAfterBtn.addEventListener('mouseleave', () => {
+        playAfterBtn.style.background = 'white';
+    });
+    playAfterBtn.addEventListener('click', () => {
+        playChordSequence(transformed, afterChipElements, 300);
+    });
+    afterHeader.appendChild(playAfterBtn);
+    afterCol.appendChild(afterHeader);
+
+    const afterChips = document.createElement('div');
+    afterChips.style.cssText = 'display: flex; gap: 6px; flex-wrap: wrap;';
+    transformed.forEach((chord, i) => {
+        const chordDef = CHORD_DEFINITIONS[chord.type];
+        const symbol = chordDef?.symbol || '';
+        const changed = chord.type !== original[i]?.type || chord.root !== original[i]?.root;
+        const chip = document.createElement('span');
+        chip.textContent = `${chord.root}${symbol}`;
+        chip.style.cssText = `
+            padding: 6px 10px;
+            background: ${changed ? '#eef2ff' : '#f3f4f6'};
+            border: ${changed ? '2px solid #667eea' : '1px solid #e5e7eb'};
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: ${changed ? '600' : '400'};
+            color: ${changed ? '#667eea' : '#374151'};
+            cursor: pointer;
+            transition: all 0.15s;
+            user-select: none;
+        `;
+        // Hold-to-play for individual chord
+        setupHoldToPlay(chip, chord);
+        afterChips.appendChild(chip);
+        afterChipElements.push(chip);
+    });
+    afterCol.appendChild(afterChips);
+    comparison.appendChild(afterCol);
+
+    container.appendChild(comparison);
+
+    // Action buttons
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display: flex; gap: 12px; justify-content: center;';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.style.cssText = `
+        padding: 12px 24px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: white;
+        cursor: pointer;
+        font-size: 14px;
+    `;
+    cancelBtn.addEventListener('click', () => renderTransformIntent(container));
+    actions.appendChild(cancelBtn);
+
+    const applyBtn = document.createElement('button');
+    applyBtn.textContent = 'Apply Transformation';
+    applyBtn.style.cssText = `
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+    `;
+    applyBtn.addEventListener('click', () => {
+        if (window.saveStateBeforeChange) window.saveStateBeforeChange();
+        setProgressionData(transformed);
+        window.dispatchEvent(new CustomEvent('progressionUpdated'));
+        updatePersistentProgressionBar();
+        // Show success and go back
+        renderTransformIntent(container);
+    });
+    actions.appendChild(applyBtn);
+
+    container.appendChild(actions);
+}
+
+/**
+ * Optimize Intent: Opens the full Tension Curve Optimizer modal
+ * The optimizer is too complex to embed inline - use the dedicated modal
+ */
+function renderOptimizeIntent(container) {
+    // Clear container first
+    container.innerHTML = '';
+
+    const progressionData = getProgressionData() || [];
+
+    if (progressionData.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: #6b7280;">
+                <div style="font-size: 48px; margin-bottom: 16px;">📈</div>
+                <h3 style="margin: 0 0 8px 0; font-size: 16px; color: #374151;">No Progression to Optimize</h3>
+                <p style="margin: 0; font-size: 14px;">Add some chords first, then optimize them for your desired tension curve.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Show a launcher for the full Tension Curve Optimizer
+    container.innerHTML = `
+        <div style="text-align: center; padding: 30px 20px;">
+            <div style="font-size: 64px; margin-bottom: 20px;">📈</div>
+            <h3 style="margin: 0 0 12px 0; font-size: 20px; color: #374151;">Tension Curve Optimizer</h3>
+            <p style="margin: 0 0 24px 0; font-size: 14px; color: #6b7280; max-width: 400px; margin-left: auto; margin-right: auto; line-height: 1.6;">
+                Optimize your progression's inversions and chord extensions to match a target tension curve.
+                Choose from templates like "Build & Release", "Constant Drive", or "Gentle Wave".
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 12px; max-width: 320px; margin: 0 auto;">
+                <button id="open-tension-optimizer-btn" style="
+                    padding: 14px 24px;
+                    border: none;
+                    border-radius: 10px;
+                    background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+                    color: white;
+                    font-size: 15px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    box-shadow: 0 4px 14px rgba(139, 92, 246, 0.35);
+                    transition: all 0.2s;
+                ">
+                    <span>📊</span> Open Tension Curve Optimizer
+                </button>
+                <div style="font-size: 12px; color: #9ca3af;">
+                    Opens in a dedicated window with full analysis tools
+                </div>
+            </div>
+
+            <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+                <h4 style="margin: 0 0 16px 0; font-size: 14px; color: #6b7280; font-weight: 500;">What it does:</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; text-align: left;">
+                    <div style="background: #f9fafb; padding: 16px; border-radius: 8px;">
+                        <div style="font-size: 24px; margin-bottom: 8px;">🎯</div>
+                        <div style="font-weight: 600; color: #374151; margin-bottom: 4px;">Target Curves</div>
+                        <div style="font-size: 12px; color: #6b7280;">Select from tension arc templates that define how intensity should flow through your progression</div>
+                    </div>
+                    <div style="background: #f9fafb; padding: 16px; border-radius: 8px;">
+                        <div style="font-size: 24px; margin-bottom: 8px;">🔄</div>
+                        <div style="font-weight: 600; color: #374151; margin-bottom: 4px;">Smart Suggestions</div>
+                        <div style="font-size: 12px; color: #6b7280;">Get inversion and extension suggestions for each chord to better match your target curve</div>
+                    </div>
+                    <div style="background: #f9fafb; padding: 16px; border-radius: 8px;">
+                        <div style="font-size: 24px; margin-bottom: 8px;">📉</div>
+                        <div style="font-weight: 600; color: #374151; margin-bottom: 4px;">Visual Comparison</div>
+                        <div style="font-size: 12px; color: #6b7280;">See your current tension vs target tension in an interactive curve visualization</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Wire up the button
+    const openBtn = container.querySelector('#open-tension-optimizer-btn');
+    openBtn.addEventListener('mouseenter', () => {
+        openBtn.style.transform = 'translateY(-2px)';
+        openBtn.style.boxShadow = '0 6px 20px rgba(139, 92, 246, 0.45)';
+    });
+    openBtn.addEventListener('mouseleave', () => {
+        openBtn.style.transform = '';
+        openBtn.style.boxShadow = '0 4px 14px rgba(139, 92, 246, 0.35)';
+    });
+    openBtn.addEventListener('click', () => {
+        // Close this modal and open the Tension Optimizer
+        closeUnifiedRecommendationModal();
+        // Use the global function or import
+        if (window.showTensionOptimizerModal) {
+            window.showTensionOptimizerModal();
+        } else {
+            import('../tensionOptimizerModal.js').then(module => {
+                module.showTensionOptimizerModal();
+            }).catch(err => {
+                console.error('Could not open Tension Optimizer:', err);
+                alert('Could not open Tension Optimizer. Please try again.');
+            });
+        }
+    });
+}
+
+// Note: Optimize intent now launches the dedicated Tension Optimizer modal
+// The old embedded implementation has been removed in favor of the full-featured modal
+
+/**
+ * Get color for tension level
+ */
+function getTensionColor(tension) {
+    if (tension >= 80) return '#ef4444'; // High tension - red
+    if (tension >= 60) return '#f97316'; // Medium-high - orange
+    if (tension >= 40) return '#eab308'; // Medium - yellow
+    if (tension >= 20) return '#22c55e'; // Low-medium - green
+    return '#06b6d4'; // Low tension - cyan
+}
+
+// Legacy function for backward compatibility
 function createChordViewSelector() {
     const nav = document.createElement('div');
     nav.style.cssText = `
@@ -1461,6 +3066,7 @@ function createChordViewSelector() {
     return nav;
 }
 
+// Legacy function kept for any remaining references
 function renderChordView() {
     const container = document.getElementById('chord-view-content');
     if (!container) return;
@@ -2405,6 +4011,9 @@ function addChordToProgression(rec, rhythmicContext, options = {}) {
     if (!options.skipRender) {
         // Refresh the UI to show the updated progression
         renderActiveTab();
+
+        // Update the persistent progression bar in the modal
+        updatePersistentProgressionBar();
 
         // Also refresh the main progression displays so newly created sections are visible immediately
         if (window.renderProgressionDisplay) {
@@ -9539,5 +11148,9 @@ export default {
     showUnifiedRecommendationModal,
     closeUnifiedRecommendationModal,
     TABS,
-    CHORD_VIEWS
+    CHORD_VIEWS,
+    CHORD_INTENTS
 };
+
+// Named exports for easier imports
+export { CHORD_INTENTS };

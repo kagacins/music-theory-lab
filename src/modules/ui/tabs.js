@@ -17,12 +17,90 @@ import { updateButtonVisibility } from './presetUI.js';
 import { updateTabSidebarHeight } from './sectionSidebar.js';
 import { initEnhancedNotation } from '../notation/notationInit.js';
 
+// ===========================================
+// BROWSER HISTORY STATE MANAGEMENT
+// ===========================================
+
+// Track the current lesson being viewed (if any)
+let currentLessonId = null;
+
+/**
+ * Set the current lesson ID for history tracking
+ * Called by lessonViewer when rendering a lesson
+ */
+export function setCurrentLessonForHistory(lessonId) {
+    currentLessonId = lessonId;
+}
+
+/**
+ * Get the current lesson ID
+ */
+export function getCurrentLessonForHistory() {
+    return currentLessonId;
+}
+
+/**
+ * Initialize browser history handling for tab navigation
+ * This allows the back button to return to previous tabs/lessons
+ */
+export function initTabHistory() {
+    // Handle browser back/forward buttons
+    window.addEventListener('popstate', (event) => {
+        if (event.state && event.state.tabId) {
+            // Switch to the tab without pushing new history
+            switchTab(event.state.tabId, { pushHistory: false });
+
+            // If there was a lesson being viewed, restore it
+            if (event.state.lessonId && event.state.tabId === 'learn') {
+                setTimeout(() => {
+                    if (window.renderLessonViewer) {
+                        // Use learn-tab-content (the inner container) not tab-learn (the outer wrapper)
+                        const learnContainer = document.getElementById('learn-tab-content');
+                        if (learnContainer) {
+                            window.renderLessonViewer(event.state.lessonId, learnContainer, false);
+                        }
+                    }
+                }, 100);
+            }
+        }
+    });
+
+    // Set initial state
+    const initialTab = getCurrentTab() || 'builder';
+    if (!history.state) {
+        history.replaceState({ tabId: initialTab, lessonId: null }, '', '');
+    }
+}
+
 /**
  * Switches between tabs and manages their visibility and state
  * @param {string} tabId - The ID of the tab to switch to ('builder', 'trainer', or 'scales')
+ * @param {Object} options - Options for tab switching
+ * @param {boolean} options.pushHistory - Whether to push to browser history (default: true)
  */
-export function switchTab(tabId) {
-    const tabs = ['builder', 'trainer', 'melody', 'scales'];
+export function switchTab(tabId, options = {}) {
+    const { pushHistory = true } = options;
+
+    // Get the previous tab and lesson for history
+    const previousTab = getCurrentTab();
+    const previousLessonId = currentLessonId;
+
+    // Push to browser history if requested and tab is changing
+    if (pushHistory && previousTab !== tabId) {
+        // First, update the current state with the lesson if we're leaving the learn tab
+        if (previousTab === 'learn' && previousLessonId) {
+            history.replaceState({ tabId: previousTab, lessonId: previousLessonId }, '', '');
+        }
+
+        // Push the new tab state
+        history.pushState({ tabId: tabId, lessonId: null }, '', '');
+    }
+
+    // Clear lesson ID when leaving the learn tab
+    if (tabId !== 'learn') {
+        currentLessonId = null;
+    }
+    const tabs = ['builder', 'trainer', 'melody', 'scales', 'learn'];
     tabs.forEach(id => {
         document.getElementById(`tab-${id}`).classList.toggle('hidden', id !== tabId);
 
@@ -40,6 +118,9 @@ export function switchTab(tabId) {
         } else if (id === 'scales') {
             activeColor = 'bg-lime-400'; // Lime for Scale Explorer (lime-400 matches keyboard)
             inactiveHover = 'hover:bg-gray-700';
+        } else if (id === 'learn') {
+            activeColor = 'bg-blue-500'; // Blue for Learn tab
+            inactiveHover = 'hover:bg-gray-700';
         }
         
         // Update sidebar button
@@ -53,11 +134,11 @@ export function switchTab(tabId) {
 
         // Update header button
         const headerBtn = document.getElementById(`header-tab-btn-${id}`);
-        headerBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-violet-600', 'bg-indigo-500', 'text-white', 'text-gray-500', 'hover:bg-gray-200');
+        headerBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-violet-600', 'bg-indigo-500', 'text-white', 'text-gray-500', 'text-gray-600', 'hover:bg-gray-100');
         if (id === tabId) {
             headerBtn.classList.add(activeColor, 'text-white');
         } else {
-            headerBtn.classList.add('text-gray-500', 'hover:bg-gray-200');
+            headerBtn.classList.add('text-gray-600', 'hover:bg-gray-100');
         }
 
         if (id === tabId) {
@@ -102,6 +183,7 @@ export function switchTab(tabId) {
     document.getElementById('floating-trainer-controls').classList.toggle('hidden', tabId !== 'trainer');
     document.getElementById('floating-melody-controls').classList.toggle('hidden', tabId !== 'melody');
     document.getElementById('floating-scale-controls').classList.toggle('hidden', tabId !== 'scales');
+    document.getElementById('floating-learn-controls').classList.toggle('hidden', tabId !== 'learn');
 
     // Show/hide the correct action button containers
     const builderActions = document.getElementById('builder-actions-container');
@@ -227,6 +309,17 @@ export function switchTab(tabId) {
             sharedChordDisplay.classList.add('w-64');
         }
         updateKeyboardLabels();
+    } else if (tabId === 'learn') {
+        // Initialize Learn tab content
+        if (window.initLearnTab) {
+            window.initLearnTab();
+        }
+        // Use same width as other tabs
+        const sharedChordDisplay = document.getElementById('shared-chord-display');
+        if (sharedChordDisplay) {
+            sharedChordDisplay.classList.remove('w-72', 'w-80');
+            sharedChordDisplay.classList.add('w-64');
+        }
     }
 
     // Update the main page title
@@ -234,13 +327,15 @@ export function switchTab(tabId) {
     const baseTitle = "Interactive Music Theory Lab";
     let tabTitle = "";
     if (tabId === 'builder') {
-        tabTitle = "Chord Builder";
+        tabTitle = "Chord Lab";
     } else if (tabId === 'trainer') {
-        tabTitle = "Progression Builder";
+        tabTitle = "Progression Workshop";
     } else if (tabId === 'melody') {
-        tabTitle = "Melody Composer";
+        tabTitle = "Composition Studio";
     } else if (tabId === 'scales') {
         tabTitle = "Scale Explorer";
+    } else if (tabId === 'learn') {
+        tabTitle = "Theory Academy";
     }
     mainTitle.innerHTML = `${baseTitle}:<br><span class="text-xl sm:text-2xl font-extrabold text-indigo-700">${tabTitle}</span>`;
     

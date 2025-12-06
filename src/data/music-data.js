@@ -73,6 +73,16 @@ const CHORD_DEFINITIONS = {
     '7b9': { intervals: [0, 4, 7, 10, 13], symbol: '7b9', description: 'A dominant 7th chord with a flatted 9th (R, M3, P5, m7, b9). Lowers the 9th by a half step. A very common and tense altered dominant chord in jazz.' },
     '7#9': { intervals: [0, 4, 7, 10, 15], symbol: '7#9', description: 'A dominant 7th chord with a sharped 9th (R, M3, P5, m7, #9). Raises the 9th by a half step. Also known as the "Hendrix chord".' },
     'Power Chord': { intervals: [0, 7], symbol: '5', description: 'Contains only the root and the 5th (R, P5). The 3rd is omitted, making it neither major nor minor. Common in rock music.' },
+
+    // Aliases for backwards compatibility (non-hyphenated and long form names)
+    'Half Diminished 7th': { intervals: [0, 3, 6, 10], symbol: 'm7b5', description: 'Alias for Half-Diminished 7th' },
+    'Minor Major 7th': { intervals: [0, 3, 7, 11], symbol: 'm(maj7)', description: 'Alias for Minor-Major 7th' },
+    'Dominant 7th #9': { intervals: [0, 4, 7, 10, 15], symbol: '7#9', description: 'Alias for 7#9 (Hendrix chord)' },
+    'Dominant 7th b9': { intervals: [0, 4, 7, 10, 13], symbol: '7b9', description: 'Alias for 7b9' },
+    'Dominant 7th #5': { intervals: [0, 4, 8, 10], symbol: '7#5', description: 'Alias for 7#5' },
+    'Dominant 7th b5': { intervals: [0, 4, 6, 10], symbol: '7b5', description: 'Alias for 7b5' },
+    'Sus2': { intervals: [0, 2, 7], symbol: 'sus2', description: 'Alias for Suspended 2nd' },
+    'Sus4': { intervals: [0, 5, 7], symbol: 'sus4', description: 'Alias for Suspended 4th' },
 };
 
 const INVERSION_NAMES = ['Root', '1st', '2nd', '3rd', '4th', '5th'];

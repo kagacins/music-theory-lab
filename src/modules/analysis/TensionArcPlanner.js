@@ -242,8 +242,10 @@ export const CHORD_TENSION_SCORES = {
     'Major 7th': { baseTension: 0.25, stability: 0.85, resolution: true },
     'Minor 7th': { baseTension: 0.35, stability: 0.75, resolution: true },
     'Diminished 7th': { baseTension: 0.90, stability: 0.15, resolution: false },
-    'Half Diminished 7th': { baseTension: 0.75, stability: 0.25, resolution: false },
-    'Minor Major 7th': { baseTension: 0.55, stability: 0.50, resolution: false },
+    'Half-Diminished 7th': { baseTension: 0.75, stability: 0.25, resolution: false },
+    'Half Diminished 7th': { baseTension: 0.75, stability: 0.25, resolution: false }, // Alias without hyphen
+    'Minor-Major 7th': { baseTension: 0.55, stability: 0.50, resolution: false },
+    'Minor Major 7th': { baseTension: 0.55, stability: 0.50, resolution: false }, // Alias without hyphen
 
     // Sixth chords
     'Major 6th': { baseTension: 0.20, stability: 0.85, resolution: true },
@@ -263,7 +265,12 @@ export const CHORD_TENSION_SCORES = {
     'Major 13th': { baseTension: 0.35, stability: 0.65, resolution: true },
     'Minor 13th': { baseTension: 0.45, stability: 0.60, resolution: true },
 
-    // Altered chords
+    // Altered chords - use CHORD_DEFINITIONS keys (short form)
+    '7#9': { baseTension: 0.85, stability: 0.20, resolution: false },
+    '7b9': { baseTension: 0.85, stability: 0.20, resolution: false },
+    '7#5': { baseTension: 0.80, stability: 0.25, resolution: false },
+    '7b5': { baseTension: 0.80, stability: 0.25, resolution: false },
+    // Aliases for long form names (backwards compatibility)
     'Dominant 7th #9': { baseTension: 0.85, stability: 0.20, resolution: false },
     'Dominant 7th b9': { baseTension: 0.85, stability: 0.20, resolution: false },
     'Dominant 7th #5': { baseTension: 0.80, stability: 0.25, resolution: false },
