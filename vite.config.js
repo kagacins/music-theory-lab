@@ -1,8 +1,11 @@
 import { defineConfig } from 'vite';
 
-export default defineConfig({
-  // Base path for GitHub Pages (change 'Music-Theory-Lab' to your actual repo name)
-  base: '/Music-Theory-Lab/',
+export default defineConfig(({ mode }) => ({
+  // Base path: use repo name for production (GitHub Pages), '/' for dev
+  // Set VITE_BASE_PATH env var or it defaults to '/Music-Theory-Lab/'
+  base: mode === 'production'
+    ? (process.env.VITE_BASE_PATH || '/music-theory-lab/')
+    : '/',
 
   // Use index.html in root as entry point
   root: '.',

@@ -9,7 +9,11 @@
 // ES MODULE IMPORTS (Bundled by Vite)
 // ===========================================
 import * as Tonal from 'tonal';
-import { BasicPitch } from '@spotify/basic-pitch';
+import { BasicPitch, addPitchBendsToNoteEvents, noteFramesToTime, outputToNotesPoly } from '@spotify/basic-pitch';
+
+// Basic Pitch model URL - loaded from node_modules via Vite
+// The path is resolved at build time by Vite
+import basicPitchModelUrl from '@spotify/basic-pitch/model/model.json?url';
 
 // ===========================================
 // STATE
@@ -344,6 +348,44 @@ async function loadAudioFile(file) {
 }
 
 /**
+ * Resample an AudioBuffer to a target sample rate and convert to mono
+ * Uses OfflineAudioContext for high-quality resampling
+ * @param {AudioBuffer} audioBuffer - Original audio buffer
+ * @param {number} targetSampleRate - Target sample rate
+ * @returns {Promise<AudioBuffer>} Resampled mono audio buffer
+ */
+async function resampleAudioBuffer(audioBuffer, targetSampleRate) {
+    const duration = audioBuffer.duration;
+    const newLength = Math.round(duration * targetSampleRate);
+
+    // Create offline context at target sample rate, mono output
+    const offlineCtx = new OfflineAudioContext(1, newLength, targetSampleRate);
+
+    // Create buffer source
+    const source = offlineCtx.createBufferSource();
+    source.buffer = audioBuffer;
+
+    // If stereo, use a channel merger to mix down to mono
+    if (audioBuffer.numberOfChannels > 1) {
+        // Create a gain node to mix channels (average them)
+        const gainNode = offlineCtx.createGain();
+        gainNode.gain.value = 1 / audioBuffer.numberOfChannels;
+        source.connect(gainNode);
+        gainNode.connect(offlineCtx.destination);
+    } else {
+        source.connect(offlineCtx.destination);
+    }
+
+    source.start(0);
+
+    // Render and return
+    const resampledBuffer = await offlineCtx.startRendering();
+    console.log(`[SongAnalyzer] Resampled: ${audioBuffer.numberOfChannels}ch ${audioBuffer.length} samples @ ${audioBuffer.sampleRate}Hz -> 1ch ${resampledBuffer.length} samples @ ${resampledBuffer.sampleRate}Hz`);
+
+    return resampledBuffer;
+}
+
+/**
  * Downsample audio for faster processing
  * @param {Float32Array} samples - Original audio samples
  * @param {number} originalSampleRate - Original sample rate
@@ -379,22 +421,19 @@ function downsampleAudio(samples, originalSampleRate, targetSampleRate = 22050) 
 async function analyzeChords(audioBuffer) {
     updateProgress('Analyzing harmonic content...', 30);
 
-    // Get mono audio data
-    const channelData = audioBuffer.getChannelData(0);
-
     // Use 44100 Hz as recommended for Essentia's chord detection
     const targetSampleRate = 44100;
     let samples, sampleRate;
 
-    if (audioBuffer.sampleRate === targetSampleRate) {
-        samples = channelData;
-        sampleRate = targetSampleRate;
-    } else if (audioBuffer.sampleRate > targetSampleRate) {
-        samples = downsampleAudio(channelData, audioBuffer.sampleRate, targetSampleRate);
+    // CRITICAL FIX: Use OfflineAudioContext for proper resampling
+    // Simple decimation (taking every Nth sample) causes pitch shift!
+    if (audioBuffer.sampleRate !== targetSampleRate || audioBuffer.numberOfChannels !== 1) {
+        console.log(`[SongAnalyzer] Resampling from ${audioBuffer.sampleRate}Hz ${audioBuffer.numberOfChannels}ch to ${targetSampleRate}Hz mono using OfflineAudioContext`);
+        const resampledBuffer = await resampleAudioBuffer(audioBuffer, targetSampleRate);
+        samples = resampledBuffer.getChannelData(0);
         sampleRate = targetSampleRate;
     } else {
-        // If source is lower, use original
-        samples = channelData;
+        samples = audioBuffer.getChannelData(0);
         sampleRate = audioBuffer.sampleRate;
     }
 
@@ -896,11 +935,10 @@ async function initBasicPitch() {
     updateProgress('Loading AI model (first time may take a moment)...', 10);
 
     try {
-        console.log('[SongAnalyzer] Loading Basic Pitch model...');
-        // BasicPitch is now imported as an ES module via Vite
-        basicPitchModel = new BasicPitch();
-        await basicPitchModel.initialize();
-        console.log('[SongAnalyzer] Basic Pitch model loaded successfully');
+        console.log('[SongAnalyzer] Loading Basic Pitch model from:', basicPitchModelUrl);
+        // BasicPitch constructor takes the model path
+        basicPitchModel = new BasicPitch(basicPitchModelUrl);
+        console.log('[SongAnalyzer] Basic Pitch model ready');
 
         basicPitchLoading = false;
         return basicPitchModel;
@@ -922,23 +960,63 @@ async function analyzeChordsWithBasicPitch(audioBuffer) {
     // Initialize Basic Pitch model
     const model = await initBasicPitch();
 
-    // Get mono audio data at 22050Hz (Basic Pitch's expected sample rate)
-    const channelData = audioBuffer.getChannelData(0);
-    const samples = downsampleAudio(channelData, audioBuffer.sampleRate, 22050);
+    updateProgress('Preparing audio for AI analysis...', 20);
+
+    // Basic Pitch requires 22050 Hz mono audio - resample and convert if needed
+    let resampledBuffer = audioBuffer;
+    if (audioBuffer.sampleRate !== 22050 || audioBuffer.numberOfChannels !== 1) {
+        console.log(`[SongAnalyzer] Converting to 22050 Hz mono (from ${audioBuffer.sampleRate} Hz, ${audioBuffer.numberOfChannels} channels)`);
+        resampledBuffer = await resampleAudioBuffer(audioBuffer, 22050);
+    }
 
     updateProgress('Transcribing audio to notes (this may take a while)...', 25);
 
     console.log('[SongAnalyzer] Running Basic Pitch transcription...');
 
-    // Run Basic Pitch inference
-    let noteEvents;
+    // Collect frames, onsets, and contours from the model
+    const frames = [];
+    const onsets = [];
+    const contours = [];
+
+    // Run Basic Pitch inference with the correct API
     try {
-        const frames = await model.evaluateModel(samples, 22050);
-        noteEvents = model.convertFramesToNoteEvents(frames);
-        console.log(`[SongAnalyzer] Basic Pitch detected ${noteEvents.length} note events`);
+        await model.evaluateModel(
+            resampledBuffer,
+            // Data callback - receives frames, onsets, contours
+            (f, o, c) => {
+                frames.push(...f);
+                onsets.push(...o);
+                contours.push(...c);
+            },
+            // Progress callback
+            (percent) => {
+                const progress = 25 + Math.floor(percent * 35);
+                updateProgress('Transcribing audio...', progress);
+            }
+        );
+
+        console.log(`[SongAnalyzer] Basic Pitch processed ${frames.length} frames`);
     } catch (error) {
         console.error('[SongAnalyzer] Basic Pitch inference failed:', error);
         throw new Error('AI transcription failed: ' + error.message);
+    }
+
+    updateProgress('Converting to note events...', 65);
+
+    // Convert frames to note events using the helper functions
+    // Tuned parameters for better accuracy:
+    // - onsetThreshold: 0.6 (higher = ignores ghost notes, fret noise)
+    // - frameThreshold: 0.5 (higher = more stable sustain, less bleeding)
+    // - minNoteLength: 12 (frames, ~130ms = removes accidental blips)
+    let noteEvents;
+    try {
+        const rawNotes = outputToNotesPoly(frames, onsets, 0.6, 0.5, 12);
+        const notesWithBends = addPitchBendsToNoteEvents(contours, rawNotes);
+        noteEvents = noteFramesToTime(notesWithBends);
+        console.log(`[SongAnalyzer] Basic Pitch detected ${noteEvents.length} note events`);
+    } catch (error) {
+        console.error('[SongAnalyzer] Note conversion failed:', error);
+        throw new Error('Note conversion failed: ' + error.message);
     }
 
     if (!noteEvents || noteEvents.length === 0) {
@@ -946,7 +1024,7 @@ async function analyzeChordsWithBasicPitch(audioBuffer) {
         return [];
     }
 
-    updateProgress('Analyzing note patterns for chords...', 60);
+    updateProgress('Analyzing note patterns for chords...', 75);
 
     // Group notes by time windows and detect chords using Tonal.js
     const chords = detectChordsFromNotes(noteEvents, audioBuffer.duration);
@@ -981,15 +1059,72 @@ function midiToPitchClass(midiNote) {
 }
 
 /**
+ * Simplify complex chord names to basic triads/7ths
+ * E.g., "Cmaj13#11" -> "Cmaj7", "Dm7add11/A" -> "Dm7"
+ */
+function simplifyChordName(chordName) {
+    if (!chordName) return null;
+
+    // Extract root note (e.g., "C", "F#", "Bb")
+    const rootMatch = chordName.match(/^[A-G][#b]?/);
+    if (!rootMatch) return chordName;
+    const root = rootMatch[0];
+
+    // Remove slash bass notes (inversions) for simplicity
+    const withoutBass = chordName.split('/')[0];
+
+    // Determine basic quality
+    const lowerChord = withoutBass.toLowerCase();
+
+    // Check for diminished
+    if (lowerChord.includes('dim') || lowerChord.includes('°')) {
+        return root + 'dim';
+    }
+    // Check for augmented
+    if (lowerChord.includes('aug') || lowerChord.includes('+') || lowerChord.includes('#5')) {
+        return root + 'aug';
+    }
+    // Check for sus chords
+    if (lowerChord.includes('sus4')) {
+        return root + 'sus4';
+    }
+    if (lowerChord.includes('sus2')) {
+        return root + 'sus2';
+    }
+    // Check for major 7th
+    if (lowerChord.includes('maj7') || lowerChord.includes('maj9') || lowerChord.includes('maj11') || lowerChord.includes('maj13')) {
+        return root + 'maj7';
+    }
+    // Check for dominant 7th
+    if (/[^a-z]7|^.{1,2}7/.test(withoutBass) && !lowerChord.includes('maj')) {
+        // Minor 7th
+        if (lowerChord.includes('m') && !lowerChord.includes('maj')) {
+            return root + 'm7';
+        }
+        return root + '7';
+    }
+    // Check for minor
+    if (lowerChord.includes('m') && !lowerChord.includes('maj')) {
+        return root + 'm';
+    }
+
+    // Default to major triad
+    return root;
+}
+
+/**
  * Group note events by time windows and detect chords using Tonal.js
+ * BASS-WEIGHTED APPROACH: Preserves octave info, prioritizes bass note as root
  * @param {Array} noteEvents - Array of note events from Basic Pitch
  * @param {number} duration - Total audio duration
  * @returns {Array} Array of detected chords
  */
 function detectChordsFromNotes(noteEvents, duration) {
-    // Time window for grouping notes (in seconds)
-    const WINDOW_SIZE = 0.5; // Half second windows
-    const WINDOW_HOP = 0.25; // Quarter second hop
+    // Time windows for stability
+    const WINDOW_SIZE = 1.0;
+    const WINDOW_HOP = 0.5;
+    // Velocity threshold to filter noise (0-1 scale)
+    const VELOCITY_THRESHOLD = 0.3;
 
     const chords = [];
     let currentTime = 0;
@@ -1000,33 +1135,54 @@ function detectChordsFromNotes(noteEvents, duration) {
     while (currentTime < duration) {
         const windowEnd = currentTime + WINDOW_SIZE;
 
-        // Find notes active during this window
+        // Find notes active during this window - KEEP FULL MIDI INFO (don't lose octaves)
         const activeNotes = noteEvents.filter(note => {
             const noteStart = note.startTimeSeconds || note.start || 0;
             const noteEnd = note.endTimeSeconds || note.end || noteStart + 0.1;
             return noteStart < windowEnd && noteEnd > currentTime;
-        });
+        }).map(note => ({
+            pitch: note.pitchMidi || note.pitch || note.noteNumber || 60,
+            velocity: note.amplitude || note.velocity || 0.5,
+            start: note.startTimeSeconds || note.start || 0
+        }));
 
         if (activeNotes.length >= 2) {
-            // Get unique pitch classes
-            const pitchClasses = [...new Set(activeNotes.map(note => {
-                const midiNote = note.pitchMidi || note.pitch || note.noteNumber;
-                return midiToPitchClass(midiNote);
-            }))];
+            // Filter out low-velocity notes (noise gate)
+            const strongNotes = activeNotes.filter(n => n.velocity > VELOCITY_THRESHOLD);
+            if (strongNotes.length < 2) {
+                currentTime += WINDOW_HOP;
+                continue;
+            }
 
-            // Sort by pitch class for consistent detection
-            pitchClasses.sort();
+            // Sort by pitch to find bass note (lowest)
+            strongNotes.sort((a, b) => a.pitch - b.pitch);
+            const bassNote = strongNotes[0];
+            const bassRoot = midiToPitchClass(bassNote.pitch);
+
+            // Get unique pitch classes for chord detection
+            const pitchClasses = [...new Set(strongNotes.map(n => midiToPitchClass(n.pitch)))];
 
             let chordName = null;
             let confidence = 0.7;
 
             if (hasTonal && pitchClasses.length >= 3) {
-                // Use Tonal.js to detect chord
                 try {
-                    const detected = Tonal.Chord.detect(pitchClasses);
-                    if (detected && detected.length > 0) {
-                        chordName = detected[0];
-                        confidence = 0.8;
+                    // Detect all possible chords
+                    const potentialChords = Tonal.Chord.detect(pitchClasses, { assumePerfectFifth: true });
+
+                    if (potentialChords && potentialChords.length > 0) {
+                        // BASS-WEIGHTED: Prefer chords where root matches bass note
+                        const bassMatchedChord = potentialChords.find(chordStr => {
+                            const chordInfo = Tonal.Chord.get(chordStr);
+                            return chordInfo && chordInfo.tonic === bassRoot;
+                        });
+
+                        // Pick bass-matched chord, or simplest if no match
+                        const sortedBySimplicity = potentialChords.sort((a, b) => a.length - b.length);
+                        const bestMatch = bassMatchedChord || sortedBySimplicity[0];
+
+                        chordName = simplifyChordName(bestMatch);
+                        confidence = bassMatchedChord ? 0.9 : 0.75;
                     }
                 } catch (e) {
                     console.warn('[SongAnalyzer] Tonal chord detection error:', e);
@@ -1051,7 +1207,8 @@ function detectChordsFromNotes(noteEvents, duration) {
                         startTime: currentTime,
                         endTime: windowEnd,
                         confidence: confidence,
-                        pitchClasses: pitchClasses
+                        pitchClasses: pitchClasses,
+                        bassNote: bassRoot
                     });
                 } else {
                     // Extend previous chord
