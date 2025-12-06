@@ -45,7 +45,7 @@
         <div class="p-4 flex-shrink-0">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold text-indigo-300">Navigation</h2>
-                <button onclick="toggleSidebar()" class="p-2 rounded-full hover:bg-gray-700 transition" title="Close Sidebar">
+                <button onclick="window.toggleSidebar && window.toggleSidebar()" class="p-2 rounded-full hover:bg-gray-700 transition" title="Close Sidebar">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
                 </button>
             </div>
@@ -54,35 +54,35 @@
             <div class="p-4 pt-0">
             <nav class="flex flex-col gap-1">
                 <div class="flex items-center gap-2">
-                    <button id="sidebar-btn-builder" onclick="switchTab('builder')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold bg-indigo-500 flex-grow">1. Chord Lab</button>
+                    <button id="sidebar-btn-builder" onclick="window.switchTab && window.switchTab('builder')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold bg-indigo-500 flex-grow">1. Chord Lab</button>
                     <div class="relative group">
                         <button class="p-2 text-gray-400 hover:text-white transition"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
                                 <div class="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">Build custom chords, intervals, and voicings from scratch. This is your creative canvas.</div>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button id="sidebar-btn-trainer" onclick="switchTab('trainer')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">2. Progression Workshop</button>
+                    <button id="sidebar-btn-trainer" onclick="window.switchTab && window.switchTab('trainer')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">2. Progression Workshop</button>
                     <div class="relative group">
                         <button class="p-2 text-gray-400 hover:text-white transition"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
                                 <div class="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">Practice pre-made chord progressions or create your own. Use the record button to capture ideas from the keyboard.</div>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button id="sidebar-btn-melody" onclick="switchTab('melody')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">3. Composition Studio</button>
+                    <button id="sidebar-btn-melody" onclick="window.switchTab && window.switchTab('melody')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">3. Composition Studio</button>
                     <div class="relative group">
                         <button class="p-2 text-gray-400 hover:text-white transition"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
                                 <div class="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">Build melodies over chord progressions or create standalone melodic ideas. Craft and explore musical phrases with powerful generation tools.</div>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button id="sidebar-btn-scales" onclick="switchTab('scales')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">4. Scale Explorer</button>
+                    <button id="sidebar-btn-scales" onclick="window.switchTab && window.switchTab('scales')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">4. Scale Explorer</button>
                     <div class="relative group">
                         <button class="p-2 text-gray-400 hover:text-white transition"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
                                 <div class="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">Explore a wide variety of musical scales and modes. Hear how they sound and see their notes on the keyboard.</div>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button id="sidebar-btn-learn" onclick="switchTab('learn')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">5. Theory Academy</button>
+                    <button id="sidebar-btn-learn" onclick="window.switchTab && window.switchTab('learn')" class="sidebar-btn text-left py-2 px-3 rounded-lg font-semibold hover:bg-gray-700 flex-grow">5. Theory Academy</button>
                     <div class="relative group">
                         <button class="p-2 text-gray-400 hover:text-white transition"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg></button>
                                 <div class="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-nowrap">Interactive lessons, guided learning, and the Songwriting Wizard to help you master music theory.</div>
@@ -260,7 +260,7 @@
 
                     <!-- Recommendation Weights Button -->
                     <div class="mt-4 pt-3 border-t border-gray-700">
-                        <button id="recommendation-weights-btn" onclick="showSettingsModal()" class="w-full py-2 px-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-sm font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between group">
+                        <button id="recommendation-weights-btn" onclick="window.showSettingsModal && window.showSettingsModal()" class="w-full py-2 px-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-sm font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between group">
                             <span class="flex items-center gap-2">
                                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z"></path></svg>
                                 <span>Recommendation Weights</span>
@@ -272,14 +272,14 @@
             </div>
         </div>
     </div>
-    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden" onclick="toggleSidebar()"></div>
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden" onclick="window.toggleSidebar && window.toggleSidebar()"></div>
 
     <div class="max-w-7xl mx-auto">
         <!-- Main Header -->
         <div id="main-header" class="grid items-center bg-gradient-to-r from-gray-50/90 to-gray-100/90 backdrop-blur-sm py-1 px-2 rounded-xl shadow-lg mb-1 sticky top-4 z-20 border-2 border-gray-300 transition-opacity duration-300" style="grid-template-columns: auto 1fr auto;">
             <!-- Left side: Sidebar Toggle and Title -->
             <div class="flex items-center gap-2 justify-start">
-                <button id="sidebar-toggle" onclick="toggleSidebar()" class="p-1.5 rounded-md hover:bg-gray-200 transition" title="Open Menu & Settings">
+                <button id="sidebar-toggle" onclick="window.toggleSidebar && window.toggleSidebar()" class="p-1.5 rounded-md hover:bg-gray-200 transition" title="Open Menu & Settings">
                     <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                 </button>
                 <div>
@@ -308,7 +308,7 @@
                         <div id="scale-info-display" class="text-center py-0.5 px-1 bg-lime-50 rounded-lg shadow-inner hidden"><p id="scale-name" class="text-xs font-bold text-gray-900 truncate px-1 leading-tight">C Major Scale</p><p id="scale-notes-display" class="text-[10px] text-lime-700 font-medium h-3.5 truncate px-1 leading-tight">C4-D4-E4-F4-G4-A4-B4-C5</p></div>
                     </div>
                 </div>
-                <button onclick="toggleDisplayPanel('header-display-panels')" class="p-0.5 text-gray-400 hover:text-gray-600" title="Toggle Header Displays"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"></path></svg></button>
+                <button onclick="window.toggleDisplayPanel && window.toggleDisplayPanel('header-display-panels')" class="p-0.5 text-gray-400 hover:text-gray-600" title="Toggle Header Displays"><svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"></path></svg></button>
             </div>
 
 
@@ -342,11 +342,11 @@
                 </div>
                 <!-- Header Tab buttons - cohesive selection bar -->
                 <div class="hidden md:flex border border-gray-300 rounded-md overflow-hidden">
-                    <button id="header-tab-btn-builder" onclick="switchTab('builder')" class="px-2 py-0.5 text-xs font-semibold leading-tight">Chord<br>Lab</button>
-                    <button id="header-tab-btn-trainer" onclick="switchTab('trainer')" class="px-2 py-0.5 text-xs font-semibold leading-tight">Progression<br>Workshop</button>
-                    <button id="header-tab-btn-melody" onclick="switchTab('melody')" class="px-2 py-0.5 text-xs font-semibold leading-tight">Composition<br>Studio</button>
-                    <button id="header-tab-btn-scales" onclick="switchTab('scales')" class="px-2 py-0.5 text-xs font-semibold leading-tight">Scale<br>Explorer</button>
-                    <button id="header-tab-btn-learn" onclick="switchTab('learn')" class="px-2 py-0.5 text-xs font-semibold leading-tight">Theory<br>Academy</button>
+                    <button id="header-tab-btn-builder" onclick="window.switchTab && window.switchTab('builder')" class="px-2 py-0.5 text-xs font-semibold leading-tight">Chord<br>Lab</button>
+                    <button id="header-tab-btn-trainer" onclick="window.switchTab && window.switchTab('trainer')" class="px-2 py-0.5 text-xs font-semibold leading-tight">Progression<br>Workshop</button>
+                    <button id="header-tab-btn-melody" onclick="window.switchTab && window.switchTab('melody')" class="px-2 py-0.5 text-xs font-semibold leading-tight">Composition<br>Studio</button>
+                    <button id="header-tab-btn-scales" onclick="window.switchTab && window.switchTab('scales')" class="px-2 py-0.5 text-xs font-semibold leading-tight">Scale<br>Explorer</button>
+                    <button id="header-tab-btn-learn" onclick="window.switchTab && window.switchTab('learn')" class="px-2 py-0.5 text-xs font-semibold leading-tight">Theory<br>Academy</button>
                 </div>
             </div>
         </div>
@@ -980,7 +980,7 @@
 
                 <!-- Advanced Theory Tools Panel -->
                 <div class="mb-3 trainer-section-item">
-                    <button id="theory-tools-toggle" onclick="toggleTheoryPanel()" class="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
+                    <button id="theory-tools-toggle" onclick="window.toggleTheoryPanel && window.toggleTheoryPanel()" class="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
                         <span class="flex items-center gap-2">
                             <svg class="w-4 h-4 text-white/70 cursor-move drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Drag to reorder">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
@@ -999,15 +999,15 @@
                                 <div class="flex items-center gap-2 mb-2">
                                     <div class="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm">V</div>
                                     <h3 class="text-sm font-bold text-gray-800 flex-1">Secondary Dominants</h3>
-                                    <button onclick="showSecondaryDominantsInfo()" class="text-xs text-blue-600 hover:text-blue-800 hover:underline font-medium" title="Learn about Secondary Dominants">What is this?</button>
+                                    <button onclick="window.showSecondaryDominantsInfo && window.showSecondaryDominantsInfo()" class="text-xs text-blue-600 hover:text-blue-800 hover:underline font-medium" title="Learn about Secondary Dominants">What is this?</button>
                                 </div>
                                 <p class="text-xs text-gray-600 mb-2">Add tension by temporarily tonicizing any chord. Click to insert before the current chord.</p>
                                 <div class="grid grid-cols-2 gap-1">
-                                    <button onclick="insertSecondaryDominant('ii')" class="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold rounded transition" title="Dominant of ii chord">V/ii</button>
-                                    <button onclick="insertSecondaryDominant('iii')" class="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold rounded transition" title="Dominant of iii chord">V/iii</button>
-                                    <button onclick="insertSecondaryDominant('IV')" class="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold rounded transition" title="Dominant of IV chord">V/IV</button>
-                                    <button onclick="insertSecondaryDominant('V')" class="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold rounded transition" title="Dominant of V chord">V/V</button>
-                                    <button onclick="insertSecondaryDominant('vi')" class="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold rounded transition" title="Dominant of vi chord">V/vi</button>
+                                    <button onclick="window.insertSecondaryDominant && window.insertSecondaryDominant('ii')" class="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold rounded transition" title="Dominant of ii chord">V/ii</button>
+                                    <button onclick="window.insertSecondaryDominant && window.insertSecondaryDominant('iii')" class="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold rounded transition" title="Dominant of iii chord">V/iii</button>
+                                    <button onclick="window.insertSecondaryDominant && window.insertSecondaryDominant('IV')" class="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold rounded transition" title="Dominant of IV chord">V/IV</button>
+                                    <button onclick="window.insertSecondaryDominant && window.insertSecondaryDominant('V')" class="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold rounded transition" title="Dominant of V chord">V/V</button>
+                                    <button onclick="window.insertSecondaryDominant && window.insertSecondaryDominant('vi')" class="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 font-semibold rounded transition" title="Dominant of vi chord">V/vi</button>
                                 </div>
                             </div>
 
@@ -1016,7 +1016,7 @@
                                 <div class="flex items-center gap-2 mb-2">
                                     <div class="w-8 h-8 bg-cyan-600 text-white rounded-full flex items-center justify-center font-bold text-sm">♭</div>
                                     <h3 class="text-sm font-bold text-gray-800 flex-1">Modal Interchange</h3>
-                                    <button onclick="showModalInterchangeInfo()" class="text-xs text-cyan-600 hover:text-cyan-800 hover:underline font-medium" title="Learn about Modal Interchange">What is this?</button>
+                                    <button onclick="window.showModalInterchangeInfo && window.showModalInterchangeInfo()" class="text-xs text-cyan-600 hover:text-cyan-800 hover:underline font-medium" title="Learn about Modal Interchange">What is this?</button>
                                 </div>
                                 <p class="text-xs text-gray-600 mb-2">Borrow chords from parallel modes for color and emotion. Select a mode to see available chords.</p>
                                 <select id="modal-interchange-select" onchange="showModalInterchangeChords(this.value)" class="w-full p-1 text-xs border border-gray-300 rounded mb-2 focus:ring-cyan-500 focus:border-cyan-500">
@@ -1041,7 +1041,7 @@
                                     <h3 class="text-sm font-bold text-gray-800">Chord Substitution</h3>
                                 </div>
                                 <p class="text-xs text-gray-600 mb-2">Click a chord in your progression below to see substitute chords with explanations.</p>
-                                <button onclick="showChordSubstitutions()" class="w-full px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded shadow transition text-sm" title="Show or hide chord substitution suggestions">
+                                <button onclick="window.showChordSubstitutions && window.showChordSubstitutions()" class="w-full px-3 py-2 bg-pink-600 hover:bg-pink-700 text-white font-semibold rounded shadow transition text-sm" title="Show or hide chord substitution suggestions">
                                     Show Substitution Suggestions
                                 </button>
                                 <div id="substitution-results" class="mt-2 text-xs"></div>
@@ -1057,28 +1057,28 @@
                                 <div class="flex items-center gap-2 mb-2">
                                     <div class="w-8 h-8 bg-cyan-600 text-white rounded-full flex items-center justify-center font-bold text-sm">ii</div>
                                     <h3 class="text-sm font-bold text-gray-800 flex-1">Jazz Progressions</h3>
-                                    <button onclick="showJazzProgressionsInfo()" class="text-xs text-cyan-600 hover:text-cyan-800 hover:underline font-medium" title="Learn about Jazz Progressions">What is this?</button>
+                                    <button onclick="window.showJazzProgressionsInfo && window.showJazzProgressionsInfo()" class="text-xs text-cyan-600 hover:text-cyan-800 hover:underline font-medium" title="Learn about Jazz Progressions">What is this?</button>
                     </div>
                                 <p class="text-xs text-gray-600 mb-2">Insert classic jazz progression patterns and passing chords.</p>
 
                                 <!-- ii-V-I Pattern -->
                                 <div class="mb-2">
                                     <label class="text-xs font-semibold text-gray-700 block mb-1">ii-V-I Pattern:</label>
-                                    <button onclick="insertTwoFiveOne()" class="w-full px-2 py-1 text-xs bg-cyan-100 hover:bg-cyan-200 text-cyan-800 font-semibold rounded transition" title="Insert classic ii-V-I progression">Insert ii-V-I</button>
+                                    <button onclick="window.insertTwoFiveOne && window.insertTwoFiveOne()" class="w-full px-2 py-1 text-xs bg-cyan-100 hover:bg-cyan-200 text-cyan-800 font-semibold rounded transition" title="Insert classic ii-V-I progression">Insert ii-V-I</button>
                 </div>
 
                                 <!-- Diminished Passing Chords -->
                                 <div class="mb-2">
                                     <label class="text-xs font-semibold text-gray-700 block mb-1">Passing Chords:</label>
-                                    <button onclick="insertDiminishedPassing()" class="w-full px-2 py-1 text-xs bg-cyan-100 hover:bg-cyan-200 text-cyan-800 font-semibold rounded transition" title="Insert diminished 7th passing chord between selected and next chord">Insert Dim7 Passing</button>
+                                    <button onclick="window.insertDiminishedPassing && window.insertDiminishedPassing()" class="w-full px-2 py-1 text-xs bg-cyan-100 hover:bg-cyan-200 text-cyan-800 font-semibold rounded transition" title="Insert diminished 7th passing chord between selected and next chord">Insert Dim7 Passing</button>
                         </div>
 
                                 <!-- Approach Chords -->
                                 <div>
                                     <label class="text-xs font-semibold text-gray-700 block mb-1">Approach Chords:</label>
                                     <div class="grid grid-cols-2 gap-1">
-                                        <button onclick="insertChromaticApproach('below')" class="px-2 py-1 text-xs bg-cyan-100 hover:bg-cyan-200 text-cyan-800 font-semibold rounded transition" title="Chromatic approach from below">From Below</button>
-                                        <button onclick="insertChromaticApproach('above')" class="px-2 py-1 text-xs bg-cyan-100 hover:bg-cyan-200 text-cyan-800 font-semibold rounded transition" title="Chromatic approach from above">From Above</button>
+                                        <button onclick="window.insertChromaticApproach && window.insertChromaticApproach('below')" class="px-2 py-1 text-xs bg-cyan-100 hover:bg-cyan-200 text-cyan-800 font-semibold rounded transition" title="Chromatic approach from below">From Below</button>
+                                        <button onclick="window.insertChromaticApproach && window.insertChromaticApproach('above')" class="px-2 py-1 text-xs bg-cyan-100 hover:bg-cyan-200 text-cyan-800 font-semibold rounded transition" title="Chromatic approach from above">From Above</button>
                         </div>
                         </div>
                         </div>
@@ -1088,7 +1088,7 @@
                                 <div class="flex items-center gap-2 mb-2">
                                     <div class="w-8 h-8 bg-orange-600 text-white rounded-full flex items-center justify-center font-bold text-sm">♯</div>
                                     <h3 class="text-sm font-bold text-gray-800 flex-1">Altered Dominants</h3>
-                                    <button onclick="showAlteredDominantsInfo()" class="text-xs text-orange-600 hover:text-orange-800 hover:underline font-medium" title="Learn about Altered Dominants">What is this?</button>
+                                    <button onclick="window.showAlteredDominantsInfo && window.showAlteredDominantsInfo()" class="text-xs text-orange-600 hover:text-orange-800 hover:underline font-medium" title="Learn about Altered Dominants">What is this?</button>
                         </div>
                                 <p class="text-xs text-gray-600 mb-2">Add altered extensions to dominant chords or insert tritone substitutions.</p>
 
@@ -1096,17 +1096,17 @@
                                 <div class="mb-2">
                                     <label class="text-xs font-semibold text-gray-700 block mb-1">Apply to Selected:</label>
                                     <div class="grid grid-cols-2 gap-1">
-                                        <button onclick="applyAlteration('7b9')" class="px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-orange-800 font-semibold rounded transition" title="Apply flat 9 extension">7♭9</button>
-                                        <button onclick="applyAlteration('7#9')" class="px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-orange-800 font-semibold rounded transition" title="Apply sharp 9 extension">7♯9</button>
-                                        <button onclick="applyAlteration('7b5')" class="px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-orange-800 font-semibold rounded transition" title="Apply flat 5 extension">7♭5</button>
-                                        <button onclick="applyAlteration('7#5')" class="px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-orange-800 font-semibold rounded transition" title="Apply sharp 5 extension">7♯5</button>
+                                        <button onclick="window.applyAlteration && window.applyAlteration('7b9')" class="px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-orange-800 font-semibold rounded transition" title="Apply flat 9 extension">7♭9</button>
+                                        <button onclick="window.applyAlteration && window.applyAlteration('7#9')" class="px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-orange-800 font-semibold rounded transition" title="Apply sharp 9 extension">7♯9</button>
+                                        <button onclick="window.applyAlteration && window.applyAlteration('7b5')" class="px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-orange-800 font-semibold rounded transition" title="Apply flat 5 extension">7♭5</button>
+                                        <button onclick="window.applyAlteration && window.applyAlteration('7#5')" class="px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-orange-800 font-semibold rounded transition" title="Apply sharp 5 extension">7♯5</button>
                     </div>
                 </div>
                 
                                 <!-- Tritone Substitution -->
                                 <div>
                                     <label class="text-xs font-semibold text-gray-700 block mb-1">Tritone Sub:</label>
-                                    <button onclick="insertTritoneSubstitution()" class="w-full px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-orange-800 font-semibold rounded transition" title="Replace selected dominant with tritone substitution">Insert ♭II7</button>
+                                    <button onclick="window.insertTritoneSubstitution && window.insertTritoneSubstitution()" class="w-full px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-orange-800 font-semibold rounded transition" title="Replace selected dominant with tritone substitution">Insert ♭II7</button>
                                 </div>
                 </div>
 
@@ -1115,7 +1115,7 @@
                                 <div class="flex items-center gap-2 mb-2">
                                     <div class="w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center font-bold text-sm">9</div>
                                     <h3 class="text-sm font-bold text-gray-800 flex-1">Jazz Voicings</h3>
-                                    <button onclick="showJazzVoicingsInfo()" class="text-xs text-emerald-600 hover:text-emerald-800 hover:underline font-medium" title="Learn about Jazz Voicings">What is this?</button>
+                                    <button onclick="window.showJazzVoicingsInfo && window.showJazzVoicingsInfo()" class="text-xs text-emerald-600 hover:text-emerald-800 hover:underline font-medium" title="Learn about Jazz Voicings">What is this?</button>
                                 </div>
                                 <p class="text-xs text-gray-600 mb-2">Enhance chords with jazz extensions and suggest reharmonizations.</p>
 
@@ -1123,16 +1123,16 @@
                                 <div class="mb-2">
                                     <label class="text-xs font-semibold text-gray-700 block mb-1">Add Extensions:</label>
                                     <div class="grid grid-cols-3 gap-1">
-                                        <button onclick="addExtension('9')" class="px-2 py-1 text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-semibold rounded transition" title="Add 9th">9</button>
-                                        <button onclick="addExtension('11')" class="px-2 py-1 text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-semibold rounded transition" title="Add 11th">11</button>
-                                        <button onclick="addExtension('13')" class="px-2 py-1 text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-semibold rounded transition" title="Add 13th">13</button>
+                                        <button onclick="window.addExtension && window.addExtension('9')" class="px-2 py-1 text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-semibold rounded transition" title="Add 9th">9</button>
+                                        <button onclick="window.addExtension && window.addExtension('11')" class="px-2 py-1 text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-semibold rounded transition" title="Add 11th">11</button>
+                                        <button onclick="window.addExtension && window.addExtension('13')" class="px-2 py-1 text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-semibold rounded transition" title="Add 13th">13</button>
                                     </div>
                                 </div>
 
                                 <!-- Reharmonization -->
                                 <div>
                                     <label class="text-xs font-semibold text-gray-700 block mb-1">Reharmonize:</label>
-                                    <button onclick="suggestReharmonization()" class="w-full px-2 py-1 text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-semibold rounded transition" title="Show reharmonization suggestions">Show Suggestions</button>
+                                    <button onclick="window.suggestReharmonization && window.suggestReharmonization()" class="w-full px-2 py-1 text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-semibold rounded transition" title="Show reharmonization suggestions">Show Suggestions</button>
                                     <div id="reharmonization-results" class="mt-2 text-xs"></div>
                                 </div>
                             </div>
@@ -1143,7 +1143,7 @@
 
                 <!-- Melody Generator Panel -->
                 <div class="mb-3 trainer-section-item">
-                    <button id="melody-generator-toggle" onclick="toggleMelodyGeneratorPanel()" class="w-full px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
+                    <button id="melody-generator-toggle" onclick="window.toggleMelodyGeneratorPanel && window.toggleMelodyGeneratorPanel()" class="w-full px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
                         <span class="flex items-center gap-2">
                             <svg class="w-4 h-4 text-white/70 cursor-move drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Drag to reorder">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
@@ -1237,22 +1237,22 @@
 
                         <!-- Action Buttons -->
                         <div class="flex flex-wrap gap-2 mb-3">
-                            <button onclick="generateMelody()" class="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-lg shadow transition flex items-center gap-2">
+                            <button onclick="window.generateMelody && window.generateMelody()" class="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-lg shadow transition flex items-center gap-2">
                                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path></svg>
                                 Generate Melody
                             </button>
 
-                            <button onclick="playGeneratedMelody()" id="play-melody-btn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow transition flex items-center gap-2" disabled>
+                            <button onclick="window.playGeneratedMelody && window.playGeneratedMelody()" id="play-melody-btn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow transition flex items-center gap-2" disabled>
                                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
                                 Play Melody
                             </button>
 
-                            <button onclick="stopMelody()" id="stop-melody-btn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow transition flex items-center gap-2" disabled>
+                            <button onclick="window.stopMelody && window.stopMelody()" id="stop-melody-btn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow transition flex items-center gap-2" disabled>
                                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd"></path></svg>
                                 Stop
                             </button>
 
-                            <button onclick="saveMelody()" id="save-melody-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow transition flex items-center gap-2" disabled>
+                            <button onclick="window.saveMelody && window.saveMelody()" id="save-melody-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow transition flex items-center gap-2" disabled>
                                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z"></path></svg>
                                 Save MIDI
                             </button>
@@ -1300,13 +1300,13 @@
                                         </div>
                                     </div>
                                     <div class="flex gap-2">
-                                        <button onclick="updateMelodyNote()" class="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 text-white font-semibold rounded transition">
+                                        <button onclick="window.updateMelodyNote && window.updateMelodyNote()" class="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 text-white font-semibold rounded transition">
                                             Update Note
                                         </button>
-                                        <button onclick="deleteMelodyNote()" class="px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold rounded transition">
+                                        <button onclick="window.deleteMelodyNote && window.deleteMelodyNote()" class="px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold rounded transition">
                                             Delete Note
                                         </button>
-                                        <button onclick="insertMelodyNote()" class="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition">
+                                        <button onclick="window.insertMelodyNote && window.insertMelodyNote()" class="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition">
                                             Insert Note After
                                         </button>
                                     </div>
@@ -1855,22 +1855,22 @@
 
                             <!-- AI Mode Buttons -->
                             <div class="flex flex-wrap gap-2 mb-3">
-                                <button onclick="generateMelody()" class="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-lg shadow transition flex items-center gap-2">
+                                <button onclick="window.generateMelody && window.generateMelody()" class="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-lg shadow transition flex items-center gap-2">
                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path></svg>
                                     Generate Melody
                                 </button>
 
-                                <button onclick="playGeneratedMelody()" id="play-melody-btn-main" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow transition flex items-center gap-2" disabled>
+                                <button onclick="window.playGeneratedMelody && window.playGeneratedMelody()" id="play-melody-btn-main" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow transition flex items-center gap-2" disabled>
                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
                                     Play Melody
                                 </button>
 
-                                <button onclick="stopMelody()" id="stop-melody-btn-main" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow transition flex items-center gap-2" disabled>
+                                <button onclick="window.stopMelody && window.stopMelody()" id="stop-melody-btn-main" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow transition flex items-center gap-2" disabled>
                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd"></path></svg>
                                     Stop
                                 </button>
 
-                                <button onclick="saveMelody()" id="save-melody-btn-main" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow transition flex items-center gap-2" disabled>
+                                <button onclick="window.saveMelody && window.saveMelody()" id="save-melody-btn-main" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow transition flex items-center gap-2" disabled>
                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 012 0v2H9V4z"></path></svg>
                                     Save MIDI
                                 </button>
@@ -2064,7 +2064,7 @@
                                         </svg>
                                         🎶 Melody Suggestions
                                     </button>
-                                    <button id="notation-shortcuts-btn" onclick="showNotationShortcuts()" class="flex items-center gap-2 px-4 py-2 text-base font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-lg shadow-md hover:shadow-lg transition-all transform hover:scale-105">
+                                    <button id="notation-shortcuts-btn" onclick="window.showNotationShortcuts && window.showNotationShortcuts()" class="flex items-center gap-2 px-4 py-2 text-base font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-lg shadow-md hover:shadow-lg transition-all transform hover:scale-105">
                                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                                             <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
                                         </svg>
@@ -2110,7 +2110,7 @@
                                     <button onclick="window.toggleMelodyEditMode && window.toggleMelodyEditMode()" id="edit-melody-btn-main" class="px-3 py-1 text-xs bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded transition">
                                         Edit Melody
                                     </button>
-                                    <button onclick="refreshMelodyDisplay()" class="px-3 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded transition">
+                                    <button onclick="window.refreshMelodyDisplay && window.refreshMelodyDisplay()" class="px-3 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded transition">
                                         Refresh View
                                     </button>
                                 </div>
@@ -2145,13 +2145,13 @@
                                         </div>
                                     </div>
                                     <div class="flex gap-2">
-                                        <button onclick="updateMelodyNote()" class="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 text-white font-semibold rounded transition">
+                                        <button onclick="window.updateMelodyNote && window.updateMelodyNote()" class="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 text-white font-semibold rounded transition">
                                             Update Note
                                         </button>
-                                        <button onclick="deleteMelodyNote()" class="px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold rounded transition">
+                                        <button onclick="window.deleteMelodyNote && window.deleteMelodyNote()" class="px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white font-semibold rounded transition">
                                             Delete Note
                                         </button>
-                                        <button onclick="insertMelodyNote()" class="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition">
+                                        <button onclick="window.insertMelodyNote && window.insertMelodyNote()" class="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition">
                                             Insert Note After
                                         </button>
                                     </div>
@@ -2258,11 +2258,11 @@
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg> 
                     <span class="compact-hide">Play Chord</span><span class="compact-show">Play</span>
                 </button>
-                <button onclick="addChordToProgression(false)" class="px-2 py-1 bg-indigo-500 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-1 whitespace-nowrap text-sm" title="Add Chord to Progression">
+                <button onclick="window.addChordToProgression && window.addChordToProgression(false)" class="px-2 py-1 bg-indigo-500 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-1 whitespace-nowrap text-sm" title="Add Chord to Progression">
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"></path></svg> 
                     <span class="compact-hide">Add Chord</span><span class="compact-show">Add</span>
                 </button>
-                <button onclick="addChordToProgression(true)" class="px-2 py-1 bg-teal-500 text-white font-bold rounded-xl shadow-lg hover:bg-teal-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-1 whitespace-nowrap text-sm" title="Add Chord and Switch to Progression Workshop">
+                <button onclick="window.addChordToProgression && window.addChordToProgression(true)" class="px-2 py-1 bg-teal-500 text-white font-bold rounded-xl shadow-lg hover:bg-teal-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-1 whitespace-nowrap text-sm" title="Add Chord and Switch to Progression Workshop">
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"></path></svg> 
                     <span class="compact-hide">Add & Go</span><span class="compact-show">Add/Go</span>
                 </button>
@@ -2271,9 +2271,9 @@
             <div class="flex flex-col gap-2 compact-hide">
                 <div class="flex items-center justify-between gap-1" title="Arpeggio Speed">
                     <span class="text-xs font-medium text-gray-600">Arp Speed:</span>
-                    <button id="arp-speed-down" onclick="changeArpeggioSpeed('slower')" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Slower Arpeggio">-</button>
+                    <button id="arp-speed-down" onclick="window.changeArpeggioSpeed && window.changeArpeggioSpeed('slower')" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Slower Arpeggio">-</button>
                     <span id="arp-speed-display" class="text-sm font-semibold text-gray-700 w-12 text-center" title="Current Arpeggio Speed">Medium</span>
-                    <button id="arp-speed-up" onclick="changeArpeggioSpeed('faster')" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Faster Arpeggio">+</button>
+                    <button id="arp-speed-up" onclick="window.changeArpeggioSpeed && window.changeArpeggioSpeed('faster')" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Faster Arpeggio">+</button>
                 </div>
                 <div class="flex items-center justify-between gap-1" title="Right-Hand Octave Shift">
                     <span class="text-xs font-medium text-gray-600">RH Octave:</span>
@@ -2287,16 +2287,16 @@
         <!-- Trainer Floating Controls -->
         <div id="floating-trainer-controls" class="hidden flex-col items-stretch gap-2 p-3 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border w-max" style="pointer-events: auto;" title="Progression Workshop Controls">
             <div class="flex flex-col gap-2 w-full">
-                <button id="play-progression-btn" onclick="handleAutoPlayback()" class="w-full px-2 py-1 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 flex items-center justify-center whitespace-nowrap text-sm" title="Toggle Auto Play"><span id="play-text">Auto Play</span></button>
+                <button id="play-progression-btn" onclick="window.handleAutoPlayback && window.handleAutoPlayback()" class="w-full px-2 py-1 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 flex items-center justify-center whitespace-nowrap text-sm" title="Toggle Auto Play"><span id="play-text">Auto Play</span></button>
                 <button id="step-chord-btn" onmousedown="startStepChord()" onmouseup="stopStepChord()" ontouchstart="startStepChord()" ontouchend="stopStepChord()" ontouchcancel="stopStepChord()" disabled class="w-full px-2 py-1 bg-indigo-500 hover:bg-indigo-600 active:scale-95 transition text-white font-bold rounded-xl shadow-lg disabled:opacity-50 cursor-pointer whitespace-nowrap text-sm" title="Hold to play chord">Step ►</button>
 
                 <!-- Undo/Redo Buttons -->
                 <div class="flex flex-col gap-2 w-full">
-                    <button id="undo-btn" onclick="handleUndo()" disabled class="w-full px-2 py-1 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-1" title="Undo Last Change (Ctrl+Z)">
+                    <button id="undo-btn" onclick="window.handleUndo && window.handleUndo()" disabled class="w-full px-2 py-1 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-1" title="Undo Last Change (Ctrl+Z)">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd"></path></svg>
                         Undo
                     </button>
-                    <button id="redo-btn" onclick="handleRedo()" disabled class="w-full px-2 py-1 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-1" title="Redo Last Undone Change (Ctrl+Shift+Z)">
+                    <button id="redo-btn" onclick="window.handleRedo && window.handleRedo()" disabled class="w-full px-2 py-1 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-1" title="Redo Last Undone Change (Ctrl+Shift+Z)">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10.293 16.707a1 1 0 001.414 0l6-6a1 1 0 000-1.414l-6-6a1 1 0 00-1.414 1.414L14.586 9H3a1 1 0 100 2h11.586l-4.293 4.293a1 1 0 000 1.414z" clip-rule="evenodd"></path></svg>
                         Redo
                     </button>
@@ -2320,11 +2320,11 @@
                 </div>
 
                 <div class="flex flex-col gap-2 w-full hidden" >
-                    <button id="record-progression-btn" onclick="toggleRecording()" class="flex-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg transition duration-300 transform hover:scale-105 flex items-center justify-center gap-2 text-sm" title="Start/Stop Recording">
+                    <button id="record-progression-btn" onclick="window.toggleRecording && window.toggleRecording()" class="flex-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg transition duration-300 transform hover:scale-105 flex items-center justify-center gap-2 text-sm" title="Start/Stop Recording">
                         <svg id="record-icon" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"></circle></svg>
                         <span id="record-text">Record</span>
                     </button>
-                    <button id="save-recording-btn" onclick="saveRecording()" disabled class="px-2 py-1 bg-blue-500 hover:bg-blue-600 transition text-white font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm" title="Save Recorded Progression">Save</button>
+                    <button id="save-recording-btn" onclick="window.saveRecording && window.saveRecording()" disabled class="px-2 py-1 bg-blue-500 hover:bg-blue-600 transition text-white font-bold rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm" title="Save Recorded Progression">Save</button>
                 </div>
             </div>
         </div>
@@ -2337,11 +2337,11 @@
 
                 <!-- Undo/Redo Buttons -->
                 <div class="flex flex-col gap-2 w-full">
-                    <button id="undo-melody-btn" onclick="handleUndo()" disabled class="w-full px-2 py-1 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-1" title="Undo Last Change (Ctrl+Z)">
+                    <button id="undo-melody-btn" onclick="window.handleUndo && window.handleUndo()" disabled class="w-full px-2 py-1 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-1" title="Undo Last Change (Ctrl+Z)">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd"></path></svg>
                         Undo
                     </button>
-                    <button id="redo-melody-btn" onclick="handleRedo()" disabled class="w-full px-2 py-1 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-1" title="Redo Last Undone Change (Ctrl+Shift+Z)">
+                    <button id="redo-melody-btn" onclick="window.handleRedo && window.handleRedo()" disabled class="w-full px-2 py-1 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-1" title="Redo Last Undone Change (Ctrl+Shift+Z)">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10.293 16.707a1 1 0 001.414 0l6-6a1 1 0 000-1.414l-6-6a1 1 0 00-1.414 1.414L14.586 9H3a1 1 0 100 2h11.586l-4.293 4.293a1 1 0 000 1.414z" clip-rule="evenodd"></path></svg>
                         Redo
                     </button>
@@ -2358,11 +2358,11 @@
         <!-- Scale Floating Controls -->
         <div id="floating-scale-controls" class="hidden flex-col items-stretch gap-2 p-3 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border w-max" style="pointer-events: auto;" title="Scale Explorer Controls">
             <div class="flex flex-col items-stretch gap-2">
-                <button onclick="playScale('asc')" class="px-2 py-1 bg-lime-600 text-white font-bold rounded-xl shadow-lg hover:bg-lime-700 active:scale-95 transition duration-150 transform flex items-center justify-center gap-2 whitespace-nowrap text-sm" title="Play Scale Ascending">
+                <button onclick="window.playScale && window.playScale('asc')" class="px-2 py-1 bg-lime-600 text-white font-bold rounded-xl shadow-lg hover:bg-lime-700 active:scale-95 transition duration-150 transform flex items-center justify-center gap-2 whitespace-nowrap text-sm" title="Play Scale Ascending">
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
                     <span class="compact-hide">Play Asc</span><span class="compact-show">Asc</span>
                 </button>
-                <button onclick="playScale('desc')" class="px-2 py-1 bg-lime-500 text-white font-bold rounded-xl shadow-lg hover:bg-lime-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-2 whitespace-nowrap text-sm" title="Play Scale Descending">
+                <button onclick="window.playScale && window.playScale('desc')" class="px-2 py-1 bg-lime-500 text-white font-bold rounded-xl shadow-lg hover:bg-lime-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-2 whitespace-nowrap text-sm" title="Play Scale Descending">
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" transform="rotate(180)"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
                     <span class="compact-hide">Play Desc</span><span class="compact-show">Desc</span>
                 </button>
@@ -2371,15 +2371,15 @@
             <div class="flex flex-col gap-2 compact-target">
                 <div class="flex items-center justify-between gap-1" title="Scale Playback Speed">
                     <span class="text-xs font-medium text-gray-600">Speed:</span>
-                    <button id="scale-speed-down" onclick="changeScaleSpeed('slower')" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Slower Scale">-</button>
+                    <button id="scale-speed-down" onclick="window.changeScaleSpeed && window.changeScaleSpeed('slower')" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Slower Scale">-</button>
                     <span id="scale-speed-display" class="text-sm font-semibold text-gray-700 w-12 text-center" title="Current Scale Speed">Medium</span>
-                    <button id="scale-speed-up" onclick="changeScaleSpeed('faster')" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Faster Scale">+</button>
+                    <button id="scale-speed-up" onclick="window.changeScaleSpeed && window.changeScaleSpeed('faster')" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Faster Scale">+</button>
                 </div>
                 <div class="flex items-center justify-between gap-1" title="Scale Octave Shift">
                     <span class="text-xs font-medium text-gray-600">Octave:</span>
-                    <button id="scale-octave-down" onclick="changeScaleOctave(-1)" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Decrease Octave">-</button>
+                    <button id="scale-octave-down" onclick="window.changeScaleOctave && window.changeScaleOctave(-1)" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Decrease Octave">-</button>
                     <span id="scale-octave-display" class="text-sm font-semibold text-gray-700 w-12 text-center" title="Current Octave Shift">Oct: 0</span>
-                    <button id="scale-octave-up" onclick="changeScaleOctave(1)" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Increase Octave">+</button>
+                    <button id="scale-octave-up" onclick="window.changeScaleOctave && window.changeScaleOctave(1)" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Increase Octave">+</button>
                 </div>
             </div>
         </div>
@@ -2400,7 +2400,7 @@
     </div>
 
     <!-- NEW: Expand Floating Controls Button -->
-    <button id="expand-controls-btn" onclick="toggleFloatingControls()" class="fixed bottom-6 right-4 z-10 p-2 bg-gray-700 text-white rounded-full shadow-lg hover:bg-gray-600 transition" title="Show/Hide Floating Controls">
+    <button id="expand-controls-btn" onclick="window.toggleFloatingControls && window.toggleFloatingControls()" class="fixed bottom-6 right-4 z-10 p-2 bg-gray-700 text-white rounded-full shadow-lg hover:bg-gray-600 transition" title="Show/Hide Floating Controls">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
         </svg>
@@ -2638,14 +2638,14 @@
     <div id="message-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50 overflow-y-auto">
         <div class="bg-white p-6 rounded-lg shadow-xl max-w-3xl w-full my-8 max-h-[90vh] overflow-y-auto relative">
             <!-- Close button in top right -->
-            <button onclick="hideModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition p-1" title="Close">
+            <button onclick="window.hideModal && window.hideModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition p-1" title="Close">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
             </button>
             <div id="modal-text" class="text-gray-800 mb-4"></div>
             <div class="text-center">
-                <button id="modal-close-btn" onclick="hideModal()" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition">
+                <button id="modal-close-btn" onclick="window.hideModal && window.hideModal()" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition">
                     Got It
                 </button>
             </div>
