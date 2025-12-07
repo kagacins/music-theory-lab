@@ -481,9 +481,9 @@ function handleKeyClick(event) {
         closeCircleOfFifthsPanel();
     }
 
-    // Switch to trainer tab if not already there
-    if (window.currentTab !== 'trainer' && window.switchTab) {
-        window.switchTab('trainer');
+    // Switch to Composition Studio if not already there
+    if (window.currentTab !== 'melody' && window.switchTab) {
+        window.switchTab('melody');
     }
 
     // Visual feedback

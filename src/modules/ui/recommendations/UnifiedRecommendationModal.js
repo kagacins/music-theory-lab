@@ -3359,7 +3359,8 @@ function attachTensionEventListeners(container, progressionData, key, sections, 
     if (templateSelect) {
         templateSelect.addEventListener('change', (e) => {
             planner.setTemplate(e.target.value);
-            renderOptimizeIntent(container.parentElement || container);
+            // Re-render just the tension arc section (container is already the correct target)
+            renderOptimizeIntent(container);
         });
     }
 
@@ -3370,7 +3371,8 @@ function attachTensionEventListeners(container, progressionData, key, sections, 
             const newLength = parseInt(e.target.value, 10);
             if (newLength >= 4 && newLength <= 64) {
                 tensionArcState.expectedLength = newLength;
-                renderOptimizeIntent(container.parentElement || container);
+                // Re-render just the tension arc section (container is already the correct target)
+                renderOptimizeIntent(container);
             }
         });
     }

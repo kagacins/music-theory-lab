@@ -1,0 +1,279 @@
+/**
+ * Design Tokens - Centralized CSS Variables
+ *
+ * This file serves as the single source of truth for all CSS custom properties.
+ * Import this file first in any CSS file that needs access to design tokens.
+ *
+ * Organization:
+ * 1. Colors (Primary, Secondary, Semantic, Grays)
+ * 2. Gradients (Primary, Tab-specific, Semantic)
+ * 3. Spacing (Consistent spacing scale)
+ * 4. Typography (Font sizes, weights)
+ * 5. Borders & Radii
+ * 6. Shadows
+ * 7. Transitions & Animations
+ * 8. Layout (Header, keyboard heights)
+ * 9. Z-Index Scale
+ */
+
+:root {
+    /* ========================================
+       COLORS - PRIMARY PALETTE
+       ======================================== */
+    --color-primary: #8b5cf6;
+    --color-primary-light: #a78bfa;
+    --color-primary-dark: #7c3aed;
+    --color-primary-50: #f5f3ff;
+    --color-primary-100: #ede9fe;
+    --color-primary-500: #8b5cf6;
+    --color-primary-600: #7c3aed;
+    --color-primary-700: #6d28d9;
+
+    /* Secondary Color (Indigo) */
+    --color-secondary: #667eea;
+    --color-secondary-light: #818cf8;
+    --color-secondary-dark: #4f46e5;
+
+    /* ========================================
+       COLORS - TAB THEMES
+       ======================================== */
+    --color-builder: #f59e0b;      /* Amber - Chord Lab */
+    --color-trainer: #14b8a6;      /* Teal - Progression Workshop (legacy) */
+    --color-melody: #8b5cf6;       /* Purple - Composition Studio */
+    --color-scales: #84cc16;       /* Lime - Scale Explorer */
+    --color-learn: #3b82f6;        /* Blue - Theory Academy */
+
+    /* ========================================
+       COLORS - SEMANTIC
+       ======================================== */
+    --color-success: #10b981;
+    --color-success-light: #34d399;
+    --color-success-dark: #059669;
+
+    --color-warning: #f59e0b;
+    --color-warning-light: #fbbf24;
+    --color-warning-dark: #d97706;
+
+    --color-error: #ef4444;
+    --color-error-light: #f87171;
+    --color-error-dark: #dc2626;
+
+    --color-info: #3b82f6;
+    --color-info-light: #60a5fa;
+    --color-info-dark: #2563eb;
+
+    /* ========================================
+       COLORS - NEUTRALS (GRAYS)
+       ======================================== */
+    --color-gray-50: #f9fafb;
+    --color-gray-100: #f3f4f6;
+    --color-gray-200: #e5e7eb;
+    --color-gray-300: #d1d5db;
+    --color-gray-400: #9ca3af;
+    --color-gray-500: #6b7280;
+    --color-gray-600: #4b5563;
+    --color-gray-700: #374151;
+    --color-gray-800: #1f2937;
+    --color-gray-900: #111827;
+
+    /* ========================================
+       COLORS - BACKGROUND & SURFACE
+       ======================================== */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f9fafb;
+    --bg-tertiary: #f3f4f6;
+    --text-primary: #111827;
+    --text-secondary: #4b5563;
+    --text-muted: #9ca3af;
+
+    /* Card-specific */
+    --card-bg: #ffffff;
+    --card-border: #e5e7eb;
+
+    /* ========================================
+       GRADIENTS - PRIMARY
+       ======================================== */
+    --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+
+    /* ========================================
+       GRADIENTS - TAB THEMES
+       ======================================== */
+    --gradient-amber: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    --gradient-teal: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+    --gradient-lime: linear-gradient(135deg, #84cc16 0%, #65a30d 100%);
+    --gradient-purple: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
+    --gradient-blue: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+
+    /* ========================================
+       GRADIENTS - SEMANTIC
+       ======================================== */
+    --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    --gradient-info: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+
+    /* ========================================
+       SPACING SCALE
+       ======================================== */
+    --spacing-0: 0;
+    --spacing-1: 0.25rem;   /* 4px */
+    --spacing-2: 0.5rem;    /* 8px */
+    --spacing-3: 0.75rem;   /* 12px */
+    --spacing-4: 1rem;      /* 16px */
+    --spacing-5: 1.25rem;   /* 20px */
+    --spacing-6: 1.5rem;    /* 24px */
+    --spacing-8: 2rem;      /* 32px */
+    --spacing-10: 2.5rem;   /* 40px */
+    --spacing-12: 3rem;     /* 48px */
+    --spacing-16: 4rem;     /* 64px */
+
+    /* Semantic spacing aliases */
+    --spacing-xs: var(--spacing-2);    /* 0.5rem / 8px */
+    --spacing-sm: var(--spacing-3);    /* 0.75rem / 12px */
+    --spacing-md: var(--spacing-4);    /* 1rem / 16px */
+    --spacing-lg: var(--spacing-6);    /* 1.5rem / 24px */
+    --spacing-xl: var(--spacing-8);    /* 2rem / 32px */
+
+    /* ========================================
+       TYPOGRAPHY
+       ======================================== */
+    --font-family-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+    --font-size-xs: 0.75rem;    /* 12px */
+    --font-size-sm: 0.875rem;   /* 14px */
+    --font-size-base: 1rem;     /* 16px */
+    --font-size-lg: 1.125rem;   /* 18px */
+    --font-size-xl: 1.25rem;    /* 20px */
+    --font-size-2xl: 1.5rem;    /* 24px */
+    --font-size-3xl: 1.875rem;  /* 30px */
+
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+
+    --line-height-tight: 1.25;
+    --line-height-normal: 1.5;
+    --line-height-relaxed: 1.625;
+
+    /* ========================================
+       BORDERS & RADII
+       ======================================== */
+    --border-width: 1px;
+    --border-width-2: 2px;
+    --border-color: var(--color-gray-200);
+    --border-color-dark: var(--color-gray-300);
+
+    --radius-sm: 0.25rem;   /* 4px */
+    --radius-md: 0.375rem;  /* 6px */
+    --radius-lg: 0.5rem;    /* 8px */
+    --radius-xl: 0.75rem;   /* 12px */
+    --radius-2xl: 1rem;     /* 16px */
+    --radius-full: 9999px;
+
+    /* Card-specific */
+    --card-radius: var(--radius-2xl);
+
+    /* ========================================
+       SHADOWS
+       ======================================== */
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+
+    /* Semantic shadows */
+    --shadow-soft: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    --shadow-glow: 0 0 20px rgba(102, 126, 234, 0.3);
+    --shadow-glow-primary: 0 0 20px rgba(139, 92, 246, 0.3);
+    --shadow-glow-amber: 0 0 20px rgba(245, 158, 11, 0.3);
+
+    /* Card shadows */
+    --card-shadow: var(--shadow-md);
+    --card-shadow-hover: var(--shadow-lg);
+
+    /* ========================================
+       TRANSITIONS & ANIMATIONS
+       ======================================== */
+    --transition-fast: 150ms ease;
+    --transition-normal: 250ms ease;
+    --transition-slow: 350ms ease;
+
+    --ease-in: cubic-bezier(0.4, 0, 1, 1);
+    --ease-out: cubic-bezier(0, 0, 0.2, 1);
+    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* ========================================
+       LAYOUT
+       ======================================== */
+    --header-height: 76px;
+    --keyboard-height: 120px;
+    --sidebar-width: 18rem;  /* 288px / w-72 */
+    --max-content-width: 80rem; /* 1280px / max-w-7xl */
+
+    /* ========================================
+       Z-INDEX SCALE
+       ======================================== */
+    --z-dropdown: 10;
+    --z-sticky: 10;
+    --z-fixed: 20;
+    --z-sidebar-overlay: 20;
+    --z-sidebar: 30;
+    --z-modal-backdrop: 40;
+    --z-modal: 50;
+    --z-tooltip: 50;
+    --z-popover: 60;
+    --z-toast: 100;
+
+    /* ========================================
+       SCROLLBAR
+       ======================================== */
+    --scrollbar-width: 6px;
+    --scrollbar-track: rgba(0, 0, 0, 0.05);
+    --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+    --scrollbar-thumb-hover: rgba(0, 0, 0, 0.3);
+
+    /* ========================================
+       FOCUS STATES (Accessibility)
+       ======================================== */
+    --focus-ring-color: var(--color-primary);
+    --focus-ring-width: 2px;
+    --focus-ring-offset: 2px;
+    --focus-ring-opacity: 0.2;
+}
+
+/* ============================================
+   DARK MODE OVERRIDES
+   ============================================ */
+[data-theme="dark"],
+.dark {
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --bg-tertiary: #0f3460;
+    --text-primary: #eaeaea;
+    --text-secondary: #a0a0a0;
+    --text-muted: #6b7280;
+
+    --card-bg: #1e293b;
+    --card-border: #334155;
+    --border-color: #334155;
+    --border-color-dark: #475569;
+
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
+}
+
+/* ============================================
+   ACCESSIBILITY - REDUCED MOTION
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --transition-fast: 0ms;
+        --transition-normal: 0ms;
+        --transition-slow: 0ms;
+    }
+}

@@ -683,25 +683,21 @@ export async function importInternetSongProgression(song) {
  */
 function expandAndScrollToProgressionSection() {
     // Determine which tab we're on
-    const currentTab = window.currentTab || 'trainer';
-    
+    const currentTab = window.currentTab || 'melody';
+
     let panelId, toggleId, chevronId;
-    if (currentTab === 'trainer') {
-        panelId = 'progression-visualization-panel';
-        toggleId = 'progression-visualization-toggle';
-        chevronId = 'progression-visualization-chevron';
-    } else if (currentTab === 'melody') {
-        panelId = 'melody-progression-panel';
-        toggleId = 'melody-progression-toggle';
-        chevronId = 'melody-progression-chevron';
+    if (currentTab === 'melody') {
+        panelId = 'chord-progression-card-panel';
+        toggleId = 'chord-progression-card-toggle';
+        chevronId = 'chord-progression-card-chevron';
     } else {
-        // If not on trainer or melody tab, switch to trainer tab first
+        // If not on melody tab, switch to melody tab first
         if (window.switchTab) {
-            window.switchTab('trainer');
+            window.switchTab('melody');
         }
-        panelId = 'progression-visualization-panel';
-        toggleId = 'progression-visualization-toggle';
-        chevronId = 'progression-visualization-chevron';
+        panelId = 'chord-progression-card-panel';
+        toggleId = 'chord-progression-card-toggle';
+        chevronId = 'chord-progression-card-chevron';
     }
     
     const panel = document.getElementById(panelId);

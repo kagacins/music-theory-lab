@@ -638,8 +638,8 @@ function attachWizardListeners(container) {
         setCurrentKey(customizations.key || mood?.progression.key || 'C');
         setProgressionData(progressionData);
 
-        // Switch to trainer tab
-        switchTab('trainer');
+        // Switch to Composition Studio
+        switchTab('melody');
     });
 
     // Load to melody

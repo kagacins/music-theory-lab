@@ -2180,7 +2180,8 @@ export function updateIntervalButtonCaptions() {
         const isSelected = mainButton.classList.contains('bg-emerald-600');
         const primaryTextColor = isSelected ? 'text-white' : 'text-gray-800';
         const secondaryTextColor = isSelected ? 'text-white' : 'text-gray-500';
-        mainButton.innerHTML = `<span class="block text-sm pointer-events-none ${primaryTextColor}">${intervalType}</span><span class="block ${secondaryTextColor} text-xs pointer-events-none">${symbolNotation}</span>`;
+        // Match chord button sizing: text-xs for primary, 0.65rem for secondary
+        mainButton.innerHTML = `<span class="block text-xs font-bold leading-tight pointer-events-none ${primaryTextColor}">${intervalType}</span><span class="block ${secondaryTextColor} pointer-events-none" style="font-size: 0.65rem; line-height: 0.9;">${symbolNotation}</span>`;
     });
 }
 
@@ -2693,14 +2694,14 @@ export function renderBuilderSelectors() {
         intervalSelector.innerHTML = '';
         INTERVAL_GROUPS.forEach(group => {
             const groupContainer = document.createElement('div');
-            groupContainer.className = 'border border-gray-200 rounded-lg p-3 flex flex-col';
+            groupContainer.className = 'border border-gray-200 rounded-lg p-2 flex flex-col';
             const title = document.createElement('h4');
-            title.className = 'text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 text-center';
+            title.className = 'text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 text-center';
             title.textContent = group.title;
             groupContainer.appendChild(title);
 
             const buttonGrid = document.createElement('div');
-            buttonGrid.className = 'grid grid-cols-1 gap-2';
+            buttonGrid.className = 'grid grid-cols-1 gap-1.5';
             group.types.forEach(intervalType => {
                 if (INTERVAL_DEFINITIONS[intervalType]) {
                     const buttonContainer = document.createElement('div');
@@ -2708,7 +2709,7 @@ export function renderBuilderSelectors() {
 
                     // Main button for block interval
                     const mainButton = document.createElement('button');
-                    mainButton.className = 'flex-grow px-2 py-2 text-center font-medium text-gray-800 hover:bg-amber-100';
+                    mainButton.className = 'flex-grow px-1.5 py-1.5 text-center text-sm font-medium text-gray-800 hover:bg-amber-100';
                     mainButton.dataset.intervalType = intervalType;
                     const intervalDescription = INTERVAL_DEFINITIONS[intervalType].description || '';
                     mainButton.onmousedown = () => selectBuilderInterval(intervalType, true);
@@ -2843,11 +2844,11 @@ export function renderVoicingEditor(notes, editorId, containerId, omittedNotes, 
 
 /**
  * Add the current builder chord to the progression
- * @param {boolean} switchToTrainer - Whether to switch to trainer tab after adding
+ * @param {boolean} switchToCompositionStudio - Whether to switch to Composition Studio tab after adding
  * @param {boolean} playShutterSound - Whether to play the camera shutter sound (default: true)
  * @param {boolean} fromRecommendation - Whether adding from recommendations (sets LH to 'off')
  */
-export function addChordToProgression(switchToTrainer = false, playShutterSound = true, fromRecommendation = false) {
+export function addChordToProgression(switchToCompositionStudio = false, playShutterSound = true, fromRecommendation = false) {
     // Determine the root note - in diatonic mode, use the selected diatonic chord's root
     const chordLibraryMode = getChordLibraryMode();
     const lastDiatonic = getLastDiatonicChord();
@@ -2999,8 +3000,8 @@ export function addChordToProgression(switchToTrainer = false, playShutterSound 
         window.updateRecommendations();
     }
 
-    if (switchToTrainer && window.switchTab) {
-        window.switchTab('trainer');
+    if (switchToCompositionStudio && window.switchTab) {
+        window.switchTab('melody');
     }
 }
 

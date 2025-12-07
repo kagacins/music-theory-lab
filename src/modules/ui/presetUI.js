@@ -35,7 +35,6 @@ let isPresetPanelOpen = false;
  * Initialize preset UI
  */
 export function initPresetUI() {
-    setupQuickSaveButton();
     setupPresetButtonInSidebar();
     setupPresetPanel();
 }
@@ -55,96 +54,11 @@ function getCategoryFromCurrentTab() {
 }
 
 /**
- * Setup quick save and load buttons above floating control panel
- */
-function setupQuickSaveButton() {
-    // Find the floating controls container (using more specific selector)
-    const floatingContainer = document.querySelector('div.fixed.bottom-6.right-4.z-20.flex.flex-col.items-end');
-    if (!floatingContainer) {
-        // Fallback: try alternative selector
-        const altContainer = document.querySelector('.fixed.bottom-6.right-4');
-        if (altContainer) {
-            return setupButtonsInContainer(altContainer);
-        }
-        console.warn('Floating controls container not found for preset buttons');
-        return;
-    }
-
-    setupButtonsInContainer(floatingContainer);
-}
-
-/**
- * Helper function to setup save and load buttons in a container
- * Now uses OS-based project save/load instead of localStorage presets
- */
-function setupButtonsInContainer(container) {
-    // Check if buttons already exist
-    if (document.getElementById('quick-save-btn') || document.getElementById('quick-load-btn')) {
-        return; // Already exists
-    }
-
-    // Create quick save button - saves project to file
-    const saveButton = document.createElement('button');
-    saveButton.id = 'quick-save-btn';
-    saveButton.className = 'quick-save-btn px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-md hover:shadow-lg flex items-center gap-1';
-    saveButton.style.height = 'auto';
-    saveButton.style.pointerEvents = 'auto';
-    saveButton.innerHTML = '<span>💾</span><span>Save</span>';
-    saveButton.onclick = () => {
-        // Use OS-based project save
-        if (window.saveProject) {
-            window.saveProject();
-        } else {
-            console.error('saveProject function not available');
-        }
-    };
-    saveButton.title = 'Save project to file';
-
-    // Create load button - loads project from file
-    const loadButton = document.createElement('button');
-    loadButton.id = 'quick-load-btn';
-    loadButton.className = 'quick-load-btn px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-md hover:shadow-lg flex items-center gap-1';
-    loadButton.style.height = 'auto';
-    loadButton.style.pointerEvents = 'auto';
-    loadButton.innerHTML = '<span>📂</span><span>Load</span>';
-    loadButton.onclick = () => {
-        // Use OS-based project load
-        if (window.loadProject) {
-            window.loadProject();
-        } else {
-            console.error('loadProject function not available');
-        }
-    };
-    loadButton.title = 'Load project from file';
-
-    // Insert at the beginning of the floating container (above all floating controls)
-    container.insertBefore(loadButton, container.firstChild);
-    container.insertBefore(saveButton, container.firstChild);
-
-    // Set initial visibility
-    updateButtonVisibility();
-}
-
-/**
  * Update button visibility based on current tab
- * Exported so it can be called when tabs are switched
+ * Exported so it can be called when tabs are switched (no-op now that quick save/load buttons are removed)
  */
 export function updateButtonVisibility() {
-    const saveButton = document.getElementById('quick-save-btn');
-    const loadButton = document.getElementById('quick-load-btn');
-    if (!saveButton) return;
-
-    const currentTab = window.currentTab || 'builder';
-
-    // Show save/load buttons on Progression Builder and Composition Studio tabs
-    // These are the tabs where projects can be saved/loaded
-    if (currentTab === 'trainer' || currentTab === 'melody') {
-        saveButton.style.display = 'flex';
-        if (loadButton) loadButton.style.display = 'flex';
-    } else {
-        saveButton.style.display = 'none';
-        if (loadButton) loadButton.style.display = 'none';
-    }
+    // Quick save/load buttons have been removed - this function is kept for compatibility
 }
 
 /**

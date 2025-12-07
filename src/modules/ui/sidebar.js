@@ -181,3 +181,40 @@ export function handleOctaveRangeChange(value) {
     else if (currentTab === 'trainer') highlightTrainer(trainerState.scaleNotes, null);
     else if (currentTab === 'scales') updateScaleDisplay();
 }
+
+/**
+ * Toggle settings group expand/collapse state
+ * @param {string} groupName - The data-group attribute value of the settings group
+ */
+export function toggleSettingsGroup(groupName) {
+    const group = document.querySelector(`.settings-group[data-group="${groupName}"]`);
+    if (group) {
+        group.classList.toggle('collapsed');
+
+        // Save collapsed state to localStorage
+        const collapsedGroups = JSON.parse(localStorage.getItem('collapsedSettingsGroups') || '[]');
+        const isCollapsed = group.classList.contains('collapsed');
+
+        if (isCollapsed && !collapsedGroups.includes(groupName)) {
+            collapsedGroups.push(groupName);
+        } else if (!isCollapsed && collapsedGroups.includes(groupName)) {
+            const index = collapsedGroups.indexOf(groupName);
+            collapsedGroups.splice(index, 1);
+        }
+
+        localStorage.setItem('collapsedSettingsGroups', JSON.stringify(collapsedGroups));
+    }
+}
+
+/**
+ * Restore settings group collapsed states from localStorage
+ */
+export function restoreSettingsGroupStates() {
+    const collapsedGroups = JSON.parse(localStorage.getItem('collapsedSettingsGroups') || '[]');
+    collapsedGroups.forEach(groupName => {
+        const group = document.querySelector(`.settings-group[data-group="${groupName}"]`);
+        if (group) {
+            group.classList.add('collapsed');
+        }
+    });
+}

@@ -2894,10 +2894,22 @@ export function playSelectedMeasure() {
     }
     const numMeasures = Math.max(hasChords ? progressionData.length : 0, maxMeasureFromMelody, measureCountFromState, interactiveMelody.numMeasures || 4);
 
-    // Use selected measure, or default to first measure (0)
-    const measureToPlay = selectedMeasureIndex >= 0 && selectedMeasureIndex < numMeasures
-        ? selectedMeasureIndex
-        : 0;
+    // Check multiple sources for selected measure:
+    // 1. Notation composer's selected measure (blue outline in VexFlow)
+    // 2. Local selectedMeasureIndex
+    // 3. Default to 0 if none selected
+    let measureToPlay = 0;
+
+    // First check notation composer selection (takes priority)
+    const notationSelectedMeasure = window.getNotationSelectedMeasure?.() ?? -1;
+    if (notationSelectedMeasure >= 0 && notationSelectedMeasure < numMeasures) {
+        measureToPlay = notationSelectedMeasure;
+        // Sync local state
+        selectedMeasureIndex = notationSelectedMeasure;
+    } else if (selectedMeasureIndex >= 0 && selectedMeasureIndex < numMeasures) {
+        measureToPlay = selectedMeasureIndex;
+    }
+    // Otherwise measureToPlay stays at 0 (first measure)
 
     playMeasure(measureToPlay);
 }
@@ -2947,10 +2959,22 @@ export function playFromSelectedMeasure() {
     }
     const numMeasures = Math.max(hasChords ? progressionData.length : 0, maxMeasureFromMelody, measureCountFromState, interactiveMelody.numMeasures || 4);
 
-    // Use selected measure, or default to first measure (0)
-    const startMeasure = selectedMeasureIndex >= 0 && selectedMeasureIndex < numMeasures
-        ? selectedMeasureIndex
-        : 0;
+    // Check multiple sources for selected measure:
+    // 1. Notation composer's selected measure (blue outline in VexFlow)
+    // 2. Local selectedMeasureIndex
+    // 3. Default to 0 if none selected
+    let startMeasure = 0;
+
+    // First check notation composer selection (takes priority)
+    const notationSelectedMeasure = window.getNotationSelectedMeasure?.() ?? -1;
+    if (notationSelectedMeasure >= 0 && notationSelectedMeasure < numMeasures) {
+        startMeasure = notationSelectedMeasure;
+        // Sync local state
+        selectedMeasureIndex = notationSelectedMeasure;
+    } else if (selectedMeasureIndex >= 0 && selectedMeasureIndex < numMeasures) {
+        startMeasure = selectedMeasureIndex;
+    }
+    // Otherwise startMeasure stays at 0 (first measure)
 
     // Allow playing even if there are no melody notes - just play the chords
     const hasMelodyNotes = hasMelody;

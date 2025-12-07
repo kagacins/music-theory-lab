@@ -74,11 +74,16 @@ export function initTabHistory() {
 
 /**
  * Switches between tabs and manages their visibility and state
- * @param {string} tabId - The ID of the tab to switch to ('builder', 'trainer', or 'scales')
+ * @param {string} tabId - The ID of the tab to switch to ('builder', 'melody', 'scales', or 'learn')
  * @param {Object} options - Options for tab switching
  * @param {boolean} options.pushHistory - Whether to push to browser history (default: true)
  */
 export function switchTab(tabId, options = {}) {
+    // Redirect deprecated 'trainer' tab to 'melody' (Composition Studio)
+    if (tabId === 'trainer') {
+        tabId = 'melody';
+    }
+
     const { pushHistory = true } = options;
 
     // Get the previous tab and lesson for history
@@ -100,7 +105,22 @@ export function switchTab(tabId, options = {}) {
     if (tabId !== 'learn') {
         currentLessonId = null;
     }
-    const tabs = ['builder', 'trainer', 'melody', 'scales', 'learn'];
+
+    // Set data attribute on body for CSS tab-aware theming (action bar, etc.)
+    document.body.setAttribute('data-active-tab', tabId);
+
+    // Show/hide sticky action bar based on tab (builder and melody tabs)
+    const actionBar = document.getElementById('action-bar');
+    if (actionBar) {
+        const showActionBar = tabId === 'builder' || tabId === 'melody';
+        actionBar.classList.toggle('hidden', !showActionBar);
+    }
+
+    const tabs = ['builder', 'melody', 'scales', 'learn'];
+    // Also hide the old trainer tab content
+    const trainerTab = document.getElementById('tab-trainer');
+    if (trainerTab) trainerTab.classList.add('hidden');
+
     tabs.forEach(id => {
         document.getElementById(`tab-${id}`).classList.toggle('hidden', id !== tabId);
 
@@ -108,9 +128,6 @@ export function switchTab(tabId, options = {}) {
         let activeColor, inactiveHover;
         if (id === 'builder') {
             activeColor = 'bg-orange-500'; // Orange for Chord Builder (amber on keyboard)
-            inactiveHover = 'hover:bg-gray-700';
-        } else if (id === 'trainer') {
-            activeColor = 'bg-teal-600'; // Teal for Progression Builder (teal-600 matches keyboard)
             inactiveHover = 'hover:bg-gray-700';
         } else if (id === 'melody') {
             activeColor = 'bg-violet-600'; // Violet for Melody Composer
@@ -123,22 +140,26 @@ export function switchTab(tabId, options = {}) {
             inactiveHover = 'hover:bg-gray-700';
         }
         
-        // Update sidebar button
+        // Update sidebar button (if it exists)
         const sidebarBtn = document.getElementById(`sidebar-btn-${id}`);
-        sidebarBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-violet-600', 'bg-indigo-500', 'hover:bg-gray-700');
-        if (id === tabId) {
-            sidebarBtn.classList.add(activeColor);
-        } else {
-            sidebarBtn.classList.add(inactiveHover);
+        if (sidebarBtn) {
+            sidebarBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-violet-600', 'bg-indigo-500', 'hover:bg-gray-700');
+            if (id === tabId) {
+                sidebarBtn.classList.add(activeColor);
+            } else {
+                sidebarBtn.classList.add(inactiveHover);
+            }
         }
 
-        // Update header button
+        // Update header button (if it exists)
         const headerBtn = document.getElementById(`header-tab-btn-${id}`);
-        headerBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-violet-600', 'bg-indigo-500', 'text-white', 'text-gray-500', 'text-gray-600', 'hover:bg-gray-100');
-        if (id === tabId) {
-            headerBtn.classList.add(activeColor, 'text-white');
-        } else {
-            headerBtn.classList.add('text-gray-600', 'hover:bg-gray-100');
+        if (headerBtn) {
+            headerBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-violet-600', 'bg-indigo-500', 'text-white', 'text-gray-500', 'text-gray-600', 'hover:bg-gray-100');
+            if (id === tabId) {
+                headerBtn.classList.add(activeColor, 'text-white');
+            } else {
+                headerBtn.classList.add('text-gray-600', 'hover:bg-gray-100');
+            }
         }
 
         if (id === tabId) {
@@ -153,7 +174,7 @@ export function switchTab(tabId, options = {}) {
     
     // Restore panel states for the tab being switched to
     // Use a small delay to ensure DOM is ready
-    if (window.restoreTabPanelStates && (tabId === 'builder' || tabId === 'trainer' || tabId === 'melody')) {
+    if (window.restoreTabPanelStates && (tabId === 'builder' || tabId === 'melody')) {
         setTimeout(() => {
             window.restoreTabPanelStates(tabId);
         }, 10);
@@ -163,7 +184,7 @@ export function switchTab(tabId, options = {}) {
     const headerExpandCollapse = document.getElementById('header-expand-collapse-group');
     if (headerExpandCollapse) {
         // Show controls for tabs that have collapsible sections
-        if (tabId === 'builder' || tabId === 'trainer' || tabId === 'melody') {
+        if (tabId === 'builder' || tabId === 'melody') {
             headerExpandCollapse.classList.remove('hidden');
         } else {
             headerExpandCollapse.classList.add('hidden');
@@ -175,12 +196,11 @@ export function switchTab(tabId, options = {}) {
 
     // Restore visibility logic for the correct display panel
     document.getElementById('builder-info-display').classList.toggle('hidden', tabId !== 'builder');
-    document.getElementById('progression-chord-display').classList.toggle('hidden', tabId !== 'trainer');
+    document.getElementById('progression-chord-display').classList.add('hidden'); // Always hidden (trainer tab removed)
     document.getElementById('scale-info-display').classList.toggle('hidden', tabId !== 'scales');
 
     // Manage visibility of floating controls
-    document.getElementById('floating-builder-controls').classList.toggle('hidden', tabId !== 'builder');
-    document.getElementById('floating-trainer-controls').classList.toggle('hidden', tabId !== 'trainer');
+    document.getElementById('floating-builder-controls').classList.add('hidden');
     document.getElementById('floating-melody-controls').classList.toggle('hidden', tabId !== 'melody');
     document.getElementById('floating-scale-controls').classList.toggle('hidden', tabId !== 'scales');
     document.getElementById('floating-learn-controls').classList.toggle('hidden', tabId !== 'learn');
@@ -210,24 +230,9 @@ export function switchTab(tabId, options = {}) {
             window.updateKeySignatureDisplay(rootNote);
         }
         updateKeyboardLabels();
-    } else if (tabId === 'trainer') {
-        const trainerState = getTrainerState();
-        // Always render progression display, even if empty
-        renderProgressionDisplay();
-        if (trainerState.scaleNotes && trainerState.scaleNotes.length > 0) {
-            highlightTrainer(trainerState.scaleNotes, null);
-            updateKeySignatureDisplay(trainerState.currentKey);
-        } else {
-            loadProgression();
-        }
-        // Reset shared-chord-display width for Progression Builder
-        const sharedChordDisplay = document.getElementById('shared-chord-display');
-        if (sharedChordDisplay) {
-            sharedChordDisplay.classList.remove('w-80');
-            sharedChordDisplay.classList.add('w-64');
-        }
-        updateKeyboardLabels();
     } else if (tabId === 'melody') {
+        // Always render progression display when entering Composition Studio
+        renderProgressionDisplay();
         const trainerState = getTrainerState();
 
         // Phase 4.4: Initialize enhanced notation system FIRST
@@ -328,8 +333,6 @@ export function switchTab(tabId, options = {}) {
     let tabTitle = "";
     if (tabId === 'builder') {
         tabTitle = "Chord Lab";
-    } else if (tabId === 'trainer') {
-        tabTitle = "Progression Workshop";
     } else if (tabId === 'melody') {
         tabTitle = "Composition Studio";
     } else if (tabId === 'scales') {
@@ -349,7 +352,7 @@ export function switchTab(tabId, options = {}) {
 
     // Update sidebar height for the active tab to ensure it meets dimension requirements
     // This ensures the sidebar height matches the taller of: white container OR sidebar content
-    if (tabId === 'builder' || tabId === 'trainer' || tabId === 'melody') {
+    if (tabId === 'builder' || tabId === 'melody') {
         updateTabSidebarHeight(tabId);
     }
 

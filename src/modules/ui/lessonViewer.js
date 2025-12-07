@@ -1135,9 +1135,9 @@ function attachLessonEventListeners(container, lesson) {
         switchTab('builder');
     });
 
-    // Open Progression Builder
+    // Open Composition Studio
     container.querySelector('#open-progression-builder-btn')?.addEventListener('click', () => {
-        switchTab('trainer');
+        switchTab('melody');
     });
 
     // Free play button (for lessons that don't use embedded keyboard)
@@ -1336,7 +1336,7 @@ function attachTryItListeners(container, lesson) {
     });
 
     container.querySelector('#open-progression-builder-btn')?.addEventListener('click', () => {
-        switchTab('trainer');
+        switchTab('melody');
     });
 }
 

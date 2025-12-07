@@ -23,7 +23,7 @@ import { initAllSectionSidebars, triggerSectionSidebarUpdate } from './modules/u
 import { showModal, hideModal } from './modules/ui/modals.js';
 import { renderKeyboard, updateKeyboardLabels, updateKeyNames, clearHighlights, g_KeyboardKeys } from './modules/ui/keyboard.js';
 import { updateKeySignatureDisplay, setupResponsiveTitle } from './modules/ui/header.js';
-import { toggleSidebar } from './modules/ui/sidebar.js';
+import { toggleSidebar, toggleSettingsGroup, restoreSettingsGroupStates } from './modules/ui/sidebar.js';
 import { showSettingsModal, showChordWeightsModal, showMelodyWeightsModal } from './modules/ui/settingsModal.js';
 import { initPresetUI, togglePresetPanel, openPresetPanel, closePresetPanel } from './modules/ui/presetUI.js';
 import { initUnifiedSuggestionsPanel, updateUnifiedSuggestions } from './modules/ui/unifiedSuggestionsPanel.js';
@@ -1024,6 +1024,7 @@ window.refreshAllTabs = refreshAllTabs;
 window.showModal = showModal;
 window.hideModal = hideModal;
 window.toggleSidebar = toggleSidebar;
+window.toggleSettingsGroup = toggleSettingsGroup;
 window.showSettingsModal = showSettingsModal;
 window.showChordWeightsModal = showChordWeightsModal;
 window.showMelodyWeightsModal = showMelodyWeightsModal;
@@ -1065,14 +1066,14 @@ function shockDragDrop() {
     if (typeof window.switchTab !== 'function') return fallback();
 
     try {
-        // If we are on trainer, hop to builder, then back after a short delay
-        if (prevTab === 'trainer') {
+        // If we are on melody tab, hop to builder, then back after a short delay
+        if (prevTab === 'melody') {
             window.switchTab('builder');
             setTimeout(() => {
-                window.switchTab('trainer');
+                window.switchTab('melody');
             }, 75);
         } else {
-            window.switchTab('trainer');
+            window.switchTab('melody');
             setTimeout(() => {
                 window.switchTab(prevTab);
             }, 75);
@@ -1994,6 +1995,44 @@ window.playSelectedMeasure = playSelectedMeasure;
 window.playFromSelectedMeasure = playFromSelectedMeasure;
 
 /**
+ * Clear all treble clef (melody) notes
+ */
+window.clearAllTrebleNotes = function() {
+    const compositionState = getCompositionState();
+    if (!compositionState) {
+        console.warn('No composition state to clear');
+        return;
+    }
+
+    // Confirm with user
+    if (!confirm('Are you sure you want to clear all melody notes from the treble clef?')) {
+        return;
+    }
+
+    // Save state for undo BEFORE making changes
+    if (window.saveStateBeforeChange) {
+        window.saveStateBeforeChange();
+    }
+
+    // Get total duration in beats (all measures)
+    const numMeasures = compositionState.measures?.length || 8;
+    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const totalBeats = numMeasures * beatsPerMeasure;
+
+    // Clear all treble notes using the beat range method
+    if (compositionState.clearTrebleBeatRange) {
+        compositionState.clearTrebleBeatRange(0, totalBeats);
+    }
+
+    // Refresh notation display
+    if (window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
+    }
+
+    console.log('Cleared all treble clef notes');
+};
+
+/**
  * Show the Auto-Harmonize modal to suggest chords for the melody
  */
 window.showAutoHarmonize = function() {
@@ -2225,6 +2264,28 @@ window.toggleMelodyHighlight = function(enabled) {
 };
 
 /**
+ * Toggle floating panel collapse/expand state
+ */
+window.toggleFloatingPanelCollapse = function() {
+    const content = document.getElementById('floating-panel-content');
+    const toggleBtn = document.getElementById('toggle-floating-panel-btn');
+    if (!content || !toggleBtn) return;
+
+    const isCollapsed = content.classList.contains('hidden');
+    content.classList.toggle('hidden', !isCollapsed);
+
+    // Rotate the chevron icon
+    const svg = toggleBtn.querySelector('svg');
+    if (svg) {
+        if (isCollapsed) {
+            svg.style.transform = 'rotate(0deg)';
+        } else {
+            svg.style.transform = 'rotate(180deg)';
+        }
+    }
+};
+
+/**
  * Toggle melody recording on/off
  * @param {boolean} isRecording - true to start recording (Record), false to stop (Stop)
  */
@@ -2413,7 +2474,405 @@ window.onload = () => {
         const keyboardTop = headerHeight + headerTop;
         document.documentElement.style.setProperty('--header-height', `${keyboardTop}px`);
     }
-    
+
+    // Set initial tab data attribute on body
+    document.body.setAttribute('data-active-tab', getCurrentTab());
+
+    // Hide Tab hint banner if user previously dismissed it
+    const tabHintBanner = document.getElementById('tab-hint-banner');
+    if (tabHintBanner && localStorage.getItem('tab-hint-dismissed') === 'true') {
+        tabHintBanner.classList.add('hidden');
+    }
+
+    // Wire up sticky action bar buttons
+    const actionPlayBtn = document.getElementById('action-play-btn');
+    const actionPlayAll = document.getElementById('action-play-all');
+    const actionPlayProgression = document.getElementById('action-play-progression');
+    const actionPlayFromCursor = document.getElementById('action-play-from-cursor');
+    const actionPlayMeasure = document.getElementById('action-play-measure');
+    const actionStopBtn = document.getElementById('action-stop-btn');
+    const actionTabSuggestions = document.getElementById('action-tab-suggestions');
+    const actionSave = document.getElementById('action-save');
+    const actionLoad = document.getElementById('action-load');
+    const actionExportMidi = document.getElementById('action-export-midi');
+    const actionCopyLink = document.getElementById('action-copy-link');
+    const actionSettingsBtn = document.getElementById('action-settings-btn');
+    const actionSettingsPopover = document.getElementById('action-settings-popover');
+    const actionBpmSlider = document.getElementById('action-bpm-slider');
+    const actionBpmValue = document.getElementById('action-bpm-value');
+    const actionLoopToggle = document.getElementById('action-loop-toggle');
+    const actionHighlightToggle = document.getElementById('action-highlight-toggle');
+    const actionHelpBtn = document.getElementById('action-help-btn');
+    const actionUndo = document.getElementById('action-undo');
+    const actionRedo = document.getElementById('action-redo');
+    // Chord Lab specific
+    const actionAddChord = document.getElementById('action-add-chord');
+    const actionAddGo = document.getElementById('action-add-go');
+    const actionArpSlower = document.getElementById('action-arp-slower');
+    const actionArpFaster = document.getElementById('action-arp-faster');
+    const actionArpSpeed = document.getElementById('action-arp-speed');
+    const actionOctaveDown = document.getElementById('action-octave-down');
+    const actionOctaveUp = document.getElementById('action-octave-up');
+    const actionOctaveDisplay = document.getElementById('action-octave-display');
+
+    // Play button (primary) - context-aware based on current tab
+    if (actionPlayBtn) {
+        actionPlayBtn.addEventListener('click', (e) => {
+            // Don't trigger if clicking on dropdown arrow area (melody tab has dropdown)
+            if (e.target.closest('.group > div:not(button)')) return;
+
+            const currentTab = window.currentTab || 'builder';
+
+            if (currentTab === 'melody') {
+                // Composition Studio: Play melody + chords
+                if (window.playAllMelody) {
+                    window.playAllMelody();
+                }
+            } else if (currentTab === 'trainer') {
+                // Progression Workshop: Play chords only (toggle auto-playback)
+                if (window.handleAutoPlayback) {
+                    window.handleAutoPlayback();
+                }
+            } else if (currentTab === 'builder') {
+                // Chord Lab: Play current chord or progression if exists
+                if (window.handleAutoPlayback) {
+                    window.handleAutoPlayback();
+                } else if (window.playBuilderChord) {
+                    window.playBuilderChord();
+                }
+            }
+        });
+    }
+
+    // Play All dropdown option (melody tab)
+    if (actionPlayAll) {
+        actionPlayAll.addEventListener('click', () => {
+            if (window.playAllMelody) {
+                window.playAllMelody();
+            }
+        });
+    }
+
+    // Play Chords Only (progression without melody)
+    if (actionPlayProgression) {
+        actionPlayProgression.addEventListener('click', () => {
+            if (window.handleAutoPlayback) {
+                window.handleAutoPlayback();
+            }
+        });
+    }
+
+    // Play from Selected/Cursor
+    if (actionPlayFromCursor) {
+        actionPlayFromCursor.addEventListener('click', () => {
+            if (window.playFromSelectedMeasure) {
+                window.playFromSelectedMeasure();
+            } else if (window.playAllMelody) {
+                // Fall back to play all if no selection function
+                window.playAllMelody();
+            }
+        });
+    }
+
+    // Play Measure (plays currently selected measure only)
+    if (actionPlayMeasure) {
+        actionPlayMeasure.addEventListener('click', () => {
+            if (window.playSelectedMeasure) {
+                window.playSelectedMeasure();
+            } else if (window.playMeasure) {
+                // Fall back to playing measure 0
+                window.playMeasure(0);
+            }
+        });
+    }
+
+    if (actionStopBtn) {
+        actionStopBtn.addEventListener('click', () => {
+            // Stop all types of playback
+            if (window.stopPlayAllMelody) window.stopPlayAllMelody();
+            if (window.stopMelody) window.stopMelody();
+            if (window.forceStopAllPlayback) window.forceStopAllPlayback(true);
+            if (window.stopNotationPlaybackHighlighting) window.stopNotationPlaybackHighlighting();
+        });
+    }
+
+    if (actionTabSuggestions) {
+        actionTabSuggestions.addEventListener('click', () => {
+            if (window.showUnifiedRecommendationModal) {
+                window.showUnifiedRecommendationModal({});
+            }
+        });
+    }
+
+    // Save button
+    if (actionSave) {
+        actionSave.addEventListener('click', () => {
+            if (window.saveProject) {
+                window.saveProject();
+            }
+        });
+    }
+
+    // Load button
+    if (actionLoad) {
+        actionLoad.addEventListener('click', () => {
+            if (window.loadProject) {
+                window.loadProject();
+            }
+        });
+    }
+
+    // Export MIDI
+    if (actionExportMidi) {
+        actionExportMidi.addEventListener('click', () => {
+            if (window.saveMelody) {
+                window.saveMelody();
+            }
+        });
+    }
+
+    if (actionCopyLink) {
+        actionCopyLink.addEventListener('click', () => {
+            // Copy current progression as shareable link
+            const progression = window.g_ProgressionChords || [];
+            if (progression.length === 0) {
+                alert('No progression to share. Add some chords first!');
+                return;
+            }
+            const progressionData = {
+                chords: progression,
+                key: window.g_ProgressionKey || 'C',
+                tempo: window.g_Tempo || 120
+            };
+            const encoded = btoa(JSON.stringify(progressionData));
+            const url = `${window.location.origin}${window.location.pathname}?p=${encoded}`;
+            navigator.clipboard.writeText(url).then(() => {
+                alert('Link copied to clipboard!');
+            }).catch(() => {
+                prompt('Copy this link:', url);
+            });
+        });
+    }
+
+    if (actionHelpBtn) {
+        actionHelpBtn.addEventListener('click', () => {
+            // Show keyboard shortcuts help
+            const helpContent = `
+Keyboard Shortcuts:
+━━━━━━━━━━━━━━━━━━━
+Tab         → Open Suggestions Modal
+Space       → Play/Stop Progression
+1-7         → Add scale degree chord
+Shift+1-7   → Add minor variant
+Ctrl+Z      → Undo last action
+Ctrl+S      → Save progression
+←/→         → Navigate chords
+Delete      → Remove selected chord
+
+In Suggestions Modal:
+━━━━━━━━━━━━━━━━━━━
+↑/↓         → Navigate suggestions
+Enter       → Apply suggestion
+Esc         → Close modal
+            `.trim();
+            alert(helpContent);
+        });
+    }
+
+    // Undo button
+    if (actionUndo) {
+        actionUndo.addEventListener('click', () => {
+            if (window.handleUndo) {
+                window.handleUndo();
+            }
+        });
+    }
+
+    // Redo button
+    if (actionRedo) {
+        actionRedo.addEventListener('click', () => {
+            if (window.handleRedo) {
+                window.handleRedo();
+            }
+        });
+    }
+
+    // Clear Treble Clef button
+    const actionClearTreble = document.getElementById('action-clear-treble');
+    if (actionClearTreble) {
+        actionClearTreble.addEventListener('click', () => {
+            if (window.clearAllTrebleNotes) {
+                window.clearAllTrebleNotes();
+            }
+        });
+    }
+
+    // Clear Progression button
+    const actionClearProgression = document.getElementById('action-clear-progression');
+    if (actionClearProgression) {
+        actionClearProgression.addEventListener('click', () => {
+            if (window.clearProgression) {
+                window.clearProgression();
+            }
+        });
+    }
+
+    // Settings popover is now hover-based (no click handler needed)
+
+    // BPM slider
+    if (actionBpmSlider && actionBpmValue) {
+        // Initialize from current tempo (prefer interactiveMelody.tempo if available)
+        const interactiveMelody = window.getInteractiveMelody?.() || {};
+        const initialTempo = interactiveMelody.tempo || window.g_Tempo || 120;
+        actionBpmSlider.value = initialTempo;
+        actionBpmValue.textContent = initialTempo;
+
+        actionBpmSlider.addEventListener('input', (e) => {
+            const bpm = parseInt(e.target.value);
+            actionBpmValue.textContent = bpm;
+            window.g_Tempo = bpm;
+
+            // Update interactiveMelody.tempo for melody playback
+            if (window.setMelodyTempo) {
+                window.setMelodyTempo(bpm);
+            }
+
+            // Update compositionState settings for notation playback
+            const compositionState = window.getCompositionState?.();
+            if (compositionState?.setSettings) {
+                const currentSettings = compositionState.getSettings?.() || {};
+                compositionState.setSettings({ ...currentSettings, tempo: bpm });
+            }
+
+            // Sync with existing BPM inputs
+            const bpmInput = document.getElementById('bpm-input');
+            if (bpmInput) bpmInput.value = bpm;
+            const melodyBpm = document.getElementById('melody-bpm-value');
+            if (melodyBpm) melodyBpm.textContent = bpm;
+            const melodyBpmSlider = document.getElementById('melody-bpm');
+            if (melodyBpmSlider) melodyBpmSlider.value = bpm;
+        });
+    }
+
+    // Loop toggle
+    if (actionLoopToggle) {
+        // Initialize from current state
+        actionLoopToggle.checked = window.g_LoopEnabled || false;
+
+        actionLoopToggle.addEventListener('change', (e) => {
+            window.g_LoopEnabled = e.target.checked;
+            // Sync with existing loop toggle
+            const loopToggle = document.getElementById('loop-toggle');
+            if (loopToggle) loopToggle.checked = e.target.checked;
+        });
+    }
+
+    // Highlight toggle
+    if (actionHighlightToggle) {
+        // Initialize from current state (default on)
+        actionHighlightToggle.checked = window.g_HighlightEnabled !== false;
+
+        actionHighlightToggle.addEventListener('change', (e) => {
+            window.g_HighlightEnabled = e.target.checked;
+            // Sync with existing highlight toggle
+            const highlightToggle = document.getElementById('highlight-toggle');
+            if (highlightToggle) highlightToggle.checked = e.target.checked;
+        });
+    }
+
+    // Chord Lab: Add Chord button
+    if (actionAddChord) {
+        actionAddChord.addEventListener('click', () => {
+            if (window.addChordToProgression) {
+                window.addChordToProgression(false);
+            }
+        });
+    }
+
+    // Chord Lab: Add & Go button
+    if (actionAddGo) {
+        actionAddGo.addEventListener('click', () => {
+            if (window.addChordToProgression) {
+                window.addChordToProgression(true);
+            }
+        });
+    }
+
+    // Chord Lab: Arpeggio Speed controls
+    if (actionArpSlower) {
+        actionArpSlower.addEventListener('click', () => {
+            if (window.changeArpeggioSpeed) {
+                window.changeArpeggioSpeed('slower');
+                // Sync display
+                const floatingDisplay = document.getElementById('arp-speed-display');
+                if (floatingDisplay && actionArpSpeed) {
+                    actionArpSpeed.textContent = floatingDisplay.textContent;
+                }
+            }
+        });
+    }
+
+    if (actionArpFaster) {
+        actionArpFaster.addEventListener('click', () => {
+            if (window.changeArpeggioSpeed) {
+                window.changeArpeggioSpeed('faster');
+                // Sync display
+                const floatingDisplay = document.getElementById('arp-speed-display');
+                if (floatingDisplay && actionArpSpeed) {
+                    actionArpSpeed.textContent = floatingDisplay.textContent;
+                }
+            }
+        });
+    }
+
+    // Chord Lab: RH Octave controls
+    if (actionOctaveDown) {
+        actionOctaveDown.addEventListener('click', () => {
+            if (window.changeBuilderOctave) {
+                window.changeBuilderOctave(-1); // Pass -1, not 'down'
+                // Sync display
+                const floatingDisplay = document.getElementById('builder-octave-display');
+                if (floatingDisplay && actionOctaveDisplay) {
+                    actionOctaveDisplay.textContent = floatingDisplay.textContent;
+                }
+            }
+        });
+    }
+
+    if (actionOctaveUp) {
+        actionOctaveUp.addEventListener('click', () => {
+            if (window.changeBuilderOctave) {
+                window.changeBuilderOctave(1); // Pass 1, not 'up'
+                // Sync display
+                const floatingDisplay = document.getElementById('builder-octave-display');
+                if (floatingDisplay && actionOctaveDisplay) {
+                    actionOctaveDisplay.textContent = floatingDisplay.textContent;
+                }
+            }
+        });
+    }
+
+    // Initialize Chord Lab action bar displays from existing controls
+    if (actionArpSpeed) {
+        const floatingArpDisplay = document.getElementById('arp-speed-display');
+        if (floatingArpDisplay) {
+            actionArpSpeed.textContent = floatingArpDisplay.textContent;
+        }
+    }
+    if (actionOctaveDisplay) {
+        const floatingOctaveDisplay = document.getElementById('builder-octave-display');
+        if (floatingOctaveDisplay) {
+            actionOctaveDisplay.textContent = floatingOctaveDisplay.textContent;
+        }
+    }
+
+    // Show action bar if starting on builder, trainer or melody tab
+    const actionBar = document.getElementById('action-bar');
+    const currentTab = getCurrentTab();
+    if (actionBar && (currentTab === 'builder' || currentTab === 'trainer' || currentTab === 'melody')) {
+        actionBar.classList.remove('hidden');
+    }
+
     // Ensure g_NumOctaves is available
     window.g_NumOctaves = getNumOctaves();
 
@@ -2547,6 +3006,9 @@ window.onload = () => {
             }
         }
     }
+
+    // Restore settings group collapsed states from localStorage
+    restoreSettingsGroupStates();
 
     // Initialize melody mode toggle (default to Free mode - unchecked)
     const melodyModeToggle = document.getElementById('melody-mode-toggle');
@@ -2872,12 +3334,12 @@ window.loadPresetData = function(category, data) {
                     const currentShift = getBuilderOctaveShift();
                     // Reset to 0 first
                     for (let i = 0; i < Math.abs(currentShift); i++) {
-                        changeBuilderOctave(currentShift < 0 ? 'up' : 'down');
+                        changeBuilderOctave(currentShift < 0 ? 1 : -1);
                     }
                     // Apply target shift
                     const targetShift = data.builderOctaveShift;
                     for (let i = 0; i < Math.abs(targetShift); i++) {
-                        changeBuilderOctave(targetShift > 0 ? 'up' : 'down');
+                        changeBuilderOctave(targetShift > 0 ? 1 : -1);
                     }
                 }
 
@@ -2887,8 +3349,8 @@ window.loadPresetData = function(category, data) {
 
             case 'progression':
                 console.log('Loading progression preset...');
-                // Switch to progression tab first
-                switchTab('trainer');
+                // Switch to Composition Studio tab first
+                switchTab('melody');
 
                 // Load progression state
                 if (data.progressionData && Array.isArray(data.progressionData)) {
@@ -2936,12 +3398,13 @@ window.loadPresetData = function(category, data) {
 
 // Set up keyboard shortcuts for Undo/Redo
 document.addEventListener('keydown', (event) => {
-    // Check if we're in the Progression Builder tab
+    // Check which tab we're in - undo/redo works on builder, trainer, and melody tabs
     const currentTab = document.querySelector('[id^="tab-"]:not(.hidden)');
-    const isTrainerTab = currentTab && currentTab.id === 'tab-trainer';
+    const tabId = currentTab ? currentTab.id : '';
+    const isUndoRedoTab = tabId === 'tab-builder' || tabId === 'tab-trainer' || tabId === 'tab-melody';
 
-    // Only handle undo/redo in trainer tab
-    if (!isTrainerTab) return;
+    // Only handle undo/redo in tabs that support it
+    if (!isUndoRedoTab) return;
 
     // Check if user is typing in an input or select element
     const activeElement = document.activeElement;
@@ -3696,10 +4159,16 @@ window.toggleMelodyControlsPanel = function() {
 window.syncProgressionToMelodyTab = function() {
     const trainerState = getTrainerState();
     const melodyCurrentKeyDisplay = document.getElementById('melody-current-key-display');
+    const melodyKeyDisplayText = document.getElementById('melody-key-display-text');
 
-    // Update key display
+    // Update key display in header badge
     if (melodyCurrentKeyDisplay && trainerState.currentKey) {
         melodyCurrentKeyDisplay.textContent = trainerState.currentKey;
+    }
+
+    // Update key display in Progression Setup panel
+    if (melodyKeyDisplayText && trainerState.currentKey) {
+        melodyKeyDisplayText.textContent = trainerState.currentKey;
     }
 
     // Use the same rendering function as the Progression Builder

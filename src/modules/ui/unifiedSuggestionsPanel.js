@@ -153,19 +153,32 @@ export function updateUnifiedSuggestions() {
  * Update quick analysis bar
  */
 function updateQuickAnalysis(progression, key) {
+    // Get elements from both trainer tab and melody tab
     const romanNumeralsEl = document.getElementById('quick-roman-numerals');
     const moodEl = document.getElementById('quick-mood');
     const tensionEl = document.getElementById('quick-tension');
-    
-    // Return early if elements don't exist yet
-    if (!romanNumeralsEl || !moodEl || !tensionEl) {
+    const romanNumeralsMelodyEl = document.getElementById('quick-roman-numerals-melody');
+    const moodMelodyEl = document.getElementById('quick-mood-melody');
+    const tensionMelodyEl = document.getElementById('quick-tension-melody');
+
+    // Return early if no elements exist at all
+    const hasTrainerElements = romanNumeralsEl && moodEl && tensionEl;
+    const hasMelodyElements = romanNumeralsMelodyEl && moodMelodyEl && tensionMelodyEl;
+    if (!hasTrainerElements && !hasMelodyElements) {
         return;
     }
-    
+
     if (progression.length === 0) {
-        romanNumeralsEl.textContent = '—';
-        moodEl.textContent = '—';
-        tensionEl.textContent = '—';
+        if (hasTrainerElements) {
+            romanNumeralsEl.textContent = '—';
+            moodEl.textContent = '—';
+            tensionEl.textContent = '—';
+        }
+        if (hasMelodyElements) {
+            romanNumeralsMelodyEl.textContent = '—';
+            moodMelodyEl.textContent = '—';
+            tensionMelodyEl.textContent = '—';
+        }
         return;
     }
 
@@ -177,11 +190,10 @@ function updateQuickAnalysis(progression, key) {
         ? analysis.romanNumerals.slice(-maxToShow)
         : analysis.romanNumerals;
     const romans = romansToShow.join(' - ');
-    romanNumeralsEl.textContent = romans;
 
     // Mood with emoji
     const moodEmoji = getMoodEmoji(analysis.mood);
-    moodEl.textContent = `${moodEmoji} ${analysis.mood}`;
+    const moodText = `${moodEmoji} ${analysis.mood}`;
 
     // Calculate average HARMONIC tension (NOT voice leading)
     // Use the same tension curve calculation for consistency - inversions don't affect harmonic tension
@@ -190,7 +202,21 @@ function updateQuickAnalysis(progression, key) {
         const sum = analysis.tensionCurve.reduce((acc, val) => acc + val, 0);
         avgTension = Math.round(sum / analysis.tensionCurve.length);
     }
-    tensionEl.textContent = `${avgTension}%`;
+    const tensionText = `${avgTension}%`;
+
+    // Update trainer tab elements
+    if (hasTrainerElements) {
+        romanNumeralsEl.textContent = romans;
+        moodEl.textContent = moodText;
+        tensionEl.textContent = tensionText;
+    }
+
+    // Update melody tab elements
+    if (hasMelodyElements) {
+        romanNumeralsMelodyEl.textContent = romans;
+        moodMelodyEl.textContent = moodText;
+        tensionMelodyEl.textContent = tensionText;
+    }
 }
 
 /**

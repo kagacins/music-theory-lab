@@ -122,7 +122,7 @@ export function playArpeggio(selectionType, type, direction) {
                 type,
                 window.builderInversion || 0,
                 rootNote,
-                window.builderOctaveShift || 0,
+                (window.builderOctaveShift || 0) * 12, // Convert octaves to semitones
                 window.enharmonicPreference || 'sharp',
                 window.getNotationPreference ? window.getNotationPreference() : 'full'
             );
@@ -134,7 +134,7 @@ export function playArpeggio(selectionType, type, direction) {
             const result = window.getIntervalNotes(
                 rootNote,
                 type,
-                window.builderOctaveShift || 0,
+                (window.builderOctaveShift || 0) * 12, // Convert octaves to semitones
                 window.enharmonicPreference || 'sharp'
             );
             notesToPlay = result.specificNotes.filter(note => !omittedNotes.includes(note));

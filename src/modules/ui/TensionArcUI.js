@@ -512,7 +512,8 @@ export class TensionArcUI {
         if (templateSelect) {
             templateSelect.addEventListener('change', (e) => {
                 this.planner.setTemplate(e.target.value);
-                this.render(this.container.parentElement, progressionData, key, sections);
+                // Re-render the tension arc (render method targets progression-visualization-panel)
+                this.render(this.container, progressionData, key, sections);
             });
         }
 
@@ -616,7 +617,7 @@ export class TensionArcUI {
      */
     update(progressionData, key, sections) {
         if (this.container) {
-            this.render(this.container.parentElement || this.container, progressionData, key, sections);
+            this.render(this.container, progressionData, key, sections);
         }
     }
 }

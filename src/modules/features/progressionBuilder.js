@@ -9475,14 +9475,22 @@ function escapeRegex(string) {
 }
 
 /**
- * Update the "Current Key: X" display text
+ * Update the current key display text (both trainer and melody tabs)
  */
 function updateCurrentKeyDisplay() {
+    const trainerState = getTrainerState();
+    const currentKey = trainerState.currentKey || 'C';
+
+    // Update trainer tab display
     const displayText = document.getElementById('current-key-display-text');
     if (displayText) {
-        const trainerState = getTrainerState();
-        const currentKey = trainerState.currentKey || 'C';
-        displayText.textContent = `Current Key: ${currentKey}`;
+        displayText.textContent = currentKey;
+    }
+
+    // Update melody tab (Composition Studio) display
+    const melodyDisplayText = document.getElementById('melody-key-display-text');
+    if (melodyDisplayText) {
+        melodyDisplayText.textContent = currentKey;
     }
 }
 
@@ -11320,7 +11328,10 @@ function renderMelodyNotationIfNeeded(preventScroll = false) {
  */
 export function clearProgression() {
     const trainerState = getTrainerState();
-    
+
+    // Save state for undo before clearing
+    saveStateBeforeChange();
+
     // Stop any active playback
     if (trainerState.isPlaying && window.handleAutoPlayback) {
         window.handleAutoPlayback();
