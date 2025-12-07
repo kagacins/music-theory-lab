@@ -287,7 +287,7 @@ Replace varied timings (0.15s, 0.2s, 0.25s, 0.3s) with CSS variables:
 | Unified panel styling | MEDIUM | **COMPLETED** | Dec 7, 2025 |
 | Scrollbar consistency | MEDIUM | **COMPLETED** | Dec 7, 2025 |
 | Header modernization | MEDIUM | **COMPLETED** | Dec 7, 2025 |
-| Standardize breakpoints | MEDIUM | Not Started | - |
+| Standardize breakpoints | MEDIUM | **COMPLETED** | Dec 7, 2025 |
 | Complete dark mode | MEDIUM | Not Started | - |
 | Split music.css | LOW | **COMPLETED** | Dec 7, 2025 |
 | Remove legacy files | LOW | **COMPLETED** | Dec 7, 2025 |
@@ -371,6 +371,19 @@ Replace varied timings (0.15s, 0.2s, 0.25s, 0.3s) with CSS variables:
   - `--transition-normal: 0.25s ease`
   - `--transition-slow: 0.35s ease`
 - No additional changes needed
+
+### Completed: Standardize Breakpoints
+- Documented standard breakpoints in `src/styles/variables.css` header comment
+- Standard values (aligned with Tailwind CSS):
+  - `xs: 480px` - Extra small
+  - `sm: 640px` - Small
+  - `md: 768px` - Medium
+  - `lg: 1024px` - Large
+  - `xl: 1280px` - Extra large
+  - `2xl: 1536px` - 2X large
+- Fixed non-standard breakpoints:
+  - `900px` → `768px` in composition-studio.css
+  - `1100px` → `1024px` in music.css (circle of fifths)
 
 ---
 

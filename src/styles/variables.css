@@ -14,6 +14,17 @@
  * 7. Transitions & Animations
  * 8. Layout (Header, keyboard heights)
  * 9. Z-Index Scale
+ *
+ * RESPONSIVE BREAKPOINTS (for @media queries):
+ * Note: CSS variables cannot be used in @media queries, so these are documented here.
+ * Always use these standard values for consistency (aligned with Tailwind CSS):
+ *
+ *   xs:  480px  - Extra small (large phones)
+ *   sm:  640px  - Small (phones landscape, small tablets)
+ *   md:  768px  - Medium (tablets)
+ *   lg:  1024px - Large (laptops, small desktops)
+ *   xl:  1280px - Extra large (desktops)
+ *   2xl: 1536px - 2X large (large desktops)
  */
 
 :root {
