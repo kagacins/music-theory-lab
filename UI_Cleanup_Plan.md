@@ -280,12 +280,13 @@ Replace varied timings (0.15s, 0.2s, 0.25s, 0.3s) with CSS variables:
 
 | Task | Priority | Status | Date Completed |
 |------|----------|--------|----------------|
-| Sidebar toggle grouping | HIGH | **COMPLETED** | Dec 7, 2024 |
-| CSS variable consolidation | HIGH | **COMPLETED** | Dec 7, 2024 |
-| Focus states for accessibility | HIGH | **COMPLETED** | Dec 7, 2024 |
+| Sidebar toggle grouping | HIGH | **COMPLETED** | Dec 7, 2025 |
+| CSS variable consolidation | HIGH | **COMPLETED** | Dec 7, 2025 |
+| Focus states for accessibility | HIGH | **COMPLETED** | Dec 7, 2025 |
 | Hardcoded colors in JS | HIGH | **IN PROGRESS** | - |
-| Unified panel styling | MEDIUM | Not Started | - |
-| Scrollbar consistency | MEDIUM | Not Started | - |
+| Unified panel styling | MEDIUM | **COMPLETED** | Dec 7, 2025 |
+| Scrollbar consistency | MEDIUM | **COMPLETED** | Dec 7, 2025 |
+| Header modernization | MEDIUM | **COMPLETED** | Dec 7, 2025 |
 | Standardize breakpoints | MEDIUM | Not Started | - |
 | Complete dark mode | MEDIUM | Not Started | - |
 | Split music.css | LOW | Not Started | - |
@@ -325,7 +326,32 @@ Replace varied timings (0.15s, 0.2s, 0.25s, 0.3s) with CSS variables:
   - `.score-*` badge colors
 - Gradual migration recommended for JS files
 
+### Completed: Scrollbar Consistency
+- Created `.custom-scrollbar` class for light backgrounds
+- Created `.custom-scrollbar-dark` class for dark backgrounds (sidebar, dark panels)
+- Unified scrollbar width to 6px
+- Purple accent color (`rgba(139, 92, 246, 0.5)`) for consistency with theme
+- Firefox support via `scrollbar-width: thin` and `scrollbar-color`
+
+### Completed: Unified Panel Styling
+- Added panel base classes to `music.css`:
+  - `.panel-base` - shared border-radius and shadow
+  - `.panel-light` - white background with subtle border
+  - `.panel-glass` - semi-transparent with backdrop blur
+  - `.panel-dark` - dark gradient for floating panels
+  - `.panel-floating` - elevated shadow for overlays
+  - `.panel-dropdown` - for menus and popovers
+  - `.panel-card` - content cards with color variants (amber, purple, teal, lime)
+  - `.panel-header`, `.panel-body`, `.panel-footer` - structural components
+
+### Completed: Header Modernization
+- Tab navigation: Icon + two-line text pills with gradient active states
+- Collapsible center displays with localStorage persistence
+- Compact 56px fixed header height
+- Full title "Interactive Music Theory Lab" always displayed
+- Removed wrapping/abbreviation logic
+
 ---
 
-*Document created: December 2024*
-*Last updated: December 7, 2024*
+*Document created: December 2025*
+*Last updated: December 7, 2025*

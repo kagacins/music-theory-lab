@@ -76,65 +76,31 @@ export function toggleDisplayPanel() {
 }
 
 /**
- * Setup responsive title abbreviation
- * Abbreviates "Interactive Music Theory Lab" to "IMTL" when it wraps to a second line
+ * Setup responsive title
+ * Previously abbreviated to "IMTL" when wrapping - now always shows full title
  */
 export function setupResponsiveTitle() {
     const titleElement = document.getElementById('main-title');
     if (!titleElement) return;
 
     const fullText = "Interactive Music Theory Lab";
-    const abbreviatedText = "IMTL";
-    
-    // Function to check if title is wrapping and update accordingly
+
+    // Function to ensure title is set correctly
     function updateTitle() {
         // Check if title has HTML content (tab title format) or just text (base title)
         const hasHTML = titleElement.children.length > 0;
-        
+
         if (hasHTML) {
-            // Tab title format: "Interactive Music Theory Lab:<br><span>Tab Title</span>"
-            // Extract the tab title span and preserve its classes
+            // Tab title format - preserve any tab-specific span
             const tabTitleSpan = titleElement.querySelector('span');
             if (tabTitleSpan) {
                 const spanClasses = tabTitleSpan.className;
                 const spanText = tabTitleSpan.textContent;
-                
-                // Create a temporary element to measure if the base title wraps
-                const tempDiv = document.createElement('div');
-                tempDiv.style.cssText = window.getComputedStyle(titleElement).cssText;
-                tempDiv.style.position = 'absolute';
-                tempDiv.style.visibility = 'hidden';
-                tempDiv.style.whiteSpace = 'nowrap';
-                tempDiv.textContent = `${fullText}:`;
-                document.body.appendChild(tempDiv);
-                const fullTextWidth = tempDiv.offsetWidth;
-                document.body.removeChild(tempDiv);
-                
-                // Get the actual width available for the title
-                const titleWidth = titleElement.offsetWidth;
-                
-                // Check if wrapping
-                const isWrapping = fullTextWidth > titleWidth;
-                
-                if (isWrapping) {
-                    titleElement.innerHTML = `${abbreviatedText}:<br><span class="${spanClasses}">${spanText}</span>`;
-                } else {
-                    titleElement.innerHTML = `${fullText}:<br><span class="${spanClasses}">${spanText}</span>`;
-                }
+                titleElement.innerHTML = `${fullText}:<br><span class="${spanClasses}">${spanText}</span>`;
             }
         } else {
-            // Base title format: just text
-            // Reset to full text first to measure
+            // Base title format: just text - always use full text
             titleElement.textContent = fullText;
-            
-            // Check if the title is wrapping (scrollHeight > clientHeight means it's multi-line)
-            const isWrapping = titleElement.scrollHeight > titleElement.clientHeight;
-            
-            if (isWrapping) {
-                titleElement.textContent = abbreviatedText;
-            } else {
-                titleElement.textContent = fullText;
-            }
         }
     }
     

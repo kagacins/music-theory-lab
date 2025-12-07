@@ -218,3 +218,52 @@ export function restoreSettingsGroupStates() {
         }
     });
 }
+
+/**
+ * Toggle header displays panel visibility (collapsible center section)
+ */
+export function toggleHeaderDisplays() {
+    const container = document.getElementById('header-display-panels');
+    const chevron = document.getElementById('header-displays-chevron');
+    const header = document.getElementById('main-header');
+
+    if (container) {
+        container.classList.toggle('collapsed');
+        const isCollapsed = container.classList.contains('collapsed');
+
+        // Rotate chevron
+        if (chevron) {
+            chevron.style.transform = isCollapsed ? 'rotate(180deg)' : 'rotate(0deg)';
+        }
+
+        // Add class to header for additional styling if needed
+        if (header) {
+            header.classList.toggle('header-displays-collapsed', isCollapsed);
+        }
+
+        // Save state to localStorage
+        localStorage.setItem('headerDisplaysCollapsed', isCollapsed ? 'true' : 'false');
+    }
+}
+
+/**
+ * Restore header displays collapsed state from localStorage
+ */
+export function restoreHeaderDisplaysState() {
+    const isCollapsed = localStorage.getItem('headerDisplaysCollapsed') === 'true';
+    if (isCollapsed) {
+        const container = document.getElementById('header-display-panels');
+        const chevron = document.getElementById('header-displays-chevron');
+        const header = document.getElementById('main-header');
+
+        if (container) {
+            container.classList.add('collapsed');
+        }
+        if (chevron) {
+            chevron.style.transform = 'rotate(180deg)';
+        }
+        if (header) {
+            header.classList.add('header-displays-collapsed');
+        }
+    }
+}

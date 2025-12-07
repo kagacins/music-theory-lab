@@ -23,7 +23,7 @@ import { initAllSectionSidebars, triggerSectionSidebarUpdate } from './modules/u
 import { showModal, hideModal } from './modules/ui/modals.js';
 import { renderKeyboard, updateKeyboardLabels, updateKeyNames, clearHighlights, g_KeyboardKeys } from './modules/ui/keyboard.js';
 import { updateKeySignatureDisplay, setupResponsiveTitle } from './modules/ui/header.js';
-import { toggleSidebar, toggleSettingsGroup, restoreSettingsGroupStates } from './modules/ui/sidebar.js';
+import { toggleSidebar, toggleSettingsGroup, restoreSettingsGroupStates, toggleHeaderDisplays, restoreHeaderDisplaysState } from './modules/ui/sidebar.js';
 import { showSettingsModal, showChordWeightsModal, showMelodyWeightsModal } from './modules/ui/settingsModal.js';
 import { initPresetUI, togglePresetPanel, openPresetPanel, closePresetPanel } from './modules/ui/presetUI.js';
 import { initUnifiedSuggestionsPanel, updateUnifiedSuggestions } from './modules/ui/unifiedSuggestionsPanel.js';
@@ -1025,6 +1025,7 @@ window.showModal = showModal;
 window.hideModal = hideModal;
 window.toggleSidebar = toggleSidebar;
 window.toggleSettingsGroup = toggleSettingsGroup;
+window.toggleHeaderDisplays = toggleHeaderDisplays;
 window.showSettingsModal = showSettingsModal;
 window.showChordWeightsModal = showChordWeightsModal;
 window.showMelodyWeightsModal = showMelodyWeightsModal;
@@ -3009,6 +3010,9 @@ Esc         → Close modal
 
     // Restore settings group collapsed states from localStorage
     restoreSettingsGroupStates();
+
+    // Restore header displays collapsed state from localStorage
+    restoreHeaderDisplaysState();
 
     // Initialize melody mode toggle (default to Free mode - unchecked)
     const melodyModeToggle = document.getElementById('melody-mode-toggle');

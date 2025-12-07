@@ -154,8 +154,12 @@ export function switchTab(tabId, options = {}) {
         // Update header button (if it exists)
         const headerBtn = document.getElementById(`header-tab-btn-${id}`);
         if (headerBtn) {
-            headerBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-violet-600', 'bg-indigo-500', 'text-white', 'text-gray-500', 'text-gray-600', 'hover:bg-gray-100');
+            // Remove old styling classes
+            headerBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-violet-600', 'bg-indigo-500', 'text-white', 'text-gray-500', 'text-gray-600', 'hover:bg-gray-100', 'active');
             if (id === tabId) {
+                // Add active class for new pill styling (CSS handles the gradient)
+                headerBtn.classList.add('active');
+                // Also add legacy classes for backwards compatibility
                 headerBtn.classList.add(activeColor, 'text-white');
             } else {
                 headerBtn.classList.add('text-gray-600', 'hover:bg-gray-100');
@@ -327,25 +331,10 @@ export function switchTab(tabId, options = {}) {
         }
     }
 
-    // Update the main page title
+    // Update the main page title - just show base title (tab is indicated by the pill buttons)
     const mainTitle = document.getElementById('main-title');
     const baseTitle = "Interactive Music Theory Lab";
-    let tabTitle = "";
-    if (tabId === 'builder') {
-        tabTitle = "Chord Lab";
-    } else if (tabId === 'melody') {
-        tabTitle = "Composition Studio";
-    } else if (tabId === 'scales') {
-        tabTitle = "Scale Explorer";
-    } else if (tabId === 'learn') {
-        tabTitle = "Theory Academy";
-    }
-    mainTitle.innerHTML = `${baseTitle}:<br><span class="text-xl sm:text-2xl font-extrabold text-indigo-700">${tabTitle}</span>`;
-    
-    // Update responsive title after setting the new title
-    if (window.updateResponsiveTitle) {
-        setTimeout(() => window.updateResponsiveTitle(), 10);
-    }
+    mainTitle.textContent = baseTitle;
 
     // Update preset button visibility based on current tab
     updateButtonVisibility();
