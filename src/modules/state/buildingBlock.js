@@ -926,7 +926,8 @@ export class BuildingBlockSequence {
                         duration: unitsToDuration(unitsToPlace),
                         beat: measureUnitOffset / UNITS_PER_BEAT,
                         isRest: note.isRest,
-                        isTied: !isFirstPart, // Tied if this is a continuation
+                        isTied: !isFirstPart, // True if this is a continuation FROM the previous note
+                        tied: !isLastPart && !note.isRest, // True if this note ties TO the next part (for rendering)
                         chordIndex: block.chordIndex,
                         blockId: block.id,
 

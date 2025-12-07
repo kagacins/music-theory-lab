@@ -898,7 +898,8 @@ export class CompositionState {
                     duration: note.duration,
                     beat: note.beat,
                     dotted: note.duration?.includes('.') || false,
-                    isTied: note.isTied,
+                    isTied: note.isTied, // True if this note is tied FROM the previous note
+                    tied: note.tied, // True if this note ties TO the next note
                     isRest: note.isRest,
                     chordIndex: note.chordIndex,
                     blockId: note.blockId,

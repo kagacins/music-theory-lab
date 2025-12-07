@@ -68,7 +68,12 @@ import {
     searchSongChords,
     importSongProgression,
     openUltimateGuitarSearch,
-    importInternetSongProgression
+    importInternetSongProgression,
+    toggleSearchMode,
+    getSearchMode,
+    generateChordSuggestions,
+    applySuggestedChord,
+    highlightChordInProgression
 } from './modules/features/songSearch.js';
 import {
     renderBuilderSelectors,
@@ -82,6 +87,7 @@ import {
     playBuilderChordWithDuration,
     changeBuilderOctave,
     selectBuilderChordBySymbol,
+    updateChordAtIndex,
     updateBuilderOctaveUI,
     updateLHInversionSelector,
     addChordToProgression,
@@ -1107,6 +1113,7 @@ window.selectBuilderChordType = selectBuilderChordType;
 window.selectBuilderInterval = selectBuilderInterval;
 window.selectBuilderInversion = selectBuilderInversion;
 window.selectBuilderChordBySymbol = selectBuilderChordBySymbol;
+window.updateChordAtIndex = updateChordAtIndex;
 window.playArpeggio = playArpeggio;
 window.stopArpeggio = stopArpeggio;
 window.getNoteKeyId = getNoteKeyId;
@@ -1493,6 +1500,11 @@ window.searchSongChords = searchSongChords;
 window.importSongProgression = importSongProgression;
 window.openUltimateGuitarSearch = openUltimateGuitarSearch;
 window.importInternetSongProgression = importInternetSongProgression;
+window.toggleSearchMode = toggleSearchMode;
+window.getSearchMode = getSearchMode;
+window.generateChordSuggestions = generateChordSuggestions;
+window.applySuggestedChord = applySuggestedChord;
+window.highlightChordInProgression = highlightChordInProgression;
 
 // Song Analyzer functions (audio chord detection)
 window.openAudioAnalyzerModal = openAudioAnalyzerModal;

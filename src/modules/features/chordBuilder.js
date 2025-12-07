@@ -3035,7 +3035,12 @@ export function addSpecificChordToProgression(chordType, inversion, playShutterS
     const lhOctaveShift = parseInt(document.getElementById('builder-lh-octave-select').value, 10);
     const omittedNotes = [...getBuilderOmittedNotes()]; // Capture current voicing
     const lhOmittedNotes = [...getBuilderLHOmittedNotes()]; // Capture LH voicing
-    const octaveShift = getBuilderOctaveShift() * 12; // Convert whole octaves to semitones
+
+    // Allow octave override for imported chords (e.g., from song analysis)
+    // options.octaveShift is in semitones (e.g., -12 for one octave down)
+    const octaveShift = options.octaveShift !== undefined
+        ? options.octaveShift
+        : getBuilderOctaveShift() * 12; // Convert whole octaves to semitones
 
     const trainerState = getTrainerState();
     const result = getInvertedChordNotes(
@@ -3267,9 +3272,93 @@ export function selectBuilderChordBySymbol(root, type, playShutterSound = true, 
     
     // Update displays
     updateBuilderDisplay();
-    
+
     // Add to progression (pass through playShutterSound parameter)
     addChordToProgression(false, playShutterSound);
+}
+
+/**
+ * Update a chord at a specific index in the progression
+ * Used for applying chord suggestions (e.g., A -> A7)
+ * @param {number} index - Index in the progression to update
+ * @param {string} root - New root note (e.g., "C", "F#", "Bb")
+ * @param {string} type - New chord type (e.g., "major", "minor", "dominant7")
+ */
+export function updateChordAtIndex(index, root, type) {
+    const trainerState = window.getTrainerState ? window.getTrainerState() : null;
+    if (!trainerState || !trainerState.progressionData) {
+        console.warn('[ChordBuilder] No progression data available');
+        return false;
+    }
+
+    if (index < 0 || index >= trainerState.progressionData.length) {
+        console.warn(`[ChordBuilder] Invalid index: ${index}`);
+        return false;
+    }
+
+    // Map common chord type names to internal type names
+    const typeMap = {
+        'major': 'Major',
+        'minor': 'Minor',
+        'diminished': 'Diminished',
+        'augmented': 'Augmented',
+        'sus2': 'Sus2',
+        'sus4': 'Sus4',
+        'major7': 'Major 7th',
+        'minor7': 'Minor 7th',
+        'dominant7': 'Dominant 7th',
+        'dominant9': 'Dominant 9th',
+        'minor9': 'Minor 9th',
+        'major9': 'Major 9th'
+    };
+
+    const mappedType = typeMap[type.toLowerCase()] || 'Major';
+
+    // Get note arrays based on enharmonic preference
+    const noteArray = getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+
+    // Find the root note index
+    const rootIndex = noteArray.indexOf(root);
+    if (rootIndex === -1) {
+        console.warn(`[ChordBuilder] Root note not found: ${root}`);
+        return false;
+    }
+
+    // Get the current chord at this index
+    const chord = trainerState.progressionData[index];
+
+    // Update the chord properties
+    chord.root = root;
+    chord.type = mappedType;
+
+    // Get chord definition for new type
+    const chordDef = CHORD_DEFINITIONS[mappedType];
+    if (chordDef) {
+        // Calculate new notes based on root and type
+        const intervals = chordDef.intervals;
+        const newNotes = intervals.map(interval => {
+            const noteIndex = (rootIndex + interval) % 12;
+            return noteArray[noteIndex];
+        });
+
+        chord.notes = newNotes;
+        chord.simpleName = `${root}${chordDef.symbol || ''}`;
+        chord.name = `${root} ${mappedType}`;
+    }
+
+    // Update display name for chord card
+    if (chord.displayName !== undefined) {
+        chord.displayName = chord.simpleName || chord.name;
+    }
+
+    console.log(`[ChordBuilder] Updated chord at index ${index}: ${chord.simpleName || chord.name}`);
+
+    // Trigger re-render
+    if (window.renderProgressionDisplay) {
+        window.renderProgressionDisplay();
+    }
+
+    return true;
 }
 
 // ============================================================================

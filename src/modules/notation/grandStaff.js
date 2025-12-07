@@ -643,6 +643,64 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
     return 'above'; // Default for bass clef (most bass notes are low)
   }
 
+  // Helper to normalize pitch for comparison (handle enharmonic equivalents)
+  // Returns a simplified pitch string for comparison, e.g., "C3", "F#2"
+  function normalizePitch(pitch) {
+    if (!pitch) return null;
+    // Handle array of pitches (chords) - return first pitch for tie comparison
+    if (Array.isArray(pitch)) {
+      pitch = pitch[0];
+    }
+    if (typeof pitch !== 'string') return null;
+    // Normalize to uppercase and handle common enharmonic variations
+    return pitch.trim().toUpperCase();
+  }
+
+  // Helper to check if two notes have matching pitches (for valid ties)
+  // A tie should only connect notes of the SAME pitch
+  function pitchesMatch(noteData1, noteData2) {
+    if (!noteData1 || !noteData2) return false;
+
+    // Get pitches from various possible properties
+    const pitch1 = noteData1.pitch || noteData1.pitches?.[0] || noteData1.keys?.[0];
+    const pitch2 = noteData2.pitch || noteData2.pitches?.[0] || noteData2.keys?.[0];
+
+    const norm1 = normalizePitch(pitch1);
+    const norm2 = normalizePitch(pitch2);
+
+    if (!norm1 || !norm2) return false;
+
+    // Direct match
+    if (norm1 === norm2) return true;
+
+    // Handle enharmonic equivalents (e.g., C# = Db)
+    const enharmonicMap = {
+      'C#': 'DB', 'DB': 'C#',
+      'D#': 'EB', 'EB': 'D#',
+      'F#': 'GB', 'GB': 'F#',
+      'G#': 'AB', 'AB': 'G#',
+      'A#': 'BB', 'BB': 'A#',
+    };
+
+    // Extract note name and octave
+    const match1 = norm1.match(/^([A-G][#B]?)(\d+)?$/);
+    const match2 = norm2.match(/^([A-G][#B]?)(\d+)?$/);
+
+    if (!match1 || !match2) return false;
+
+    const [, note1, oct1] = match1;
+    const [, note2, oct2] = match2;
+
+    // Octaves must match (if specified)
+    if (oct1 && oct2 && oct1 !== oct2) return false;
+
+    // Check direct note match or enharmonic equivalent
+    if (note1 === note2) return true;
+    if (enharmonicMap[note1] === note2) return true;
+
+    return false;
+  }
+
   // Look for tied notes across measure boundaries
   // Semantic: note.tied=true means "tie FROM this note TO the next note"
   // So we check the LAST note of the current measure for the tied flag
@@ -689,6 +747,11 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
       const firstNextNoteData = nextBassNoteData?.[0];
       if (firstNextNoteData?.isRest) {
         continue; // Skip tie if next note is a rest
+      }
+
+      // IMPORTANT: Only draw tie if pitches match - ties connect same pitches only
+      if (!pitchesMatch(lastNoteData, firstNextNoteData)) {
+        continue; // Skip tie if pitches don't match (different chords)
       }
 
       // Check if measures are on the same row
@@ -793,7 +856,8 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
 
       // Skip ties for rests - rests don't need tie markings
       // Check if THIS note has tied=true (meaning tie TO the next note)
-      if (noteData && (noteData.isTied === true || noteData.tied === true) && !noteData.isRest && !nextNoteData?.isRest) {
+      // Also verify pitches match - ties only connect same pitches
+      if (noteData && (noteData.isTied === true || noteData.tied === true) && !noteData.isRest && !nextNoteData?.isRest && pitchesMatch(noteData, nextNoteData)) {
         const currNote = bassNotes[j];
         const nextNote = bassNotes[j + 1];
 
@@ -820,6 +884,95 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
           }
         } catch (e) {
           // Could not get bounding box for intra-measure tie - skip
+        }
+      }
+    }
+  }
+
+  // =====================================================================
+  // BASS TIES - Cross-page partial ties
+  // These handle ties that continue to/from another page
+  // =====================================================================
+
+  // Check FIRST measure of page for "tie from nowhere" (note has isTied=true)
+  // This means the note is a continuation from the previous page
+  if (renderedMeasures.length > 0) {
+    const firstMeasure = renderedMeasures[0];
+    const firstBassNotes = firstMeasure.bassNotes;
+
+    if (firstBassNotes && firstBassNotes.length > 0) {
+      const firstMeasureData = measures[firstMeasure.index];
+      let firstBassNoteData = firstMeasureData?.notation?.bass?.voices?.[0]?.notes;
+      if (!firstBassNoteData || firstBassNoteData.length === 0) {
+        firstBassNoteData = firstMeasureData?.bassNotes;
+      }
+
+      const firstNoteData = firstBassNoteData?.[0];
+
+      // If first note has isTied=true, it's a continuation from previous page
+      if (firstNoteData && firstNoteData.isTied === true && !firstNoteData.isRest) {
+        const firstNote = firstBassNotes[0];
+        try {
+          const box = firstNote.getBoundingBox();
+          if (box) {
+            const direction = getTieDirection(firstNote);
+            const endX = box.getX();
+            const startX = endX - 30; // "From nowhere" - left of the note
+
+            let endY;
+            if (direction === 'above') {
+              endY = box.getY() - 5;
+            } else {
+              endY = box.getY() + box.getH() + 5;
+            }
+
+            // Draw partial tie coming from the left
+            drawPartialTieCurve(ctx, startX, endY, endX, endY, direction, 'start');
+          }
+        } catch (e) {
+          // Could not get bounding box - skip
+        }
+      }
+    }
+  }
+
+  // Check LAST measure of page for "tie to nowhere" (note has tied=true)
+  // This means the note continues to the next page
+  if (renderedMeasures.length > 0) {
+    const lastMeasure = renderedMeasures[renderedMeasures.length - 1];
+    const lastBassNotes = lastMeasure.bassNotes;
+
+    if (lastBassNotes && lastBassNotes.length > 0) {
+      const lastMeasureData = measures[lastMeasure.index];
+      let lastBassNoteData = lastMeasureData?.notation?.bass?.voices?.[0]?.notes;
+      if (!lastBassNoteData || lastBassNoteData.length === 0) {
+        lastBassNoteData = lastMeasureData?.bassNotes;
+      }
+
+      const lastNoteData = lastBassNoteData?.[lastBassNoteData.length - 1];
+
+      // If last note has tied=true, it continues to the next page
+      if (lastNoteData && lastNoteData.tied === true && !lastNoteData.isRest) {
+        const lastNote = lastBassNotes[lastBassNotes.length - 1];
+        try {
+          const box = lastNote.getBoundingBox();
+          if (box) {
+            const direction = getTieDirection(lastNote);
+            const startX = box.getX() + box.getW();
+            const endX = startX + 30; // "To nowhere" - right of the note
+
+            let startY;
+            if (direction === 'above') {
+              startY = box.getY() - 5;
+            } else {
+              startY = box.getY() + box.getH() + 5;
+            }
+
+            // Draw partial tie going to the right
+            drawPartialTieCurve(ctx, startX, startY, endX, startY, direction, 'end');
+          }
+        } catch (e) {
+          // Could not get bounding box - skip
         }
       }
     }
@@ -902,6 +1055,11 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
       const firstNextNoteData = nextTrebleNoteData?.[0];
       if (firstNextNoteData?.isRest) {
         continue; // Skip tie if next note is a rest
+      }
+
+      // IMPORTANT: Only draw tie if pitches match - ties connect same pitches only
+      if (!pitchesMatch(lastNoteData, firstNextNoteData)) {
+        continue; // Skip tie if pitches don't match (different chords)
       }
 
       // Check if measures are on the same row
@@ -995,7 +1153,8 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
       const nextNoteData = trebleNoteData[j + 1];
 
       // Check if THIS note has tied=true (meaning tie TO the next note)
-      if (noteData && (noteData.isTied === true || noteData.tied === true) && !noteData.isRest && !nextNoteData?.isRest) {
+      // Also verify pitches match - ties only connect same pitches
+      if (noteData && (noteData.isTied === true || noteData.tied === true) && !noteData.isRest && !nextNoteData?.isRest && pitchesMatch(noteData, nextNoteData)) {
         const currNote = trebleNotes[j];
         const nextNote = trebleNotes[j + 1];
 
@@ -1022,6 +1181,91 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
           }
         } catch (e) {
           // Could not get bounding box for intra-measure treble tie - skip
+        }
+      }
+    }
+  }
+
+  // =====================================================================
+  // TREBLE TIES - Cross-page partial ties
+  // These handle ties that continue to/from another page
+  // =====================================================================
+
+  // Check FIRST measure of page for "tie from nowhere" (note has isTied=true)
+  if (renderedMeasures.length > 0) {
+    const firstMeasure = renderedMeasures[0];
+    const firstTrebleNotes = firstMeasure.trebleNotes;
+
+    if (firstTrebleNotes && firstTrebleNotes.length > 0) {
+      const firstMeasureData = measures[firstMeasure.index];
+      let firstTrebleNoteData = firstMeasureData?.notation?.treble?.voices?.[0]?.notes;
+      if (!firstTrebleNoteData || firstTrebleNoteData.length === 0) {
+        firstTrebleNoteData = firstMeasureData?.trebleNotes;
+      }
+
+      const firstNoteData = firstTrebleNoteData?.[0];
+
+      // If first note has isTied=true, it's a continuation from previous page
+      if (firstNoteData && firstNoteData.isTied === true && !firstNoteData.isRest) {
+        const firstNote = firstTrebleNotes[0];
+        try {
+          const box = firstNote.getBoundingBox();
+          if (box) {
+            const direction = getTrebleTieDirection(firstNote);
+            const endX = box.getX();
+            const startX = endX - 30;
+
+            let endY;
+            if (direction === 'above') {
+              endY = box.getY() - 5;
+            } else {
+              endY = box.getY() + box.getH() + 5;
+            }
+
+            drawPartialTieCurve(ctx, startX, endY, endX, endY, direction, 'start');
+          }
+        } catch (e) {
+          // Could not get bounding box - skip
+        }
+      }
+    }
+  }
+
+  // Check LAST measure of page for "tie to nowhere" (note has tied=true)
+  if (renderedMeasures.length > 0) {
+    const lastMeasure = renderedMeasures[renderedMeasures.length - 1];
+    const lastTrebleNotes = lastMeasure.trebleNotes;
+
+    if (lastTrebleNotes && lastTrebleNotes.length > 0) {
+      const lastMeasureData = measures[lastMeasure.index];
+      let lastTrebleNoteData = lastMeasureData?.notation?.treble?.voices?.[0]?.notes;
+      if (!lastTrebleNoteData || lastTrebleNoteData.length === 0) {
+        lastTrebleNoteData = lastMeasureData?.trebleNotes;
+      }
+
+      const lastNoteData = lastTrebleNoteData?.[lastTrebleNoteData.length - 1];
+
+      // If last note has tied=true, it continues to the next page
+      if (lastNoteData && lastNoteData.tied === true && !lastNoteData.isRest) {
+        const lastNote = lastTrebleNotes[lastTrebleNotes.length - 1];
+        try {
+          const box = lastNote.getBoundingBox();
+          if (box) {
+            const direction = getTrebleTieDirection(lastNote);
+            const startX = box.getX() + box.getW();
+            const endX = startX + 30;
+
+            let startY;
+            if (direction === 'above') {
+              startY = box.getY() - 5;
+            } else {
+              startY = box.getY() + box.getH() + 5;
+            }
+
+            drawPartialTieCurve(ctx, startX, startY, endX, startY, direction, 'end');
+          }
+        } catch (e) {
+          // Could not get bounding box - skip
         }
       }
     }

@@ -99,6 +99,55 @@ const DAILY_SEARCH_LIMIT = 100; // Free tier limit (should match Google Cloud qu
 const SEARCH_COUNT_KEY = 'google_search_count';
 const SEARCH_DATE_KEY = 'google_search_date';
 
+// Search mode: 'api' (local + Google API) or 'free' (DuckDuckGo scraping)
+let currentSearchMode = 'api';
+
+/**
+ * Get the current search mode
+ * @returns {string} 'api' or 'free'
+ */
+export function getSearchMode() {
+    return currentSearchMode;
+}
+
+/**
+ * Toggle between API and free search modes
+ */
+export function toggleSearchMode() {
+    const toggle = document.getElementById('free-search-toggle');
+    currentSearchMode = toggle?.checked ? 'free' : 'api';
+
+    // Update UI labels
+    const localLabel = document.getElementById('search-mode-local-label');
+    const freeLabel = document.getElementById('search-mode-free-label');
+    const description = document.getElementById('search-mode-description');
+    const searchCountDisplay = document.getElementById('search-count-display');
+
+    if (currentSearchMode === 'free') {
+        localLabel?.classList.remove('text-purple-600');
+        localLabel?.classList.add('text-gray-400');
+        freeLabel?.classList.remove('text-gray-400');
+        freeLabel?.classList.add('text-green-600');
+        if (description) {
+            description.innerHTML = '<strong>Free Search Mode:</strong> Searches online chord databases via DuckDuckGo. No API key required, unlimited searches!';
+        }
+        if (searchCountDisplay) {
+            searchCountDisplay.innerHTML = '<em>Free mode - no daily limits</em>';
+        }
+    } else {
+        localLabel?.classList.remove('text-gray-400');
+        localLabel?.classList.add('text-purple-600');
+        freeLabel?.classList.remove('text-green-600');
+        freeLabel?.classList.add('text-gray-400');
+        if (description) {
+            description.innerHTML = '<strong>Local + API Mode:</strong> Searches local database first, then Google Custom Search API (requires API key). Uses daily quota.';
+        }
+        updateSearchCountDisplay();
+    }
+
+    console.log(`[SongSearch] Switched to ${currentSearchMode} mode`);
+}
+
 /**
  * Get today's date as a string (YYYY-MM-DD)
  * @returns {string} Today's date
@@ -201,28 +250,41 @@ export function toggleSongSearchPanel() {
 
 /**
  * Search for song chords - searches local database first, then internet
+ * Supports two modes: 'api' (local + Google API) and 'free' (DuckDuckGo scraping)
  */
 export async function searchSongChords() {
     const searchInput = document.getElementById('song-search-input');
     const resultsContainer = document.getElementById('song-search-results');
-    
+
     if (!searchInput || !resultsContainer) return;
-    
+
     const query = searchInput.value.trim();
-    
+
     if (query.length < 2) {
         resultsContainer.innerHTML = '<p class="text-sm text-gray-500 italic">Enter at least 2 characters to search...</p>';
         return;
     }
-    
+
+    // Hide previous suggestions
+    const suggestionsContainer = document.getElementById('chord-suggestions-container');
+    if (suggestionsContainer) suggestionsContainer.classList.add('hidden');
+
     // Show loading state
     resultsContainer.innerHTML = '<div class="flex items-center gap-2 text-sm text-gray-600"><div class="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div> Searching...</div>';
-    
+
+    // Check which search mode we're in
+    if (currentSearchMode === 'free') {
+        // Free search mode - use DuckDuckGo scraping
+        await performFreeSearch(query, resultsContainer);
+        return;
+    }
+
+    // API mode - original behavior
     // Ensure database is loaded before searching
     await loadSongDatabase();
-    
+
     const queryLower = query.toLowerCase();
-    
+
     // First, search the local demo database
     const localResults = DEMO_SONG_DATABASE.map((song, originalIndex) => ({
         ...song,
@@ -232,11 +294,11 @@ export async function searchSongChords() {
         const songText = `${songWithIndex.title} ${songWithIndex.artist}`.toLowerCase();
         return songText.includes(queryLower);
     });
-    
+
     // Only search the internet if no local results found (to save API calls)
     let internetResults = [];
     let rateLimitReached = false;
-    
+
     if (localResults.length === 0) {
         // No local results, search the internet (only if under daily limit)
         if (isDailyLimitReached()) {
@@ -245,7 +307,7 @@ export async function searchSongChords() {
         } else {
             // Check if we have API credentials before attempting search
             const hasApiCredentials = window.GOOGLE_SEARCH_API_KEY && window.GOOGLE_SEARCH_ENGINE_ID;
-            
+
             if (hasApiCredentials) {
                 try {
                     internetResults = await searchInternetForChords(query);
@@ -1050,5 +1112,532 @@ function escapeHtml(text) {
 export async function getSongDatabase() {
     await loadSongDatabase();
     return DEMO_SONG_DATABASE;
+}
+
+/**
+ * Perform a free search using DuckDuckGo scraping
+ * @param {string} query - Search query
+ * @param {HTMLElement} resultsContainer - Container to display results
+ */
+async function performFreeSearch(query, resultsContainer) {
+    try {
+        const chords = await searchFreeOnlineChords(query);
+
+        if (chords.length === 0) {
+            resultsContainer.innerHTML = `
+                <div class="space-y-3">
+                    <p class="text-sm text-gray-500 italic">No chords found automatically for "${escapeHtml(query)}".</p>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p class="text-sm text-blue-800 mb-2">Try searching manually:</p>
+                        <div class="flex flex-wrap gap-2">
+                            <a href="https://www.ultimate-guitar.com/search.php?search_type=title&value=${encodeURIComponent(query)}"
+                               target="_blank" rel="noopener"
+                               class="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition">
+                                Ultimate Guitar
+                            </a>
+                            <a href="https://chordify.net/search/${encodeURIComponent(query)}"
+                               target="_blank" rel="noopener"
+                               class="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg transition">
+                                Chordify
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        console.log(`[SongSearch] Found ${chords.length} chords online:`, chords);
+
+        // Generate suggestions by comparing with current progression
+        const suggestions = generateChordSuggestions(chords);
+        displayChordSuggestions(suggestions);
+
+        // Display the found chords
+        resultsContainer.innerHTML = `
+            <div class="bg-white p-4 rounded-lg border border-green-200">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="font-bold text-gray-800 text-sm">Chords found for "${escapeHtml(query)}"</h4>
+                    <span class="text-xs text-green-600 font-medium">${chords.length} chords</span>
+                </div>
+                <div class="flex flex-wrap gap-2 mb-3">
+                    ${chords.map(chord => `
+                        <button onclick="window.highlightChordInProgression && window.highlightChordInProgression('${escapeHtml(chord)}')"
+                                class="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-800 text-sm font-semibold rounded-lg border border-green-300 transition"
+                                title="Click to highlight matching chords in your progression">
+                            ${escapeHtml(chord)}
+                        </button>
+                    `).join('')}
+                </div>
+                <div class="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+                    <a href="https://www.ultimate-guitar.com/search.php?search_type=title&value=${encodeURIComponent(query)}"
+                       target="_blank" rel="noopener"
+                       class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                        </svg>
+                        View on Ultimate Guitar
+                    </a>
+                    <a href="https://chordify.net/search/${encodeURIComponent(query)}"
+                       target="_blank" rel="noopener"
+                       class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                        </svg>
+                        View on Chordify
+                    </a>
+                </div>
+            </div>
+        `;
+
+    } catch (error) {
+        console.error('[SongSearch] Free search error:', error);
+        resultsContainer.innerHTML = `
+            <div class="space-y-3">
+                <div class="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p class="text-sm text-red-800">Search failed: ${escapeHtml(error.message)}</p>
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p class="text-sm text-blue-800 mb-2">Try searching manually:</p>
+                    <div class="flex flex-wrap gap-2">
+                        <a href="https://www.ultimate-guitar.com/search.php?search_type=title&value=${encodeURIComponent(query)}"
+                           target="_blank" rel="noopener"
+                           class="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition">
+                            Ultimate Guitar
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+/**
+ * Highlight chords in the current progression that match an online chord
+ * @param {string} chordName - Chord name to highlight
+ */
+export function highlightChordInProgression(chordName) {
+    console.log(`[SongSearch] Highlighting chord: ${chordName}`);
+
+    // Get the progression display
+    const progressionDisplay = document.getElementById('progression-display') ||
+                               document.getElementById('melody-progression-display');
+
+    if (!progressionDisplay) {
+        console.log('[SongSearch] No progression display found');
+        return;
+    }
+
+    // Normalize chord name for comparison
+    const normalizeChord = (c) => {
+        return c.replace(/maj/gi, '')
+                .replace(/min/gi, 'm')
+                .replace(/M(?![a-z])/g, '')
+                .trim()
+                .toUpperCase();
+    };
+
+    const targetNormalized = normalizeChord(chordName);
+    const targetRoot = targetNormalized.match(/^[A-G][#B]?/)?.[0];
+
+    // Find all chord cards in the progression
+    const chordCards = progressionDisplay.querySelectorAll('.chord-card, [data-chord-index]');
+
+    // Clear previous highlights
+    chordCards.forEach(card => {
+        card.classList.remove('ring-2', 'ring-green-500', 'ring-yellow-500', 'bg-green-50', 'bg-yellow-50');
+    });
+
+    let matchCount = 0;
+
+    chordCards.forEach(card => {
+        // Try to get chord name from various attributes
+        const cardChord = card.getAttribute('data-chord') ||
+                         card.querySelector('.chord-name')?.textContent ||
+                         card.querySelector('.font-bold')?.textContent ||
+                         '';
+
+        const cardNormalized = normalizeChord(cardChord);
+        const cardRoot = cardNormalized.match(/^[A-G][#B]?/)?.[0];
+
+        // Handle enharmonic equivalents
+        const enharmonicMap = {
+            'C#': 'DB', 'DB': 'C#',
+            'D#': 'EB', 'EB': 'D#',
+            'F#': 'GB', 'GB': 'F#',
+            'G#': 'AB', 'AB': 'G#',
+            'A#': 'BB', 'BB': 'A#'
+        };
+
+        const rootsMatch = targetRoot && cardRoot && (
+            targetRoot === cardRoot ||
+            targetRoot === enharmonicMap[cardRoot] ||
+            enharmonicMap[targetRoot] === cardRoot
+        );
+
+        if (cardNormalized === targetNormalized ||
+            (targetRoot && targetNormalized === targetRoot && cardNormalized === cardRoot)) {
+            // Exact match - highlight green
+            card.classList.add('ring-2', 'ring-green-500', 'bg-green-50');
+            matchCount++;
+        } else if (rootsMatch) {
+            // Root matches but quality differs - highlight yellow (potential upgrade)
+            card.classList.add('ring-2', 'ring-yellow-500', 'bg-yellow-50');
+        }
+    });
+
+    // Show a brief message
+    if (matchCount > 0) {
+        console.log(`[SongSearch] Found ${matchCount} matching chord(s)`);
+    } else if (targetRoot) {
+        console.log(`[SongSearch] No exact matches, but showing similar chords with root ${targetRoot}`);
+    }
+}
+
+/**
+ * Search for chords using free DuckDuckGo scraping
+ * @param {string} query - Search query
+ * @returns {Promise<Array<string>>} Array of chord names found
+ */
+async function searchFreeOnlineChords(query) {
+    console.log(`[SongSearch] Free search for: ${query}`);
+
+    // Use CORS proxies to fetch search results
+    const corsProxies = [
+        'https://api.allorigins.win/raw?url=',
+        'https://corsproxy.io/?',
+    ];
+
+    let html = null;
+
+    for (const proxy of corsProxies) {
+        try {
+            const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query + ' chords')}`;
+            const response = await fetch(proxy + encodeURIComponent(searchUrl), {
+                headers: { 'Accept': 'text/html' }
+            });
+
+            if (response.ok) {
+                html = await response.text();
+                break;
+            }
+        } catch (e) {
+            console.warn(`[SongSearch] Proxy ${proxy} failed:`, e.message);
+        }
+    }
+
+    if (!html) {
+        throw new Error('All CORS proxies failed');
+    }
+
+    // Parse the HTML to extract chords
+    return parseFreeSearchResults(html);
+}
+
+/**
+ * Parse search results HTML to extract chord names
+ * @param {string} html - Raw HTML from search results
+ * @returns {Array<string>} Array of chord names
+ */
+function parseFreeSearchResults(html) {
+    const chords = new Set();
+
+    // Strip HTML tags to get plain text
+    const plainText = html
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&[^;]+;/g, ' ')
+        .replace(/\s+/g, ' ');
+
+    // Chord pattern: Letter + optional sharp/flat + optional quality + optional bass note
+    const chordPattern = /\b([A-G][#b]?)(m|maj7?|min|dim|aug|7|9|11|13|sus[24]?|add[0-9]+|M7)?(\/[A-G][#b]?)?\b/g;
+
+    let match;
+    while ((match = chordPattern.exec(plainText)) !== null) {
+        const fullChord = match[0];
+        if (fullChord.length === 1) continue;
+        if (/^[A-G](nd|re|ut|id|ll|ve|nt|ng|ed|er|ly|es|st)$/i.test(fullChord)) continue;
+        chords.add(fullChord);
+    }
+
+    // Look for chord progressions in common formats
+    const progressionPattern = /([A-G][#b]?(?:m|maj7?|min|dim|aug|7|9|sus[24]?)?)\s*[-–—,]\s*([A-G][#b]?(?:m|maj7?|min|dim|aug|7|9|sus[24]?)?)/gi;
+    while ((match = progressionPattern.exec(plainText)) !== null) {
+        if (match[1].length > 1) chords.add(match[1]);
+        if (match[2].length > 1) chords.add(match[2]);
+    }
+
+    // Sort by musical order
+    const sortOrder = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B'];
+
+    return Array.from(chords)
+        .filter(c => c.length >= 2 && /^[A-G]/.test(c))
+        .sort((a, b) => {
+            const rootA = a.match(/^[A-G][#b]?/)?.[0] || '';
+            const rootB = b.match(/^[A-G][#b]?/)?.[0] || '';
+            return sortOrder.indexOf(rootA) - sortOrder.indexOf(rootB);
+        })
+        .slice(0, 20);
+}
+
+/**
+ * Compare current progression with online chords and generate suggestions
+ * Uses pattern recognition to suggest chord quality improvements
+ * @param {Array<string>} onlineChords - Chords found online
+ * @returns {Array<Object>} Array of suggestion objects {original, suggested, reason}
+ */
+export function generateChordSuggestions(onlineChords) {
+    const suggestions = [];
+
+    // Get current progression chords
+    const trainerState = window.getTrainerState ? window.getTrainerState() : null;
+    const progressionData = trainerState?.progressionData || [];
+
+    if (progressionData.length === 0) {
+        console.log('[SongSearch] No current progression to compare with');
+        return suggestions;
+    }
+
+    // Extract root notes from current progression
+    const currentChords = progressionData.map(item => {
+        // Handle different chord data structures
+        if (typeof item === 'string') return item;
+        if (item.chord) return item.chord;
+        if (item.chordSymbol) return item.chordSymbol;
+        if (item.root && item.type) {
+            const typeMap = {
+                'major': '', 'minor': 'm', 'dominant7': '7', 'major7': 'maj7',
+                'minor7': 'm7', 'diminished': 'dim', 'augmented': 'aug',
+                'sus2': 'sus2', 'sus4': 'sus4', 'dominant9': '9'
+            };
+            return item.root + (typeMap[item.type] || '');
+        }
+        return null;
+    }).filter(Boolean);
+
+    console.log('[SongSearch] Current progression:', currentChords);
+    console.log('[SongSearch] Online chords:', onlineChords);
+
+    // Normalize chord for comparison (extract root + basic quality)
+    const normalizeChord = (chord) => {
+        return chord
+            .replace(/maj/gi, '')
+            .replace(/min/gi, 'm')
+            .toUpperCase();
+    };
+
+    // Get root from chord
+    const getRoot = (chord) => {
+        const match = chord.match(/^[A-G][#b]?/i);
+        return match ? match[0].toUpperCase() : null;
+    };
+
+    // Get quality from chord (m, 7, maj7, dim, etc.)
+    const getQuality = (chord) => {
+        const root = getRoot(chord);
+        if (!root) return '';
+        return chord.substring(root.length).toLowerCase();
+    };
+
+    // Check for each chord in current progression
+    currentChords.forEach(currentChord => {
+        const currentRoot = getRoot(currentChord);
+        const currentQuality = getQuality(currentChord);
+
+        if (!currentRoot) return;
+
+        // Look for online chords with same root but different quality
+        onlineChords.forEach(onlineChord => {
+            const onlineRoot = getRoot(onlineChord);
+            const onlineQuality = getQuality(onlineChord);
+
+            if (!onlineRoot) return;
+
+            // Check if roots match (considering enharmonics)
+            const enharmonicMap = {
+                'C#': 'Db', 'Db': 'C#',
+                'D#': 'Eb', 'Eb': 'D#',
+                'F#': 'Gb', 'Gb': 'F#',
+                'G#': 'Ab', 'Ab': 'G#',
+                'A#': 'Bb', 'Bb': 'A#'
+            };
+
+            const rootsMatch = currentRoot === onlineRoot ||
+                currentRoot === enharmonicMap[onlineRoot] ||
+                enharmonicMap[currentRoot] === onlineRoot;
+
+            if (rootsMatch && currentQuality !== onlineQuality) {
+                // Check if online version is more specific (has more info)
+                const isUpgrade = onlineQuality.length > currentQuality.length ||
+                    (onlineQuality.includes('7') && !currentQuality.includes('7')) ||
+                    (onlineQuality.includes('9') && !currentQuality.includes('9')) ||
+                    (onlineQuality.includes('maj') && !currentQuality.includes('maj')) ||
+                    (onlineQuality.includes('sus') && !currentQuality.includes('sus'));
+
+                if (isUpgrade) {
+                    // Check if we already have this suggestion
+                    const exists = suggestions.some(s =>
+                        s.original === currentChord && s.suggested === onlineChord
+                    );
+
+                    if (!exists) {
+                        let reason = '';
+                        if (onlineQuality.includes('7') && !currentQuality.includes('7')) {
+                            reason = 'Add 7th for richer sound';
+                        } else if (onlineQuality.includes('9') && !currentQuality.includes('9')) {
+                            reason = 'Add 9th for jazz/soul feel';
+                        } else if (onlineQuality.includes('maj7') && currentQuality === '') {
+                            reason = 'Major 7th adds warmth';
+                        } else if (onlineQuality.includes('sus')) {
+                            reason = 'Suspended chord adds tension';
+                        } else {
+                            reason = 'More specific chord voicing';
+                        }
+
+                        suggestions.push({
+                            original: currentChord,
+                            suggested: onlineChord,
+                            reason: reason
+                        });
+                    }
+                }
+            }
+        });
+    });
+
+    console.log('[SongSearch] Generated suggestions:', suggestions);
+    return suggestions;
+}
+
+/**
+ * Display chord suggestions in the UI
+ * @param {Array<Object>} suggestions - Array of suggestion objects
+ */
+function displayChordSuggestions(suggestions) {
+    const container = document.getElementById('chord-suggestions-container');
+    const list = document.getElementById('chord-suggestions-list');
+
+    if (!container || !list) return;
+
+    if (suggestions.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+
+    list.innerHTML = suggestions.map(s => `
+        <div class="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-yellow-300 shadow-sm">
+            <span class="text-sm font-medium text-gray-600">${escapeHtml(s.original)}</span>
+            <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+            </svg>
+            <button onclick="window.applySuggestedChord && window.applySuggestedChord('${escapeHtml(s.original)}', '${escapeHtml(s.suggested)}')"
+                    class="px-2 py-1 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-bold rounded transition"
+                    title="${escapeHtml(s.reason)}">
+                ${escapeHtml(s.suggested)}
+            </button>
+            <span class="text-xs text-gray-500 italic hidden md:inline">${escapeHtml(s.reason)}</span>
+        </div>
+    `).join('');
+
+    container.classList.remove('hidden');
+}
+
+/**
+ * Apply a suggested chord improvement to the progression
+ * @param {string} original - Original chord to replace
+ * @param {string} suggested - Suggested replacement chord
+ */
+export function applySuggestedChord(original, suggested) {
+    console.log(`[SongSearch] Applying suggestion: ${original} -> ${suggested}`);
+
+    // Get current progression
+    const trainerState = window.getTrainerState ? window.getTrainerState() : null;
+    const progressionData = trainerState?.progressionData || [];
+
+    if (progressionData.length === 0) {
+        alert('No progression to modify');
+        return;
+    }
+
+    // Find the chord to replace
+    const normalizeForCompare = (chord) => {
+        return chord.replace(/maj/gi, '').replace(/min/gi, 'm').toUpperCase();
+    };
+
+    const originalNorm = normalizeForCompare(original);
+    let found = false;
+
+    for (let i = 0; i < progressionData.length; i++) {
+        const item = progressionData[i];
+        let itemChord = '';
+
+        if (typeof item === 'string') {
+            itemChord = item;
+        } else if (item.chord) {
+            itemChord = item.chord;
+        } else if (item.chordSymbol) {
+            itemChord = item.chordSymbol;
+        } else if (item.root && item.type) {
+            const typeMap = {
+                'major': '', 'minor': 'm', 'dominant7': '7', 'major7': 'maj7',
+                'minor7': 'm7', 'diminished': 'dim', 'augmented': 'aug'
+            };
+            itemChord = item.root + (typeMap[item.type] || '');
+        }
+
+        if (normalizeForCompare(itemChord) === originalNorm) {
+            // Found the chord - use the chord builder to replace it
+            if (window.selectChordCardByIndex) {
+                window.selectChordCardByIndex(i);
+            }
+
+            // Parse and apply the new chord
+            const match = suggested.match(/^([A-G])([#b]?)(.*)$/);
+            if (match) {
+                const root = match[1] + match[2];
+                const quality = match[3];
+
+                let chordType = 'major';
+                if (quality.startsWith('m') && !quality.startsWith('maj')) {
+                    chordType = 'minor';
+                } else if (quality.includes('dim')) {
+                    chordType = 'diminished';
+                } else if (quality.includes('aug')) {
+                    chordType = 'augmented';
+                } else if (quality.includes('sus')) {
+                    chordType = quality.includes('sus2') ? 'sus2' : 'sus4';
+                } else if (quality.includes('7')) {
+                    if (quality.includes('maj7') || quality.includes('M7')) {
+                        chordType = 'major7';
+                    } else if (quality.startsWith('m7')) {
+                        chordType = 'minor7';
+                    } else {
+                        chordType = 'dominant7';
+                    }
+                } else if (quality.includes('9')) {
+                    chordType = 'dominant9';
+                }
+
+                // Update the chord at this position
+                if (window.updateChordAtIndex) {
+                    window.updateChordAtIndex(i, root, chordType);
+                    found = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (found) {
+        // Refresh the display
+        if (window.renderProgressionDisplay) {
+            window.renderProgressionDisplay();
+        }
+        console.log(`[SongSearch] Successfully applied ${suggested}`);
+    } else {
+        console.warn(`[SongSearch] Could not find chord ${original} in progression`);
+        alert(`Could not find ${original} in your progression to replace`);
+    }
 }
 

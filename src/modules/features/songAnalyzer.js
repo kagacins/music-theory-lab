@@ -9,11 +9,15 @@
 // ES MODULE IMPORTS (Bundled by Vite)
 // ===========================================
 import * as Tonal from 'tonal';
+import * as tf from '@tensorflow/tfjs';
 import { BasicPitch, addPitchBendsToNoteEvents, noteFramesToTime, outputToNotesPoly } from '@spotify/basic-pitch';
 
 // Basic Pitch model URL - loaded from node_modules via Vite
 // The path is resolved at build time by Vite
 import basicPitchModelUrl from '@spotify/basic-pitch/model/model.json?url';
+
+// Server-side analysis configuration
+import { SERVER_API_URL, SERVER_ENABLED } from '../../../server/config.js';
 
 // ===========================================
 // STATE
@@ -40,6 +44,12 @@ let pitchOffset = 0;
 
 // Current transpose offset for UI (user-adjustable after analysis)
 let transposeOffset = 0;
+
+// Enharmonic preference: 'auto' (based on key), 'sharps', or 'flats'
+let enharmonicPreference = 'auto';
+
+// Expected key hint (set before analysis to guide enharmonic spelling)
+let expectedKeyHint = null;
 
 // Basic Pitch model instance (loaded on demand)
 let basicPitchModel = null;
@@ -285,6 +295,155 @@ function transposeChordName(chordName, semitones) {
 
     const newRoot = PITCH_CLASSES[newIndex];
     return newRoot + suffix;
+}
+
+// ===========================================
+// ENHARMONIC SPELLING
+// ===========================================
+
+// Keys that use flats (and how many flats)
+const FLAT_KEYS = {
+    'F': 1, 'Dm': 1,
+    'Bb': 2, 'Gm': 2,
+    'Eb': 3, 'Cm': 3,
+    'Ab': 4, 'Fm': 4,
+    'Db': 5, 'Bbm': 5,
+    'Gb': 6, 'Ebm': 6,
+};
+
+// Keys that use sharps (and how many sharps)
+const SHARP_KEYS = {
+    'G': 1, 'Em': 1,
+    'D': 2, 'Bm': 2,
+    'A': 3, 'F#m': 3,
+    'E': 4, 'C#m': 4,
+    'B': 5, 'G#m': 5,
+    'F#': 6, 'D#m': 6,
+};
+
+// Sharp to flat conversion
+const SHARP_TO_FLAT = {
+    'C#': 'Db', 'D#': 'Eb', 'F#': 'Gb', 'G#': 'Ab', 'A#': 'Bb'
+};
+
+// Flat to sharp conversion
+const FLAT_TO_SHARP = {
+    'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#'
+};
+
+/**
+ * Determine if a key prefers flats, sharps, or neutral
+ * @param {string} key - Key name (e.g., "F major", "Gm", "A")
+ * @returns {'flats'|'sharps'|'neutral'}
+ */
+function getKeyEnharmonicPreference(key) {
+    if (!key) return 'neutral';
+
+    // Normalize key format
+    const normalized = key.replace(' major', '').replace(' minor', 'm').replace(' Major', '').replace(' Minor', 'm');
+
+    if (FLAT_KEYS[normalized]) return 'flats';
+    if (SHARP_KEYS[normalized]) return 'sharps';
+    return 'neutral';
+}
+
+/**
+ * Convert a chord name to use the preferred enharmonic spelling
+ * @param {string} chordName - Original chord name (e.g., "A#m", "Gb7")
+ * @param {'auto'|'sharps'|'flats'} preference - Enharmonic preference
+ * @param {string} keyContext - Optional key for 'auto' mode
+ * @returns {string} Chord with preferred enharmonic spelling
+ */
+function applyEnharmonicSpelling(chordName, preference = 'auto', keyContext = null) {
+    if (!chordName) return chordName;
+
+    // Determine actual preference
+    let actualPreference = preference;
+    if (preference === 'auto') {
+        const keyPref = getKeyEnharmonicPreference(keyContext || expectedKeyHint || detectedKey);
+        actualPreference = keyPref === 'neutral' ? 'flats' : keyPref; // Default to flats if neutral
+    }
+
+    // Parse the chord - find root and suffix
+    let root = '';
+    let suffix = '';
+
+    if (chordName.length >= 2 && (chordName[1] === '#' || chordName[1] === 'b')) {
+        root = chordName.substring(0, 2);
+        suffix = chordName.substring(2);
+    } else {
+        root = chordName[0];
+        suffix = chordName.substring(1);
+    }
+
+    // Convert based on preference
+    let newRoot = root;
+    if (actualPreference === 'flats' && SHARP_TO_FLAT[root]) {
+        newRoot = SHARP_TO_FLAT[root];
+    } else if (actualPreference === 'sharps' && FLAT_TO_SHARP[root]) {
+        newRoot = FLAT_TO_SHARP[root];
+    }
+
+    return newRoot + suffix;
+}
+
+/**
+ * Set the enharmonic preference
+ * @param {'auto'|'sharps'|'flats'} preference
+ */
+export function setEnharmonicPreference(preference) {
+    if (['auto', 'sharps', 'flats'].includes(preference)) {
+        enharmonicPreference = preference;
+        console.log(`[SongAnalyzer] Enharmonic preference set to: ${preference}`);
+
+        // Update button styles
+        const autoBtn = document.getElementById('enharmonic-auto-btn');
+        const flatsBtn = document.getElementById('enharmonic-flats-btn');
+        const sharpsBtn = document.getElementById('enharmonic-sharps-btn');
+
+        const activeClasses = 'bg-amber-200 text-amber-800';
+        const inactiveClasses = 'bg-white text-amber-700 hover:bg-amber-100';
+
+        [autoBtn, flatsBtn, sharpsBtn].forEach(btn => {
+            if (btn) {
+                btn.classList.remove('bg-amber-200', 'text-amber-800', 'bg-white', 'text-amber-700', 'hover:bg-amber-100');
+            }
+        });
+
+        if (autoBtn) autoBtn.classList.add(...(preference === 'auto' ? activeClasses : inactiveClasses).split(' '));
+        if (flatsBtn) flatsBtn.classList.add(...(preference === 'flats' ? activeClasses : inactiveClasses).split(' '));
+        if (sharpsBtn) sharpsBtn.classList.add(...(preference === 'sharps' ? activeClasses : inactiveClasses).split(' '));
+
+        // Re-render if we have chords
+        if (detectedChords.length > 0) {
+            renderDetectedChords();
+        }
+    }
+}
+
+/**
+ * Get the current enharmonic preference
+ * @returns {'auto'|'sharps'|'flats'}
+ */
+export function getEnharmonicPreference() {
+    return enharmonicPreference;
+}
+
+/**
+ * Set the expected key hint (used before analysis for enharmonic guidance)
+ * @param {string} key - Expected key (e.g., "F", "Bb major", "Gm")
+ */
+export function setExpectedKeyHint(key) {
+    expectedKeyHint = key;
+    console.log(`[SongAnalyzer] Expected key hint set to: ${key}`);
+}
+
+/**
+ * Get the expected key hint
+ * @returns {string|null}
+ */
+export function getExpectedKeyHint() {
+    return expectedKeyHint;
 }
 
 // ===========================================
@@ -979,7 +1138,8 @@ async function analyzeChordsWithBasicPitch(audioBuffer) {
     const contours = [];
 
     // Run Basic Pitch inference with the correct API
-    try {
+    // With WebGL fallback to CPU if GPU fails
+    const runInference = async () => {
         await model.evaluateModel(
             resampledBuffer,
             // Data callback - receives frames, onsets, contours
@@ -994,10 +1154,23 @@ async function analyzeChordsWithBasicPitch(audioBuffer) {
                 updateProgress('Transcribing audio...', progress);
             }
         );
+    };
 
+    try {
+        await runInference();
         console.log(`[SongAnalyzer] Basic Pitch processed ${frames.length} frames`);
     } catch (error) {
         console.error('[SongAnalyzer] Basic Pitch inference failed:', error);
+
+        // For GPU/shader errors, fall back to Essentia DSP (much faster than CPU TensorFlow)
+        if (error.message && (error.message.includes('shader') || error.message.includes('WebGL'))) {
+            console.warn('[SongAnalyzer] WebGL failed, falling back to Essentia DSP method...');
+            updateProgress('GPU failed, using DSP method instead...', 30);
+
+            // Return null to signal caller to use Essentia fallback
+            return null;
+        }
+
         throw new Error('AI transcription failed: ' + error.message);
     }
 
@@ -1281,6 +1454,136 @@ function mapTonalChordToOurFormat(tonalChord) {
     // We may need to add Tonal-specific mappings
 
     return chord;
+}
+
+/**
+ * Analyze chords using server-side processing (Modal.com)
+ */
+async function analyzeChordsWithServer(audioBuffer) {
+    if (!SERVER_API_URL) {
+        throw new Error('Server API URL not configured');
+    }
+    updateProgress('Preparing audio for server...', 5);
+    const wavBlob = await audioBufferToWav(audioBuffer);
+    const arrayBuffer = await wavBlob.arrayBuffer();
+
+    updateProgress('Encoding audio...', 10);
+    const base64Audio = btoa(new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+
+    // Calculate sizes for display
+    // Note: WAV conversion + base64 encoding inflates size significantly
+    const originalDurationSec = audioBuffer.duration;
+    const uploadSizeMB = (base64Audio.length / 1024 / 1024).toFixed(1);
+    updateProgress(`Uploading audio (${Math.round(originalDurationSec)}s) to server...`, 15);
+
+    // Use XMLHttpRequest for upload progress tracking
+    const result = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        let uploadComplete = false;
+
+        // Track upload progress
+        xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+                const uploadPercent = Math.round((event.loaded / event.total) * 100);
+                // Map upload progress to 15-45% of total progress
+                const progress = 15 + Math.round(uploadPercent * 0.3);
+                updateProgress(`Uploading: ${uploadPercent}%`, progress);
+            }
+        };
+
+        // Upload finished, now waiting for server to process
+        xhr.upload.onload = () => {
+            uploadComplete = true;
+            updateProgress('Processing on server (this may take a minute)...', 50);
+        };
+
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    resolve(JSON.parse(xhr.responseText));
+                } catch (e) {
+                    reject(new Error('Invalid server response'));
+                }
+            } else {
+                reject(new Error(`Server error: ${xhr.status}`));
+            }
+        };
+
+        xhr.onerror = () => reject(new Error('Network error during upload'));
+        xhr.ontimeout = () => reject(new Error('Upload timed out - server may be starting up, please try again'));
+
+        xhr.open('POST', SERVER_API_URL);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.timeout = 300000; // 5 minute timeout
+        xhr.send(JSON.stringify({ audio: base64Audio, sample_rate: audioBuffer.sampleRate }));
+    });
+
+    updateProgress('Server analysis complete, processing results...', 90);
+    if (!result.success) throw new Error(result.error || 'Server analysis failed');
+
+    // Log analysis metadata
+    if (result.tempo) {
+        console.log(`[SongAnalyzer] Detected tempo: ${result.tempo} BPM`);
+        detectedTempo = result.tempo;
+    }
+    if (result.beat_count) {
+        console.log(`[SongAnalyzer] Detected ${result.beat_count} beats`);
+    }
+
+    return result.chords.filter(c => c.chord !== 'N').map(chord => {
+        const chordName = chord.chord;
+        const match = chordName.match(/^([A-G][#b]?)(m7?b?5?|7|dim7?|aug|maj7|mM7|sus[24]|add9)?$/);
+        const root = match ? match[1] : chordName;
+        const suffix = match?.[2] || '';
+        const typeMap = {
+            '': 'Major',
+            'm': 'Minor',
+            'm7': 'Minor 7th',
+            '7': 'Dominant 7th',
+            'maj7': 'Major 7th',
+            'dim': 'Diminished',
+            'dim7': 'Diminished 7th',
+            'aug': 'Augmented',
+            'm7b5': 'Half-Diminished',
+            'mM7': 'Minor Major 7th',
+            'sus2': 'Suspended 2nd',
+            'sus4': 'Suspended 4th',
+            'add9': 'Add 9'
+        };
+
+        // Build display chord name with inversion if present
+        let displayChord = chordName;
+        if (chord.inversion) {
+            displayChord = `${chordName}/${chord.inversion}`;
+        }
+
+        return {
+            chord: displayChord,  // Chord name with inversion (e.g., "C/E")
+            root,
+            type: typeMap[suffix] || 'Major',
+            startTime: chord.time,
+            endTime: chord.time + chord.duration,
+            bass: chord.bass || null,
+            inversion: chord.inversion || null,
+            isSeventh: chord.is_seventh || false,
+            confidence: chord.confidence || 0.85
+        };
+    });
+}
+
+function audioBufferToWav(audioBuffer) {
+    const samples = audioBuffer.numberOfChannels === 1 ? audioBuffer.getChannelData(0) :
+        Array.from({ length: audioBuffer.length }, (_, i) => Array.from({ length: audioBuffer.numberOfChannels }, (_, ch) =>
+            audioBuffer.getChannelData(ch)[i]).reduce((a, b) => a + b) / audioBuffer.numberOfChannels);
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+    const writeStr = (o, s) => [...s].forEach((c, i) => view.setUint8(o + i, c.charCodeAt(0)));
+    writeStr(0, 'RIFF'); view.setUint32(4, 36 + samples.length * 2, true); writeStr(8, 'WAVE'); writeStr(12, 'fmt ');
+    view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+    view.setUint32(24, audioBuffer.sampleRate, true); view.setUint32(28, audioBuffer.sampleRate * 2, true);
+    view.setUint16(32, 2, true); view.setUint16(34, 16, true); writeStr(36, 'data'); view.setUint32(40, samples.length * 2, true);
+    for (let i = 0; i < samples.length; i++) view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, samples[i])) * 0x7FFF, true);
+    return new Blob([buffer], { type: 'audio/wav' });
 }
 
 /**
@@ -1749,15 +2052,31 @@ function renderDetectedChords() {
         const duration = chord.endTime - chord.startTime;
 
         // Apply transpose offset to the displayed chord name
-        const displayChord = transposeOffset !== 0
+        let displayChord = transposeOffset !== 0
             ? transposeChordName(chord.chord, transposeOffset)
             : chord.chord;
 
+        // Apply enharmonic spelling preference
+        // Handle inversions: "C/E" -> apply to both parts
+        if (displayChord.includes('/')) {
+            const [chordPart, bassPart] = displayChord.split('/');
+            displayChord = applyEnharmonicSpelling(chordPart, enharmonicPreference) + '/' +
+                           applyEnharmonicSpelling(bassPart, enharmonicPreference);
+        } else {
+            displayChord = applyEnharmonicSpelling(displayChord, enharmonicPreference);
+        }
+
+        // Visual indicators for chord type
+        const isSeventh = chord.isSeventh || displayChord.includes('7');
+        const hasInversion = chord.inversion || displayChord.includes('/');
+
         return `
-            <div class="chord-detection-item flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 transition cursor-pointer border border-transparent hover:border-gray-200" data-index="${index}">
+            <div class="chord-detection-item flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 transition cursor-pointer border border-transparent hover:border-gray-200" data-index="${index}" data-chord="${displayChord}">
                 <div class="flex items-center gap-3">
                     <span class="text-xs text-gray-400 w-16">${formatTime(chord.startTime)}</span>
-                    <span class="font-bold text-gray-800">${displayChord}</span>
+                    <span class="font-bold text-gray-800 chord-name">${displayChord}</span>
+                    ${isSeventh ? '<span class="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">7th</span>' : ''}
+                    ${hasInversion ? '<span class="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded">inv</span>' : ''}
                     ${transposeOffset !== 0 ? `<span class="text-xs text-purple-500">(was ${chord.chord})</span>` : ''}
                     <span class="text-xs text-gray-500">(${duration.toFixed(1)}s)</span>
                 </div>
@@ -1891,10 +2210,20 @@ export async function startAudioAnalysis() {
         const audioBuffer = await loadAudioFile(currentAudioFile);
 
         // Detect chords based on selected method
-        if (method === 'basicpitch') {
+        if (method === 'server') {
+            console.log('[SongAnalyzer] Starting server-side analysis...');
+            detectedChords = await analyzeChordsWithServer(audioBuffer);
+        } else if (method === 'basicpitch') {
             // Use Basic Pitch + Tonal.js (AI/ML method)
             console.log('[SongAnalyzer] Starting Basic Pitch + Tonal.js analysis...');
             detectedChords = await analyzeChordsWithBasicPitch(audioBuffer);
+
+            // If Basic Pitch failed (returned null), fall back to Essentia
+            if (detectedChords === null) {
+                console.log('[SongAnalyzer] Basic Pitch failed, falling back to Essentia DSP...');
+                await initEssentia();
+                detectedChords = await analyzeChords(audioBuffer);
+            }
         } else {
             // Use Essentia DSP method (default)
             console.log('[SongAnalyzer] Starting Essentia DSP analysis...');
@@ -1962,21 +2291,123 @@ export async function importDetectedChords() {
         window.clearProgression();
     }
 
+    // Helper to parse slash chords and calculate inversion
+    function parseSlashChord(chordName) {
+        // Check for slash chord (e.g., "C/G", "Am/E")
+        if (!chordName.includes('/')) {
+            return { baseChord: chordName, bassNote: null, inversion: 0 };
+        }
+
+        const [baseChord, bassNote] = chordName.split('/');
+
+        // Get the root of the base chord
+        const rootMatch = baseChord.match(/^([A-G][#b]?)/);
+        if (!rootMatch) {
+            return { baseChord: chordName, bassNote: null, inversion: 0 };
+        }
+        const root = rootMatch[0];
+
+        // Determine chord quality to know the chord tones
+        const isMinor = baseChord.includes('m') && !baseChord.includes('dim') && !baseChord.includes('maj');
+        const isDim = baseChord.includes('dim');
+        const isAug = baseChord.includes('aug');
+
+        // Get semitones from root to bass note
+        const NOTE_TO_SEMITONE = {
+            'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3,
+            'E': 4, 'Fb': 4, 'E#': 5, 'F': 5, 'F#': 6, 'Gb': 6,
+            'G': 7, 'G#': 8, 'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10,
+            'B': 11, 'Cb': 11, 'B#': 0
+        };
+
+        const rootSemitone = NOTE_TO_SEMITONE[root];
+        const bassSemitone = NOTE_TO_SEMITONE[bassNote];
+
+        if (rootSemitone === undefined || bassSemitone === undefined) {
+            return { baseChord, bassNote, inversion: 0 };
+        }
+
+        const interval = (bassSemitone - rootSemitone + 12) % 12;
+
+        // Determine inversion based on interval
+        // Major/Minor triads: root=0, 3rd=3/4, 5th=7
+        // 1st inversion = 3rd in bass, 2nd inversion = 5th in bass
+        let inversion = 0;
+        if (isMinor) {
+            // Minor: root=0, m3=3, P5=7
+            if (interval === 3) inversion = 1; // Minor 3rd = 1st inversion
+            else if (interval === 7) inversion = 2; // Perfect 5th = 2nd inversion
+        } else if (isDim) {
+            // Dim: root=0, m3=3, dim5=6
+            if (interval === 3) inversion = 1;
+            else if (interval === 6) inversion = 2;
+        } else if (isAug) {
+            // Aug: root=0, M3=4, aug5=8
+            if (interval === 4) inversion = 1;
+            else if (interval === 8) inversion = 2;
+        } else {
+            // Major: root=0, M3=4, P5=7
+            if (interval === 4) inversion = 1; // Major 3rd = 1st inversion
+            else if (interval === 7) inversion = 2; // Perfect 5th = 2nd inversion
+        }
+
+        return { baseChord, bassNote, inversion };
+    }
+
+    // Track cumulative beat positions to prevent rounding drift
+    // By tracking the expected vs actual cumulative position, we can adjust
+    // individual durations to minimize total drift from detected timing
+    let cumulativeExpectedBeats = 0;  // Expected position from raw (unrounded) durations
+    let cumulativeActualBeats = 0;    // Actual position from rounded durations
+    const tempoToUse = detectedTempo || FALLBACK_TEMPO;
+
+    // Subdivision for rounding - 0.5 = eighth notes, 0.25 = sixteenth notes, 1 = quarter notes
+    // Using 0.5 allows chord changes on the "and" of beats (eighth note precision)
+    const BEAT_SUBDIVISION = 0.5;
+
+    // Helper to round to nearest subdivision
+    const roundToSubdivision = (beats) => {
+        return Math.round(beats / BEAT_SUBDIVISION) * BEAT_SUBDIVISION;
+    };
+
     // Process chords in batches to prevent UI blocking
     for (let i = 0; i < totalChords; i++) {
         const chord = detectedChords[i];
         const isLast = i === totalChords - 1;
 
         // Apply transpose offset to get the actual chord to import
-        const transposedChordName = transposeOffset !== 0
+        let transposedChordName = transposeOffset !== 0
             ? transposeChordName(chord.chord, transposeOffset)
             : chord.chord;
 
-        const mapped = ESSENTIA_CHORD_MAP[transposedChordName];
+        // Apply enharmonic spelling preference (so saved chord matches what user saw)
+        transposedChordName = applyEnharmonicSpelling(transposedChordName, enharmonicPreference);
 
-        // Calculate duration in beats (duration in seconds * BPM / 60)
+        // Parse slash chords to get base chord and inversion
+        const { baseChord, bassNote, inversion } = parseSlashChord(transposedChordName);
+
+        // Look up the base chord (without slash) in our map
+        const mapped = ESSENTIA_CHORD_MAP[baseChord];
+
+        // Calculate duration in beats with drift compensation
+        // Instead of rounding each duration independently, we round based on
+        // where the chord SHOULD end to minimize cumulative timing error
         const durationSeconds = chord.endTime - chord.startTime;
-        const durationBeats = Math.max(1, Math.round((durationSeconds * FALLBACK_TEMPO) / 60));
+        const rawDurationBeats = (durationSeconds * tempoToUse) / 60;
+
+        // Update expected cumulative position
+        cumulativeExpectedBeats += rawDurationBeats;
+
+        // Calculate the ideal end position (rounded to nearest subdivision)
+        // This represents where this chord should end to stay aligned
+        const idealEndBeat = roundToSubdivision(cumulativeExpectedBeats);
+
+        // The duration for this chord should bring us to the ideal end position
+        // Minimum duration is one subdivision (e.g., 0.5 for eighth notes)
+        const durationBeats = Math.max(BEAT_SUBDIVISION, idealEndBeat - cumulativeActualBeats);
+
+        // Update actual cumulative position with the rounded duration
+        cumulativeActualBeats += durationBeats;
 
         // Determine chord type and root
         let chordType, chordRoot;
@@ -1984,23 +2415,27 @@ export async function importDetectedChords() {
             chordType = mapped.type;
             chordRoot = mapped.root;
         } else {
-            // Try to parse chord manually
-            chordRoot = transposedChordName.replace(/m|dim|aug|7|9|sus2|sus4|maj/g, '');
+            // Try to parse chord manually (from baseChord, not slash chord)
+            chordRoot = baseChord.replace(/m|dim|aug|7|9|sus2|sus4|maj/g, '');
             chordType = 'Major';
-            if (transposedChordName.includes('m') && !transposedChordName.includes('dim') && !transposedChordName.includes('maj')) {
+            if (baseChord.includes('m') && !baseChord.includes('dim') && !baseChord.includes('maj')) {
                 chordType = 'Minor';
-            } else if (transposedChordName.includes('dim')) {
+            } else if (baseChord.includes('dim')) {
                 chordType = 'Diminished';
-            } else if (transposedChordName.includes('7')) {
+            } else if (baseChord.includes('7')) {
                 chordType = 'Dominant 7th';
             }
-            console.warn(`[SongAnalyzer] Unmapped chord: ${transposedChordName} -> ${chordRoot} ${chordType}`);
+            console.warn(`[SongAnalyzer] Unmapped chord: ${transposedChordName} -> ${chordRoot} ${chordType} (inv: ${inversion})`);
         }
 
         if (window.addSpecificChordToProgression) {
             // Skip render for all but the last chord, no sound
             // addSpecificChordToProgression(chordType, inversion, playShutterSound, overrideRoot, beats, options)
-            window.addSpecificChordToProgression(chordType, 0, false, chordRoot, durationBeats, { skipRender: !isLast });
+            // Use octaveShift: -12 (one octave down) to place chords in bass register (octave 3 instead of 4)
+            window.addSpecificChordToProgression(chordType, inversion, false, chordRoot, durationBeats, {
+                skipRender: !isLast,
+                octaveShift: -12 // Place in bass register
+            });
         }
 
         // Update progress
@@ -2213,6 +2648,288 @@ export function getDetectedKey() {
 /**
  * Initialize the song analyzer module
  */
+/**
+ * Search for chords online using DuckDuckGo (free, no API key needed)
+ * Parses search results to extract chord information from popular chord sites
+ */
+export async function searchOnlineChords() {
+    const songInput = document.getElementById('online-chord-song-input');
+    const artistInput = document.getElementById('online-chord-artist-input');
+    const resultsContainer = document.getElementById('online-chords-results');
+    const chordsList = document.getElementById('online-chords-list');
+    const loadingEl = document.getElementById('online-chords-loading');
+    const errorEl = document.getElementById('online-chords-error');
+
+    const songName = songInput?.value?.trim() || '';
+    const artistName = artistInput?.value?.trim() || '';
+
+    if (!songName) {
+        errorEl.textContent = 'Please enter a song name';
+        errorEl.classList.remove('hidden');
+        resultsContainer.classList.add('hidden');
+        return;
+    }
+
+    // Hide previous results/errors, show loading
+    resultsContainer.classList.add('hidden');
+    errorEl.classList.add('hidden');
+    loadingEl.classList.remove('hidden');
+
+    try {
+        const query = `${songName} ${artistName} chords`.trim();
+        console.log(`[SongAnalyzer] Searching online for: ${query}`);
+
+        // Use a CORS proxy to fetch search results
+        // Try multiple proxies in case one is down
+        const corsProxies = [
+            'https://api.allorigins.win/raw?url=',
+            'https://corsproxy.io/?',
+        ];
+
+        let html = null;
+        let proxyUsed = null;
+
+        for (const proxy of corsProxies) {
+            try {
+                const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+                const response = await fetch(proxy + encodeURIComponent(searchUrl), {
+                    headers: { 'Accept': 'text/html' }
+                });
+
+                if (response.ok) {
+                    html = await response.text();
+                    proxyUsed = proxy;
+                    break;
+                }
+            } catch (e) {
+                console.warn(`[SongAnalyzer] Proxy ${proxy} failed:`, e.message);
+            }
+        }
+
+        if (!html) {
+            throw new Error('Could not fetch search results. Try again later.');
+        }
+
+        console.log(`[SongAnalyzer] Fetched ${html.length} characters via ${proxyUsed}`);
+
+        // Check if we got actual search results (DuckDuckGo specific check)
+        if (html.includes('No results found') || html.length < 1000) {
+            console.warn('[SongAnalyzer] Search returned no/few results');
+        }
+
+        // Parse the HTML to extract chord information
+        const chords = parseChordSearchResults(html, songName, artistName);
+
+        loadingEl.classList.add('hidden');
+
+        if (chords.length === 0) {
+            // Show helpful message with links
+            chordsList.innerHTML = `
+                <div class="text-sm text-gray-600 w-full">
+                    <p class="mb-2">No chords found automatically. Try searching manually:</p>
+                    <div class="flex flex-wrap gap-2">
+                        <a href="https://www.ultimate-guitar.com/search.php?search_type=title&value=${encodeURIComponent(query)}"
+                           target="_blank" rel="noopener"
+                           class="px-3 py-1 bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition text-xs">
+                            Ultimate Guitar
+                        </a>
+                        <a href="https://www.google.com/search?q=${encodeURIComponent(query)}"
+                           target="_blank" rel="noopener"
+                           class="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition text-xs">
+                            Google Search
+                        </a>
+                        <a href="https://chordify.net/search/${encodeURIComponent(songName + ' ' + artistName)}"
+                           target="_blank" rel="noopener"
+                           class="px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition text-xs">
+                            Chordify
+                        </a>
+                    </div>
+                </div>
+            `;
+            resultsContainer.classList.remove('hidden');
+            return;
+        }
+
+        // Display the found chords
+        chordsList.innerHTML = chords.map((chord, i) => `
+            <button class="px-3 py-1.5 bg-white border border-purple-300 rounded-lg text-sm font-medium text-purple-700 hover:bg-purple-100 hover:border-purple-400 transition"
+                    onclick="window.applyOnlineChord && window.applyOnlineChord('${chord}')"
+                    title="Click to see how this compares to your detected chords">
+                ${chord}
+            </button>
+        `).join('');
+
+        // Add a link to search for more
+        chordsList.innerHTML += `
+            <a href="https://www.google.com/search?q=${encodeURIComponent(query)}"
+               target="_blank" rel="noopener"
+               class="px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-200 transition flex items-center gap-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                </svg>
+                More...
+            </a>
+        `;
+
+        resultsContainer.classList.remove('hidden');
+        console.log(`[SongAnalyzer] Found ${chords.length} chords online:`, chords);
+
+    } catch (error) {
+        console.error('[SongAnalyzer] Online chord search error:', error);
+        loadingEl.classList.add('hidden');
+        errorEl.textContent = error.message || 'Search failed. Try again.';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+/**
+ * Parse search results HTML to extract chord names
+ * Looks for common chord patterns in search result snippets
+ */
+function parseChordSearchResults(html, songName, artistName) {
+    const chords = new Set();
+
+    // Strip HTML tags to get plain text - more robust than looking for specific classes
+    const plainText = html
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove scripts
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')   // Remove styles
+        .replace(/<[^>]+>/g, ' ')                          // Remove all HTML tags
+        .replace(/&[^;]+;/g, ' ')                          // Remove HTML entities
+        .replace(/\s+/g, ' ');                             // Normalize whitespace
+
+    console.log('[SongAnalyzer] Parsing search results, text length:', plainText.length);
+
+    // Common chord pattern: Letter + optional sharp/flat + optional quality + optional bass note
+    // Examples: C, Am, F#m, Bb7, Cmaj7, Dsus4, G/B, Em7, A7
+    const chordPattern = /\b([A-G][#b]?)(m|maj7?|min|dim|aug|7|9|11|13|sus[24]?|add[0-9]+|M7)?(\/[A-G][#b]?)?\b/g;
+
+    // Find all chord matches in the plain text
+    let match;
+    while ((match = chordPattern.exec(plainText)) !== null) {
+        const fullChord = match[0];
+
+        // Filter out single letters that are likely just words, not chords
+        // But keep them if they have any modifier (m, 7, #, b, etc.)
+        if (fullChord.length === 1) {
+            continue; // Skip single letters like "A", "B", "C" without context
+        }
+
+        // Skip common false positives that look like chords but aren't
+        const falsePositives = ['Am', 'Be', 'Do', 'Em']; // These need context
+        // Actually, Am, Em, Dm etc. ARE valid chords, so let's be more careful
+
+        // Skip if it's just a capital letter followed by common word endings
+        if (/^[A-G](nd|re|ut|id|ll|ve|nt|ng|ed|er|ly|es|st)$/i.test(fullChord)) {
+            continue;
+        }
+
+        chords.add(fullChord);
+    }
+
+    // Also look for chord progressions in common formats
+    // Format: "F Em7 A7 Dm" or "F - Em7 - A7 - Dm" or "F, Em7, A7, Dm"
+    const progressionPattern = /([A-G][#b]?(?:m|maj7?|min|dim|aug|7|9|sus[24]?)?)\s*[-–—,]\s*([A-G][#b]?(?:m|maj7?|min|dim|aug|7|9|sus[24]?)?)/gi;
+    while ((match = progressionPattern.exec(plainText)) !== null) {
+        if (match[1].length > 1) chords.add(match[1]);
+        if (match[2].length > 1) chords.add(match[2]);
+    }
+
+    // Look for sequences of chords (space-separated, at least 3 in a row)
+    const sequencePattern = /([A-G][#b]?(?:m|maj7?|7|dim|aug|sus[24])?)\s+([A-G][#b]?(?:m|maj7?|7|dim|aug|sus[24])?)\s+([A-G][#b]?(?:m|maj7?|7|dim|aug|sus[24])?)/gi;
+    while ((match = sequencePattern.exec(plainText)) !== null) {
+        if (match[1].length > 1) chords.add(match[1]);
+        if (match[2].length > 1) chords.add(match[2]);
+        if (match[3].length > 1) chords.add(match[3]);
+    }
+
+    console.log('[SongAnalyzer] Found chords before filtering:', Array.from(chords));
+
+    // Convert to array and sort by musical order
+    const sortOrder = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B'];
+
+    const result = Array.from(chords)
+        .filter(c => {
+            // Must be at least 2 characters (e.g., "Am", "C7", "Bb")
+            // OR be a valid single-letter chord with modifier
+            if (c.length < 2) return false;
+
+            // Must start with a valid note
+            if (!/^[A-G]/.test(c)) return false;
+
+            return true;
+        })
+        .sort((a, b) => {
+            const rootA = a.match(/^[A-G][#b]?/)?.[0] || '';
+            const rootB = b.match(/^[A-G][#b]?/)?.[0] || '';
+            return sortOrder.indexOf(rootA) - sortOrder.indexOf(rootB);
+        })
+        .slice(0, 20); // Limit to 20 chords
+
+    console.log('[SongAnalyzer] Final chord list:', result);
+    return result;
+}
+
+/**
+ * Apply an online chord suggestion - highlights matching/different chords in the timeline
+ */
+export function applyOnlineChord(chordName) {
+    console.log(`[SongAnalyzer] Applying online chord: ${chordName}`);
+
+    // Find and highlight matching chords in the detected timeline
+    const timeline = document.getElementById('detected-chords-timeline');
+    if (!timeline) return;
+
+    // Normalize chord name for comparison
+    const normalizeChord = (c) => {
+        return c.replace(/maj/gi, '')
+                .replace(/min/gi, 'm')
+                .replace(/M(?![a-z])/g, '')
+                .trim()
+                .toUpperCase();
+    };
+
+    const targetNormalized = normalizeChord(chordName);
+
+    // Find all chord items in the timeline
+    const chordItems = timeline.querySelectorAll('[data-chord]');
+    let matchCount = 0;
+
+    chordItems.forEach(item => {
+        const itemChord = item.getAttribute('data-chord');
+        const itemNormalized = normalizeChord(itemChord);
+
+        // Check if this chord matches (considering root only for partial matches)
+        const targetRoot = targetNormalized.match(/^[A-G][#B]?/)?.[0];
+        const itemRoot = itemNormalized.match(/^[A-G][#B]?/)?.[0];
+
+        if (itemNormalized === targetNormalized) {
+            // Exact match - highlight green
+            item.classList.add('ring-2', 'ring-green-500', 'bg-green-50');
+            matchCount++;
+        } else if (targetRoot && itemRoot && targetRoot === itemRoot) {
+            // Root matches but quality differs - highlight yellow
+            item.classList.add('ring-2', 'ring-yellow-500', 'bg-yellow-50');
+        }
+    });
+
+    // Show a brief toast or update
+    const resultsEl = document.getElementById('online-chords-results');
+    const existingToast = resultsEl?.querySelector('.online-chord-toast');
+    if (existingToast) existingToast.remove();
+
+    if (resultsEl) {
+        const toast = document.createElement('div');
+        toast.className = 'online-chord-toast text-xs mt-2 p-2 rounded bg-purple-100 text-purple-700';
+        toast.textContent = matchCount > 0
+            ? `Found ${matchCount} matching "${chordName}" chord${matchCount !== 1 ? 's' : ''} (highlighted in green)`
+            : `No exact matches for "${chordName}" - similar roots highlighted in yellow`;
+        resultsEl.appendChild(toast);
+
+        // Remove toast after 5 seconds
+        setTimeout(() => toast.remove(), 5000);
+    }
+}
+
 export function initSongAnalyzer() {
     console.log('[SongAnalyzer] Initializing...');
 
@@ -2267,6 +2984,21 @@ export function initSongAnalyzer() {
     window.getTransposeOffset = getTransposeOffset;
     window.setExpectedKey = setExpectedKey;
     window.getDetectedKey = getDetectedKey;
+    window.setEnharmonicPreference = setEnharmonicPreference;
+    window.getEnharmonicPreference = getEnharmonicPreference;
+    window.setExpectedKeyHint = setExpectedKeyHint;
+    window.getExpectedKeyHint = getExpectedKeyHint;
+    window.searchOnlineChords = searchOnlineChords;
+    window.applyOnlineChord = applyOnlineChord;
+
+    // Show server option if configured
+    if (SERVER_ENABLED && SERVER_API_URL) {
+        const serverLabel = document.getElementById('server-method-label');
+        if (serverLabel) {
+            serverLabel.classList.remove('hidden');
+            console.log('[SongAnalyzer] Server analysis option enabled');
+        }
+    }
 
     console.log('[SongAnalyzer] Initialized successfully');
 }
