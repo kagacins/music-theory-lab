@@ -50,7 +50,9 @@ export function updateKeySignatureDisplay(key) {
     }
 
     if (imageInfo && trebleImg) {
-        trebleImg.src = `public/key_signatures/${imageInfo.treble}`;
+        // Use BASE_URL for correct path in production (GitHub Pages with base path)
+        const basePath = import.meta.env?.BASE_URL || '/';
+        trebleImg.src = `${basePath}key_signatures/${imageInfo.treble}`;
     }
 
     // Show the enharmonic label if an equivalent key was used for the image

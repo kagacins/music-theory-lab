@@ -3,6 +3,15 @@
 /* Integrated Canvas Suggestions System */
 @import './src/modules/canvas/suggestions/components/SuggestionPalette.css?v=9';
 
+/* ============================================================================
+   MODULAR CSS IMPORTS
+   Feature-specific styles extracted for better maintainability
+   ============================================================================ */
+@import './src/styles/keyboard.css';
+@import './src/styles/header.css';
+@import './src/styles/sidebar.css';
+@import './src/styles/components.css';
+
 /* Design Tokens - Note: Centralized tokens also available in src/styles/variables.css */
 :root {
     /* Tab Colors */

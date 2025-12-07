@@ -1,0 +1,205 @@
+/**
+ * Sidebar Styles
+ * Left sidebar navigation, settings groups, and toggles
+ * Extracted from music.css for better modularity
+ */
+
+/* ============================================================================
+   SIDEBAR - Modern Glass Effect
+   ============================================================================ */
+
+#sidebar {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: var(--shadow-soft);
+}
+
+/* Sidebar Scrollbar */
+#sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(139, 92, 246, 0.5) rgba(0, 0, 0, 0.2);
+}
+
+#sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+#sidebar::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+#sidebar::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.5);
+    border-radius: 3px;
+}
+
+#sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.7);
+}
+
+/* Sidebar Heading */
+#sidebar h2 {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+/* ============================================================================
+   SIDEBAR BUTTONS
+   ============================================================================ */
+
+.sidebar-btn {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.sidebar-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transition: left 0.5s;
+}
+
+.sidebar-btn:hover::before {
+    left: 100%;
+}
+
+.sidebar-btn:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* Settings Section */
+#sidebar .border-t {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Ensure equal spacing between toggle rows */
+#sidebar .flex.flex-col.gap-2 > div {
+    min-height: 2rem;
+    display: flex;
+    align-items: center;
+}
+
+/* ============================================================================
+   TOGGLE SWITCHES - Modern Design
+   ============================================================================ */
+
+.toggle-bg {
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+input:checked + .toggle-bg {
+    background: var(--gradient-primary);
+    box-shadow: 0 0 15px rgba(102, 126, 234, 0.5);
+}
+
+.toggle-bg:after {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================================================
+   SETTINGS GROUP STYLING
+   ============================================================================ */
+
+.settings-group {
+    margin-bottom: 0.5rem;
+}
+
+.settings-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 0.5rem;
+}
+
+.settings-group-header:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 0.375rem;
+    margin: 0 -0.5rem;
+    padding: 0.5rem;
+}
+
+.settings-group-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #9CA3AF;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.settings-group-title svg {
+    opacity: 0.7;
+}
+
+.settings-group-chevron {
+    width: 1rem;
+    height: 1rem;
+    color: #6B7280;
+    transition: transform 0.2s ease;
+}
+
+.settings-group.collapsed .settings-group-chevron {
+    transform: rotate(-90deg);
+}
+
+.settings-group-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-left: 0.25rem;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.2s ease;
+}
+
+.settings-group.collapsed .settings-group-content {
+    max-height: 0;
+    opacity: 0;
+    margin-bottom: 0;
+}
+
+.settings-group:not(.collapsed) .settings-group-content {
+    max-height: 500px;
+    opacity: 1;
+}
+
+/* Settings Group Focus State */
+.settings-group-header:focus-visible {
+    outline: 2px solid white;
+    outline-offset: 2px;
+    border-radius: 0.375rem;
+}
+
+/* ============================================================================
+   SIDEBAR TOOLTIP POSITIONING
+   ============================================================================ */
+
+/* Allow tooltips to escape overflow container */
+#sidebar > .flex-1.overflow-y-auto {
+    overflow-x: visible !important;
+}
+
+/* Ensure sidebar tooltips appear above everything else */
+#sidebar .group > div.absolute.left-full {
+    z-index: 9999;
+}

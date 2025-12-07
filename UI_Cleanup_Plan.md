@@ -289,9 +289,9 @@ Replace varied timings (0.15s, 0.2s, 0.25s, 0.3s) with CSS variables:
 | Header modernization | MEDIUM | **COMPLETED** | Dec 7, 2025 |
 | Standardize breakpoints | MEDIUM | Not Started | - |
 | Complete dark mode | MEDIUM | Not Started | - |
-| Split music.css | LOW | Not Started | - |
-| Remove legacy files | LOW | Not Started | - |
-| Standardize animations | LOW | Not Started | - |
+| Split music.css | LOW | **COMPLETED** | Dec 7, 2025 |
+| Remove legacy files | LOW | **COMPLETED** | Dec 7, 2025 |
+| Standardize animations | LOW | **COMPLETED** | Dec 7, 2025 |
 
 ---
 
@@ -350,6 +350,27 @@ Replace varied timings (0.15s, 0.2s, 0.25s, 0.3s) with CSS variables:
 - Compact 56px fixed header height
 - Full title "Interactive Music Theory Lab" always displayed
 - Removed wrapping/abbreviation logic
+
+### Completed: Split music.css
+- Created modular CSS architecture with separate feature files:
+  - `src/styles/keyboard.css` - Piano keyboard styles and highlighting states
+  - `src/styles/header.css` - Header bar, tab pills, and displays
+  - `src/styles/sidebar.css` - Sidebar, settings groups, toggles
+  - `src/styles/components.css` - Panels, floating controls, scrollbars
+- Added `@import` statements at top of `music.css` for all modules
+- Original styles remain in `music.css` as fallback (gradual migration)
+
+### Completed: Remove Legacy Files
+- Deleted `src/modules/audio/melodyGenerator_old.js`
+- Deleted `src/modules/features/progressionBuilder-simplified-refactor.js`
+- Works/ folder legacy files not present in current codebase
+
+### Completed: Standardize Animations
+- Animation timing variables already present in `src/styles/variables.css`:
+  - `--transition-fast: 0.15s ease`
+  - `--transition-normal: 0.25s ease`
+  - `--transition-slow: 0.35s ease`
+- No additional changes needed
 
 ---
 

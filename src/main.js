@@ -2535,11 +2535,9 @@ window.onload = () => {
                     window.handleAutoPlayback();
                 }
             } else if (currentTab === 'builder') {
-                // Chord Lab: Play current chord or progression if exists
-                if (window.handleAutoPlayback) {
-                    window.handleAutoPlayback();
-                } else if (window.playBuilderChord) {
-                    window.playBuilderChord();
+                // Chord Lab: Play current chord (primary action)
+                if (window.playBuilderChordWithDuration) {
+                    window.playBuilderChordWithDuration();
                 }
             }
         });
@@ -2557,6 +2555,26 @@ window.onload = () => {
     // Play Chords Only (progression without melody)
     if (actionPlayProgression) {
         actionPlayProgression.addEventListener('click', () => {
+            if (window.handleAutoPlayback) {
+                window.handleAutoPlayback();
+            }
+        });
+    }
+
+    // Chord Lab: Play Current Chord dropdown option
+    const actionPlayCurrentChord = document.getElementById('action-play-current-chord');
+    if (actionPlayCurrentChord) {
+        actionPlayCurrentChord.addEventListener('click', () => {
+            if (window.playBuilderChordWithDuration) {
+                window.playBuilderChordWithDuration();
+            }
+        });
+    }
+
+    // Chord Lab: Play Progression dropdown option
+    const actionPlayBuilderProgression = document.getElementById('action-play-builder-progression');
+    if (actionPlayBuilderProgression) {
+        actionPlayBuilderProgression.addEventListener('click', () => {
             if (window.handleAutoPlayback) {
                 window.handleAutoPlayback();
             }

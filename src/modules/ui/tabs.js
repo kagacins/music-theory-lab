@@ -331,10 +331,25 @@ export function switchTab(tabId, options = {}) {
         }
     }
 
-    // Update the main page title - just show base title (tab is indicated by the pill buttons)
-    const mainTitle = document.getElementById('main-title');
-    const baseTitle = "Interactive Music Theory Lab";
-    mainTitle.textContent = baseTitle;
+    // Update the tab subtitle to show current tab name
+    const tabSubtitle = document.getElementById('tab-subtitle');
+    if (tabSubtitle) {
+        const tabNames = {
+            'builder': 'Chord Lab',
+            'melody': 'Composition Studio',
+            'scales': 'Scale Explorer',
+            'learn': 'Theory Academy'
+        };
+        const tabColors = {
+            'builder': 'text-amber-600',
+            'melody': 'text-violet-600',
+            'scales': 'text-lime-600',
+            'learn': 'text-blue-600'
+        };
+        // Remove all color classes and add the new one
+        tabSubtitle.className = 'text-[10px] font-semibold leading-tight ' + (tabColors[tabId] || 'text-gray-600');
+        tabSubtitle.textContent = tabNames[tabId] || tabId;
+    }
 
     // Update preset button visibility based on current tab
     updateButtonVisibility();
