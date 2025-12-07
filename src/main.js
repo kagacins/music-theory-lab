@@ -211,7 +211,6 @@ import {
     setCurrentMelody,
     getCurrentMelody,
     exportMelodyToMIDI,
-    toggleMelodyGeneratorPanel,
     renderMelodyNotation,
     renderChordMelodyTimeline,
     toggleMelodyEditMode,
@@ -1288,8 +1287,7 @@ window.expandAllTrainerSections = function() {
         { panelId: 'progression-controls-panel', chevronId: 'progression-controls-chevron' },
         { panelId: 'style-mood-insights-panel', chevronId: 'style-mood-insights-chevron' },
         { panelId: 'progression-visualization-panel', chevronId: 'progression-visualization-chevron' },
-        { panelId: 'theory-tools-panel', chevronId: 'theory-tools-chevron' },
-        { panelId: 'melody-generator-panel', chevronId: 'melody-generator-chevron' }
+        { panelId: 'theory-tools-panel', chevronId: 'theory-tools-chevron' }
     ];
     sections.forEach(({ panelId, chevronId }) => {
         const panelEl = document.getElementById(panelId);
@@ -1311,8 +1309,7 @@ window.collapseAllTrainerSections = function() {
         { panelId: 'progression-controls-panel', chevronId: 'progression-controls-chevron' },
         { panelId: 'style-mood-insights-panel', chevronId: 'style-mood-insights-chevron' },
         { panelId: 'progression-visualization-panel', chevronId: 'progression-visualization-chevron' },
-        { panelId: 'theory-tools-panel', chevronId: 'theory-tools-chevron' },
-        { panelId: 'melody-generator-panel', chevronId: 'melody-generator-chevron' }
+        { panelId: 'theory-tools-panel', chevronId: 'theory-tools-chevron' }
     ];
     sections.forEach(({ panelId, chevronId }) => {
         const panelEl = document.getElementById(panelId);
@@ -1795,7 +1792,6 @@ function renderCombinedNotation() {
         ctx.fillText('This will show melody notes over chord symbols.', canvas.width / 2, canvas.height / 2 + 25);
     });
 };
-window.toggleMelodyGeneratorPanel = toggleMelodyGeneratorPanel;
 window.toggleMelodyEditMode = toggleMelodyEditMode;
 window.updateMelodyNote = updateMelodyNote;
 window.deleteMelodyNote = deleteMelodyNote;

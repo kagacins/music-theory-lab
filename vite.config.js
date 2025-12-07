@@ -43,6 +43,19 @@ export default defineConfig(({ mode }) => ({
     ]
   },
 
+  // Force single version of TensorFlow.js to avoid duplicate kernel registrations
+  resolve: {
+    dedupe: [
+      '@tensorflow/tfjs',
+      '@tensorflow/tfjs-core',
+      '@tensorflow/tfjs-backend-cpu',
+      '@tensorflow/tfjs-backend-webgl',
+      '@tensorflow/tfjs-converter',
+      '@tensorflow/tfjs-layers',
+      '@tensorflow/tfjs-data'
+    ]
+  },
+
   // Handle large chunks from TensorFlow
   esbuild: {
     target: 'es2020'

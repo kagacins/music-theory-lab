@@ -593,31 +593,6 @@ export function exportMelodyToMIDI() {
     URL.revokeObjectURL(url);
 }
 
-/**
- * Toggle melody generator panel
- */
-export function toggleMelodyGeneratorPanel() {
-    const panel = document.getElementById('melody-generator-panel');
-    const chevron = document.getElementById('melody-generator-chevron');
-
-    if (panel && chevron) {
-        const isHidden = panel.classList.contains('hidden');
-
-        if (isHidden) {
-            panel.classList.remove('hidden');
-            chevron.classList.add('rotate-180');
-        } else {
-            panel.classList.add('hidden');
-            chevron.classList.remove('rotate-180');
-        }
-        
-        // Save panel state
-        if (window.savePanelState) {
-            window.savePanelState('melody-generator-panel', !isHidden);
-        }
-    }
-}
-
 // ============================================================================
 // VexFlow Notation Rendering
 // ============================================================================

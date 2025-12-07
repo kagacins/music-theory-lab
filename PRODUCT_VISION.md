@@ -1,320 +1,458 @@
-# Music Theory Lab - Product Vision & Roadmap
+# Music Theory Lab - Product Vision & UX Strategy
 
-## The Core Problem
+## Executive Summary
 
-Musicians face a fragmented workflow when working with harmony and chord progressions:
+Music Theory Lab is a **comprehensive, browser-based music theory and composition platform** that combines:
+- Audio chord detection (local files, not just database songs)
+- Intelligent chord/melody recommendations with style/mood awareness
+- Full notation rendering (VexFlow grand staff)
+- Interactive theory lessons (beginner → advanced)
+- Practice and training modes
 
-- **Songwriters** record demos but struggle to identify what they played and communicate it to collaborators
-- **Students** learn theory in isolation without hearing/seeing how concepts apply to real music
-- **Hobbyists** want to write songs but don't know what chord "should" come next
-- **Worship leaders & band directors** need quick charts for original arrangements
-
-Existing tools solve pieces of this:
-- Chordify detects chords in *existing* songs (not your recordings)
-- Noteflight/Finale render notation (but don't help you write)
-- Hooktheory teaches theory (but isn't a creation tool)
-- DAWs have MIDI (but no theory intelligence)
-
-**Music Theory Lab bridges these gaps** — analyze, understand, create, and export, all in one free browser-based tool.
+**The core technology is built.** The challenge now is:
+1. Making it discoverable and usable
+2. Creating clear user flows
+3. Reducing visual clutter without losing functionality
+4. Adding export capabilities for monetization
 
 ---
 
-## What Makes This Unique
+## What's Actually Built (Comprehensive Audit)
 
-### 1. Analyze Your Own Music
-Most chord detection tools focus on songs in their database. Music Theory Lab analyzes LOCAL audio files — your demos, your recordings, your ideas. This serves songwriters and producers working on original material.
+### Core Engines (Fully Implemented)
 
-### 2. Theory-Aware Recommendations
-Not just "here are the chords" but "here's WHY they work and what could come NEXT."
+| Feature | Status | Location |
+|---------|--------|----------|
+| Audio chord detection (madmom) | Complete | `songAnalyzer.js` |
+| 3D chord recommendations (root × type × inversion) | Complete | `comprehensiveChordRecommendations.js` |
+| Style-aware scoring (pop, jazz, classical, rock) | Complete | `comprehensiveChordRecommendations.js` |
+| Mood-aware scoring (bright, dark, tense, calm) | Complete | `comprehensiveChordRecommendations.js` |
+| Tension arc planning | Complete | `TensionArcPlanner.js` |
+| Section-aware recommendations | Complete | `sectionTransitionAnalyzer.js` |
+| Voice leading optimization | Complete | `enhancedVoiceLeading.js` |
+| Melody phrase generation | Complete | `melodicPhraseGenerator.js` |
+| Auto-harmonization | Complete | `autoHarmonize.js` |
+| VexFlow notation rendering | Complete | `grandStaff.js` |
 
-### 3. Integrated Workflow
-Audio analysis → Notation rendering → Theory suggestions → Practice mode → Export. One tool, no context switching.
+### Educational System (Fully Implemented)
 
-### 4. Free & Browser-Based
-No install, no subscription for core features. Accessible to students and hobbyists.
+| Feature | Status | Location |
+|---------|--------|----------|
+| Lesson curriculum (20+ lessons) | Complete | `theoryExplanations/lessons/` |
+| Interactive tutorials | Complete | `interactiveTutorial.js` |
+| "Why This Works" explanations | Complete | `whyThisWorksPanel.js` |
+| Multi-level explanations (beginner/intermediate/advanced) | Complete | `theoryExplanations/` |
+| Progress tracking | Complete | `learningProgress.js` |
+| Quiz system | Complete | `lessonViewer.js` |
 
----
+### UI Components (Fully Implemented)
 
-## Target Audiences
+| Feature | Status | Location |
+|---------|--------|----------|
+| Unified Recommendation Modal (Tab key) | Complete | `UnifiedRecommendationModal.js` |
+| Circle of Fifths | Complete | `circleOfFifths.js` |
+| Guitar fretboard | Complete | `guitarFretboard.js` |
+| Theory tools panel | Complete | `theoryTools.js` |
+| Chord cards display | Complete | `progressionBuilder.js` |
 
-| Audience | Pain Point | Value Proposition |
-|----------|-----------|-------------------|
-| **Indie Songwriters** | "I recorded a demo, now I need a chart for my band" | Demo → Lead Sheet in 60 seconds |
-| **Music Students** | "I learn theory but can't apply it" | See/hear theory concepts in context |
-| **Worship Teams** | "We need charts for Sunday, fast" | Quick analysis + professional export |
-| **Hobbyist Musicians** | "I don't know what chord comes next" | Intelligent suggestions based on theory |
-| **Music Teachers** | "I need to create examples and analyze student work" | All-in-one teaching tool |
+### What's Missing
 
----
-
-## The Intelligence Layer: Theory & Recommendation Engines
-
-This is the differentiator. While other tools are passive (show you what exists), Music Theory Lab is active (suggests what could be).
-
-### A. Next Chord Recommendations
-
-**How it works:**
-- Analyze current progression context (key, recent chords, cadence patterns)
-- Suggest chords ranked by:
-  - **Common practice** — What statistically follows in this style?
-  - **Voice leading** — What moves smoothly from current voicing?
-  - **Harmonic function** — What creates appropriate tension/resolution?
-  - **Style matching** — Jazz vs Pop vs Classical expectations
-
-**User experience:**
-```
-Current: Am → F → G → ?
-
-Suggestions:
-  [C]  — Resolve to tonic (I). Classic V-I cadence.
-  [Am] — Return to vi. Creates loop (Axis progression).
-  [E7] — Secondary dominant (V/vi). Adds tension before Am.
-  [Dm] — Move to iv. Darker, modal sound.
-```
-
-**Implementation approach:**
-- Rule-based system using functional harmony (I, IV, V relationships)
-- Weighted by detected style/genre
-- Voice leading calculator finds smoothest transitions
-- User feedback loop: track which suggestions are accepted
-
-### B. Harmony Enhancement Suggestions
-
-**The problem:** Detected chords are often simplified. "A" might really be "A7" or "Amaj7" in context.
-
-**How it works:**
-- Compare detected chords against:
-  - Online chord databases (what do published charts show?)
-  - Harmonic context (dominant chords often want 7ths)
-  - Style norms (jazz = extensions, pop = triads)
-- Suggest enhancements: "Consider A7 here — dominant 7ths are common before the IV chord"
-
-**User experience:**
-```
-Detected: D → G → A → D
-
-Suggestions:
-  A → A7: "Dominant 7th adds pull toward D (V7-I resolution)"
-  G → Gmaj7: "Major 7th adds sophistication (common in singer-songwriter style)"
-```
-
-### C. Melody-Harmony Relationship
-
-**How it works:**
-- Given a chord progression, suggest melody notes that:
-  - Land on chord tones on strong beats
-  - Use passing tones and neighbor tones appropriately
-  - Follow common melodic patterns for the style
-  - Respect voice leading from melody note to melody note
-
-**User experience:**
-```
-Progression: C → Am → F → G
-
-Melody suggestions for measure 1 (C chord):
-  Strong beats: C, E, G (chord tones)
-  Passing options: D (between C-E), F (between E-G)
-  Tension note: B (major 7, resolve down to G)
-```
-
-### D. Secondary Dominants & Borrowed Chords
-
-**Already partially implemented.** Expand to:
-- Explain WHY each option works
-- Audio preview of each option
-- Show notation of how it changes the progression
-- Suggest specific voice leading for smooth integration
-
-**User experience:**
-```
-Current progression: C → Am → Dm → G
-
-Theory suggestions:
-  [Insert E7 before Am]: "Secondary dominant (V/vi) creates stronger pull to Am"
-  [Replace Dm with D7]: "Secondary dominant (V/V) intensifies motion to G"
-  [Replace Am with Ab]: "Borrowed from C minor (bVI). Creates chromatic bass line."
-```
-
-### E. Style/Genre Awareness
-
-**How it works:**
-- Detect or let user specify genre
-- Adjust all recommendations to match style norms:
-
-| Genre | Characteristics | Recommendation Style |
-|-------|-----------------|---------------------|
-| Pop | Triads, 4-chord loops, predictable | Suggest common patterns (I-V-vi-IV) |
-| Jazz | Extensions, ii-V-I, chromatic | Suggest 7ths, 9ths, alterations |
-| Classical | Functional harmony, voice leading | Emphasize proper resolution |
-| Folk | Simple triads, modal borrowing | Suggest relative minor, modal interchange |
-| Gospel | Extended chords, chromatic passing | Suggest 7ths, diminished passing chords |
-
-### F. "Why Does This Work?" Explanations
-
-**The educational layer.** Every suggestion includes:
-- Theory explanation in plain language
-- Roman numeral analysis
-- Audio example
-- Historical/style context
-
-**Example:**
-```
-Why does F → G → C sound good?
-
-This is a IV → V → I progression in C major.
-- F (IV) is the subdominant — creates gentle tension
-- G (V) is the dominant — creates strong pull toward home
-- C (I) is the tonic — resolution, "home" feeling
-
-This is one of the most common progressions in Western music,
-found in everything from Bach to The Beatles.
-
-[Play Example] [Show in Notation]
-```
+| Feature | Status | Priority |
+|---------|--------|----------|
+| PDF lead sheet export | Not built | **HIGH** (monetization) |
+| MIDI export | Not built | **HIGH** (monetization) |
+| MusicXML export | Not built | MEDIUM |
+| Shareable links | Not built | MEDIUM |
+| Onboarding wizard | Not built | **HIGH** (adoption) |
+| Simplified UI modes | Not built | **HIGH** (usability) |
+| User preference learning | Code exists, not active | LOW (future) |
 
 ---
 
-## Product Roadmap
+## The UX Problem
 
-### Phase 1: Core Polish (Current)
-- [x] Audio chord detection
-- [x] Notation rendering
-- [x] Basic theory tools (secondary dominants, modal interchange)
-- [x] Practice/trainer mode
-- [ ] Bug fixes and UX improvements
+### Current State
 
-### Phase 2: The "Demo to Lead Sheet" Pipeline
-**Goal:** Clear workflow for analyzing original recordings
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Header: 5 tabs + settings + displays                        │
+├─────────────────────────────────────────────────────────────┤
+│ Keyboard (sticky)                                           │
+├─────────────────────────────────────────────────────────────┤
+│ Tab Content:                                                │
+│   ├── Collapsible Panel 1 (expanded by default?)            │
+│   ├── Collapsible Panel 2                                   │
+│   ├── Collapsible Panel 3                                   │
+│   ├── Collapsible Panel 4                                   │
+│   ├── Collapsible Panel 5                                   │
+│   ├── Collapsible Panel 6                                   │
+│   └── Collapsible Panel 7...                                │
+├─────────────────────────────────────────────────────────────┤
+│ Sidebar: 12+ toggles for features                           │
+└─────────────────────────────────────────────────────────────┘
+```
 
-- [ ] **Section detection** — Identify verse/chorus/bridge from patterns
-- [ ] **PDF lead sheet export** — Professional output with chord symbols, structure
-- [ ] **MIDI export** — For DAW integration
-- [ ] **MusicXML export** — For Finale/Sibelius/MuseScore
+**Problems:**
+1. **Overwhelming first impression** — New users see a wall of collapsed panels
+2. **No clear starting point** — "Where do I click first?"
+3. **Feature hiding** — Powerful features (Tab modal, lessons) are not obvious
+4. **Cognitive load** — Even collapsed, 7+ panels create decision fatigue
+5. **No task guidance** — Users must figure out the workflow themselves
 
-**Monetization:** Free to use, paid exports ($3-5 per export or $10/month unlimited)
+### The Insight
 
-### Phase 3: Intelligent Recommendations
-**Goal:** The theory-aware assistant
-
-- [ ] **Next chord suggestions** — Context-aware recommendations
-- [ ] **Harmony enhancement** — "A could be A7 here"
-- [ ] **Voice leading optimizer** — Smoothest path between chords
-- [ ] **Style detection** — Adjust suggestions to genre
-
-### Phase 4: Educational Layer
-**Goal:** Teach while you create
-
-- [ ] **"Why does this work?"** — Explanations for every suggestion
-- [ ] **Guided lessons** — "Build your first jazz progression"
-- [ ] **Ear training mode** — Identify chords by ear, with feedback
-- [ ] **Progress tracking** — What theory concepts have you mastered?
-
-**Monetization:** Free basics, paid courses/certifications
-
-### Phase 5: Collaboration & Community
-**Goal:** Share and learn together
-
-- [ ] **Shareable links** — "Here's my progression, what do you think?"
-- [ ] **Remix/fork** — Build on others' progressions
-- [ ] **Community library** — Browse progressions by style/mood
-- [ ] **Teacher tools** — Assign exercises, track student progress
-
-**Monetization:** Free personal use, paid team/education licenses
+You've built a **professional-grade tool** but it's presented like a **developer's debug panel** — every feature exposed, no hierarchy, no guidance.
 
 ---
 
-## Revenue Model Options
+## Proposed Solution: Task-Based Modes
 
-### Freemium (Recommended)
-| Free | Paid ($10/month or $50/year) |
-|------|------------------------------|
-| Audio analysis (limited minutes) | Unlimited analysis |
-| Basic notation view | PDF/MIDI/MusicXML export |
-| Theory suggestions | Advanced recommendations |
-| Practice mode | Progress tracking |
-| | Cloud save & sync |
-| | Priority support |
+Instead of organizing by *feature type*, organize by *what the user wants to do*.
+
+### Mode 1: "Quick Start" (New Users)
+
+**Goal:** Get someone making music in 60 seconds
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Welcome! What would you like to do?                        │
+│                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │  🎵 Build   │  │  🎧 Analyze │  │  📚 Learn   │         │
+│  │    a Song   │  │   My Audio  │  │   Theory    │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+│                                                             │
+│  ┌─────────────┐  ┌─────────────┐                          │
+│  │  🔍 Search  │  │  ⚡ Power   │                          │
+│  │  Song Chords│  │   User Mode │                          │
+│  └─────────────┘  └─────────────┘                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Mode 2: "Build a Song" Flow
+
+**Guided workflow:**
+
+```
+Step 1: Choose a Key        →  Circle of Fifths (simplified)
+Step 2: Pick a Style/Mood   →  Style buttons (pop, jazz, etc.)
+Step 3: Add Chords          →  Smart suggestions appear
+Step 4: Refine              →  "Press Tab for more options"
+Step 5: Export              →  PDF / MIDI / Share
+```
+
+**UI shows only relevant tools at each step.**
+
+### Mode 3: "Analyze My Audio" Flow
+
+```
+Step 1: Upload Audio        →  Drag & drop zone
+Step 2: Review Detected     →  Timeline with chords
+Step 3: Import & Edit       →  One-click import to progression
+Step 4: Enhance             →  "Tab" for suggestions
+Step 5: Export Lead Sheet   →  PDF export
+```
+
+### Mode 4: "Learn Theory" Flow
+
+```
+Step 1: Assess Level        →  Quick quiz or self-select
+Step 2: Lesson Path         →  Guided curriculum
+Step 3: Practice            →  Interactive exercises
+Step 4: Apply               →  "Try it in the Builder"
+```
+
+### Mode 5: "Power User" Mode
+
+**Current UI, but with better defaults:**
+- Most panels collapsed by default
+- Clear visual hierarchy
+- Keyboard shortcuts prominently displayed
+- "Tab = Recommendations" always visible
+
+---
+
+## Specific UI Recommendations
+
+### 1. Add a Landing/Home State
+
+When the app loads, don't show the full interface. Show a **choice**:
+
+```javascript
+// Pseudocode
+if (firstVisit || noProgressionLoaded) {
+    showWelcomeScreen();  // The "What would you like to do?" modal
+} else {
+    showLastSession();    // Resume where they left off
+}
+```
+
+### 2. Reduce Visible Panels Per Tab
+
+**Current:** 7-8 panels visible (even if collapsed)
+**Proposed:** 3-4 primary panels + "More Tools" expansion
+
+Example for Progression Workshop:
+```
+ALWAYS VISIBLE:
+├── Current Progression (the main workspace)
+├── Quick Actions Bar (Play, Export, Clear, Tab for Suggestions)
+
+EXPANDABLE "MORE TOOLS":
+├── Song Search
+├── Theory Tools
+├── Style & Mood Insights
+└── Advanced Settings
+```
+
+### 3. Consolidate the Sidebar Toggles
+
+**Current:** 12+ toggles in sidebar
+**Proposed:** Group into categories
+
+```
+DISPLAY
+├── Notation Style (standard/simple)
+├── Dark Mode
+
+FEATURES
+├── Roman Numerals
+├── Guitar Fretboard
+├── Chord Tone Highlighting
+
+ADVANCED (collapsed by default)
+├── Key Names on Keyboard
+├── Compact Controls
+├── Suggestion Engine
+└── etc.
+```
+
+### 4. Make "Tab = Suggestions" Unmissable
+
+The Unified Recommendation Modal is your most powerful feature, but users don't know it exists.
+
+**Solutions:**
+- Floating hint on first visit: "Press Tab for smart suggestions"
+- Subtle pulsing "Tab" indicator near the progression
+- Include in onboarding flow
+
+### 5. Sticky Action Bar
+
+Instead of scrolling to find actions, keep essential controls visible:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ [▶ Play] [⏹ Stop] [Tab: Suggestions] [Export ▼] [? Help]   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 6. Progressive Disclosure in Panels
+
+When a panel IS expanded, don't show everything:
+
+```
+THEORY TOOLS (expanded)
+├── Secondary Dominants  [+ Add]
+├── Modal Interchange    [+ Add]
+├── Chord Substitutions  [+ Add]
+└── [Show Advanced Options ▼]
+    ├── Extended Harmonics
+    ├── Custom Voicings
+    └── etc.
+```
+
+---
+
+## Visual Design Recommendations
+
+### What Works
+- **Tab-specific color themes** — Good for wayfinding (knowing which tab you're in)
+- **Keyboard highlighting per tab** — Reinforces the tab identity
+- **Gradient headers** — Provide visual hierarchy
+
+### What Could Improve
+
+**1. Consistency Within Each Tab**
+
+Currently, panels within the same tab have different gradient schemes:
+- Progression Workshop has: purple→pink, teal→indigo, amber→orange, blue→cyan, violet→fuchsia
+
+Consider: Use the **tab's primary color** for all panels within that tab, with varying intensity:
+```
+Tab: Progression Workshop (purple theme)
+├── Primary panel:   Purple gradient header (bold)
+├── Secondary panel: Purple-tinted border/accent (subtle)
+├── Tertiary panel:  Neutral with purple icon accent
+```
+
+**2. Reduce Gradient Intensity**
+
+Instead of bold gradients on every header:
+```css
+/* Current: Bold gradient */
+.panel-header {
+    background: linear-gradient(to right, #8B5CF6, #EC4899);
+}
+
+/* Alternative: Subtle gradient or solid with accent */
+.panel-header {
+    background: #F5F3FF;  /* Very light purple */
+    border-left: 3px solid #8B5CF6;  /* Color accent */
+}
+```
+
+**3. Let Content Be Colorful, Not Chrome**
+
+The interesting colors should be on:
+- Chord cards (function-based coloring)
+- Notes on the keyboard
+- Notation highlights
+
+The UI chrome (headers, borders, buttons) can be more subdued so content stands out.
+
+**4. Whitespace**
+- Increase padding between sections
+- Let content breathe
+- Collapsed panels could have less visual weight
+
+---
+
+## Implementation Roadmap
+
+### Phase 1: UI Stabilization (First Priority)
+**Goal:** Finalize the interface before building onboarding
+
+- [ ] Decide on panel organization per tab (what stays, what goes to "More Tools")
+- [ ] Unify color scheme within each tab (tab identity, consistent intensity)
+- [ ] Reduce visual clutter (collapsed defaults, whitespace)
+- [ ] Add sticky action bar with key controls
+- [ ] Add "Press Tab for suggestions" hint
+- [ ] Consolidate sidebar toggles into grouped categories
+- [ ] Test with a few real users, iterate
+
+### Phase 2: Export Pipeline
+**Goal:** Enable monetization
+
+- [ ] PDF lead sheet export (basic)
+- [ ] MIDI export
+- [ ] Shareable progression links
+
+### Phase 3: Onboarding & Guided Flows
+**Goal:** Help new users (only after UI is stable)
+
+- [ ] Welcome modal for first-time users ("What do you want to do?")
+- [ ] "Build a Song" guided flow
+- [ ] "Analyze My Audio" guided flow
+- [ ] Keyboard shortcut cheat sheet
+
+### Phase 4: Polish & Monetization
+- [ ] Freemium gate on exports
+- [ ] Landing page / marketing site
+- [ ] User feedback collection
+- [ ] Analytics to track activation/engagement
+
+---
+
+## Monetization Strategy
+
+### Free Tier
+- Full access to all creation tools
+- Audio analysis (limited minutes/day?)
+- All lessons and learning content
+- Basic notation view
+
+### Paid Tier ($10/month or $50/year)
+- Unlimited audio analysis
+- PDF lead sheet export
+- MIDI export
+- MusicXML export
+- Cloud save & sync
+- No watermark on exports
 
 ### One-Time Purchases
 - Export pack: $5 for 10 exports
-- Course bundle: $29 for complete theory course
-- Desktop app: $49 one-time
-
-### B2B / Education
-- School/church site license: $99/year
-- LMS integration: Custom pricing
-- White-label: Custom pricing
-
----
-
-## Competitive Positioning
-
-```
-                    Theory Intelligence
-                           ↑
-                           |
-        Music Theory Lab   |   Hooktheory
-        (Your recordings,  |   (Learning focused,
-         create & learn)   |    limited creation)
-                           |
-   ←───────────────────────┼───────────────────────→
-   Your Music              |              Existing Songs
-                           |
-        DAWs               |   Chordify
-        (Powerful but no   |   (Great detection,
-         theory help)      |    no creation tools)
-                           |
-                           ↓
-                    Passive Display
-```
-
-**Music Theory Lab's unique position:** Theory-intelligent tools for YOUR original music.
+- Lifetime access: $99
 
 ---
 
 ## Key Metrics to Track
 
+### Activation
+- % of new users who create a progression
+- % who use Tab (recommendations modal)
+- % who complete first lesson
+
 ### Engagement
-- Audio files analyzed per user
+- Sessions per week
 - Progressions created per session
-- Suggestions accepted vs. ignored
-- Return visit rate
+- Features used per session
 
-### Value
-- Exports generated (conversion to paid)
-- Time spent in learning modules
-- Completion rate for guided lessons
-
-### Growth
-- Organic signups
-- Shared progression views
-- Referral rate
+### Conversion
+- % who attempt export
+- % who convert to paid
 
 ---
 
-## The Vision
+## The North Star
 
-**Music Theory Lab becomes the intelligent companion for anyone creating music with chords.**
+**"Music Theory Lab is where musicians go to understand, create, and share chord progressions — powered by intelligent suggestions that teach as they assist."**
 
-Not just a tool that shows you what exists, but a teacher and collaborator that:
-- Understands what you're trying to create
-- Suggests improvements grounded in theory
-- Explains concepts as you encounter them
-- Grows with you from beginner to advanced
-
-The goal isn't to replace human creativity — it's to democratize music theory knowledge so anyone can write better progressions, understand why songs work, and communicate their ideas clearly.
+The technology is built. The features are comprehensive. The next phase is about **removing friction** and **guiding users** to the powerful tools you've already created.
 
 ---
 
-## Next Actions
+## Appendix: Current Feature Inventory
 
-1. **Validate the "Demo to Lead Sheet" workflow** — Find 10 songwriters, have them try it, watch where they struggle
-2. **Build PDF export** — Even basic, this unlocks revenue
-3. **Prototype next-chord suggestions** — Start simple (common progressions), iterate based on feedback
-4. **Create landing page** — Clear value prop: "Turn your demo into a lead sheet in 60 seconds"
-5. **Set up analytics** — Understand how people actually use the tool
+### Tab: Chord Lab
+- Chord Setup (root, type, inversion, octave)
+- Chord Library (presets)
+- Intervals Panel
+- Builder Progression Cards
+
+### Tab: Progression Workshop
+- Song Search (local + free online)
+- Progression Setup (key, circle of fifths, templates)
+- Current Progression (cards + notation views)
+- Style & Mood Insights
+- Theory Tools (secondary dominants, modal interchange, substitutions)
+
+### Tab: Composition Studio
+- Full notation editor
+- Melody tools
+- Bass patterns
+- Section management
+
+### Tab: Scale Explorer
+- Scale visualization
+- Mode explorer
+- Scale patterns
+
+### Tab: Theory Academy
+- Lesson browser
+- Interactive tutorials
+- Progress tracking
+- Quizzes
+
+### Global: Unified Recommendations (Tab key)
+- Chord suggestions
+- Melody suggestions
+- Section generation
+- Auto-harmonize
+- Polyphony preview
+
+### Sidebar Settings
+- Notation style toggle
+- Enharmonic preference
+- Roman numeral display
+- Key names on keyboard
+- Classic keyboard style
+- Compact controls
+- Dark mode
+- Guitar fretboard
+- Suggestion engine
+- Chord spans
+- Chord tone highlighting
 
 ---
 
-*Document created: December 2024*
-*Last updated: December 2024*
+*Document updated: December 2024*

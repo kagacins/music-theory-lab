@@ -140,8 +140,7 @@ function getTabPanelConfigs(tabId) {
             { panelId: 'progression-controls-panel', toggleId: 'progression-controls-toggle', chevronId: 'progression-controls-chevron' },
             { panelId: 'style-mood-insights-panel', toggleId: 'style-mood-insights-toggle', chevronId: 'style-mood-insights-chevron' },
             { panelId: 'progression-visualization-panel', toggleId: 'progression-visualization-toggle', chevronId: 'progression-visualization-chevron' },
-            { panelId: 'theory-tools-panel', toggleId: 'theory-tools-toggle', chevronId: 'theory-tools-chevron' },
-            { panelId: 'melody-generator-panel', toggleId: 'melody-generator-toggle', chevronId: 'melody-generator-chevron' }
+            { panelId: 'theory-tools-panel', toggleId: 'theory-tools-toggle', chevronId: 'theory-tools-chevron' }
         ],
         melody: [
             { panelId: 'melody-progression-panel', toggleId: 'melody-progression-toggle', chevronId: 'melody-progression-chevron' },

@@ -270,6 +270,46 @@ export const RHYTHM_PATTERNS = {
             }
             return pattern;
         }
+    },
+    even8th: {
+        id: 'even8th',
+        label: 'Even 8th Notes',
+        description: 'All eighth notes - steady 8th note feel',
+        getPattern: (length) => Array(length).fill(0.5) // All 8th notes (0.5 beats each)
+    },
+    even16th: {
+        id: 'even16th',
+        label: 'Even 16th Notes',
+        description: 'All sixteenth notes - fast, busy feel',
+        getPattern: (length) => Array(length).fill(0.25) // All 16th notes (0.25 beats each)
+    },
+    swing: {
+        id: 'swing',
+        label: 'Swing',
+        description: 'Jazz swing feel - long-short triplet groove',
+        getPattern: (length) => {
+            // Swing is typically 2:1 ratio (like triplet quarter + triplet eighth)
+            // For every pair: first note gets 2/3, second gets 1/3
+            const pattern = [];
+            for (let i = 0; i < length; i++) {
+                pattern.push(i % 2 === 0 ? 2 : 1); // 2:1 ratio for swing feel
+            }
+            return pattern;
+        }
+    },
+    mixed: {
+        id: 'mixed',
+        label: 'Mixed Rhythms',
+        description: 'Varied rhythm values for interest',
+        getPattern: (length) => {
+            // Mix of different note values for rhythmic variety
+            const rhythmOptions = [1, 1, 1.5, 2, 0.5, 0.5, 1];
+            const pattern = [];
+            for (let i = 0; i < length; i++) {
+                pattern.push(rhythmOptions[i % rhythmOptions.length]);
+            }
+            return pattern;
+        }
     }
 };
 
