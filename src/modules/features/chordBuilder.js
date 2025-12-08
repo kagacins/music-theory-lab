@@ -1729,7 +1729,8 @@ export function updateBuilderDisplay() {
             setBuilderOmittedNotes([...notesForHighlight]);
             updateBuilderDisplay();
             playCurrentChord();
-        }
+        },
+        { externalButtonsContainerId: 'rh-voicing-buttons' }
     );
 
     const allLhNotes = getLHNotes(
@@ -2784,35 +2785,58 @@ export function renderBuilderSelectors() {
  * @param {Function} onToggle - Callback when note is toggled
  * @param {Function} onSelectAll - Callback to select all notes
  * @param {Function} onSelectNone - Callback to select none notes
+ * @param {Object} options - Additional options
+ * @param {string} options.externalButtonsContainerId - If provided, wire up buttons in this external container instead of rendering them inline
  */
-export function renderVoicingEditor(notes, editorId, containerId, omittedNotes, onToggle, onSelectAll = null, onSelectNone = null) {
+export function renderVoicingEditor(notes, editorId, containerId, omittedNotes, onToggle, onSelectAll = null, onSelectNone = null, options = {}) {
     const editor = document.getElementById(editorId);
     const editorContainer = document.getElementById(containerId);
     editor.innerHTML = '';
 
     if (!notes || notes.length === 0) {
         editorContainer.classList.add('hidden');
+        // Also hide external buttons container if provided
+        if (options.externalButtonsContainerId) {
+            const extBtns = document.getElementById(options.externalButtonsContainerId);
+            if (extBtns) extBtns.classList.add('hidden');
+        }
         return;
     }
     editorContainer.classList.remove('hidden');
 
-    // Add "All" and "None" buttons if callbacks are provided
-    if (onSelectAll && onSelectNone) {
+    // Handle external buttons (in header)
+    if (options.externalButtonsContainerId && onSelectAll && onSelectNone) {
+        const extBtnsContainer = document.getElementById(options.externalButtonsContainerId);
+        if (extBtnsContainer) {
+            extBtnsContainer.classList.remove('hidden');
+            // Wire up the All and None buttons
+            const allBtn = extBtnsContainer.querySelector('[id$="-select-all"]');
+            const noneBtn = extBtnsContainer.querySelector('[id$="-select-none"]');
+            if (allBtn) {
+                allBtn.onclick = onSelectAll;
+            }
+            if (noneBtn) {
+                noneBtn.onclick = onSelectNone;
+            }
+        }
+    }
+    // Only render inline buttons if no external container provided
+    else if (onSelectAll && onSelectNone) {
         const buttonContainer = document.createElement('div');
         buttonContainer.className = 'flex gap-1 mb-2';
-        
+
         const allButton = document.createElement('button');
         allButton.textContent = 'All';
         allButton.className = 'px-2 py-0.5 text-xs font-semibold bg-indigo-500 hover:bg-indigo-600 text-white rounded transition-colors';
         allButton.onclick = onSelectAll;
         allButton.title = 'Select all notes';
-        
+
         const noneButton = document.createElement('button');
         noneButton.textContent = 'None';
         noneButton.className = 'px-2 py-0.5 text-xs font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded transition-colors';
         noneButton.onclick = onSelectNone;
         noneButton.title = 'Deselect all notes';
-        
+
         buttonContainer.appendChild(allButton);
         buttonContainer.appendChild(noneButton);
         editor.appendChild(buttonContainer);
@@ -2867,12 +2891,12 @@ export function addChordToProgression(switchToCompositionStudio = false, playShu
         getCameraShutter().start();
     }
 
-    // When adding from recommendations, default LH pattern to 'off'
-    const lhType = fromRecommendation ? 'off' : document.getElementById('builder-lh-type-select').value;
-    const lhInversion = parseInt(document.getElementById('builder-lh-inversion-select').value, 10) || 0;
-    const lhOctaveShift = parseInt(document.getElementById('builder-lh-octave-select').value, 10);
+    // LH accompaniment is no longer part of chord cards - always set to 'off'
+    const lhType = 'off';
+    const lhInversion = 0;
+    const lhOctaveShift = 0;
     const omittedNotes = [...getBuilderOmittedNotes()]; // Capture current voicing
-    const lhOmittedNotes = [...getBuilderLHOmittedNotes()]; // Capture LH voicing
+    const lhOmittedNotes = []; // LH no longer used in chord cards
     const octaveShift = getBuilderOctaveShift() * 12; // Convert whole octaves to semitones
 
     let newChordData;
@@ -3031,11 +3055,12 @@ export function addSpecificChordToProgression(chordType, inversion, playShutterS
         getCameraShutter().start();
     }
     
-    const lhType = document.getElementById('builder-lh-type-select').value;
-    const lhInversion = parseInt(document.getElementById('builder-lh-inversion-select').value, 10) || 0;
-    const lhOctaveShift = parseInt(document.getElementById('builder-lh-octave-select').value, 10);
+    // LH accompaniment is no longer part of chord cards - always set to 'off'
+    const lhType = 'off';
+    const lhInversion = 0;
+    const lhOctaveShift = 0;
     const omittedNotes = [...getBuilderOmittedNotes()]; // Capture current voicing
-    const lhOmittedNotes = [...getBuilderLHOmittedNotes()]; // Capture LH voicing
+    const lhOmittedNotes = []; // LH no longer used in chord cards
 
     // Allow octave override for imported chords (e.g., from song analysis)
     // options.octaveShift is in semitones (e.g., -12 for one octave down)

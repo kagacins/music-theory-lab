@@ -419,6 +419,10 @@ function scoreModalInterchange(chordRoot, chordType, key, style, mood, context =
  * @param {boolean} rhythmInfo.enabled - Whether to include duration suggestions
  * @param {Object} rhythmInfo.compositionState - Full composition state for rhythm analysis
  * @param {number} rhythmInfo.insertAfterIndex - Index after which to insert (for position context)
+ * @param {Object} forwardContextInfo - Forward-looking context info (Phase 4 - Compare mode enhancement)
+ * @param {boolean} forwardContextInfo.enabled - Whether to use forward context scoring
+ * @param {Object} forwardContextInfo.nextChord - The chord that follows the position being replaced
+ * @param {number} forwardContextInfo.weight - Weight for forward context scoring (0-1, default 0.15)
  * @returns {Array<{root:string, type:string, inversion:number, score:number, reason:string, confidence:number, suggestedDuration:number, durationReason:string, durationConfidence:number}>}
  */
 export function generateComprehensiveRecommendations(
@@ -437,7 +441,8 @@ export function generateComprehensiveRecommendations(
     useEnhancedScoring = true,  // Phase 1 enhanced scoring (voice leading, harmonic relationships)
     sectionInfo = null,         // Phase 2 section context
     tensionArcInfo = null,      // Phase 3 tension arc scoring
-    rhythmInfo = null           // Rhythmic context for duration suggestions
+    rhythmInfo = null,          // Rhythmic context for duration suggestions
+    forwardContextInfo = null   // Phase 4: Forward-looking context (for Compare mode)
 ) {
     const recommendations = [];
 
@@ -743,6 +748,42 @@ export function generateComprehensiveRecommendations(
                     }
                 }
 
+                // Phase 4: Calculate forward context score (how well this chord leads to the NEXT chord)
+                // Used primarily in Compare mode to evaluate alternatives based on what follows
+                let forwardContextScore = 0;
+                let forwardContextDetails = null;
+                if (forwardContextInfo && forwardContextInfo.enabled && forwardContextInfo.nextChord) {
+                    try {
+                        const fwdNextChord = forwardContextInfo.nextChord;
+                        const forwardWeight = forwardContextInfo.weight || 0.15;
+
+                        // Calculate voice leading to the next chord
+                        const fwdNextMidi = getChordMidi(fwdNextChord.root, fwdNextChord.type, fwdNextChord.inversion || 0);
+                        if (fwdNextMidi.length > 0) {
+                            const forwardVLScore = scoreVoiceLeading(nextMidi, fwdNextMidi, fwdNextChord.inversion || 0);
+
+                            // Calculate harmonic function score for this -> next transition
+                            const fwdNextDegree = getScaleDegree(fwdNextChord.root, key);
+                            const fwdNextFunction = fwdNextDegree !== null ? (DEGREE_TO_FUNCTION[fwdNextDegree] || HARMONIC_FUNCTIONS.TONIC) : null;
+                            const forwardFunctionScore = scoreHarmonicFunction(nextFunction, fwdNextFunction, 'resolve', nextDegree, fwdNextDegree);
+
+                            // Combine voice leading and harmonic function for forward score
+                            // Weight: 40% voice leading, 60% harmonic function (function more important for flow)
+                            forwardContextScore = (forwardVLScore * 0.4) + (forwardFunctionScore * 0.6);
+
+                            forwardContextDetails = {
+                                nextChord: `${fwdNextChord.root} ${fwdNextChord.type}`,
+                                voiceLeadingToNext: forwardVLScore,
+                                functionToNext: forwardFunctionScore,
+                                combinedScore: forwardContextScore,
+                                weight: forwardWeight
+                            };
+                        }
+                    } catch (e) {
+                        forwardContextScore = 0;
+                    }
+                }
+
                 // Get weights - use saved weights as base, then apply adaptive adjustments if enhanced scoring
                 //
                 // IMPORTANT: This weight calculation approach should be mirrored in melody generation:
@@ -796,6 +837,11 @@ export function generateComprehensiveRecommendations(
                 // Tension arc score is weighted and added to total
                 const tensionArcBonus = tensionArcScore * tensionArcWeight;
 
+                // Phase 4: Calculate forward context bonus
+                // Forward context score evaluates how well this chord leads to the NEXT chord
+                const forwardContextWeight = forwardContextInfo?.weight || 0.15;
+                const forwardContextBonus = forwardContextScore * forwardContextWeight;
+
                 if (contextMode && context && context.hasContext) {
                     // Context-aware mode: use context weights (includes context and modal interchange factors)
                     totalScore =
@@ -807,7 +853,8 @@ export function generateComprehensiveRecommendations(
                         (modalInterchangeScore * (weights.modalInterchange || 0)) +
                         resolutionBonus +
                         sectionAdjustment +   // Phase 2: Section-aware adjustment
-                        tensionArcBonus;      // Phase 3: Tension arc alignment
+                        tensionArcBonus +     // Phase 3: Tension arc alignment
+                        forwardContextBonus;  // Phase 4: Forward context (leads well to next chord)
                 } else {
                     // Standard mode: use standard weights (includes modal interchange factor)
                     totalScore =
@@ -818,7 +865,8 @@ export function generateComprehensiveRecommendations(
                         (modalInterchangeScore * (weights.modalInterchange || 0)) +
                         resolutionBonus +
                         sectionAdjustment +   // Phase 2: Section-aware adjustment
-                        tensionArcBonus;      // Phase 3: Tension arc alignment
+                        tensionArcBonus +     // Phase 3: Tension arc alignment
+                        forwardContextBonus;  // Phase 4: Forward context (leads well to next chord)
                 }
 
                 // Apply penalty for recommending the exact same chord and inversion
@@ -883,6 +931,9 @@ export function generateComprehensiveRecommendations(
                     // Phase 3 tension arc details
                     tensionArcScore: tensionArcScore,
                     tensionArcDetails: tensionArcDetails,
+                    // Phase 4 forward context details (how well this leads to the next chord)
+                    forwardContextScore: forwardContextScore,
+                    forwardContextDetails: forwardContextDetails,
                     // Rhythmic/Duration suggestions
                     suggestedDuration: rhythmicAnalysis
                         ? (chordDurationAdjustment?.duration ?? rhythmicAnalysis.suggestedDuration)

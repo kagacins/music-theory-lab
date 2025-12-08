@@ -672,11 +672,23 @@ function showFallbackExplanation(context, explanation) {
     const prevChordDisplay = context.prevChordData
       ? getChordDisplayName(context.prevChordData.root, context.prevChordData.type)
       : null;
+    // FORWARD CONTEXT: Get the next chord display name if available
+    const nextChordDisplay = context.nextChordData
+      ? getChordDisplayName(context.nextChordData.root, context.nextChordData.type)
+      : null;
 
     // Build transition display with full chord names (e.g., "G7 → C")
     const transitionDisplay = prevChordDisplay
       ? `${prevChordDisplay} → ${currentChordDisplay}`
       : currentChordDisplay;
+
+    // Build full context display showing both backward and forward if available
+    // e.g., "G7 → C → Am" (prev → current → next)
+    const fullContextDisplay = prevChordDisplay && nextChordDisplay
+      ? `${prevChordDisplay} → ${currentChordDisplay} → ${nextChordDisplay}`
+      : nextChordDisplay
+        ? `${currentChordDisplay} → ${nextChordDisplay}`
+        : transitionDisplay;
 
     // Determine chord function for button display
     // Use the explanation's function property, or detect from roman numeral
@@ -737,9 +749,9 @@ function showFallbackExplanation(context, explanation) {
       <div style="background: linear-gradient(135deg, ${functionColor} 0%, ${functionColor}dd 100%); color: white; padding: 20px 24px; position: relative;">
         <button id="wtw-popup-close" style="position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.25); border: none; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; color: white; font-size: 28px; display: flex; align-items: center; justify-content: center; transition: background 0.15s; font-weight: 300; z-index: 100;" onmouseover="this.style.background='rgba(255,255,255,0.4)'" onmouseout="this.style.background='rgba(255,255,255,0.25)'">&times;</button>
 
-        <!-- Transition Display per document: "You chose: G → C" -->
+        <!-- Transition Display showing full context: prev → current → next -->
         <div style="font-size: 13px; opacity: 0.9; margin-bottom: 8px;">
-          ${context.prevChordData ? 'You chose:' : 'Chord:'} <strong>${transitionDisplay}</strong>
+          ${context.prevChordData || context.nextChordData ? 'Context:' : 'Chord:'} <strong>${fullContextDisplay}</strong>
           ${context.key ? ` <span style="opacity: 0.8;">(Key of ${context.key})</span>` : ''}
         </div>
 
@@ -764,7 +776,12 @@ function showFallbackExplanation(context, explanation) {
           </h4>
           ${keyAwareExplanation.transitionExplanation ? `
             <p style="color: #4b5563; line-height: 1.7; margin: 0 0 12px 0; font-size: 15px; padding: 12px; background: #f0fdf4; border-radius: 8px; border-left: 3px solid #22c55e;">
-              <strong style="color: #15803d;">Why this follows well:</strong> ${keyAwareExplanation.transitionExplanation}
+              <strong style="color: #15803d;">← Why this follows well:</strong> ${keyAwareExplanation.transitionExplanation}
+            </p>
+          ` : ''}
+          ${explanation.forwardContextInfo && nextChordDisplay ? `
+            <p style="color: #4b5563; line-height: 1.7; margin: 0 0 12px 0; font-size: 15px; padding: 12px; background: #fef3c7; border-radius: 8px; border-left: 3px solid #f59e0b;">
+              <strong style="color: #b45309;">→ Why this leads well to ${nextChordDisplay}:</strong> ${explanation.forwardContextInfo}
             </p>
           ` : ''}
           <p style="color: #4b5563; line-height: 1.7; margin: 0; font-size: 15px;">

@@ -268,13 +268,27 @@ export function getWhyThisWorks(chordNumeral, prevChord = null, nextChord = null
 
   const explanation = chord[level] || chord.simple;
   let contextualInfo = '';
+  let forwardContextInfo = '';
 
-  // Add transition info if we know the previous chord
+  // Add transition info if we know the previous chord (BACKWARD CONTEXT)
   if (prevChord) {
     const transitionKey = `${prevChord}-${chordNumeral}`;
     const transition = chordTransitions[transitionKey];
     if (transition) {
       contextualInfo = transition[level] || transition.simple;
+    }
+  }
+
+  // Add forward transition info if we know the next chord (FORWARD CONTEXT)
+  // This explains why this chord is a good choice BEFORE the next chord
+  if (nextChord) {
+    const forwardTransitionKey = `${chordNumeral}-${nextChord}`;
+    const forwardTransition = chordTransitions[forwardTransitionKey];
+    if (forwardTransition) {
+      forwardContextInfo = forwardTransition[level] || forwardTransition.simple;
+    } else {
+      // Generate a generic forward context explanation based on harmonic function
+      forwardContextInfo = generateForwardContextExplanation(chordNumeral, nextChord, chord.function, level);
     }
   }
 
@@ -285,9 +299,132 @@ export function getWhyThisWorks(chordNumeral, prevChord = null, nextChord = null
     function: chord.function,
     color: chord.color,
     contextualInfo,
+    forwardContextInfo,  // NEW: Forward-looking context
     suggestions: chord.commonNextChords || [],
     whenToUse: explanation.whenToUse
   };
+}
+
+/**
+ * Generate a forward context explanation when no specific transition is defined
+ * Explains why a chord leads well into the next chord
+ *
+ * @param {string} currentNumeral - Current chord's roman numeral
+ * @param {string} nextNumeral - Next chord's roman numeral
+ * @param {string} currentFunction - Current chord's function (tonic, dominant, subdominant)
+ * @param {string} level - Skill level
+ * @returns {string} Forward context explanation
+ */
+function generateForwardContextExplanation(currentNumeral, nextNumeral, currentFunction, level) {
+  // Get base numerals without suffixes (e.g., "V7" -> "V", "ii7" -> "ii")
+  const baseCurrent = currentNumeral.replace(/[0-9majø°sus]+$/gi, '');
+  const baseNext = nextNumeral.replace(/[0-9majø°sus]+$/gi, '');
+
+  // Check for suspended chords (creates tension that wants to resolve)
+  const isSuspended = /sus[24]?/i.test(currentNumeral);
+
+  // Check for 7th chords (adds forward momentum)
+  const hasSeventh = /7|9|11|13/i.test(currentNumeral);
+
+  // Check for diminished (unstable, wants resolution)
+  const isDiminished = /°|dim/i.test(currentNumeral);
+
+  // Common forward motion patterns
+  const forwardPatterns = {
+    // Dominant function chords lead well to tonic
+    'dominant-to-tonic': {
+      simple: 'This chord creates tension that naturally resolves to the next chord.',
+      intermediate: 'The dominant function creates expectation for resolution to the tonic.',
+      advanced: 'The tritone in dominant-function chords resolves by half-step motion to the stable tonic.'
+    },
+    // Subdominant leads well to dominant
+    'subdominant-to-dominant': {
+      simple: 'This chord builds momentum toward the next chord.',
+      intermediate: 'Pre-dominant chords like this one commonly lead to dominant chords.',
+      advanced: 'The subdominant function provides pre-dominant preparation, setting up the dominant arrival.'
+    },
+    // Suspended chords create tension
+    'suspended': {
+      simple: 'The suspended note creates tension that pulls toward the next chord.',
+      intermediate: 'Suspended chords delay resolution, building anticipation for what follows.',
+      advanced: 'The suspended 4th or 2nd replaces the 3rd, creating instability that seeks resolution.'
+    },
+    // Diminished chords are unstable
+    'diminished': {
+      simple: 'This unstable chord creates tension that resolves to the next chord.',
+      intermediate: 'Diminished chords are inherently unstable, naturally leading to resolution.',
+      advanced: 'The stacked minor thirds create maximum instability, demanding resolution by half-step.'
+    },
+    // 7th chords add forward motion
+    'seventh-chord': {
+      simple: 'The added 7th creates forward momentum toward the next chord.',
+      intermediate: 'Seventh chords add harmonic color and a sense of motion.',
+      advanced: 'The 7th creates a dissonance that propels the harmony forward.'
+    },
+    // Tonic can lead anywhere (but avoid calling everything "stable")
+    'tonic-to-any': {
+      simple: 'This chord connects smoothly to the next chord in the progression.',
+      intermediate: 'The tonic function allows flexible motion to other harmonic areas.',
+      advanced: 'From the tonic, various harmonic paths are available depending on the musical context.'
+    },
+    // Generic connection (fallback - avoids incorrect "stable" claims)
+    'generic': {
+      simple: 'This chord connects to the next chord through shared tones or smooth voice leading.',
+      intermediate: 'The harmonic relationship between these chords creates a natural flow.',
+      advanced: 'Voice leading and common tones facilitate the connection between these chords.'
+    },
+    // Generic deceptive motion
+    'deceptive': {
+      simple: 'This creates an unexpected but satisfying connection to the next chord.',
+      intermediate: 'This motion avoids the expected resolution, creating harmonic interest.',
+      advanced: 'Deceptive resolution substitutes the expected target with a related chord.'
+    }
+  };
+
+  // Determine pattern type based on chord characteristics
+  let patternType = 'generic';
+
+  // Suspended chords are always unstable
+  if (isSuspended) {
+    patternType = 'suspended';
+  }
+  // Diminished chords are always unstable
+  else if (isDiminished) {
+    patternType = 'diminished';
+  }
+  // Dominant function logic
+  else if (currentFunction === 'dominant') {
+    if (['I', 'i'].includes(baseNext)) {
+      patternType = 'dominant-to-tonic';
+    } else if (['vi', 'VI', 'IV'].includes(baseNext)) {
+      patternType = 'deceptive';
+    } else {
+      patternType = 'seventh-chord'; // V7 and similar have built-in tension
+    }
+  }
+  // Subdominant function logic
+  else if (currentFunction === 'subdominant') {
+    if (['V', 'v', 'vii'].includes(baseNext)) {
+      patternType = 'subdominant-to-dominant';
+    } else if (hasSeventh) {
+      patternType = 'seventh-chord';
+    }
+  }
+  // Tonic function - only use tonic-to-any if actually going somewhere meaningful
+  else if (currentFunction === 'tonic') {
+    if (['IV', 'iv', 'V', 'v', 'ii', 'II'].includes(baseNext)) {
+      patternType = 'tonic-to-any';
+    } else if (hasSeventh) {
+      patternType = 'seventh-chord';
+    }
+  }
+  // 7th chords have forward momentum
+  else if (hasSeventh) {
+    patternType = 'seventh-chord';
+  }
+
+  const pattern = forwardPatterns[patternType];
+  return pattern[level] || pattern.simple;
 }
 
 /**

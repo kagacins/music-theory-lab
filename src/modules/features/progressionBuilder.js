@@ -4331,78 +4331,6 @@ function createDetailedCardHTML(chord, index, key) {
         `);
     }
 
-    // LH: Generate notes based on pattern
-    // Ensure lhType has a default value
-    if (!chord.lhType) {
-        chord.lhType = 'rootOnly';
-    }
-
-    // Generate LH notes if missing and lhType is not 'off'
-    if (chord.lhType !== 'off' && (!chord.lhNotes || chord.lhNotes.length === 0)) {
-        const rhOctaveShift = chord.octaveShift || 0;
-        const lhRelativeShift = chord.lhOctaveShift || 0;
-        const absoluteLHOctaveShift = rhOctaveShift + lhRelativeShift;
-        const lhInversion = chord.lhInversion || 0;
-        chord.lhNotes = getLHNotes(
-            chord.root,
-            chord.lhType,
-            lhInversion,
-            key,
-            absoluteLHOctaveShift,
-            chord.type,
-            getEnharmonicPreference()
-        );
-    }
-
-    const lhNotes = chord.lhNotes || [];
-    const lhOctaveShift = chord.lhOctaveShift || 0;
-    const lhInversion = chord.lhInversion || 0;
-    const lhNoteCheckboxes = lhNotes.map(note => {
-        const isChecked = !(chord.lhOmittedNotes || []).includes(note);
-        const noteWithoutOctave = note.replace(/\d+$/, '');
-        const isInScale = scaleNotes.includes(noteWithoutOctave);
-
-        return `
-            <label class="flex items-center gap-0.5 cursor-pointer text-gray-700 text-[10px] ${isInScale ? 'font-semibold' : ''}">
-                <input type="checkbox" value="${note}" ${isChecked ? 'checked' : ''}
-                    class="lh-note-checkbox w-2.5 h-2.5 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500">
-                <span class="${isInScale ? 'text-green-700' : ''}">${note}</span>
-                ${isInScale ? '<span class="text-[8px] text-green-600">●</span>' : ''}
-            </label>
-        `;
-    }).join('');
-
-    // LH Inversion buttons
-    const lhInversionButtons = [];
-    for (let inv = 0; inv <= maxInversion; inv++) {
-        const isActive = inv === lhInversion;
-        const label = inv === 0 ? 'R' : inv.toString();
-        lhInversionButtons.push(`
-            <button class="lh-inversion-btn w-8 px-0.5 py-0.5 text-[9px] font-semibold rounded transition-colors ${
-                isActive ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }" data-inversion="${inv}">${label}</button>
-        `);
-    }
-
-    // LH Pattern options - matching Melody Composer
-    const lhPatterns = [
-        { value: 'off', label: 'Off' },
-        { value: 'rootOnly', label: 'Root Only' },
-        { value: 'rootAnd5th', label: 'Root + 5th' },
-        { value: 'powerChord', label: 'Power Chord' },
-        { value: 'Major', label: 'Major Triad' },
-        { value: 'Minor', label: 'Minor Triad' },
-        { value: 'shell_maj7', label: 'Shell (R-3-7)' },
-        { value: 'shell_min7', label: 'Minor 7th Shell (R-b3-b7)' },
-        { value: 'shell_dom7', label: 'Dominant 7th Shell (R-3-b7)' },
-        { value: 'spread', label: 'Spread Triad (R-5-10)' },
-        { value: 'quartal', label: 'Quartal (R-4-7)' },
-        { value: 'Dominant 7th', label: 'Dominant 7th' }
-    ];
-    const lhOptions = lhPatterns.map(p =>
-        `<option value="${p.value}" ${(chord.lhType || 'rootOnly') === p.value ? 'selected' : ''}>${p.label}</option>`
-    ).join('');
-
     return `
         <div class="detailed-card bg-white border-2 border-blue-500 rounded-lg overflow-hidden shadow-lg">
             <!-- Header - drag handle for reordering -->
@@ -4496,57 +4424,6 @@ function createDetailedCardHTML(chord, index, key) {
                     </div>
                 </div>
 
-                <!-- LH SECTION -->
-                <div class="border-2 border-green-200 rounded p-1 bg-green-50">
-                    <div class="text-[10px] font-bold text-green-700 mb-0.5">LEFT HAND (Bass)</div>
-
-                    <!-- LH Pattern -->
-                    <div class="mb-0.5">
-                        <label class="block text-[9px] font-semibold text-gray-700 mb-0.5">Pattern</label>
-                        <select class="lh-pattern-select w-full px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
-                            ${lhOptions}
-                        </select>
-                    </div>
-
-                    <!-- LH Octave Shift (Relative to RH) -->
-                    <div class="mb-0.5">
-                        <label class="block text-[9px] font-semibold text-gray-700 mb-0.5">Octave (from RH)</label>
-                        <select class="lh-octave-select w-full px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
-                            <option value="-36" ${lhOctaveShift === -36 ? 'selected' : ''}>-3 octaves</option>
-                            <option value="-24" ${lhOctaveShift === -24 ? 'selected' : ''}>-2 octaves</option>
-                            <option value="-12" ${lhOctaveShift === -12 ? 'selected' : ''}>-1 octave</option>
-                            <option value="0" ${lhOctaveShift === 0 ? 'selected' : ''}>Default</option>
-                            <option value="12" ${lhOctaveShift === 12 ? 'selected' : ''}>+1 octave</option>
-                            <option value="24" ${lhOctaveShift === 24 ? 'selected' : ''}>+2 octaves</option>
-                            <option value="36" ${lhOctaveShift === 36 ? 'selected' : ''}>+3 octaves</option>
-                        </select>
-                    </div>
-
-                    <!-- LH Inversion -->
-                    <div class="mb-0.5">
-                        <label class="block text-[9px] font-semibold text-gray-700 mb-0.5">Inversion</label>
-                        <div class="flex gap-0.5">
-                            ${lhInversionButtons.join('')}
-                        </div>
-                    </div>
-
-                    <!-- LH Notes/Voicing -->
-                    ${lhNotes.length > 0 ? `
-                    <div class="border border-gray-300 rounded p-1 bg-white">
-                        <div class="flex items-center justify-between mb-0.5">
-                            <label class="text-[9px] font-semibold text-green-600">Notes</label>
-                            <div class="flex gap-0.5">
-                                <button class="lh-notes-all-btn px-1.5 py-0.5 text-[9px] font-semibold bg-green-500 hover:bg-green-600 text-white rounded">All</button>
-                                <button class="lh-notes-none-btn px-1.5 py-0.5 text-[9px] font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded">None</button>
-                            </div>
-                        </div>
-                        <div class="flex flex-wrap gap-x-2 gap-y-0.5">
-                            ${lhNoteCheckboxes}
-                        </div>
-                    </div>
-                    ` : '<div class="text-[9px] text-gray-500 italic">No LH notes (pattern is Off)</div>'}
-                </div>
-
                 <!-- Musical Notation (Permanent) -->
                 <div class="border-t border-gray-200 pt-1.5 mt-1.5">
                     <div class="text-[10px] font-semibold text-gray-700 mb-1">Musical Notation</div>
@@ -4573,7 +4450,6 @@ function attachCardEventListeners(wrapper, index) {
     const playBtn = wrapper.querySelector('.play-btn');
     const deleteBtn = wrapper.querySelector('.delete-btn');
     const typeSelect = wrapper.querySelector('.type-select');
-    const lhPatternSelect = wrapper.querySelector('.lh-pattern-select');
     const inversionBtns = wrapper.querySelectorAll('.inversion-btn');
     const noteCheckboxes = wrapper.querySelectorAll('.note-checkbox');
     const notesAllBtn = wrapper.querySelector('.notes-all-btn');
@@ -4729,14 +4605,6 @@ function attachCardEventListeners(wrapper, index) {
         });
     }
 
-    // LH pattern select
-    if (lhPatternSelect) {
-        lhPatternSelect.addEventListener('change', (e) => {
-            e.stopPropagation();
-            updateChordLHPattern(index, e.target.value);
-        });
-    }
-
     // Inversion buttons
     inversionBtns.forEach(btn => {
         let wasPressed = false;
@@ -4868,134 +4736,6 @@ function attachCardEventListeners(wrapper, index) {
         });
     }
 
-    // LH Octave shift dropdown
-    const lhOctaveSelect = wrapper.querySelector('.lh-octave-select');
-    if (lhOctaveSelect) {
-        lhOctaveSelect.addEventListener('change', (e) => {
-            e.stopPropagation();
-            const shift = parseInt(e.target.value);
-            updateLHOctaveShift(index, shift);
-        });
-    }
-
-    // LH Inversion buttons
-    const lhInversionBtns = wrapper.querySelectorAll('.lh-inversion-btn');
-    lhInversionBtns.forEach(btn => {
-        let wasPressed = false;
-
-        btn.addEventListener('mousedown', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            wasPressed = true;
-            const inversion = parseInt(btn.getAttribute('data-inversion'));
-
-            // Update WITHOUT syncing notation (to prevent flash)
-            updateLHInversion(index, inversion, true, false);
-
-            // Start playing the chord with the new LH inversion
-            if (window.startProgressionChord) {
-                window.startProgressionChord(index);
-            }
-        });
-
-        // Stop playing on mouseup and sync notation immediately
-        btn.addEventListener('mouseup', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            if (window.stopTrainerChord) {
-                window.stopTrainerChord();
-            }
-
-            // Update notation preserving treble notes
-            updateChordAndRenderPreservingTrebleNotes(index);
-
-            wasPressed = false;
-        });
-
-        // Also stop if mouse leaves button and sync if was pressed
-        btn.addEventListener('mouseleave', (e) => {
-            if (window.stopTrainerChord) {
-                window.stopTrainerChord();
-            }
-
-            // Sync notation if button was pressed
-            if (wasPressed) {
-                updateChordAndRenderPreservingTrebleNotes(index);
-            }
-
-            wasPressed = false;
-        });
-    });
-
-    // LH Note checkboxes
-    const lhNoteCheckboxes = wrapper.querySelectorAll('.lh-note-checkbox');
-    lhNoteCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', (e) => {
-            e.stopPropagation();
-            const note = checkbox.value;
-            toggleLHNote(index, note);
-
-            // Update the card to reflect the change
-            updateSingleCard(index);
-        });
-    });
-
-    // LH All/None buttons
-    const lhAllBtn = wrapper.querySelector('.lh-notes-all-btn');
-    const lhNoneBtn = wrapper.querySelector('.lh-notes-none-btn');
-
-    if (lhAllBtn) {
-        lhAllBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-
-            // Get compositionState directly - the single source of truth
-            const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-            if (!compositionState) {
-                return;
-            }
-
-            const chord = compositionState.getChord(index);
-            if (chord) {
-                // Update chord in compositionState
-                compositionState.updateChordByIndex(index, {
-                    lhOmittedNotes: []
-                });
-
-                // Update checkboxes
-                lhNoteCheckboxes.forEach(cb => cb.checked = true);
-                // Play the chord
-                if (window.startProgressionChord && window.stopTrainerChord) {
-                    window.startProgressionChord(index);
-                    setTimeout(() => window.stopTrainerChord(), 500);
-                }
-            }
-        });
-    }
-
-    if (lhNoneBtn) {
-        lhNoneBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-
-            // Get compositionState directly - the single source of truth
-            const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-            if (!compositionState) {
-                return;
-            }
-
-            const chord = compositionState.getChord(index);
-            if (chord && chord.lhNotes) {
-                // Update chord in compositionState
-                compositionState.updateChordByIndex(index, {
-                    lhOmittedNotes: [...chord.lhNotes]
-                });
-
-                // Update checkboxes
-                lhNoteCheckboxes.forEach(cb => cb.checked = false);
-            }
-        });
-    }
-
-    // Staff Notation Toggle button
     // Suggestions button
     const suggestionsBtn = wrapper.querySelector('.suggestions-btn');
     if (suggestionsBtn) {
@@ -6147,46 +5887,6 @@ function updateChordVoicing(index, newVoicing) {
 }
 
 /**
- * Update chord LH pattern from simplified view
- */
-function updateChordLHPattern(index, newLHPattern) {
-    // Save state for undo BEFORE making changes
-    saveStateBeforeChange();
-
-    const trainerState = getTrainerState();
-    const chord = trainerState.progressionData[index];
-    chord.lhType = newLHPattern;
-
-    // Regenerate LH notes with new pattern (using relative LH octave shift)
-    const rhOctaveShift = chord.octaveShift || 0;
-    const lhRelativeShift = chord.lhOctaveShift || 0;
-    const absoluteLHOctaveShift = rhOctaveShift + lhRelativeShift;
-    chord.lhNotes = getLHNotes(
-        chord.root,
-        newLHPattern,
-        chord.lhInversion || 0,
-        trainerState.currentKey,
-        absoluteLHOctaveShift,
-        chord.type,
-        getEnharmonicPreference()
-    );
-
-    // Update only this card (LH pattern doesn't affect tension curve)
-    updateSingleCard(index);
-
-    // Also update the grand staff notation
-    updateChordAndRenderPreservingTrebleNotes(index);
-
-    // Play the chord with the new LH pattern
-    const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
-    const lhNotes = (chord.lhNotes || []).filter(n => !(chord.lhOmittedNotes || []).includes(n));
-    const allNotes = voicedNotes.concat(lhNotes);
-    if (allNotes.length > 0) {
-        playTrainerChordOnce(allNotes);
-    }
-}
-
-/**
  * Get scale notes for a given key (for highlighting scale degree indicators)
  */
 function getScaleNotesForKey(key) {
@@ -6296,178 +5996,6 @@ function updateRHOctaveShift(index, shift) {
         updatedChord.type,
         getEnharmonicPreference()
     ).filter(n => !(updatedChord.lhOmittedNotes || []).includes(n));
-    const allNotes = voicedNotes.concat(lhNotes);
-    if (allNotes.length > 0) {
-        playTrainerChordOnce(allNotes);
-    }
-}
-
-/**
- * Update LH octave shift (relative to RH)
- */
-function updateLHOctaveShift(index, shift) {
-    // Get compositionState directly - the single source of truth
-    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-    if (!compositionState) {
-        return;
-    }
-
-    const trainerState = getTrainerState();
-    const chord = compositionState.getChord(index);
-    if (!chord) {
-        return;
-    }
-
-    // Regenerate LH notes with new relative octave shift
-    const rhOctaveShift = chord.octaveShift || 0;
-    const absoluteLHOctaveShift = rhOctaveShift + shift;
-    const newLhNotes = getLHNotes(
-        chord.root,
-        chord.lhType || 'off',
-        chord.lhInversion || 0,
-        trainerState.currentKey,
-        absoluteLHOctaveShift,
-        chord.type,
-        getEnharmonicPreference()
-    );
-
-    // Save state for undo BEFORE making changes
-    saveStateBeforeChange();
-
-    // Update chord in compositionState
-    compositionState.updateChordByIndex(index, {
-        lhOctaveShift: shift,
-        lhNotes: newLhNotes
-    });
-
-    // Also update trainerState.progressionData to keep in sync
-    if (trainerState.progressionData && trainerState.progressionData[index]) {
-        trainerState.progressionData[index].lhOctaveShift = shift;
-        trainerState.progressionData[index].lhNotes = newLhNotes;
-    }
-
-    // Update only this card
-    updateSingleCard(index);
-
-    // Also update the grand staff notation
-    updateChordAndRenderPreservingTrebleNotes(index);
-
-    // Play the chord with the new LH octave
-    const updatedChord = compositionState.getChord(index);
-    const voicedNotes = updatedChord.notes.filter(n => !(updatedChord.omittedNotes || []).includes(n));
-    const lhNotes = (updatedChord.lhNotes || []).filter(n => !(updatedChord.lhOmittedNotes || []).includes(n));
-    const allNotes = voicedNotes.concat(lhNotes);
-    if (allNotes.length > 0) {
-        playTrainerChordOnce(allNotes);
-    }
-}
-
-/**
- * Update LH inversion
- */
-function updateLHInversion(index, newInversion, shouldUpdateUI = true, shouldSyncNotation = true) {
-    // Get compositionState directly - the single source of truth
-    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-    if (!compositionState) {
-        return;
-    }
-
-    const trainerState = getTrainerState();
-    const chord = compositionState.getChord(index);
-    if (!chord) {
-        return;
-    }
-
-    // Regenerate LH notes with new inversion (using relative LH octave shift)
-    const rhOctaveShift = chord.octaveShift || 0;
-    const lhRelativeShift = chord.lhOctaveShift || 0;
-    const absoluteLHOctaveShift = rhOctaveShift + lhRelativeShift;
-    const newLhNotes = getLHNotes(
-        chord.root,
-        chord.lhType || 'off',
-        newInversion,
-        trainerState.currentKey,
-        absoluteLHOctaveShift,
-        chord.type,
-        getEnharmonicPreference()
-    );
-
-    // Save state for undo BEFORE making changes
-    saveStateBeforeChange();
-
-    // Update chord in compositionState
-    compositionState.updateChordByIndex(index, {
-        lhInversion: newInversion,
-        lhNotes: newLhNotes,
-        lhOmittedNotes: [] // Clear since note names change with inversion
-    });
-
-    // Also update trainerState.progressionData to keep in sync
-    if (trainerState.progressionData && trainerState.progressionData[index]) {
-        trainerState.progressionData[index].lhInversion = newInversion;
-        trainerState.progressionData[index].lhNotes = newLhNotes;
-        trainerState.progressionData[index].lhOmittedNotes = [];
-    }
-
-    // Update only this card (if requested)
-    if (shouldUpdateUI) {
-        updateSingleCard(index);
-    }
-
-    // Also update the grand staff notation (if requested)
-    if (shouldSyncNotation) {
-        updateChordAndRenderPreservingTrebleNotes(index);
-    }
-
-    // Note: Playback is handled by the press-and-hold event handler on the button
-    // Don't call playTrainerChordOnce here as it would conflict with the hold behavior
-}
-
-/**
- * Toggle LH note on/off
- */
-function toggleLHNote(index, note) {
-    // Get compositionState directly - the single source of truth
-    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-    if (!compositionState) {
-        return;
-    }
-
-    const trainerState = getTrainerState();
-    const chord = compositionState.getChord(index);
-    if (!chord) {
-        return;
-    }
-
-    const lhOmittedNotes = chord.lhOmittedNotes || [];
-
-    const idx = lhOmittedNotes.indexOf(note);
-    if (idx > -1) {
-        lhOmittedNotes.splice(idx, 1);
-    } else {
-        lhOmittedNotes.push(note);
-    }
-
-    // Save state for undo BEFORE making changes
-    saveStateBeforeChange();
-
-    // Update chord in compositionState
-    compositionState.updateChordByIndex(index, {
-        lhOmittedNotes: lhOmittedNotes
-    });
-
-    // Also update trainerState.progressionData to keep in sync
-    if (trainerState.progressionData && trainerState.progressionData[index]) {
-        trainerState.progressionData[index].lhOmittedNotes = lhOmittedNotes;
-    }
-
-    // Update the grand staff notation
-    updateChordAndRenderPreservingTrebleNotes(index);
-
-    // Play the chord with the new LH voicing
-    const updatedChord = compositionState.getChord(index);
-    const voicedNotes = updatedChord.notes.filter(n => !(updatedChord.omittedNotes || []).includes(n));
-    const lhNotes = (updatedChord.lhNotes || []).filter(n => !updatedChord.lhOmittedNotes.includes(n));
     const allNotes = voicedNotes.concat(lhNotes);
     if (allNotes.length > 0) {
         playTrainerChordOnce(allNotes);
@@ -7804,10 +7332,28 @@ function hideTensionTooltip() {
 /**
  * Render the progression display with all chord cards
  * Shows chord cards with controls for type, inversion, voicing, LH settings
+ *
+ * CHORD CARD UPDATE DEBUGGING: If cards don't update after data changes, see the
+ * comprehensive debugging guide in trainerState.js (search for "CHORD CARD UPDATE FLOW").
+ *
+ * This function:
+ * 1. Gets fresh data from getTrainerState().progressionData (which calls getProgressionData())
+ * 2. Clears the container and rebuilds all chord cards from scratch
+ * 3. Does NOT modify the data - only reads and renders
+ *
+ * Common issue: If cards show stale data, the problem is usually in the data update
+ * step BEFORE this function is called. Check that:
+ * - setProgressionData() was called with the new data
+ * - invalidateProgressionDataCache() was called (happens automatically in setProgressionData)
+ * - This render function is called AFTER the data update completes
+ *
  * @param {string} containerId - Optional container ID. Defaults to 'progression-visualization'
  * @param {boolean} syncBothTabs - If true, also updates the other tab. Defaults to true for main container, false for melody container
  */
 export function renderProgressionDisplay(containerId = 'progression-visualization', syncBothTabs = true) {
+    // DEBUGGING: Uncomment to trace when render is called
+    // console.log('[renderProgressionDisplay] Rendering', containerId);
+
     // Capture staff notation states before clearing DOM (always capture from both tabs)
     captureStaffNotationStates();
     

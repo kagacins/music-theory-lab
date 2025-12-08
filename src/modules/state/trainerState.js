@@ -2,6 +2,74 @@
  * Trainer Tab State Management Module
  * Manages UI state for the chord progression trainer
  * NOTE: Chord data now lives in compositionState (single source of truth)
+ *
+ * ============================================================================
+ * CHORD CARD UPDATE FLOW - DEBUGGING GUIDE
+ * ============================================================================
+ *
+ * This section documents why chord cards sometimes don't update immediately.
+ * Reference this when debugging "delayed chord card update" issues.
+ *
+ * DATA FLOW ARCHITECTURE:
+ * -----------------------
+ * 1. compositionState.storedProgressionData - SOURCE OF TRUTH for chord data
+ * 2. compositionState.measures - Derived from storedProgressionData, used for notation
+ * 3. getProgressionData() - Returns from storedProgressionData via exportToProgressionData()
+ * 4. getTrainerState().progressionData - Calls getProgressionData(), used by UI rendering
+ *
+ * CACHING MECHANISM:
+ * ------------------
+ * - cachedProgressionData: Caches exportToProgressionData() results
+ * - Cache is invalidated when setProgressionData() is called
+ * - Hash is computed from compositionState.measures (NOT storedProgressionData!)
+ * - POTENTIAL BUG: If measures don't update but storedProgressionData does, cache may stale
+ *
+ * CORRECT UPDATE SEQUENCE:
+ * ------------------------
+ * 1. Call setProgressionData(newProgression)
+ *    - This calls compositionState.syncWithProgressionData()
+ *    - Which updates storedProgressionData FIRST, then rebuilds measures
+ *    - Then calls invalidateProgressionDataCache()
+ * 2. Call window.renderProgressionDisplay()
+ *    - Gets fresh data via getTrainerState().progressionData
+ *    - Rebuilds all chord card DOM elements
+ * 3. Dispatch 'progressionUpdated' and 'progression-changed' events
+ *    - These notify other components (notation, sidebar, etc.)
+ *
+ * COMMON ISSUES & SOLUTIONS:
+ * --------------------------
+ * Issue 1: "Cards don't update until hover/mouse interaction"
+ *   - Cause: renderProgressionDisplay() runs but cards show stale data
+ *   - Debug: Check if getProgressionData() returns fresh data at render time
+ *   - Fix: Ensure invalidateProgressionDataCache() is called BEFORE render
+ *
+ * Issue 2: "Playback is correct but visual is wrong"
+ *   - Cause: Playback reads from different source than card rendering
+ *   - Debug: Compare what startProgressionChord() uses vs card display
+ *   - Playback uses: getProgressionData()[index] directly
+ *   - Cards use: getTrainerState().progressionData
+ *
+ * Issue 3: "Modal progression bar updates but main cards don't"
+ *   - Cause: Modal may re-render its own UI but not trigger main render
+ *   - Fix: Always call window.renderProgressionDisplay() after data changes
+ *
+ * KEY FUNCTIONS TO CHECK:
+ * -----------------------
+ * - setProgressionData() (this file) - Entry point for all chord data updates
+ * - syncWithProgressionData() (compositionState.js:3078) - Actually updates data
+ * - exportToProgressionData() (compositionState.js:3429) - Returns chord data
+ * - renderProgressionDisplay() (progressionBuilder.js:7338) - Renders cards
+ * - invalidateProgressionDataCache() (this file) - Clears stale cache
+ *
+ * DEBUGGING STEPS:
+ * ----------------
+ * 1. Add console.log in setProgressionData to verify it's called
+ * 2. Add console.log in invalidateProgressionDataCache to verify cache cleared
+ * 3. Add console.log in getProgressionData to see if cache is hit/miss
+ * 4. Add console.log in renderProgressionDisplay to verify it runs
+ * 5. Compare progressionData at render time vs expected values
+ *
+ * ============================================================================
  */
 
 // Trainer state object - UI state only
@@ -60,6 +128,22 @@ function generateMeasuresHash(measures) {
     return `${measures.length}-${chordParts.join('|')}`;
 }
 
+/**
+ * Get the current progression data from compositionState
+ *
+ * CHORD CARD UPDATE DEBUGGING: This function uses caching to improve performance.
+ * If chord cards aren't updating, the cache may be returning stale data.
+ *
+ * Cache invalidation happens in two ways:
+ * 1. Explicit: invalidateProgressionDataCache() is called (see setProgressionData)
+ * 2. Implicit: The measures hash changes (but this depends on measures being rebuilt!)
+ *
+ * IMPORTANT: The hash is computed from compositionState.measures, but the actual
+ * data comes from compositionState.storedProgressionData. If these get out of sync,
+ * the cache may return stale data even though the source of truth has updated.
+ *
+ * @returns {Array} Array of chord objects
+ */
 export function getProgressionData() {
     // Silent delegation to compositionState (single source of truth)
     if (window.getCompositionState) {
@@ -70,7 +154,9 @@ export function getProgressionData() {
         const currentMeasuresLength = compositionState.measures?.length || 0;
         const currentMeasuresHash = generateMeasuresHash(compositionState.measures);
 
-        // Only re-export if measures have changed
+        // Only re-export if measures have changed OR cache is invalidated
+        // DEBUGGING: If cards show stale data, add console.log here to check cache hit/miss
+        // console.log('[getProgressionData] cache check:', { cached: cachedProgressionData !== null, hashMatch: cachedMeasuresHash === currentMeasuresHash });
         if (cachedProgressionData === null ||
             cachedMeasuresLength !== currentMeasuresLength ||
             cachedMeasuresHash !== currentMeasuresHash) {
@@ -84,16 +170,35 @@ export function getProgressionData() {
     return [];
 }
 
+/**
+ * Set the progression data - THE MAIN ENTRY POINT for chord updates
+ *
+ * CHORD CARD UPDATE DEBUGGING: After calling this function, you MUST also call
+ * window.renderProgressionDisplay() to update the visual chord cards.
+ *
+ * This function:
+ * 1. Calls compositionState.syncWithProgressionData() - updates the source of truth
+ * 2. Calls invalidateProgressionDataCache() - clears stale cached data
+ *
+ * After calling this, the caller is responsible for:
+ * - Calling window.renderProgressionDisplay() to refresh cards
+ * - Dispatching 'progressionUpdated' event if other components need notification
+ *
+ * @param {Array} value - Array of chord objects to set as the new progression
+ */
 export function setProgressionData(value) {
     // Silent delegation to compositionState (single source of truth)
     if (window.getCompositionState && Array.isArray(value)) {
         const compositionState = window.getCompositionState();
         if (compositionState) {
+            // DEBUGGING: Uncomment to trace when progression data is set
+            // console.log('[setProgressionData] Setting progression with', value.length, 'chords:', value.map(c => `${c.root}${c.type}`));
             compositionState.syncWithProgressionData(value, {
                 key: trainerState.currentKey,
                 timeSignature: { num: 4, denom: 4 }
             });
             // Invalidate cache when progression data is set
+            // This ensures next getProgressionData() call returns fresh data
             invalidateProgressionDataCache();
         }
     }
@@ -101,12 +206,24 @@ export function setProgressionData(value) {
 
 /**
  * Invalidate the progression data cache
- * Call this when you know the composition state has changed
+ *
+ * CHORD CARD UPDATE DEBUGGING: This function clears the cache so that the next
+ * getProgressionData() call will fetch fresh data from compositionState.
+ *
+ * Call this when:
+ * - You've modified chord data through compositionState directly
+ * - You've imported/loaded new progression data
+ * - Cards are showing stale data and you need to force a refresh
+ *
+ * NOTE: This function does NOT trigger a re-render. You must also call
+ * window.renderProgressionDisplay() to update the visual cards.
  */
 export function invalidateProgressionDataCache() {
     cachedProgressionData = null;
     cachedMeasuresLength = 0;
     cachedMeasuresHash = null;
+    // DEBUGGING: Uncomment to trace cache invalidation
+    // console.log('[invalidateProgressionDataCache] Cache cleared');
 }
 
 // Getters and Setters for currentIndex
