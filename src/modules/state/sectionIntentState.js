@@ -317,6 +317,56 @@ export function refreshInsertContext(sections, progressionLength) {
 }
 
 /**
+ * Update the section intent state based on a specific chord index
+ * Use this when you have an explicit index (e.g., from modal's selectedProgressionIndex)
+ * instead of relying on the global trainer selection state
+ * @param {number} chordIndex - The chord index to compute context for
+ * @param {Array} sections - Sections from compositionState
+ * @param {number} progressionLength - Total chords
+ * @returns {Object} The computed context
+ */
+export function refreshInsertContextForIndex(chordIndex, sections, progressionLength) {
+    // If no valid index, return empty context
+    if (chordIndex < 0 || chordIndex >= progressionLength) {
+        return {
+            insertAfterIndex: null,
+            targetSection: null,
+            ungroupedRange: null,
+            needsSelection: true
+        };
+    }
+
+    // Find section for this chord
+    let targetSection = null;
+    if (sections && sections.length > 0) {
+        for (const section of sections) {
+            if (section.chordIndices && section.chordIndices.includes(chordIndex)) {
+                targetSection = { ...section };
+                break;
+            }
+        }
+    }
+
+    // If ungrouped, compute implicit section range
+    let ungroupedRange = null;
+    if (!targetSection) {
+        ungroupedRange = computeUngroupedRange(chordIndex, sections || [], progressionLength);
+    }
+
+    const context = {
+        insertAfterIndex: chordIndex,
+        targetSection,
+        ungroupedRange,
+        needsSelection: false
+    };
+
+    // Update the state
+    setSectionIntent(context);
+
+    return context;
+}
+
+/**
  * Get section context for recommendation scoring based on current intent
  * This translates user intent into the format expected by sectionTransitionAnalyzer
  * @returns {Object|null} Section context for scoring

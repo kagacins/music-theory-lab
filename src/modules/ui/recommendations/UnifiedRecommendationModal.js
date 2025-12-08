@@ -39,7 +39,8 @@ import {
     getInsertAfterIndex,
     setInsertAfterIndex,
     getEffectiveSectionContext,
-    refreshInsertContext
+    refreshInsertContext,
+    refreshInsertContextForIndex
 } from '../../state/sectionIntentState.js';
 import { getCompositionState } from '../../state/compositionState.js';
 import { getInvertedChordNotes, getChordNotes, getEnharmonicPreferenceForKey, spellNoteInKey } from '../../utils/noteUtils.js';
@@ -789,6 +790,28 @@ export function showUnifiedRecommendationModal(options = {}) {
     // Create and show modal
     const modal = createModalStructure();
     document.body.appendChild(modal);
+
+    // Initialize section intent context based on current selection
+    // This sets targetSection so we know which section type the user is working with
+    const compositionStateForInit = getCompositionState();
+    if (compositionStateForInit?.getSections) {
+        const sections = compositionStateForInit.getSections();
+        const progLength = progressionData.length; // Use progressionData from line 748
+
+        // If no chord is selected but we have chords, default to first chord (index 0)
+        // This matches the visual highlighting behavior in the modal
+        if (modalState.selectedProgressionIndex === -1 && progLength > 0) {
+            modalState.selectedProgressionIndex = 0;
+            const firstChord = progressionData[0];
+            modalState.currentRoot = firstChord.root;
+            modalState.currentChordType = firstChord.type;
+            modalState.activeInversion = firstChord.inversion || 0;
+        }
+
+        // Use the modal's selectedProgressionIndex for section context
+        const effectiveIndex = modalState.selectedProgressionIndex >= 0 ? modalState.selectedProgressionIndex : 0;
+        refreshInsertContextForIndex(effectiveIndex, sections, progLength);
+    }
 
     // Render initial content
     renderActiveTab();
@@ -3466,10 +3489,30 @@ function renderQuickSuggestionsView(container) {
         tensionDirection = 'build';
     }
 
+    // Get effective section context from intent state (converts user intent to scoring format)
+    // NOTE: We get this BEFORE tension direction logic so we can use section type
+    const effectiveContext = getEffectiveSectionContext();
+    const currentSectionType = effectiveContext?.currentSectionType || 'custom';
+
     // Override tension direction based on section intent subMode
+    // SECTION-AWARE FINAL LOGIC:
+    // - Sections that typically END with resolution (chorus, outro): resolve to tonic
+    // - Sections that typically END with tension (verse, prechorus, bridge): maintain tension for momentum
     if (intent.mode === INTENT_MODES.CONTINUE) {
         if (intent.subMode === CONTINUE_SUBMODES.FINAL) {
-            tensionDirection = 'resolve'; // Final chord should resolve
+            // Final chord behavior depends on section type
+            // Sections that typically resolve at the end:
+            const resolvingSections = ['chorus', 'outro', 'intro'];
+            // Sections that typically maintain tension to lead into next section:
+            const tensionSections = ['verse', 'prechorus', 'bridge'];
+
+            if (resolvingSections.includes(currentSectionType)) {
+                tensionDirection = 'resolve'; // End on tonic for closure
+            } else if (tensionSections.includes(currentSectionType)) {
+                tensionDirection = 'maintain'; // End on V or IV for forward momentum
+            } else {
+                tensionDirection = 'resolve'; // Default to resolve for unknown sections
+            }
         } else if (intent.subMode === CONTINUE_SUBMODES.CONCLUDING) {
             tensionDirection = 'resolve'; // Approaching end, should resolve
         } else if (intent.subMode === CONTINUE_SUBMODES.BUILDING) {
@@ -3484,9 +3527,6 @@ function renderQuickSuggestionsView(container) {
             tensionDirection = 'resolve'; // Ending section
         }
     }
-
-    // Get effective section context from intent state (converts user intent to scoring format)
-    const effectiveContext = getEffectiveSectionContext();
 
     // Build section info with intentContext for scoring
     const compositionState = getCompositionState();
@@ -3744,6 +3784,11 @@ function createCompactProgressionSelector(progressionData, key, onRender) {
                 modalState.currentRoot = chord.root;
                 modalState.currentChordType = chord.type;
                 modalState.activeInversion = chord.inversion || 0;
+
+                // Update section intent context for the newly selected chord
+                // This ensures targetSection is refreshed when user clicks different chords
+                refreshInsertContextForIndex(idx, sections, progressionData.length);
+
                 if (onRender) onRender();
             });
             chipsWrapper.appendChild(chip);
@@ -4814,9 +4859,26 @@ function renderSequencesView(container) {
             tensionDirection = 'build';
         }
 
+        // Get section type for context-aware tension direction
+        const seqEffectiveContext = getEffectiveSectionContext();
+        const seqSectionType = seqEffectiveContext?.currentSectionType || 'custom';
+
         // Override tension direction based on section intent subMode
+        // Uses same section-aware logic as Suggest intent
         if (intent.mode === INTENT_MODES.CONTINUE) {
-            if (intent.subMode === CONTINUE_SUBMODES.FINAL || intent.subMode === CONTINUE_SUBMODES.CONCLUDING) {
+            if (intent.subMode === CONTINUE_SUBMODES.FINAL) {
+                // Final chord behavior depends on section type
+                const resolvingSections = ['chorus', 'outro', 'intro'];
+                const tensionSections = ['verse', 'prechorus', 'bridge'];
+
+                if (resolvingSections.includes(seqSectionType)) {
+                    tensionDirection = 'resolve';
+                } else if (tensionSections.includes(seqSectionType)) {
+                    tensionDirection = 'maintain';
+                } else {
+                    tensionDirection = 'resolve';
+                }
+            } else if (intent.subMode === CONTINUE_SUBMODES.CONCLUDING) {
                 tensionDirection = 'resolve';
             } else if (intent.subMode === CONTINUE_SUBMODES.BUILDING) {
                 tensionDirection = 'build';
@@ -4857,7 +4919,8 @@ function renderSequencesView(container) {
                     sectionInfo: sectionInfo,
                     contextMode: getContextAwareMode(),
                     melodyOptions: melodyOptions,
-                    tensionArcShape: modalState.tensionArcShape
+                    tensionArcShape: modalState.tensionArcShape,
+                    tensionDirection: tensionDirection // Pass user's Build/Resolve/Final selection
                 }
             );
         } else {
@@ -4969,11 +5032,19 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
         const firstChordSpelled = spellNoteInKey(firstChordInSeq?.root, key);
         const firstChordDisplay = `${firstChordSpelled}${firstChordSymbol}`;
 
+        // Get prev chord for context (the chord before this sequence position)
+        const prevChordForSeq = currentChord;
+
         seq.chords.forEach((chord, chordIdx) => {
             const chordDef = CHORD_DEFINITIONS[chord.type];
             const symbol = chordDef?.symbol || '';
-            const chip = document.createElement('button');
             const isFirstChord = chordIdx === 0;
+
+            // Create a wrapper for the chip + why button
+            const chipWrapper = document.createElement('div');
+            chipWrapper.style.cssText = 'position: relative; display: inline-block;';
+
+            const chip = document.createElement('button');
 
             // First chord (the "next" chord) gets a distinct teal/cyan highlight
             chip.style.cssText = isFirstChord ? `
@@ -5002,13 +5073,67 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
             chip.textContent = `${spelledChordRoot}${symbol}${invLabel}`;
             chip.title = chord.inversion ? `Hold to play ${spelledChordRoot} ${chord.type} (${INVERSION_NAMES[chord.inversion]} inversion)` : 'Hold to play chord';
             setupHoldToPlay(chip, chord);
-            chip.addEventListener('mouseenter', () => {
+
+            // Create the "?" button that appears on hover
+            const whyBtn = document.createElement('button');
+            whyBtn.textContent = '?';
+            whyBtn.style.cssText = `
+                position: absolute;
+                top: -6px;
+                right: -6px;
+                width: 14px;
+                height: 14px;
+                background: #6b7280;
+                color: white;
+                border: 1px solid white;
+                border-radius: 50%;
+                cursor: pointer;
+                font-size: 9px;
+                font-weight: 600;
+                padding: 0;
+                line-height: 12px;
+                opacity: 0;
+                transition: opacity 0.15s;
+                z-index: 10;
+            `;
+            whyBtn.title = 'Why this chord works';
+
+            // Get context for Why This Works
+            const prevChordInSeq = chordIdx === 0 ? prevChordForSeq : seq.chords[chordIdx - 1];
+            const nextChordInSeq = chordIdx < seq.chords.length - 1 ? seq.chords[chordIdx + 1] : null;
+            const chordRoman = noteToRomanNumeral(chord.root, key, chord.type) || '';
+
+            whyBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (typeof window.showWhyThisWorks === 'function') {
+                    window.showWhyThisWorks({
+                        romanNumeral: chordRoman,
+                        chord: spelledChordRoot,
+                        type: chord.type,
+                        key: key,
+                        root: chord.root,
+                        prevChord: prevChordInSeq ? noteToRomanNumeral(prevChordInSeq.root, key, prevChordInSeq.type) : null,
+                        prevChordData: prevChordInSeq,
+                        nextChord: nextChordInSeq ? noteToRomanNumeral(nextChordInSeq.root, key, nextChordInSeq.type) : null,
+                        nextChordData: nextChordInSeq
+                    });
+                }
+            });
+
+            // Show/hide why button on wrapper hover
+            chipWrapper.addEventListener('mouseenter', () => {
                 if (!chip.dataset.playing) chip.style.background = isFirstChord ? '#99f6e4' : '#c7d2fe';
+                whyBtn.style.opacity = '1';
             });
-            chip.addEventListener('mouseleave', () => {
+            chipWrapper.addEventListener('mouseleave', () => {
                 if (!chip.dataset.playing) chip.style.background = isFirstChord ? '#ccfbf1' : '#eef2ff';
+                whyBtn.style.opacity = '0';
             });
-            mainRow.appendChild(chip);
+
+            chipWrapper.appendChild(chip);
+            chipWrapper.appendChild(whyBtn);
+            mainRow.appendChild(chipWrapper);
             allChips.push(chip);
 
             // Arrow between chords (but not after the last one)

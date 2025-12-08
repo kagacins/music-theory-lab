@@ -875,6 +875,22 @@ export function generateComprehensiveRecommendations(
                     totalScore *= 0.3; // 70% penalty for exact repetition
                 }
 
+                // Apply tension-aware scoring for suspended chords
+                // Sus4 and Sus2 chords have inherent unresolved tension (the suspended note wants to resolve)
+                // Goal: sus chords should appear occasionally but not dominate any context
+                const isSuspendedChord = nextType === 'Sus4' || nextType === 'Sus2';
+                if (isSuspendedChord) {
+                    if (tensionDirection === 'resolve') {
+                        // Moderate penalty: sus chords can work as passing chords but shouldn't be primary choices
+                        totalScore *= 0.55; // 45% penalty - allows some sus chords but prefers resolved options
+                    } else if (tensionDirection === 'build') {
+                        // No bonus for build - sus chords are already competitive without artificial boost
+                        // They naturally score well due to their harmonic function
+                        // This prevents sus chord dominance in build contexts
+                    }
+                    // 'maintain' direction: no adjustment, suspended chords are neutral
+                }
+
                 // Check if this is a borrowed chord
                 const borrowedInfo = getBorrowedChordInfo(nextRoot, nextType, key);
 

@@ -1500,7 +1500,8 @@ export function generateTensionArcSequences(
         sectionInfo = null,
         contextMode = false,
         melodyOptions = null,
-        tensionArcShape = null
+        tensionArcShape = null,
+        tensionDirection = 'maintain' // User's Build/Resolve/Final selection
     } = options;
 
     // Generate sequences using standard method
@@ -1512,7 +1513,7 @@ export function generateTensionArcSequences(
         key,
         style,
         mood,
-        'maintain', // Tension direction handled by arc
+        tensionDirection, // Pass user's tension direction for chord filtering (sus chord penalties, etc.)
         4, // lookbackDepth
         targetTensionArc.length,
         topN * 3, // Request more to filter by tension
