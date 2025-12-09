@@ -158,6 +158,15 @@ import { initAudio, getPiano, getGuitar, getInstrument, getAudioIsReady, getCame
 import { updateUndoRedoButtons } from './modules/utils/undoRedo.js';
 import { savePanelState, restoreAllPanelStates, restoreTabPanelStates } from './modules/storage/panelState.js';
 import {
+    initExportService,
+    showPDFExportDialog,
+    showMIDIExportDialog,
+    showMIDIImportDialog,
+    copyShareableLink,
+    parseShareableLink,
+    importFromMIDI
+} from './modules/export/exportService.js';
+import {
     saveProjectToFile,
     loadProjectFromFile,
     applyProjectToState,
@@ -2485,6 +2494,32 @@ window.onload = () => {
         tabHintBanner.classList.add('hidden');
     }
 
+    // Check for shared progression link
+    const sharedProgression = initExportService();
+    if (sharedProgression) {
+        console.log('[Main] Loading shared progression:', sharedProgression);
+        // Load shared progression after app is ready
+        setTimeout(() => {
+            // Set the key
+            if (sharedProgression.key) {
+                const keySelect = document.getElementById('key-select');
+                if (keySelect) {
+                    keySelect.value = sharedProgression.key;
+                    keySelect.dispatchEvent(new Event('change'));
+                }
+            }
+            // Add chords to progression
+            // addSpecificChordToProgression(chordType, inversion, playShutterSound, overrideRoot)
+            if (sharedProgression.progression && sharedProgression.progression.length > 0) {
+                sharedProgression.progression.forEach(chord => {
+                    addSpecificChordToProgression(chord.type, chord.inversion || 0, false, chord.root);
+                });
+            }
+            // Clean URL without reloading
+            window.history.replaceState({}, '', window.location.pathname);
+        }, 500);
+    }
+
     // Wire up sticky action bar buttons
     const actionPlayBtn = document.getElementById('action-play-btn');
     const actionPlayAll = document.getElementById('action-play-all');
@@ -2495,7 +2530,9 @@ window.onload = () => {
     const actionTabSuggestions = document.getElementById('action-tab-suggestions');
     const actionSave = document.getElementById('action-save');
     const actionLoad = document.getElementById('action-load');
+    const actionImportMidi = document.getElementById('action-import-midi');
     const actionExportMidi = document.getElementById('action-export-midi');
+    const actionExportPDF = document.getElementById('action-export-pdf');
     const actionCopyLink = document.getElementById('action-copy-link');
     const actionSettingsBtn = document.getElementById('action-settings-btn');
     const actionSettingsPopover = document.getElementById('action-settings-popover');
@@ -2641,35 +2678,30 @@ window.onload = () => {
         });
     }
 
+    // Import MIDI
+    if (actionImportMidi) {
+        actionImportMidi.addEventListener('click', () => {
+            showMIDIImportDialog();
+        });
+    }
+
     // Export MIDI
     if (actionExportMidi) {
         actionExportMidi.addEventListener('click', () => {
-            if (window.saveMelody) {
-                window.saveMelody();
-            }
+            showMIDIExportDialog();
         });
     }
 
     if (actionCopyLink) {
         actionCopyLink.addEventListener('click', () => {
-            // Copy current progression as shareable link
-            const progression = window.g_ProgressionChords || [];
-            if (progression.length === 0) {
-                alert('No progression to share. Add some chords first!');
-                return;
-            }
-            const progressionData = {
-                chords: progression,
-                key: window.g_ProgressionKey || 'C',
-                tempo: window.g_Tempo || 120
-            };
-            const encoded = btoa(JSON.stringify(progressionData));
-            const url = `${window.location.origin}${window.location.pathname}?p=${encoded}`;
-            navigator.clipboard.writeText(url).then(() => {
-                alert('Link copied to clipboard!');
-            }).catch(() => {
-                prompt('Copy this link:', url);
-            });
+            copyShareableLink();
+        });
+    }
+
+    // Export PDF
+    if (actionExportPDF) {
+        actionExportPDF.addEventListener('click', () => {
+            showPDFExportDialog();
         });
     }
 

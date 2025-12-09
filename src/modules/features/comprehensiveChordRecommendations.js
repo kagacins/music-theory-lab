@@ -765,7 +765,7 @@ export function generateComprehensiveRecommendations(
                             // Calculate harmonic function score for this -> next transition
                             const fwdNextDegree = getScaleDegree(fwdNextChord.root, key);
                             const fwdNextFunction = fwdNextDegree !== null ? (DEGREE_TO_FUNCTION[fwdNextDegree] || HARMONIC_FUNCTIONS.TONIC) : null;
-                            const forwardFunctionScore = scoreHarmonicFunction(nextFunction, fwdNextFunction, 'resolve', nextDegree, fwdNextDegree);
+                            const forwardFunctionScore = scoreHarmonicFunction(nextFunction, fwdNextFunction, tensionDirection, nextDegree, fwdNextDegree);
 
                             // Combine voice leading and harmonic function for forward score
                             // Weight: 40% voice leading, 60% harmonic function (function more important for flow)

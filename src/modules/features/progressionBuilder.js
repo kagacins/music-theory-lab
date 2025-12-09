@@ -224,7 +224,8 @@ function getFunctionColors(roman) {
     const func = getChordFunction(roman);
 
     // Check if it's a borrowed chord (has flat or sharp prefix)
-    const isBorrowed = roman && (roman.includes('♭') || roman.includes('#') || roman.includes('b'));
+    // Handles both unicode symbols (♭, ♯) and ASCII equivalents (b, #)
+    const isBorrowed = roman && (roman.includes('♭') || roman.includes('♯') || roman.includes('#') || roman.startsWith('b'));
 
     const colorMap = {
         'Tonic': {
@@ -4375,12 +4376,20 @@ function createDetailedCardHTML(chord, index, key) {
 
             <!-- Controls -->
             <div class="p-1.5 space-y-1.5 text-xs">
-                <!-- Chord Type -->
-                <div>
-                    <label class="block text-[10px] font-semibold text-gray-700 mb-0.5">Chord Type</label>
-                    <select class="type-select w-full px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
-                        ${getChordTypeOptions(chord.type)}
-                    </select>
+                <!-- Root Note & Chord Type side by side -->
+                <div class="flex gap-1">
+                    <div class="flex-1">
+                        <label class="block text-[10px] font-semibold text-gray-700 mb-0.5">Root</label>
+                        <select class="root-select w-full px-1 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
+                            ${getRootNoteOptions(chord.root)}
+                        </select>
+                    </div>
+                    <div class="flex-[2]">
+                        <label class="block text-[10px] font-semibold text-gray-700 mb-0.5">Type</label>
+                        <select class="type-select w-full px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
+                            ${getChordTypeOptions(chord.type)}
+                        </select>
+                    </div>
                 </div>
 
                 <!-- RH SECTION -->
@@ -4449,6 +4458,7 @@ function attachCardEventListeners(wrapper, index) {
     const collapseBtns = wrapper.querySelectorAll('.collapse-btn'); // Get ALL collapse buttons
     const playBtn = wrapper.querySelector('.play-btn');
     const deleteBtn = wrapper.querySelector('.delete-btn');
+    const rootSelect = wrapper.querySelector('.root-select');
     const typeSelect = wrapper.querySelector('.type-select');
     const inversionBtns = wrapper.querySelectorAll('.inversion-btn');
     const noteCheckboxes = wrapper.querySelectorAll('.note-checkbox');
@@ -4596,6 +4606,14 @@ function attachCardEventListeners(wrapper, index) {
             // No longer need to preserve transforms - flexbox/grid handles layout
         });
     });
+
+    // Chord root select
+    if (rootSelect) {
+        rootSelect.addEventListener('change', (e) => {
+            e.stopPropagation();
+            updateChordRoot(index, e.target.value);
+        });
+    }
 
     // Chord type select
     if (typeSelect) {
@@ -5315,6 +5333,21 @@ function getChordTypeOptions(currentType) {
 }
 
 /**
+ * Helper: Get root note options HTML
+ * All 12 chromatic notes
+ */
+function getRootNoteOptions(currentRoot) {
+    const roots = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B'];
+
+    // Normalize current root for comparison (handle enharmonics)
+    const normalizedCurrent = currentRoot || 'C';
+
+    return roots.map(root =>
+        `<option value="${root}" ${root === normalizedCurrent ? 'selected' : ''}>${root}</option>`
+    ).join('');
+}
+
+/**
  * Helper: Get inversion options HTML
  */
 function getInversionOptions(currentInversion) {
@@ -5558,6 +5591,100 @@ function updateChordType(index, newType) {
         trainerState.currentKey,
         absoluteLHOctaveShift,
         newType,
+        getEnharmonicPreference()
+    ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
+    const allNotes = voicedNotes.concat(lhNotes);
+    if (allNotes.length > 0) {
+        playTrainerChordOnce(allNotes);
+    }
+}
+
+/**
+ * Update chord root note from simplified view
+ * Changes the root note while preserving the chord type
+ */
+function updateChordRoot(index, newRoot) {
+    // Get compositionState directly - the single source of truth
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) {
+        return;
+    }
+
+    const trainerState = getTrainerState();
+    const chord = compositionState.getChord(index);
+    if (!chord) {
+        return;
+    }
+
+    // Keep the same chord type, just change the root
+    const chordType = chord.type || 'Major';
+
+    // Regenerate chord notes with new root
+    const chordInfo = getProgressionChordNotes(
+        chord.key || trainerState.currentKey,
+        newRoot,  // Use the new root directly (not roman numeral)
+        chordType,
+        chord.inversion
+    );
+
+    if (!chordInfo) {
+        return;
+    }
+
+    // Prepare updates object
+    const updates = {
+        root: newRoot,
+        notes: chordInfo.notes,
+        lhNotes: chordInfo.lhNotes,
+        name: chordInfo.name,
+        simpleName: chordInfo.simpleName,
+        roman: '' // Clear roman numeral since we're using absolute root
+    };
+
+    // Reapply octave shift if it was previously set
+    if (chord.octaveShift && chord.octaveShift !== 0) {
+        updates.notes = updates.notes.map(note => {
+            const match = note.match(/^([A-G][#b]?)(\d+)$/);
+            if (!match) return note;
+            const noteName = match[1];
+            const octave = parseInt(match[2]);
+            const newOctave = octave + Math.floor(chord.octaveShift / 12);
+            // Clamp octave to valid MIDI range (0-8)
+            const clampedOctave = Math.max(0, Math.min(8, newOctave));
+            return `${noteName}${clampedOctave}`;
+        });
+    }
+
+    // Save state for undo BEFORE making changes
+    saveStateBeforeChange();
+
+    // Update chord in compositionState
+    compositionState.updateChordByIndex(index, updates);
+
+    // Also update trainerState.progressionData to keep in sync
+    if (trainerState.progressionData && trainerState.progressionData[index]) {
+        Object.assign(trainerState.progressionData[index], updates);
+    }
+
+    // Update only this card and tension curve
+    updateSingleCard(index);
+    updateTensionCurveIfVisible();
+
+    // Update the grand staff notation
+    updateChordAndRenderPreservingTrebleNotes(index);
+
+    // Play the chord with the new root
+    const voicedNotes = updates.notes.filter(n => !(chord.omittedNotes || []).includes(n));
+    const rhOctaveShift = chord.octaveShift || 0;
+    const lhRelativeShift = chord.lhOctaveShift || 0;
+    const absoluteLHOctaveShift = rhOctaveShift + lhRelativeShift;
+    const lhNotes = getLHNotes(
+        newRoot,
+        chord.lhType,
+        chord.lhInversion,
+        trainerState.currentKey,
+        absoluteLHOctaveShift,
+        chordType,
         getEnharmonicPreference()
     ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
     const allNotes = voicedNotes.concat(lhNotes);
@@ -10871,9 +10998,23 @@ function renderMelodyNotationIfNeeded(preventScroll = false) {
 
 /**
  * Clear all chords from the progression
+ * Shows confirmation dialog if progression has chords
  */
 export function clearProgression() {
     const trainerState = getTrainerState();
+    const progressionData = getProgressionData();
+
+    // If there are chords, ask for confirmation
+    if (progressionData && progressionData.length > 0) {
+        const chordCount = progressionData.length;
+        const message = chordCount === 1
+            ? 'Are you sure you want to clear the progression? This will remove 1 chord.'
+            : `Are you sure you want to clear the progression? This will remove ${chordCount} chords.`;
+
+        if (!confirm(message)) {
+            return; // User cancelled
+        }
+    }
 
     // Save state for undo before clearing
     saveStateBeforeChange();

@@ -1903,6 +1903,64 @@ function renderCompareIntent(container) {
     // Generate alternatives using the recommendation engine
     // Uses the same style, mood, and weight settings as other intents
     // FORWARD CONTEXT: Pass the next chord for forward-looking scoring
+
+    // Determine tensionDirection based on chord position in progression/section
+    // Compare intent should respect the musical context of where the chord sits
+    let compareTensionDirection = 'maintain'; // Default for middle positions
+
+    // Get section context for the selected chord
+    const compositionState = getCompositionState();
+    const sections = compositionState?.getSections?.() || [];
+    let compareTargetSection = null;
+
+    // Find section containing this chord
+    for (const section of sections) {
+        if (section.chordIndices && section.chordIndices.includes(chordIndex)) {
+            compareTargetSection = section;
+            break;
+        }
+    }
+
+    // Determine tension direction based on position
+    if (compareTargetSection) {
+        const sectionIndices = compareTargetSection.chordIndices;
+        const posInSection = sectionIndices.indexOf(chordIndex);
+        const sectionLength = sectionIndices.length;
+        const isLastInSection = posInSection === sectionLength - 1;
+        const isNearEnd = posInSection >= sectionLength - 2;
+
+        if (isLastInSection) {
+            // Last chord - resolve for chorus/outro/intro, maintain for verse/bridge
+            const resolvingSections = ['chorus', 'outro', 'intro'];
+            compareTensionDirection = resolvingSections.includes(compareTargetSection.type) ? 'resolve' : 'maintain';
+        } else if (isNearEnd) {
+            compareTensionDirection = 'resolve'; // Approaching end
+        } else if (posInSection === 0) {
+            compareTensionDirection = 'build'; // First chord of section, building
+        }
+        // else: middle position stays 'maintain'
+    } else {
+        // No section - use position in overall progression
+        const isLast = chordIndex === progressionData.length - 1;
+        const isNearEnd = chordIndex >= progressionData.length - 2;
+        if (isLast) {
+            compareTensionDirection = 'resolve';
+        } else if (isNearEnd) {
+            compareTensionDirection = 'resolve';
+        } else if (chordIndex === 0) {
+            compareTensionDirection = 'build';
+        }
+    }
+
+    // Build sectionInfo for scoring
+    const compareSectionInfo = {
+        mode: INTENT_MODES.CONTINUE,
+        subMode: compareTensionDirection === 'resolve' ? CONTINUE_SUBMODES.CONCLUDING : CONTINUE_SUBMODES.BUILDING,
+        targetSection: compareTargetSection,
+        sections: sections,
+        currentChordIndex: chordIndex
+    };
+
     const recommendations = generateComprehensiveRecommendations(
         currentChord.root,
         currentChord.type,
@@ -1910,14 +1968,14 @@ function renderCompareIntent(container) {
         key,
         modalState.style,            // style
         modalState.mood,             // mood
-        'resolve',                   // tensionDirection - alternatives typically resolve
+        compareTensionDirection,     // tensionDirection - context-aware
         10,                          // limit
         progressionData,             // progressionData
         true,                        // contextMode - enable context awareness
         modalState.lookbackDepth,    // lookbackDepth
         modalState.customWeights,    // customWeights from sliders
         true,                        // useEnhancedScoring
-        null,                        // sectionInfo
+        compareSectionInfo,          // sectionInfo - context-aware
         null,                        // tensionArcInfo
         null,                        // rhythmInfo
         // Phase 4: Forward context info - evaluate how alternatives lead to the NEXT chord

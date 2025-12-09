@@ -102,8 +102,30 @@ export function noteToRomanNumeral(noteName, key, chordType) {
     const interval = (noteIndex - keyRootIndex + 12) % 12;
 
     // Find the scale degree in the major scale
-    const scaleDegreeIndex = MAJOR_SCALE_STEPS.indexOf(interval);
-    if (scaleDegreeIndex === -1) return null; // Not in the diatonic scale
+    let scaleDegreeIndex = MAJOR_SCALE_STEPS.indexOf(interval);
+    let chromaticPrefix = '';
+
+    // Handle chromatic/out-of-key notes
+    if (scaleDegreeIndex === -1) {
+        // Find the closest diatonic degree and determine if it's sharp or flat
+        // Major scale intervals: [0, 2, 4, 5, 7, 9, 11]
+        // Chromatic intervals that are NOT in major scale: 1, 3, 6, 8, 10
+        const chromaticMapping = {
+            1: { degree: 1, prefix: '♭' },  // ♭II (e.g., Db in C)
+            3: { degree: 2, prefix: '♭' },  // ♭III (e.g., Eb in C) - could also be ♯II
+            6: { degree: 3, prefix: '♯' },  // ♯IV (e.g., F# in C) - could also be ♭V
+            8: { degree: 4, prefix: '♭' },  // ♭VI (e.g., Ab in C) - could also be ♯V
+            10: { degree: 5, prefix: '♭' }  // ♭VII (e.g., Bb in C)
+        };
+
+        const mapping = chromaticMapping[interval];
+        if (mapping) {
+            scaleDegreeIndex = mapping.degree;
+            chromaticPrefix = mapping.prefix;
+        } else {
+            return null; // Should never happen, but safety fallback
+        }
+    }
 
     // Find the matching Roman numeral for the base triad quality
     const romanKeys = Object.keys(ROMAN_MAP_BASE);
@@ -155,7 +177,8 @@ export function noteToRomanNumeral(noteName, key, chordType) {
     // Add chord quality suffix for extended chords
     const qualitySuffix = getChordQualitySuffix(chordType, baseRoman);
 
-    return baseRoman + qualitySuffix;
+    // Add chromatic prefix for out-of-key chords (e.g., ♭II, ♯IV)
+    return chromaticPrefix + baseRoman + qualitySuffix;
 }
 
 /**

@@ -66,9 +66,9 @@ const FUNCTION_LEGEND = {
         textColor: 'text-purple-700',
         icon: '🟣',
         label: 'Surprise',
-        technicalTerm: 'Borrowed/Modal',
-        chords: '♭VII, ♭VI, iv',
-        description: 'This chord is "borrowed" from a parallel key for unexpected color.',
+        technicalTerm: 'Borrowed/Chromatic',
+        chords: '♭II, ♭III, ♯IV, ♭VI, ♭VII',
+        description: 'This chord is "borrowed" or chromatic - outside the key for unexpected color.',
         simpleExplanation: 'Like a plot twist - unexpected but effective!'
     }
 };
