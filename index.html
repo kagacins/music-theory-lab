@@ -1499,7 +1499,7 @@
                             <span class="ml-2 px-2 py-0.5 bg-white/20 rounded text-xs">
                                 Key: <span id="melody-current-key-display">C Major</span>
                             </span>
-                            <!-- View Toggle -->
+                            <!-- View Toggle (abc/note) -->
                             <div class="flex items-center gap-1.5 ml-2" onclick="event.stopPropagation()" title="Toggle view: Cards ↔ Notation">
                                 <span class="text-[10px] font-bold text-white/70">abc</span>
                                 <label class="relative inline-flex items-center cursor-pointer toggle-switch">
@@ -1508,6 +1508,8 @@
                                 </label>
                                 <svg class="w-3.5 h-3.5 text-white/70" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
                             </div>
+                            <!-- Section View Toggle (placeholder - populated by JS when sections exist) -->
+                            <div id="header-section-view-toggle" class="hidden ml-2" onclick="event.stopPropagation()"></div>
                         </span>
                         <svg id="chord-progression-card-chevron" class="w-5 h-5 transform rotate-180 transition-transform" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                     </button>

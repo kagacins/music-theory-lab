@@ -99,6 +99,219 @@ const expandedChords = new Set();
 // Used when inserting chords via suggestions to avoid rare section+layout bugs.
 let forceFlatLayoutOnce = false;
 
+// ============================================================================
+// VIEW MODE STATE (Scroll View vs Section View)
+// ============================================================================
+
+// View mode: 'scroll' (horizontal scroll) or 'section' (section-based navigation)
+let progressionViewMode = 'scroll';
+
+// Selected section IDs for section view mode (supports multi-select)
+let selectedSectionIds = new Set();
+
+// LocalStorage key for view mode persistence
+const VIEW_MODE_STORAGE_KEY = 'progression-view-mode';
+
+/**
+ * Initialize view mode from localStorage
+ */
+function initViewModeState() {
+    const stored = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    if (stored === 'scroll' || stored === 'section') {
+        progressionViewMode = stored;
+    }
+}
+
+/**
+ * Get current view mode
+ * @returns {'scroll'|'section'} Current view mode
+ */
+export function getProgressionViewMode() {
+    return progressionViewMode;
+}
+
+/**
+ * Set view mode and persist to localStorage
+ * @param {'scroll'|'section'} mode - View mode to set
+ */
+export function setProgressionViewMode(mode) {
+    if (mode !== 'scroll' && mode !== 'section') return;
+    progressionViewMode = mode;
+    localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
+
+    // Clear section selection when switching modes
+    if (mode === 'scroll') {
+        selectedSectionIds.clear();
+        // Also clear the notation measure filter so render() shows all measures
+        const notationComposer = window.getNotationComposer ? window.getNotationComposer() : null;
+        if (notationComposer && typeof notationComposer.clearMeasureFilter === 'function') {
+            notationComposer.clearMeasureFilter();
+        }
+    } else if (mode === 'section') {
+        // Auto-select first section when switching to section view
+        const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+        if (compositionState) {
+            const sections = compositionState.getSections();
+            if (sections.length > 0 && selectedSectionIds.size === 0) {
+                // Sort by first chord index to get the "first" section
+                const sortedSections = [...sections].sort((a, b) => {
+                    const aMin = Math.min(...(a.chordIndices || [0]));
+                    const bMin = Math.min(...(b.chordIndices || [0]));
+                    return aMin - bMin;
+                });
+                selectedSectionIds.add(sortedSections[0].id);
+            }
+        }
+    }
+}
+
+/**
+ * Get selected section IDs for section view
+ * @returns {Array<string>} Array of selected section IDs
+ */
+export function getSelectedSectionIds() {
+    return [...selectedSectionIds];
+}
+
+/**
+ * Check if a section is currently selected
+ * @param {string} sectionId - Section ID to check
+ * @returns {boolean} True if section is selected
+ */
+export function isSectionSelectedInView(sectionId) {
+    return selectedSectionIds.has(sectionId);
+}
+
+/**
+ * Select a section (optionally additive for multi-select)
+ * @param {string} sectionId - Section ID to select
+ * @param {boolean} additive - If true, add to selection; if false, replace selection
+ */
+export function selectSectionInView(sectionId, additive = false) {
+    if (!additive) {
+        selectedSectionIds.clear();
+    }
+    selectedSectionIds.add(sectionId);
+}
+
+/**
+ * Deselect a section
+ * @param {string} sectionId - Section ID to deselect
+ */
+export function deselectSectionInView(sectionId) {
+    selectedSectionIds.delete(sectionId);
+}
+
+/**
+ * Clear all section selections
+ */
+export function clearSectionSelection() {
+    selectedSectionIds.clear();
+    // Also clear the notation measure filter when clearing section selection
+    const notationComposer = window.getNotationComposer ? window.getNotationComposer() : null;
+    if (notationComposer && typeof notationComposer.clearMeasureFilter === 'function') {
+        notationComposer.clearMeasureFilter();
+    }
+}
+
+/**
+ * Select a range of adjacent sections from last selected to target
+ * @param {string} targetSectionId - Target section ID
+ * @param {Array} sections - Array of all sections (in order)
+ */
+export function selectSectionRange(targetSectionId, sections) {
+    if (selectedSectionIds.size === 0) {
+        // No previous selection, just select the target
+        selectedSectionIds.add(targetSectionId);
+        return;
+    }
+
+    // Get the current selection's last section
+    const selectedArray = [...selectedSectionIds];
+    const lastSelectedId = selectedArray[selectedArray.length - 1];
+
+    // Find indices
+    const lastIndex = sections.findIndex(s => s.id === lastSelectedId);
+    const targetIndex = sections.findIndex(s => s.id === targetSectionId);
+
+    if (lastIndex === -1 || targetIndex === -1) return;
+
+    // Select all sections in range
+    const start = Math.min(lastIndex, targetIndex);
+    const end = Math.max(lastIndex, targetIndex);
+
+    for (let i = start; i <= end; i++) {
+        selectedSectionIds.add(sections[i].id);
+    }
+}
+
+/**
+ * Convert hex color to rgba
+ * @param {string} hex - Hex color string
+ * @param {number} alpha - Alpha value (0-1)
+ * @returns {string} RGBA color string
+ */
+function hexToRgba(hex, alpha = 0.15) {
+    if (!hex || typeof hex !== 'string') {
+        return `rgba(192, 132, 252, ${alpha})`;
+    }
+    let parsed = hex.replace('#', '');
+    if (parsed.length === 3) {
+        parsed = parsed.split('').map(c => c + c).join('');
+    }
+    const r = parseInt(parsed.slice(0, 2), 16);
+    const g = parseInt(parsed.slice(2, 4), 16);
+    const b = parseInt(parsed.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// Initialize view mode state on load
+initViewModeState();
+
+// Set up keyboard navigation for section view
+function setupSectionViewKeyboardNavigation() {
+    document.addEventListener('keydown', (e) => {
+        // Only handle if we're in section view mode
+        if (progressionViewMode !== 'section') return;
+
+        // Check if we have sections
+        const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+        const sections = compositionState ? compositionState.getSections() : [];
+        if (sections.length === 0) return;
+
+        // Only handle if no input/textarea is focused
+        const activeElement = document.activeElement;
+        if (activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA') return;
+
+        switch (e.key) {
+            case 'ArrowLeft':
+                e.preventDefault();
+                navigateToPreviousSection();
+                break;
+            case 'ArrowRight':
+                e.preventDefault();
+                navigateToNextSection();
+                break;
+            case 'Escape':
+                // Clear section selection
+                clearSectionSelection();
+                renderProgressionDisplay('melody-progression-visualization', true);
+                updateNotationForSelectedSections();
+                break;
+        }
+    });
+}
+
+// Initialize keyboard navigation
+setupSectionViewKeyboardNavigation();
+
+// Expose view mode functions to window for external access
+window.setProgressionViewMode = setProgressionViewMode;
+window.getProgressionViewMode = getProgressionViewMode;
+window.navigateToPreviousSection = navigateToPreviousSection;
+window.navigateToNextSection = navigateToNextSection;
+window.clearSectionSelection = clearSectionSelection;
+
 // Import note/chord utilities
 import {
     noteToMidi,
@@ -1080,7 +1293,7 @@ function suggestInversion(chordIndex) {
 
 /**
  * Toggle staff notation display for a chord card
- * Works with both Progression Builder and Melody Composer tabs
+ * Works with both Progression Builder and Composition Studio tabs
  * @param {number} chordIndex - Index of chord in progression
  * @param {string} sourceContainerId - Optional container ID where the toggle was clicked
  */
@@ -1291,7 +1504,7 @@ function updateGlobalToggleButtons(showStaff) {
         progToggle.checked = showStaff;
     }
 
-    // Update Melody Composer toggle checkbox
+    // Update Composition Studio toggle checkbox
     const melodyToggle = document.getElementById('melody-view-toggle');
     if (melodyToggle) {
         melodyToggle.checked = showStaff;
@@ -1300,7 +1513,7 @@ function updateGlobalToggleButtons(showStaff) {
 
 /**
  * Capture current staff notation visibility states before re-rendering
- * Checks both Progression Builder and Melody Composer tabs
+ * Checks both Progression Builder and Composition Studio tabs
  */
 function captureStaffNotationStates() {
     staffNotationStates.clear();
@@ -1329,7 +1542,7 @@ function captureStaffNotationStates() {
 
 /**
  * Restore staff notation visibility states after re-rendering
- * Restores to both Progression Builder and Melody Composer tabs
+ * Restores to both Progression Builder and Composition Studio tabs
  */
 function restoreStaffNotationStates() {
     // Use setTimeout to ensure DOM is fully rendered
@@ -2269,7 +2482,7 @@ function renderStaffNotation(chordIndex, canvas) {
 
 /**
  * Render chord staff notation with provided chord data
- * Wrapper function that accepts chord data directly (for Melody Composer)
+ * Wrapper function that accepts chord data directly (for Composition Studio)
  * @param {HTMLCanvasElement} canvas - Canvas element to render on
  * @param {Object} chordData - Chord data object with notes, lhType, etc.
  * @param {string} key - Current key (e.g., "C", "Dm")
@@ -2862,7 +3075,7 @@ function renderSimplifiedChordSequence(container, progressionData, key, options 
 
     if (!progressionData || progressionData.length === 0) return;
 
-    // Render cards directly into the grid container (like Melody Composer)
+    // Render cards directly into the grid container (like Composition Studio)
     // Clear existing content
     container.innerHTML = '';
 
@@ -3058,6 +3271,856 @@ function renderFlatCards(gridContainer, progressionData, key, options = {}) {
         updateCardShifts();
     });
 }
+
+// ============================================================================
+// VIEW MODE UI COMPONENTS
+// ============================================================================
+
+/**
+ * Create view mode toggle UI component
+ * @returns {HTMLElement} Toggle container element
+ */
+function createViewModeToggle() {
+    const container = document.createElement('div');
+    container.className = 'view-mode-toggle flex items-center gap-1 bg-gray-100 rounded-lg p-0.5';
+    container.id = 'view-mode-toggle';
+
+    const isScrollView = progressionViewMode === 'scroll';
+    const isSectionView = progressionViewMode === 'section';
+
+    container.innerHTML = `
+        <button class="view-mode-btn px-2 py-1 text-xs font-medium rounded-md transition-all duration-200 flex items-center gap-1
+                       ${isScrollView ? 'bg-white shadow text-indigo-600' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}"
+                data-mode="scroll" title="Scroll View - Horizontal scrolling">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+            Scroll
+        </button>
+        <button class="view-mode-btn px-2 py-1 text-xs font-medium rounded-md transition-all duration-200 flex items-center gap-1
+                       ${isSectionView ? 'bg-white shadow text-indigo-600' : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'}"
+                data-mode="section" title="Section View - Navigate by section">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+            </svg>
+            Section
+        </button>
+    `;
+
+    // Add event listeners
+    container.querySelectorAll('.view-mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const mode = btn.getAttribute('data-mode');
+            console.log('[SectionView] View mode toggle clicked:', mode);
+            console.log('[SectionView] Previous mode was:', progressionViewMode);
+            setProgressionViewMode(mode);
+            console.log('[SectionView] Mode after set:', progressionViewMode);
+            // Re-render both progression displays
+            renderProgressionDisplay('melody-progression-visualization', true);
+            renderProgressionDisplay('melody-progression-visualization', false);
+            // Update notation for section view
+            updateNotationForSelectedSections();
+        });
+    });
+
+    return container;
+}
+
+/**
+ * Create compact view mode toggle for header placement
+ * Includes "View:" label with Scroll/Section text buttons
+ * @returns {HTMLElement} Compact toggle container element
+ */
+function createCompactViewModeToggle() {
+    const container = document.createElement('div');
+    container.className = 'flex items-center gap-1.5';
+    container.id = 'compact-view-mode-toggle';
+
+    const isScrollView = progressionViewMode === 'scroll';
+    const isSectionView = progressionViewMode === 'section';
+
+    container.innerHTML = `
+        <span class="text-xs text-white/70 font-medium">View:</span>
+        <div class="flex items-center gap-0.5 bg-white/20 rounded-md p-0.5">
+            <button class="compact-view-btn px-2 py-1 text-xs font-medium rounded transition-all duration-200
+                           ${isScrollView ? 'bg-white/30 text-white shadow-sm' : 'text-white/60 hover:text-white hover:bg-white/10'}"
+                    data-mode="scroll" title="Scroll View - Horizontal scrolling">
+                Scroll
+            </button>
+            <button class="compact-view-btn px-2 py-1 text-xs font-medium rounded transition-all duration-200
+                           ${isSectionView ? 'bg-white/30 text-white shadow-sm' : 'text-white/60 hover:text-white hover:bg-white/10'}"
+                    data-mode="section" title="Section View - Navigate by section">
+                Section
+            </button>
+        </div>
+    `;
+
+    // Add event listeners
+    container.querySelectorAll('.compact-view-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent header collapse
+            const mode = btn.getAttribute('data-mode');
+            console.log('[SectionView] Compact toggle clicked:', mode);
+            setProgressionViewMode(mode);
+            // Re-render progression display
+            renderProgressionDisplay('melody-progression-visualization', true);
+            renderProgressionDisplay('melody-progression-visualization', false);
+            // Update notation for section view
+            updateNotationForSelectedSections();
+            // Update toggle button styles
+            container.querySelectorAll('.compact-view-btn').forEach(b => {
+                const isActive = b.getAttribute('data-mode') === progressionViewMode;
+                b.className = `compact-view-btn px-2 py-1 text-xs font-medium rounded transition-all duration-200
+                              ${isActive ? 'bg-white/30 text-white shadow-sm' : 'text-white/60 hover:text-white hover:bg-white/10'}`;
+            });
+        });
+    });
+
+    return container;
+}
+
+/**
+ * Create section chip element for section picker bar
+ * @param {Object} section - Section object
+ * @param {boolean} isSelected - Whether section is selected
+ * @param {Function} onClick - Click handler
+ * @returns {HTMLElement} Section chip element
+ */
+function createSectionChip(section, isSelected, onClick) {
+    const chip = document.createElement('button');
+    const chordCount = section.chordIndices?.length || 0;
+    const sectionColor = section.color || '#c084fc';
+
+    // Much stronger visual difference for selected state
+    chip.className = `section-chip flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold
+                      transition-all duration-200 flex-shrink-0 cursor-pointer
+                      ${isSelected ? 'ring-2 ring-offset-2 shadow-lg transform scale-105' : 'hover:scale-102'}`;
+    chip.style.cssText = `
+        background: ${isSelected ? hexToRgba(sectionColor, 0.35) : hexToRgba(sectionColor, 0.08)};
+        border: 2px solid ${isSelected ? sectionColor : hexToRgba(sectionColor, 0.25)};
+        color: ${isSelected ? '#1f2937' : '#6b7280'};
+        ${isSelected ? `--tw-ring-color: ${sectionColor}; box-shadow: 0 4px 12px ${hexToRgba(sectionColor, 0.4)};` : ''}
+    `;
+
+    chip.innerHTML = `
+        <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background: ${sectionColor}; ${isSelected ? 'box-shadow: 0 0 8px ' + sectionColor + ';' : ''}"></span>
+        <span class="truncate max-w-[100px]">${section.label || 'Section'}</span>
+        <span class="text-[10px] ${isSelected ? 'font-bold' : 'opacity-70'}">(${chordCount})</span>
+        ${isSelected ? '<svg class="w-3 h-3 ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>' : ''}
+    `;
+
+    chip.onclick = (e) => onClick(section.id, e.shiftKey, e.ctrlKey || e.metaKey);
+    chip.setAttribute('data-section-id', section.id);
+
+    return chip;
+}
+
+/**
+ * Create section picker bar for section view mode
+ * Includes "All" button at left, real sections, and "No Group X" pseudo-sections for ungrouped chords
+ * @param {Array} sections - Array of section objects
+ * @returns {HTMLElement} Section picker bar element
+ */
+function createSectionPickerBar(sections) {
+    const bar = document.createElement('div');
+    bar.className = 'section-picker-bar flex items-center gap-2 p-2 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg mb-2 border border-gray-200';
+    bar.id = 'section-picker-bar';
+
+    // Previous section button
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'section-nav-btn p-1.5 rounded-full bg-white border border-gray-200 hover:bg-gray-100 hover:border-gray-300 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0';
+    prevBtn.innerHTML = `<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+    </svg>`;
+    prevBtn.title = 'Previous section (←)';
+    prevBtn.onclick = () => navigateToPreviousSection();
+    bar.appendChild(prevBtn);
+
+    // "All" button - moved to left side, right after prev button
+    const allBtn = document.createElement('button');
+    allBtn.className = `px-2.5 py-1.5 text-xs font-semibold rounded-full transition-all duration-200 flex-shrink-0
+                        ${selectedSectionIds.size === 0 ? 'bg-indigo-500 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`;
+    allBtn.textContent = 'All';
+    allBtn.title = 'Show all chords';
+    allBtn.onclick = () => {
+        clearSectionSelection();
+        renderProgressionDisplay('melody-progression-visualization', true);
+        updateNotationForSelectedSections();
+    };
+    bar.appendChild(allBtn);
+
+    // Section chips container
+    const chipsContainer = document.createElement('div');
+    chipsContainer.className = 'flex items-center gap-1.5 flex-1 overflow-x-auto py-1 px-1';
+    chipsContainer.style.scrollbarWidth = 'none'; // Hide scrollbar
+
+    // Build combined list of real sections and ungrouped pseudo-sections
+    const allChips = buildSectionChipsWithUngrouped(sections);
+
+    allChips.forEach(chipData => {
+        const isSelected = selectedSectionIds.has(chipData.id);
+        const chip = createSectionChip(chipData, isSelected, handleSectionChipClick);
+        chipsContainer.appendChild(chip);
+    });
+
+    bar.appendChild(chipsContainer);
+
+    // Next section button
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'section-nav-btn p-1.5 rounded-full bg-white border border-gray-200 hover:bg-gray-100 hover:border-gray-300 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0';
+    nextBtn.innerHTML = `<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+    </svg>`;
+    nextBtn.title = 'Next section (→)';
+    nextBtn.onclick = () => navigateToNextSection();
+    bar.appendChild(nextBtn);
+
+    return bar;
+}
+
+/**
+ * Build array of section chip data including both real sections and "No Group X" pseudo-sections
+ * for ungrouped chords, sorted by chord position
+ * @param {Array} sections - Real sections from compositionState
+ * @returns {Array} Combined array of section/pseudo-section objects for chips
+ */
+function buildSectionChipsWithUngrouped(sections) {
+    const trainerState = getTrainerState();
+    const progressionLength = trainerState.progressionData?.length || 0;
+
+    if (progressionLength === 0) return sections;
+
+    // Find all chord indices that are in a section
+    const sectionedIndices = new Set();
+    sections.forEach(section => {
+        (section.chordIndices || []).forEach(idx => sectionedIndices.add(idx));
+    });
+
+    // Find ungrouped indices (not in any section)
+    const ungroupedIndices = [];
+    for (let i = 0; i < progressionLength; i++) {
+        if (!sectionedIndices.has(i)) {
+            ungroupedIndices.push(i);
+        }
+    }
+
+    // If no ungrouped chords, just return sections sorted by position
+    if (ungroupedIndices.length === 0) {
+        return [...sections].sort((a, b) => {
+            const aMin = Math.min(...(a.chordIndices || [0]));
+            const bMin = Math.min(...(b.chordIndices || [0]));
+            return aMin - bMin;
+        });
+    }
+
+    // Group consecutive ungrouped indices into pseudo-sections
+    const ungroupedGroups = [];
+    let currentGroup = [ungroupedIndices[0]];
+
+    for (let i = 1; i < ungroupedIndices.length; i++) {
+        // Check if this index is consecutive OR if there's a section in between
+        const prevIdx = ungroupedIndices[i - 1];
+        const currIdx = ungroupedIndices[i];
+
+        // Check if there's a section starting between prevIdx and currIdx
+        const sectionInBetween = sections.some(s => {
+            const sectionStart = Math.min(...(s.chordIndices || [Infinity]));
+            return sectionStart > prevIdx && sectionStart < currIdx;
+        });
+
+        if (currIdx === prevIdx + 1 && !sectionInBetween) {
+            // Consecutive ungrouped chord, add to current group
+            currentGroup.push(currIdx);
+        } else {
+            // Gap or section in between - start new group
+            ungroupedGroups.push([...currentGroup]);
+            currentGroup = [currIdx];
+        }
+    }
+    // Don't forget the last group
+    if (currentGroup.length > 0) {
+        ungroupedGroups.push(currentGroup);
+    }
+
+    // Create pseudo-section objects for each ungrouped group
+    const pseudoSections = ungroupedGroups.map((indices, groupIndex) => ({
+        id: `no-group-${groupIndex + 1}`,
+        label: `No Group ${groupIndex + 1}`,
+        color: '#9ca3af', // Gray color for ungrouped
+        chordIndices: indices,
+        isPseudoSection: true
+    }));
+
+    // Combine real sections and pseudo-sections, sort by first chord index
+    const allSections = [...sections, ...pseudoSections];
+    allSections.sort((a, b) => {
+        const aMin = Math.min(...(a.chordIndices || [Infinity]));
+        const bMin = Math.min(...(b.chordIndices || [Infinity]));
+        return aMin - bMin;
+    });
+
+    return allSections;
+}
+
+/**
+ * Handle section chip click
+ * @param {string} sectionId - Section ID that was clicked
+ * @param {boolean} isShiftClick - Whether shift key was held
+ * @param {boolean} isCtrlClick - Whether ctrl/cmd key was held
+ */
+function handleSectionChipClick(sectionId, isShiftClick, isCtrlClick = false) {
+    console.log('[SectionView] Chip clicked:', sectionId, 'shift:', isShiftClick, 'ctrl:', isCtrlClick);
+
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    const realSections = compositionState ? compositionState.getSections() : [];
+    // Use combined list including pseudo-sections for proper range selection
+    const allSections = buildSectionChipsWithUngrouped(realSections);
+    console.log('[SectionView] All sections (including pseudo):', allSections.length);
+
+    if (isShiftClick) {
+        // Shift+click: select range of adjacent sections
+        selectSectionRange(sectionId, allSections);
+    } else if (isCtrlClick) {
+        // Ctrl+click: toggle this section in the selection
+        if (selectedSectionIds.has(sectionId)) {
+            selectedSectionIds.delete(sectionId);
+            console.log('[SectionView] Ctrl-deselected section:', sectionId);
+        } else {
+            selectedSectionIds.add(sectionId);
+            console.log('[SectionView] Ctrl-added section:', sectionId);
+        }
+    } else {
+        // Normal click: toggle selection or select single
+        if (selectedSectionIds.has(sectionId) && selectedSectionIds.size === 1) {
+            // Clicking the only selected section - deselect it
+            selectedSectionIds.delete(sectionId);
+            console.log('[SectionView] Deselected section:', sectionId);
+        } else {
+            // Select only this section
+            selectedSectionIds.clear();
+            selectedSectionIds.add(sectionId);
+            console.log('[SectionView] Selected section:', sectionId);
+        }
+    }
+
+    console.log('[SectionView] Selected IDs after click:', [...selectedSectionIds]);
+    console.log('[SectionView] Current view mode:', progressionViewMode);
+
+    // Re-render with new selection
+    console.log('[SectionView] Calling renderProgressionDisplay for melody-progression-visualization');
+    renderProgressionDisplay('melody-progression-visualization', true);
+
+    // Update notation to show only selected section measures
+    console.log('[SectionView] Calling updateNotationForSelectedSections');
+    updateNotationForSelectedSections();
+}
+
+/**
+ * Navigate to previous section (includes pseudo-sections like "No Group X")
+ * Going "before" the first section selects "All" (clears selection)
+ */
+function navigateToPreviousSection() {
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    const realSections = compositionState.getSections();
+    // Get all sections including pseudo-sections, already sorted by position
+    const allSections = buildSectionChipsWithUngrouped(realSections);
+    if (allSections.length === 0) return;
+
+    const selectedIds = getSelectedSectionIds();
+    if (selectedIds.length === 0) {
+        // Already at "All" - select last section
+        selectSectionInView(allSections[allSections.length - 1].id);
+    } else {
+        // Find current section index and go to previous
+        const currentId = selectedIds[0];
+        const currentIndex = allSections.findIndex(s => s.id === currentId);
+        if (currentIndex === -1) {
+            // Current selection not found, go to "All"
+            clearSectionSelection();
+        } else if (currentIndex === 0) {
+            // At first section - go to "All" (clear selection)
+            clearSectionSelection();
+        } else {
+            const prevIndex = currentIndex - 1;
+            selectSectionInView(allSections[prevIndex].id);
+        }
+    }
+
+    renderProgressionDisplay('melody-progression-visualization', true);
+    updateNotationForSelectedSections();
+}
+
+/**
+ * Navigate to next section (includes pseudo-sections like "No Group X")
+ */
+function navigateToNextSection() {
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    const realSections = compositionState.getSections();
+    // Get all sections including pseudo-sections, already sorted by position
+    const allSections = buildSectionChipsWithUngrouped(realSections);
+    if (allSections.length === 0) return;
+
+    const selectedIds = getSelectedSectionIds();
+    if (selectedIds.length === 0) {
+        // No selection - select first section
+        selectSectionInView(allSections[0].id);
+    } else {
+        // Find current section index and go to next
+        const currentId = selectedIds[selectedIds.length - 1];
+        const currentIndex = allSections.findIndex(s => s.id === currentId);
+        if (currentIndex === -1) {
+            // Current selection not found, select first
+            selectSectionInView(allSections[0].id);
+        } else {
+            const nextIndex = Math.min(allSections.length - 1, currentIndex + 1);
+            selectSectionInView(allSections[nextIndex].id);
+        }
+    }
+
+    renderProgressionDisplay('melody-progression-visualization', true);
+    updateNotationForSelectedSections();
+}
+
+/**
+ * Update notation display to show only measures for selected sections
+ */
+function updateNotationForSelectedSections() {
+    console.log('[SectionView] updateNotationForSelectedSections called, viewMode:', progressionViewMode);
+
+    if (progressionViewMode !== 'section') {
+        console.log('[SectionView] Not in section mode, skipping notation update');
+        return;
+    }
+
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) {
+        console.log('[SectionView] No compositionState, skipping');
+        return;
+    }
+
+    const selectedIds = getSelectedSectionIds();
+    console.log('[SectionView] Selected IDs for notation:', selectedIds);
+
+    // Get notation composer instance via the getter function
+    const notationComposer = window.getNotationComposer ? window.getNotationComposer() : null;
+    console.log('[SectionView] notationComposer exists:', !!notationComposer);
+    if (!notationComposer) {
+        console.log('[SectionView] No notation composer found - ensure getNotationComposer is available');
+        return;
+    }
+
+    if (selectedIds.length === 0) {
+        // Show all measures when no section selected
+        console.log('[SectionView] No section selected, clearing filter and rendering all');
+        // Clear any existing measure filter
+        if (typeof notationComposer.clearMeasureFilter === 'function') {
+            notationComposer.clearMeasureFilter();
+        }
+        if (typeof notationComposer.render === 'function') {
+            notationComposer.render();
+        }
+        return;
+    }
+
+    // Calculate measure range - need to handle both real sections and pseudo-sections
+    // Build the combined sections list (including pseudo-sections)
+    const realSections = compositionState.getSections() || [];
+    const allSectionsWithPseudo = buildSectionChipsWithUngrouped(realSections);
+
+    // Collect all chord indices from selected sections (real or pseudo)
+    let allChordIndices = [];
+    selectedIds.forEach(sectionId => {
+        const section = allSectionsWithPseudo.find(s => s.id === sectionId);
+        if (section && section.chordIndices) {
+            allChordIndices.push(...section.chordIndices);
+        }
+    });
+
+    if (allChordIndices.length === 0) {
+        console.log('[SectionView] No chord indices found for selected sections');
+        if (typeof notationComposer.render === 'function') {
+            notationComposer.render();
+        }
+        return;
+    }
+
+    // Calculate measure range from chord indices
+    const startMeasure = Math.min(...allChordIndices);
+    const endMeasure = Math.max(...allChordIndices);
+
+    console.log('[SectionView] Calculated measure range:', startMeasure, 'to', endMeasure);
+
+    // Set the persistent measure filter so that subsequent render() calls respect it
+    // This allows canvas interactions (hover, click, edit) to work within the filtered view
+    if (typeof notationComposer.setMeasureFilter === 'function') {
+        notationComposer.setMeasureFilter(startMeasure, endMeasure);
+    }
+
+    // Render the filtered measures
+    console.log('[SectionView] renderFilteredMeasures exists:', typeof notationComposer.renderFilteredMeasures === 'function');
+    if (typeof notationComposer.renderFilteredMeasures === 'function') {
+        console.log('[SectionView] Calling renderFilteredMeasures:', startMeasure, 'to', endMeasure);
+        notationComposer.renderFilteredMeasures(startMeasure, endMeasure);
+    } else {
+        // Fallback: just render normally (filter is set, render() will use it)
+        console.log('[SectionView] renderFilteredMeasures not found, falling back to render()');
+        if (typeof notationComposer.render === 'function') {
+            notationComposer.render();
+        }
+    }
+}
+
+/**
+ * Render section view mode with filtered cards
+ * @param {HTMLElement} container - Container element
+ * @param {Array} progressionData - Chord progression data
+ * @param {string} key - Current key
+ * @param {Array} sections - Array of section objects
+ */
+function renderSectionViewMode(container, progressionData, key, sections) {
+    console.log('[SectionView] renderSectionViewMode called:', {
+        containerId: container.id,
+        progressionLength: progressionData.length,
+        sectionsCount: sections.length,
+        key
+    });
+
+    // Create section picker bar
+    const pickerBar = createSectionPickerBar(sections);
+    container.appendChild(pickerBar);
+    console.log('[SectionView] Section picker bar created');
+
+    // Create cards container with horizontal scroll wrapper
+    const cardsWrapper = document.createElement('div');
+    cardsWrapper.className = 'section-cards-wrapper relative overflow-x-auto custom-scrollbar scroll-view-container';
+    cardsWrapper.id = 'section-cards-wrapper';
+    // Add inline styles for smooth scrolling
+    cardsWrapper.style.cssText = `
+        scroll-snap-type: x mandatory;
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 8px;
+    `;
+
+    const cardsContainer = document.createElement('div');
+    cardsContainer.className = 'section-filtered-cards flex flex-nowrap items-start gap-2 transition-all duration-300';
+    cardsContainer.id = `${container.id}-cards-grid`;
+
+    // Collect visible chord indices based on selected sections
+    let visibleChordIndices = new Set();
+    const selectedIds = getSelectedSectionIds();
+    console.log('[SectionView] Selected section IDs:', selectedIds);
+
+    // Build the combined sections list (including pseudo-sections for ungrouped chords)
+    const allSectionsWithPseudo = buildSectionChipsWithUngrouped(sections);
+
+    if (selectedIds.length === 0) {
+        // No section selected - show all cards
+        progressionData.forEach((_, idx) => visibleChordIndices.add(idx));
+        console.log('[SectionView] No section selected, showing all', progressionData.length, 'cards');
+    } else {
+        // Show only cards from selected sections (including pseudo-sections)
+        selectedIds.forEach(sectionId => {
+            // Look up in combined list that includes pseudo-sections
+            const section = allSectionsWithPseudo.find(s => s.id === sectionId);
+            console.log('[SectionView] Finding section:', sectionId, 'found:', !!section, 'chordIndices:', section?.chordIndices);
+            if (section && section.chordIndices) {
+                section.chordIndices.forEach(idx => visibleChordIndices.add(idx));
+            }
+        });
+        console.log('[SectionView] Visible chord indices:', [...visibleChordIndices]);
+    }
+
+    // Add "Add Chord", "Section" and "Clear All" buttons
+    const isMelodyComposer = container.id?.includes('melody');
+    const toggleFunction = isMelodyComposer ? 'toggleQuickAddChordMelody' : 'toggleQuickAddChord';
+    const containerId = container.id || 'progression-visualization';
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'chord-card-wrapper flex flex-col flex-shrink-0 justify-center items-center gap-1.5 p-2 bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl';
+    buttonContainer.style.scrollSnapAlign = 'start';
+    buttonContainer.innerHTML = `
+        <button onclick="window.${toggleFunction} && window.${toggleFunction}()"
+                class="w-full px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                title="Add chord to progression">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Add
+        </button>
+        <button onclick="window.showAddSectionMenu && window.showAddSectionMenu(event, '${containerId}')"
+                class="w-full px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                title="Select adjacent chords, then add to a section">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+            </svg>
+            Section
+        </button>
+        <button onclick="window.clearProgression && window.clearProgression()"
+                class="w-full px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                title="Clear all chords">
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"></path>
+            </svg>
+            Clear
+        </button>
+    `;
+    cardsContainer.appendChild(buttonContainer);
+
+    // Render filtered cards grouped by sections (with outlines and labels)
+    let animationIndex = 0;
+
+    // Render each section/pseudo-section that has visible chords
+    // (allSectionsWithPseudo was already built above for filtering)
+    allSectionsWithPseudo.forEach(sectionData => {
+        // Check if any of this section's chords are visible
+        const visibleInSection = sectionData.chordIndices.filter(idx => visibleChordIndices.has(idx));
+        if (visibleInSection.length === 0) return;
+
+        // Create section container with outline and label
+        const sectionContainer = document.createElement('div');
+        sectionContainer.className = 'section-unified-container inline-flex flex-col flex-shrink-0 rounded-lg overflow-visible section-view-card';
+        sectionContainer.setAttribute('data-section-id', sectionData.id);
+        sectionContainer.style.cssText = `animation-delay: ${animationIndex * 50}ms; scroll-snap-align: start;`;
+
+        // Banner header with section label
+        const banner = document.createElement('div');
+        banner.className = 'section-banner flex items-center gap-2 px-2 py-1 rounded-t-lg cursor-grab active:cursor-grabbing';
+        banner.style.backgroundColor = sectionData.color || '#9ca3af';
+        banner.setAttribute('data-section-id', sectionData.id);
+
+        const isPseudoSection = sectionData.isPseudoSection;
+        banner.innerHTML = `
+            <svg class="w-3 h-3 text-white/70 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
+            </svg>
+            <span class="text-white text-xs font-semibold flex-grow">${sectionData.label || 'Section'}</span>
+            ${!isPseudoSection ? `
+                <button class="section-menu-btn p-0.5 rounded hover:bg-white/20 transition"
+                        onclick="event.stopPropagation(); window.showSectionMenu && window.showSectionMenu(event, '${sectionData.id}')"
+                        title="Section options">
+                    <svg class="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
+                    </svg>
+                </button>
+            ` : ''}
+        `;
+        sectionContainer.appendChild(banner);
+
+        // Cards area with colored background
+        const cardsArea = document.createElement('div');
+        cardsArea.className = 'section-cards-area items-start gap-2 p-2 rounded-b-lg';
+        cardsArea.style.display = 'flex';
+        cardsArea.style.flexDirection = 'row';
+        cardsArea.style.flexWrap = 'wrap';
+        cardsArea.style.backgroundColor = (sectionData.color || '#9ca3af') + '20';
+        cardsArea.style.borderLeft = `3px solid ${sectionData.color || '#9ca3af'}`;
+        cardsArea.style.borderRight = `3px solid ${sectionData.color || '#9ca3af'}`;
+        cardsArea.style.borderBottom = `3px solid ${sectionData.color || '#9ca3af'}`;
+        cardsArea.setAttribute('data-section-id', sectionData.id);
+
+        // Render cards in this section
+        visibleInSection.forEach(chordIdx => {
+            if (chordIdx < progressionData.length) {
+                const chord = progressionData[chordIdx];
+                const wrapper = createChordCardWrapper(chord, chordIdx, key);
+                wrapper.setAttribute('data-in-section', sectionData.id);
+                cardsArea.appendChild(wrapper);
+            }
+        });
+
+        sectionContainer.appendChild(cardsArea);
+        cardsContainer.appendChild(sectionContainer);
+        animationIndex++;
+    });
+
+    console.log('[SectionView] Rendered', animationIndex, 'section containers');
+
+    cardsWrapper.appendChild(cardsContainer);
+    container.appendChild(cardsWrapper);
+    console.log('[SectionView] Cards wrapper appended to container');
+
+    // Initialize sortable on filtered cards
+    initializeSimplifiedSortable(cardsContainer);
+    console.log('[SectionView] renderSectionViewMode complete');
+}
+
+/**
+ * Render scroll view mode with horizontal scroll
+ * @param {HTMLElement} gridContainer - Grid container element
+ * @param {Array} progressionData - Chord progression data
+ * @param {string} key - Current key
+ * @param {Object} options - Rendering options
+ */
+function renderScrollViewMode(gridContainer, progressionData, key, options = {}) {
+    // Apply scroll view styles
+    gridContainer.className = 'scroll-view-container flex flex-nowrap items-start gap-2 overflow-x-auto pb-2';
+    gridContainer.style.cssText = `
+        scroll-snap-type: x mandatory;
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 transparent;
+    `;
+
+    // Use section-aware or flat rendering with scroll snap
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    const hasSections = compositionState && compositionState.getSections().length > 0;
+
+    if (hasSections) {
+        renderSectionAwareCardsScroll(gridContainer, progressionData, key, options);
+    } else {
+        renderFlatCardsScroll(gridContainer, progressionData, key, options);
+    }
+}
+
+/**
+ * Render section-aware cards in scroll mode
+ * Same as renderSectionAwareCards but with scroll-snap styles
+ */
+function renderSectionAwareCardsScroll(gridContainer, progressionData, key, options = {}) {
+    const { showActionButtons = true } = options;
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+
+    if (!progressionData || progressionData.length === 0) return;
+
+    // Get sections sorted by their first chord index
+    const sections = compositionState ? compositionState.getSections() : [];
+    const sortedSections = [...sections].sort((a, b) => {
+        const aMin = Math.min(...a.chordIndices);
+        const bMin = Math.min(...b.chordIndices);
+        return aMin - bMin;
+    });
+
+    // Build a map of chord index → section
+    const chordToSection = new Map();
+    sections.forEach(section => {
+        section.chordIndices.forEach(chordIdx => {
+            chordToSection.set(chordIdx, section);
+        });
+    });
+
+    // Add action buttons
+    if (showActionButtons) {
+        const isMelodyComposer = gridContainer.id?.includes('melody');
+        const toggleFunction = isMelodyComposer ? 'toggleQuickAddChordMelody' : 'toggleQuickAddChord';
+        const containerId = gridContainer.id || 'progression-visualization';
+
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'chord-card-wrapper flex flex-col justify-center items-center gap-1.5 p-2 bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl flex-shrink-0';
+        buttonContainer.style.scrollSnapAlign = 'start';
+        buttonContainer.innerHTML = `
+            <button onclick="window.${toggleFunction} && window.${toggleFunction}()"
+                    class="w-full px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Add
+            </button>
+            <button onclick="window.showAddSectionMenu && window.showAddSectionMenu(event, '${containerId}')"
+                    class="w-full px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+                Section
+            </button>
+            <button onclick="window.clearProgression && window.clearProgression()"
+                    class="w-full px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"></path>
+                </svg>
+                Clear
+            </button>
+        `;
+        gridContainer.appendChild(buttonContainer);
+    }
+
+    // Render cards in sequence with scroll snap
+    let i = 0;
+    while (i < progressionData.length) {
+        const section = chordToSection.get(i);
+
+        if (section) {
+            // This card is in a section - render the entire section as a unified container
+            const sectionContainer = createUnifiedSectionContainer(section, progressionData, key);
+            sectionContainer.style.scrollSnapAlign = 'start';
+            sectionContainer.style.flexShrink = '0';
+            gridContainer.appendChild(sectionContainer);
+
+            // Skip all cards in this section
+            const maxIndex = Math.max(...section.chordIndices);
+            i = maxIndex + 1;
+        } else {
+            // Ungrouped card - render normally with scroll snap
+            const chord = progressionData[i];
+            const wrapper = createChordCardWrapper(chord, i, key);
+            wrapper.style.scrollSnapAlign = 'start';
+            wrapper.style.flexShrink = '0';
+            gridContainer.appendChild(wrapper);
+            i++;
+        }
+    }
+}
+
+/**
+ * Render flat cards in scroll mode
+ */
+function renderFlatCardsScroll(gridContainer, progressionData, key, options = {}) {
+    const { showActionButtons = true } = options;
+
+    if (!progressionData || progressionData.length === 0) return;
+
+    // Add action buttons
+    if (showActionButtons) {
+        const isMelodyComposer = gridContainer.id?.includes('melody');
+        const toggleFunction = isMelodyComposer ? 'toggleQuickAddChordMelody' : 'toggleQuickAddChord';
+        const containerId = gridContainer.id || 'progression-visualization';
+
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'chord-card-wrapper flex flex-col justify-center items-center gap-1.5 p-2 bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-dashed border-gray-300 rounded-xl flex-shrink-0';
+        buttonContainer.style.scrollSnapAlign = 'start';
+        buttonContainer.innerHTML = `
+            <button onclick="window.${toggleFunction} && window.${toggleFunction}()"
+                    class="w-full px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Add
+            </button>
+            <button onclick="window.showAddSectionMenu && window.showAddSectionMenu(event, '${containerId}')"
+                    class="w-full px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+                Section
+            </button>
+            <button onclick="window.clearProgression && window.clearProgression()"
+                    class="w-full px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"></path>
+                </svg>
+                Clear
+            </button>
+        `;
+        gridContainer.appendChild(buttonContainer);
+    }
+
+    // Render all cards with scroll snap
+    progressionData.forEach((chord, index) => {
+        const wrapper = createChordCardWrapper(chord, index, key);
+        wrapper.style.scrollSnapAlign = 'start';
+        wrapper.style.flexShrink = '0';
+        gridContainer.appendChild(wrapper);
+    });
+}
+
+// ============================================================================
+// SECTION-AWARE CARD RENDERING (Original Functions)
+// ============================================================================
 
 /**
  * Render cards with section indicators into a grid container
@@ -3544,7 +4607,7 @@ function handleSectionReorder(oldIndex, newIndex) {
     compositionState.reorderSections(oldIndex, newIndex);
 
     // Re-render
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
 }
 
@@ -3588,7 +4651,7 @@ function handleChordMoveToSection(evt) {
     }
 
     // Re-render
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
 }
 
@@ -3699,7 +4762,7 @@ function createNewSection(type, containerId) {
                 // Use only the contiguous range
                 compositionState.createSection(type, contiguousRange);
                 clearSelection();
-                renderProgressionDisplay('progression-visualization', true);
+                renderProgressionDisplay('melody-progression-visualization', true);
                 renderProgressionDisplay('melody-progression-visualization', false);
                 return;
             }
@@ -3713,7 +4776,7 @@ function createNewSection(type, containerId) {
     clearSelection();
 
     // Re-render
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
 }
 
@@ -3731,7 +4794,7 @@ window.toggleSectionCollapse = function(sectionId) {
     compositionState.updateSection(sectionId, { collapsed: !section.collapsed });
 
     // Re-render
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
 };
 
@@ -3760,7 +4823,7 @@ window.editSectionLabel = function(sectionId, labelElement) {
         const newLabel = prompt('Enter new section name:', currentLabel);
         if (newLabel !== null && newLabel.trim() !== '') {
             compositionState.updateSection(sectionId, { label: newLabel.trim() });
-            renderProgressionDisplay('progression-visualization', true);
+            renderProgressionDisplay('melody-progression-visualization', true);
             renderProgressionDisplay('melody-progression-visualization', false);
         }
         return;
@@ -3784,7 +4847,7 @@ window.editSectionLabel = function(sectionId, labelElement) {
         compositionState.updateSection(sectionId, { label: newLabel });
 
         // Re-render
-        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
     };
 
@@ -3809,7 +4872,7 @@ window.editSectionLabel = function(sectionId, labelElement) {
         const newLabel = prompt('Enter new section name:', currentLabel);
         if (newLabel !== null && newLabel.trim() !== '') {
             compositionState.updateSection(sectionId, { label: newLabel.trim() });
-            renderProgressionDisplay('progression-visualization', true);
+            renderProgressionDisplay('melody-progression-visualization', true);
             renderProgressionDisplay('melody-progression-visualization', false);
         }
     }
@@ -3868,7 +4931,7 @@ window.showSectionMenu = function(event, sectionId) {
         { label: 'Delete Section', icon: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16', action: () => {
             if (confirm(`Delete "${section.label}"? Chords will become ungrouped.`)) {
                 compositionState.deleteSection(sectionId);
-                renderProgressionDisplay('progression-visualization', true);
+                renderProgressionDisplay('melody-progression-visualization', true);
                 renderProgressionDisplay('melody-progression-visualization', false);
             }
         }, danger: true }
@@ -3981,7 +5044,7 @@ window.showDuplicateSectionDialog = function(sectionId, sectionLabel, compositio
 
         // Perform duplication with selected mode
         compositionState.duplicateSection(sectionId, { mode });
-        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
     };
 };
@@ -5080,7 +6143,7 @@ function attachCardEventListeners(wrapper, index) {
                 updateSingleCard(index);
                 updateTensionCurveIfVisible();
 
-                // Also update the Melody Composer's notation
+                // Also update the Composition Studio's notation
                 updateChordAndRenderPreservingTrebleNotes(index);
             }
         });
@@ -5112,7 +6175,7 @@ function attachCardEventListeners(wrapper, index) {
  * Uses transform instead of margin to preserve card width
  */
 function updateCardShifts() {
-    // Update shifts for all three containers (Progression Builder, Melody Composer, Chord Builder)
+    // Update shifts for all three containers (Progression Builder, Composition Studio, Chord Builder)
     const containers = [
         document.getElementById('progression-visualization'),
         document.getElementById('melody-progression-visualization'),
@@ -6358,7 +7421,7 @@ function initializeSimplifiedSortable(container) {
                 setProgressionRomans(progressionRomans);
 
                 // Re-render both views (this will recalculate shifts properly)
-                renderProgressionDisplay('progression-visualization', true);
+                renderProgressionDisplay('melody-progression-visualization', true);
                 renderProgressionDisplay('melody-progression-visualization', false);
 
                 // Update grand staff notation
@@ -6456,7 +7519,7 @@ function handleCardDragWithinSection(evt, originalSectionId) {
 
     if (JSON.stringify(newChordOrder) === JSON.stringify(oldOrder)) {
         // Still re-render to update section visuals
-        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
         return;
     }
@@ -6479,7 +7542,7 @@ function handleCardDragWithinSection(evt, originalSectionId) {
     setProgressionRomans(newProgressionRomans);
 
     // Re-render
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
 
     // Update notation
@@ -6536,7 +7599,7 @@ function handleSectionDragEnd(container, sectionEl, evt) {
     setProgressionRomans(newProgressionRomans);
 
     // Re-render
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
 
     // Update notation
@@ -7228,7 +8291,7 @@ function deleteSelectedChords(indices) {
     clearMultiSelection();
 
     // Re-render
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
 }
 
@@ -7292,7 +8355,7 @@ function pasteChords() {
     }
 
     // Re-render
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
 
     updateMultiSelectVisuals();
@@ -7336,7 +8399,7 @@ function duplicateSelectedChords(indices) {
     }
 
     // Re-render
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
 
     updateMultiSelectVisuals();
@@ -7505,7 +8568,10 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
 
     const trainerState = getTrainerState();
 
-    // PHASE 3.3: Add analysis visualizations (only for main progression builder tab)
+    // DEPRECATED: This block handles the old "Progression Workshop" tab which has been removed.
+    // The container 'progression-visualization' no longer exists in the UI.
+    // This code is kept for reference but will never execute.
+    // TODO: Remove this entire block in a future cleanup pass.
     if (containerId === 'progression-visualization' && trainerState.progressionData.length > 0) {
         // Get parent panel to render pattern badges and tension curve outside the grid
         const panel = container.parentElement;
@@ -7547,7 +8613,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
 
         // Both section-aware and flat rendering use the same approach:
         // 1. Clear container and remove grid classes
-        // 2. Add toolbar at top (full width)
+        // 2. Add toolbar at top (full width) with view mode toggle
         // 3. Add grid container with cards below
 
         // Clear and restructure container
@@ -7556,26 +8622,68 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         const originalClasses = container.className;
         container.className = 'flex flex-col gap-2 p-2 bg-white rounded-lg border border-gray-200';
 
+        // Add view mode toggle toolbar if we have sections
+        const sections = compositionState ? compositionState.getSections() : [];
+        if (sections.length > 0) {
+            const toolbar = document.createElement('div');
+            toolbar.className = 'flex items-center justify-between px-3 py-2 bg-indigo-50 rounded-lg border-2 border-indigo-200 mb-3';
+            toolbar.id = 'view-mode-toolbar';
+            toolbar.style.cssText = 'min-height: 40px;'; // Ensure visibility
+
+            // Label on left
+            const label = document.createElement('span');
+            label.className = 'text-sm font-semibold text-indigo-700';
+            label.textContent = 'Card View:';
+            toolbar.appendChild(label);
+
+            // Toggle on right
+            toolbar.appendChild(createViewModeToggle());
+            container.appendChild(toolbar);
+
+            console.log('[ViewMode] Toolbar added to container:', containerId, 'sections:', sections.length);
+
+            // Debug: verify it's actually in the DOM
+            setTimeout(() => {
+                const toolbarCheck = document.getElementById('view-mode-toolbar');
+                console.log('[ViewMode] After 100ms, toolbar in DOM:', !!toolbarCheck);
+            }, 100);
+        } else {
+            console.log('[ViewMode] No sections found for container:', containerId);
+        }
+
         // Create container for cards
         const gridContainer = document.createElement('div');
         gridContainer.id = `${containerId}-cards-grid`;
 
-        // Use flexbox with wrapping in both cases; section-aware rendering controls its own layout
-        gridContainer.className = 'flex flex-wrap items-start gap-2';
-        if (hasSections) {
-            renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
+        // Branch based on view mode
+        if (progressionViewMode === 'section' && sections.length > 0) {
+            // Section View Mode: show section picker and filtered cards
+            gridContainer.className = 'flex flex-col gap-2';
+            renderSectionViewMode(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', sections);
+        } else if (progressionViewMode === 'scroll') {
+            // Scroll View Mode: horizontal scrolling
+            renderScrollViewMode(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
                 showActionButtons: true
             });
+            // Initialize sortable on the grid container
+            initializeSimplifiedSortable(gridContainer);
         } else {
-            renderFlatCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
-                showActionButtons: true
-            });
+            // Default: Use flexbox with wrapping; section-aware rendering controls its own layout
+            gridContainer.className = 'flex flex-wrap items-start gap-2';
+            if (hasSections) {
+                renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
+                    showActionButtons: true
+                });
+            } else {
+                renderFlatCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
+                    showActionButtons: true
+                });
+            }
+            // Initialize sortable on the grid container
+            initializeSimplifiedSortable(gridContainer);
         }
 
         container.appendChild(gridContainer);
-
-        // Initialize sortable on the grid container
-        initializeSimplifiedSortable(gridContainer);
 
         // 3. Tension curve visualization (after grid, at bottom of panel) - Phase 3 Enhanced
         if (panel) {
@@ -7604,42 +8712,77 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         return;
     }
 
-    // MELODY COMPOSER: Use same simplified/detailed card style with Add/Clear buttons
+    // COMPOSITION STUDIO: Use simplified/detailed card style with Add/Clear buttons
     if (containerId === 'melody-progression-visualization' && trainerState.progressionData.length > 0) {
         // Check if we have any sections defined - if so, use section-aware rendering
         const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-        const hasSections = compositionState && compositionState.getSections().length > 0;
+        const sections = compositionState ? compositionState.getSections() : [];
+        const hasSections = sections.length > 0;
 
         // Same restructured layout as Progression Builder
         container.innerHTML = '';
         container.className = 'flex flex-col gap-2 p-2 bg-white rounded-lg border border-gray-200';
 
-        // Note: Section toolbar moved to card header in HTML (Add Section button)
-        // No longer render toolbar row here
+        // Populate header toggle if we have sections (toggle is in the Chord Progression header)
+        const headerToggle = document.getElementById('header-section-view-toggle');
+        if (headerToggle) {
+            if (sections.length > 0) {
+                headerToggle.innerHTML = '';
+                headerToggle.className = 'flex items-center gap-1 ml-2';
+                headerToggle.appendChild(createCompactViewModeToggle());
+                console.log('[ViewMode] Header toggle populated with', sections.length, 'sections');
+            } else {
+                headerToggle.innerHTML = '';
+                headerToggle.className = 'hidden ml-2';
+            }
+        }
 
         // Create container for cards
         const gridContainer = document.createElement('div');
         gridContainer.id = `${containerId}-cards-grid`;
 
-        // Use flexbox with wrapping for both section-aware and flat rendering
-        // This matches Progression Workshop and ensures consistent spacing and shifting behavior
-        gridContainer.className = 'flex flex-wrap items-start gap-2';
-        if (hasSections) {
-            renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
+        console.log('[SectionView] COMPOSITION STUDIO renderProgressionDisplay:', {
+            containerId,
+            progressionViewMode,
+            sectionsCount: sections.length,
+            selectedSectionIds: [...selectedSectionIds],
+            progressionLength: trainerState.progressionData.length
+        });
+
+        // Branch based on view mode
+        if (progressionViewMode === 'section' && sections.length > 0) {
+            // Section View Mode: show section picker and filtered cards
+            console.log('[SectionView] >>> Entering Section View Mode branch');
+            gridContainer.className = 'flex flex-col gap-2';
+            renderSectionViewMode(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', sections);
+        } else if (progressionViewMode === 'scroll') {
+            // Scroll View Mode: horizontal scrolling
+            console.log('[SectionView] >>> Entering Scroll View Mode branch');
+            renderScrollViewMode(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
                 showActionButtons: true
             });
+            // Initialize sortable on the grid container
+            initializeSimplifiedSortable(gridContainer);
         } else {
-            renderFlatCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
-                showActionButtons: true
-            });
+            // Default: Use flexbox with wrapping
+            console.log('[SectionView] >>> Entering Default/Wrap View Mode branch');
+            gridContainer.className = 'flex flex-wrap items-start gap-2';
+            if (hasSections) {
+                renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
+                    showActionButtons: true
+                });
+            } else {
+                renderFlatCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
+                    showActionButtons: true
+                });
+            }
+            // Initialize sortable on the grid container
+            initializeSimplifiedSortable(gridContainer);
         }
 
         container.appendChild(gridContainer);
 
-        // Initialize sortable on the grid container
-        initializeSimplifiedSortable(gridContainer);
-
-        // Also update the Melody Composer's notation
+        // Also update the Composition Studio's notation
         if (window.refreshNotationFromProgression) {
             // Use requestAnimationFrame to ensure system is ready
             requestAnimationFrame(() => {
@@ -7647,8 +8790,17 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
                 if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
                     window.syncProgressionToMelodyComposer();
                 }
-                // Then refresh the notation rendering
-                window.refreshNotationFromProgression();
+                // Then refresh notation - but respect section view filtering!
+                if (progressionViewMode === 'section' && selectedSectionIds.size > 0) {
+                    // In section view with a selection - use filtered rendering
+                    // Add a small delay to ensure sync has completed
+                    setTimeout(() => {
+                        updateNotationForSelectedSections();
+                    }, 50);
+                } else {
+                    // Normal full rendering
+                    window.refreshNotationFromProgression();
+                }
             });
         }
 
@@ -8827,7 +9979,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
                     cont.sortableInstance = null;
                 }
             } catch (_) {}
-            renderProgressionDisplay('progression-visualization', true);
+            renderProgressionDisplay('melody-progression-visualization', true);
             renderProgressionDisplay('melody-progression-visualization', false);
             return window.ddInspect();
         };
@@ -8986,7 +10138,7 @@ export function loadProgression() {
     setProgressionData(progressionData);
 
     updateProgressionControlsUI();
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
     highlightTrainer(scaleNotes, null);
 
@@ -9131,7 +10283,7 @@ export function updateProgressionEnharmonics() {
     setProgressionData(progressionData);
 
     // Re-render the display
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
 
     // Update keyboard labels
@@ -10507,7 +11659,7 @@ export function showProgressionChordSuggestions(chordIndex) {
         setProgressionData(progression);
 
         // Re-render
-        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
         updateProgressionControlsUI();
     };
@@ -10691,7 +11843,7 @@ function updateChordAndRenderPreservingTrebleNotes(index) {
         }
     }
 
-    // Update chord cards across all tabs (Progression Builder, Melody Composer, Chord Builder)
+    // Update chord cards across all tabs (Progression Builder, Composition Studio, Chord Builder)
     updateSingleCard(index);
 
     // Render the notation
@@ -10817,7 +11969,7 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
         // Fallback: append and sync manually
         const appended = [...currentProgression, newChordData];
         setProgressionData(appended);
-        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
     }
 
@@ -10839,7 +11991,7 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
 
                 const reordered = compositionState.exportToProgressionData();
                 setProgressionData(reordered);
-                renderProgressionDisplay('progression-visualization', true);
+                renderProgressionDisplay('melody-progression-visualization', true);
                 renderProgressionDisplay('melody-progression-visualization', false);
             } else {
                 // Pure JS fallback reorder if compositionState is unavailable
@@ -10847,7 +11999,7 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
                 const [moved] = manual.splice(appendedIndex, 1);
                 manual.splice(targetIndex, 0, moved);
                 setProgressionData(manual);
-                renderProgressionDisplay('progression-visualization', true);
+                renderProgressionDisplay('melody-progression-visualization', true);
                 renderProgressionDisplay('melody-progression-visualization', false);
             }
             // Update insertedIndex to reflect the actual position
@@ -10883,7 +12035,7 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
 
     // Re-render display if a section was modified (to show section visuals)
     if (sectionWasModified) {
-        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
     }
 
@@ -10953,10 +12105,10 @@ function highlightTrainer(scaleNotes, chordNotes) {
 
 /**
  * Helper function to render melody notation if needed
- * Checks if we're on Melody Composer tab or if Free mode is active
+ * Checks if we're on Composition Studio tab or if Free mode is active
  */
 function renderMelodyNotationIfNeeded(preventScroll = false) {
-    // Check if we're on the Melody Composer tab
+    // Check if we're on the Composition Studio tab
     const currentTab = getCurrentTab();
     const isMelodyTab = currentTab === 'melody';
 
@@ -11046,7 +12198,7 @@ export function clearProgression() {
     });
 
     // Re-render the display
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
 
     // Update UI
@@ -11118,11 +12270,11 @@ export function removeChordFromProgression(index) {
 
     // Re-render both tabs to ensure synchronization
     // First render the main progression builder
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     // Then render the melody composer tab (syncBothTabs=false to avoid infinite recursion)
     renderProgressionDisplay('melody-progression-visualization', false);
 
-    // Auto-render melody notation if on Melody Composer tab or if Free mode is active
+    // Auto-render melody notation if on Composition Studio tab or if Free mode is active
     renderMelodyNotationIfNeeded();
 
     // Phase 2.2: Dispatch event for chord recommendations sidebar
@@ -11473,10 +12625,10 @@ function updateProgressionChord(index, property, value) {
         trainerState.progressionData[index] = newData;
         
         // Re-render both progression displays to keep them in sync
-        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
         
-        // Auto-render melody notation if on Melody Composer tab or if Free mode is active
+        // Auto-render melody notation if on Composition Studio tab or if Free mode is active
         renderMelodyNotationIfNeeded();
     }
 
@@ -11530,10 +12682,10 @@ function updateProgressionChordLH(index, property, value) {
     playTrainerChordOnce(chord.notes.concat(lhNotes));
     
     // Re-render both progression displays to keep them in sync
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
     
-    // Auto-render melody notation if on Melody Composer tab or if Free mode is active
+    // Auto-render melody notation if on Composition Studio tab or if Free mode is active
     renderMelodyNotationIfNeeded();
 }
 
@@ -11596,7 +12748,7 @@ export function toggleRecording() {
         setRecordedProgression([]);
         setProgressionData([]);
         setProgressionRomans([]);
-        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
 
         recordText.textContent = 'Stop';
@@ -11702,10 +12854,10 @@ export function addToProgressionData(chordData, options = {}) {
     const containerScrollLeft = canvasContainer ? canvasContainer.scrollLeft : 0;
 
     // Render both progression displays to keep them in sync
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
 
-    // Auto-render melody notation if on Melody Composer tab or if Free mode is active
+    // Auto-render melody notation if on Composition Studio tab or if Free mode is active
     // This function already checks the tab and only refreshes if needed
     // Pass preventScroll=true to prevent page from jumping to notation
     renderMelodyNotationIfNeeded(true);
@@ -11821,7 +12973,7 @@ export function renderProgressionControls() {
         loadProgression();
     } else {
         // Render progression display
-        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
     }
 }
@@ -11912,7 +13064,7 @@ function restoreProgressionState(state) {
     }
 
     // Re-render display
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
 
     // Update keyboard labels if function exists
@@ -11950,7 +13102,7 @@ export function handleUndo() {
 
         // Re-render progression display in both tabs
         if (window.renderProgressionDisplay) {
-            window.renderProgressionDisplay('progression-visualization', true);
+            window.renderProgressionDisplay('melody-progression-visualization', true);
             window.renderProgressionDisplay('melody-progression-visualization', false);
         }
 
@@ -12006,7 +13158,7 @@ export function handleRedo() {
 
         // Re-render progression display in both tabs
         if (window.renderProgressionDisplay) {
-            window.renderProgressionDisplay('progression-visualization', true);
+            window.renderProgressionDisplay('melody-progression-visualization', true);
             window.renderProgressionDisplay('melody-progression-visualization', false);
         }
 
@@ -12383,7 +13535,7 @@ export function importChordList(mode = 'replace') {
         trainerState = getTrainerState();
         
         // Render progression display
-        renderProgressionDisplay('progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
         
         // Update UI
@@ -12547,7 +13699,7 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
     }
 
     // Render progression display
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
 
     // Update UI controls
@@ -12732,7 +13884,7 @@ export function applyRhythmPatternToProgression(patternId) {
     setProgressionData(updated);
 
     // Re-render displays
-    renderProgressionDisplay('progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
 
     // Sync to composition state for playback

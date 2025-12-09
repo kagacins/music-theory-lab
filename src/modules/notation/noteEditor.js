@@ -384,8 +384,10 @@ export class NoteEditor {
       if (selectedNoteInMeasure) {
         // Add this pitch to the selected note (polyphony)
         console.log('[NoteEditor] Adding polyphony to selected note:', selectedNoteInMeasure);
+        // SECTION VIEW FIX: Apply filter offset to convert local index to global
+        const filterOffset = this.composerIntegration?.getMeasureFilterOffset?.() || 0;
         this.onPolyphonyAdd({
-          measureIndex: selectedNoteInMeasure.measureIndex,
+          measureIndex: selectedNoteInMeasure.measureIndex + filterOffset,
           staff: selectedNoteInMeasure.staff,
           voiceIndex: selectedNoteInMeasure.voiceIndex || 0,
           noteIndex: selectedNoteInMeasure.noteIndex,
@@ -466,9 +468,12 @@ export class NoteEditor {
       // Add to the last note
       const targetNote = sameStaffNotes[sameStaffNotes.length - 1];
 
+      // SECTION VIEW FIX: Apply filter offset to convert local index to global
+      const filterOffset = this.composerIntegration?.getMeasureFilterOffset?.() || 0;
+
       // Emit polyphony add event
       this.onPolyphonyAdd({
-        measureIndex: targetNote.measureIndex,
+        measureIndex: targetNote.measureIndex + filterOffset,
         staff: targetNote.staff,
         noteIndex: targetNote.noteIndex,
         pitch: staffPosition.pitch,
@@ -1287,7 +1292,9 @@ export class NoteEditor {
 
     // CRITICAL: Always use the CLICKED/HOVERED measure, not the selected measure
     // The measure where the mouse is hovering is what the user expects the note to be added to
-    const targetMeasureIndex = staffPosition.measure?.index ?? 0;
+    // SECTION VIEW FIX: Apply filter offset to convert local index to global
+    const filterOffset = this.composerIntegration?.getMeasureFilterOffset?.() || 0;
+    const targetMeasureIndex = (staffPosition.measure?.index ?? 0) + filterOffset;
 
     // Use the staff from staffPosition (treble or bass from where user clicked)
     const staff = staffPosition.staff;

@@ -4610,6 +4610,40 @@ export class CompositionState {
     }
 
     /**
+     * Get measure range for selected sections
+     * Used by Section View mode to filter notation display
+     * @param {Array<string>} sectionIds - Array of section IDs
+     * @returns {{ startMeasure: number, endMeasure: number, chordIndices: Array<number> }|null}
+     */
+    getMeasureRangeForSections(sectionIds) {
+        if (!sectionIds || sectionIds.length === 0) return null;
+
+        let allChordIndices = [];
+        sectionIds.forEach(sectionId => {
+            const section = this.getSection(sectionId);
+            if (section && section.chordIndices) {
+                allChordIndices.push(...section.chordIndices);
+            }
+        });
+
+        if (allChordIndices.length === 0) return null;
+
+        // Remove duplicates and sort
+        allChordIndices = [...new Set(allChordIndices)].sort((a, b) => a - b);
+
+        // For simple progressions, chord index maps to measure index 1:1
+        // For variable duration chords, we need to calculate actual measure positions
+        const startMeasure = Math.min(...allChordIndices);
+        const endMeasure = Math.max(...allChordIndices);
+
+        return {
+            startMeasure,
+            endMeasure,
+            chordIndices: allChordIndices
+        };
+    }
+
+    /**
      * Create a new section
      * @param {string} type - Section type (verse, chorus, etc.)
      * @param {Array<number>} chordIndices - Indices of chords to include

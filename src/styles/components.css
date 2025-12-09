@@ -277,3 +277,116 @@
 #builder-progression-visualization {
     gap: 0.25rem !important; /* Force 4px gap between cards for minimal white space */
 }
+
+/* ============================================================================
+   SECTION VIEW ANIMATIONS
+   ============================================================================ */
+
+/* Scroll view container */
+.scroll-view-container {
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+.scroll-view-container::-webkit-scrollbar {
+    height: 6px;
+}
+
+.scroll-view-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.scroll-view-container::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 3px;
+}
+
+.scroll-view-container::-webkit-scrollbar-thumb:hover {
+    background-color: #94a3b8;
+}
+
+.scroll-view-container .chord-card-wrapper,
+.scroll-view-container .section-unified-container {
+    scroll-snap-align: start;
+    flex-shrink: 0;
+}
+
+/* Section picker bar */
+.section-picker-bar {
+    border-bottom: 1px solid #e5e7eb;
+}
+
+/* Section chip animations */
+.section-chip {
+    transition: all 0.2s ease-out;
+}
+
+.section-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Navigation button styles */
+.section-nav-btn {
+    transition: all 0.15s ease-out;
+}
+
+.section-nav-btn:hover:not(:disabled) {
+    background-color: #f3f4f6;
+    transform: scale(1.05);
+}
+
+.section-nav-btn:active:not(:disabled) {
+    transform: scale(0.95);
+}
+
+/* Card slide animations for section switching */
+.section-filtered-cards {
+    transition: opacity 0.2s ease-out, transform 0.3s ease-out;
+}
+
+/* Individual card animations */
+.section-view-card {
+    animation: slideInFromRight 0.3s ease-out forwards;
+    /* Cards start visible - animation handles the slide effect */
+}
+
+@keyframes slideInFromRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Stagger animation for multiple cards */
+.section-view-card:nth-child(1) { animation-delay: 0ms; }
+.section-view-card:nth-child(2) { animation-delay: 30ms; }
+.section-view-card:nth-child(3) { animation-delay: 60ms; }
+.section-view-card:nth-child(4) { animation-delay: 90ms; }
+.section-view-card:nth-child(5) { animation-delay: 120ms; }
+.section-view-card:nth-child(6) { animation-delay: 150ms; }
+.section-view-card:nth-child(7) { animation-delay: 180ms; }
+.section-view-card:nth-child(8) { animation-delay: 210ms; }
+.section-view-card:nth-child(9) { animation-delay: 240ms; }
+.section-view-card:nth-child(10) { animation-delay: 270ms; }
+
+/* View mode toggle styles */
+.view-mode-toggle {
+    transition: all 0.2s ease-out;
+}
+
+.view-mode-btn {
+    transition: all 0.15s ease-out;
+}
+
+.view-mode-btn.active {
+    background: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
