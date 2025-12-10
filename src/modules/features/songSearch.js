@@ -635,12 +635,12 @@ export async function importInternetSongProgression(song) {
     }
     
     // Play shutter sound only once at the beginning of import
-    // Use a flag to ensure it only plays once even if function is called multiple times
     let shutterSoundPlayed = false;
     if (!shutterSoundPlayed && window.getAudioIsReady && window.getCameraShutter) {
         const audioIsReady = window.getAudioIsReady();
         const cameraShutter = window.getCameraShutter();
-        if (audioIsReady && cameraShutter) {
+        // Only play if buffer is loaded
+        if (audioIsReady && cameraShutter && cameraShutter.loaded) {
             cameraShutter.start();
             shutterSoundPlayed = true;
         }
@@ -1032,12 +1032,12 @@ export async function importSongProgression(songIndex) {
     }
     
     // Play shutter sound only once at the beginning of import
-    // Use a flag to ensure it only plays once even if function is called multiple times
     let shutterSoundPlayed = false;
     if (!shutterSoundPlayed && window.getAudioIsReady && window.getCameraShutter) {
         const audioIsReady = window.getAudioIsReady();
         const cameraShutter = window.getCameraShutter();
-        if (audioIsReady && cameraShutter) {
+        // Only play if buffer is loaded
+        if (audioIsReady && cameraShutter && cameraShutter.loaded) {
             cameraShutter.start();
             shutterSoundPlayed = true;
         }

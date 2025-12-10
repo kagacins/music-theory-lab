@@ -84,6 +84,9 @@ export function initAudio() {
     cameraShutter = new Tone.Player({
         url: "public/camera-shutter.mp3",
         autostart: false,
+        onload: () => {
+            console.log("Camera shutter sound loaded.");
+        }
     }).toDestination();
 
     // Initialize guitar for fretboard mode

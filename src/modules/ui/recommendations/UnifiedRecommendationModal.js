@@ -475,6 +475,29 @@ function getInversionLabel(inversion) {
 }
 
 /**
+ * Check if audio is ready for playback
+ * Initializes audio if needed and returns whether it's ready to play
+ */
+function ensureAudioReady() {
+    // Initialize audio if needed
+    if (window.initAudio) window.initAudio();
+
+    // Check if audio is ready
+    const audioIsReady = window.getAudioIsReady && window.getAudioIsReady();
+    if (!audioIsReady) {
+        console.log('[UnifiedRecommendationModal] Audio not ready yet, skipping playback');
+        return false;
+    }
+
+    // Ensure Tone.js context is started
+    if (window.Tone && window.Tone.context.state !== 'running') {
+        window.Tone.start();
+    }
+
+    return true;
+}
+
+/**
  * Play a single chord using direct instrument control
  * This approach matches chordSuggestionModal's working implementation
  */
@@ -483,6 +506,9 @@ function playChord(chord) {
     stopChord();
 
     try {
+        // Check if audio is ready before playing
+        if (!ensureAudioReady()) return;
+
         // Get the current key for proper note resolution
         const key = getCurrentKey() || 'C';
 
@@ -503,12 +529,6 @@ function playChord(chord) {
         // Get the instrument
         const instrument = window.getInstrument && window.getInstrument();
         if (!instrument) return;
-
-        // Ensure Tone.js is started and audio is ready
-        if (window.Tone && window.Tone.context.state !== 'running') {
-            window.Tone.start();
-        }
-        if (window.initAudio) window.initAudio();
 
         // Check if guitar mode for staggered attack
         const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();

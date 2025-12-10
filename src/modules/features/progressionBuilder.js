@@ -13918,7 +13918,8 @@ export function importChordList(mode = 'replace') {
     if (window.getAudioIsReady && window.getCameraShutter) {
         const audioIsReady = window.getAudioIsReady();
         const cameraShutter = window.getCameraShutter();
-        if (audioIsReady && cameraShutter) {
+        // Only play if buffer is loaded
+        if (audioIsReady && cameraShutter && cameraShutter.loaded) {
             cameraShutter.start();
             shutterSoundPlayed = true;
         }

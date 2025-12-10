@@ -2919,9 +2919,13 @@ export function addChordToProgression(switchToCompositionStudio = false, playShu
         rootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[getBuilderRootIndex()];
     }
 
-    // Play camera shutter sound effect (only if requested)
+    // Play camera shutter sound effect (only if requested and buffer is loaded)
     if (playShutterSound && getAudioIsReady() && getCameraShutter()) {
-        getCameraShutter().start();
+        const shutter = getCameraShutter();
+        // Only play if the buffer is loaded (Tone.Player has a loaded property)
+        if (shutter.loaded) {
+            shutter.start();
+        }
     }
 
     // LH accompaniment is no longer part of chord cards - always set to 'off'
@@ -3083,11 +3087,15 @@ export function addSpecificChordToProgression(chordType, inversion, playShutterS
         rootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[getBuilderRootIndex()];
     }
     
-    // Play camera shutter sound effect (only if requested)
+    // Play camera shutter sound effect (only if requested and buffer is loaded)
     if (playShutterSound && getAudioIsReady() && getCameraShutter()) {
-        getCameraShutter().start();
+        const shutter = getCameraShutter();
+        // Only play if the buffer is loaded (Tone.Player has a loaded property)
+        if (shutter.loaded) {
+            shutter.start();
+        }
     }
-    
+
     // LH accompaniment is no longer part of chord cards - always set to 'off'
     const lhType = 'off';
     const lhInversion = 0;
