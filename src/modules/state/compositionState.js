@@ -302,6 +302,7 @@ export class CompositionState {
             autoGenerateBass: false,       // Auto-fill bass when chord changes (default OFF)
             voiceLeadingStrict: true,      // Use strict voice leading rules
             bassPattern: 'root-fifth',     // Default bass pattern
+            bassOctave: null,              // Bass octave (null = use pattern-specific default, 2 or 3 for override)
             bassFollowsInversion: false,   // Bass uses inversion note (3rd/5th) instead of root (default OFF)
             highlightChordTones: true,     // Highlight melody notes that are chord tones
             autoHarmonize: false,          // Auto-suggest chords from melody
@@ -2488,6 +2489,7 @@ export class CompositionState {
                 durationBeats,
                 {
                     bassPattern: this.settings.bassPattern,
+                    bassOctave: this.settings.bassOctave,
                     bassFollowsInversion: this.settings.bassFollowsInversion,
                     timeSignature: timeSignature,
                 }
@@ -2584,6 +2586,7 @@ export class CompositionState {
             durationBeats,
             {
                 bassPattern: this.settings.bassPattern,
+                bassOctave: this.settings.bassOctave,
                 bassFollowsInversion: this.settings.bassFollowsInversion,
                 timeSignature: timeSignature,
             }

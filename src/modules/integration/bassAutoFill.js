@@ -76,6 +76,67 @@ function getChordIntervalsRobust(chordType) {
 
 // Note names for calculation
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+/**
+ * Default octave for each bass pattern
+ * Octave 2: Traditional low bass register (upright bass, stride left hand)
+ * Octave 3: Higher, clearer register (classical accompaniment, lighter styles)
+ *
+ * These are defaults - users can override via the octave selector
+ */
+export const BASS_PATTERN_OCTAVE_DEFAULTS = {
+    // Octave 2 - Low bass register (traditional bass patterns)
+    'whole-note': 2,
+    'root-fifth': 2,
+    'walking': 2,
+    'stride': 2,           // Needs low "oom" for stride effect
+    'boogie': 2,           // Boogie-woogie needs that low rumble
+    'driving-rock': 2,
+    'motown': 2,
+    'country': 2,
+    'pedal': 2,
+    'power-chord': 2,
+    'rock-power': 2,
+    'open-fifth': 2,
+    'half-time': 2,
+    'reggae': 2,           // One-drop bass is typically low
+    'disco-octave': 2,     // Disco bass is funky but low
+    'funk': 2,
+    'staccato': 2,
+    'call-response': 2,
+
+    // Octave 3 - Higher, clearer register
+    'alberti': 3,          // Classical Alberti is mid-register (Mozart, etc.)
+    'arpeggio': 3,         // Arpeggios often clearer in higher register
+    'bossa-nova': 3,       // Bossa guitar/piano bass is often mid-register
+    'shell-voicing': 3,    // Jazz shells need clarity
+    'ballad': 3,           // Ballad accompaniment is lighter
+    'bebop': 3,            // Bebop lines need articulation clarity
+
+    // Octave 2 but could go either way
+    'broken-octave': 2,    // Starts at 2, alternates to 3
+    'octave-doubling': 2,  // Base is 2, doubles at 3
+    'syncopated': 2,
+    'dotted-rhythm': 2,
+    'anticipation': 2,
+    'shuffle': 2,
+    'chromatic-approach': 2,
+    'scalar-walk': 2,
+    'tango': 2,
+    'montuno': 2,
+    'tenths': 2,
+    'gospel': 2
+};
+
+/**
+ * Get the default octave for a bass pattern
+ * @param {string} pattern - Bass pattern name
+ * @returns {number} Default octave (2 or 3)
+ */
+export function getDefaultOctaveForPattern(pattern) {
+    return BASS_PATTERN_OCTAVE_DEFAULTS[pattern] ?? 2;
+}
+
 const NOTE_TO_SEMITONE = {
     'C': 0, 'C#': 1, 'Db': 1,
     'D': 2, 'D#': 3, 'Eb': 3,
@@ -206,14 +267,17 @@ export function generateBassVoicing(chord, previousChord = null, options = {}) {
 }
 
 /**
- * Get chord notes transposed to bass register (octave 2-3)
+ * Get chord notes transposed to bass register
  * @param {object} chord - Chord data
- * @returns {array} Array of note names in bass register
+ * @param {number} baseOctave - Base octave for bass (default: 2)
+ * @returns {array} Array of note names in bass register (baseOctave and baseOctave+1)
  */
-function getChordNotesInBassRegister(chord) {
+function getChordNotesInBassRegister(chord, baseOctave = 2) {
+    const upperOctave = baseOctave + 1;
+
     if (!chord.notes || chord.notes.length === 0) {
         // Fallback: just use root note
-        return [`${chord.root}2`, `${chord.root}3`];
+        return [`${chord.root}${baseOctave}`, `${chord.root}${upperOctave}`];
     }
 
     // Filter out omitted notes before processing
@@ -221,7 +285,7 @@ function getChordNotesInBassRegister(chord) {
 
     // If all notes are omitted, use root as fallback
     if (voicedNotes.length === 0) {
-        return [`${chord.root}2`, `${chord.root}3`];
+        return [`${chord.root}${baseOctave}`, `${chord.root}${upperOctave}`];
     }
 
     // Remove octave numbers and add bass octaves
@@ -231,14 +295,14 @@ function getChordNotesInBassRegister(chord) {
     // Create bass register versions
     const bassNotes = [];
 
-    // First add all notes in octave 2
+    // First add all notes in base octave
     uniqueNotes.forEach(note => {
-        bassNotes.push(`${note}2`);
+        bassNotes.push(`${note}${baseOctave}`);
     });
 
-    // Then add all notes in octave 3
+    // Then add all notes in upper octave
     uniqueNotes.forEach(note => {
-        bassNotes.push(`${note}3`);
+        bassNotes.push(`${note}${upperOctave}`);
     });
 
     // Phase 1C Round 4.5: Sort by pitch for proper arpeggio patterns
@@ -521,15 +585,15 @@ function findSixth(root, chord, octave = 2) {
  * @param {array} chordNotes - Available chord notes
  * @returns {string} Fifth note name
  */
-function findFifth(root, chordNotes) {
+function findFifth(root, chordNotes, octave = 2) {
     const fifthInterval = 7; // Perfect fifth
-    const rootMidi = noteToMidi(`${root}2`);
+    const rootMidi = noteToMidi(`${root}${octave}`);
     const fifthMidi = rootMidi + fifthInterval;
 
     // Find the note in chordNotes closest to the perfect fifth
     const closest = findClosestNote(chordNotes, fifthMidi);
 
-    return closest || `${root}2`;
+    return closest || `${root}${octave}`;
 }
 
 /**
@@ -884,6 +948,10 @@ function getDurationBeats(duration) {
  * @param {object|null} previousChord - Previous chord for voice leading
  * @param {number} totalBeats - Total duration of the building block in beats
  * @param {object} options - Generation options
+ * @param {string} options.bassPattern - Bass pattern name (e.g., 'root-fifth', 'walking')
+ * @param {boolean} options.bassFollowsInversion - Whether bass follows chord inversion
+ * @param {object} options.timeSignature - Time signature { num, denom }
+ * @param {number} options.bassOctave - Base octave for bass (default: pattern-specific or 2)
  * @returns {Array} Array of note objects with beat positions (absolute within block)
  */
 export function generateBuildingBlockBass(chord, previousChord = null, totalBeats, options = {}) {
@@ -891,20 +959,25 @@ export function generateBuildingBlockBass(chord, previousChord = null, totalBeat
         bassPattern = 'root-fifth',
         bassFollowsInversion = false,
         timeSignature = { num: 4, denom: 4 },
+        bassOctave = null,  // null means use pattern-specific default
     } = options;
 
     if (!chord || !chord.root) {
         return [];
     }
 
-    const chordNotes = getChordNotesInBassRegister(chord);
-    // Get the bass note based on inversion setting
-    const bassNote = getBassNoteForChord(chord, bassFollowsInversion, 2);
-    const fifth = findFifth(chord.root, chordNotes);
+    // Determine the octave to use: explicit override > pattern default > fallback to 2
+    const effectiveOctave = bassOctave ?? getDefaultOctaveForPattern(bassPattern);
+
+    const chordNotes = getChordNotesInBassRegister(chord, effectiveOctave);
+    // Get the bass note based on inversion setting, using the effective octave
+    const bassNote = getBassNoteForChord(chord, bassFollowsInversion, effectiveOctave);
+    const fifth = findFifth(chord.root, chordNotes, effectiveOctave);
     const beatsPerMeasure = timeSignature.num || 4;
 
     // Generate the pattern based on type
     // Note: bassNote respects the bassFollowsInversion setting
+    // Pass bassNote, fifth, and effectiveOctave to ensure correct octave is used
     switch (bassPattern) {
         case 'whole-note':
             return generateWholeNoteBlockBass(bassNote, totalBeats, beatsPerMeasure);
@@ -913,42 +986,42 @@ export function generateBuildingBlockBass(chord, previousChord = null, totalBeat
             return generateRootFifthBlockBass(bassNote, fifth, totalBeats, beatsPerMeasure);
 
         case 'arpeggio':
-            return generateArpeggioBlockBass(chordNotes, totalBeats, beatsPerMeasure, chord.root);
+            return generateArpeggioBlockBass(chordNotes, totalBeats, beatsPerMeasure, chord.root, effectiveOctave);
 
         case 'alberti':
             return generateAlbertiBlockBass(chordNotes, totalBeats, beatsPerMeasure);
 
         case 'walking':
-            return generateWalkingBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateWalkingBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth, effectiveOctave);
 
         // Polyphonic patterns
         case 'broken-octave':
-            return generateBrokenOctaveBlockBass(bassNote, totalBeats, beatsPerMeasure);
+            return generateBrokenOctaveBlockBass(bassNote, totalBeats, beatsPerMeasure, effectiveOctave);
 
         case 'octave-doubling':
-            return generateOctaveDoublingBlockBass(bassNote, totalBeats, beatsPerMeasure);
+            return generateOctaveDoublingBlockBass(bassNote, totalBeats, beatsPerMeasure, effectiveOctave);
 
         case 'power-chord':
             return generatePowerChordBlockBass(bassNote, fifth, totalBeats, beatsPerMeasure);
 
         case 'stride':
-            return generateStrideBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateStrideBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
 
         case 'boogie':
-            return generateBoogieBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateBoogieBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth, effectiveOctave);
 
         case 'shell-voicing':
-            return generateShellVoicingBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateShellVoicingBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
 
         // Style patterns
         case 'tango':
-            return generateTangoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateTangoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth);
 
         case 'montuno':
-            return generateMontunoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateMontunoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth);
 
         case 'reggae':
-            return generateReggaeBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateReggaeBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth);
 
         case 'country':
             return generateCountryBlockBass(bassNote, fifth, totalBeats, beatsPerMeasure);
@@ -960,66 +1033,66 @@ export function generateBuildingBlockBass(chord, previousChord = null, totalBeat
             return generateDrivingRockBlockBass(bassNote, totalBeats, beatsPerMeasure);
 
         case 'funk':
-            return generateFunkBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateFunkBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth);
 
         case 'tenths':
-            return generateTenthsBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateTenthsBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
 
-        // NEW RHYTHMIC PATTERNS
+        // RHYTHMIC PATTERNS
         case 'dotted-rhythm':
-            return generateDottedRhythmBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateDottedRhythmBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth);
 
         case 'syncopated':
-            return generateSyncopatedBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateSyncopatedBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth);
 
         case 'anticipation':
-            return generateAnticipationBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateAnticipationBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth);
 
         case 'shuffle':
-            return generateShuffleBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateShuffleBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth);
 
-        // NEW MELODIC PATTERNS
+        // MELODIC PATTERNS
         case 'chromatic-approach':
-            return generateChromaticApproachBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateChromaticApproachBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
 
         case 'scalar-walk':
-            return generateScalarWalkBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateScalarWalkBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
 
         case 'bebop':
-            return generateBebopBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateBebopBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
 
-        // NEW STYLE PATTERNS
+        // STYLE PATTERNS
         case 'bossa-nova':
-            return generateBossaNovaBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateBossaNovaBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth);
 
         case 'disco-octave':
-            return generateDiscoOctaveBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateDiscoOctaveBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
 
         case 'motown':
-            return generateMotownBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateMotownBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth, effectiveOctave);
 
         case 'ballad':
-            return generateBalladBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateBalladBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth);
 
         // REST-BASED PATTERNS
         case 'staccato':
-            return generateStaccatoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateStaccatoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth);
 
         case 'call-response':
-            return generateCallResponseBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateCallResponseBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth);
 
         // ADDITIONAL POLYPHONIC PATTERNS
         case 'open-fifth':
-            return generateOpenFifthBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateOpenFifthBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth);
 
         case 'rock-power':
             return generateRockPowerBlockBass(bassNote, fifth, totalBeats, beatsPerMeasure);
 
         case 'gospel':
-            return generateGospelBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateGospelBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
 
         case 'half-time':
-            return generateHalfTimeBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure);
+            return generateHalfTimeBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth);
 
         default:
             return generateWholeNoteBlockBass(bassNote, totalBeats, beatsPerMeasure);
@@ -1218,13 +1291,13 @@ function generateAlbertiBlockBass(chordNotes, totalBeats, beatsPerMeasure) {
  * Generate walking bass pattern for a building block
  * Stepwise motion with chromatic approaches
  */
-function generateWalkingBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateWalkingBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth, effectiveOctave) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
+    // Use passed bassNote and fifth (already calculated with correct octave)
+    const root = bassNote;
     const rootMidi = noteToMidi(root);
-    const fifth = findFifth(chord.root, chordNotes);
     const fifthMidi = noteToMidi(fifth);
 
     // Walking pattern per 4 beats: root, step up, root, fifth
@@ -1395,13 +1468,15 @@ function generatePowerChordBlockBass(root, fifth, totalBeats, beatsPerMeasure) {
  * Alternates between low bass note and mid-register chord
  * Classic jazz/ragtime left-hand pattern
  */
-function generateStrideBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateStrideBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
-    // Get chord tones in octave 3 for the "stride" chord
-    const midChordNotes = chordNotes.filter(n => n.endsWith('3')).slice(0, 3);
+    // Use passed bassNote (already calculated with correct octave)
+    const root = bassNote;
+    // Get chord tones in the upper octave for the "stride" chord
+    const upperOctave = effectiveOctave + 1;
+    const midChordNotes = chordNotes.filter(n => n.endsWith(String(upperOctave))).slice(0, 3);
 
     let isBassBeat = true; // Alternate bass note and chord
 
@@ -1448,15 +1523,15 @@ function generateStrideBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure)
  * Classic 8-to-the-bar blues/boogie left-hand pattern
  * Uses eighth notes with characteristic chromatic movement
  */
-function generateBoogieBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateBoogieBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth, effectiveOctave) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
+    // Use passed bassNote and fifth (already calculated with correct octave)
+    const root = bassNote;
     const rootMidi = noteToMidi(root);
-    const fifth = findFifth(chord.root, chordNotes);
-    const third = findThird(chord.root, chord, 2); // Chord-quality-aware third
-    const sixth = findSixth(chord.root, chord, 2); // Chord-quality-aware sixth
+    const third = findThird(chord.root, chord, effectiveOctave); // Chord-quality-aware third
+    const sixth = findSixth(chord.root, chord, effectiveOctave); // Chord-quality-aware sixth
 
     // Boogie pattern: root-3rd-5th-6th-5th-3rd (ascending/descending)
     const boogiePattern = [
@@ -1509,11 +1584,12 @@ function generateBoogieBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure)
  * The 3rd or 7th is placed in octave 3 (above the root in octave 2)
  * for clearer voice separation typical of jazz voicings
  */
-function generateShellVoicingBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateShellVoicingBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
+    // Use passed bassNote (already calculated with correct octave)
+    const root = bassNote;
     const rootMidi = noteToMidi(root);
 
     // Determine chord quality and get appropriate shell notes
@@ -1604,12 +1680,12 @@ function generateShellVoicingBlockBass(chord, chordNotes, totalBeats, beatsPerMe
  * Classic tango rhythm: dotted quarter + eighth + half
  * Creates that distinctive Latin feel
  */
-function generateTangoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateTangoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
-    const fifth = findFifth(chord.root, chordNotes);
+    // Use passed bassNote and fifth (already calculated with correct octave)
+    const root = bassNote;
 
     // Tango pattern per 4 beats: root (dotted quarter), fifth (eighth), root (half)
     // Duration pattern: 1.5 + 0.5 + 2 = 4 beats
@@ -1649,13 +1725,13 @@ function generateTangoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) 
  * Generate Latin montuno bass pattern for a building block
  * Syncopated Cuban-style bass with anticipated notes
  */
-function generateMontunoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateMontunoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
+    // Use passed bassNote and fifth (already calculated with correct octave)
+    const root = bassNote;
     const rootMidi = noteToMidi(root);
-    const fifth = findFifth(chord.root, chordNotes);
     const octave = midiToNoteName(rootMidi + 12);
 
     // Montuno: syncopated pattern with anticipation
@@ -1698,12 +1774,12 @@ function generateMontunoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure
  *   Beat 4: fifth (eighth) + root (eighth)
  * This creates the characteristic reggae groove with anticipation
  */
-function generateReggaeBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateReggaeBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
-    const fifth = findFifth(chord.root, chordNotes);
+    // Use passed bassNote and fifth (already calculated with correct octave)
+    const root = bassNote;
 
     // Reggae pattern: rest, pickup, drop, groove
     // Total: 1 + 0.5 + 0.5 + 1 + 0.5 + 0.5 = 4 beats
@@ -1888,14 +1964,14 @@ function generateDrivingRockBlockBass(root, totalBeats, beatsPerMeasure) {
  *   1e+a 2e+a 3e+a 4e+a
  *   R.O. .R.. R.5. .O.R  (R=root, O=octave, 5=fifth, .=rest)
  */
-function generateFunkBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateFunkBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
+    // Use passed bassNote and fifth (already calculated with correct octave)
+    const root = bassNote;
     const rootMidi = noteToMidi(root);
     const octave = midiToNoteName(rootMidi + 12);
-    const fifth = findFifth(chord.root, chordNotes);
 
     // Funk pattern: 16th note based for authentic syncopation
     // Each entry is 0.25 beats (16th note)
@@ -1968,11 +2044,12 @@ function generateFunkBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
  * Generate 10ths pattern for a building block
  * Root + 10th (3rd up an octave) - rich romantic sound
  */
-function generateTenthsBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateTenthsBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
+    // Use passed bassNote (already calculated with correct octave)
+    const root = bassNote;
     const rootMidi = noteToMidi(root);
 
     // Determine if major or minor 10th based on chord type
@@ -2020,12 +2097,12 @@ function generateTenthsBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure)
  * Creates a lilting, dance-like groove
  * Pattern per 2 beats: dotted quarter (1.5) + eighth (0.5)
  */
-function generateDottedRhythmBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateDottedRhythmBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
-    const fifth = findFifth(chord.root, chordNotes);
+    // Use passed bassNote and fifth (already calculated with correct octave)
+    const root = bassNote;
 
     // Dotted rhythm: long-short pattern alternating root and fifth
     // Pattern: root (dotted quarter), fifth (eighth), root (dotted quarter), fifth (eighth)
@@ -2064,12 +2141,12 @@ function generateDottedRhythmBlockBass(chord, chordNotes, totalBeats, beatsPerMe
  * Off-beat accents for rhythmic tension
  * Pattern: rest on beat 1, note on "and", note on beat 3, rest on beat 4
  */
-function generateSyncopatedBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateSyncopatedBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
-    const fifth = findFifth(chord.root, chordNotes);
+    // Use passed bassNote and fifth (already calculated with correct octave)
+    const root = bassNote;
 
     // Syncopated pattern: emphasizes off-beats
     // Pattern per 4 beats: rest (0.5), root (0.5), rest (0.5), fifth (0.5), root (1), rest (1)
@@ -2125,12 +2202,12 @@ function generateSyncopatedBlockBass(chord, chordNotes, totalBeats, beatsPerMeas
  * Notes anticipate the next beat - creates forward momentum
  * Pattern: notes on the "and" of beats, creating push toward next measure
  */
-function generateAnticipationBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateAnticipationBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
-    const fifth = findFifth(chord.root, chordNotes);
+    // Use passed bassNote and fifth (already calculated with correct octave)
+    const root = bassNote;
 
     // Anticipation pattern: notes slightly before the beat
     // Pattern per 4 beats: rest (0.5), root (1.5), rest (0.5), fifth (1.5)
@@ -2184,12 +2261,12 @@ function generateAnticipationBlockBass(chord, chordNotes, totalBeats, beatsPerMe
  * Swing feel with long-short triplet subdivision
  * Classic blues/swing groove
  */
-function generateShuffleBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateShuffleBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
-    const fifth = findFifth(chord.root, chordNotes);
+    // Use passed bassNote and fifth (already calculated with correct octave)
+    const root = bassNote;
     const rootMidi = noteToMidi(root);
     const thirdBelow = midiToNoteName(rootMidi - 4); // Major third below for blues feel
 
@@ -2241,11 +2318,12 @@ function generateShuffleBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure
  * Walks chromatically toward the root from below
  * Creates tension and resolution
  */
-function generateChromaticApproachBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateChromaticApproachBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
+    // Use passed bassNote (already calculated with correct octave)
+    const root = bassNote;
     const rootMidi = noteToMidi(root);
 
     // Chromatic approach: walk up chromatically to the root
@@ -2287,11 +2365,12 @@ function generateChromaticApproachBlockBass(chord, chordNotes, totalBeats, beats
  * Walks through scale tones for melodic interest
  * Uses major scale intervals from the root
  */
-function generateScalarWalkBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateScalarWalkBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
+    // Use passed bassNote (already calculated with correct octave)
+    const root = bassNote;
     const rootMidi = noteToMidi(root);
 
     // Scalar pattern using major scale intervals (ascending then descending)
@@ -2330,13 +2409,14 @@ function generateScalarWalkBlockBass(chord, chordNotes, totalBeats, beatsPerMeas
  * Jazz bebop-style walking with chromatic passing tones
  * Features characteristic chromatic approaches and enclosures
  */
-function generateBebopBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateBebopBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
+    // Use passed bassNote (already calculated with correct octave)
+    const root = bassNote;
     const rootMidi = noteToMidi(root);
-    const fifth = findFifth(chord.root, chordNotes);
+    const fifth = findFifth(chord.root, chordNotes, effectiveOctave);
     const fifthMidi = noteToMidi(fifth);
 
     // Bebop pattern with enclosure and chromatic passing tones
@@ -2382,12 +2462,12 @@ function generateBebopBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) 
  * Classic Brazilian bossa nova feel
  * Syncopated pattern with emphasis on beats 1 and the "and" of 2
  */
-function generateBossaNovaBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateBossaNovaBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
-    const fifth = findFifth(chord.root, chordNotes);
+    // Use passed bassNote and fifth (already calculated with correct octave)
+    const root = bassNote;
 
     // Bossa nova pattern: root on 1, fifth on "and" of 2, root on 3
     // Creates the characteristic syncopated Brazilian feel
@@ -2427,13 +2507,14 @@ function generateBossaNovaBlockBass(chord, chordNotes, totalBeats, beatsPerMeasu
  * Classic disco pumping octaves on every beat
  * Alternates between low and high octave
  */
-function generateDiscoOctaveBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateDiscoOctaveBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
     const notes = [];
     let currentBeat = 0;
 
+    // Use passed effectiveOctave for low/high octave calculation
     const noteName = chord.root;
-    const lowRoot = `${noteName}2`;
-    const highRoot = `${noteName}3`;
+    const lowRoot = `${noteName}${effectiveOctave}`;
+    const highRoot = `${noteName}${effectiveOctave + 1}`;
 
     // Disco pattern: steady eighths alternating octaves
     // Low-high-low-high... (8 per measure)
@@ -2469,14 +2550,14 @@ function generateDiscoOctaveBlockBass(chord, chordNotes, totalBeats, beatsPerMea
  * Melodic, syncopated Motown/soul style bass
  * Uses chord tones with rhythmic variety
  */
-function generateMotownBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateMotownBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth, effectiveOctave) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
+    // Use passed bassNote and fifth (already calculated with correct octave)
+    const root = bassNote;
     const rootMidi = noteToMidi(root);
-    const fifth = findFifth(chord.root, chordNotes);
-    const third = findThird(chord.root, chord, 2); // Chord-quality-aware third
+    const third = findThird(chord.root, chord, effectiveOctave); // Chord-quality-aware third
     const octave = midiToNoteName(rootMidi + 12);
 
     // Motown pattern: melodic with syncopation
@@ -2535,12 +2616,12 @@ function generateMotownBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure)
  * Sparse, expressive pattern for slow songs
  * Leaves space for emotional impact
  */
-function generateBalladBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateBalladBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
-    const fifth = findFifth(chord.root, chordNotes);
+    // Use passed bassNote and fifth (already calculated with correct octave)
+    const root = bassNote;
 
     // Ballad pattern: sparse with breathing room
     // Pattern: root (dotted half), rest, fifth to root pickup
@@ -2597,12 +2678,12 @@ function generateBalladBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure)
  * Short, detached notes with rests between
  * Creates a punchy, percussive feel
  */
-function generateStaccatoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateStaccatoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
-    const fifth = findFifth(chord.root, chordNotes);
+    // Use passed bassNote and fifth (already calculated with correct octave)
+    const root = bassNote;
 
     // Staccato pattern: short note followed by rest
     // Creates a punchy, detached feel with 8th notes
@@ -2660,13 +2741,15 @@ function generateStaccatoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasur
  * Phrases followed by rests - like a musical conversation
  * Great for gospel, blues, and soul
  */
-function generateCallResponseBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateCallResponseBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
-    const fifth = findFifth(chord.root, chordNotes);
-    const third = findThird(chord.root, chord, 3); // Use octave 3 for the third
+    // Use passed bassNote and fifth (already calculated with correct octave)
+    const root = bassNote;
+    // Extract octave from bassNote for third calculation
+    const octave = parseInt(bassNote.match(/\d+$/)?.[0] || '2');
+    const third = findThird(chord.root, chord, octave + 1); // Use next octave for the third
 
     // Call-response pattern: "call" phrase then rest for "response"
     // Pattern: root-third-fifth (call), rest, root-fifth (response), rest
@@ -2727,12 +2810,12 @@ function generateCallResponseBlockBass(chord, chordNotes, totalBeats, beatsPerMe
  * Root and fifth played together with open voicing
  * Creates a powerful, open sound
  */
-function generateOpenFifthBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateOpenFifthBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
-    const fifth = findFifth(chord.root, chordNotes);
+    // Use passed bassNote and fifth (already calculated with correct octave)
+    const root = bassNote;
 
     while (currentBeat < totalBeats) {
         const remainingBeats = totalBeats - currentBeat;
@@ -2803,15 +2886,16 @@ function generateRockPowerBlockBass(root, fifth, totalBeats, beatsPerMeasure) {
  * Rich passing chord movement typical of gospel music
  * Uses passing chords and chromatic approaches
  */
-function generateGospelBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateGospelBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
+    // Use passed bassNote (already calculated with correct octave)
+    const root = bassNote;
     const rootMidi = noteToMidi(root);
-    const third = findThird(chord.root, chord, 2); // Chord-quality-aware third
-    const fifth = findFifth(chord.root, chordNotes);
-    const sixth = findSixth(chord.root, chord, 2); // Chord-quality-aware sixth
+    const third = findThird(chord.root, chord, effectiveOctave); // Chord-quality-aware third
+    const fifth = findFifth(chord.root, chordNotes, effectiveOctave);
+    const sixth = findSixth(chord.root, chord, effectiveOctave); // Chord-quality-aware sixth
     const passingNote = midiToNoteName(rootMidi + 2); // Whole step above root
 
     // Gospel pattern: root-third, passing chord, fifth-root
@@ -2853,12 +2937,12 @@ function generateGospelBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure)
  * Notes only on beats 1 and 3 - creates spacious feel
  * Great for ballads and slow grooves
  */
-function generateHalfTimeBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure) {
+function generateHalfTimeBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth) {
     const notes = [];
     let currentBeat = 0;
 
-    const root = `${chord.root}2`;
-    const fifth = findFifth(chord.root, chordNotes);
+    // Use passed bassNote and fifth (already calculated with correct octave)
+    const root = bassNote;
 
     // Half-time: notes on 1 and 3 only
     const halfTimePattern = [

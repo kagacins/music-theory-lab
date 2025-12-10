@@ -997,18 +997,74 @@ function createHeader() {
     const header = document.createElement('div');
     header.className = 'rm-header';
 
+    // Left side: Title with key and selection info
+    const titleArea = document.createElement('div');
+    titleArea.style.cssText = 'display: flex; align-items: center; gap: 12px;';
+
     const title = document.createElement('h2');
     title.textContent = 'Recommendation Center';
     title.className = 'rm-header-title';
+    titleArea.appendChild(title);
+
+    // Key indicator
+    const key = getCurrentKey() || 'C';
+    const keyBadge = document.createElement('span');
+    keyBadge.id = 'header-key-badge';
+    keyBadge.style.cssText = `
+        font-size: 12px;
+        padding: 2px 8px;
+        background: #dbeafe;
+        color: #1e40af;
+        border-radius: 4px;
+        font-weight: 600;
+    `;
+    keyBadge.textContent = `Key: ${key}`;
+    titleArea.appendChild(keyBadge);
+
+    // Selection indicator
+    const selectionBadge = document.createElement('span');
+    selectionBadge.id = 'header-selection-badge';
+    selectionBadge.style.cssText = `
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.9);
+    `;
+    updateHeaderSelectionBadge(selectionBadge);
+    titleArea.appendChild(selectionBadge);
+
+    header.appendChild(titleArea);
 
     const closeBtn = document.createElement('button');
     closeBtn.innerHTML = '&times;';
     closeBtn.className = 'rm-close-btn';
     closeBtn.addEventListener('click', closeUnifiedRecommendationModal);
 
-    header.appendChild(title);
     header.appendChild(closeBtn);
     return header;
+}
+
+function updateHeaderSelectionBadge(badge) {
+    if (!badge) {
+        badge = document.getElementById('header-selection-badge');
+    }
+    if (!badge) return;
+
+    const progressionData = getProgressionData() || [];
+    const hasMultiSelectChords = modalState.selectedProgressionStart >= 0 && modalState.selectedProgressionEnd >= 0 &&
+                           modalState.selectedProgressionStart !== modalState.selectedProgressionEnd;
+
+    if (modalState.selectedProgressionIndex === -1 && !hasMultiSelectChords) {
+        badge.innerHTML = `<strong style="color: #6ee7b7;">Adding</strong> after #${progressionData.length || 0}`;
+    } else if (hasMultiSelectChords) {
+        const start = Math.min(modalState.selectedProgressionStart, modalState.selectedProgressionEnd);
+        const end = Math.max(modalState.selectedProgressionStart, modalState.selectedProgressionEnd);
+        const count = end - start + 1;
+        badge.innerHTML = `<strong style="color: #c4b5fd;">Range:</strong> #${start + 1} - #${end + 1} (${count})`;
+    } else {
+        const selectedChord = progressionData[modalState.selectedProgressionIndex];
+        const chordDef = CHORD_DEFINITIONS[selectedChord?.type];
+        const symbol = chordDef?.symbol || '';
+        badge.innerHTML = `<strong style="color: #c4b5fd;">Selected:</strong> ${selectedChord?.root}${symbol} (#${modalState.selectedProgressionIndex + 1})`;
+    }
 }
 
 /**
@@ -1029,6 +1085,7 @@ function createPersistentProgressionBar() {
 /**
  * Update the persistent progression bar content
  * Now includes section picker for navigation and filtered chord display
+ * Header info (key, selection) has been moved to modal header
  */
 function updatePersistentProgressionBar(bar) {
     if (!bar) {
@@ -1037,6 +1094,9 @@ function updatePersistentProgressionBar(bar) {
     if (!bar) return;
 
     bar.innerHTML = '';
+
+    // Also update header selection badge
+    updateHeaderSelectionBadge();
 
     const key = getCurrentKey() || 'C';
     const progressionData = getProgressionData() || [];
@@ -1060,41 +1120,9 @@ function updatePersistentProgressionBar(bar) {
 
     // Main container with vertical layout
     const mainContainer = document.createElement('div');
-    mainContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px; width: 100%;';
+    mainContainer.style.cssText = 'display: flex; flex-direction: column; gap: 4px; width: 100%;';
 
-    // Row 1: Header with label and selection indicator
-    const headerRow = document.createElement('div');
-    headerRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px;';
-
-    const label = document.createElement('div');
-    label.className = 'rm-progression-label';
-    label.innerHTML = `<span class="rm-progression-label-icon">🎹</span> Progression <span class="rm-progression-label-key">(${key})</span>`;
-    headerRow.appendChild(label);
-
-    // Selection indicator
-    const selectionIndicator = document.createElement('div');
-    selectionIndicator.className = 'rm-selection-indicator';
-    selectionIndicator.style.cssText = 'font-size: 11px; color: #6b7280; white-space: nowrap;';
-    const hasMultiSelectChords = modalState.selectedProgressionStart >= 0 && modalState.selectedProgressionEnd >= 0 &&
-                           modalState.selectedProgressionStart !== modalState.selectedProgressionEnd;
-
-    if (modalState.selectedProgressionIndex === -1 && !hasMultiSelectChords) {
-        selectionIndicator.innerHTML = `<strong style="color: #10b981;">Adding</strong> after #${progressionData.length || 0}`;
-    } else if (hasMultiSelectChords) {
-        const start = Math.min(modalState.selectedProgressionStart, modalState.selectedProgressionEnd);
-        const end = Math.max(modalState.selectedProgressionStart, modalState.selectedProgressionEnd);
-        const count = end - start + 1;
-        selectionIndicator.innerHTML = `<strong style="color: var(--rm-primary);">Range:</strong> #${start + 1} - #${end + 1} (${count} chords)`;
-    } else {
-        const selectedChord = progressionData[modalState.selectedProgressionIndex];
-        const chordDef = CHORD_DEFINITIONS[selectedChord?.type];
-        const symbol = chordDef?.symbol || '';
-        selectionIndicator.innerHTML = `<strong style="color: var(--rm-primary);">Selected:</strong> ${selectedChord?.root}${symbol} (#${modalState.selectedProgressionIndex + 1})`;
-    }
-    headerRow.appendChild(selectionIndicator);
-    mainContainer.appendChild(headerRow);
-
-    // Row 2: Section picker bar (only if sections exist)
+    // Row 1: Section picker bar (only if sections exist)
     if (allSectionsWithPseudo.length > 0) {
         const sectionPickerRow = document.createElement('div');
         sectionPickerRow.style.cssText = `
@@ -1466,8 +1494,9 @@ function createContextBar() {
     const bar = document.createElement('div');
     bar.id = 'unified-context-bar';
     bar.className = 'rm-context-bar';
+    bar.style.cssText = 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 12px;';
 
-    // Section Intent Controls
+    // Section Intent Controls (now with dropdown for submodes)
     const sectionControls = createSectionIntentControls();
     bar.appendChild(sectionControls);
 
@@ -1501,22 +1530,29 @@ function createContextBar() {
 function createSeparator() {
     const sep = document.createElement('div');
     sep.className = 'rm-separator';
-    sep.style.height = '24px';
+    sep.style.cssText = 'height: 20px; width: 1px; background: #d1d5db;';
     return sep;
 }
 
 function createSectionIntentControls() {
     const container = document.createElement('div');
-    container.style.cssText = 'display: flex; align-items: center; gap: 6px;';
+    container.style.cssText = 'display: flex; align-items: center; gap: 4px;';
 
     const intent = getSectionIntent();
 
-    // Mode selector (Continue / New Section)
+    // Mode selector (Continue / New Section) - compact
     const modeSelect = document.createElement('select');
     modeSelect.id = 'section-mode-select';
-    modeSelect.className = 'rm-select';
+    modeSelect.style.cssText = `
+        padding: 4px 6px;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        font-size: 11px;
+        background: white;
+        cursor: pointer;
+    `;
     modeSelect.innerHTML = `
-        <option value="${INTENT_MODES.CONTINUE}">Continue Section</option>
+        <option value="${INTENT_MODES.CONTINUE}">Continue</option>
         <option value="${INTENT_MODES.NEW_SECTION}">New Section</option>
     `;
     modeSelect.value = intent.mode;
@@ -1531,7 +1567,7 @@ function createSectionIntentControls() {
     // Sub-mode selector container (changes based on mode)
     const subContainer = document.createElement('div');
     subContainer.id = 'section-submode-container';
-    subContainer.style.cssText = `display: flex; align-items: center; gap: 6px;`;
+    subContainer.style.cssText = `display: flex; align-items: center; gap: 4px;`;
     container.appendChild(subContainer);
 
     // Initialize sub-mode selector
@@ -1549,42 +1585,44 @@ function updateSubModeSelector() {
     const modeSelect = document.getElementById('section-mode-select');
 
     if (modeSelect?.value === INTENT_MODES.CONTINUE || intent.mode === INTENT_MODES.CONTINUE) {
-        // Continue mode: show submode buttons
+        // Continue mode: show submode dropdown instead of buttons
         const submodes = [
             { id: CONTINUE_SUBMODES.BUILDING, label: 'Build', title: 'Continue building the section' },
             { id: CONTINUE_SUBMODES.CONCLUDING, label: 'Resolve', title: 'Work toward section resolution' },
             { id: CONTINUE_SUBMODES.FINAL, label: 'Final', title: 'Last chord of section' }
         ];
 
+        const subModeSelect = document.createElement('select');
+        subModeSelect.id = 'section-submode-select';
+        subModeSelect.style.cssText = `
+            padding: 4px 6px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 11px;
+            background: white;
+            cursor: pointer;
+        `;
         submodes.forEach(sm => {
-            const btn = document.createElement('button');
-            btn.textContent = sm.label;
-            btn.title = sm.title;
-            btn.style.cssText = `
-                padding: 4px 10px;
-                border: 1px solid ${intent.subMode === sm.id ? '#667eea' : '#d1d5db'};
-                border-radius: 4px;
-                background: ${intent.subMode === sm.id ? '#eef2ff' : 'white'};
-                color: ${intent.subMode === sm.id ? '#667eea' : '#374151'};
-                font-size: 12px;
-                cursor: pointer;
-                font-weight: ${intent.subMode === sm.id ? '600' : '400'};
-            `;
-            btn.addEventListener('click', () => {
-                setSectionIntent({ subMode: sm.id });
-                updateSubModeSelector();
-                renderActiveTab(); // Re-render to update scoring
-            });
-            container.appendChild(btn);
+            const opt = document.createElement('option');
+            opt.value = sm.id;
+            opt.textContent = sm.label;
+            opt.title = sm.title;
+            subModeSelect.appendChild(opt);
         });
+        subModeSelect.value = intent.subMode || CONTINUE_SUBMODES.BUILDING;
+        subModeSelect.addEventListener('change', () => {
+            setSectionIntent({ subMode: subModeSelect.value });
+            renderActiveTab(); // Re-render to update scoring
+        });
+        container.appendChild(subModeSelect);
     } else {
         // New section mode: show section type selector
         const typeSelect = document.createElement('select');
         typeSelect.style.cssText = `
-            padding: 6px 10px;
+            padding: 4px 6px;
             border: 1px solid #d1d5db;
-            border-radius: 6px;
-            font-size: 13px;
+            border-radius: 4px;
+            font-size: 11px;
             background: white;
             cursor: pointer;
         `;
@@ -1609,22 +1647,22 @@ function createStyleMoodControls() {
     container.style.cssText = `
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 4px;
     `;
 
     // Style selector
     const styleLabel = document.createElement('span');
     styleLabel.textContent = 'Style:';
-    styleLabel.style.cssText = 'font-size: 12px; color: #6b7280;';
+    styleLabel.style.cssText = 'font-size: 11px; color: #6b7280;';
     container.appendChild(styleLabel);
 
     const styleSelect = document.createElement('select');
     styleSelect.id = 'unified-style-select';
     styleSelect.style.cssText = `
-        padding: 4px 8px;
+        padding: 4px 6px;
         border: 1px solid #d1d5db;
         border-radius: 4px;
-        font-size: 12px;
+        font-size: 11px;
         background: white;
         cursor: pointer;
     `;
@@ -1650,16 +1688,16 @@ function createStyleMoodControls() {
     // Mood selector
     const moodLabel = document.createElement('span');
     moodLabel.textContent = 'Mood:';
-    moodLabel.style.cssText = 'font-size: 12px; color: #6b7280; margin-left: 8px;';
+    moodLabel.style.cssText = 'font-size: 11px; color: #6b7280; margin-left: 4px;';
     container.appendChild(moodLabel);
 
     const moodSelect = document.createElement('select');
     moodSelect.id = 'unified-mood-select';
     moodSelect.style.cssText = `
-        padding: 4px 8px;
+        padding: 4px 6px;
         border: 1px solid #d1d5db;
         border-radius: 4px;
-        font-size: 12px;
+        font-size: 11px;
         background: white;
         cursor: pointer;
     `;
@@ -1690,7 +1728,7 @@ function createDurationToggle() {
     container.style.cssText = `
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 4px;
     `;
 
     const checkbox = document.createElement('input');
@@ -1698,8 +1736,8 @@ function createDurationToggle() {
     checkbox.id = 'unified-duration-toggle';
     checkbox.checked = modalState.rhythmAwarenessEnabled;
     checkbox.style.cssText = `
-        width: 16px;
-        height: 16px;
+        width: 14px;
+        height: 14px;
         cursor: pointer;
         accent-color: #667eea;
     `;
@@ -1717,7 +1755,7 @@ function createDurationToggle() {
     label.textContent = 'Duration';
     label.title = 'Show suggested chord durations based on harmonic rhythm analysis';
     label.style.cssText = `
-        font-size: 12px;
+        font-size: 11px;
         color: #6b7280;
         cursor: pointer;
     `;
@@ -1729,9 +1767,25 @@ function createDurationToggle() {
 
 function createWeightsButton() {
     const btn = document.createElement('button');
-    btn.innerHTML = '⚙️ Weights';
+    btn.innerHTML = '⚙️';
     btn.title = 'Adjust recommendation scoring weights';
-    btn.className = 'rm-btn rm-btn-secondary';
+    btn.style.cssText = `
+        padding: 4px 8px;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        background: white;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    `;
+    btn.addEventListener('mouseenter', () => {
+        btn.style.background = '#f3f4f6';
+        btn.style.borderColor = '#9ca3af';
+    });
+    btn.addEventListener('mouseleave', () => {
+        btn.style.background = 'white';
+        btn.style.borderColor = '#d1d5db';
+    });
     btn.addEventListener('click', () => {
         // Open existing chord weights modal
         if (window.showChordWeightsModal) {
@@ -1753,12 +1807,14 @@ function switchTab(tabId) {
     modalState.activeTab = tabId;
     localStorage.setItem('unified-modal-active-tab', tabId);
 
-    // Update tab button styles
+    // Update tab button styles - now using pill-style tabs
     document.querySelectorAll('.unified-tab-btn').forEach(btn => {
         const isActive = btn.dataset.tab === tabId;
-        btn.style.borderBottomColor = isActive ? '#667eea' : 'transparent';
-        btn.style.color = isActive ? '#667eea' : '#6b7280';
-        btn.style.background = isActive ? 'white' : 'none';
+        if (isActive) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
     });
 
     renderActiveTab();
@@ -1997,6 +2053,7 @@ function renderSequenceIntent(container) {
 /**
  * Advanced Intent: Borrowed chords, secondary dominants, chromatic mediants
  * Exposes advanced harmonic techniques for users who want to explore beyond diatonic harmony
+ * Now context-aware: recommends and sorts chords based on the selected chord
  */
 function renderAdvancedIntent(container) {
     container.innerHTML = '';
@@ -2004,7 +2061,22 @@ function renderAdvancedIntent(container) {
     const key = getCurrentKey() || 'C';
     const progressionData = getProgressionData() || [];
 
-    // Header section
+    // Get selected chord context
+    const selectedIndex = modalState.selectedProgressionIndex;
+    const selectedChord = selectedIndex >= 0 && progressionData[selectedIndex]
+        ? progressionData[selectedIndex]
+        : null;
+
+    // Build context object for scoring
+    const context = {
+        selectedChord,
+        selectedIndex,
+        key,
+        progressionData,
+        hasContext: !!selectedChord
+    };
+
+    // Header section - context-aware
     const header = document.createElement('div');
     header.style.cssText = `
         background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
@@ -2013,15 +2085,33 @@ function renderAdvancedIntent(container) {
         padding: 12px 16px;
         margin-bottom: 16px;
     `;
-    header.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-            <span style="font-size: 18px;">✨</span>
-            <strong style="color: #5b21b6; font-size: 14px;">Advanced Harmonic Techniques</strong>
-        </div>
-        <p style="color: #6d28d9; font-size: 12px; margin: 0;">
-            Explore chords beyond the standard diatonic palette. These add color, tension, and sophistication to your progressions.
-        </p>
-    `;
+
+    if (selectedChord) {
+        const chordDef = CHORD_DEFINITIONS[selectedChord.type];
+        const symbol = chordDef?.symbol || '';
+        const spelledRoot = spellNoteInKey(selectedChord.root, key);
+        const selectedDisplay = `${spelledRoot}${symbol}`;
+
+        header.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                <span style="font-size: 18px;">✨</span>
+                <strong style="color: #5b21b6; font-size: 14px;">Advanced Chords to Follow ${selectedDisplay}</strong>
+            </div>
+            <p style="color: #6d28d9; font-size: 12px; margin: 0;">
+                <strong style="color: #7c3aed;">Recommended chords</strong> are sorted to the top of each section based on how well they follow <strong>${selectedDisplay}</strong> (position #${selectedIndex + 1}).
+            </p>
+        `;
+    } else {
+        header.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                <span style="font-size: 18px;">✨</span>
+                <strong style="color: #5b21b6; font-size: 14px;">Advanced Harmonic Techniques</strong>
+            </div>
+            <p style="color: #6d28d9; font-size: 12px; margin: 0;">
+                Explore chords beyond the standard diatonic palette. <strong>Select a chord</strong> from your progression above to see personalized recommendations.
+            </p>
+        `;
+    }
     container.appendChild(header);
 
     // Create tabbed sections for different categories
@@ -2029,21 +2119,153 @@ function renderAdvancedIntent(container) {
     sections.style.cssText = 'display: flex; flex-direction: column; gap: 16px;';
 
     // 1. Borrowed Chords Section
-    sections.appendChild(createAdvancedSection_BorrowedChords(key));
+    sections.appendChild(createAdvancedSection_BorrowedChords(key, context));
 
     // 2. Secondary Dominants Section
-    sections.appendChild(createAdvancedSection_SecondaryDominants(key));
+    sections.appendChild(createAdvancedSection_SecondaryDominants(key, context));
 
     // 3. Chromatic Mediants Section
-    sections.appendChild(createAdvancedSection_ChromaticMediants(key, progressionData));
+    sections.appendChild(createAdvancedSection_ChromaticMediants(key, context));
 
     container.appendChild(sections);
 }
 
 /**
+ * Score how well an advanced chord follows the selected chord
+ * Returns { score: 0-100, reasons: string[], isRecommended: boolean }
+ */
+function scoreAdvancedChordInContext(advancedChord, context, sectionType) {
+    if (!context.hasContext || !context.selectedChord) {
+        return { score: 0, reasons: [], isRecommended: false };
+    }
+
+    const { selectedChord, key } = context;
+    const reasons = [];
+    let score = 0;
+
+    // Normalize roots for comparison
+    const selectedRoot = normalizeNoteForComparison(selectedChord.root);
+    const advancedRoot = normalizeNoteForComparison(advancedChord.root);
+
+    // Calculate interval between selected chord root and advanced chord root
+    const ALL_NOTES_NORM = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const selectedIdx = ALL_NOTES_NORM.indexOf(selectedRoot);
+    const advancedIdx = ALL_NOTES_NORM.indexOf(advancedRoot);
+    const interval = (advancedIdx - selectedIdx + 12) % 12;
+
+    // === SCORING CRITERIA ===
+
+    // 1. Secondary Dominant resolving to selected chord's function
+    if (sectionType === 'secondary-dominant') {
+        // Check if this secondary dominant's target matches the selected chord
+        const target = advancedChord.numeral.replace('V7/', '');
+        const selectedType = selectedChord.type;
+        const isMinorSelected = selectedType === 'Minor' || selectedType === 'Minor 7th';
+
+        // Map scale degrees to intervals from tonic
+        const degreeIntervals = { 'ii': 2, 'iii': 4, 'IV': 5, 'V': 7, 'vi': 9 };
+        const targetInterval = degreeIntervals[target];
+
+        // Calculate what interval the selected chord is from the key
+        const keyIdx = ALL_NOTES_NORM.indexOf(normalizeNoteForComparison(key));
+        const selectedIntervalFromKey = (selectedIdx - keyIdx + 12) % 12;
+
+        // If the secondary dominant resolves TO the selected chord, it's a setup
+        if (targetInterval === selectedIntervalFromKey) {
+            score += 40;
+            reasons.push(`Sets up ${advancedChord.display} → ${selectedChord.root} resolution`);
+        }
+
+        // If selected chord could lead INTO this secondary dominant
+        // (selected is diatonic and this V7/x would be a natural next move)
+        if (interval === 5) { // Perfect 4th up (common approach)
+            score += 25;
+            reasons.push('Smooth voice leading from selected chord');
+        }
+        if (interval === 7) { // Perfect 5th up
+            score += 20;
+            reasons.push('Strong root motion by 5th');
+        }
+    }
+
+    // 2. Borrowed chords - evaluate modal color
+    if (sectionType === 'borrowed') {
+        // bVI after V creates deceptive cadence feel
+        if (advancedChord.numeral === 'bVI' && selectedChord.type?.includes('Dominant')) {
+            score += 45;
+            reasons.push('Classic deceptive cadence: V → bVI');
+        }
+        // bVII after I or IV is very common in rock/pop
+        if (advancedChord.numeral === 'bVII') {
+            if (interval === 10) { // bVII is whole step below
+                score += 30;
+                reasons.push('Natural mixolydian movement');
+            }
+        }
+        // iv after IV creates powerful minor plagal feel
+        if (advancedChord.numeral === 'iv' && selectedChord.type === 'Major' && interval === 0) {
+            score += 35;
+            reasons.push('Modal interchange: major to minor subdominant');
+        }
+        // bIII after I or vi
+        if (advancedChord.numeral === 'bIII') {
+            if (interval === 3) {
+                score += 30;
+                reasons.push('Colorful chromatic mediant relationship');
+            }
+        }
+        // Smooth voice leading (step-wise root motion)
+        if (interval === 1 || interval === 2 || interval === 10 || interval === 11) {
+            score += 15;
+            reasons.push('Smooth chromatic/step-wise root motion');
+        }
+    }
+
+    // 3. Chromatic mediants - evaluate dramatic shift potential
+    if (sectionType === 'chromatic-mediant') {
+        // Major 3rd relationships (interval 4 or 8)
+        if (interval === 4 || interval === 8) {
+            score += 40;
+            reasons.push('Major 3rd chromatic mediant: dramatic color shift');
+        }
+        // Minor 3rd relationships (interval 3 or 9)
+        if (interval === 3 || interval === 9) {
+            score += 35;
+            reasons.push('Minor 3rd chromatic mediant: rich harmonic color');
+        }
+        // Neapolitan (bII) works especially well before V or as surprise
+        if (advancedChord.numeral === 'bII') {
+            if (selectedChord.type?.includes('Dominant')) {
+                score += 30;
+                reasons.push('Neapolitan approach: unexpected before dominant');
+            }
+            score += 20;
+            reasons.push('Neapolitan chord: exotic, mysterious quality');
+        }
+    }
+
+    // 4. Universal bonuses
+    // Common tone bonus
+    const selectedNotes = getChordNotesForDisplay(selectedChord.root, selectedChord.type);
+    const advancedNotes = getChordNotesForDisplay(advancedChord.root, advancedChord.type);
+    const commonTones = selectedNotes.filter(n =>
+        advancedNotes.some(a => normalizeNoteForComparison(a) === normalizeNoteForComparison(n))
+    );
+    if (commonTones.length > 0) {
+        score += commonTones.length * 8;
+        reasons.push(`${commonTones.length} common tone${commonTones.length > 1 ? 's' : ''} for smooth voice leading`);
+    }
+
+    // Determine if recommended (threshold)
+    const isRecommended = score >= 25;
+
+    return { score, reasons, isRecommended };
+}
+
+/**
  * Create the Borrowed Chords section for the Advanced tab
  */
-function createAdvancedSection_BorrowedChords(key) {
+function createAdvancedSection_BorrowedChords(key, context) {
     const section = document.createElement('div');
     section.style.cssText = `
         background: white;
@@ -2089,10 +2311,18 @@ function createAdvancedSection_BorrowedChords(key) {
     `;
 
     // Get borrowed chords for the current key
-    const borrowedChords = generateBorrowedChordsForKey(key);
+    let borrowedChords = generateBorrowedChordsForKey(key);
+
+    // Score and sort by recommendation if we have context
+    if (context.hasContext) {
+        borrowedChords = borrowedChords.map(chord => ({
+            ...chord,
+            scoring: scoreAdvancedChordInContext(chord, context, 'borrowed')
+        })).sort((a, b) => b.scoring.score - a.scoring.score);
+    }
 
     borrowedChords.forEach(chord => {
-        const card = createAdvancedChordCard(chord, key);
+        const card = createAdvancedChordCard(chord, key, 'borrowed', context, chord.scoring);
         cardsContainer.appendChild(card);
     });
 
@@ -2103,7 +2333,7 @@ function createAdvancedSection_BorrowedChords(key) {
 /**
  * Create the Secondary Dominants section for the Advanced tab
  */
-function createAdvancedSection_SecondaryDominants(key) {
+function createAdvancedSection_SecondaryDominants(key, context) {
     const section = document.createElement('div');
     section.style.cssText = `
         background: white;
@@ -2149,10 +2379,18 @@ function createAdvancedSection_SecondaryDominants(key) {
     `;
 
     // Generate secondary dominants
-    const secondaryDominants = generateSecondaryDominantsForKey(key);
+    let secondaryDominants = generateSecondaryDominantsForKey(key);
+
+    // Score and sort by recommendation if we have context
+    if (context.hasContext) {
+        secondaryDominants = secondaryDominants.map(chord => ({
+            ...chord,
+            scoring: scoreAdvancedChordInContext(chord, context, 'secondary-dominant')
+        })).sort((a, b) => b.scoring.score - a.scoring.score);
+    }
 
     secondaryDominants.forEach(chord => {
-        const card = createAdvancedChordCard(chord, key);
+        const card = createAdvancedChordCard(chord, key, 'secondary-dominant', context, chord.scoring);
         cardsContainer.appendChild(card);
     });
 
@@ -2163,7 +2401,7 @@ function createAdvancedSection_SecondaryDominants(key) {
 /**
  * Create the Chromatic Mediants section for the Advanced tab
  */
-function createAdvancedSection_ChromaticMediants(key, progressionData) {
+function createAdvancedSection_ChromaticMediants(key, context) {
     const section = document.createElement('div');
     section.style.cssText = `
         background: white;
@@ -2209,10 +2447,18 @@ function createAdvancedSection_ChromaticMediants(key, progressionData) {
     `;
 
     // Generate chromatic mediants
-    const chromaticMediants = generateChromaticMediantsForKey(key);
+    let chromaticMediants = generateChromaticMediantsForKey(key);
+
+    // Score and sort by recommendation if we have context
+    if (context.hasContext) {
+        chromaticMediants = chromaticMediants.map(chord => ({
+            ...chord,
+            scoring: scoreAdvancedChordInContext(chord, context, 'chromatic-mediant')
+        })).sort((a, b) => b.scoring.score - a.scoring.score);
+    }
 
     chromaticMediants.forEach(chord => {
-        const card = createAdvancedChordCard(chord, key);
+        const card = createAdvancedChordCard(chord, key, 'chromatic-mediant', context, chord.scoring);
         cardsContainer.appendChild(card);
     });
 
@@ -2222,37 +2468,153 @@ function createAdvancedSection_ChromaticMediants(key, progressionData) {
 
 /**
  * Create a chord card for the advanced section
+ * @param {Object} chordInfo - Chord data object
+ * @param {string} key - Current key
+ * @param {string} sectionType - 'borrowed', 'secondary-dominant', or 'chromatic-mediant'
+ * @param {Object} context - Context object with selectedChord info
+ * @param {Object} scoring - Scoring result { score, reasons, isRecommended }
  */
-function createAdvancedChordCard(chordInfo, key) {
+function createAdvancedChordCard(chordInfo, key, sectionType, context, scoring) {
+    const isRecommended = scoring?.isRecommended || false;
+    const reasons = scoring?.reasons || [];
+
     const card = document.createElement('div');
-    card.style.cssText = `
-        background: white;
-        border: 1px solid #e5e7eb;
-        border-radius: 6px;
-        padding: 10px 12px;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        transition: all 0.15s;
-        cursor: pointer;
-    `;
+
+    // Different styling for recommended vs non-recommended cards
+    if (isRecommended) {
+        card.style.cssText = `
+            background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+            border: 2px solid #22c55e;
+            border-radius: 6px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: all 0.15s;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(34, 197, 94, 0.15);
+        `;
+    } else {
+        card.style.cssText = `
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: all 0.15s;
+            cursor: pointer;
+        `;
+    }
+
+    const defaultBorderColor = isRecommended ? '#22c55e' : '#e5e7eb';
+    const defaultBoxShadow = isRecommended ? '0 2px 8px rgba(34, 197, 94, 0.15)' : 'none';
 
     card.addEventListener('mouseenter', () => {
         card.style.borderColor = '#a78bfa';
-        card.style.boxShadow = '0 2px 8px rgba(139, 92, 246, 0.15)';
+        card.style.boxShadow = '0 2px 8px rgba(139, 92, 246, 0.25)';
     });
     card.addEventListener('mouseleave', () => {
-        card.style.borderColor = '#e5e7eb';
-        card.style.boxShadow = 'none';
+        card.style.borderColor = defaultBorderColor;
+        card.style.boxShadow = defaultBoxShadow;
     });
 
-    // Chord name and numeral
+    // Recommended badge row (if recommended)
+    if (isRecommended && context?.selectedChord) {
+        const chordDef = CHORD_DEFINITIONS[context.selectedChord.type];
+        const symbol = chordDef?.symbol || '';
+        const selectedDisplay = `${context.selectedChord.root}${symbol}`;
+
+        const badgeRow = document.createElement('div');
+        badgeRow.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 2px;
+        `;
+        badgeRow.innerHTML = `
+            <span style="
+                background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+                color: white;
+                font-size: 9px;
+                font-weight: 600;
+                padding: 2px 6px;
+                border-radius: 3px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            ">Recommended</span>
+            <span style="font-size: 10px; color: #16a34a;">after ${selectedDisplay}</span>
+        `;
+        card.appendChild(badgeRow);
+    }
+
+    // Top row: Info button, chord name, and numeral
     const topRow = document.createElement('div');
     topRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center;';
 
+    // Left side: Info button + chord name
+    const leftSide = document.createElement('div');
+    leftSide.style.cssText = 'display: flex; align-items: center; gap: 6px;';
+
+    // Info button for tooltip
+    const infoBtn = document.createElement('button');
+    infoBtn.textContent = '?';
+    infoBtn.title = 'Learn more about this technique';
+    infoBtn.style.cssText = `
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 1px solid #a78bfa;
+        background: #f5f3ff;
+        color: #7c3aed;
+        font-size: 10px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.15s;
+        flex-shrink: 0;
+    `;
+    infoBtn.addEventListener('mouseenter', () => {
+        infoBtn.style.background = '#7c3aed';
+        infoBtn.style.color = 'white';
+    });
+    infoBtn.addEventListener('mouseleave', () => {
+        infoBtn.style.background = '#f5f3ff';
+        infoBtn.style.color = '#7c3aed';
+    });
+    infoBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Build the item object for the tooltip modal
+        const item = {
+            chordRoot: chordInfo.root,
+            chordType: chordInfo.type,
+            key: key,
+            // Pass context and scoring for recommendation explanation
+            contextChord: context?.selectedChord || null,
+            recommendationReasons: reasons,
+            isRecommended: isRecommended
+        };
+
+        if (sectionType === 'borrowed') {
+            item.type = 'modal-interchange';
+            item.borrowedFrom = chordInfo.source;
+        } else if (sectionType === 'secondary-dominant') {
+            item.type = 'secondary-dominant';
+            // Extract target from numeral (e.g., 'V7/ii' -> 'ii')
+            item.target = chordInfo.numeral.replace('V7/', '');
+        } else if (sectionType === 'chromatic-mediant') {
+            item.type = 'chromatic-mediant';
+            item.mediantDetails = { type: chordInfo.source };
+        }
+
+        showAdvancedExplanationModal(item);
+    });
+    leftSide.appendChild(infoBtn);
+
     const chordName = document.createElement('span');
-    chordName.style.cssText = 'font-weight: 600; font-size: 14px; color: #1f2937;';
+    chordName.style.cssText = `font-weight: 600; font-size: 14px; color: ${isRecommended ? '#166534' : '#1f2937'};`;
     chordName.textContent = chordInfo.display;
+    leftSide.appendChild(chordName);
 
     const numeral = document.createElement('span');
     numeral.style.cssText = `
@@ -2265,18 +2627,35 @@ function createAdvancedChordCard(chordInfo, key) {
     `;
     numeral.textContent = chordInfo.numeral;
 
-    topRow.appendChild(chordName);
+    topRow.appendChild(leftSide);
     topRow.appendChild(numeral);
     card.appendChild(topRow);
 
+    // Recommendation reasons (if recommended, show first reason)
+    if (isRecommended && reasons.length > 0) {
+        const reasonsDiv = document.createElement('div');
+        reasonsDiv.style.cssText = `
+            font-size: 10px;
+            color: #15803d;
+            background: #dcfce7;
+            padding: 4px 8px;
+            border-radius: 4px;
+            line-height: 1.3;
+        `;
+        // Show first reason, or first two if short
+        const displayReasons = reasons.slice(0, 2).join(' • ');
+        reasonsDiv.textContent = displayReasons;
+        card.appendChild(reasonsDiv);
+    }
+
     // Description
     const description = document.createElement('div');
-    description.style.cssText = 'font-size: 11px; color: #6b7280; line-height: 1.3;';
+    description.style.cssText = `font-size: 11px; color: ${isRecommended ? '#166534' : '#6b7280'}; line-height: 1.3;`;
     description.textContent = chordInfo.description;
     card.appendChild(description);
 
-    // Source/mode if applicable
-    if (chordInfo.source) {
+    // Source/mode if applicable (hide if recommended to save space)
+    if (chordInfo.source && !isRecommended) {
         const source = document.createElement('div');
         source.style.cssText = 'font-size: 10px; color: #9ca3af; font-style: italic;';
         source.textContent = chordInfo.source;
@@ -2295,9 +2674,9 @@ function createAdvancedChordCard(chordInfo, key) {
         width: 28px;
         height: 28px;
         border-radius: 50%;
-        background: #dbeafe;
-        color: #1d4ed8;
-        border: 1px solid #bfdbfe;
+        background: ${isRecommended ? '#bbf7d0' : '#dbeafe'};
+        color: ${isRecommended ? '#166534' : '#1d4ed8'};
+        border: 1px solid ${isRecommended ? '#86efac' : '#bfdbfe'};
         cursor: pointer;
         font-size: 10px;
         transition: all 0.15s;
@@ -2313,9 +2692,9 @@ function createAdvancedChordCard(chordInfo, key) {
         width: 28px;
         height: 28px;
         border-radius: 50%;
-        background: #e0e7ff;
-        color: #4338ca;
-        border: 1px solid #c7d2fe;
+        background: ${isRecommended ? '#22c55e' : '#e0e7ff'};
+        color: ${isRecommended ? 'white' : '#4338ca'};
+        border: 1px solid ${isRecommended ? '#16a34a' : '#c7d2fe'};
         cursor: pointer;
         font-size: 14px;
         font-weight: 600;
@@ -2350,7 +2729,7 @@ function generateBorrowedChordsForKey(key) {
     const bIII = ALL_NOTES[(keyIndex + 3) % 12];
     borrowed.push({
         root: bIII,
-        type: 'major',
+        type: 'Major',
         display: `${spellNoteInKey(bIII, key)}`,
         numeral: 'bIII',
         description: 'Major chord on flat third - adds brightness in minor contexts',
@@ -2361,7 +2740,7 @@ function generateBorrowedChordsForKey(key) {
     const iv = ALL_NOTES[(keyIndex + 5) % 12];
     borrowed.push({
         root: iv,
-        type: 'minor',
+        type: 'Minor',
         display: `${spellNoteInKey(iv, key)}m`,
         numeral: 'iv',
         description: 'Minor subdominant - adds melancholy touch',
@@ -2372,7 +2751,7 @@ function generateBorrowedChordsForKey(key) {
     const bVI = ALL_NOTES[(keyIndex + 8) % 12];
     borrowed.push({
         root: bVI,
-        type: 'major',
+        type: 'Major',
         display: `${spellNoteInKey(bVI, key)}`,
         numeral: 'bVI',
         description: 'Dramatic, uplifting - the "deceptive" cadence target',
@@ -2383,7 +2762,7 @@ function generateBorrowedChordsForKey(key) {
     const bVII = ALL_NOTES[(keyIndex + 10) % 12];
     borrowed.push({
         root: bVII,
-        type: 'major',
+        type: 'Major',
         display: `${spellNoteInKey(bVII, key)}`,
         numeral: 'bVII',
         description: 'Rock/folk staple - bluesy, earthy feel',
@@ -2395,7 +2774,7 @@ function generateBorrowedChordsForKey(key) {
     const IV = ALL_NOTES[(keyIndex + 5) % 12];
     borrowed.push({
         root: IV,
-        type: 'major',
+        type: 'Major',
         display: `${spellNoteInKey(IV, key)}`,
         numeral: 'IV',
         description: 'Major subdominant in minor - Dorian brightness',
@@ -2407,7 +2786,7 @@ function generateBorrowedChordsForKey(key) {
     const sharpIV = ALL_NOTES[(keyIndex + 6) % 12];
     borrowed.push({
         root: sharpIV,
-        type: 'diminished',
+        type: 'Diminished',
         display: `${spellNoteInKey(sharpIV, key)}°`,
         numeral: '#iv°',
         description: 'Creates dreamy, floating quality',
@@ -2432,7 +2811,7 @@ function generateSecondaryDominantsForKey(key) {
     const VofII = ALL_NOTES[(keyIndex + 9) % 12]; // A in key of C
     secondaryDoms.push({
         root: VofII,
-        type: 'dominant7',
+        type: 'Dominant 7th',
         display: `${spellNoteInKey(VofII, key)}7`,
         numeral: 'V7/ii',
         description: `Pulls strongly to ${spellNoteInKey(ii, key)}m`,
@@ -2445,7 +2824,7 @@ function generateSecondaryDominantsForKey(key) {
     const VofIII = ALL_NOTES[(keyIndex + 11) % 12]; // B in key of C
     secondaryDoms.push({
         root: VofIII,
-        type: 'dominant7',
+        type: 'Dominant 7th',
         display: `${spellNoteInKey(VofIII, key)}7`,
         numeral: 'V7/iii',
         description: `Pulls strongly to ${spellNoteInKey(iii, key)}m`,
@@ -2458,7 +2837,7 @@ function generateSecondaryDominantsForKey(key) {
     const VofIV = ALL_NOTES[(keyIndex + 0) % 12]; // C in key of C (I7)
     secondaryDoms.push({
         root: VofIV,
-        type: 'dominant7',
+        type: 'Dominant 7th',
         display: `${spellNoteInKey(VofIV, key)}7`,
         numeral: 'V7/IV',
         description: `Pulls strongly to ${spellNoteInKey(IV, key)} - bluesy!`,
@@ -2471,7 +2850,7 @@ function generateSecondaryDominantsForKey(key) {
     const VofV = ALL_NOTES[(keyIndex + 2) % 12]; // D in key of C
     secondaryDoms.push({
         root: VofV,
-        type: 'dominant7',
+        type: 'Dominant 7th',
         display: `${spellNoteInKey(VofV, key)}7`,
         numeral: 'V7/V',
         description: `The classic - pulls to ${spellNoteInKey(V, key)}`,
@@ -2484,7 +2863,7 @@ function generateSecondaryDominantsForKey(key) {
     const VofVI = ALL_NOTES[(keyIndex + 4) % 12]; // E in key of C
     secondaryDoms.push({
         root: VofVI,
-        type: 'dominant7',
+        type: 'Dominant 7th',
         display: `${spellNoteInKey(VofVI, key)}7`,
         numeral: 'V7/vi',
         description: `Pulls strongly to ${spellNoteInKey(vi, key)}m`,
@@ -2508,7 +2887,7 @@ function generateChromaticMediantsForKey(key) {
     const upperMajor = ALL_NOTES[(keyIndex + 4) % 12]; // E in C (but as major)
     mediants.push({
         root: upperMajor,
-        type: 'major',
+        type: 'Major',
         display: `${spellNoteInKey(upperMajor, key)}`,
         numeral: 'III',
         description: 'Bright, cinematic shift upward',
@@ -2520,7 +2899,7 @@ function generateChromaticMediantsForKey(key) {
     const lowerMajor = ALL_NOTES[(keyIndex + 8) % 12]; // Ab in C
     mediants.push({
         root: lowerMajor,
-        type: 'major',
+        type: 'Major',
         display: `${spellNoteInKey(lowerMajor, key)}`,
         numeral: 'bVI',
         description: 'Dramatic, unexpected shift down',
@@ -2532,7 +2911,7 @@ function generateChromaticMediantsForKey(key) {
     const upperMinor = ALL_NOTES[(keyIndex + 3) % 12]; // Eb in C
     mediants.push({
         root: upperMinor,
-        type: 'major',
+        type: 'Major',
         display: `${spellNoteInKey(upperMinor, key)}`,
         numeral: 'bIII',
         description: 'Rich, colorful shift - film score favorite',
@@ -2543,7 +2922,7 @@ function generateChromaticMediantsForKey(key) {
     const lowerMinor = ALL_NOTES[(keyIndex + 9) % 12]; // A in C
     mediants.push({
         root: lowerMinor,
-        type: 'major',
+        type: 'Major',
         display: `${spellNoteInKey(lowerMinor, key)}`,
         numeral: 'VI',
         description: 'Bold, confident shift',
@@ -2555,7 +2934,7 @@ function generateChromaticMediantsForKey(key) {
     const bII = ALL_NOTES[(keyIndex + 1) % 12]; // Db in C (Neapolitan)
     mediants.push({
         root: bII,
-        type: 'major',
+        type: 'Major',
         display: `${spellNoteInKey(bII, key)}`,
         numeral: 'bII',
         description: 'Neapolitan - exotic, mysterious quality',
@@ -4942,28 +5321,78 @@ function showAdvancedExplanationModal(item) {
     const existingModal = document.getElementById('advanced-explanation-modal');
     if (existingModal) existingModal.remove();
 
-    const { type, chordRoot, chordType, key, borrowedFrom, target, mediantDetails } = item;
+    const { type, chordRoot, chordType, key, borrowedFrom, target, mediantDetails,
+            contextChord, recommendationReasons, isRecommended } = item;
     const chordSymbol = CHORD_DEFINITIONS[chordType]?.symbol || '';
     const chordName = `${chordRoot}${chordSymbol}`;
 
+    // All available keys for the selector
+    const allKeys = ['C', 'C#', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
     // Generate content based on type
-    let content = '';
     let title = '';
     let headerGradient = '';
 
     if (type === 'modal-interchange') {
         title = `Modal Interchange: ${chordName}`;
         headerGradient = 'from-violet-600 to-purple-600';
-        content = generateModalInterchangeExplanation(chordRoot, chordType, key, borrowedFrom);
     } else if (type === 'secondary-dominant') {
         title = `Secondary Dominant: ${chordName}`;
         headerGradient = 'from-amber-500 to-orange-500';
-        content = generateSecondaryDominantExplanation(chordRoot, chordType, key, target);
     } else if (type === 'chromatic-mediant') {
         title = `Chromatic Mediant: ${chordName}`;
         headerGradient = 'from-cyan-500 to-teal-500';
-        content = generateChromaticMediantExplanation(chordRoot, chordType, key, mediantDetails);
     }
+
+    // Build context chord display name
+    let contextDisplay = '';
+    if (contextChord) {
+        const contextSymbol = CHORD_DEFINITIONS[contextChord.type]?.symbol || '';
+        contextDisplay = `${contextChord.root}${contextSymbol}`;
+    }
+
+    // Generate recommendation section HTML
+    const generateRecommendationSection = () => {
+        if (!isRecommended || !recommendationReasons || recommendationReasons.length === 0) {
+            return '';
+        }
+
+        const reasonsList = recommendationReasons.map(r => `<li class="flex items-start gap-2"><span class="text-emerald-500 mt-0.5">✓</span><span>${r}</span></li>`).join('');
+
+        return `
+            <div class="bg-emerald-50 rounded-lg p-4 border-2 border-emerald-300 mb-4">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="bg-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded uppercase">Recommended</span>
+                    <span class="text-emerald-700 text-sm font-medium">after ${contextDisplay}</span>
+                </div>
+                <h4 class="font-semibold text-emerald-800 mb-2">Why This Chord Works Here</h4>
+                <ul class="text-sm text-emerald-700 space-y-1">
+                    ${reasonsList}
+                </ul>
+            </div>
+        `;
+    };
+
+    // Function to generate content based on selected key
+    const generateContent = (selectedKey) => {
+        const recommendationHTML = generateRecommendationSection();
+        let explanationHTML = '';
+
+        if (type === 'modal-interchange') {
+            explanationHTML = generateModalInterchangeExplanation(chordRoot, chordType, selectedKey, borrowedFrom);
+        } else if (type === 'secondary-dominant') {
+            explanationHTML = generateSecondaryDominantExplanation(chordRoot, chordType, selectedKey, target);
+        } else if (type === 'chromatic-mediant') {
+            explanationHTML = generateChromaticMediantExplanation(chordRoot, chordType, selectedKey, mediantDetails);
+        }
+
+        return recommendationHTML + explanationHTML;
+    };
+
+    // Build key selector dropdown options
+    const keyOptions = allKeys.map(k =>
+        `<option value="${k}" ${k === key ? 'selected' : ''}>${k}</option>`
+    ).join('');
 
     const modalHTML = `
         <div id="advanced-explanation-modal" class="fixed inset-0 flex items-center justify-center p-4" style="background: rgba(0,0,0,0.6); z-index: 100001;">
@@ -4972,7 +5401,13 @@ function showAdvancedExplanationModal(item) {
                 <div class="bg-gradient-to-r ${headerGradient} px-6 py-4 flex items-center justify-between">
                     <div>
                         <h2 class="text-lg font-bold text-white">${title}</h2>
-                        <p class="text-white/80 text-sm">Key of ${key} major</p>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="text-white/80 text-sm">Key of</span>
+                            <select id="advanced-modal-key-selector" class="bg-white text-gray-900 text-sm rounded px-2 py-0.5 border border-white/30 cursor-pointer hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50">
+                                ${keyOptions}
+                            </select>
+                            <span class="text-white/80 text-sm">major</span>
+                        </div>
                     </div>
                     <button id="close-advanced-modal" class="text-white/80 hover:text-white transition-colors">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4982,12 +5417,13 @@ function showAdvancedExplanationModal(item) {
                 </div>
 
                 <!-- Content -->
-                <div class="p-6 overflow-y-auto flex-1">
-                    ${content}
+                <div id="advanced-modal-content" class="p-6 overflow-y-auto flex-1">
+                    ${generateContent(key)}
                 </div>
 
                 <!-- Footer -->
-                <div class="px-6 py-4 bg-gray-50 border-t flex justify-end">
+                <div class="px-6 py-4 bg-gray-50 border-t flex items-center justify-between">
+                    <span class="text-xs text-gray-500">Change the key to see examples in different keys</span>
                     <button id="dismiss-advanced-modal" class="px-4 py-2 bg-gradient-to-r ${headerGradient} text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium">
                         Got it!
                     </button>
@@ -5002,6 +5438,8 @@ function showAdvancedExplanationModal(item) {
     const modal = document.getElementById('advanced-explanation-modal');
     const closeBtn = document.getElementById('close-advanced-modal');
     const dismissBtn = document.getElementById('dismiss-advanced-modal');
+    const keySelector = document.getElementById('advanced-modal-key-selector');
+    const contentEl = document.getElementById('advanced-modal-content');
 
     const closeModal = () => modal.remove();
 
@@ -5009,6 +5447,12 @@ function showAdvancedExplanationModal(item) {
     dismissBtn.addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => {
         if (e.target === modal) closeModal();
+    });
+
+    // Key selector change handler - update content in real-time
+    keySelector.addEventListener('change', (e) => {
+        const selectedKey = e.target.value;
+        contentEl.innerHTML = generateContent(selectedKey);
     });
 
     const handleEscape = (e) => {
@@ -7384,45 +7828,43 @@ function renderMelodyPhrasesView(container, currentChord, key) {
         modalState.melodySelectedChordEnd = -1; // Single chord selection
     }
 
-    // Position Mode Toggle (Add to End vs Add for Section)
+    // Position Mode Toggle (Add to End vs Add for Section) - compact version
     const positionModeSection = document.createElement('div');
     positionModeSection.style.cssText = `
         display: flex;
-        gap: 4px;
-        padding: 4px;
+        gap: 2px;
+        padding: 2px;
         background: #e5e7eb;
-        border-radius: 8px;
-        margin-bottom: 12px;
+        border-radius: 6px;
+        margin-bottom: 8px;
     `;
 
     positionModeSection.innerHTML = `
         <button id="melody-pos-end" class="melody-pos-btn" data-mode="end" style="
             flex: 1;
-            padding: 10px 16px;
-            border: ${isEndMode ? '2px solid #3b82f6' : '2px solid transparent'};
-            border-radius: 6px;
-            font-size: 13px;
+            padding: 5px 10px;
+            border: ${isEndMode ? '1px solid #3b82f6' : '1px solid transparent'};
+            border-radius: 4px;
+            font-size: 11px;
             font-weight: ${isEndMode ? '600' : '500'};
             cursor: pointer;
             transition: all 0.15s ease;
             background: ${isEndMode ? 'white' : 'transparent'};
             color: ${isEndMode ? '#3b82f6' : '#6b7280'};
-            box-shadow: ${isEndMode ? '0 2px 4px rgba(59, 130, 246, 0.2)' : 'none'};
         ">
             Add to End
         </button>
         <button id="melody-pos-section" class="melody-pos-btn" data-mode="section" style="
             flex: 1;
-            padding: 10px 16px;
-            border: ${isSectionMode ? '2px solid #3b82f6' : '2px solid transparent'};
-            border-radius: 6px;
-            font-size: 13px;
+            padding: 5px 10px;
+            border: ${isSectionMode ? '1px solid #3b82f6' : '1px solid transparent'};
+            border-radius: 4px;
+            font-size: 11px;
             font-weight: ${isSectionMode ? '600' : '500'};
             cursor: pointer;
             transition: all 0.15s ease;
             background: ${isSectionMode ? 'white' : 'transparent'};
             color: ${isSectionMode ? '#3b82f6' : '#6b7280'};
-            box-shadow: ${isSectionMode ? '0 2px 4px rgba(59, 130, 246, 0.2)' : 'none'};
         ">
             Add for Section
         </button>
@@ -7433,11 +7875,11 @@ function renderMelodyPhrasesView(container, currentChord, key) {
     if (isSectionMode) {
         const selectorWrapper = document.createElement('div');
         selectorWrapper.style.cssText = `
-            margin-bottom: 12px;
-            padding: 12px;
+            margin-bottom: 8px;
+            padding: 6px 10px;
             background: #eff6ff;
             border: 1px solid #bfdbfe;
-            border-radius: 8px;
+            border-radius: 6px;
         `;
 
         // Calculate selection info
@@ -7463,7 +7905,7 @@ function renderMelodyPhrasesView(container, currentChord, key) {
         const totalBeats = getSelectedDuration();
 
         const selectorLabel = document.createElement('div');
-        selectorLabel.style.cssText = 'font-size: 12px; font-weight: 600; color: #1e40af; margin-bottom: 4px;';
+        selectorLabel.style.cssText = 'font-size: 11px; font-weight: 600; color: #1e40af;';
         if (hasSelection) {
             if (isMultiChord) {
                 selectorLabel.innerHTML = `🎼 Generating melody for <strong>${selectionCount} chords</strong> (#${startIdx + 1} - #${endIdx + 1}) · ${totalBeats} beats`;
@@ -7478,12 +7920,6 @@ function renderMelodyPhrasesView(container, currentChord, key) {
             selectorLabel.textContent = '🎼 Select chord(s) from the Progression picker above';
         }
         selectorWrapper.appendChild(selectorLabel);
-
-        const selectorHint = document.createElement('div');
-        selectorHint.style.cssText = 'font-size: 10px; color: #6b7280; margin-bottom: 8px;';
-        selectorHint.innerHTML = '💡 <strong>Tip:</strong> Use <strong>Shift+Click</strong> in the Progression bar above to select multiple consecutive chords';
-        selectorWrapper.appendChild(selectorHint);
-
         container.appendChild(selectorWrapper);
     }
 
@@ -7662,18 +8098,10 @@ function renderMelodyPhrasesView(container, currentChord, key) {
     `;
 
     controlsSection.innerHTML = `
-        <!-- Group 1: Style & Character -->
+        <!-- Group 1: Character -->
         <div style="${groupStyle}">
-            <div style="${groupHeaderStyle}">Style & Character</div>
+            <div style="${groupHeaderStyle}">Character</div>
             <div style="${groupContentStyle}">
-                <div style="${controlRowStyle}">
-                    <label style="${labelStyle}">Genre</label>
-                    <select id="phrase-style-select" style="${selectStyle}">
-                        ${melodyStyleOptions.map(s => `
-                            <option value="${s.id}" ${s.id === modalState.melodyStyleId ? 'selected' : ''}>${s.label}</option>
-                        `).join('')}
-                    </select>
-                </div>
                 <div style="${controlRowStyle}">
                     <label style="${labelStyle}">Section</label>
                     <select id="phrase-section-select" style="${selectStyle}" ${autoDetectedSectionType ? 'title="Auto-detected from selected chord"' : ''}>
@@ -7800,13 +8228,7 @@ function setupPhraseControlListeners(currentChord, key, phrasesContainer) {
         }
     };
 
-    if (styleSelect) {
-        styleSelect.addEventListener('change', () => {
-            modalState.melodyStyleId = styleSelect.value;
-            localStorage.setItem('melody-suggestion-style', styleSelect.value);
-            updateAndRegenerate();
-        });
-    }
+    // Note: Genre selector removed - melody now uses global Style setting
 
     if (sectionSelect) {
         sectionSelect.addEventListener('change', () => {
@@ -7951,8 +8373,8 @@ function generateAndDisplayPhrases(container, chord, key) {
             outro: 'pop',
             prechorus: 'pop'
         };
-        // Prefer the user-selected melody style, fall back to section-based mapping
-        const styleId = modalState.melodyStyleId || sectionStyleMap[effectiveSectionType] || 'any';
+        // Use global style setting (from context bar), fall back to section-based mapping
+        const styleId = modalState.style || sectionStyleMap[effectiveSectionType] || 'balanced';
 
         // Log style and mood for debugging
         console.log(`[Melody Tab] Generating phrases with styleId: ${styleId}, mood: ${modalState.mood}`);

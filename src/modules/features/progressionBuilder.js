@@ -4208,12 +4208,15 @@ function renderSectionAwareCardsScroll(gridContainer, progressionData, key, opti
         gridContainer.appendChild(buttonContainer);
     }
 
-    // Track if we have any sections (to show ungrouped drop zone)
+    // Track if we have any sections and ungrouped chords
     const hasSections = sections.length > 0;
     let ungroupedZone = null;
 
-    // Create ungrouped zone if there are sections (so cards can be dragged out)
-    if (hasSections) {
+    // Check if there are any ungrouped chords (chords not in any section)
+    const hasUngroupedChords = progressionData.some((_, idx) => !chordToSection.has(idx));
+
+    // Create ungrouped zone only if there are sections AND ungrouped chords
+    if (hasSections && hasUngroupedChords) {
         ungroupedZone = document.createElement('div');
         ungroupedZone.className = 'ungrouped-drop-zone flex flex-col rounded-lg overflow-visible flex-shrink-0';
         ungroupedZone.style.cssText = `
@@ -4443,12 +4446,15 @@ function renderSectionAwareCards(gridContainer, progressionData, key, options = 
         gridContainer.appendChild(buttonContainer);
     }
 
-    // Track if we have any sections (to show ungrouped drop zone)
+    // Track if we have any sections and ungrouped chords
     const hasSections = sections.length > 0;
     let ungroupedZone = null;
 
-    // Create ungrouped zone if there are sections (so cards can be dragged out)
-    if (hasSections) {
+    // Check if there are any ungrouped chords (chords not in any section)
+    const hasUngroupedChords = progressionData.some((_, idx) => !chordToSection.has(idx));
+
+    // Create ungrouped zone only if there are sections AND ungrouped chords
+    if (hasSections && hasUngroupedChords) {
         ungroupedZone = document.createElement('div');
         ungroupedZone.className = 'ungrouped-drop-zone flex flex-col rounded-lg overflow-visible';
         ungroupedZone.style.cssText = `
@@ -5659,17 +5665,8 @@ function createSimplifiedCardStructure(chord, index, key) {
     const cardElement = cardStructure ? cardStructure.querySelector('.simplified-card') : null;
 
     if (cardElement) {
-        // Create and add tooltip to the card's parent (which is the wrapper)
-        const tooltipElement = createTooltipElement(chord, index, key);
-        if (tooltipElement) {
-            // Insert tooltip after the simplified-card but before duration controls
-            const durationControls = cardStructure.querySelector('.flex.items-center.justify-center.gap-1.mt-1');
-            if (durationControls) {
-                cardStructure.insertBefore(tooltipElement, durationControls);
-            } else {
-                cardStructure.appendChild(tooltipElement);
-            }
-        }
+        // Create tooltip (appended to body for z-index escape)
+        createTooltipElement(chord, index, key);
     }
 
     fragment.appendChild(controlBar);
@@ -5720,10 +5717,18 @@ function createTooltipElement(chord, index, key) {
         `);
     }
 
+    // Remove any existing tooltip for this index (cleanup on re-render)
+    const existingTooltip = document.querySelector(`.chord-tooltip[data-chord-index="${index}"]`);
+    if (existingTooltip) {
+        existingTooltip.remove();
+    }
+
     const tooltip = document.createElement('div');
-    tooltip.className = 'chord-tooltip hidden absolute bg-gray-800 border-2 border-indigo-500 rounded-lg shadow-xl p-4 pointer-events-auto';
-    // Default to above; will be repositioned based on container when shown
-    tooltip.style.cssText = 'z-index: 99999; left: 50%; transform: translateX(-50%); min-width: 250px; max-width: 350px;';
+    tooltip.className = 'chord-tooltip hidden bg-gray-800 border-2 border-indigo-500 rounded-lg shadow-xl p-4 pointer-events-auto';
+    tooltip.style.cssText = 'position: fixed; z-index: 999999; min-width: 250px; max-width: 350px;';
+    tooltip.setAttribute('data-chord-index', index);
+    // Append to body to escape all containers
+    document.body.appendChild(tooltip);
     tooltip.innerHTML = `
         <!-- Close button for touch devices -->
         <button class="tooltip-close-btn absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center text-white text-sm font-bold transition bg-gray-700 hover:bg-gray-600" title="Close">×</button>
@@ -6341,9 +6346,10 @@ function attachCardEventListeners(wrapper, index) {
 
     // === SIMPLIFIED CARD INTERACTIVE TOOLTIP ===
     const simplifiedCard = wrapper.querySelector('.simplified-card');
-    const chordTooltip = wrapper.querySelector('.chord-tooltip');
+    // Tooltip is now on body, find it by data-chord-index
+    const chordTooltip = document.querySelector(`.chord-tooltip[data-chord-index="${index}"]`);
     const infoTooltipBtn = wrapper.querySelector('.info-tooltip-btn');
-    const tooltipInversionBtns = wrapper.querySelectorAll('.tooltip-inversion-btn');
+    const tooltipInversionBtns = chordTooltip ? chordTooltip.querySelectorAll('.tooltip-inversion-btn') : [];
 
     // Get the card wrapper (parent of simplified-card) for hover events
     const cardWrapper = simplifiedCard ? simplifiedCard.parentElement : null;
@@ -6353,6 +6359,27 @@ function attachCardEventListeners(wrapper, index) {
         let isTooltipPinned = false;
         let hideTimeout = null;
         let inversionWasChanged = false; // Track if inversion was changed during this tooltip session
+        let isOverCard = false;
+        let isOverTooltip = false;
+        const ensureTooltipVisible = () => {
+            if (!isTooltipPinned && chordTooltip.classList.contains('hidden') && !tooltipTimeout) {
+                tooltipTimeout = setTimeout(() => {
+                    showTooltip();
+                }, 120); // quick recovery show
+            }
+        };
+
+        const scheduleHideTooltip = () => {
+            if (hideTimeout) {
+                clearTimeout(hideTimeout);
+            }
+            hideTimeout = setTimeout(() => {
+                const shouldHide = !isOverCard && !isOverTooltip;
+                if (shouldHide) {
+                    hideTooltip();
+                }
+            }, 350); // Grace period to allow moving between card and tooltip
+        };
 
         const showTooltip = () => {
             if (hideTimeout) {
@@ -6362,63 +6389,66 @@ function attachCardEventListeners(wrapper, index) {
             // Reset the change flag when tooltip opens
             inversionWasChanged = false;
 
-            // Detect which container we're in to position tooltip appropriately
-            const isBuilderTab = wrapper.closest('#builder-progression-panel') !== null;
+            const rect = wrapper.getBoundingClientRect();
             const arrow = chordTooltip.querySelector('.tooltip-arrow');
 
-            if (isBuilderTab) {
-                // Position tooltip BELOW the card on Builder tab (to avoid keyboard)
-                chordTooltip.style.top = '100%';
-                chordTooltip.style.bottom = 'auto';
-                chordTooltip.style.marginTop = '8px';
-                chordTooltip.style.marginBottom = '0';
-                // Arrow points UP (at top of tooltip)
-                if (arrow) {
-                    arrow.style.top = '-8px';
-                    arrow.style.bottom = 'auto';
-                    arrow.style.borderBottom = '8px solid #6366f1'; // indigo-500
-                    arrow.style.borderTop = 'none';
-                }
-            } else {
-                // Position tooltip ABOVE the card on other tabs
-                chordTooltip.style.bottom = '100%';
-                chordTooltip.style.top = 'auto';
-                chordTooltip.style.marginBottom = '8px';
-                chordTooltip.style.marginTop = '0';
-                // Arrow points DOWN (at bottom of tooltip)
+            // Show tooltip to measure it
+            chordTooltip.classList.remove('hidden');
+            const tooltipRect = chordTooltip.getBoundingClientRect();
+
+            // Center horizontally on the card
+            let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+            left = Math.max(8, Math.min(left, window.innerWidth - tooltipRect.width - 8));
+            chordTooltip.style.left = `${left}px`;
+
+            const margin = 8;
+            const availableAbove = rect.top;
+            const availableBelow = window.innerHeight - rect.bottom;
+            // Prefer placing above; fall back to below only if there's clearly more space below
+            const placeAbove = availableAbove >= tooltipRect.height + margin || availableAbove >= availableBelow;
+
+            if (placeAbove) {
+                chordTooltip.style.top = `${rect.top - tooltipRect.height - margin}px`;
                 if (arrow) {
                     arrow.style.bottom = '-8px';
                     arrow.style.top = 'auto';
-                    arrow.style.borderTop = '8px solid #6366f1'; // indigo-500
+                    arrow.style.borderTop = '8px solid #6366f1';
                     arrow.style.borderBottom = 'none';
                 }
+            } else {
+                chordTooltip.style.top = `${rect.bottom + margin}px`;
+                if (arrow) {
+                    arrow.style.top = '-8px';
+                    arrow.style.bottom = 'auto';
+                    arrow.style.borderBottom = '8px solid #6366f1';
+                    arrow.style.borderTop = 'none';
+                }
             }
-
-            chordTooltip.classList.remove('hidden');
         };
 
         const hideTooltip = () => {
-            if (!isTooltipPinned) {
-                // Longer delay before hiding to allow mouse to move to tooltip
-                hideTimeout = setTimeout(() => {
-                    chordTooltip.classList.add('hidden');
-                    // Update the card UI after tooltip closes to show any inversion changes
-                    updateSingleCard(index);
-                    updateTensionCurveIfVisible();
+            chordTooltip.classList.add('hidden');
+            isTooltipPinned = false;
+            // Update the card UI after tooltip closes to show any inversion changes
+            updateSingleCard(index);
+            updateTensionCurveIfVisible();
 
-                    // Sync notation ONLY if inversion was actually changed
-                    if (inversionWasChanged) {
-                        updateChordAndRenderPreservingTrebleNotes(index);
-                    }
-
-                    // Reset the flag for next time
-                    inversionWasChanged = false;
-                }, 500);
+            // Sync notation ONLY if inversion was actually changed
+            if (inversionWasChanged) {
+                updateChordAndRenderPreservingTrebleNotes(index);
             }
+
+            // Reset the flag for next time
+            inversionWasChanged = false;
         };
 
         // Show tooltip on hover (desktop) - use cardWrapper since tooltip is sibling to card
         cardWrapper.addEventListener('mouseenter', (e) => {
+            isOverCard = true;
+            if (hideTimeout) {
+                clearTimeout(hideTimeout);
+                hideTimeout = null;
+            }
             // Don't show tooltip if hovering over duration controls
             if (e.target.closest('.duration-whole-select') || e.target.closest('.duration-frac-select')) {
                 return;
@@ -6430,29 +6460,51 @@ function attachCardEventListeners(wrapper, index) {
             }
         });
 
-        // Hide tooltip when mouse leaves cardWrapper (if not pinned)
+        // When mouse leaves card, only cancel the pending show timeout
         cardWrapper.addEventListener('mouseleave', (e) => {
+            isOverCard = false;
             if (tooltipTimeout) {
                 clearTimeout(tooltipTimeout);
                 tooltipTimeout = null;
             }
-            // Only hide if not moving to the tooltip
-            if (!chordTooltip.contains(e.relatedTarget)) {
-                hideTooltip();
+            // Start delayed hide if user doesn't enter tooltip
+            scheduleHideTooltip();
+        });
+
+        // Redundant listener on the card itself to improve reliability
+        simplifiedCard.addEventListener('mouseenter', () => {
+            isOverCard = true;
+            if (hideTimeout) {
+                clearTimeout(hideTimeout);
+                hideTimeout = null;
+            }
+            if (!isTooltipPinned && !tooltipTimeout) {
+                tooltipTimeout = setTimeout(() => {
+                    showTooltip();
+                }, 150);
             }
         });
 
-        // Keep tooltip open when mouse enters tooltip
+        // If cursor moves on the card and tooltip failed to appear, recover quickly
+        simplifiedCard.addEventListener('mousemove', () => {
+            isOverCard = true;
+            ensureTooltipVisible();
+        });
+
+        // Keep tooltip open when mouse enters it
         chordTooltip.addEventListener('mouseenter', () => {
+            isOverTooltip = true;
+            isTooltipPinned = true;
             if (hideTimeout) {
                 clearTimeout(hideTimeout);
                 hideTimeout = null;
             }
         });
 
-        // Hide tooltip when mouse leaves tooltip (if not pinned)
+        // ONLY hide when mouse leaves the tooltip itself
         chordTooltip.addEventListener('mouseleave', () => {
-            hideTooltip();
+            isOverTooltip = false;
+            scheduleHideTooltip();
         });
 
         // Hide tooltip when hovering over duration controls
@@ -6510,7 +6562,8 @@ function attachCardEventListeners(wrapper, index) {
                     // Reset the flag
                     inversionWasChanged = false;
                 } else {
-                    chordTooltip.classList.remove('hidden');
+                    // Show tooltip using the same positioning logic
+                    showTooltip();
                     isTooltipPinned = true;
                     // Reset the flag when opening
                     inversionWasChanged = false;
@@ -6583,9 +6636,9 @@ function attachCardEventListeners(wrapper, index) {
                     window.stopTrainerChord();
                 }
 
-                // Sync notation immediately
+                // Sync notation immediately without rebuilding the card/tooltip
                 if (inversionWasChanged) {
-                    updateChordAndRenderPreservingTrebleNotes(index);
+                    updateChordAndRenderPreservingTrebleNotes(index, { skipCardRefresh: true });
                     inversionWasChanged = false;
                 }
 
@@ -6594,13 +6647,14 @@ function attachCardEventListeners(wrapper, index) {
 
             // Mouseleave - stop playing if user drags off button and sync notation
             btn.addEventListener('mouseleave', (e) => {
+                e.stopPropagation(); // Don't let this bubble to tooltip's mouseleave
                 if (window.stopTrainerChord) {
                     window.stopTrainerChord();
                 }
 
                 // Sync notation if button was pressed and user dragged off
                 if (wasPressed && inversionWasChanged) {
-                    updateChordAndRenderPreservingTrebleNotes(index);
+                    updateChordAndRenderPreservingTrebleNotes(index, { skipCardRefresh: true });
                     inversionWasChanged = false;
                 }
 
@@ -7092,24 +7146,36 @@ function updateChordType(index, newType) {
         return;
     }
 
-    // Use roman numeral if available, otherwise fall back to root note
-    const romanOrRoot = chord.roman || chord.root;
-    if (!romanOrRoot) {
-        console.warn('[updateChordType] No roman numeral or root note available for chord');
+    // Use the chord's root directly - this is more reliable for non-diatonic chords
+    // like secondary dominants (B7 in key of C) where the roman numeral might just be the note name
+    const chordRoot = chord.root;
+    if (!chordRoot) {
+        console.warn('[updateChordType] No root note available for chord');
         return;
     }
 
-    // Regenerate chord notes with new type
-    const chordInfo = getProgressionChordNotes(
-        chord.key || trainerState.currentKey,
-        romanOrRoot,
+    // Regenerate chord notes using getInvertedChordNotes directly with the chord's root
+    // This is more reliable than getProgressionChordNotes for non-diatonic chords
+    const chordResult = getInvertedChordNotes(
+        chordRoot,
         newType,
-        chord.inversion
+        chord.inversion || 0,
+        chord.key || trainerState.currentKey,
+        0, // Get base notes without octave shift
+        getEnharmonicPreference(),
+        getNotationPreference()
     );
 
-    if (!chordInfo) {
+    if (!chordResult || !chordResult.specificNotes || chordResult.specificNotes.length === 0) {
+        console.warn('[updateChordType] Could not regenerate notes for chord:', chordRoot, newType);
         return;
     }
+
+    const chordInfo = {
+        notes: chordResult.specificNotes,
+        name: chordResult.name,
+        simpleName: chordResult.simpleName
+    };
 
     // Prepare updates object
     const updates = {
@@ -7192,25 +7258,29 @@ function updateChordRoot(index, newRoot) {
     // Keep the same chord type, just change the root
     const chordType = chord.type || 'Major';
 
-    // Regenerate chord notes with new root
-    const chordInfo = getProgressionChordNotes(
-        chord.key || trainerState.currentKey,
-        newRoot,  // Use the new root directly (not roman numeral)
+    // Regenerate chord notes using getInvertedChordNotes directly with the new root
+    // This is more reliable than getProgressionChordNotes for all chord types
+    const chordResult = getInvertedChordNotes(
+        newRoot,
         chordType,
-        chord.inversion
+        chord.inversion || 0,
+        chord.key || trainerState.currentKey,
+        0, // Get base notes without octave shift
+        getEnharmonicPreference(),
+        getNotationPreference()
     );
 
-    if (!chordInfo) {
+    if (!chordResult || !chordResult.specificNotes || chordResult.specificNotes.length === 0) {
+        console.warn('[updateChordRoot] Could not regenerate notes for chord:', newRoot, chordType);
         return;
     }
 
     // Prepare updates object
     const updates = {
         root: newRoot,
-        notes: chordInfo.notes,
-        lhNotes: chordInfo.lhNotes,
-        name: chordInfo.name,
-        simpleName: chordInfo.simpleName,
+        notes: chordResult.specificNotes,
+        name: chordResult.name,
+        simpleName: chordResult.simpleName,
         roman: '' // Clear roman numeral since we're using absolute root
     };
 
@@ -7505,24 +7575,32 @@ function updateChordInversion(index, newInversion, shouldUpdateUI = true, should
         return;
     }
 
-    // Use roman numeral if available, otherwise fall back to root note
-    const romanOrRoot = chord.roman || chord.root;
-    if (!romanOrRoot) {
-        console.warn('[updateChordInversion] No roman numeral or root note available for chord');
+    // Use the chord's root directly - this is more reliable for non-diatonic chords
+    // like secondary dominants (B7 in key of C) where the roman numeral might just be the note name
+    const chordRoot = chord.root;
+    if (!chordRoot) {
+        console.warn('[updateChordInversion] No root note available for chord');
         return;
     }
 
-    // Regenerate chord notes with new inversion
-    const chordInfo = getProgressionChordNotes(
-        chord.key || trainerState.currentKey,
-        romanOrRoot,
+    // Regenerate chord notes using getInvertedChordNotes directly with the chord's root and type
+    // This is more reliable than getProgressionChordNotes for non-diatonic chords
+    const chordResult = getInvertedChordNotes(
+        chordRoot,
         chord.type,
-        newInversion
+        newInversion,
+        chord.key || trainerState.currentKey,
+        0, // Get base notes without octave shift
+        getEnharmonicPreference(),
+        getNotationPreference()
     );
 
-    if (!chordInfo) {
+    if (!chordResult || !chordResult.specificNotes || chordResult.specificNotes.length === 0) {
+        console.warn('[updateChordInversion] Could not regenerate notes for chord:', chordRoot, chord.type);
         return;
     }
+
+    const chordInfo = { notes: chordResult.specificNotes };
 
     // Prepare updates object
     const updates = {
@@ -7630,24 +7708,32 @@ function updateRHOctaveShift(index, shift) {
         return;
     }
 
-    // Use roman numeral if available, otherwise fall back to root note
-    const romanOrRoot = chord.roman || chord.root;
-    if (!romanOrRoot) {
-        console.warn('[updateRHOctaveShift] No roman numeral or root note available for chord');
+    // Use the chord's root directly - this is more reliable for non-diatonic chords
+    // like secondary dominants (B7 in key of C) where the roman numeral might just be the note name
+    const chordRoot = chord.root;
+    if (!chordRoot) {
+        console.warn('[updateRHOctaveShift] No root note available for chord');
         return;
     }
 
-    // Regenerate notes with new octave
-    const chordInfo = getProgressionChordNotes(
-        chord.key || trainerState.currentKey,
-        romanOrRoot,
+    // Regenerate notes using getInvertedChordNotes directly with the chord's root and type
+    // This is more reliable than getProgressionChordNotes for non-diatonic chords
+    const chordResult = getInvertedChordNotes(
+        chordRoot,
         chord.type,
-        chord.inversion
+        chord.inversion || 0,
+        chord.key || trainerState.currentKey,
+        0, // Get base notes without octave shift
+        getEnharmonicPreference(),
+        getNotationPreference()
     );
 
-    if (!chordInfo || !chordInfo.notes) {
+    if (!chordResult || !chordResult.specificNotes || chordResult.specificNotes.length === 0) {
+        console.warn('[updateRHOctaveShift] Could not regenerate notes for chord:', chordRoot, chord.type);
         return;
     }
+
+    const chordInfo = { notes: chordResult.specificNotes };
 
     // Apply octave shift
     const shiftedNotes = chordInfo.notes.map(note => {
@@ -12327,8 +12413,12 @@ window.showProgressionChordSuggestions = showProgressionChordSuggestions;
 /**
  * Helper function to update a chord in compositionState and render WITHOUT wiping treble notes
  * Use this instead of window.syncNotationFromProgression() to preserve user-added treble notes
+ * @param {number} index - chord index to sync
+ * @param {object} [options]
+ * @param {boolean} [options.skipCardRefresh=false] - if true, do not rebuild card DOM
  */
-function updateChordAndRenderPreservingTrebleNotes(index) {
+function updateChordAndRenderPreservingTrebleNotes(index, options = {}) {
+    const { skipCardRefresh = false } = options;
     if (!window.getCompositionState || !window.getNotationComposer) {
         return;
     }
@@ -12404,8 +12494,10 @@ function updateChordAndRenderPreservingTrebleNotes(index) {
         }
     }
 
-    // Update chord cards across all tabs (Progression Builder, Composition Studio, Chord Builder)
-    updateSingleCard(index);
+    // Update chord cards across all tabs unless explicitly skipped
+    if (!skipCardRefresh) {
+        updateSingleCard(index);
+    }
 
     // Render the notation
     if (notationComposer && typeof notationComposer.render === 'function') {
@@ -13422,6 +13514,11 @@ export function addToProgressionData(chordData, options = {}) {
     // Render both progression displays to keep them in sync
     renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
+
+    // Also update the Chord Lab/Builder panel if it exists
+    if (window.updateBuilderProgressionPanel) {
+        window.updateBuilderProgressionPanel();
+    }
 
     // Auto-render melody notation if on Composition Studio tab or if Free mode is active
     // This function already checks the tab and only refreshes if needed

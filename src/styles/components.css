@@ -276,6 +276,7 @@
 #melody-progression-visualization,
 #builder-progression-visualization {
     gap: 0.25rem !important; /* Force 4px gap between cards for minimal white space */
+    overflow: visible !important; /* Allow tooltips to escape container */
 }
 
 /* ============================================================================
@@ -312,6 +313,16 @@
 .scroll-view-container .section-unified-container {
     scroll-snap-align: start;
     flex-shrink: 0;
+}
+
+/* Ensure chord card wrapper allows tooltip to appear on top */
+.chord-card-wrapper {
+    position: relative;
+}
+
+/* Chord tooltip must appear above everything */
+.chord-tooltip {
+    z-index: 999999 !important;
 }
 
 /* Section picker bar */

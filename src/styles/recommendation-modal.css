@@ -166,15 +166,15 @@
 }
 
 /* ============================================
-   PROGRESSION BAR
+   PROGRESSION BAR - Compact chord display
    ============================================ */
 .rm-progression-bar {
-    padding: var(--rm-space-sm) var(--rm-space-md);
+    padding: 6px 12px;
     background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
     border-bottom: 1px solid var(--rm-border);
     display: flex;
     align-items: center;
-    gap: var(--rm-space-sm);
+    gap: 6px;
     flex-wrap: wrap;
 }
 
@@ -182,14 +182,14 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: var(--rm-font-sm);
+    font-size: 11px;
     font-weight: 600;
     color: var(--rm-text-secondary);
     white-space: nowrap;
 }
 
 .rm-progression-label-icon {
-    font-size: var(--rm-font-base);
+    font-size: 12px;
 }
 
 .rm-progression-label-key {
@@ -274,53 +274,61 @@
 }
 
 /* ============================================
-   TAB NAVIGATION
+   TAB NAVIGATION - Pill-style clickable tabs
    ============================================ */
 .rm-tabs {
     display: flex;
-    border-bottom: 1px solid var(--rm-border);
-    background: var(--rm-bg-subtle);
+    gap: 4px;
+    padding: 6px 8px;
+    background: #e5e7eb;
+    border-bottom: none;
+    border-radius: 8px;
+    margin: 0 12px 0 12px;
 }
 
 .rm-tab {
     flex: 1;
-    padding: var(--rm-space-sm) var(--rm-space-md);
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
+    padding: 8px 12px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
     font-size: var(--rm-font-md);
     font-weight: 500;
     cursor: pointer;
-    transition: all var(--rm-transition);
-    color: var(--rm-text-muted);
+    transition: all 0.15s ease;
+    color: #6b7280;
+    text-align: center;
 }
 
-.rm-tab:hover:not(:disabled) {
-    background: var(--rm-bg-hover);
+.rm-tab:hover:not(:disabled):not(.active) {
+    background: rgba(255, 255, 255, 0.5);
+    color: #374151;
 }
 
 .rm-tab.active {
-    border-bottom-color: var(--rm-primary);
+    background: white;
     color: var(--rm-primary);
-    background: var(--rm-bg);
+    border-color: var(--rm-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    font-weight: 600;
 }
 
 .rm-tab:disabled {
     cursor: not-allowed;
-    color: var(--rm-border-dark);
+    color: #9ca3af;
     opacity: 0.6;
 }
 
 /* ============================================
-   CONTEXT BAR
+   CONTEXT BAR - Compact single row
    ============================================ */
 .rm-context-bar {
-    padding: var(--rm-space-sm) var(--rm-space-md);
+    padding: 6px 12px;
     background: var(--rm-bg-subtle);
     border-bottom: 1px solid var(--rm-border);
     display: flex;
     flex-wrap: wrap;
-    gap: var(--rm-space-sm);
+    gap: 8px;
     align-items: center;
 }
 

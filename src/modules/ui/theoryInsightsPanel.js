@@ -1076,6 +1076,7 @@ export class TheoryInsightsPanel {
 
     /**
      * Show a modal with concept explanation
+     * Features an interactive key selector that updates the explanation in real-time
      */
     showConceptModal(conceptType, fallbackTitle) {
         console.log('[TheoryInsights] Showing concept modal:', conceptType);
@@ -1094,12 +1095,12 @@ export class TheoryInsightsPanel {
             existingModal.remove();
         }
 
-        // Get current key for context-aware transposition
-        const currentKey = window.getCompositionState?.()?.metadata?.key ||
+        // Get current key for context-aware transposition (this becomes the default)
+        const defaultKey = window.getCompositionState?.()?.metadata?.key ||
                           window.getCurrentKey?.() || 'C';
 
-        // Transpose the explanation to the current key
-        const transposedExplanation = this.transposeExplanation(concept.explanation, currentKey);
+        // Store reference to this for use in closures
+        const self = this;
 
         // Convert markdown-style formatting to HTML
         const formatText = (text) => {
@@ -1110,7 +1111,27 @@ export class TheoryInsightsPanel {
                 .replace(/\n/g, '<br>');
         };
 
-        // Create modal HTML
+        // All available keys for the selector
+        const allKeys = ['C', 'C#', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+        // Function to update the content based on selected key
+        const updateContent = (selectedKey) => {
+            const contentEl = document.getElementById('theory-concept-content');
+            if (contentEl) {
+                const transposedExplanation = self.transposeExplanation(concept.explanation, selectedKey);
+                contentEl.innerHTML = `<p>${formatText(transposedExplanation)}</p>`;
+            }
+        };
+
+        // Generate key selector options
+        const keyOptions = allKeys.map(key =>
+            `<option value="${key}" ${key === defaultKey ? 'selected' : ''}>${key}</option>`
+        ).join('');
+
+        // Transpose the explanation to the default key
+        const transposedExplanation = this.transposeExplanation(concept.explanation, defaultKey);
+
+        // Create modal HTML with interactive key selector
         const modalHTML = `
             <div id="theory-concept-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(0,0,0,0.5);">
                 <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col">
@@ -1118,27 +1139,31 @@ export class TheoryInsightsPanel {
                     <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 flex items-center justify-between">
                         <div>
                             <h2 class="text-xl font-bold text-white">${concept.title}</h2>
-                            <p class="text-blue-100 text-sm mt-0.5">${concept.summary}</p>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="text-white/80 text-sm">Key of</span>
+                                <select id="concept-key-selector" class="bg-white text-gray-900 text-sm rounded px-2 py-0.5 border border-white/30 cursor-pointer hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50">
+                                    ${keyOptions}
+                                </select>
+                                <span class="text-white/80 text-sm">major</span>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <span class="px-2 py-1 bg-white/20 rounded text-white text-xs font-medium">Key: ${currentKey}</span>
-                            <button id="close-concept-modal" class="text-white/80 hover:text-white transition-colors">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                </svg>
-                            </button>
-                        </div>
+                        <button id="close-concept-modal" class="text-white/80 hover:text-white transition-colors">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
                     </div>
 
                     <!-- Content -->
                     <div class="p-6 overflow-y-auto flex-1">
-                        <div class="prose prose-sm max-w-none text-gray-700">
+                        <div id="theory-concept-content" class="prose prose-sm max-w-none text-gray-700">
                             <p>${formatText(transposedExplanation)}</p>
                         </div>
                     </div>
 
                     <!-- Footer -->
-                    <div class="px-6 py-4 bg-gray-50 border-t flex justify-end">
+                    <div class="px-6 py-4 bg-gray-50 border-t flex justify-between items-center">
+                        <span class="text-xs text-gray-500">Change the key to see examples in different keys</span>
                         <button id="dismiss-concept-modal" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
                             Got it!
                         </button>
@@ -1154,6 +1179,7 @@ export class TheoryInsightsPanel {
         const modal = document.getElementById('theory-concept-modal');
         const closeBtn = document.getElementById('close-concept-modal');
         const dismissBtn = document.getElementById('dismiss-concept-modal');
+        const keySelector = document.getElementById('concept-key-selector');
 
         const closeModal = () => {
             modal.remove();
@@ -1161,6 +1187,11 @@ export class TheoryInsightsPanel {
 
         closeBtn.addEventListener('click', closeModal);
         dismissBtn.addEventListener('click', closeModal);
+
+        // Key selector change handler - updates content in real-time
+        keySelector.addEventListener('change', (e) => {
+            updateContent(e.target.value);
+        });
 
         // Close on backdrop click
         modal.addEventListener('click', (e) => {

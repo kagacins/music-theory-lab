@@ -47,6 +47,9 @@ import {
 
 import { getTrainerState, getCurrentKey } from '../state/trainerState.js';
 
+// Share chord card rendering (tooltips, inversion playback, presentation) with Composition Studio
+import { renderProgressionDisplayForBuilder } from './progressionBuilder.js';
+
 // Import guided mode event dispatcher for lesson integration
 import { dispatchBuilderEvent, isGuidedModeActive } from '../ui/lessonGuidedMode.js';
 
@@ -1172,10 +1175,9 @@ export function renderBuilderProgressionCards() {
     // Clear existing cards
     container.innerHTML = '';
 
-    // Use progressionBuilder's renderProgressionDisplay function
-    // by delegating to the same function that renders for trainer and melody tabs
-    if (window.renderProgressionDisplayForBuilder) {
-        window.renderProgressionDisplayForBuilder(container, progressionData, key, {
+    // Use the shared card renderer (same tooltips + inversion playback as Composition Studio)
+    if (renderProgressionDisplayForBuilder) {
+        renderProgressionDisplayForBuilder(container, progressionData, key, {
             showActionButtons: false, // No add/clear buttons - those are in the chord library
             isBuilderTab: true,
             detailed: builderDetailedView
