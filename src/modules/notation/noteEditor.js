@@ -4476,16 +4476,26 @@ export class NoteEditor {
       mouseY: mouseY, // Store mouse Y for accurate positioning
     };
 
-    // Get harmonic coloring if chord context is set
-    if (this.chordContext && !this.isRestMode) {
-      const analysis = analyzeChordTone(
-        staffPosition.pitch,
-        this.chordContext,
-        this.keySignature
-      );
-      if (analysis) {
-        this.ghostNote.color = analysis.colors.fill;
-        this.ghostNote.tooltip = analysis.tooltip;
+    // Get harmonic coloring based on the hovered measure's chord
+    // staffPosition.measure is the measureBounds object, use .index to get measure number
+    const measureIndex = staffPosition.measure?.index;
+    if (!this.isRestMode && measureIndex !== undefined) {
+      // Get chord for the current measure being hovered
+      const compositionState = window.getCompositionState?.();
+      const chord = compositionState?.getChord?.(measureIndex) || this.chordContext;
+      const key = compositionState?.metadata?.key || this.keySignature || 'C';
+
+      if (chord) {
+        const analysis = analyzeChordTone(
+          staffPosition.pitch,
+          chord,
+          key
+        );
+        if (analysis) {
+          this.ghostNote.color = analysis.colors.fill;
+          this.ghostNote.tooltip = analysis.tooltip;
+          this.ghostNote.toneType = analysis.relationship; // e.g., 'root', 'third', 'scaleTone', etc.
+        }
       }
     }
   }

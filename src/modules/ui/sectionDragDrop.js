@@ -186,11 +186,32 @@ function loadSectionOrder(tabId) {
 export function initAllSectionDragDrop() {
     // Initialize for Chord Builder tab
     initSectionDragDrop('builder', 'builder-sections-container', 'builder-section-item');
-    
+
     // Initialize for Progression Builder tab
     initSectionDragDrop('trainer', 'trainer-sections-container', 'trainer-section-item');
-    
+
     // Initialize for Melody Composer tab (new dashboard layout)
     initSectionDragDrop('melody', 'melody-dashboard-sections-container', 'melody-section-item');
 }
+
+/**
+ * Reinitialize drag-and-drop for a specific tab
+ * Call this after dynamically adding new sections to ensure they're draggable
+ * @param {string} tabId - The tab ID ('builder', 'trainer', 'melody')
+ */
+export function reinitSectionDragDrop(tabId) {
+    const containerMap = {
+        'builder': { containerId: 'builder-sections-container', sectionClass: 'builder-section-item' },
+        'trainer': { containerId: 'trainer-sections-container', sectionClass: 'trainer-section-item' },
+        'melody': { containerId: 'melody-dashboard-sections-container', sectionClass: 'melody-section-item' }
+    };
+
+    const config = containerMap[tabId];
+    if (config) {
+        initSectionDragDrop(tabId, config.containerId, config.sectionClass);
+    }
+}
+
+// Expose reinit function globally for dynamically created panels
+window.reinitSectionDragDrop = reinitSectionDragDrop;
 

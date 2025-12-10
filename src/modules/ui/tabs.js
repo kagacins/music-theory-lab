@@ -220,6 +220,10 @@ export function switchTab(tabId, options = {}) {
 
     if (tabId === 'builder') {
         updateBuilderDisplay();
+        // Update the Chord Lab progression panel to reflect any changes made in other tabs
+        if (window.renderBuilderProgressionCards) {
+            window.renderBuilderProgressionCards();
+        }
         // Reset shared-chord-display width for Chord Builder
         const sharedChordDisplay = document.getElementById('shared-chord-display');
         if (sharedChordDisplay) {

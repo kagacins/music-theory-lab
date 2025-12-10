@@ -303,6 +303,10 @@ export function setAudioIsReady(value) {
 // Audio Context Keep-Alive
 // ============================================================================
 
+let keepAliveInterval = null;
+let silentOscillator = null;
+let lastInteractionTime = Date.now();
+
 /**
  * Proactively resume audio context to reduce playback delay
  * Called when page becomes visible or window regains focus
@@ -318,6 +322,107 @@ export function resumeAudioContextIfNeeded() {
 }
 
 /**
+ * Play a silent tick to keep the audio context warm and prevent suspension
+ * Uses a very short, inaudible oscillator burst
+ */
+function playSilentKeepAliveTick() {
+    if (typeof Tone === 'undefined' || !Tone.context) return;
+
+    // Don't tick if context is suspended (requires user interaction to resume)
+    if (Tone.context.state !== 'running') return;
+
+    // Don't tick if page is hidden (save resources)
+    if (document.hidden) return;
+
+    try {
+        // Create a very short, inaudible oscillator burst
+        // This keeps the audio graph "warm" without producing audible sound
+        const ctx = Tone.context.rawContext;
+        if (!ctx) return;
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        // Set gain to essentially zero (inaudible)
+        gain.gain.value = 0.0001;
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.frequency.value = 1; // Very low frequency
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.001); // Very short duration
+
+        // Cleanup
+        osc.onended = () => {
+            osc.disconnect();
+            gain.disconnect();
+        };
+    } catch (e) {
+        // Silently fail - this is just a keep-alive mechanism
+    }
+}
+
+/**
+ * Start the periodic keep-alive mechanism
+ * Sends silent ticks every 10 seconds to prevent audio context suspension
+ */
+function startKeepAlive() {
+    if (keepAliveInterval) return; // Already running
+
+    // Tick every 10 seconds to keep audio context warm
+    // This prevents the browser from suspending the audio context due to inactivity
+    keepAliveInterval = setInterval(() => {
+        const timeSinceInteraction = Date.now() - lastInteractionTime;
+
+        // Only keep alive if user has been inactive for less than 5 minutes
+        // After 5 minutes, let the audio context suspend to save resources
+        if (timeSinceInteraction < 5 * 60 * 1000) {
+            playSilentKeepAliveTick();
+        }
+    }, 10000); // Every 10 seconds
+}
+
+/**
+ * Stop the keep-alive mechanism
+ */
+function stopKeepAlive() {
+    if (keepAliveInterval) {
+        clearInterval(keepAliveInterval);
+        keepAliveInterval = null;
+    }
+}
+
+/**
+ * Record user interaction time for the keep-alive mechanism
+ */
+function recordInteraction() {
+    lastInteractionTime = Date.now();
+
+    // Also resume audio context on any interaction
+    resumeAudioContextIfNeeded();
+}
+
+/**
+ * Pre-warm the audio context before playback
+ * Call this before playing notes to minimize latency
+ */
+export function preWarmAudioContext() {
+    if (typeof Tone === 'undefined' || !Tone.context) return;
+
+    // Resume if needed
+    if (Tone.context.state !== 'running') {
+        Tone.context.resume();
+    }
+
+    // Record this as an interaction
+    recordInteraction();
+
+    // Play a silent tick immediately to ensure audio path is ready
+    playSilentKeepAliveTick();
+}
+
+/**
  * Initialize audio context keep-alive listeners
  * Resumes audio context when user returns to the page
  */
@@ -327,21 +432,38 @@ export function initAudioContextKeepAlive() {
         if (!document.hidden) {
             // Page is now visible - resume audio context proactively
             resumeAudioContextIfNeeded();
+            // Restart keep-alive when page becomes visible
+            startKeepAlive();
+            // Play immediate tick to warm up
+            setTimeout(playSilentKeepAliveTick, 50);
+        } else {
+            // Page is hidden - stop keep-alive to save resources
+            stopKeepAlive();
         }
     });
 
     // Resume audio context when window regains focus
     window.addEventListener('focus', () => {
         resumeAudioContextIfNeeded();
+        recordInteraction();
+        // Play immediate tick to warm up
+        setTimeout(playSilentKeepAliveTick, 50);
     });
 
-    // Also resume on mouse/touch events (user interaction)
-    // This ensures audio is ready even if visibility/focus events don't fire
-    // Using { once: true } means these listeners will automatically be removed after first call
-    const resumeOnInteraction = () => {
+    // Track user interactions to keep the audio context warm
+    const interactionEvents = ['mousedown', 'touchstart', 'keydown', 'mousemove'];
+    interactionEvents.forEach(event => {
+        document.addEventListener(event, recordInteraction, { passive: true });
+    });
+
+    // First interaction also resumes audio context
+    const resumeOnFirstInteraction = () => {
         resumeAudioContextIfNeeded();
+        // Start the keep-alive mechanism after first user interaction
+        startKeepAlive();
     };
-    
-    document.addEventListener('mousedown', resumeOnInteraction, { once: true });
-    document.addEventListener('touchstart', resumeOnInteraction, { once: true, passive: true });
+
+    document.addEventListener('mousedown', resumeOnFirstInteraction, { once: true });
+    document.addEventListener('touchstart', resumeOnFirstInteraction, { once: true, passive: true });
+    document.addEventListener('keydown', resumeOnFirstInteraction, { once: true });
 }

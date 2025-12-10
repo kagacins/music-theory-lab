@@ -208,6 +208,10 @@ import {
 } from './modules/state/builderState.js';
 import { getScaleRootIndex } from './modules/state/scaleState.js';
 import { toggleSuggestionEngine } from './modules/utils/voiceLeading.js';
+// Import voice leading overlay to register global toggle functions
+import './modules/notation/voiceLeadingOverlay.js';
+// Import theory insights panel to register global functions
+import './modules/ui/theoryInsightsPanel.js';
 import {
     getNoteKeyId,
     getInvertedChordNotes,
@@ -1340,7 +1344,8 @@ window.expandAllBuilderSections = function() {
     const sections = [
         { panelId: 'chord-setup-panel', chevronId: 'chord-setup-chevron' },
         { panelId: 'chord-library-panel', chevronId: 'chord-library-chevron' },
-        { panelId: 'chord-intervals-panel', chevronId: 'chord-intervals-chevron' }
+        { panelId: 'chord-intervals-panel', chevronId: 'chord-intervals-chevron' },
+        { panelId: 'builder-progression-panel', chevronId: 'builder-progression-chevron' }
     ];
     sections.forEach(({ panelId, chevronId }) => {
         const panelEl = document.getElementById(panelId);
@@ -1360,7 +1365,8 @@ window.collapseAllBuilderSections = function() {
     const sections = [
         { panelId: 'chord-setup-panel', chevronId: 'chord-setup-chevron' },
         { panelId: 'chord-library-panel', chevronId: 'chord-library-chevron' },
-        { panelId: 'chord-intervals-panel', chevronId: 'chord-intervals-chevron' }
+        { panelId: 'chord-intervals-panel', chevronId: 'chord-intervals-chevron' },
+        { panelId: 'builder-progression-panel', chevronId: 'builder-progression-chevron' }
     ];
     sections.forEach(({ panelId, chevronId }) => {
         const panelEl = document.getElementById(panelId);
@@ -1377,7 +1383,11 @@ window.collapseAllBuilderSections = function() {
 };
 
 window.expandAllMelodySections = function() {
+    // Standard sections with panel/chevron pattern
     const sections = [
+        { panelId: 'melody-progression-setup-panel', chevronId: 'melody-progression-setup-chevron' },
+        { panelId: 'chord-progression-card-panel', chevronId: 'chord-progression-card-chevron' },
+        { panelId: 'staff-notation-card-panel', chevronId: 'staff-notation-card-chevron' },
         { panelId: 'melody-progression-panel', chevronId: 'melody-progression-chevron' },
         { panelId: 'melody-controls-panel', chevronId: 'melody-controls-chevron' },
         { panelId: 'current-melody-panel', chevronId: 'current-melody-chevron' }
@@ -1388,16 +1398,31 @@ window.expandAllMelodySections = function() {
         if (panelEl && chevronEl) {
             panelEl.classList.remove('hidden');
             chevronEl.classList.add('rotate-180');
-            // Save panel state
             if (window.savePanelState) {
                 window.savePanelState(panelId, true);
             }
         }
     });
+
+    // Handle Voice Leading panel (custom toggle)
+    const voiceLeadingPanel = window.voiceLeadingDiagram;
+    if (voiceLeadingPanel && !voiceLeadingPanel.isPanelExpanded) {
+        voiceLeadingPanel.togglePanel();
+    }
+
+    // Handle Theory Insights panel (custom toggle)
+    const theoryInsightsPanel = window.theoryInsightsPanel;
+    if (theoryInsightsPanel && !theoryInsightsPanel.isPanelExpanded) {
+        theoryInsightsPanel.togglePanel();
+    }
 };
 
 window.collapseAllMelodySections = function() {
+    // Standard sections with panel/chevron pattern
     const sections = [
+        { panelId: 'melody-progression-setup-panel', chevronId: 'melody-progression-setup-chevron' },
+        { panelId: 'chord-progression-card-panel', chevronId: 'chord-progression-card-chevron' },
+        { panelId: 'staff-notation-card-panel', chevronId: 'staff-notation-card-chevron' },
         { panelId: 'melody-progression-panel', chevronId: 'melody-progression-chevron' },
         { panelId: 'melody-controls-panel', chevronId: 'melody-controls-chevron' },
         { panelId: 'current-melody-panel', chevronId: 'current-melody-chevron' }
@@ -1408,12 +1433,23 @@ window.collapseAllMelodySections = function() {
         if (panelEl && chevronEl) {
             panelEl.classList.add('hidden');
             chevronEl.classList.remove('rotate-180');
-            // Save panel state
             if (window.savePanelState) {
                 window.savePanelState(panelId, false);
             }
         }
     });
+
+    // Handle Voice Leading panel (custom toggle)
+    const voiceLeadingPanel = window.voiceLeadingDiagram;
+    if (voiceLeadingPanel && voiceLeadingPanel.isPanelExpanded) {
+        voiceLeadingPanel.togglePanel();
+    }
+
+    // Handle Theory Insights panel (custom toggle)
+    const theoryInsightsPanel = window.theoryInsightsPanel;
+    if (theoryInsightsPanel && theoryInsightsPanel.isPanelExpanded) {
+        theoryInsightsPanel.togglePanel();
+    }
 };
 
 // Universal expand/collapse functions that route to the correct tab function

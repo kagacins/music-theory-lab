@@ -386,7 +386,8 @@ export class StaffLayoutManager {
         realY >= bounds.y &&
         realY <= bounds.y + bounds.height + verticalTolerance
       ) {
-        return bounds;
+        // Add index to bounds for consistency with actual positions path
+        return { ...bounds, index };
       }
     }
 

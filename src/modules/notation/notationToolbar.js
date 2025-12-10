@@ -111,6 +111,10 @@ export class NotationToolbar {
     this.restDisplayMode = localStorage.getItem('notation-rest-display-mode') || 'clean'; // 'clean' or 'explicit'
     this.cueRestsForSecondaryVoice = localStorage.getItem('notation-cue-rests') !== 'false'; // default true
     this.onRestDisplayModeChange = options.onRestDisplayModeChange || (() => {});
+
+    // Voice leading visualization
+    this.isVoiceLeadingVisible = localStorage.getItem('voice-leading-overlay-visible') === 'true';
+    this.onVoiceLeadingToggle = options.onVoiceLeadingToggle || (() => {});
   }
 
   /**
@@ -136,260 +140,147 @@ export class NotationToolbar {
           <span class="selection-badge">✓ ${this.selectedNotesCount} note${this.selectedNotesCount !== 1 ? 's' : ''} selected</span>
         </div>
 
-        <!-- Interaction Mode Toggle -->
-        <div class="toolbar-section interaction-mode-section">
-          <div class="button-group interaction-mode-buttons">
-            <button
-              class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'noteEntry' ? 'active' : ''}"
-              data-interaction-mode="noteEntry"
-              title="Note Entry Mode: Alt+Click always adds a note, ignoring existing notes"
-            >
-              ✏
-            </button>
-            <button
-              class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'select' ? 'active' : ''}"
-              data-interaction-mode="select"
-              title="Select Mode: Click on notes to select them, Alt+Click to add"
-            >
-              ⎀
-            </button>
+        <!-- NOTE INPUT GROUP -->
+        <div class="toolbar-group">
+          <span class="group-label">Input</span>
+          <div class="toolbar-group-content">
+            <!-- Mode Toggle -->
+            <div class="toolbar-section interaction-mode-section">
+              <div class="button-group">
+                <button
+                  class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'noteEntry' ? 'active' : ''}"
+                  data-interaction-mode="noteEntry"
+                  title="Note Entry Mode (Alt+Click adds note)"
+                >✏</button>
+                <button
+                  class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'select' ? 'active' : ''}"
+                  data-interaction-mode="select"
+                  title="Select Mode (Click selects, Alt+Click adds)"
+                >⎀</button>
+              </div>
+            </div>
+
+            <!-- Duration -->
+            <div class="toolbar-section duration-section">
+              <div class="button-group duration-buttons">
+                ${DURATIONS.map((d, i) => `
+                  <button
+                    class="toolbar-btn duration-btn ${d.id === this.currentDuration ? 'active' : ''}"
+                    data-duration="${d.id}"
+                    title="${d.label} (Shift+${i + 1})"
+                  >${d.symbol}</button>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Modifiers -->
+            <div class="toolbar-section modifiers-section">
+              <button class="toolbar-btn rest-btn ${this.isRestMode ? 'active' : ''}" data-action="rest" title="Rest">𝄽</button>
+              <button class="toolbar-btn dot-btn ${this.isDotted ? 'active' : ''}" data-action="dot" title="Dotted">•</button>
+              <button class="toolbar-btn tie-btn" data-action="tie" title="Tie">⁀</button>
+            </div>
+
+            <!-- Tuplets -->
+            <div class="toolbar-section tuplet-section">
+              <div class="button-group">
+                <button class="toolbar-btn tuplet-btn ${this.tupletInsertMode === 'triplet' ? 'active' : ''}" data-tuplet="triplet" title="Triplet (3:2)">3</button>
+                <button class="toolbar-btn tuplet-btn ${this.tupletInsertMode === 'quintuplet' ? 'active' : ''}" data-tuplet="quintuplet" title="Quintuplet (5:4)">5</button>
+                <button class="toolbar-btn tuplet-btn ${this.tupletInsertMode === 'sextuplet' ? 'active' : ''}" data-tuplet="sextuplet" title="Sextuplet (6:4)">6</button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Duration Section -->
-        <div class="toolbar-section duration-section">
-          <span class="section-label">Duration</span>
-          <div class="button-group duration-buttons">
-            ${DURATIONS.map((d, i) => `
-              <button
-                class="toolbar-btn duration-btn ${d.id === this.currentDuration ? 'active' : ''}"
-                data-duration="${d.id}"
-                title="${d.label} note (Shift+${i + 1})"
-              >
-                ${d.symbol}
-              </button>
-            `).join('')}
+        <!-- PITCH/STYLE GROUP -->
+        <div class="toolbar-group">
+          <span class="group-label">Pitch</span>
+          <div class="toolbar-group-content">
+            <!-- Accidentals -->
+            <div class="toolbar-section accidentals-section">
+              <div class="button-group">
+                ${ACCIDENTALS.map(a => `
+                  <button
+                    class="toolbar-btn accidental-btn ${a.id === this.currentAccidental ? 'active' : ''}"
+                    data-accidental="${a.id}"
+                    title="${a.label}"
+                  >${a.symbol}</button>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Octave -->
+            <div class="toolbar-section octave-section">
+              <button class="toolbar-btn octave-up-btn" data-action="octaveUp" title="Octave Up (Ctrl+↑)">⬆8</button>
+              <button class="toolbar-btn octave-down-btn" data-action="octaveDown" title="Octave Down (Ctrl+↓)">⬇8</button>
+            </div>
+
+            <!-- Articulations -->
+            <div class="toolbar-section articulations-section">
+              <div class="button-group">
+                ${ARTICULATIONS.map(a => `
+                  <button
+                    class="toolbar-btn articulation-btn ${a.id === this.currentArticulation ? 'active' : ''}"
+                    data-articulation="${a.id}"
+                    title="${a.label}"
+                  >${a.symbol}</button>
+                `).join('')}
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Modifiers Section -->
-        <div class="toolbar-section modifiers-section">
-          <button
-            class="toolbar-btn rest-btn ${this.isRestMode ? 'active' : ''}"
-            data-action="rest"
-            title="Rest"
-          >
-            𝄽
-          </button>
-          <button
-            class="toolbar-btn dot-btn ${this.isDotted ? 'active' : ''}"
-            data-action="dot"
-            title="Dotted"
-          >
-            •
-          </button>
-          <button
-            class="toolbar-btn tie-btn"
-            data-action="tie"
-            title="Tie"
-          >
-            ⁀
-          </button>
-        </div>
-
-        <!-- Tuplet Section -->
-        <div class="toolbar-section tuplet-section">
-          <span class="section-label">Tuplet</span>
-          <div class="button-group tuplet-buttons">
-            <button
-              class="toolbar-btn tuplet-btn ${this.tupletInsertMode === 'triplet' ? 'active' : ''}"
-              data-tuplet="triplet"
-              title="Triplet (3:2) - Select 3 notes + Shift+3, or Ctrl+Shift+3 for insert mode"
-            >
-              3
-            </button>
-            <button
-              class="toolbar-btn tuplet-btn ${this.tupletInsertMode === 'quintuplet' ? 'active' : ''}"
-              data-tuplet="quintuplet"
-              title="Quintuplet (5:4) - Select 5 notes + Shift+5, or Ctrl+Shift+5 for insert mode"
-            >
-              5
-            </button>
-            <button
-              class="toolbar-btn tuplet-btn ${this.tupletInsertMode === 'sextuplet' ? 'active' : ''}"
-              data-tuplet="sextuplet"
-              title="Sextuplet (6:4) - Select 6 notes + Shift+6, or Ctrl+Shift+6 for insert mode"
-            >
-              6
-            </button>
+        <!-- EDIT GROUP -->
+        <div class="toolbar-group">
+          <span class="group-label">Edit</span>
+          <div class="toolbar-group-content">
+            <div class="toolbar-section edit-section">
+              <button class="toolbar-btn undo-btn" data-action="undo" title="Undo (Ctrl+Z)">↩</button>
+              <button class="toolbar-btn redo-btn" data-action="redo" title="Redo (Ctrl+Y)">↪</button>
+              <button class="toolbar-btn copy-btn" data-action="copy" title="Copy (Ctrl+C)">📋</button>
+              <button class="toolbar-btn paste-btn" data-action="paste" title="Paste (Ctrl+V)">📥</button>
+              <button class="toolbar-btn copy-block-btn" data-action="copyBlock" title="Copy Block">📦</button>
+              <button class="toolbar-btn delete-btn" data-action="delete" title="Delete (Del)">🗑</button>
+            </div>
           </div>
         </div>
 
-        <!-- Accidentals Section -->
-        <div class="toolbar-section accidentals-section">
-          <span class="section-label">Accidental</span>
-          <div class="button-group accidental-buttons">
-            ${ACCIDENTALS.map(a => `
-              <button
-                class="toolbar-btn accidental-btn ${a.id === this.currentAccidental ? 'active' : ''}"
-                data-accidental="${a.id}"
-                title="${a.label}"
-              >
-                ${a.symbol}
-              </button>
-            `).join('')}
+        <!-- CHORD GROUP -->
+        <div class="toolbar-group">
+          <span class="group-label">Chord</span>
+          <div class="toolbar-group-content">
+            <div class="toolbar-section chord-symbol-section">
+              <input type="text" class="chord-symbol-input" placeholder="Cmaj7" title="Enter chord symbol">
+              <button class="toolbar-btn apply-chord-btn" data-action="applyChord" title="Apply Chord Symbol">✓</button>
+            </div>
           </div>
         </div>
 
-        <!-- Articulations Section -->
-        <div class="toolbar-section articulations-section">
-          <span class="section-label">Articulation</span>
-          <div class="button-group articulation-buttons">
-            ${ARTICULATIONS.map(a => `
-              <button
-                class="toolbar-btn articulation-btn ${a.id === this.currentArticulation ? 'active' : ''}"
-                data-articulation="${a.id}"
-                title="${a.label}"
-              >
-                ${a.symbol}
-              </button>
-            `).join('')}
+        <!-- VIEW GROUP -->
+        <div class="toolbar-group">
+          <span class="group-label">View</span>
+          <div class="toolbar-group-content">
+            <div class="toolbar-section view-section">
+              <select class="voice-select" title="Select voice for editing">
+                <option value="1" ${this.voiceNumber === 1 ? 'selected' : ''}>Voice 1</option>
+                <option value="2" ${this.voiceNumber === 2 ? 'selected' : ''}>Voice 2</option>
+              </select>
+              <select class="measures-select" title="Measures per line">
+                ${MEASURES_PER_LINE_OPTIONS.map(m => `
+                  <option value="${m}" ${m === this.measuresPerLine ? 'selected' : ''}>${m} measures</option>
+                `).join('')}
+              </select>
+            </div>
+            <div class="toolbar-section rest-display-section">
+              <div class="button-group">
+                <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'clean' ? 'active' : ''}" data-rest-mode="clean" title="Clean: Hide redundant rests">Clean</button>
+                <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'explicit' ? 'active' : ''}" data-rest-mode="explicit" title="Show all rests">All</button>
+              </div>
+              <label class="cue-rest-toggle" title="Show cue-sized rests for secondary voice">
+                <input type="checkbox" class="cue-rest-checkbox" ${this.cueRestsForSecondaryVoice ? 'checked' : ''}>
+                <span class="cue-rest-label">Cue</span>
+              </label>
+            </div>
           </div>
-        </div>
-
-        <!-- Edit Section -->
-        <div class="toolbar-section edit-section">
-          <button
-            class="toolbar-btn undo-btn"
-            data-action="undo"
-            title="Undo (Ctrl+Z)"
-          >
-            ↩
-          </button>
-          <button
-            class="toolbar-btn redo-btn"
-            data-action="redo"
-            title="Redo (Ctrl+Y)"
-          >
-            ↪
-          </button>
-          <button
-            class="toolbar-btn copy-btn"
-            data-action="copy"
-            title="Copy Notes (Ctrl+C)"
-          >
-            📋
-          </button>
-          <button
-            class="toolbar-btn copy-block-btn"
-            data-action="copyBlock"
-            title="Copy Building Block (Ctrl+Shift+C)"
-          >
-            ⊞
-          </button>
-          <button
-            class="toolbar-btn paste-btn"
-            data-action="paste"
-            title="Paste (Ctrl+V)"
-          >
-            📥
-          </button>
-          <select class="paste-position-select" title="Paste Position">
-            <option value="afterSelection">After Selection</option>
-            <option value="beginning">At Beginning</option>
-            <option value="end">At End</option>
-          </select>
-          <button
-            class="toolbar-btn delete-btn"
-            data-action="delete"
-            title="Delete (Del)"
-          >
-            🗑
-          </button>
-        </div>
-
-        <!-- Octave Section -->
-        <div class="toolbar-section octave-section">
-          <button
-            class="toolbar-btn octave-up-btn"
-            data-action="octaveUp"
-            title="Octave Up (Ctrl+↑)"
-          >
-            ⬆8
-          </button>
-          <button
-            class="toolbar-btn octave-down-btn"
-            data-action="octaveDown"
-            title="Octave Down (Ctrl+↓)"
-          >
-            ⬇8
-          </button>
-        </div>
-
-        <!-- Chord Symbol Section -->
-        <div class="toolbar-section chord-symbol-section">
-          <span class="section-label">Chord Symbol</span>
-          <input
-            type="text"
-            class="chord-symbol-input"
-            placeholder="Cmaj7"
-            title="Chord symbol (appears above measure)"
-            maxlength="12"
-          >
-          <button class="toolbar-btn apply-chord-btn" title="Apply chord symbol to measure">
-            Apply
-          </button>
-        </div>
-
-        <!-- Voice Section -->
-        <div class="toolbar-section voice-section">
-          <span class="section-label">Voice</span>
-          <select class="voice-select" title="Select voice">
-            <option value="1" ${this.voiceNumber === 1 ? 'selected' : ''}>Voice 1</option>
-            <option value="2" ${this.voiceNumber === 2 ? 'selected' : ''}>Voice 2</option>
-          </select>
-        </div>
-
-        <!-- View Section -->
-        <div class="toolbar-section view-section">
-          <span class="section-label">Zoom</span>
-          <select class="zoom-select" title="Zoom level">
-            ${ZOOM_LEVELS.map(z => `
-              <option value="${z}" ${z === this.zoom ? 'selected' : ''}>${z}%</option>
-            `).join('')}
-          </select>
-
-          <span class="section-label">Measures/Line</span>
-          <select class="measures-select" title="Measures per line">
-            ${MEASURES_PER_LINE_OPTIONS.map(m => `
-              <option value="${m}" ${m === this.measuresPerLine ? 'selected' : ''}>${m}</option>
-            `).join('')}
-          </select>
-        </div>
-
-        <!-- Multi-Voice Rest Display Section -->
-        <div class="toolbar-section rest-display-section">
-          <span class="section-label">Rests</span>
-          <div class="button-group rest-display-buttons">
-            <button
-              class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'clean' ? 'active' : ''}"
-              data-rest-mode="clean"
-              title="Clean Notation: Hide redundant rests when another voice has a note on the same beat"
-            >
-              Clean
-            </button>
-            <button
-              class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'explicit' ? 'active' : ''}"
-              data-rest-mode="explicit"
-              title="Explicit Notation: Show all rests in all voices"
-            >
-              All
-            </button>
-          </div>
-          <label class="cue-rest-toggle" title="Use smaller (cue-sized) rests for secondary voice">
-            <input type="checkbox" class="cue-rest-checkbox" ${this.cueRestsForSecondaryVoice ? 'checked' : ''}>
-            <span class="cue-rest-label">Cue</span>
-          </label>
         </div>
       </div>
     `;
@@ -410,39 +301,69 @@ export class NotationToolbar {
       .notation-toolbar {
         display: flex;
         flex-wrap: wrap;
-        gap: 16px;
-        padding: 12px;
+        gap: 6px;
+        padding: 6px 8px;
         background: var(--bg-secondary, #2a2a2a);
-        border-radius: 8px;
-        margin-bottom: 16px;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        align-items: stretch;
+      }
+
+      /* Toolbar groups with labels */
+      .toolbar-group {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 4px 6px;
+        background: rgba(255,255,255,0.03);
+        border-radius: 4px;
+        border: 1px solid rgba(255,255,255,0.05);
+      }
+
+      .group-label {
+        font-size: 9px;
+        font-weight: 600;
+        color: var(--text-muted, #888);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        text-align: center;
+        margin-bottom: 2px;
+      }
+
+      .toolbar-group-content {
+        display: flex;
         align-items: center;
+        gap: 4px;
       }
 
       .toolbar-section {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 2px;
       }
 
-      .section-label {
-        font-size: 12px;
-        color: var(--text-muted, #888);
-        margin-right: 4px;
+      /* Subtle divider between sections within a group */
+      .toolbar-group-content > .toolbar-section:not(:first-child)::before {
+        content: '';
+        width: 1px;
+        height: 16px;
+        background: rgba(255,255,255,0.1);
+        margin-right: 2px;
       }
 
       .button-group {
         display: flex;
-        gap: 2px;
+        gap: 1px;
       }
 
       .toolbar-btn {
-        width: 36px;
-        height: 36px;
+        width: 32px;
+        height: 32px;
         border: none;
         border-radius: 4px;
         background: var(--bg-tertiary, #333);
         color: var(--text-primary, #fff);
-        font-size: 18px;
+        font-size: 15px;
         cursor: pointer;
         display: flex;
         align-items: center;
@@ -489,11 +410,11 @@ export class NotationToolbar {
       }
 
       .duration-btn {
-        font-size: 20px;
+        font-size: 18px;
       }
 
       .accidental-btn {
-        font-size: 16px;
+        font-size: 15px;
       }
 
       .articulation-btn {
@@ -501,47 +422,62 @@ export class NotationToolbar {
         font-weight: bold;
       }
 
+      .tuplet-btn {
+        font-size: 13px;
+        font-weight: 600;
+      }
+
       .toolbar-section select {
-        padding: 6px 8px;
+        padding: 4px 8px;
         border-radius: 4px;
         border: none;
         background: var(--bg-tertiary, #333);
         color: var(--text-primary, #fff);
         font-size: 12px;
         cursor: pointer;
+        height: 32px;
       }
 
       .toolbar-section select:focus {
         outline: 2px solid var(--accent-color, #4a9eff);
       }
 
-      .zoom-select, .measures-select, .voice-select {
-        min-width: 70px;
+      .zoom-select {
+        min-width: 52px;
+      }
+
+      .measures-select {
+        min-width: 55px;
+      }
+
+      .voice-select {
+        min-width: 36px;
       }
 
       .selection-indicator {
         background: var(--accent-color, #4a9eff);
-        padding: 8px 12px;
-        border-radius: 6px;
+        padding: 4px 8px;
+        border-radius: 4px;
         font-weight: bold;
       }
 
       .selection-badge {
         color: white;
-        font-size: 13px;
+        font-size: 11px;
         white-space: nowrap;
       }
 
       .chord-symbol-input {
-        padding: 6px 10px;
+        padding: 4px 8px;
         border-radius: 4px;
         border: 1px solid var(--bg-tertiary, #333);
         background: var(--bg-input, #222);
         color: var(--text-primary, #fff);
-        font-size: 13px;
+        font-size: 12px;
         font-family: 'Courier New', monospace;
-        width: 100px;
+        width: 70px;
         text-align: center;
+        height: 32px;
       }
 
       .chord-symbol-input:focus {
@@ -555,23 +491,28 @@ export class NotationToolbar {
       }
 
       .apply-chord-btn {
-        width: auto;
-        padding: 0 12px;
+        width: 28px;
+        padding: 0;
         font-size: 12px;
         font-weight: 600;
       }
 
       /* Rest display mode section */
       .rest-display-section {
-        border-left: 1px solid var(--bg-tertiary, #444);
-        padding-left: 12px;
+        border-left: none;
+        padding-left: 0;
+      }
+
+      .rest-display-section::before {
+        display: none;
       }
 
       .rest-display-btn {
         width: auto;
-        padding: 0 10px;
+        padding: 0 8px;
         font-size: 11px;
         font-weight: 500;
+        height: 32px;
       }
 
       .cue-rest-toggle {
@@ -585,6 +526,7 @@ export class NotationToolbar {
         font-size: 11px;
         color: var(--text-primary, #fff);
         transition: background 0.15s ease;
+        height: 32px;
       }
 
       .cue-rest-toggle:hover {
@@ -592,7 +534,7 @@ export class NotationToolbar {
       }
 
       .cue-rest-checkbox {
-        width: 14px;
+        width: 12px;
         height: 14px;
         cursor: pointer;
       }
@@ -800,6 +742,11 @@ export class NotationToolbar {
     // Cue rest checkbox
     this.container.querySelector('.cue-rest-checkbox')?.addEventListener('change', (e) => {
       this.setCueRestsEnabled(e.target.checked);
+    });
+
+    // Voice leading toggle button
+    this.container.querySelector('.voice-leading-btn')?.addEventListener('click', () => {
+      this.toggleVoiceLeading();
     });
 
     // Keyboard shortcuts
@@ -1026,6 +973,39 @@ export class NotationToolbar {
     this.isDotted = !this.isDotted;
     this.updateDotButton();
     this.onDottedChange(this.isDotted);
+  }
+
+  /**
+   * Toggle voice leading visualization
+   */
+  toggleVoiceLeading() {
+    this.isVoiceLeadingVisible = !this.isVoiceLeadingVisible;
+    localStorage.setItem('voice-leading-overlay-visible', this.isVoiceLeadingVisible.toString());
+    this.updateVoiceLeadingButton();
+    this.onVoiceLeadingToggle(this.isVoiceLeadingVisible);
+  }
+
+  /**
+   * Update voice leading button state
+   */
+  updateVoiceLeadingButton() {
+    const btn = this.container?.querySelector('.voice-leading-btn');
+    if (btn) {
+      btn.classList.toggle('active', this.isVoiceLeadingVisible);
+    }
+  }
+
+  /**
+   * Set voice leading visibility explicitly
+   * @param {boolean} visible - Whether to show voice leading
+   */
+  setVoiceLeadingVisible(visible) {
+    if (this.isVoiceLeadingVisible !== visible) {
+      this.isVoiceLeadingVisible = visible;
+      localStorage.setItem('voice-leading-overlay-visible', this.isVoiceLeadingVisible.toString());
+      this.updateVoiceLeadingButton();
+      this.onVoiceLeadingToggle(this.isVoiceLeadingVisible);
+    }
   }
 
   /**

@@ -41,6 +41,115 @@ let currentChordContext = null;
 let isPanelVisible = false;
 
 // ===========================================
+// LESSON LINKS MAPPING
+// ===========================================
+
+/**
+ * Map chord functions and features to relevant lessons
+ * Each entry has: lessonId, title, description, keywords
+ */
+const LESSON_LINKS = {
+    'lesson-voice-leading': {
+        title: 'Voice Leading',
+        description: 'How notes move between chords',
+        keywords: ['voice leading', 'parallel', 'leading tone', 'resolution', 'contrary motion']
+    },
+    'lesson-modes-intro': {
+        title: 'Introduction to Modes',
+        description: 'Understanding modal scales',
+        keywords: ['dorian', 'mixolydian', 'phrygian', 'lydian', 'aeolian', 'mode', 'modal']
+    },
+    'lesson-modal-harmony': {
+        title: 'Modal Harmony',
+        description: 'Using borrowed chords',
+        keywords: ['borrowed', 'modal interchange', 'parallel minor', 'parallel major', 'bVI', 'bVII', 'iv', 'bIII']
+    },
+    'lesson-extended-chords': {
+        title: 'Extended Chords',
+        description: 'Adding 9ths, 11ths, and 13ths',
+        keywords: ['extended', '9th', '11th', '13th', 'add9', 'maj9', 'min9', 'jazz', 'color']
+    }
+};
+
+/**
+ * Get relevant lessons for the current chord context
+ * @param {Object} context - The chord context
+ * @param {Object} explanation - The explanation object
+ * @returns {Array} Array of relevant lesson objects
+ */
+function getRelevantLessons(context, explanation) {
+    const lessons = [];
+    const romanNumeral = (context.romanNumeral || '').toLowerCase();
+    const explText = (explanation.explanation || '').toLowerCase();
+    const contextInfo = (explanation.contextualInfo || '').toLowerCase();
+    const reason = (context.reason || '').toLowerCase();
+
+    // Combine all text for keyword matching
+    const allText = `${romanNumeral} ${explText} ${contextInfo} ${reason} ${context.type || ''}`;
+
+    // Check for borrowed chord indicators
+    const borrowedIndicators = ['bvi', 'bvii', 'biii', 'borrowed', 'modal interchange', 'parallel minor', 'parallel major'];
+    if (borrowedIndicators.some(ind => allText.includes(ind))) {
+        lessons.push({
+            ...LESSON_LINKS['lesson-modal-harmony'],
+            lessonId: 'lesson-modal-harmony'
+        });
+    }
+
+    // Check for mode indicators
+    const modeIndicators = ['dorian', 'mixolydian', 'phrygian', 'lydian', 'aeolian', 'modal'];
+    if (modeIndicators.some(ind => allText.includes(ind))) {
+        lessons.push({
+            ...LESSON_LINKS['lesson-modes-intro'],
+            lessonId: 'lesson-modes-intro'
+        });
+    }
+
+    // Check for extended chord indicators
+    const extendedIndicators = ['9th', '11th', '13th', 'add9', 'maj9', 'min9', 'extended'];
+    if (extendedIndicators.some(ind => allText.includes(ind)) ||
+        (context.type && context.type.includes('9'))) {
+        lessons.push({
+            ...LESSON_LINKS['lesson-extended-chords'],
+            lessonId: 'lesson-extended-chords'
+        });
+    }
+
+    // Check for voice leading indicators
+    const vlIndicators = ['voice leading', 'leading tone', 'resolution', 'resolves', 'parallel fifth', 'parallel octave', 'contrary motion'];
+    if (vlIndicators.some(ind => allText.includes(ind))) {
+        lessons.push({
+            ...LESSON_LINKS['lesson-voice-leading'],
+            lessonId: 'lesson-voice-leading'
+        });
+    }
+
+    // Remove duplicates
+    const uniqueLessons = lessons.filter((lesson, index, self) =>
+        index === self.findIndex(l => l.lessonId === lesson.lessonId)
+    );
+
+    return uniqueLessons.slice(0, 2); // Max 2 lessons to keep it clean
+}
+
+/**
+ * Open a lesson from the Why This Works panel
+ * @param {string} lessonId - The lesson ID to open
+ */
+function openLesson(lessonId) {
+    if (window.openLessonById && typeof window.openLessonById === 'function') {
+        window.openLessonById(lessonId);
+    } else if (window.showLessonViewer && typeof window.showLessonViewer === 'function') {
+        window.showLessonViewer(lessonId);
+    } else {
+        console.warn('[WhyThisWorks] Lesson viewer not available');
+    }
+}
+
+// Expose openLesson for use in inline handlers
+window.wtwOpenLesson = openLesson;
+
+// ===========================================
 // HELPERS
 // ===========================================
 
@@ -1255,6 +1364,37 @@ function buildExplanationHTML(context, explanation, chordFunc) {
     }
   }
 
+  // Build lesson links section
+  let lessonLinksHTML = '';
+  const relevantLessons = getRelevantLessons(context, explanation);
+  if (relevantLessons.length > 0) {
+    lessonLinksHTML = `
+      <div class="p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+        <h5 class="text-sm font-bold text-indigo-800 mb-2 flex items-center gap-2">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"></path>
+          </svg>
+          Explore Related Lessons
+        </h5>
+        <div class="flex flex-wrap gap-2">
+          ${relevantLessons.map(lesson => `
+            <button onclick="window.wtwOpenLesson('${lesson.lessonId}')"
+                    class="flex items-center gap-2 px-3 py-2 bg-white border border-indigo-300 rounded-lg hover:bg-indigo-100 hover:border-indigo-400 transition-colors cursor-pointer group">
+              <span class="text-indigo-600 group-hover:text-indigo-800">📖</span>
+              <div class="text-left">
+                <div class="text-sm font-medium text-indigo-800">${lesson.title}</div>
+                <div class="text-xs text-indigo-600">${lesson.description}</div>
+              </div>
+              <svg class="w-4 h-4 text-indigo-400 group-hover:text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+              </svg>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
   return `
     <!-- Header -->
     <div class="flex items-center justify-between mb-4">
@@ -1299,6 +1439,7 @@ function buildExplanationHTML(context, explanation, chordFunc) {
     ${reasonsHTML}
     ${suggestionsHTML}
     ${advancedHTML}
+    ${lessonLinksHTML}
   `;
 }
 

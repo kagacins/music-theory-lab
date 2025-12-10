@@ -116,7 +116,8 @@ const CHORD_INTENTS = {
     COMPARE: 'compare',      // Compare alternatives for a position
     TRANSFORM: 'transform',  // Transform the whole progression
     OPTIMIZE: 'optimize',    // Optimize for tension curve
-    SEQUENCE: 'sequence'     // Build multi-chord sequences
+    SEQUENCE: 'sequence',    // Build multi-chord sequences
+    ADVANCED: 'advanced'     // Borrowed chords, secondary dominants, chromatic mediants
 };
 
 function hexToRgba(hex, alpha = 0.15) {
@@ -353,6 +354,8 @@ let modalState = {
     // Multi-selection support: start and end indices for range selection (shift+click)
     selectedProgressionStart: -1, // -1 = use selectedProgressionIndex as single selection
     selectedProgressionEnd: -1,   // -1 = same as start (single chord)
+    // Section picker state for navigation (Set of section IDs)
+    selectedSectionIds: new Set(), // Empty = show all chords
     // Melody tab state
     melodyView: localStorage.getItem('unified-modal-melody-view') || MELODY_VIEWS.NOTES,
     melodyStyleId: localStorage.getItem('melody-suggestion-style') || 'any',
@@ -1005,6 +1008,7 @@ function createPersistentProgressionBar() {
 
 /**
  * Update the persistent progression bar content
+ * Now includes section picker for navigation and filtered chord display
  */
 function updatePersistentProgressionBar(bar) {
     if (!bar) {
@@ -1017,29 +1021,12 @@ function updatePersistentProgressionBar(bar) {
     const key = getCurrentKey() || 'C';
     const progressionData = getProgressionData() || [];
 
-    // Label with progression icon
-    const label = document.createElement('div');
-    label.className = 'rm-progression-label';
-    label.innerHTML = `<span class="rm-progression-label-icon">🎹</span> Progression <span class="rm-progression-label-key">(${key})</span>`;
-    bar.appendChild(label);
-
-    // Separator
-    const sep = document.createElement('div');
-    sep.className = 'rm-separator';
-    bar.appendChild(sep);
-
-    // Build section lookup for chord coloring
+    // Build section data
     const compositionState = getCompositionState();
     const sections = compositionState?.getSections?.() || [];
-    const sectionStartMap = new Map();
     const sectionChordMap = new Map();
     sections.forEach(section => {
         if (!section?.chordIndices || section.chordIndices.length === 0) return;
-        const startIdx = Math.min(...section.chordIndices);
-        if (!sectionStartMap.has(startIdx)) {
-            sectionStartMap.set(startIdx, []);
-        }
-        sectionStartMap.get(startIdx).push(section);
         section.chordIndices.forEach(idx => {
             if (!sectionChordMap.has(idx)) {
                 sectionChordMap.set(idx, []);
@@ -1048,114 +1035,32 @@ function updatePersistentProgressionBar(bar) {
         });
     });
 
-    // Chord chips container
-    const chipsContainer = document.createElement('div');
-    chipsContainer.className = 'rm-chips-container';
-    chipsContainer.style.cssText = 'flex: 1;';
+    // Build pseudo-sections for ungrouped chords (like in progressionBuilder)
+    const allSectionsWithPseudo = buildSectionsWithUngrouped(sections, progressionData.length);
 
-    if (progressionData.length === 0) {
-        const emptyMsg = document.createElement('span');
-        emptyMsg.textContent = 'No chords yet - add some to get recommendations';
-        emptyMsg.style.cssText = 'font-size: 10px; color: #9ca3af; font-style: italic;';
-        chipsContainer.appendChild(emptyMsg);
-    } else {
-        progressionData.forEach((chord, idx) => {
-            // Section badge at start of section
-            const sectionBadges = sectionStartMap.get(idx);
-            if (sectionBadges) {
-                sectionBadges.forEach(section => {
-                    const badge = document.createElement('span');
-                    const sectionLabel = section.label || section.type || 'Section';
-                    badge.textContent = sectionLabel;
-                    const color = section.color || '#c084fc';
-                    badge.className = 'rm-badge';
-                    badge.style.cssText = `background: ${color}1A; color: ${color}; border: 1px solid ${color}33;`;
-                    chipsContainer.appendChild(badge);
-                });
-            }
+    // Main container with vertical layout
+    const mainContainer = document.createElement('div');
+    mainContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px; width: 100%;';
 
-            const chordSections = sectionChordMap.get(idx);
-            const primarySection = chordSections?.[0];
-            const chordDef = CHORD_DEFINITIONS[chord.type];
-            const symbol = chordDef?.symbol || '';
-            const invLabel = getInversionLabel(chord.inversion);
-            const spelledRoot = spellNoteInKey(chord.root, key);
+    // Row 1: Header with label and selection indicator
+    const headerRow = document.createElement('div');
+    headerRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px;';
 
-            // Check if this chord is in selection range (supports multi-select)
-            const selStart = modalState.selectedProgressionStart;
-            const selEnd = modalState.selectedProgressionEnd;
-            const hasMultiSelect = selStart >= 0 && selEnd >= 0 && selStart !== selEnd;
-            const isInRange = hasMultiSelect
-                ? idx >= Math.min(selStart, selEnd) && idx <= Math.max(selStart, selEnd)
-                : modalState.selectedProgressionIndex === idx;
+    const label = document.createElement('div');
+    label.className = 'rm-progression-label';
+    label.innerHTML = `<span class="rm-progression-label-icon">🎹</span> Progression <span class="rm-progression-label-key">(${key})</span>`;
+    headerRow.appendChild(label);
 
-            const chip = document.createElement('button');
-            chip.textContent = `${spelledRoot}${symbol}${invLabel}`;
-            chip.title = `${spelledRoot} ${chord.type}${chord.inversion ? ` (${INVERSION_NAMES[chord.inversion]})` : ''} - Click to select, Shift+click to select range`;
-            chip.className = 'rm-chord-chip' + (isInRange ? ' selected' : '');
-
-            // Dynamic colors for section theming - keep section color, use outline for selection
-            if (primarySection) {
-                const sectionColor = primarySection.color || '#c084fc';
-                if (isInRange) {
-                    // Selected: keep section color but add strong outline
-                    chip.style.cssText = `background: ${hexToRgba(sectionColor, 0.25)}; border-color: ${sectionColor}; color: ${sectionColor}; outline: 2px solid var(--rm-primary); outline-offset: 1px;`;
-                } else {
-                    chip.style.cssText = `background: ${hexToRgba(sectionColor, 0.18)}; border-color: ${sectionColor}; color: ${sectionColor};`;
-                }
-            } else if (isInRange) {
-                // No section, just selected - use outline
-                chip.style.cssText = `outline: 2px solid var(--rm-primary); outline-offset: 1px;`;
-            }
-
-            chip.addEventListener('click', (e) => {
-                if (e.shiftKey && modalState.selectedProgressionIndex >= 0) {
-                    // Shift+click: extend selection range from current to clicked
-                    const startIdx = modalState.selectedProgressionIndex;
-                    modalState.selectedProgressionStart = Math.min(startIdx, idx);
-                    modalState.selectedProgressionEnd = Math.max(startIdx, idx);
-                } else {
-                    // Normal click: single selection, clear range
-                    modalState.selectedProgressionIndex = idx;
-                    modalState.selectedProgressionStart = -1;
-                    modalState.selectedProgressionEnd = -1;
-                    modalState.currentRoot = chord.root;
-                    modalState.currentChordType = chord.type;
-                    modalState.activeInversion = chord.inversion || 0;
-                }
-                updatePersistentProgressionBar();
-                renderActiveTab();
-            });
-
-            chip.addEventListener('mouseenter', () => {
-                if (!isInRange) {
-                    chip.style.transform = 'scale(1.05)';
-                    chip.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-                }
-            });
-            chip.addEventListener('mouseleave', () => {
-                chip.style.transform = '';
-                chip.style.boxShadow = '';
-            });
-
-            chipsContainer.appendChild(chip);
-        });
-    }
-
-    // Note: Removed the "+ Add" button as it wasn't providing useful functionality
-    // Users can add chords after the last position by default when no chord is selected
-
-    bar.appendChild(chipsContainer);
-
-    // Current selection indicator
+    // Selection indicator
     const selectionIndicator = document.createElement('div');
     selectionIndicator.className = 'rm-selection-indicator';
-    const hasMultiSelect = modalState.selectedProgressionStart >= 0 && modalState.selectedProgressionEnd >= 0 &&
+    selectionIndicator.style.cssText = 'font-size: 11px; color: #6b7280; white-space: nowrap;';
+    const hasMultiSelectChords = modalState.selectedProgressionStart >= 0 && modalState.selectedProgressionEnd >= 0 &&
                            modalState.selectedProgressionStart !== modalState.selectedProgressionEnd;
 
-    if (modalState.selectedProgressionIndex === -1 && !hasMultiSelect) {
+    if (modalState.selectedProgressionIndex === -1 && !hasMultiSelectChords) {
         selectionIndicator.innerHTML = `<strong style="color: #10b981;">Adding</strong> after #${progressionData.length || 0}`;
-    } else if (hasMultiSelect) {
+    } else if (hasMultiSelectChords) {
         const start = Math.min(modalState.selectedProgressionStart, modalState.selectedProgressionEnd);
         const end = Math.max(modalState.selectedProgressionStart, modalState.selectedProgressionEnd);
         const count = end - start + 1;
@@ -1166,7 +1071,331 @@ function updatePersistentProgressionBar(bar) {
         const symbol = chordDef?.symbol || '';
         selectionIndicator.innerHTML = `<strong style="color: var(--rm-primary);">Selected:</strong> ${selectedChord?.root}${symbol} (#${modalState.selectedProgressionIndex + 1})`;
     }
-    bar.appendChild(selectionIndicator);
+    headerRow.appendChild(selectionIndicator);
+    mainContainer.appendChild(headerRow);
+
+    // Row 2: Section picker bar (only if sections exist)
+    if (allSectionsWithPseudo.length > 0) {
+        const sectionPickerRow = document.createElement('div');
+        sectionPickerRow.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            overflow-x: auto;
+            padding: 4px 0;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 transparent;
+        `;
+
+        const sectionLabel = document.createElement('span');
+        sectionLabel.textContent = 'Sections:';
+        sectionLabel.style.cssText = 'font-size: 10px; color: #6b7280; flex-shrink: 0;';
+        sectionPickerRow.appendChild(sectionLabel);
+
+        // "All" button to show all chords
+        const allBtn = document.createElement('button');
+        const isAllSelected = modalState.selectedSectionIds.size === 0;
+        allBtn.textContent = 'All';
+        allBtn.title = 'Show all chords';
+        allBtn.style.cssText = `
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: all 0.15s ease;
+            background: ${isAllSelected ? '#667eea' : '#f3f4f6'};
+            color: ${isAllSelected ? 'white' : '#6b7280'};
+            border: 1px solid ${isAllSelected ? '#667eea' : '#d1d5db'};
+        `;
+        allBtn.addEventListener('click', () => {
+            modalState.selectedSectionIds.clear();
+            updatePersistentProgressionBar();
+        });
+        sectionPickerRow.appendChild(allBtn);
+
+        // Section pills
+        // Track last clicked section for shift+click range selection
+        allSectionsWithPseudo.forEach((section, sectionIndex) => {
+            const isSelected = modalState.selectedSectionIds.has(section.id);
+            const color = section.color || '#9ca3af';
+
+            const pill = document.createElement('button');
+            pill.textContent = section.label || 'Section';
+            pill.title = `${section.label} (${section.chordIndices.length} chords) - Click to select, Shift+click for range, Ctrl+click to toggle`;
+            pill.setAttribute('data-section-index', sectionIndex);
+            pill.style.cssText = `
+                padding: 2px 8px;
+                border-radius: 9999px;
+                font-size: 10px;
+                font-weight: 600;
+                cursor: pointer;
+                flex-shrink: 0;
+                transition: all 0.15s ease;
+                background: ${isSelected ? color : hexToRgba(color, 0.15)};
+                color: ${isSelected ? 'white' : color};
+                border: 1px solid ${color};
+            `;
+
+            pill.addEventListener('click', (e) => {
+                if (e.shiftKey && modalState.lastClickedSectionIndex !== undefined) {
+                    // Shift+click: select range from last clicked to this section
+                    const start = Math.min(modalState.lastClickedSectionIndex, sectionIndex);
+                    const end = Math.max(modalState.lastClickedSectionIndex, sectionIndex);
+                    modalState.selectedSectionIds.clear();
+                    for (let i = start; i <= end; i++) {
+                        modalState.selectedSectionIds.add(allSectionsWithPseudo[i].id);
+                    }
+                } else if (e.ctrlKey || e.metaKey) {
+                    // Ctrl+click: toggle this section
+                    if (modalState.selectedSectionIds.has(section.id)) {
+                        modalState.selectedSectionIds.delete(section.id);
+                    } else {
+                        modalState.selectedSectionIds.add(section.id);
+                    }
+                    modalState.lastClickedSectionIndex = sectionIndex;
+                } else {
+                    // Normal click: select only this section
+                    modalState.selectedSectionIds.clear();
+                    modalState.selectedSectionIds.add(section.id);
+                    modalState.lastClickedSectionIndex = sectionIndex;
+                }
+                updatePersistentProgressionBar();
+            });
+
+            pill.addEventListener('mouseenter', () => {
+                if (!isSelected) {
+                    pill.style.background = hexToRgba(color, 0.3);
+                }
+            });
+            pill.addEventListener('mouseleave', () => {
+                if (!isSelected) {
+                    pill.style.background = hexToRgba(color, 0.15);
+                }
+            });
+
+            sectionPickerRow.appendChild(pill);
+        });
+
+        mainContainer.appendChild(sectionPickerRow);
+    }
+
+    // Row 3: Chord chips (filtered by selected sections, grouped visually)
+    const chipsWrapper = document.createElement('div');
+    chipsWrapper.style.cssText = `
+        display: flex;
+        align-items: stretch;
+        gap: 6px;
+        overflow-x: auto;
+        padding: 4px 0;
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 transparent;
+    `;
+
+    if (progressionData.length === 0) {
+        const emptyMsg = document.createElement('span');
+        emptyMsg.textContent = 'No chords yet - add some to get recommendations';
+        emptyMsg.style.cssText = 'font-size: 10px; color: #9ca3af; font-style: italic;';
+        chipsWrapper.appendChild(emptyMsg);
+    } else {
+        // Determine visible sections based on selection
+        let visibleSections = [];
+        if (modalState.selectedSectionIds.size === 0) {
+            // No section filter - show all sections
+            visibleSections = [...allSectionsWithPseudo];
+        } else {
+            // Show only selected sections
+            visibleSections = allSectionsWithPseudo.filter(s => modalState.selectedSectionIds.has(s.id));
+        }
+
+        // Render chord chips grouped by section
+        visibleSections.forEach((section, sectionVisualIndex) => {
+            const sectionColor = section.color || '#9ca3af';
+
+            // Create a section group container
+            const sectionGroup = document.createElement('div');
+            sectionGroup.style.cssText = `
+                display: flex;
+                flex-direction: column;
+                flex-shrink: 0;
+                border-radius: 6px;
+                overflow: hidden;
+                border: 1px solid ${hexToRgba(sectionColor, 0.3)};
+                background: ${hexToRgba(sectionColor, 0.05)};
+            `;
+
+            // Section label header (compact)
+            const sectionLabel = document.createElement('div');
+            sectionLabel.style.cssText = `
+                font-size: 8px;
+                font-weight: 600;
+                color: white;
+                background: ${sectionColor};
+                padding: 1px 6px;
+                text-align: center;
+                white-space: nowrap;
+            `;
+            sectionLabel.textContent = section.label || 'Section';
+            sectionGroup.appendChild(sectionLabel);
+
+            // Chips container within the section group
+            const sectionChips = document.createElement('div');
+            sectionChips.style.cssText = `
+                display: flex;
+                align-items: center;
+                gap: 2px;
+                padding: 3px;
+            `;
+
+            // Render chips for this section's chords
+            section.chordIndices.forEach(idx => {
+                if (idx >= progressionData.length) return;
+
+                const chord = progressionData[idx];
+                const chordDef = CHORD_DEFINITIONS[chord.type];
+                const symbol = chordDef?.symbol || '';
+                const invLabel = getInversionLabel(chord.inversion);
+                const spelledRoot = spellNoteInKey(chord.root, key);
+
+                // Check if this chord is in selection range
+                const selStart = modalState.selectedProgressionStart;
+                const selEnd = modalState.selectedProgressionEnd;
+                const hasMultiSelect = selStart >= 0 && selEnd >= 0 && selStart !== selEnd;
+                const isInRange = hasMultiSelect
+                    ? idx >= Math.min(selStart, selEnd) && idx <= Math.max(selStart, selEnd)
+                    : modalState.selectedProgressionIndex === idx;
+
+                const chip = document.createElement('button');
+                chip.textContent = `${spelledRoot}${symbol}${invLabel}`;
+                chip.title = `${spelledRoot} ${chord.type}${chord.inversion ? ` (${INVERSION_NAMES[chord.inversion]})` : ''} (#${idx + 1}) - Click to select, Shift+click to select range`;
+                chip.className = 'rm-chord-chip' + (isInRange ? ' selected' : '');
+                chip.style.cssText = `
+                    flex-shrink: 0;
+                    background: ${isInRange ? hexToRgba(sectionColor, 0.35) : hexToRgba(sectionColor, 0.18)};
+                    border-color: ${sectionColor};
+                    color: ${sectionColor};
+                    ${isInRange ? 'outline: 2px solid var(--rm-primary); outline-offset: 1px;' : ''}
+                `;
+
+                chip.addEventListener('click', (e) => {
+                    if (e.shiftKey && modalState.selectedProgressionIndex >= 0) {
+                        // Shift+click: extend selection range
+                        const startIdx = modalState.selectedProgressionIndex;
+                        modalState.selectedProgressionStart = Math.min(startIdx, idx);
+                        modalState.selectedProgressionEnd = Math.max(startIdx, idx);
+                    } else {
+                        // Normal click: single selection
+                        modalState.selectedProgressionIndex = idx;
+                        modalState.selectedProgressionStart = -1;
+                        modalState.selectedProgressionEnd = -1;
+                        modalState.currentRoot = chord.root;
+                        modalState.currentChordType = chord.type;
+                        modalState.activeInversion = chord.inversion || 0;
+                    }
+                    updatePersistentProgressionBar();
+                    renderActiveTab();
+                });
+
+                chip.addEventListener('mouseenter', () => {
+                    if (!isInRange) {
+                        chip.style.transform = 'scale(1.05)';
+                        chip.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                    }
+                });
+                chip.addEventListener('mouseleave', () => {
+                    chip.style.transform = '';
+                    chip.style.boxShadow = '';
+                });
+
+                sectionChips.appendChild(chip);
+            });
+
+            sectionGroup.appendChild(sectionChips);
+            chipsWrapper.appendChild(sectionGroup);
+        });
+    }
+
+    mainContainer.appendChild(chipsWrapper);
+    bar.appendChild(mainContainer);
+}
+
+/**
+ * Build sections list including pseudo-sections for ungrouped chords
+ */
+function buildSectionsWithUngrouped(sections, totalChords) {
+    const result = [];
+    const groupedIndices = new Set();
+
+    // First, add real sections sorted by first chord index
+    const sortedSections = [...sections].sort((a, b) => {
+        const aMin = Math.min(...(a.chordIndices || []));
+        const bMin = Math.min(...(b.chordIndices || []));
+        return aMin - bMin;
+    });
+
+    sortedSections.forEach(section => {
+        if (section.chordIndices && section.chordIndices.length > 0) {
+            result.push({
+                id: section.id,
+                label: section.label || section.type || 'Section',
+                color: section.color || '#9ca3af',
+                chordIndices: [...section.chordIndices],
+                isPseudoSection: false
+            });
+            section.chordIndices.forEach(idx => groupedIndices.add(idx));
+        }
+    });
+
+    // Find ungrouped chord indices and create pseudo-sections for consecutive ranges
+    const ungroupedIndices = [];
+    for (let i = 0; i < totalChords; i++) {
+        if (!groupedIndices.has(i)) {
+            ungroupedIndices.push(i);
+        }
+    }
+
+    if (ungroupedIndices.length > 0) {
+        // Group consecutive ungrouped indices
+        let currentGroup = [ungroupedIndices[0]];
+        let pseudoCount = 1;
+
+        for (let i = 1; i < ungroupedIndices.length; i++) {
+            if (ungroupedIndices[i] === ungroupedIndices[i - 1] + 1) {
+                currentGroup.push(ungroupedIndices[i]);
+            } else {
+                // End current group, start new one
+                result.push({
+                    id: `pseudo-${pseudoCount}`,
+                    label: `Ungrouped ${pseudoCount}`,
+                    color: '#9ca3af',
+                    chordIndices: currentGroup,
+                    isPseudoSection: true
+                });
+                pseudoCount++;
+                currentGroup = [ungroupedIndices[i]];
+            }
+        }
+        // Don't forget the last group
+        if (currentGroup.length > 0) {
+            result.push({
+                id: `pseudo-${pseudoCount}`,
+                label: `Ungrouped ${pseudoCount}`,
+                color: '#9ca3af',
+                chordIndices: currentGroup,
+                isPseudoSection: true
+            });
+        }
+    }
+
+    // Sort all by first chord index
+    result.sort((a, b) => {
+        const aMin = Math.min(...a.chordIndices);
+        const bMin = Math.min(...b.chordIndices);
+        return aMin - bMin;
+    });
+
+    return result;
 }
 
 function createTabNavigation() {
@@ -1606,6 +1835,12 @@ function createChordIntentNav() {
             label: 'Sequence',
             icon: '🔗',
             description: 'Build chord sequences'
+        },
+        {
+            id: CHORD_INTENTS.ADVANCED,
+            label: 'Advanced',
+            icon: '✨',
+            description: 'Borrowed chords, secondary dominants, chromatic mediants'
         }
     ];
 
@@ -1678,6 +1913,9 @@ function renderChordIntentContent() {
         case CHORD_INTENTS.SEQUENCE:
             renderSequenceIntent(container);
             break;
+        case CHORD_INTENTS.ADVANCED:
+            renderAdvancedIntent(container);
+            break;
         default:
             renderSuggestIntent(container);
     }
@@ -1734,6 +1972,578 @@ function renderSuggestIntent(container) {
  */
 function renderSequenceIntent(container) {
     renderSequencesView(container);
+}
+
+/**
+ * Advanced Intent: Borrowed chords, secondary dominants, chromatic mediants
+ * Exposes advanced harmonic techniques for users who want to explore beyond diatonic harmony
+ */
+function renderAdvancedIntent(container) {
+    container.innerHTML = '';
+
+    const key = getCurrentKey() || 'C';
+    const progressionData = getProgressionData() || [];
+
+    // Header section
+    const header = document.createElement('div');
+    header.style.cssText = `
+        background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+        border: 1px solid #c4b5fd;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+    `;
+    header.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+            <span style="font-size: 18px;">✨</span>
+            <strong style="color: #5b21b6; font-size: 14px;">Advanced Harmonic Techniques</strong>
+        </div>
+        <p style="color: #6d28d9; font-size: 12px; margin: 0;">
+            Explore chords beyond the standard diatonic palette. These add color, tension, and sophistication to your progressions.
+        </p>
+    `;
+    container.appendChild(header);
+
+    // Create tabbed sections for different categories
+    const sections = document.createElement('div');
+    sections.style.cssText = 'display: flex; flex-direction: column; gap: 16px;';
+
+    // 1. Borrowed Chords Section
+    sections.appendChild(createAdvancedSection_BorrowedChords(key));
+
+    // 2. Secondary Dominants Section
+    sections.appendChild(createAdvancedSection_SecondaryDominants(key));
+
+    // 3. Chromatic Mediants Section
+    sections.appendChild(createAdvancedSection_ChromaticMediants(key, progressionData));
+
+    container.appendChild(sections);
+}
+
+/**
+ * Create the Borrowed Chords section for the Advanced tab
+ */
+function createAdvancedSection_BorrowedChords(key) {
+    const section = document.createElement('div');
+    section.style.cssText = `
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        overflow: hidden;
+    `;
+
+    // Section header
+    const sectionHeader = document.createElement('div');
+    sectionHeader.style.cssText = `
+        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+        color: white;
+        padding: 10px 14px;
+        font-weight: 600;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    `;
+    sectionHeader.innerHTML = `<span>🎭</span> Borrowed Chords (Modal Interchange)`;
+    section.appendChild(sectionHeader);
+
+    // Explanation
+    const explanation = document.createElement('div');
+    explanation.style.cssText = `
+        padding: 10px 14px;
+        background: #faf5ff;
+        border-bottom: 1px solid #e9d5ff;
+        font-size: 12px;
+        color: #6b21a8;
+    `;
+    explanation.textContent = `Borrowed from parallel modes. These add emotional depth - minor chords borrowed into major keys add melancholy, while major chords in minor keys add brightness.`;
+    section.appendChild(explanation);
+
+    // Chord cards container
+    const cardsContainer = document.createElement('div');
+    cardsContainer.style.cssText = `
+        padding: 12px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 10px;
+    `;
+
+    // Get borrowed chords for the current key
+    const borrowedChords = generateBorrowedChordsForKey(key);
+
+    borrowedChords.forEach(chord => {
+        const card = createAdvancedChordCard(chord, key);
+        cardsContainer.appendChild(card);
+    });
+
+    section.appendChild(cardsContainer);
+    return section;
+}
+
+/**
+ * Create the Secondary Dominants section for the Advanced tab
+ */
+function createAdvancedSection_SecondaryDominants(key) {
+    const section = document.createElement('div');
+    section.style.cssText = `
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        overflow: hidden;
+    `;
+
+    // Section header
+    const sectionHeader = document.createElement('div');
+    sectionHeader.style.cssText = `
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: white;
+        padding: 10px 14px;
+        font-weight: 600;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    `;
+    sectionHeader.innerHTML = `<span>⚡</span> Secondary Dominants`;
+    section.appendChild(sectionHeader);
+
+    // Explanation
+    const explanation = document.createElement('div');
+    explanation.style.cssText = `
+        padding: 10px 14px;
+        background: #fffbeb;
+        border-bottom: 1px solid #fde68a;
+        font-size: 12px;
+        color: #92400e;
+    `;
+    explanation.textContent = `Dominant 7th chords that resolve to non-tonic chords. They create strong pull toward their target, adding forward momentum and harmonic interest.`;
+    section.appendChild(explanation);
+
+    // Chord cards container
+    const cardsContainer = document.createElement('div');
+    cardsContainer.style.cssText = `
+        padding: 12px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 10px;
+    `;
+
+    // Generate secondary dominants
+    const secondaryDominants = generateSecondaryDominantsForKey(key);
+
+    secondaryDominants.forEach(chord => {
+        const card = createAdvancedChordCard(chord, key);
+        cardsContainer.appendChild(card);
+    });
+
+    section.appendChild(cardsContainer);
+    return section;
+}
+
+/**
+ * Create the Chromatic Mediants section for the Advanced tab
+ */
+function createAdvancedSection_ChromaticMediants(key, progressionData) {
+    const section = document.createElement('div');
+    section.style.cssText = `
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        overflow: hidden;
+    `;
+
+    // Section header
+    const sectionHeader = document.createElement('div');
+    sectionHeader.style.cssText = `
+        background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+        color: white;
+        padding: 10px 14px;
+        font-weight: 600;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    `;
+    sectionHeader.innerHTML = `<span>🌈</span> Chromatic Mediants`;
+    section.appendChild(sectionHeader);
+
+    // Explanation
+    const explanation = document.createElement('div');
+    explanation.style.cssText = `
+        padding: 10px 14px;
+        background: #ecfeff;
+        border-bottom: 1px solid #a5f3fc;
+        font-size: 12px;
+        color: #155e75;
+    `;
+    explanation.textContent = `Major chords a third apart with chromatic root movement. Used in film scores for dramatic shifts - they share one note while the others move chromatically.`;
+    section.appendChild(explanation);
+
+    // Chord cards container
+    const cardsContainer = document.createElement('div');
+    cardsContainer.style.cssText = `
+        padding: 12px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 10px;
+    `;
+
+    // Generate chromatic mediants
+    const chromaticMediants = generateChromaticMediantsForKey(key);
+
+    chromaticMediants.forEach(chord => {
+        const card = createAdvancedChordCard(chord, key);
+        cardsContainer.appendChild(card);
+    });
+
+    section.appendChild(cardsContainer);
+    return section;
+}
+
+/**
+ * Create a chord card for the advanced section
+ */
+function createAdvancedChordCard(chordInfo, key) {
+    const card = document.createElement('div');
+    card.style.cssText = `
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        transition: all 0.15s;
+        cursor: pointer;
+    `;
+
+    card.addEventListener('mouseenter', () => {
+        card.style.borderColor = '#a78bfa';
+        card.style.boxShadow = '0 2px 8px rgba(139, 92, 246, 0.15)';
+    });
+    card.addEventListener('mouseleave', () => {
+        card.style.borderColor = '#e5e7eb';
+        card.style.boxShadow = 'none';
+    });
+
+    // Chord name and numeral
+    const topRow = document.createElement('div');
+    topRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center;';
+
+    const chordName = document.createElement('span');
+    chordName.style.cssText = 'font-weight: 600; font-size: 14px; color: #1f2937;';
+    chordName.textContent = chordInfo.display;
+
+    const numeral = document.createElement('span');
+    numeral.style.cssText = `
+        font-size: 11px;
+        color: white;
+        background: ${chordInfo.color || '#8b5cf6'};
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 500;
+    `;
+    numeral.textContent = chordInfo.numeral;
+
+    topRow.appendChild(chordName);
+    topRow.appendChild(numeral);
+    card.appendChild(topRow);
+
+    // Description
+    const description = document.createElement('div');
+    description.style.cssText = 'font-size: 11px; color: #6b7280; line-height: 1.3;';
+    description.textContent = chordInfo.description;
+    card.appendChild(description);
+
+    // Source/mode if applicable
+    if (chordInfo.source) {
+        const source = document.createElement('div');
+        source.style.cssText = 'font-size: 10px; color: #9ca3af; font-style: italic;';
+        source.textContent = chordInfo.source;
+        card.appendChild(source);
+    }
+
+    // Action buttons
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display: flex; gap: 6px; margin-top: 4px;';
+
+    // Play button
+    const playBtn = document.createElement('button');
+    playBtn.innerHTML = '▶';
+    playBtn.title = 'Hold to preview';
+    playBtn.style.cssText = `
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #dbeafe;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+        cursor: pointer;
+        font-size: 10px;
+        transition: all 0.15s;
+    `;
+    setupHoldToPlay(playBtn, { root: chordInfo.root, type: chordInfo.type, inversion: 0 });
+    actions.appendChild(playBtn);
+
+    // Add button
+    const addBtn = document.createElement('button');
+    addBtn.innerHTML = '+';
+    addBtn.title = 'Add to progression';
+    addBtn.style.cssText = `
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #e0e7ff;
+        color: #4338ca;
+        border: 1px solid #c7d2fe;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.15s;
+    `;
+    addBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        addChordToProgression({ root: chordInfo.root, type: chordInfo.type, inversion: 0 });
+    });
+    actions.appendChild(addBtn);
+
+    card.appendChild(actions);
+
+    // Click card to add
+    card.addEventListener('click', () => {
+        addChordToProgression({ root: chordInfo.root, type: chordInfo.type, inversion: 0 });
+    });
+
+    return card;
+}
+
+/**
+ * Generate borrowed chords for a given key
+ */
+function generateBorrowedChordsForKey(key) {
+    const ALL_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const keyIndex = ALL_NOTES.indexOf(key.replace('b', '#').replace('Db', 'C#').replace('Eb', 'D#').replace('Gb', 'F#').replace('Ab', 'G#').replace('Bb', 'A#'));
+
+    const borrowed = [];
+
+    // From Parallel Minor: bIII, iv, bVI, bVII
+    const bIII = ALL_NOTES[(keyIndex + 3) % 12];
+    borrowed.push({
+        root: bIII,
+        type: 'major',
+        display: `${spellNoteInKey(bIII, key)}`,
+        numeral: 'bIII',
+        description: 'Major chord on flat third - adds brightness in minor contexts',
+        source: 'Parallel Minor',
+        color: '#8b5cf6'
+    });
+
+    const iv = ALL_NOTES[(keyIndex + 5) % 12];
+    borrowed.push({
+        root: iv,
+        type: 'minor',
+        display: `${spellNoteInKey(iv, key)}m`,
+        numeral: 'iv',
+        description: 'Minor subdominant - adds melancholy touch',
+        source: 'Parallel Minor',
+        color: '#8b5cf6'
+    });
+
+    const bVI = ALL_NOTES[(keyIndex + 8) % 12];
+    borrowed.push({
+        root: bVI,
+        type: 'major',
+        display: `${spellNoteInKey(bVI, key)}`,
+        numeral: 'bVI',
+        description: 'Dramatic, uplifting - the "deceptive" cadence target',
+        source: 'Parallel Minor',
+        color: '#8b5cf6'
+    });
+
+    const bVII = ALL_NOTES[(keyIndex + 10) % 12];
+    borrowed.push({
+        root: bVII,
+        type: 'major',
+        display: `${spellNoteInKey(bVII, key)}`,
+        numeral: 'bVII',
+        description: 'Rock/folk staple - bluesy, earthy feel',
+        source: 'Mixolydian',
+        color: '#a855f7'
+    });
+
+    // From Dorian: IV (major IV in minor)
+    const IV = ALL_NOTES[(keyIndex + 5) % 12];
+    borrowed.push({
+        root: IV,
+        type: 'major',
+        display: `${spellNoteInKey(IV, key)}`,
+        numeral: 'IV',
+        description: 'Major subdominant in minor - Dorian brightness',
+        source: 'Dorian',
+        color: '#a855f7'
+    });
+
+    // From Lydian: #IV dim or II major
+    const sharpIV = ALL_NOTES[(keyIndex + 6) % 12];
+    borrowed.push({
+        root: sharpIV,
+        type: 'diminished',
+        display: `${spellNoteInKey(sharpIV, key)}°`,
+        numeral: '#iv°',
+        description: 'Creates dreamy, floating quality',
+        source: 'Lydian',
+        color: '#c084fc'
+    });
+
+    return borrowed;
+}
+
+/**
+ * Generate secondary dominants for a given key
+ */
+function generateSecondaryDominantsForKey(key) {
+    const ALL_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const keyIndex = ALL_NOTES.indexOf(key.replace('b', '#').replace('Db', 'C#').replace('Eb', 'D#').replace('Gb', 'F#').replace('Ab', 'G#').replace('Bb', 'A#'));
+
+    const secondaryDoms = [];
+
+    // V/ii - resolves to ii
+    const ii = ALL_NOTES[(keyIndex + 2) % 12];
+    const VofII = ALL_NOTES[(keyIndex + 9) % 12]; // A in key of C
+    secondaryDoms.push({
+        root: VofII,
+        type: 'dominant7',
+        display: `${spellNoteInKey(VofII, key)}7`,
+        numeral: 'V7/ii',
+        description: `Pulls strongly to ${spellNoteInKey(ii, key)}m`,
+        source: `Resolves to ii (${spellNoteInKey(ii, key)}m)`,
+        color: '#f59e0b'
+    });
+
+    // V/iii - resolves to iii
+    const iii = ALL_NOTES[(keyIndex + 4) % 12];
+    const VofIII = ALL_NOTES[(keyIndex + 11) % 12]; // B in key of C
+    secondaryDoms.push({
+        root: VofIII,
+        type: 'dominant7',
+        display: `${spellNoteInKey(VofIII, key)}7`,
+        numeral: 'V7/iii',
+        description: `Pulls strongly to ${spellNoteInKey(iii, key)}m`,
+        source: `Resolves to iii (${spellNoteInKey(iii, key)}m)`,
+        color: '#f59e0b'
+    });
+
+    // V/IV - resolves to IV
+    const IV = ALL_NOTES[(keyIndex + 5) % 12];
+    const VofIV = ALL_NOTES[(keyIndex + 0) % 12]; // C in key of C (I7)
+    secondaryDoms.push({
+        root: VofIV,
+        type: 'dominant7',
+        display: `${spellNoteInKey(VofIV, key)}7`,
+        numeral: 'V7/IV',
+        description: `Pulls strongly to ${spellNoteInKey(IV, key)} - bluesy!`,
+        source: `Resolves to IV (${spellNoteInKey(IV, key)})`,
+        color: '#f59e0b'
+    });
+
+    // V/V - resolves to V (the most common)
+    const V = ALL_NOTES[(keyIndex + 7) % 12];
+    const VofV = ALL_NOTES[(keyIndex + 2) % 12]; // D in key of C
+    secondaryDoms.push({
+        root: VofV,
+        type: 'dominant7',
+        display: `${spellNoteInKey(VofV, key)}7`,
+        numeral: 'V7/V',
+        description: `The classic - pulls to ${spellNoteInKey(V, key)}`,
+        source: `Resolves to V (${spellNoteInKey(V, key)})`,
+        color: '#f59e0b'
+    });
+
+    // V/vi - resolves to vi
+    const vi = ALL_NOTES[(keyIndex + 9) % 12];
+    const VofVI = ALL_NOTES[(keyIndex + 4) % 12]; // E in key of C
+    secondaryDoms.push({
+        root: VofVI,
+        type: 'dominant7',
+        display: `${spellNoteInKey(VofVI, key)}7`,
+        numeral: 'V7/vi',
+        description: `Pulls strongly to ${spellNoteInKey(vi, key)}m`,
+        source: `Resolves to vi (${spellNoteInKey(vi, key)}m)`,
+        color: '#f59e0b'
+    });
+
+    return secondaryDoms;
+}
+
+/**
+ * Generate chromatic mediants for a given key
+ */
+function generateChromaticMediantsForKey(key) {
+    const ALL_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const keyIndex = ALL_NOTES.indexOf(key.replace('b', '#').replace('Db', 'C#').replace('Eb', 'D#').replace('Gb', 'F#').replace('Ab', 'G#').replace('Bb', 'A#'));
+
+    const mediants = [];
+
+    // Upper chromatic mediants (a major 3rd up)
+    const upperMajor = ALL_NOTES[(keyIndex + 4) % 12]; // E in C (but as major)
+    mediants.push({
+        root: upperMajor,
+        type: 'major',
+        display: `${spellNoteInKey(upperMajor, key)}`,
+        numeral: 'III',
+        description: 'Bright, cinematic shift upward',
+        source: 'Upper chromatic mediant',
+        color: '#06b6d4'
+    });
+
+    // Lower chromatic mediants (major 3rd down)
+    const lowerMajor = ALL_NOTES[(keyIndex + 8) % 12]; // Ab in C
+    mediants.push({
+        root: lowerMajor,
+        type: 'major',
+        display: `${spellNoteInKey(lowerMajor, key)}`,
+        numeral: 'bVI',
+        description: 'Dramatic, unexpected shift down',
+        source: 'Lower chromatic mediant',
+        color: '#06b6d4'
+    });
+
+    // Minor 3rd chromatic mediants
+    const upperMinor = ALL_NOTES[(keyIndex + 3) % 12]; // Eb in C
+    mediants.push({
+        root: upperMinor,
+        type: 'major',
+        display: `${spellNoteInKey(upperMinor, key)}`,
+        numeral: 'bIII',
+        description: 'Rich, colorful shift - film score favorite',
+        source: 'Upper minor chromatic mediant',
+        color: '#0891b2'
+    });
+
+    const lowerMinor = ALL_NOTES[(keyIndex + 9) % 12]; // A in C
+    mediants.push({
+        root: lowerMinor,
+        type: 'major',
+        display: `${spellNoteInKey(lowerMinor, key)}`,
+        numeral: 'VI',
+        description: 'Bold, confident shift',
+        source: 'Lower minor chromatic mediant',
+        color: '#0891b2'
+    });
+
+    // Chromatic mediants with mode change
+    const bII = ALL_NOTES[(keyIndex + 1) % 12]; // Db in C (Neapolitan)
+    mediants.push({
+        root: bII,
+        type: 'major',
+        display: `${spellNoteInKey(bII, key)}`,
+        numeral: 'bII',
+        description: 'Neapolitan - exotic, mysterious quality',
+        source: 'Neapolitan chord',
+        color: '#14b8a6'
+    });
+
+    return mediants;
 }
 
 /**
@@ -3897,6 +4707,559 @@ function createCompactProgressionSelector(progressionData, key, onRender) {
     return container;
 }
 
+// Helper functions for advanced features in recommendation cards
+function hasAdvancedFeatures(rec) {
+    return (rec.harmonicDetails?.isSecondaryDominant) ||
+           (rec.borrowedFrom) ||
+           (rec.harmonicDetails?.chromaticMediant?.isChromaticMediant) ||
+           (rec.modalInterchangeScore && rec.modalInterchangeScore > 0);
+}
+
+function formatModeName(mode) {
+    if (!mode) return '';
+    // Convert mode identifiers to readable names
+    const modeNames = {
+        'parallel-minor': 'Parallel Minor',
+        'dorian': 'Dorian',
+        'phrygian': 'Phrygian',
+        'lydian': 'Lydian',
+        'mixolydian': 'Mixolydian',
+        'aeolian': 'Aeolian'
+    };
+    return modeNames[mode] || mode.charAt(0).toUpperCase() + mode.slice(1);
+}
+
+function getAdvancedFeatureItems(rec, currentKey) {
+    const items = [];
+
+    // Secondary dominant
+    if (rec.harmonicDetails?.isSecondaryDominant) {
+        const target = rec.harmonicDetails.secondaryDominantTarget;
+        items.push({
+            icon: '⚡',
+            label: 'Secondary Dominant',
+            detail: target ? `V/${target}` : null,
+            color: '#f59e0b', // amber
+            type: 'secondary-dominant',
+            chordRoot: rec.root,
+            chordType: rec.type,
+            target: target,
+            key: currentKey
+        });
+    }
+
+    // Borrowed from mode
+    if (rec.borrowedFrom) {
+        items.push({
+            icon: '🎭',
+            label: 'Modal Interchange',
+            detail: `from ${formatModeName(rec.borrowedFrom)}`,
+            color: '#8b5cf6', // violet
+            type: 'modal-interchange',
+            chordRoot: rec.root,
+            chordType: rec.type,
+            borrowedFrom: rec.borrowedFrom,
+            key: currentKey
+        });
+    }
+
+    // Chromatic mediant
+    if (rec.harmonicDetails?.chromaticMediant?.isChromaticMediant) {
+        const mediant = rec.harmonicDetails.chromaticMediant;
+        items.push({
+            icon: '🌈',
+            label: 'Chromatic Mediant',
+            detail: mediant.type || null,
+            color: '#06b6d4', // cyan
+            type: 'chromatic-mediant',
+            chordRoot: rec.root,
+            chordType: rec.type,
+            mediantDetails: mediant,
+            key: currentKey
+        });
+    }
+
+    return items;
+}
+
+function createAdvancedSection(rec) {
+    const currentKey = getCurrentKey() || 'C';
+    const items = getAdvancedFeatureItems(rec, currentKey);
+    if (items.length === 0) return null;
+
+    const container = document.createElement('div');
+    container.className = 'rm-card-advanced-container';
+    container.style.cssText = `
+        width: 100%;
+        margin-top: 4px;
+    `;
+
+    // Toggle button
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'rm-advanced-toggle';
+    toggleBtn.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 6px;
+        font-size: 10px;
+        color: #6366f1;
+        background: #eef2ff;
+        border: 1px solid #c7d2fe;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.15s;
+    `;
+    toggleBtn.innerHTML = `<span class="toggle-chevron" style="font-size: 8px; transition: transform 0.2s;">▶</span> Advanced`;
+
+    // Expandable content
+    const content = document.createElement('div');
+    content.className = 'rm-advanced-content';
+    content.style.cssText = `
+        display: none;
+        flex-direction: column;
+        gap: 3px;
+        margin-top: 4px;
+        padding: 6px 8px;
+        background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+        border-radius: 4px;
+        border-left: 2px solid #8b5cf6;
+    `;
+
+    // Add feature items
+    items.forEach(item => {
+        const row = document.createElement('div');
+        row.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #374151;
+        `;
+
+        // Add "?" learn more button FIRST (before icon and label)
+        const learnBtn = document.createElement('button');
+        learnBtn.style.cssText = `
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 1px solid #a78bfa;
+            background: #f5f3ff;
+            color: #7c3aed;
+            font-size: 9px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        `;
+        learnBtn.textContent = '?';
+        learnBtn.title = 'Learn more about this technique';
+        learnBtn.addEventListener('mouseenter', () => {
+            learnBtn.style.background = '#7c3aed';
+            learnBtn.style.color = '#fff';
+        });
+        learnBtn.addEventListener('mouseleave', () => {
+            learnBtn.style.background = '#f5f3ff';
+            learnBtn.style.color = '#7c3aed';
+        });
+        learnBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showAdvancedExplanationModal(item);
+        });
+
+        row.appendChild(learnBtn);
+
+        const icon = document.createElement('span');
+        icon.textContent = item.icon;
+        icon.style.fontSize = '12px';
+
+        const label = document.createElement('span');
+        label.style.fontWeight = '500';
+        label.textContent = item.label;
+
+        row.appendChild(icon);
+        row.appendChild(label);
+
+        if (item.detail) {
+            const detail = document.createElement('span');
+            detail.style.cssText = `
+                color: #6b7280;
+                font-style: italic;
+            `;
+            detail.textContent = item.detail;
+            row.appendChild(detail);
+        }
+
+        content.appendChild(row);
+    });
+
+    // Toggle behavior
+    let isExpanded = false;
+    toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        isExpanded = !isExpanded;
+        content.style.display = isExpanded ? 'flex' : 'none';
+        const chevron = toggleBtn.querySelector('.toggle-chevron');
+        if (chevron) {
+            chevron.style.transform = isExpanded ? 'rotate(90deg)' : 'rotate(0deg)';
+        }
+    });
+
+    container.appendChild(toggleBtn);
+    container.appendChild(content);
+
+    return container;
+}
+
+/**
+ * Show detailed explanation modal for advanced harmonic techniques
+ */
+function showAdvancedExplanationModal(item) {
+    // Remove existing modal if present
+    const existingModal = document.getElementById('advanced-explanation-modal');
+    if (existingModal) existingModal.remove();
+
+    const { type, chordRoot, chordType, key, borrowedFrom, target, mediantDetails } = item;
+    const chordSymbol = CHORD_DEFINITIONS[chordType]?.symbol || '';
+    const chordName = `${chordRoot}${chordSymbol}`;
+
+    // Generate content based on type
+    let content = '';
+    let title = '';
+    let headerGradient = '';
+
+    if (type === 'modal-interchange') {
+        title = `Modal Interchange: ${chordName}`;
+        headerGradient = 'from-violet-600 to-purple-600';
+        content = generateModalInterchangeExplanation(chordRoot, chordType, key, borrowedFrom);
+    } else if (type === 'secondary-dominant') {
+        title = `Secondary Dominant: ${chordName}`;
+        headerGradient = 'from-amber-500 to-orange-500';
+        content = generateSecondaryDominantExplanation(chordRoot, chordType, key, target);
+    } else if (type === 'chromatic-mediant') {
+        title = `Chromatic Mediant: ${chordName}`;
+        headerGradient = 'from-cyan-500 to-teal-500';
+        content = generateChromaticMediantExplanation(chordRoot, chordType, key, mediantDetails);
+    }
+
+    const modalHTML = `
+        <div id="advanced-explanation-modal" class="fixed inset-0 flex items-center justify-center p-4" style="background: rgba(0,0,0,0.6); z-index: 100001;">
+            <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col">
+                <!-- Header -->
+                <div class="bg-gradient-to-r ${headerGradient} px-6 py-4 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-white">${title}</h2>
+                        <p class="text-white/80 text-sm">Key of ${key} major</p>
+                    </div>
+                    <button id="close-advanced-modal" class="text-white/80 hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Content -->
+                <div class="p-6 overflow-y-auto flex-1">
+                    ${content}
+                </div>
+
+                <!-- Footer -->
+                <div class="px-6 py-4 bg-gray-50 border-t flex justify-end">
+                    <button id="dismiss-advanced-modal" class="px-4 py-2 bg-gradient-to-r ${headerGradient} text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium">
+                        Got it!
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // Add event listeners
+    const modal = document.getElementById('advanced-explanation-modal');
+    const closeBtn = document.getElementById('close-advanced-modal');
+    const dismissBtn = document.getElementById('dismiss-advanced-modal');
+
+    const closeModal = () => modal.remove();
+
+    closeBtn.addEventListener('click', closeModal);
+    dismissBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+
+    const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+            document.removeEventListener('keydown', handleEscape);
+        }
+    };
+    document.addEventListener('keydown', handleEscape);
+}
+
+/**
+ * Generate modal interchange explanation content
+ */
+function generateModalInterchangeExplanation(chordRoot, chordType, key, borrowedFrom) {
+    const modeName = formatModeName(borrowedFrom);
+    const chordSymbol = CHORD_DEFINITIONS[chordType]?.symbol || '';
+    const chordName = `${chordRoot}${chordSymbol}`;
+
+    // Determine what the diatonic equivalent would be
+    const chordDef = CHORD_DEFINITIONS[chordType];
+    const isMinor = chordDef?.intervals?.includes(3); // Has minor 3rd
+    const diatonicType = isMinor ? 'Major' : 'Minor';
+    const diatonicSymbol = CHORD_DEFINITIONS[diatonicType]?.symbol || '';
+    const diatonicName = `${chordRoot}${diatonicSymbol}`;
+
+    // Get chord notes
+    const borrowedNotes = getChordNotesForDisplay(chordRoot, chordType);
+    const diatonicNotes = getChordNotesForDisplay(chordRoot, diatonicType);
+
+    // Find the altered note
+    const alteredNote = borrowedNotes.find(n => !diatonicNotes.some(d => normalizeNoteForComparison(d) === normalizeNoteForComparison(n)));
+    const originalNote = diatonicNotes.find(n => !borrowedNotes.some(b => normalizeNoteForComparison(b) === normalizeNoteForComparison(n)));
+
+    return `
+        <div class="space-y-4">
+            <div class="prose prose-sm max-w-none text-gray-700">
+                <p><strong>Modal Interchange</strong> (also called "borrowed chords") means borrowing a chord from a parallel key or mode.</p>
+            </div>
+
+            <!-- Chord Comparison Table -->
+            <div class="bg-gray-50 rounded-lg p-4 border">
+                <h4 class="font-semibold text-gray-800 mb-3">Chord Comparison</h4>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b">
+                            <th class="text-left py-2 text-gray-600">Source</th>
+                            <th class="text-left py-2 text-gray-600">Chord</th>
+                            <th class="text-left py-2 text-gray-600">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b">
+                            <td class="py-2 text-gray-500">${key} major (diatonic)</td>
+                            <td class="py-2 font-medium">${diatonicName}</td>
+                            <td class="py-2">${diatonicNotes.join(' - ')}</td>
+                        </tr>
+                        <tr>
+                            <td class="py-2 text-violet-600 font-medium">${modeName}</td>
+                            <td class="py-2 font-bold text-violet-700">${chordName}</td>
+                            <td class="py-2">${borrowedNotes.map(n =>
+                                n === alteredNote ? `<span class="text-violet-600 font-bold">${n}</span>` : n
+                            ).join(' - ')}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Key Change -->
+            ${alteredNote && originalNote ? `
+            <div class="bg-violet-50 rounded-lg p-4 border border-violet-200">
+                <h4 class="font-semibold text-violet-800 mb-2">The Key Change</h4>
+                <p class="text-sm text-violet-700">
+                    The <strong>${originalNote}</strong> becomes <strong>${alteredNote}</strong>,
+                    changing the chord quality and adding ${isMinor ? 'a melancholy, bittersweet' : 'a brighter, unexpected'} color.
+                </p>
+            </div>
+            ` : ''}
+
+            <!-- Why It Works -->
+            <div class="bg-emerald-50 rounded-lg p-4 border border-emerald-200">
+                <h4 class="font-semibold text-emerald-800 mb-2">Why It Works</h4>
+                <ul class="text-sm text-emerald-700 space-y-1">
+                    <li>• The root (${chordRoot}) is familiar from ${key} major</li>
+                    <li>• ${isMinor ? 'The minor quality adds instant emotional depth' : 'The unexpected quality creates harmonic interest'}</li>
+                    <li>• Creates chromatic voice leading that pulls the ear</li>
+                </ul>
+            </div>
+
+            <!-- Musical Context -->
+            <div class="bg-amber-50 rounded-lg p-4 border border-amber-200">
+                <h4 class="font-semibold text-amber-800 mb-2">Try This Progression</h4>
+                <p class="text-sm text-amber-700 font-mono">
+                    ${key} → ${diatonicName} → ${chordName} → ${key}
+                </p>
+                <p class="text-xs text-amber-600 mt-1">
+                    The shift from ${diatonicName} to ${chordName} creates that classic "borrowed chord" moment.
+                </p>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Generate secondary dominant explanation content
+ */
+function generateSecondaryDominantExplanation(chordRoot, chordType, key, target) {
+    const chordSymbol = CHORD_DEFINITIONS[chordType]?.symbol || '';
+    const chordName = `${chordRoot}${chordSymbol}`;
+
+    // Calculate the target chord
+    const targetChord = getChordInKeyForDegree(target, key);
+
+    return `
+        <div class="space-y-4">
+            <div class="prose prose-sm max-w-none text-gray-700">
+                <p>A <strong>Secondary Dominant</strong> is a dominant chord that resolves to a chord other than the tonic. It "borrows" the V-I relationship to create tension toward any chord.</p>
+            </div>
+
+            <!-- Function Diagram -->
+            <div class="bg-amber-50 rounded-lg p-4 border border-amber-200">
+                <h4 class="font-semibold text-amber-800 mb-3">How It Functions</h4>
+                <div class="flex items-center justify-center gap-3 text-lg font-mono">
+                    <span class="px-3 py-2 bg-amber-200 rounded font-bold text-amber-800">${chordName}</span>
+                    <span class="text-amber-600">→</span>
+                    <span class="px-3 py-2 bg-amber-100 rounded text-amber-700">${targetChord}</span>
+                </div>
+                <p class="text-center text-sm text-amber-700 mt-2">
+                    <strong>${chordName}</strong> acts as the V chord of <strong>${targetChord}</strong>
+                </p>
+            </div>
+
+            <!-- The Notation -->
+            <div class="bg-gray-50 rounded-lg p-4 border">
+                <h4 class="font-semibold text-gray-800 mb-2">Roman Numeral Notation</h4>
+                <p class="text-sm text-gray-600">
+                    This chord is written as <strong class="text-amber-600">V/${target}</strong> (read as "five of ${target}").
+                </p>
+                <p class="text-sm text-gray-600 mt-1">
+                    It means: "the dominant chord that wants to resolve to the ${target} chord"
+                </p>
+            </div>
+
+            <!-- Why It Works -->
+            <div class="bg-emerald-50 rounded-lg p-4 border border-emerald-200">
+                <h4 class="font-semibold text-emerald-800 mb-2">Why It Works</h4>
+                <ul class="text-sm text-emerald-700 space-y-1">
+                    <li>• Contains a leading tone that pulls strongly to ${targetChord}</li>
+                    <li>• Creates the powerful V-I resolution, just targeting a different chord</li>
+                    <li>• Adds chromatic notes that create forward momentum</li>
+                </ul>
+            </div>
+
+            <!-- Try It -->
+            <div class="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
+                <h4 class="font-semibold text-indigo-800 mb-2">Try This Progression</h4>
+                <p class="text-sm text-indigo-700 font-mono">
+                    ${key} → ${chordName} → ${targetChord} → ...
+                </p>
+                <p class="text-xs text-indigo-600 mt-1">
+                    Notice how ${chordName} creates tension that's satisfied when ${targetChord} arrives.
+                </p>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Generate chromatic mediant explanation content
+ */
+function generateChromaticMediantExplanation(chordRoot, chordType, key, mediantDetails) {
+    const chordSymbol = CHORD_DEFINITIONS[chordType]?.symbol || '';
+    const chordName = `${chordRoot}${chordSymbol}`;
+    const mediantType = mediantDetails?.type || 'chromatic mediant';
+
+    return `
+        <div class="space-y-4">
+            <div class="prose prose-sm max-w-none text-gray-700">
+                <p>A <strong>Chromatic Mediant</strong> is a chord a third away from another chord, with an altered quality that creates a colorful, unexpected shift.</p>
+            </div>
+
+            <!-- What Makes It Chromatic -->
+            <div class="bg-cyan-50 rounded-lg p-4 border border-cyan-200">
+                <h4 class="font-semibold text-cyan-800 mb-2">The Chromatic Relationship</h4>
+                <p class="text-sm text-cyan-700">
+                    <strong>${chordName}</strong> is a third away from the previous chord, but with chromatic alterations that create a dramatic color shift.
+                </p>
+                ${mediantType ? `<p class="text-xs text-cyan-600 mt-1">Type: ${mediantType}</p>` : ''}
+            </div>
+
+            <!-- Why It Works -->
+            <div class="bg-emerald-50 rounded-lg p-4 border border-emerald-200">
+                <h4 class="font-semibold text-emerald-800 mb-2">Why It Works</h4>
+                <ul class="text-sm text-emerald-700 space-y-1">
+                    <li>• Usually shares one common tone with the previous chord</li>
+                    <li>• Creates smooth voice leading despite the "far" harmonic relationship</li>
+                    <li>• The chromatic movement surprises the ear in a pleasing way</li>
+                    <li>• Popular in film scores for dramatic key changes</li>
+                </ul>
+            </div>
+
+            <!-- Sound Quality -->
+            <div class="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                <h4 class="font-semibold text-purple-800 mb-2">The Sound</h4>
+                <p class="text-sm text-purple-700">
+                    Chromatic mediants create a "lifting" or "shifting" sensation—like the harmonic equivalent of changing the lighting in a room. The music feels transported somewhere new.
+                </p>
+            </div>
+
+            <!-- Famous Examples -->
+            <div class="bg-gray-50 rounded-lg p-4 border">
+                <h4 class="font-semibold text-gray-800 mb-2">Famous Uses</h4>
+                <p class="text-sm text-gray-600">
+                    Film composers like John Williams use chromatic mediants extensively. Listen for that "magical" key change feeling in scores like Star Wars and Harry Potter.
+                </p>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Helper: Get chord notes for display in explanation modals
+ */
+function getChordNotesForDisplay(root, type) {
+    const chordDef = CHORD_DEFINITIONS[type];
+    if (!chordDef) return [root];
+
+    const notes = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+    const rootIndex = notes.findIndex(n => normalizeNoteForComparison(n) === normalizeNoteForComparison(root));
+    if (rootIndex === -1) return [root];
+
+    return chordDef.intervals.slice(0, 3).map(interval => {
+        const noteIndex = (rootIndex + interval) % 12;
+        return notes[noteIndex];
+    });
+}
+
+/**
+ * Helper: Normalize note for comparison in explanation modals
+ */
+function normalizeNoteForComparison(note) {
+    const enharmonics = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+    return enharmonics[note] || note;
+}
+
+/**
+ * Helper: Get chord name for a scale degree
+ */
+function getChordInKeyForDegree(degree, key) {
+    const notes = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+    const keyIndex = notes.indexOf(key);
+    if (keyIndex === -1) return degree;
+
+    const degreeToSemitone = {
+        'I': 0, 'ii': 2, 'II': 2, 'iii': 4, 'III': 4, 'IV': 5, 'iv': 5,
+        'V': 7, 'vi': 9, 'VI': 9, 'vii': 11, 'VII': 11
+    };
+
+    const semitone = degreeToSemitone[degree];
+    if (semitone === undefined) return degree;
+
+    const noteIndex = (keyIndex + semitone) % 12;
+    const chordRoot = notes[noteIndex];
+
+    // Determine quality based on degree
+    const minorDegrees = ['ii', 'iii', 'vi'];
+    const isMinor = minorDegrees.includes(degree);
+
+    return isMinor ? `${chordRoot}m` : chordRoot;
+}
+
 function createRecommendationCard(rec, index, rhythmicContext) {
     const card = document.createElement('div');
     card.className = 'rm-card';
@@ -3931,6 +5294,15 @@ function createRecommendationCard(rec, index, rhythmicContext) {
             ${rec.reason || 'Good harmonic choice'}
         </div>
     `;
+
+    // Add advanced section if this chord has advanced features
+    if (hasAdvancedFeatures(rec)) {
+        const advancedSection = createAdvancedSection(rec);
+        if (advancedSection) {
+            info.appendChild(advancedSection);
+        }
+    }
+
     card.appendChild(info);
 
     // Duration badge

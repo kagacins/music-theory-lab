@@ -4774,6 +4774,7 @@ export class CompositionState {
 
     /**
      * Remove a chord from its section (becomes ungrouped)
+     * Auto-deletes the section if it becomes empty
      * @param {number} chordIndex - Chord index
      * @returns {string|null} ID of section it was removed from, or null
      */
@@ -4781,9 +4782,17 @@ export class CompositionState {
         for (const section of this.sections) {
             const idx = section.chordIndices.indexOf(chordIndex);
             if (idx !== -1) {
+                const sectionId = section.id;
                 section.chordIndices.splice(idx, 1);
-                this.events.emit('chordRemovedFromSection', { chordIndex, sectionId: section.id });
-                return section.id;
+                this.events.emit('chordRemovedFromSection', { chordIndex, sectionId });
+
+                // Auto-delete section if it becomes empty
+                if (section.chordIndices.length === 0) {
+                    console.log('[CompositionState] Auto-deleting empty section:', sectionId);
+                    this.deleteSection(sectionId);
+                }
+
+                return sectionId;
             }
         }
         return null;

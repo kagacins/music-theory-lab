@@ -31,6 +31,7 @@ import { PageManager } from './pageManager.js';
 import { PAGE_CONFIG, getMeasurePagePosition, applyPaginationPreset, getTotalPages } from './pageConfig.js';
 import { PageLayoutManager } from './pageLayoutManager.js';
 import { PageNavigator } from './pageNavigator.js';
+import { initVoiceLeadingOverlay, getVoiceLeadingOverlay } from './voiceLeadingOverlay.js';
 
 // ============================================================================
 // NOTATION COMPOSER CLASS
@@ -79,6 +80,7 @@ export class NotationComposer {
     this.pendingRenderFrame = null;  // requestAnimationFrame ID for debouncing renders
     this.lastRenderTime = 0;  // Timestamp of last render for debouncing
     this.noteEditor = null;  // Reference to NoteEditor for Phase 1A ghost note rendering
+    this.voiceLeadingOverlay = null;  // Voice leading visualization overlay
 
     // Highlighting state
     this.selectedMeasureIndex = -1;   // Blue border for selected measure
@@ -224,6 +226,15 @@ export class NotationComposer {
           }
           // Re-render to apply new rest display mode
           this.render();
+        },
+        onVoiceLeadingToggle: (visible) => {
+          // Toggle voice leading visualization overlay
+          if (this.voiceLeadingOverlay) {
+            this.voiceLeadingOverlay.setVisible(visible);
+          } else if (visible) {
+            // Initialize overlay if not exists and should be visible
+            this.initVoiceLeadingOverlay();
+          }
         },
       });
       this.toolbar.create(this.config.toolbarContainer);
@@ -1059,6 +1070,20 @@ export class NotationComposer {
         const ctx = this.config.container.getContext('2d');
         this.noteEditor.drawHoverToolbar(ctx);
       }
+    }
+
+    // Initialize voice leading overlay on first render if preference is set
+    const voiceLeadingPref = localStorage.getItem('voice-leading-overlay-visible');
+    if (voiceLeadingPref === 'true' && !this.voiceLeadingOverlay) {
+      this.initVoiceLeadingOverlay();
+    }
+
+    // Update voice leading overlay if visible
+    this.updateVoiceLeadingOverlay();
+
+    // Update theory insights panel
+    if (window.updateTheoryInsights) {
+      window.updateTheoryInsights();
     }
 
     // Notify listeners
@@ -2276,6 +2301,45 @@ export class NotationComposer {
     }
 
     this.toolbar.updateSelectionState(selectedNoteObjects);
+  }
+
+  // ============================================================================
+  // VOICE LEADING VISUALIZATION
+  // ============================================================================
+
+  /**
+   * Initialize the voice leading analyzer
+   * Note: This now uses a panel-based approach instead of SVG overlays
+   */
+  initVoiceLeadingOverlay() {
+    if (this.voiceLeadingOverlay) {
+      // Already initialized, just update
+      this.voiceLeadingOverlay.update();
+      return;
+    }
+
+    // Initialize the analyzer (new panel-based approach)
+    this.voiceLeadingOverlay = initVoiceLeadingOverlay({
+      container: this.config.container,
+      compositionState: this.compositionState,
+      onToggle: (visible) => {
+        // Sync toolbar button state
+        if (this.toolbar) {
+          this.toolbar.setVoiceLeadingVisible(visible);
+        }
+      },
+    });
+
+    // The analyzer handles its own visibility based on saved preference
+  }
+
+  /**
+   * Update voice leading overlay after notation changes
+   */
+  updateVoiceLeadingOverlay() {
+    if (this.voiceLeadingOverlay && this.voiceLeadingOverlay.isVisible) {
+      this.voiceLeadingOverlay.update();
+    }
   }
 
   // ============================================================================

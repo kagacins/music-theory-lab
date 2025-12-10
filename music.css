@@ -1454,11 +1454,13 @@ button:active:not(:disabled),
 #progression-visualization .chord-card-wrapper,
 #melody-progression-visualization .chord-card-wrapper,
 #builder-progression-visualization .chord-card-wrapper,
-[id$="-cards-grid"] > .chord-card-wrapper {
+[id$="-cards-grid"] > .chord-card-wrapper,
+.scroll-view-container .chord-card-wrapper,
+.section-filtered-cards .chord-card-wrapper {
     margin: 0 !important; /* Remove any margins that might cause overlap */
     box-sizing: border-box !important; /* Ensure padding is included in width */
     flex-shrink: 0; /* Prevent cards from shrinking and overlapping */
-    padding: 2px !important; /* Minimal padding to show selection ring highlight - consistent across all tabs */
+    padding: 4px !important; /* Padding to show multi-select outline (2px offset + 2px width) */
     overflow: visible; /* Allow ring highlight to show */
 }
 

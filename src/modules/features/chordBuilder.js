@@ -1236,9 +1236,42 @@ export function updateBuilderProgressionPanel() {
         countBadge.textContent = progressionData.length;
     }
 
-    // Only re-render if panel is visible
+    // Always update header toggle for section view (even if panel is collapsed)
+    updateBuilderHeaderToggle();
+
+    // Only re-render cards if panel is visible
     if (panel && !panel.classList.contains('hidden')) {
         renderBuilderProgressionCards();
+    }
+}
+
+/**
+ * Update the Chord Lab header toggle based on sections
+ * Called when sections or progression changes
+ */
+function updateBuilderHeaderToggle() {
+    const headerToggle = document.getElementById('builder-header-section-view-toggle');
+    if (!headerToggle) return;
+
+    // Check if we have sections
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    const sections = compositionState ? compositionState.getSections() : [];
+    const hasSections = sections.length > 0;
+
+    if (hasSections) {
+        // Show toggle and populate it
+        headerToggle.className = 'flex items-center gap-1 ml-2';
+        // Only rebuild if not already populated or if sections changed
+        if (headerToggle.children.length === 0 || !headerToggle.querySelector('.compact-builder-view-btn')) {
+            headerToggle.innerHTML = '';
+            if (window.createCompactBuilderViewModeToggle) {
+                headerToggle.appendChild(window.createCompactBuilderViewModeToggle());
+            }
+        }
+    } else {
+        // Hide toggle
+        headerToggle.innerHTML = '';
+        headerToggle.className = 'hidden ml-2';
     }
 }
 
