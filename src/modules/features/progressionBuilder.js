@@ -350,12 +350,28 @@ import {
     RHYTHMIC_PATTERNS,
     getPatternsForChordCount,
     getPatternById,
+    getCompingPatterns,
+    getCompingPatternById,
     applyRhythmPattern,
     detectCurrentPattern,
     formatBeatsDisplay,
     getDefaultPatternForChordCount,
     getRecommendedPatterns
 } from './rhythmicPatterns.js';
+import {
+    getAllPatternsForCount,
+    getAnyPatternById,
+    applyBeatsToProgression,
+    saveCustomPattern,
+    getCustomPatternsForCount,
+    getCustomPatterns,
+    deleteCustomPattern
+} from './rhythmPatternLibrary.js';
+import {
+    previewPattern,
+    stopPreview,
+    setPreviewOptions
+} from './rhythmPatternPreview.js';
 
 // Phase 2.1: Import section intent state for position-based insertion
 import {
@@ -14394,7 +14410,6 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
  */
 export function showRhythmPatternModal() {
     const progressionData = getProgressionData();
-
     if (!progressionData || progressionData.length === 0) {
         if (window.showModal) {
             window.showModal('No Chords', 'Add chords to the progression first before applying a rhythm pattern.');
@@ -14402,142 +14417,517 @@ export function showRhythmPatternModal() {
         return;
     }
 
-    const chordCount = progressionData.length;
-    const patterns = getPatternsForChordCount(chordCount);
-    const currentPattern = detectCurrentPattern(progressionData);
+    const selection = getSelectedIndicesArray ? getSelectedIndicesArray() : [];
+    const hasSelection = selection && selection.length > 0;
 
-    if (patterns.length === 0) {
+    const getTargetIndices = (scope) => {
+        if (scope === 'selection' && hasSelection) {
+            return [...selection];
+        }
+        return progressionData.map((_, i) => i);
+    };
+
+    let currentScope = hasSelection ? 'selection' : 'all';
+    const getTargetChords = () => getTargetIndices(currentScope).map(i => progressionData[i]).filter(Boolean);
+    const getChordCount = () => getTargetIndices(currentScope).length;
+
+    const buildPatterns = () => getAllPatternsForCount(getChordCount());
+    const getCurrentPattern = () => detectCurrentPattern(getTargetChords());
+
+    if (buildPatterns().length === 0) {
         if (window.showModal) {
-            window.showModal('No Patterns Available', `No rhythm patterns available for ${chordCount}-chord progressions.`);
+            window.showModal('No Patterns Available', `No rhythm patterns available for ${getChordCount()}-chord selection.`);
         }
         return;
     }
 
-    // Create modal
     const modal = document.createElement('div');
     modal.id = 'rhythm-pattern-modal';
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
 
     modal.innerHTML = `
-        <div class="bg-gray-900 rounded-lg shadow-2xl w-full max-w-md flex flex-col">
+        <div class="bg-gray-900 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
             <!-- Header -->
-            <div class="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
-                <h2 class="text-xl font-bold text-white">Rhythm Pattern</h2>
-                <button id="rhythm-modal-close-btn" class="text-gray-400 hover:text-white transition">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
+            <div class="px-5 py-3 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Rhythm Pattern Library</h2>
+                        <p class="text-xs text-gray-400">Apply rhythm patterns to your progression</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="rhythm-manage-custom-btn" class="px-3 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium">
+                        Manage Custom
+                    </button>
+                    <button id="rhythm-info-btn" class="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded">
+                        ?
+                    </button>
+                    <button id="rhythm-modal-close-btn" class="text-gray-400 hover:text-white transition ml-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
 
-            <!-- Content -->
-            <div class="px-6 py-4">
-                <p class="text-gray-300 text-sm mb-4">
-                    Apply a rhythmic pattern to set durations for your ${chordCount}-chord progression.
-                </p>
+            <!-- Info Panel (collapsible) -->
+            <div id="rhythm-info-panel" class="hidden px-5 py-2 bg-gray-800 border-b border-gray-700 text-xs text-gray-300 leading-relaxed">
+                <strong>Target:</strong> Choose entire progression or your current selection.
+                <strong>Patterns:</strong> Pick a rhythm pattern (beats per chord).
+                <strong>Grid:</strong> Edit beats per chord, then Apply.
+            </div>
 
-                ${currentPattern ? `
-                    <div class="mb-4 p-3 bg-gray-800 rounded-lg border border-gray-700">
-                        <div class="text-xs text-gray-500 mb-1">Current Pattern:</div>
-                        <div class="text-white font-medium">${currentPattern.name}</div>
-                        <div class="text-gray-400 text-sm">${formatBeatsDisplay(currentPattern.beats)}</div>
+            <!-- Content - Two columns -->
+            <div class="flex-1 overflow-auto">
+                <div class="px-5 py-4 flex gap-4" style="align-items: flex-start;">
+                    <!-- Left Column: Pattern Selection -->
+                    <div class="flex-1 space-y-3 min-w-0">
+                        <div class="p-3 bg-gray-800 border border-gray-700 rounded">
+                            <div class="text-xs text-gray-400 mb-1.5 font-medium">Target</div>
+                            <div class="flex items-center gap-4">
+                                <label class="inline-flex items-center gap-1.5 text-sm text-gray-200 cursor-pointer">
+                                    <input type="radio" name="rhythm-scope" value="all" class="text-orange-500" ${currentScope === 'all' ? 'checked' : ''}>
+                                    All (${progressionData.length})
+                                </label>
+                                <label class="inline-flex items-center gap-1.5 text-sm text-gray-200 cursor-pointer ${hasSelection ? '' : 'opacity-40'}">
+                                    <input type="radio" name="rhythm-scope" value="selection" class="text-orange-500" ${currentScope === 'selection' ? 'checked' : ''} ${hasSelection ? '' : 'disabled'}>
+                                    Selected (${selection.length || 0})
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="p-3 bg-gray-800 border border-gray-700 rounded">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="text-sm font-medium text-gray-300">Pattern</label>
+                                <span id="rhythm-custom-count" class="text-[10px] text-gray-500"></span>
+                            </div>
+                            <select id="rhythm-pattern-select" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-orange-500 text-sm"></select>
+                        </div>
+
+                        <div class="p-3 bg-gray-800 rounded border border-gray-700 text-sm text-gray-300 min-h-[80px]" id="rhythm-pattern-preview">
+                            <!-- Pattern description -->
+                        </div>
+
+                        <div class="p-3 bg-gray-800 border border-gray-700 rounded">
+                            <div class="flex items-center gap-2">
+                                <button id="rhythm-preview-btn" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-sm font-medium">
+                                    ▶ Preview
+                                </button>
+                                <button id="rhythm-stop-preview-btn" class="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 text-white rounded text-sm">
+                                    Stop
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                ` : `
-                    <div class="mb-4 p-3 bg-gray-800 rounded-lg border border-gray-700">
-                        <div class="text-xs text-gray-500 mb-1">Current Pattern:</div>
-                        <div class="text-gray-400 italic">Custom/Mixed durations</div>
+
+                    <!-- Right Column: Beat Grid -->
+                    <div class="flex-1 space-y-3 min-w-0">
+                        <div class="p-3 bg-gray-800 border border-gray-700 rounded">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="text-sm font-medium text-gray-300">Beat Grid</div>
+                                <div class="text-[10px] text-gray-500">Step: 0.25</div>
+                            </div>
+                            <div id="rhythm-grid" class="space-y-1.5 max-h-52 overflow-y-auto pr-1"></div>
+                        </div>
+
+                        <div class="p-3 bg-gray-800 border border-gray-700 rounded">
+                            <div class="text-xs text-gray-400 mb-2">Save as Custom Pattern</div>
+                            <div class="flex gap-2">
+                                <input id="rhythm-custom-name" type="text" class="flex-1 px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-white text-sm" placeholder="Pattern name...">
+                                <button id="rhythm-save-custom-btn" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-medium whitespace-nowrap">Save</button>
+                            </div>
+                        </div>
                     </div>
-                `}
-
-                <label class="block text-sm font-medium text-gray-300 mb-2">Select Pattern:</label>
-                <select id="rhythm-pattern-select" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-orange-500">
-                    ${patterns.map(pattern => {
-                        const beatsDisplay = formatBeatsDisplay(pattern.beats);
-                        const isSelected = currentPattern && currentPattern.id === pattern.id;
-                        return `
-                            <option value="${pattern.id}" ${isSelected ? 'selected' : ''}>
-                                ${pattern.name} (${beatsDisplay})
-                            </option>
-                        `;
-                    }).join('')}
-                </select>
-
-                <div id="rhythm-pattern-preview" class="mt-4 p-3 bg-gray-800 rounded-lg border border-gray-700">
-                    <!-- Preview will be populated by JS -->
                 </div>
             </div>
 
             <!-- Footer -->
-            <div class="px-6 py-4 border-t border-gray-700 flex justify-end gap-2">
-                <button id="rhythm-modal-cancel-btn" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition">
+            <div class="px-5 py-3 border-t border-gray-700 flex justify-end gap-2 flex-shrink-0 bg-gray-850">
+                <button id="rhythm-modal-cancel-btn" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded transition text-sm">
                     Cancel
                 </button>
-                <button id="rhythm-modal-apply-btn" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition font-semibold">
+                <button id="rhythm-modal-apply-btn" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded transition font-semibold text-sm">
                     Apply Pattern
                 </button>
+            </div>
+        </div>
+
+        <!-- Custom Pattern Manager Modal (hidden by default) -->
+        <div id="rhythm-custom-manager" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60]">
+            <div class="bg-gray-900 rounded-lg shadow-2xl w-full max-w-md max-h-[70vh] overflow-hidden flex flex-col">
+                <div class="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+                    <h3 class="text-base font-bold text-white">Custom Patterns</h3>
+                    <button id="rhythm-custom-manager-close" class="text-gray-400 hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="flex-1 overflow-auto p-4">
+                    <div id="rhythm-custom-list" class="space-y-2 text-sm">
+                        <!-- populated dynamically -->
+                    </div>
+                </div>
+                <div class="px-4 py-3 border-t border-gray-700 text-xs text-gray-400">
+                    Click Load to edit in main view, or Delete to remove.
+                </div>
             </div>
         </div>
     `;
 
     document.body.appendChild(modal);
 
-    // Update preview for selected pattern
-    const updatePreview = () => {
-        const select = document.getElementById('rhythm-pattern-select');
-        const preview = document.getElementById('rhythm-pattern-preview');
-        const selectedPattern = getPatternById(select.value);
+    const patternSelectEl = modal.querySelector('#rhythm-pattern-select');
+    const compingSelectEl = null; // hidden comping UI
+    const previewEl = modal.querySelector('#rhythm-pattern-preview');
+    const gridEl = modal.querySelector('#rhythm-grid');
+    const scopeRadios = modal.querySelectorAll('input[name="rhythm-scope"]');
+    const customNameInput = modal.querySelector('#rhythm-custom-name');
+    const infoBtn = modal.querySelector('#rhythm-info-btn');
+    const infoPanel = modal.querySelector('#rhythm-info-panel');
+    const customCountEl = modal.querySelector('#rhythm-custom-count');
+    const customCountInlineEl = modal.querySelector('#rhythm-custom-count-inline');
+    const customListEl = modal.querySelector('#rhythm-custom-list');
+    const swingEl = modal.querySelector('#rhythm-swing');
+    const humanizeEl = modal.querySelector('#rhythm-humanize');
+    const kitEl = null; // kit hidden
+    const previewBtn = modal.querySelector('#rhythm-preview-btn');
+    const stopPreviewBtn = modal.querySelector('#rhythm-stop-preview-btn');
+    const bassFollowToggle = modal.querySelector('#rhythm-bass-follow-toggle');
 
-        if (selectedPattern && preview) {
-            const beatsDisplay = formatBeatsDisplay(selectedPattern.beats);
-            preview.innerHTML = `
+    const getTargetChordsDynamic = () => getTargetIndices(currentScope).map(i => progressionData[i]).filter(Boolean);
+
+    const populatePatternOptions = () => {
+        const patterns = buildPatterns();
+        const customCount = getCustomPatternsForCount(getChordCount()).length;
+        if (customCountEl) {
+            customCountEl.textContent = customCount > 0 ? `${customCount} custom` : '';
+        }
+        if (customCountInlineEl) {
+            customCountInlineEl.textContent = customCount > 0 ? `${customCount} custom` : 'No custom patterns';
+        }
+        const currentPattern = getCurrentPattern();
+        patternSelectEl.innerHTML = patterns.map(pattern => {
+            const beatsDisplay = formatBeatsDisplay(pattern.beats);
+            const isCurrent = currentPattern && currentPattern.id === pattern.id;
+            const prefix = pattern.isCustom ? '★ ' : (pattern.isDefault ? '• ' : '');
+            return `
+                <option value="${pattern.id}" ${isCurrent ? 'selected' : ''}>
+                    ${prefix}${pattern.name} (${beatsDisplay})
+                </option>
+            `;
+        }).join('');
+    };
+
+    const renderCustomList = () => {
+        if (!customListEl) return;
+        const customs = getCustomPatternsForCount(getChordCount());
+        if (!customs.length) {
+            customListEl.innerHTML = `<div class="text-gray-400 text-sm">No custom patterns for ${getChordCount()} chords.</div>`;
+            return;
+        }
+        customListEl.innerHTML = customs.map(p => `
+            <div class="flex items-center gap-2 p-2 bg-gray-900 rounded border border-gray-700">
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm text-white truncate" title="${p.name}">${p.name}</div>
+                    <div class="text-[11px] text-gray-400">${formatBeatsDisplay(p.beats)}</div>
+                </div>
+                <button class="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded load-custom-btn" data-id="${p.id}">Load</button>
+                <button class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded delete-custom-btn" data-id="${p.id}">Delete</button>
+            </div>
+        `).join('');
+    };
+
+    const renderGrid = (beatsSource) => {
+        const chords = getTargetChordsDynamic();
+        gridEl.innerHTML = chords.map((chord, i) => {
+            const beatVal = beatsSource && beatsSource[i] !== undefined ? beatsSource[i] : (chord.beats || 4);
+            const label = chord.roman || chord.name || `Chord ${i + 1}`;
+            return `
+                <div class="flex items-center gap-2">
+                    <div class="w-28 text-xs text-gray-300 truncate">${label}</div>
+                    <input type="number" step="0.25" min="0.25" value="${beatVal}" data-beat-index="${i}"
+                        class="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-orange-500" />
+                </div>
+            `;
+        }).join('');
+    };
+
+    const updatePreview = () => {
+        const patternId = patternSelectEl.value;
+        const pattern = getAnyPatternById(patternId);
+        const chords = getTargetChordsDynamic();
+        if (pattern && previewEl) {
+            const beatsDisplay = formatBeatsDisplay(pattern.beats);
+            previewEl.innerHTML = `
                 <div class="text-xs text-gray-500 mb-2">Pattern Preview:</div>
-                <div class="text-white font-medium mb-1">${selectedPattern.name}</div>
-                <div class="text-sm text-gray-300 mb-2">${selectedPattern.description}</div>
-                <div class="flex flex-wrap gap-1">
-                    ${selectedPattern.beats.map((beat, i) => `
+                <div class="text-white font-semibold mb-1">${pattern.name}</div>
+                <div class="text-sm text-gray-300 mb-2">${pattern.description || 'Custom pattern'}</div>
+                <div class="flex flex-wrap gap-1 mb-2">
+                    ${pattern.beats.map((beat, i) => `
                         <span class="px-2 py-1 bg-orange-600 bg-opacity-30 text-orange-300 rounded text-xs font-mono">
-                            ${progressionData[i]?.roman || '?'}: ${beat} beat${beat !== 1 ? 's' : ''}
+                            ${chords[i]?.roman || chords[i]?.name || '?'}: ${beat} beat${beat !== 1 ? 's' : ''}
                         </span>
                     `).join('')}
                 </div>
             `;
+            renderGrid(pattern.beats);
+        } else {
+            previewEl.innerHTML = `<div class="text-gray-400 text-sm">Select a pattern to preview.</div>`;
+            renderGrid(getTargetChordsDynamic().map(c => c.beats || 4));
         }
     };
 
-    // Initial preview
+    populatePatternOptions();
+    renderCustomList();
     updatePreview();
 
-    // Event listeners
-    const closeModal = () => {
-        modal.remove();
-    };
+    const closeModal = () => modal.remove();
 
-    document.getElementById('rhythm-modal-close-btn').addEventListener('click', closeModal);
-    document.getElementById('rhythm-modal-cancel-btn').addEventListener('click', closeModal);
-    document.getElementById('rhythm-pattern-select').addEventListener('change', updatePreview);
+    // Event listeners
+    modal.querySelector('#rhythm-modal-close-btn').addEventListener('click', closeModal);
+    modal.querySelectorAll('#rhythm-modal-cancel-btn').forEach(btn => btn.addEventListener('click', closeModal));
+    patternSelectEl.addEventListener('change', updatePreview);
+
+    scopeRadios.forEach(r => {
+        r.addEventListener('change', () => {
+            currentScope = r.value === 'selection' && hasSelection ? 'selection' : 'all';
+            populatePatternOptions();
+            updatePreview();
+        });
+    });
 
     modal.addEventListener('click', (e) => {
         if (e.target === modal) closeModal();
     });
 
-    document.getElementById('rhythm-modal-apply-btn').addEventListener('click', () => {
-        const select = document.getElementById('rhythm-pattern-select');
-        const patternId = select.value;
-        applyRhythmPatternToProgression(patternId);
-        closeModal();
+    modal.querySelector('#rhythm-save-custom-btn').addEventListener('click', () => {
+        const name = (customNameInput.value || '').trim();
+        const chords = getTargetChordsDynamic();
+        const inputs = Array.from(gridEl.querySelectorAll('input[data-beat-index]'));
+        const beats = inputs.map(inp => Number(inp.value) || 1);
+        if (!name) {
+            if (window.showModal) window.showModal('Please name your custom pattern.', false);
+            return;
+        }
+        if (beats.length !== chords.length) {
+            if (window.showModal) window.showModal('Beat count must match chord count.', false);
+            return;
+        }
+        const saved = saveCustomPattern({
+            name,
+            beats,
+            chordCount: chords.length,
+            description: `Custom (${formatBeatsDisplay(beats)})`
+        });
+        if (saved) {
+            populatePatternOptions();
+            patternSelectEl.value = saved.id;
+            updatePreview();
+            customNameInput.value = '';
+            if (window.showModal) {
+                window.showModal(`Saved "${saved.name}"`, false);
+                setTimeout(() => window.hideModal && window.hideModal(), 1200);
+            }
+        }
     });
+
+    modal.querySelectorAll('#rhythm-modal-apply-btn').forEach(btn => btn.addEventListener('click', () => {
+        const chords = getTargetChordsDynamic();
+        const inputs = Array.from(gridEl.querySelectorAll('input[data-beat-index]'));
+        const beats = inputs.map(inp => Number(inp.value) || 1);
+        if (beats.length !== chords.length) {
+            if (window.showModal) window.showModal('Beat count must match chord count.', false);
+            return;
+        }
+        const targetIndices = getTargetIndices(currentScope);
+        const compBeats = beats;
+
+        // Apply beats to target chords
+        const updated = applyBeatsToProgression(progressionData, beats, targetIndices);
+        if (!updated) {
+            if (window.showModal) window.showModal('Pattern does not match the selected chords.', false);
+            return;
+        }
+
+        // Write comping beats into chords as metadata
+        if (compBeats) {
+            targetIndices.forEach((idx, i) => {
+                const chordIdx = targetIndices[i];
+                if (updated[chordIdx]) {
+                    updated[chordIdx].compBeats = compBeats[i % compBeats.length];
+                }
+            });
+        }
+
+        // Save state and commit
+        saveStateBeforeChange();
+        setProgressionData(updated);
+
+        // Optional: trigger bass auto generation if user requested
+        if (bassFollowToggle && bassFollowToggle.checked && window.syncProgressionToMelodyComposer) {
+            window.syncProgressionToMelodyComposer();
+        }
+        renderProgressionDisplay('melody-progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', false);
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
+        }
+
+        // Show confirmation
+        const pattern = getAnyPatternById(patternSelectEl.value);
+        const patternName = pattern ? pattern.name : 'Custom beats';
+        if (window.showModal) {
+            window.showModal(`Applied "${patternName}"`, false);
+            setTimeout(() => window.hideModal && window.hideModal(), 1500);
+        }
+
+        // Update builder panel
+        if (window.updateBuilderProgressionPanel) {
+            window.updateBuilderProgressionPanel();
+        }
+        closeModal();
+    }));
+
+    // Delete custom pattern
+    modal.querySelector('#rhythm-delete-custom-btn')?.addEventListener('click', () => {
+        const patternId = patternSelectEl.value;
+        const pattern = getAnyPatternById(patternId);
+        if (!pattern || !pattern.isCustom) {
+            if (window.showModal) {
+                window.showModal('Select a custom pattern to delete.', false);
+                setTimeout(() => window.hideModal && window.hideModal(), 1200);
+            }
+            return;
+        }
+        deleteCustomPattern(patternId);
+        populatePatternOptions();
+        renderCustomList();
+        updatePreview();
+        if (window.showModal) {
+            window.showModal(`Deleted "${pattern.name}"`, false);
+            setTimeout(() => window.hideModal && window.hideModal(), 1200);
+        }
+    });
+
+    // Custom list actions (load/delete)
+    customListEl?.addEventListener('click', (e) => {
+        const loadBtn = e.target.closest('.load-custom-btn');
+        const delBtn = e.target.closest('.delete-custom-btn');
+        if (loadBtn) {
+            const id = loadBtn.getAttribute('data-id');
+            patternSelectEl.value = id;
+            updatePreview();
+        } else if (delBtn) {
+            const id = delBtn.getAttribute('data-id');
+            const pattern = getAnyPatternById(id);
+            deleteCustomPattern(id);
+            populatePatternOptions();
+            renderCustomList();
+            if (pattern && window.showModal) {
+                window.showModal(`Deleted "${pattern.name}"`, false);
+                setTimeout(() => window.hideModal && window.hideModal(), 1200);
+            }
+        }
+    });
+
+    // Preview playback - piano chords only (no bass)
+    if (previewBtn) {
+        previewBtn.addEventListener('click', () => {
+            const chords = getTargetChordsDynamic().map(ch => ({
+                ...ch,
+                voicingNotes: ch.notes || []
+            }));
+            const inputs = Array.from(gridEl.querySelectorAll('input[data-beat-index]'));
+            const beats = inputs.map(inp => Number(inp.value) || 1);
+            const bpm = window.getCompositionState ? (window.getCompositionState()?.getTempo?.() || 100) : 100;
+
+            setPreviewOptions({
+                swing: 0,
+                humanize: 0,
+                loopLengthBars: 1,
+                kit: 'acoustic'
+            });
+
+            // Play piano chords only - pass empty bassBeats to skip bass
+            previewPattern({
+                chords,
+                bassBeats: [], // No bass
+                compBeats: beats, // Piano chords use the rhythm pattern
+                bpm,
+                swing: 0,
+                humanizeMs: 0
+            });
+        });
+    }
+
+    if (stopPreviewBtn) {
+        stopPreviewBtn.addEventListener('click', () => {
+            stopPreview();
+            if (window.stopPreviewSynths) window.stopPreviewSynths();
+        });
+    }
+
+    if (infoBtn && infoPanel) {
+        infoBtn.addEventListener('click', () => {
+            const isHidden = infoPanel.classList.contains('hidden');
+            if (isHidden) {
+                infoPanel.classList.remove('hidden');
+            } else {
+                infoPanel.classList.add('hidden');
+            }
+        });
+    }
+
+    // Manage Custom Patterns modal
+    const manageCustomBtn = modal.querySelector('#rhythm-manage-custom-btn');
+    const customManager = modal.querySelector('#rhythm-custom-manager');
+    const customManagerClose = modal.querySelector('#rhythm-custom-manager-close');
+
+    if (manageCustomBtn && customManager) {
+        manageCustomBtn.addEventListener('click', () => {
+            renderCustomList();
+            customManager.classList.remove('hidden');
+        });
+    }
+
+    if (customManagerClose && customManager) {
+        customManagerClose.addEventListener('click', () => {
+            customManager.classList.add('hidden');
+        });
+
+        // Close on backdrop click
+        customManager.addEventListener('click', (e) => {
+            if (e.target === customManager) {
+                customManager.classList.add('hidden');
+            }
+        });
+    }
 }
 
 /**
  * Apply a rhythm pattern to the current progression
  * @param {string} patternId - Pattern ID to apply
  */
-export function applyRhythmPatternToProgression(patternId) {
+export function applyRhythmPatternToProgression(patternId, options = {}) {
+    const { targetIndices = null, customBeats = null } = options;
     const progressionData = getProgressionData();
-    const updated = applyRhythmPattern(progressionData, patternId);
+    const pattern = customBeats ? null : getAnyPatternById(patternId);
+    const beats = customBeats || (pattern ? pattern.beats : null);
+
+    if (!beats || !Array.isArray(beats)) {
+        console.warn('[applyRhythmPatternToProgression] No beats found for pattern:', patternId);
+        return;
+    }
+
+    const updated = applyBeatsToProgression(progressionData, beats, targetIndices);
 
     if (!updated) {
-        console.warn('[applyRhythmPatternToProgression] Failed to apply pattern:', patternId);
+        console.warn('[applyRhythmPatternToProgression] Failed to apply pattern:', patternId, 'target:', targetIndices);
+        if (window.showModal) {
+            window.showModal('Pattern does not match the selected chords. Beat count must equal target chord count.', false);
+            setTimeout(() => window.hideModal && window.hideModal(), 1800);
+        }
         return;
     }
 
@@ -14560,12 +14950,17 @@ export function applyRhythmPatternToProgression(patternId) {
     }
 
     // Show confirmation
-    const pattern = getPatternById(patternId);
-    if (pattern && window.showModal) {
-        window.showModal(`Applied "${pattern.name}" rhythm pattern`, false);
+    const patternName = pattern ? pattern.name : 'Custom beats';
+    if (window.showModal) {
+        window.showModal(`Applied "${patternName}"`, false);
         setTimeout(() => {
             if (window.hideModal) window.hideModal();
         }, 1500);
+    }
+
+    // Update builder panel
+    if (window.updateBuilderProgressionPanel) {
+        window.updateBuilderProgressionPanel();
     }
 }
 

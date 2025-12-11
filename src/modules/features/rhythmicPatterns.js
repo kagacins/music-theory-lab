@@ -368,6 +368,74 @@ export const RHYTHMIC_PATTERNS = {
     }
 };
 
+// Basic comping pattern presets (used for preview + optional comp lane tagging)
+export const COMPING_PATTERNS = {
+    'comp-charleston-straight': {
+        id: 'comp-charleston-straight',
+        name: 'Charleston (straight)',
+        beats: [1.5, 0.5], // long-short
+        totalBeats: 2,
+        description: 'Classic long-short accent on 1 and & of 2',
+        category: PATTERN_CATEGORIES.SYNCOPATED
+    },
+    'comp-charleston-swing': {
+        id: 'comp-charleston-swing',
+        name: 'Charleston (swing)',
+        beats: [1.67, 0.33],
+        totalBeats: 2,
+        description: 'Swung long-short for jazz feel',
+        category: PATTERN_CATEGORIES.JAZZ
+    },
+    'comp-bossa': {
+        id: 'comp-bossa',
+        name: 'Bossa Nova',
+        beats: [1, 0.5, 0.5, 1, 1],
+        totalBeats: 4,
+        description: 'Anticipated push on 2+, light on 4',
+        category: PATTERN_CATEGORIES.LATIN
+    },
+    'comp-rock-stabs': {
+        id: 'comp-rock-stabs',
+        name: 'Rock Stabs',
+        beats: [1, 1],
+        totalBeats: 2,
+        description: 'Big hits on 1 and 3 (2-beat loop)',
+        category: PATTERN_CATEGORIES.ROCK
+    },
+    'comp-ballad-arp': {
+        id: 'comp-ballad-arp',
+        name: 'Ballad Arp',
+        beats: [0.5, 0.5, 0.5, 0.5],
+        totalBeats: 2,
+        description: 'Even eighth-note arpeggio feel',
+        category: PATTERN_CATEGORIES.POP
+    },
+    'comp-pad-swell': {
+        id: 'comp-pad-swell',
+        name: 'Pad Swell',
+        beats: [2],
+        totalBeats: 2,
+        description: 'Hold and bloom; great for pads/keys',
+        category: PATTERN_CATEGORIES.BASIC
+    },
+    'comp-gospel-hit': {
+        id: 'comp-gospel-hit',
+        name: 'Gospel Hit',
+        beats: [0.75, 0.25, 1],
+        totalBeats: 2,
+        description: 'Push then land; works with shout vibes',
+        category: PATTERN_CATEGORIES.SYNCOPATED
+    }
+};
+
+export function getCompingPatterns() {
+    return Object.values(COMPING_PATTERNS);
+}
+
+export function getCompingPatternById(id) {
+    return COMPING_PATTERNS[id] || null;
+}
+
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================

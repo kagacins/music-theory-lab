@@ -318,6 +318,13 @@
 /* Ensure chord card wrapper allows tooltip to appear on top */
 .chord-card-wrapper {
     position: relative;
+    overflow: visible; /* prevent ring/outline clipping */
+}
+
+/* Allow selection rings to render fully */
+.chord-card-wrapper .simplified-card,
+.chord-card-wrapper .detailed-card {
+    overflow: visible;
 }
 
 /* Chord tooltip must appear above everything */
