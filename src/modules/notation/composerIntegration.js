@@ -222,6 +222,7 @@ export class NotationComposer {
             this.compositionState.updateSettings({
               restDisplayMode: settings.restDisplayMode,
               cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice,
+              hideCueRests: settings.hideCueRests,
             });
           }
           // Re-render to apply new rest display mode
@@ -238,6 +239,16 @@ export class NotationComposer {
         },
       });
       this.toolbar.create(this.config.toolbarContainer);
+
+      // Sync toolbar's initial settings (from localStorage) to compositionState
+      if (this.compositionState) {
+        const initialRestSettings = this.toolbar.getRestDisplaySettings();
+        this.compositionState.updateSettings({
+          restDisplayMode: initialRestSettings.restDisplayMode,
+          cueRestsForSecondaryVoice: initialRestSettings.cueRestsForSecondaryVoice,
+          hideCueRests: initialRestSettings.hideCueRests,
+        });
+      }
     }
 
     // Subscribe to composition state changes
@@ -947,6 +958,8 @@ export class NotationComposer {
         // Multi-voice rest display settings
         restDisplayMode: settings.restDisplayMode || 'clean',
         cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice !== false,
+        // hideCueRests = !cueRestsForSecondaryVoice (checkbox unchecked = hide cue rests)
+        hideCueRests: settings.cueRestsForSecondaryVoice === false,
       });
     }
 
@@ -1451,6 +1464,8 @@ export class NotationComposer {
         // Multi-voice rest display settings
         restDisplayMode: settings.restDisplayMode || 'clean',
         cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice !== false,
+        // hideCueRests = !cueRestsForSecondaryVoice (checkbox unchecked = hide cue rests)
+        hideCueRests: settings.cueRestsForSecondaryVoice === false,
       });
 
       // Collect rendered measures (adjust indices back to global)
@@ -1648,6 +1663,8 @@ export class NotationComposer {
       // Multi-voice rest display settings
       restDisplayMode: settings.restDisplayMode || 'clean',
       cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice !== false,
+      // hideCueRests = !cueRestsForSecondaryVoice (checkbox unchecked = hide cue rests)
+      hideCueRests: settings.cueRestsForSecondaryVoice === false,
     });
 
     const allRenderedMeasures = [];

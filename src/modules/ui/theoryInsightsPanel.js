@@ -1457,9 +1457,7 @@ export class TheoryInsightsPanel {
     attachEventListeners() {
         // Learn more buttons - show concept explanation modal
         const learnMoreBtns = this.container.querySelectorAll('.learn-more-btn');
-        console.log('[TheoryInsights] Found learn-more-btn count:', learnMoreBtns.length);
         learnMoreBtns.forEach((btn, idx) => {
-            console.log(`[TheoryInsights] Button ${idx} dataset:`, btn.dataset);
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 // Use btn directly, not e.target (which could be text node)

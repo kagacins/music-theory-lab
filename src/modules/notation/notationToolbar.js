@@ -275,9 +275,9 @@ export class NotationToolbar {
                 <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'clean' ? 'active' : ''}" data-rest-mode="clean" title="Clean: Hide redundant rests">Clean</button>
                 <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'explicit' ? 'active' : ''}" data-rest-mode="explicit" title="Show all rests">All</button>
               </div>
-              <label class="cue-rest-toggle" title="Show cue-sized rests for secondary voice">
-                <input type="checkbox" class="cue-rest-checkbox" ${this.cueRestsForSecondaryVoice ? 'checked' : ''}>
-                <span class="cue-rest-label">Cue</span>
+              <label class="cue-rest-toggle ${this.restDisplayMode === 'explicit' ? 'disabled' : ''}" title="Show small gray cue rests where voices overlap (only applies in Clean mode)">
+                <input type="checkbox" class="cue-rest-checkbox" ${this.cueRestsForSecondaryVoice ? 'checked' : ''} ${this.restDisplayMode === 'explicit' ? 'disabled' : ''}>
+                <span class="cue-rest-label">Show Cue Rests</span>
               </label>
             </div>
           </div>
@@ -529,14 +529,23 @@ export class NotationToolbar {
         height: 32px;
       }
 
-      .cue-rest-toggle:hover {
+      .cue-rest-toggle:hover:not(.disabled) {
         background: var(--bg-hover, #444);
+      }
+
+      .cue-rest-toggle.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
       }
 
       .cue-rest-checkbox {
         width: 12px;
         height: 14px;
         cursor: pointer;
+      }
+
+      .cue-rest-checkbox:disabled {
+        cursor: not-allowed;
       }
 
       .cue-rest-label {
@@ -919,12 +928,15 @@ export class NotationToolbar {
     this.onRestDisplayModeChange({
       restDisplayMode: this.restDisplayMode,
       cueRestsForSecondaryVoice: this.cueRestsForSecondaryVoice,
+      hideCueRests: !this.cueRestsForSecondaryVoice,
     });
   }
 
   /**
    * Set cue rests enabled for secondary voice
-   * @param {boolean} enabled - Whether to use cue-sized rests
+   * When enabled (checkbox checked): Show small gray cue rests
+   * When disabled (checkbox unchecked): Hide cue rests using GhostNotes
+   * @param {boolean} enabled - Whether to show cue-sized rests (true) or hide them (false)
    */
   setCueRestsEnabled(enabled) {
     this.cueRestsForSecondaryVoice = enabled;
@@ -932,22 +944,25 @@ export class NotationToolbar {
     this.onRestDisplayModeChange({
       restDisplayMode: this.restDisplayMode,
       cueRestsForSecondaryVoice: this.cueRestsForSecondaryVoice,
+      hideCueRests: !this.cueRestsForSecondaryVoice,
     });
   }
 
   /**
    * Get current rest display settings
-   * @returns {Object} - { restDisplayMode, cueRestsForSecondaryVoice }
+   * @returns {Object} - { restDisplayMode, cueRestsForSecondaryVoice, hideCueRests }
    */
   getRestDisplaySettings() {
     return {
       restDisplayMode: this.restDisplayMode,
       cueRestsForSecondaryVoice: this.cueRestsForSecondaryVoice,
+      // hideCueRests is the inverse: when cue checkbox is checked (show cue), hide is false
+      hideCueRests: !this.cueRestsForSecondaryVoice,
     };
   }
 
   /**
-   * Update rest display mode button states
+   * Update rest display mode button states and cue checkbox disabled state
    */
   updateRestDisplayButtons() {
     if (!this.container) return;
@@ -955,6 +970,15 @@ export class NotationToolbar {
       const isActive = btn.dataset.restMode === this.restDisplayMode;
       btn.classList.toggle('active', isActive);
     });
+
+    // Disable cue checkbox when in "All" (explicit) mode
+    const cueToggle = this.container.querySelector('.cue-rest-toggle');
+    const cueCheckbox = this.container.querySelector('.cue-rest-checkbox');
+    if (cueToggle && cueCheckbox) {
+      const isExplicit = this.restDisplayMode === 'explicit';
+      cueToggle.classList.toggle('disabled', isExplicit);
+      cueCheckbox.disabled = isExplicit;
+    }
   }
 
   /**

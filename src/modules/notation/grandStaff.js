@@ -12,6 +12,7 @@ import {
   createStaveNote,
   createChordNote,
   createRest,
+  createGhostNote,
   createVoice,
   generateBeams,
   drawBeams,
@@ -320,10 +321,9 @@ export function analyzeRestVisibility(primaryVoiceNotes, secondaryVoiceNotes, op
   const primaryRestVisibility = new Map();
   const secondaryRestVisibility = new Map();
 
-  // If explicit mode, show all rests (no hiding)
-  if (restDisplayMode === 'explicit') {
-    return { primaryRestVisibility, secondaryRestVisibility };
-  }
+  // "explicit" mode ("All"): show all rests, but still apply cue styling when appropriate
+  // The difference from "clean" mode is that we never hide rests in explicit mode
+  const isExplicitMode = restDisplayMode === 'explicit';
 
   // Build beat maps for each voice
   // Format: beat -> { isRest: boolean, hasNote: boolean, isLastBeforeNote: boolean }
@@ -343,19 +343,8 @@ export function analyzeRestVisibility(primaryVoiceNotes, secondaryVoiceNotes, op
   const primaryBeatMap = buildBeatMap(primaryVoiceNotes);
   const secondaryBeatMap = buildBeatMap(secondaryVoiceNotes);
 
-  // Helper: Check if a rest at given beat in voice is "required"
-  // A rest is required if the voice has a note AFTER this rest beat
-  // (i.e., the rest is needed to position the re-entry)
-  const isRestRequired = (voiceNotes, restBeat) => {
-    // Find if there's any non-rest note after this beat
-    return voiceNotes.some(note => {
-      const noteBeat = note.beat ?? 0;
-      const isNote = !note.isRest && note.type !== 'rest';
-      return isNote && noteBeat > restBeat;
-    });
-  };
-
   // Analyze primary voice rests
+  // Primary voice gets cue treatment when secondary voice has a note at same beat
   primaryVoiceNotes.forEach((note, idx) => {
     if (note.isRest || note.type === 'rest') {
       const beat = note.beat ?? 0;
@@ -364,12 +353,25 @@ export function analyzeRestVisibility(primaryVoiceNotes, secondaryVoiceNotes, op
       // Check if secondary voice has a note at this beat
       const secondaryHasNote = secondaryAtBeat?.hasNote;
 
-      // Check if this rest is required for re-entry
-      const restRequired = isRestRequired(primaryVoiceNotes, beat);
-
-      if (secondaryHasNote && !restRequired) {
-        // Hide primary voice rest - beat structure is clear from secondary voice
-        primaryRestVisibility.set(beat, { hidden: true, isCue: false });
+      // Apply cue logic when secondary voice has a note at this beat
+      if (secondaryHasNote) {
+        if (cueRestsForSecondaryVoice) {
+          // Cue mode enabled (Show Cue Rests checked): show as cue-sized rest
+          // In explicit mode ("All"), always show cue rest (never hide)
+          // In clean mode, show cue rest (hidden: false) so user can see and interact with it
+          primaryRestVisibility.set(beat, { hidden: false, isCue: true });
+        } else {
+          // Cue mode disabled (Show Cue Rests unchecked): hide rests where other voice has note
+          // In explicit mode ("All"), show as full-size rest
+          // In clean mode, hide completely (use GhostNote)
+          if (isExplicitMode) {
+            // Show full-size rest in explicit mode
+            // No entry needed - renders as normal rest
+          } else {
+            // Hide in clean mode
+            primaryRestVisibility.set(beat, { hidden: true, isCue: false });
+          }
+        }
       }
     }
   });
@@ -383,21 +385,25 @@ export function analyzeRestVisibility(primaryVoiceNotes, secondaryVoiceNotes, op
       // Check if primary voice has a note at this beat
       const primaryHasNote = primaryAtBeat?.hasNote;
 
-      // Check if this rest is required for re-entry
-      const restRequired = isRestRequired(secondaryVoiceNotes, beat);
-
       // Voice 2 rests visibility depends on cueRestsForSecondaryVoice setting
-      if (cueRestsForSecondaryVoice) {
-        // Cue mode enabled: show as cue-sized, hide only if primary has note AND rest not required
-        const shouldHide = primaryHasNote && !restRequired;
-        secondaryRestVisibility.set(beat, { hidden: shouldHide, isCue: true });
-      } else {
-        // Cue mode disabled: hide all Voice 2 rests where primary has a note
-        // (standard multi-voice notation hides secondary voice rests when primary voice has content)
-        if (primaryHasNote) {
-          secondaryRestVisibility.set(beat, { hidden: true, isCue: false });
+      if (primaryHasNote) {
+        if (cueRestsForSecondaryVoice) {
+          // Cue mode enabled (Show Cue Rests checked): show as cue-sized rest
+          // In explicit mode ("All"), always show cue rest (never hide)
+          // In clean mode, show cue rest (hidden: false) so user can see and interact with it
+          secondaryRestVisibility.set(beat, { hidden: false, isCue: true });
+        } else {
+          // Cue mode disabled (Show Cue Rests unchecked): hide rests where other voice has note
+          // In explicit mode ("All"), show as full-size rest
+          // In clean mode, hide completely (use GhostNote)
+          if (isExplicitMode) {
+            // Show full-size rest in explicit mode
+            // No entry needed - renders as normal rest
+          } else {
+            // Hide in clean mode
+            secondaryRestVisibility.set(beat, { hidden: true, isCue: false });
+          }
         }
-        // If primary doesn't have a note at this beat, the rest renders normally (no entry needed)
       }
     }
   });
@@ -409,10 +415,16 @@ export function analyzeRestVisibility(primaryVoiceNotes, secondaryVoiceNotes, op
  * Apply rest visibility settings to a note array before rendering.
  * Modifies notes in place, adding _restDisplay property.
  *
+ * The _restDisplay property controls how rests are rendered:
+ * - { hidden: true } -> Use GhostNote (invisible spacer)
+ * - { isCue: true } -> Use small grayed cue rest
+ * - neither -> Normal full-size rest
+ *
  * @param {Array} notes - Array of note data
  * @param {Map} restVisibilityMap - Map of beat -> { hidden, isCue }
+ * @param {boolean} hideCueRests - If true, cue rests become hidden (GhostNotes)
  */
-export function applyRestVisibility(notes, restVisibilityMap) {
+export function applyRestVisibility(notes, restVisibilityMap, hideCueRests = false) {
   if (!restVisibilityMap || restVisibilityMap.size === 0) return;
 
   notes.forEach(note => {
@@ -420,7 +432,12 @@ export function applyRestVisibility(notes, restVisibilityMap) {
       const beat = note.beat ?? 0;
       const visibility = restVisibilityMap.get(beat);
       if (visibility) {
-        note._restDisplay = visibility;
+        // When hideCueRests is enabled, convert cue rests to hidden (GhostNotes)
+        if (hideCueRests && visibility.isCue && !visibility.hidden) {
+          note._restDisplay = { hidden: true, isCue: false };
+        } else {
+          note._restDisplay = visibility;
+        }
       }
     }
   });
@@ -1593,6 +1610,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     // Multi-voice rest display options
     restDisplayMode = 'clean',      // 'clean' (smart omission) or 'explicit' (show all)
     cueRestsForSecondaryVoice = true, // Use smaller rests for voice 2
+    hideCueRests = false,           // If true, cue rests become GhostNotes (invisible)
   } = options;
 
   const {
@@ -1710,8 +1728,8 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
       secondaryTrebleVoiceNotes,
       { restDisplayMode, cueRestsForSecondaryVoice }
     );
-    applyRestVisibility(primaryTrebleVoiceNotes, primaryRestVisibility);
-    applyRestVisibility(secondaryTrebleVoiceNotes, secondaryRestVisibility);
+    applyRestVisibility(primaryTrebleVoiceNotes, primaryRestVisibility, hideCueRests);
+    applyRestVisibility(secondaryTrebleVoiceNotes, secondaryRestVisibility, hideCueRests);
   }
 
   // Create notes for voice 0 (primary voice)
@@ -1772,8 +1790,8 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
       secondaryBassVoiceNotes,
       { restDisplayMode, cueRestsForSecondaryVoice }
     );
-    applyRestVisibility(primaryBassVoiceNotes, primaryRestVisibility);
-    applyRestVisibility(secondaryBassVoiceNotes, secondaryRestVisibility);
+    applyRestVisibility(primaryBassVoiceNotes, primaryRestVisibility, hideCueRests);
+    applyRestVisibility(secondaryBassVoiceNotes, secondaryRestVisibility, hideCueRests);
   }
 
   // Create notes for bass voice 0 (primary voice)
@@ -2203,11 +2221,48 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   const appendTrebleRegions = (vexArray, sourceNotes, voiceIndex) => {
     vexArray.forEach((vexNote, noteIdx) => {
       try {
-        const boundingBox = vexNote.getBoundingBox();
         const noteData = sourceNotes[noteIdx];
+        if (!noteData) return;
 
-        if (boundingBox && noteData) {
+        let boundingBox = null;
+        try {
+          boundingBox = vexNote.getBoundingBox();
+        } catch (bbErr) {
+          // GhostNotes may throw on getBoundingBox
+          console.log(`[appendTrebleRegions] getBoundingBox threw for noteIdx=${noteIdx}, beat=${noteData.beat}, isRest=${noteData.isRest}, _autoGenerated=${noteData._autoGenerated}`);
+        }
 
+        // For notes without bounding boxes (GhostNotes, or any note that fails getBoundingBox),
+        // create a synthetic bounding box so the position remains clickable/selectable
+        let syntheticBounds = null;
+        if (!boundingBox) {
+          try {
+            const noteX = vexNote.getAbsoluteX();
+            console.log(`[appendTrebleRegions] No boundingBox for noteIdx=${noteIdx}, beat=${noteData.beat}, isRest=${noteData.isRest}, _autoGenerated=${noteData._autoGenerated}, noteX=${noteX}, _isGhostNote=${vexNote._isGhostNote}, _isHiddenRest=${vexNote._isHiddenRest}`);
+            if (noteX !== undefined && noteX !== null) {
+              // Create synthetic bounds: 30px wide centered on noteX, at staff middle
+              syntheticBounds = {
+                x: noteX - 15,
+                y: trebleY + 20,  // Middle of treble staff
+                width: 30,
+                height: 40,
+              };
+              console.log(`[appendTrebleRegions] Created synthetic bounds for noteIdx=${noteIdx}, beat=${noteData.beat}:`, syntheticBounds);
+            }
+          } catch (posErr) {
+            console.log(`[appendTrebleRegions] getAbsoluteX threw for noteIdx=${noteIdx}:`, posErr);
+          }
+        }
+
+        // Use actual bounds or synthetic bounds
+        const bounds = boundingBox ? {
+          x: boundingBox.getX() - 4,
+          y: boundingBox.getY() - 4,
+          width: boundingBox.getW() + 8,
+          height: boundingBox.getH() + 8,
+        } : syntheticBounds;
+
+        if (bounds) {
           // Calculate original index (in compositionState, without auto-generated rests)
           // This ensures noteIndex matches the position in compositionState.voices[].notes[]
           let originalNoteIndex = 0;
@@ -2229,7 +2284,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
             // Fall back to bounding box if position methods not available
           }
 
-          noteRegions.push({
+          const region = {
             staff: 'treble',
             measureIndex,
             // For auto-generated rests, use -1 as noteIndex to indicate they don't exist in compositionState
@@ -2242,14 +2297,18 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
             dotted: noteData.dotted || false,
             isRest: noteData.isRest || false,
             isAutoGenerated: noteData._autoGenerated || false, // Flag for auto-generated rests
+            isHiddenRest: vexNote._isGhostNote || vexNote._isHiddenRest || false, // Flag for GhostNotes
             noteHeadPositions, // Array of {x, y} for each note head
-            bounds: {
-              x: boundingBox.getX() - 4,
-              y: boundingBox.getY() - 4,
-              width: boundingBox.getW() + 8,
-              height: boundingBox.getH() + 8,
-            },
-          });
+            bounds,
+          };
+
+          if (noteData._autoGenerated) {
+            console.log(`[appendTrebleRegions] Created region for AUTO-GENERATED rest: voice=${voiceIndex}, beat=${region.beat}, bounds=`, bounds);
+          }
+
+          noteRegions.push(region);
+        } else {
+          console.log(`[appendTrebleRegions] NO BOUNDS for noteIdx=${noteIdx}, beat=${noteData.beat}, isRest=${noteData.isRest}, _autoGenerated=${noteData._autoGenerated} - region NOT created`);
         }
       } catch (e) {
         // Ignore bounding box errors but keep rendering going
@@ -2266,10 +2325,45 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   const appendBassRegions = (vexNotes, sourceNotes, voiceIndex) => {
     vexNotes.forEach((vexNote, noteIdx) => {
       try {
-        const boundingBox = vexNote.getBoundingBox();
-        if (boundingBox && sourceNotes[noteIdx]) {
-          const noteData = sourceNotes[noteIdx];
+        const noteData = sourceNotes[noteIdx];
+        if (!noteData) return;
 
+        let boundingBox = null;
+        try {
+          boundingBox = vexNote.getBoundingBox();
+        } catch (bbErr) {
+          // GhostNotes may throw on getBoundingBox
+        }
+
+        // For GhostNotes (hidden rests), create a synthetic bounding box
+        // so the beat position remains clickable/selectable
+        let syntheticBounds = null;
+        if (!boundingBox && (vexNote._isGhostNote || vexNote._isHiddenRest)) {
+          try {
+            const noteX = vexNote.getAbsoluteX();
+            if (noteX !== undefined) {
+              // Create synthetic bounds: 30px wide centered on noteX, at staff middle
+              syntheticBounds = {
+                x: noteX - 15,
+                y: bassY + 20,  // Middle of bass staff
+                width: 30,
+                height: 40,
+              };
+            }
+          } catch (posErr) {
+            // Can't get position, skip this note
+          }
+        }
+
+        // Use actual bounds or synthetic bounds for GhostNotes
+        const bounds = boundingBox ? {
+          x: boundingBox.getX() - 4,
+          y: boundingBox.getY() - 4,
+          width: boundingBox.getW() + 8,
+          height: boundingBox.getH() + 8,
+        } : syntheticBounds;
+
+        if (bounds) {
           // Calculate original index (in compositionState, without auto-generated rests)
           // This ensures noteIndex matches the position in compositionState.voices[].notes[]
           let originalNoteIndex = 0;
@@ -2304,13 +2398,9 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
             dotted: noteData.dotted || false,  // Include dotted for beat calculations
             isRest: noteData.isRest || false,
             isAutoGenerated: noteData._autoGenerated || false, // Flag for auto-generated rests
+            isHiddenRest: vexNote._isGhostNote || vexNote._isHiddenRest || false, // Flag for GhostNotes
             noteHeadPositions, // Array of {x, y} for each note head
-            bounds: {
-              x: boundingBox.getX() - 4,
-              y: boundingBox.getY() - 4,
-              width: boundingBox.getW() + 8,
-              height: boundingBox.getH() + 8,
-            },
+            bounds,
           });
         }
       } catch (e) {
@@ -2526,15 +2616,22 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature, options =
       }
 
       // Apply rest display settings (hidden or cue-sized) for multi-voice clean notation
-      const restDisplayOptions = {};
-      if (note._restDisplay) {
-        restDisplayOptions.hidden = note._restDisplay.hidden || false;
-        restDisplayOptions.isCue = note._restDisplay.isCue || false;
+      // When hidden is true, use GhostNote for proper spacing without visible rest
+      // When isCue is true, use smaller grayed cue rest
+      let restNote;
+      if (note._restDisplay?.hidden) {
+        // Use GhostNote for hidden rests - maintains spacing without visual clutter
+        restNote = createGhostNote(note.duration || '4n');
+      } else {
+        // Use regular rest (possibly cue-sized)
+        const restDisplayOptions = {
+          isCue: note._restDisplay?.isCue || false,
+        };
+        restNote = createRest(note.duration || '4n', clef, restDisplayOptions);
       }
 
-      const restNote = createRest(note.duration || '4n', clef, restDisplayOptions);
       if (!restNote) {
-        console.warn('[createNotesForStaff] createRest returned null for note:', JSON.stringify(note));
+        console.warn('[createNotesForStaff] createRest/createGhostNote returned null for note:', JSON.stringify(note));
         continue;
       }
       vexNotes.push(restNote);
@@ -2737,6 +2834,7 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     // Multi-voice rest display options
     restDisplayMode = 'clean',      // 'clean' (smart omission) or 'explicit' (show all)
     cueRestsForSecondaryVoice = true, // Use smaller rests for secondary voice
+    hideCueRests = false,           // If true, cue rests become GhostNotes (invisible)
     // Multi-page support: offset for global measure index (0-based)
     globalMeasureOffset = 0,     // First measure's global index (for page 2, this would be 8)
   } = options;
@@ -3368,6 +3466,7 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       // Multi-voice rest display options
       restDisplayMode,
       cueRestsForSecondaryVoice,
+      hideCueRests,
     });
 
     if (result) {
