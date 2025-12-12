@@ -8,7 +8,7 @@
  * - Calculate proximity to chord changes for anticipation scoring
  */
 
-import { getCompositionState } from '../state/compositionState.js';
+import { getCompositionState, getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
 
 // -----------------------------------------------------------------------------
 // Chord Timeline Builder
@@ -59,7 +59,7 @@ export function buildChordTimeline() {
  */
 function buildMeasureBasedTimeline(compositionState) {
     const timeline = [];
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
 
     for (let i = 0; i < compositionState.measures.length; i++) {
         const measure = compositionState.measures[i];
@@ -213,7 +213,7 @@ export function getChordContext(measureIndex, noteIndex = 0) {
     const timeline = buildChordTimeline();
     if (timeline.length === 0) return null;
 
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
 
     // Get notes in measure to calculate beat position
     const trebleNotes = compositionState.getNotes(measureIndex, 'treble', 0) || [];
@@ -256,7 +256,7 @@ export function getChordSequenceForPhrase(startMeasure, startBeatInMeasure, rhyt
     const timeline = buildChordTimeline();
     if (timeline.length === 0) return [];
 
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
     const baseTime = 0.5; // rhythm value 1 = half beat (eighth note)
 
     let currentBeat = getAbsoluteBeat(startMeasure, startBeatInMeasure, beatsPerMeasure);

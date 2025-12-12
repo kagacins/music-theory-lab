@@ -9,7 +9,7 @@ import { getEnharmonicPreference, getNotationPreference } from '../state/globalS
 import { getNoteKeyId, noteToMidi, getLHNotes, getNotePitches, hasPitch, getPrimaryPitch } from '../utils/noteUtils.js';
 import { CHORD_DEFINITIONS, ALL_NOTES, MAJOR_SCALE_STEPS } from '../../data/music-data.js';
 import { analyzeChordTone, CHORD_TONE_COLORS, NOTE_RELATIONSHIPS } from '../analysis/chordToneAnalyzer.js';
-import { getCompositionState } from '../state/compositionState.js';
+import { getCompositionState, getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
 
 // Global state
 let currentMelody = null;
@@ -4232,7 +4232,7 @@ export function playAllMelody() {
         if (window.getCompositionState) {
             const compositionState = window.getCompositionState();
             const timeSignature = compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
-            const beatsPerMeasure = timeSignature.num || timeSignature.numerator || 4;
+            const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
             const events = [];
             const measureCount = compositionState.getMeasureCount();

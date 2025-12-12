@@ -20,6 +20,7 @@ import {
   createTupletAttribute,
   getTupletDuration,
 } from '../state/buildingBlock.js';
+import { getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
 
 // ============================================================================
 // CONSTANTS
@@ -1762,7 +1763,7 @@ export class NoteEditor {
    * @param {Object} compositionState - CompositionState instance
    */
   insertTrebleNoteWithShiftAtPosition(measureIndex, insertionPoint, noteData, compositionState) {
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
     const UNITS_PER_BEAT = 48;
 
     // Calculate the beat position of the insertion point
@@ -1926,7 +1927,7 @@ export class NoteEditor {
    * @param {Object} compositionState - CompositionState instance
    */
   insertTrebleNoteWithShiftAtEnd(measureIndex, noteData, compositionState) {
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
     const UNITS_PER_BEAT = 48;
 
     // Calculate the beat position (end of used beats in measure)
@@ -2929,7 +2930,7 @@ export class NoteEditor {
    * @param {Object} compositionState - CompositionState instance
    */
   applyDurationChangeWithShift(measureIndex, noteIndex, newDuration, isDotted, compositionState) {
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
     const UNITS_PER_BEAT = 48;
 
     // Get the note's unit position
@@ -4433,7 +4434,7 @@ export class NoteEditor {
     const compositionState = window.getCompositionState?.();
     if (!compositionState) return null;
 
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
 
     // Calculate absolute beat position
     const absoluteBeat = (measureIndex * beatsPerMeasure) + beatInMeasure;
@@ -4471,7 +4472,7 @@ export class NoteEditor {
     const compositionState = window.getCompositionState?.();
     if (!compositionState || !segment) return 0;
 
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
     const startMeasure = Math.floor(segment.startBeat / beatsPerMeasure);
     const endMeasure = Math.ceil((segment.startBeat + segment.durationBeats) / beatsPerMeasure) - 1;
 
@@ -5073,7 +5074,7 @@ export class NoteEditor {
     // Calculate relative beats from the first note
     const firstBeat = notesToCopy[0].note.beat || 0;
     const firstMeasure = notesToCopy[0].measureIndex;
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
 
     notesToCopy.forEach(item => {
       const absoluteBeat = (item.measureIndex - firstMeasure) * beatsPerMeasure + (item.note.beat || 0);
@@ -5153,7 +5154,7 @@ export class NoteEditor {
     // Collect all treble and bass notes for this chord
     const trebleNotes = [];
     const bassNotes = [];
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
 
     for (let i = 0; i < compositionState.measures.length; i++) {
       const measure = compositionState.measures[i];
@@ -5304,7 +5305,7 @@ export class NoteEditor {
     const compositionState = window.getCompositionState?.();
     if (!compositionState) return null;
 
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
     let startMeasure = 0;
     let startBeat = 0;
 
@@ -5372,7 +5373,7 @@ export class NoteEditor {
    * Check if there are notes after a given position
    */
   hasNotesAfterPosition(measureIndex, beat, staff, compositionState) {
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
 
     for (let m = measureIndex; m < compositionState.measures.length; m++) {
       const measure = compositionState.measures[m];
@@ -5449,7 +5450,7 @@ export class NoteEditor {
     const compositionState = window.getCompositionState?.();
     if (!compositionState) return;
 
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
 
     // Shift all notes after the paste position forward
     this.shiftNotesForward(startMeasure, startBeat, shiftBeats, staff, compositionState, beatsPerMeasure);
@@ -5590,7 +5591,7 @@ export class NoteEditor {
     const compositionState = window.getCompositionState?.();
     if (!compositionState) return;
 
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
 
     // Delete all notes at or after the paste position from ALL voices
     for (let m = startMeasure; m < compositionState.measures.length; m++) {
@@ -5626,7 +5627,7 @@ export class NoteEditor {
     const compositionState = window.getCompositionState?.();
     if (!compositionState) return;
 
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
     const pastedNoteIds = [];
 
     for (const item of this.clipboard.data) {
@@ -5767,7 +5768,7 @@ export class NoteEditor {
       return;
     }
 
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
     let startBeat = 0;
     let insertChordIndex = 0;
 
@@ -5830,7 +5831,7 @@ export class NoteEditor {
     const compositionState = window.getCompositionState?.();
     if (!compositionState) return;
 
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
     const startMeasure = Math.floor(startBeat / beatsPerMeasure);
     const startBeatInMeasure = startBeat % beatsPerMeasure;
 
@@ -5887,7 +5888,7 @@ export class NoteEditor {
     const compositionState = window.getCompositionState?.();
     if (!compositionState) return;
 
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
     const durationBeats = this.clipboard.durationBeats || 4;
 
     // Debug logging - show full pitch information

@@ -69,6 +69,7 @@ export class NotationToolbar {
     this.zoom = 100;
     this.measuresPerLine = 4;
     this.voiceNumber = 1;
+    this.timeSignature = '4/4';  // Current time signature as string
 
     // Selection state for contextual editing
     this.selectedNotesCount = 0;
@@ -86,6 +87,7 @@ export class NotationToolbar {
     this.onArticulationChange = options.onArticulationChange || (() => {});
     this.onZoomChange = options.onZoomChange || (() => {});
     this.onMeasuresPerLineChange = options.onMeasuresPerLineChange || (() => {});
+    this.onTimeSignatureChange = options.onTimeSignatureChange || (() => {});
     this.onVoiceChange = options.onVoiceChange || (() => {});
     this.onUndo = options.onUndo || (() => {});
     this.onRedo = options.onRedo || (() => {});
@@ -260,6 +262,15 @@ export class NotationToolbar {
           <span class="group-label">View</span>
           <div class="toolbar-group-content">
             <div class="toolbar-section view-section">
+              <select class="time-signature-select" title="Time Signature">
+                <option value="4/4" ${this.timeSignature === '4/4' ? 'selected' : ''}>4/4</option>
+                <option value="3/4" ${this.timeSignature === '3/4' ? 'selected' : ''}>3/4</option>
+                <option value="2/4" ${this.timeSignature === '2/4' ? 'selected' : ''}>2/4</option>
+                <option value="6/8" ${this.timeSignature === '6/8' ? 'selected' : ''}>6/8</option>
+                <option value="2/2" ${this.timeSignature === '2/2' ? 'selected' : ''}>2/2</option>
+                <option value="9/8" ${this.timeSignature === '9/8' ? 'selected' : ''}>9/8</option>
+                <option value="12/8" ${this.timeSignature === '12/8' ? 'selected' : ''}>12/8</option>
+              </select>
               <select class="voice-select" title="Select voice for editing">
                 <option value="1" ${this.voiceNumber === 1 ? 'selected' : ''}>Voice 1</option>
                 <option value="2" ${this.voiceNumber === 2 ? 'selected' : ''}>Voice 2</option>
@@ -705,6 +716,14 @@ export class NotationToolbar {
       this.onVoiceChange(this.voiceNumber);
     });
 
+    // Time signature select
+    this.container.querySelector('.time-signature-select')?.addEventListener('change', (e) => {
+      const value = e.target.value;
+      const [num, denom] = value.split('/').map(Number);
+      this.timeSignature = value;
+      this.onTimeSignatureChange(num, denom);
+    });
+
     // Zoom select
     this.container.querySelector('.zoom-select')?.addEventListener('change', (e) => {
       this.zoom = parseInt(e.target.value, 10);
@@ -946,6 +965,29 @@ export class NotationToolbar {
       cueRestsForSecondaryVoice: this.cueRestsForSecondaryVoice,
       hideCueRests: !this.cueRestsForSecondaryVoice,
     });
+  }
+
+  /**
+   * Set time signature
+   * @param {number} num - Numerator (e.g., 4)
+   * @param {number} denom - Denominator (e.g., 4)
+   */
+  setTimeSignature(num, denom) {
+    this.timeSignature = `${num}/${denom}`;
+    this.updateTimeSignatureSelect();
+    // Note: We don't call onTimeSignatureChange here because this is typically
+    // called to sync the UI with external state, not to trigger a change
+  }
+
+  /**
+   * Update time signature select to match current state
+   */
+  updateTimeSignatureSelect() {
+    if (!this.container) return;
+    const select = this.container.querySelector('.time-signature-select');
+    if (select) {
+      select.value = this.timeSignature;
+    }
   }
 
   /**

@@ -793,9 +793,17 @@ export class BuildingBlockSequence {
 
     /**
      * Get beats per measure
+     * Correctly handles all time signatures including compound meters
      */
     getBeatsPerMeasure() {
-        return this.timeSignature.num;
+        const num = this.timeSignature?.num ?? 4;
+        const denom = this.timeSignature?.denom ?? 4;
+        // Formula: multiply by (4/denom) to normalize everything to quarter-note beats
+        // 4/4: 4 * (4/4) = 4 beats
+        // 6/8: 6 * (4/8) = 3 beats (compound duple)
+        // 2/2: 2 * (4/2) = 4 beats (cut time = 4 quarter note beats)
+        // 3/4: 3 * (4/4) = 3 beats
+        return num * (4 / denom);
     }
 
     /**

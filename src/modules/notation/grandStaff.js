@@ -30,6 +30,7 @@ import {
 } from './vexFlowRenderer.js';
 
 import { analyzeChordTone, CHORD_TONE_COLORS } from '../analysis/chordToneAnalyzer.js';
+import { getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
 
 // VexFlow is loaded globally
 // Use a getter function to check at runtime, not at module load time
@@ -2919,7 +2920,7 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
   // Draw partial measure highlight for chord spans that don't align with measure boundaries
   // startBeat and endBeat are absolute beat positions from the beginning of the piece
   function drawChordSpanHighlight(startBeat, endBeat, color) {
-    const beatsPerMeasure = timeSignature.num || timeSignature.numerator || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
     // Convert global beat positions to global measure indices
     const globalStartMeasure = Math.floor(startBeat / beatsPerMeasure);
@@ -3023,7 +3024,7 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
   // @param {Object} chordData - Full chord data for click handling
   // @param {number} chordIndex - Index of this chord in the progression
   function drawChordBracket(startBeat, endBeat, chordName, color, chordData = null, chordIndex = -1) {
-    const beatsPerMeasure = timeSignature.num || timeSignature.numerator || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
     // Convert global beat positions to global measure indices
     const globalStartMeasure = Math.floor(startBeat / beatsPerMeasure);
