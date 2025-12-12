@@ -57,10 +57,10 @@ export function createNotationSystem(options = {}) {
   } = options;
 
   // Import classes
-  const { StaffLayoutManager } = require('./staffLayouter.js');
-  const { MeasureManager } = require('./measureEditor.js');
-  const { NotationToolbar } = require('./notationToolbar.js');
-  const { renderGrandStaffSystem } = require('./grandStaff.js');
+  const { StaffLayoutManager } = require('./staffLayouter.
+  const { MeasureManager } = require('./measureEditor.
+  const { NotationToolbar } = require('./notationToolbar.
+  const { renderGrandStaffSystem } = require('./grandStaff.
 
   // Create components
   const layoutManager = new StaffLayoutManager({

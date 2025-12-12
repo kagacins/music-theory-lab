@@ -43,7 +43,7 @@ function getChordAlternatives(chordIndex, progression, key) {
     const nextChord = chordIndex < progression.length - 1 ? progression[chordIndex + 1] : null;
 
     const keyRoot = key?.replace('m', '') || 'C';
-    const isMinorKey = key?.includes('m');
+    const isMinorKey = key?.includes('
 
     // Scale degree mappings for common keys
     const majorScaleDegrees = {
@@ -238,7 +238,7 @@ async function playChordSequence(chords, chordDuration = 0.8) {
     try {
         const piano = getPiano ? getPiano() : (window.getPiano ? window.getPiano() : null);
         if (!piano || typeof Tone === 'undefined') {
-            console.warn('[ChordComparison] Piano or Tone.js not available');
+
             isPlaying = false;
             return;
         }
@@ -260,7 +260,7 @@ async function playChordSequence(chords, chordDuration = 0.8) {
         // Wait for sequence to finish
         await new Promise(resolve => setTimeout(resolve, chords.length * chordDuration * 1000 + 200));
     } catch (err) {
-        console.error('[ChordComparison] Error playing sequence:', err);
+
     } finally {
         isPlaying = false;
     }
@@ -292,7 +292,7 @@ async function playChord(root, type, duration = 1.2) {
 
         await new Promise(resolve => setTimeout(resolve, duration * 1000 + 100));
     } catch (err) {
-        console.error('[ChordComparison] Error playing chord:', err);
+
     } finally {
         isPlaying = false;
     }
@@ -334,7 +334,7 @@ export function showChordComparisonModal(chordIndex) {
     const key = getCurrentKey() || 'C';
 
     if (!progression || chordIndex < 0 || chordIndex >= progression.length) {
-        console.warn('[ChordComparison] Invalid chord index:', chordIndex);
+
         return;
     }
 
@@ -344,9 +344,9 @@ export function showChordComparisonModal(chordIndex) {
     const alternatives = getChordAlternatives(chordIndex, progression, key);
 
     // Remove existing modal
-    const existingModal = document.getElementById('chord-comparison-modal');
+    const existingModal = document.getElementById('chord-comparison-
     if (existingModal) existingModal.remove();
-    const existingOverlay = document.getElementById('chord-comparison-overlay');
+    const existingOverlay = document.getElementById('chord-comparison-
     if (existingOverlay) existingOverlay.remove();
 
     // Build progression context display
@@ -361,7 +361,7 @@ export function showChordComparisonModal(chordIndex) {
     }).join(' → ');
 
     // Create modal HTML
-    const modal = document.createElement('div');
+    const modal = document.createElement('
     modal.id = 'chord-comparison-modal';
     modal.style.cssText = `
         position: fixed;
@@ -454,7 +454,7 @@ export function showChordComparisonModal(chordIndex) {
     `;
 
     // Create overlay
-    const overlay = document.createElement('div');
+    const overlay = document.createElement('
     overlay.id = 'chord-comparison-overlay';
     overlay.style.cssText = `
         position: fixed;

@@ -18,7 +18,7 @@ export function savePanelState(panelId, isExpanded) {
         states[panelId] = isExpanded;
         saveToStorage(STORAGE_KEY, states);
     } catch (e) {
-        console.warn('Error saving panel state:', e);
+
     }
 }
 
@@ -33,7 +33,7 @@ export function loadPanelState(panelId, defaultValue = true) {
         const states = loadAllPanelStates();
         return states.hasOwnProperty(panelId) ? states[panelId] : defaultValue;
     } catch (e) {
-        console.warn('Error loading panel state:', e);
+
         return defaultValue;
     }
 }
@@ -52,7 +52,7 @@ function loadAllPanelStates() {
  * @returns {string} The panel ID (e.g., 'song-search-panel')
  */
 function getPanelIdFromToggle(toggleId) {
-    return toggleId.replace('-toggle', '-panel');
+    return toggleId.replace('-toggle', '-
 }
 
 /**
@@ -61,7 +61,7 @@ function getPanelIdFromToggle(toggleId) {
  * @returns {string} The toggle button ID (e.g., 'song-search-toggle')
  */
 function getToggleIdFromPanel(panelId) {
-    return panelId.replace('-panel', '-toggle');
+    return panelId.replace('-panel', '-
 }
 
 /**
@@ -90,17 +90,17 @@ export function restorePanelState(panelId) {
     
     // There is a saved state - use it
     const isExpanded = allStates[panelId];
-    const isCurrentlyExpanded = !panel.classList.contains('hidden');
+    const isCurrentlyExpanded = !panel.classList.contains('
     
     // Apply the saved state if it's different from current state
     if (isExpanded !== isCurrentlyExpanded) {
         if (isExpanded) {
-            panel.classList.remove('hidden');
+            panel.classList.remove('
             if (chevron) {
                 chevron.classList.add('rotate-180');
             }
         } else {
-            panel.classList.add('hidden');
+            panel.classList.add('
             if (chevron) {
                 chevron.classList.remove('rotate-180');
             }
@@ -168,7 +168,7 @@ export function wrapToggleFunction(originalToggle, panelId) {
         setTimeout(() => {
             const panel = document.getElementById(panelId);
             if (panel) {
-                const isExpanded = !panel.classList.contains('hidden');
+                const isExpanded = !panel.classList.contains('
                 savePanelState(panelId, isExpanded);
             }
         }, 10);

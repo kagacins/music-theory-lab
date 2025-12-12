@@ -133,14 +133,14 @@ export class MelodySuggestionEngine {
         if (suggestion.isChordTone) {
             parts.push(`Chord tone (${suggestion.chordDegree})`);
         } else if (suggestion.isScaleTone) {
-            parts.push('Scale tone');
+            parts.push('Scale 
         }
 
         if (suggestion.voiceLeadingDistance !== null) {
             if (suggestion.voiceLeadingDistance <= 2) {
-                parts.push('Smooth voice leading');
+                parts.push('Smooth voice 
             } else if (suggestion.voiceLeadingDistance > 7) {
-                parts.push('Large leap');
+                parts.push('Large 
             }
         }
 

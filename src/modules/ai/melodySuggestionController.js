@@ -133,9 +133,9 @@ function setupEventListeners() {
     // Listen for style changes from the floating panel dropdown
     // Use a small delay to ensure the floating panel DOM is ready
     const setupStyleListener = () => {
-        const styleSelect = document.getElementById('floating-melody-style-select');
+        const styleSelect = document.getElementById('floating-melody-style-
         if (styleSelect) {
-            console.log('✅ Floating melody style dropdown found, attaching event listener');
+
             styleSelect.addEventListener('change', (e) => {
                 setStyle(e.target.value);
             });
@@ -149,7 +149,7 @@ function setupEventListeners() {
         // If not found, try again after a delay (for floating panel initialization)
         setTimeout(() => {
             if (!setupStyleListener()) {
-                console.warn('⚠️ Floating melody style dropdown not found after delay');
+
             }
         }, 500);
     }
@@ -209,7 +209,7 @@ export function refreshSuggestions() {
                 nextChord = chordContextAfterSelected.nextChord;
                 anticipationFactor = chordContextAfterSelected.anticipationFactor;
                 insertionChordContext = chordContextAfterSelected;
-                console.log(`🎯 New note will land in different chord: ${insertionChord.root} ${insertionChord.type}`);
+
             } else if (insertionChord) {
                 // Same chord, but update context for accurate anticipation
                 effectiveChord = insertionChord;
@@ -400,12 +400,12 @@ function handleNoteSelected(suggestion) {
  */
 function showNoteInsertModeDialog(suggestion) {
     // Remove any existing dialog
-    const existing = document.getElementById('note-insert-mode-dialog');
+    const existing = document.getElementById('note-insert-mode-
     if (existing) existing.remove();
 
     const afterNote = selectedNoteInfo?.note?.pitch || selectedNoteInfo?.note?.pitches?.[0] || 'selected note';
 
-    const dialog = document.createElement('div');
+    const dialog = document.createElement('
     dialog.id = 'note-insert-mode-dialog';
     dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center';
     dialog.style.zIndex = '10001';
@@ -473,8 +473,6 @@ function insertNoteAtEnd(suggestion) {
             dotted,
             'treble',
             false,
-            null
-        );
     } else {
         compositionState.addNote(currentMeasureIndex, 'treble', 0, {
             pitch: suggestion.note,
@@ -509,7 +507,7 @@ function insertNoteWithShift(suggestion) {
     // Get the insertion point (after selected note)
     const noteUnitInfo = compositionState.getTrebleNoteUnit?.(measureIndex, noteIndex);
     if (!noteUnitInfo) {
-        console.warn('Could not get note unit info, falling back to append');
+
         insertNoteAtEnd(suggestion);
         return;
     }
@@ -598,7 +596,7 @@ function durationToUnitsLocal(duration) {
  */
 function finalizeNoteInsertion(suggestion, notationComposer) {
     // Play the note for feedback
-    playNote(suggestion.note, '8n');
+    playNote(suggestion.note, '8
 
     // Visual feedback
     showInsertFeedback(suggestion);
@@ -617,7 +615,7 @@ function finalizeNoteInsertion(suggestion, notationComposer) {
  * @param {string} noteName - Note to preview (e.g., 'C4')
  */
 function handleNotePreview(noteName) {
-    playNote(noteName, '8n');
+    playNote(noteName, '8
 }
 
 /**
@@ -642,7 +640,7 @@ function playNote(noteName, duration = '8n') {
  */
 function showInsertFeedback(suggestion) {
     // Create temporary feedback element
-    const feedback = document.createElement('div');
+    const feedback = document.createElement('
     feedback.className = 'note-insert-feedback';
     feedback.textContent = `Added ${suggestion.note}`;
     feedback.style.cssText = `
@@ -685,7 +683,7 @@ export function setCurrentMeasure(measureIndex) {
  * @param {string} styleId - Style preset ID
  */
 export function setStyle(styleId) {
-    console.log('🎵 Melody Style Changed:', styleId);
+
     currentStyleId = styleId;
     refreshSuggestions();
 }
@@ -745,7 +743,7 @@ export function insertNote(noteName, options = {}) {
     compositionState.addNote(currentMeasureIndex, 'treble', 0, note);
 
     if (options.playSound !== false) {
-        playNote(noteName, '8n');
+        playNote(noteName, '8
     }
 }
 
@@ -762,7 +760,7 @@ export function getSuggestionsFor(context) {
 // CSS for feedback animation
 // -----------------------------------------------------------------------------
 
-const feedbackStyles = document.createElement('style');
+const feedbackStyles = document.createElement('
 feedbackStyles.textContent = `
 @keyframes fadeInOut {
     0% { opacity: 0; transform: translateY(10px); }

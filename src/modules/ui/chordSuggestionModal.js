@@ -31,7 +31,7 @@ import { getInvertedChordNotes } from '../utils/noteUtils.js';
  */
 export function showChordSuggestionModal(currentChordType, currentRoot, currentInversion = 0, onAddChord, onPlayChord, onStopChord) {
     // Remove existing modal if any
-    const existingModal = document.getElementById('unified-chord-suggestion-modal');
+    const existingModal = document.getElementById('unified-chord-suggestion-
     if (existingModal) existingModal.remove();
 
     // Get saved preferences or defaults
@@ -41,7 +41,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     let activeInversion = currentInversion;
 
     // Create modal overlay
-    const overlay = document.createElement('div');
+    const overlay = document.createElement('
     overlay.id = 'unified-chord-suggestion-modal';
     overlay.style.position = 'fixed';
     overlay.style.top = '0';
@@ -60,7 +60,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     };
 
     // Create modal content
-    const modal = document.createElement('div');
+    const modal = document.createElement('
     modal.style.backgroundColor = 'white';
     modal.style.borderRadius = '8px';
     modal.style.padding = '24px';
@@ -74,7 +74,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     const chordSymbol = CHORD_DEFINITIONS[currentChordType]?.symbol || '';
 
     // Title container with close button
-    const titleContainer = document.createElement('div');
+    const titleContainer = document.createElement('
     titleContainer.style.display = 'flex';
     titleContainer.style.justifyContent = 'space-between';
     titleContainer.style.alignItems = 'flex-start';
@@ -91,7 +91,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     titleContainer.appendChild(title);
     
     // Close button
-    const closeBtn = document.createElement('button');
+    const closeBtn = document.createElement('
     closeBtn.innerHTML = '×';
     closeBtn.style.background = 'none';
     closeBtn.style.border = 'none';
@@ -123,7 +123,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     modal.appendChild(titleContainer);
 
     // Style & Mood Controls (sticky at top) with Show All button
-    const controlsRow = document.createElement('div');
+    const controlsRow = document.createElement('
     controlsRow.style.display = 'flex';
     controlsRow.style.alignItems = 'flex-end';
     controlsRow.style.justifyContent = 'flex-start';
@@ -143,8 +143,8 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     controlsRow.style.flexWrap = 'wrap';
 
     // Style selector (compact)
-    const styleControl = document.createElement('div');
-    const styleLabel = document.createElement('label');
+    const styleControl = document.createElement('
+    const styleLabel = document.createElement('
     styleLabel.textContent = 'Style:';
     styleLabel.style.fontSize = '11px';
     styleLabel.style.fontWeight = '600';
@@ -153,7 +153,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     styleLabel.style.marginBottom = '4px';
     styleControl.appendChild(styleLabel);
 
-    const styleSelect = document.createElement('select');
+    const styleSelect = document.createElement('
     styleSelect.id = 'suggestion-modal-style';
     styleSelect.style.width = '160px';
     styleSelect.style.padding = '4px 6px';
@@ -163,7 +163,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     styleSelect.style.backgroundColor = 'white';
 
     SUGGESTION_STYLES.forEach(s => {
-        const option = document.createElement('option');
+        const option = document.createElement('
         option.value = s.id;
         option.textContent = s.label;
         if (s.id === currentStyle) option.selected = true;
@@ -173,8 +173,8 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     controlsRow.appendChild(styleControl);
 
     // Mood selector (compact)
-    const moodControl = document.createElement('div');
-    const moodLabel = document.createElement('label');
+    const moodControl = document.createElement('
+    const moodLabel = document.createElement('
     moodLabel.textContent = 'Mood:';
     moodLabel.style.fontSize = '11px';
     moodLabel.style.fontWeight = '600';
@@ -183,7 +183,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     moodLabel.style.marginBottom = '4px';
     moodControl.appendChild(moodLabel);
 
-    const moodSelect = document.createElement('select');
+    const moodSelect = document.createElement('
     moodSelect.id = 'suggestion-modal-mood';
     moodSelect.style.width = '160px';
     moodSelect.style.padding = '4px 6px';
@@ -193,7 +193,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     moodSelect.style.backgroundColor = 'white';
 
     SUGGESTION_MOODS.forEach(m => {
-        const option = document.createElement('option');
+        const option = document.createElement('
         option.value = m.id;
         option.textContent = m.label;
         if (m.id === currentMood) option.selected = true;
@@ -203,8 +203,8 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     controlsRow.appendChild(moodControl);
 
     // Mode Toggle (Current Chord vs Context Aware)
-    const modeControl = document.createElement('div');
-    const modeLabel = document.createElement('label');
+    const modeControl = document.createElement('
+    const modeLabel = document.createElement('
     modeLabel.textContent = 'Mode:';
     modeLabel.style.fontSize = '11px';
     modeLabel.style.fontWeight = '600';
@@ -213,7 +213,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     modeLabel.style.marginBottom = '4px';
     modeControl.appendChild(modeLabel);
 
-    const modeToggleContainer = document.createElement('div');
+    const modeToggleContainer = document.createElement('
     modeToggleContainer.style.display = 'flex';
     modeToggleContainer.style.gap = '4px';
     modeToggleContainer.style.backgroundColor = '#f3f4f6';
@@ -222,7 +222,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
 
     let contextMode = getContextAwareMode();
 
-    const currentChordBtn = document.createElement('button');
+    const currentChordBtn = document.createElement('
     currentChordBtn.textContent = 'Current Chord';
     currentChordBtn.style.padding = '4px 8px';
     currentChordBtn.style.border = 'none';
@@ -232,7 +232,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     currentChordBtn.style.fontWeight = '600';
     currentChordBtn.style.transition = 'all 0.2s';
 
-    const contextAwareBtn = document.createElement('button');
+    const contextAwareBtn = document.createElement('
     contextAwareBtn.textContent = 'Context Aware';
     contextAwareBtn.style.padding = '4px 8px';
     contextAwareBtn.style.border = 'none';
@@ -280,10 +280,10 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     controlsRow.appendChild(modeControl);
 
     // Lookback Depth Control (only visible in Context Aware mode) - DROPDOWN
-    const lookbackControl = document.createElement('div');
+    const lookbackControl = document.createElement('
     lookbackControl.style.display = contextMode ? 'block' : 'none';
 
-    const lookbackLabel = document.createElement('label');
+    const lookbackLabel = document.createElement('
     lookbackLabel.textContent = 'Analyze:';
     lookbackLabel.style.fontSize = '11px';
     lookbackLabel.style.fontWeight = '600';
@@ -292,7 +292,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     lookbackLabel.style.marginBottom = '4px';
     lookbackControl.appendChild(lookbackLabel);
 
-    const lookbackDropdown = document.createElement('select');
+    const lookbackDropdown = document.createElement('
     lookbackDropdown.style.width = '120px';
     lookbackDropdown.style.padding = '4px 6px';
     lookbackDropdown.style.border = '1px solid #d1d5db';
@@ -303,7 +303,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
 
     // Create options for 1-8 chords
     for (let i = 1; i <= 8; i++) {
-        const option = document.createElement('option');
+        const option = document.createElement('
         option.value = i.toString();
         option.textContent = `Last ${i} chord${i === 1 ? '' : 's'}`;
         if (i === getProgressionLookback()) {
@@ -324,11 +324,11 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     controlsRow.appendChild(lookbackControl);
 
     // Rhythm Awareness Toggle
-    const rhythmControl = document.createElement('div');
+    const rhythmControl = document.createElement('
     rhythmControl.style.display = 'flex';
     rhythmControl.style.flexDirection = 'column';
 
-    const rhythmLabel = document.createElement('label');
+    const rhythmLabel = document.createElement('
     rhythmLabel.textContent = 'Duration:';
     rhythmLabel.style.fontSize = '11px';
     rhythmLabel.style.fontWeight = '600';
@@ -337,13 +337,13 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     rhythmLabel.style.marginBottom = '4px';
     rhythmControl.appendChild(rhythmLabel);
 
-    const rhythmToggleContainer = document.createElement('div');
+    const rhythmToggleContainer = document.createElement('
     rhythmToggleContainer.style.display = 'flex';
     rhythmToggleContainer.style.alignItems = 'center';
     rhythmToggleContainer.style.gap = '6px';
     rhythmToggleContainer.style.height = '28px';
 
-    const rhythmCheckbox = document.createElement('input');
+    const rhythmCheckbox = document.createElement('
     rhythmCheckbox.type = 'checkbox';
     rhythmCheckbox.id = 'rhythm-awareness-toggle';
     rhythmCheckbox.checked = localStorage.getItem('chord-suggestion-rhythm-awareness') !== 'false';
@@ -352,7 +352,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     rhythmCheckbox.style.cursor = 'pointer';
     rhythmCheckbox.style.accentColor = '#667eea';
 
-    const rhythmCheckboxLabel = document.createElement('label');
+    const rhythmCheckboxLabel = document.createElement('
     rhythmCheckboxLabel.htmlFor = 'rhythm-awareness-toggle';
     rhythmCheckboxLabel.textContent = 'Suggest';
     rhythmCheckboxLabel.style.fontSize = '11px';
@@ -362,7 +362,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     rhythmCheckboxLabel.title = 'When enabled, suggestions include recommended chord durations based on harmonic rhythm analysis';
 
     rhythmCheckbox.addEventListener('change', () => {
-        localStorage.setItem('chord-suggestion-rhythm-awareness', rhythmCheckbox.checked ? 'true' : 'false');
+        localStorage.setItem('chord-suggestion-rhythm-awareness', rhythmCheckbox.checked ? 'true' : '
         // Dispatch event so other components can react
         window.dispatchEvent(new CustomEvent('rhythmAwarenessChanged', {
             detail: { enabled: rhythmCheckbox.checked }
@@ -375,7 +375,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     controlsRow.appendChild(rhythmControl);
 
     // Rhythmic Context Info Panel (Phase 5.6) - shows current harmonic rhythm analysis
-    const rhythmInfoPanel = document.createElement('div');
+    const rhythmInfoPanel = document.createElement('
     rhythmInfoPanel.id = 'rhythm-context-info';
     rhythmInfoPanel.style.cssText = 'display: none; padding: 8px 12px; background: #f5f3ff; border-radius: 6px; margin-left: auto; font-size: 11px; color: #4b5563; max-width: 220px;';
 
@@ -430,7 +430,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     controlsRow.appendChild(rhythmInfoPanel);
 
     // Show All Details button (compact, inline, aligned with selectors)
-    const showAllBtn = document.createElement('button');
+    const showAllBtn = document.createElement('
     showAllBtn.textContent = '🔬 Show All';
     showAllBtn.style.padding = '4px 12px';
     showAllBtn.style.backgroundColor = '#667eea';
@@ -470,15 +470,13 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
             selectedMood,
             onAddChord, // Use the provided callback
             onPlayChord, // Use the provided callback
-            onStopChord  // Use the provided callback
-        );
     });
     controlsRow.appendChild(showAllBtn);
 
     modal.appendChild(controlsRow);
 
     // Inversion selector row
-    const inversionRow = document.createElement('div');
+    const inversionRow = document.createElement('
     inversionRow.style.cssText = `
         display: flex;
         align-items: center;
@@ -488,12 +486,12 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
         border-bottom: 1px solid #e5e7eb;
     `;
     
-    const inversionLabel = document.createElement('label');
+    const inversionLabel = document.createElement('
     inversionLabel.textContent = 'Change Chord Inversion:';
     inversionLabel.style.cssText = 'font-size: 12px; font-weight: 600; color: #374151; white-space: nowrap;';
     inversionRow.appendChild(inversionLabel);
     
-    const inversionButtonsContainer = document.createElement('div');
+    const inversionButtonsContainer = document.createElement('
     inversionButtonsContainer.style.cssText = 'display: flex; gap: 4px; flex-wrap: wrap;';
     
     // Calculate max inversions for this chord type
@@ -502,7 +500,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     
     // Create inversion buttons
     for (let inv = 0; inv <= maxInversion; inv++) {
-        const invBtn = document.createElement('button');
+        const invBtn = document.createElement('
         invBtn.textContent = INVERSION_NAMES[inv] || `Inversion ${inv}`;
         invBtn.dataset.inversion = inv;
         invBtn.style.cssText = `
@@ -646,7 +644,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     modal.appendChild(inversionRow);
 
     // Suggestions container
-    const suggestionsContainer = document.createElement('div');
+    const suggestionsContainer = document.createElement('
     suggestionsContainer.id = 'modal-suggestions-container';
     modal.appendChild(suggestionsContainer);
 
@@ -655,7 +653,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
 
     // Helper to create hold-to-play buttons
     const createHoldPlayButton = (label, chordType, root, inv) => {
-        const btn = document.createElement('button');
+        const btn = document.createElement('
         btn.textContent = label;
         btn.style.padding = '6px 8px';
         btn.style.fontSize = '11px';
@@ -809,7 +807,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     // Function to show loading splash screen
     const showLoadingSplash = () => {
         suggestionsContainer.innerHTML = '';
-        const loadingDiv = document.createElement('div');
+        const loadingDiv = document.createElement('
         loadingDiv.style.display = 'flex';
         loadingDiv.style.flexDirection = 'column';
         loadingDiv.style.alignItems = 'center';
@@ -817,13 +815,13 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
         loadingDiv.style.padding = '40px 20px';
         loadingDiv.style.color = '#6b7280';
 
-        const iconContainer = document.createElement('div');
+        const iconContainer = document.createElement('
         iconContainer.style.fontSize = '48px';
         iconContainer.style.marginBottom = '16px';
         iconContainer.innerHTML = '🎵 🎶';
         iconContainer.style.animation = 'pulse 1.5s ease-in-out infinite';
 
-        const loadingText = document.createElement('div');
+        const loadingText = document.createElement('
         loadingText.textContent = 'Updating Suggestions...';
         loadingText.style.fontSize = '16px';
         loadingText.style.fontWeight = '600';
@@ -835,7 +833,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
 
         // Add keyframe animation for pulse
         if (!document.getElementById('pulse-animation-style')) {
-            const style = document.createElement('style');
+            const style = document.createElement('
             style.id = 'pulse-animation-style';
             style.textContent = `
                 @keyframes pulse {
@@ -868,14 +866,12 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
                 3,    // Generate 3-chord sequences
                 10,   // Return top 10
                 null, // sectionInfo
-                getContextAwareMode()  // contextMode for weight calculation
-            );
 
             // Clear loading screen
             suggestionsContainer.innerHTML = '';
 
             if (sequences.length === 0) {
-                const noResultsMsg = document.createElement('p');
+                const noResultsMsg = document.createElement('
                 noResultsMsg.textContent = 'No sequences found. Try adjusting the settings or add more chords to your progression.';
                 noResultsMsg.style.color = '#6b7280';
                 noResultsMsg.style.fontStyle = 'italic';
@@ -885,7 +881,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
 
             // Display each sequence
             sequences.forEach((seq, index) => {
-            const card = document.createElement('div');
+            const card = document.createElement('
             card.style.padding = '16px';
             card.style.marginBottom = '16px';
             card.style.backgroundColor = '#f8fafc';
@@ -904,13 +900,13 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
             });
 
             // Sequence header
-            const header = document.createElement('div');
+            const header = document.createElement('
             header.style.display = 'flex';
             header.style.justifyContent = 'space-between';
             header.style.alignItems = 'center';
             header.style.marginBottom = '12px';
 
-            const sequenceTitle = document.createElement('div');
+            const sequenceTitle = document.createElement('
             sequenceTitle.style.fontWeight = '600';
             sequenceTitle.style.color = '#1e293b';
             sequenceTitle.style.fontSize = '14px';
@@ -922,7 +918,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
             card.appendChild(header);
 
             // Sequence path visualization - Include current chord as first
-            const pathContainer = document.createElement('div');
+            const pathContainer = document.createElement('
             pathContainer.style.marginBottom = '12px';
             pathContainer.style.display = 'flex';
             pathContainer.style.alignItems = 'center';
@@ -936,7 +932,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
             ];
 
             fullSequence.forEach((chord, chordIndex) => {
-                const chordBox = document.createElement('button');
+                const chordBox = document.createElement('
                 chordBox.style.display = 'inline-block';
                 chordBox.style.padding = '6px 10px';
                 chordBox.style.backgroundColor = chord.isCurrent ? '#64748b' : '#3b82f6';
@@ -955,7 +951,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
 
                 // Add current chord badge
                 if (chord.isCurrent) {
-                    const badge = document.createElement('span');
+                    const badge = document.createElement('
                     badge.textContent = ' (Current)';
                     badge.style.fontSize = '9px';
                     badge.style.opacity = '0.8';
@@ -1065,7 +1061,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
                 pathContainer.appendChild(chordBox);
 
                 if (chordIndex < fullSequence.length - 1) {
-                    const arrow = document.createElement('span');
+                    const arrow = document.createElement('
                     arrow.textContent = '→';
                     arrow.style.color = '#64748b';
                     arrow.style.fontSize = '18px';
@@ -1077,7 +1073,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
             card.appendChild(pathContainer);
 
             // Reason text
-            const reason = document.createElement('div');
+            const reason = document.createElement('
             reason.style.fontSize = '12px';
             reason.style.color = '#475569';
             reason.style.marginBottom = '12px';
@@ -1085,13 +1081,13 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
             card.appendChild(reason);
 
             // Action buttons
-            const buttonRow = document.createElement('div');
+            const buttonRow = document.createElement('
             buttonRow.style.display = 'flex';
             buttonRow.style.gap = '8px';
             buttonRow.style.flexWrap = 'wrap';
 
             // Play Sequence button
-            const playBtn = document.createElement('button');
+            const playBtn = document.createElement('
             playBtn.innerHTML = '▶️ Play Sequence';
             playBtn.style.padding = '8px 12px';
             playBtn.style.backgroundColor = '#10b981';
@@ -1118,7 +1114,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
             buttonRow.appendChild(playBtn);
 
             // Add All to Progression button
-            const addAllBtn = document.createElement('button');
+            const addAllBtn = document.createElement('
             addAllBtn.innerHTML = '➕ Add All to Progression';
             addAllBtn.style.padding = '8px 12px';
             addAllBtn.style.backgroundColor = '#3b82f6';
@@ -1157,7 +1153,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
                             // This gives users visual feedback as each chord is added
                             await new Promise(resolve => setTimeout(resolve, 100));
                         } catch (error) {
-                            console.error('Error adding chord:', error);
+
                         }
                     }
                 }
@@ -1228,8 +1224,6 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
                 key,
                 style,
                 mood,
-                tensionDirection
-            );
 
             // Clear loading screen
             suggestionsContainer.innerHTML = '';
@@ -1245,7 +1239,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
 
             // Display each suggestion
             suggestions.forEach((suggestion) => {
-            const card = document.createElement('div');
+            const card = document.createElement('
             card.style.padding = '12px';
             card.style.marginBottom = '12px';
             card.style.backgroundColor = '#f3f4f6';
@@ -1265,7 +1259,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
             });
 
             // Chord header
-            const chordHeader = document.createElement('div');
+            const chordHeader = document.createElement('
             chordHeader.style.fontWeight = '600';
             chordHeader.style.marginBottom = '4px';
             chordHeader.style.color = '#1f2937';
@@ -1284,7 +1278,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
             card.appendChild(chordHeader);
 
             // Playback row (Current vs Next)
-            const playbackRow = document.createElement('div');
+            const playbackRow = document.createElement('
             playbackRow.style.display = 'flex';
             playbackRow.style.gap = '8px';
             playbackRow.style.margin = '8px 0';
@@ -1305,7 +1299,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
             playbackRow.appendChild(createHoldPlayButton(nextLabel, suggestion.nextChord, suggestion.nextRoot, suggestion.nextInversion));
 
             // Add to Progression button
-            const addBtn = document.createElement('button');
+            const addBtn = document.createElement('
             addBtn.textContent = '➕ Add to Progression';
             addBtn.style.padding = '6px 12px';
             addBtn.style.fontSize = '11px';
@@ -1339,7 +1333,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
             card.appendChild(playbackRow);
 
             // Reason
-            const reason = document.createElement('div');
+            const reason = document.createElement('
             reason.style.fontSize = '12px';
             reason.style.color = '#4b5563';
             reason.style.lineHeight = '1.4';
@@ -1411,7 +1405,7 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
     });
     
     // Close button at bottom
-    const closeBottomBtn = document.createElement('button');
+    const closeBottomBtn = document.createElement('
     closeBottomBtn.textContent = 'Close';
     closeBottomBtn.style.marginTop = '16px';
     closeBottomBtn.style.padding = '8px 16px';
@@ -1426,8 +1420,8 @@ export function showChordSuggestionModal(currentChordType, currentRoot, currentI
         document.removeEventListener('chord-suggestion-inversion-changed', inversionChangeHandler);
         overlay.remove();
     });
-    closeBottomBtn.addEventListener('mouseenter', () => closeBottomBtn.style.backgroundColor = '#d1d5db');
-    closeBottomBtn.addEventListener('mouseleave', () => closeBottomBtn.style.backgroundColor = '#e5e7eb');
+    closeBottomBtn.addEventListener('mouseenter', () => closeBottomBtn.style.backgroundColor = '#d1d5
+    closeBottomBtn.addEventListener('mouseleave', () => closeBottomBtn.style.backgroundColor = '#e5e7
     modal.appendChild(closeBottomBtn);
     
     // Clean up event listeners when modal is closed via overlay click

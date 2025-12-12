@@ -13,9 +13,9 @@ import { getHarmonyAnalyzer } from '../analysis/harmonyAnalyzer.js';
  */
 export function initUnifiedSuggestionsPanel() {
     // Find and remove the old panels if they still exist
-    const oldSmartPanel = document.querySelector('#recommendations-panel');
-    const oldStyleMoodPanel = document.querySelector('#style-mood-insights-panel')?.closest('.trainer-section-item');
-    const oldUnifiedPanel = document.querySelector('#unified-suggestions-panel')?.closest('.trainer-section-item');
+    const oldSmartPanel = document.querySelector('#recommendations-
+    const oldStyleMoodPanel = document.querySelector('#style-mood-insights-panel')?.closest('.trainer-section-
+    const oldUnifiedPanel = document.querySelector('#unified-suggestions-panel')?.closest('.trainer-section-
 
     if (oldSmartPanel) oldSmartPanel.remove();
     if (oldStyleMoodPanel) oldStyleMoodPanel.remove();
@@ -27,7 +27,7 @@ export function initUnifiedSuggestionsPanel() {
     // Attach event listeners for modals
     attachEventListeners();
     
-    console.log('Analysis modals initialized');
+
 }
 
 
@@ -112,21 +112,21 @@ function insertModals() {
 function attachEventListeners() {
     // Modal controls
     window.showTensionMapModal = () => {
-        document.getElementById('tension-map-modal').classList.remove('hidden');
+        document.getElementById('tension-map-modal').classList.remove('
         updateTensionMap();
     };
 
     window.closeTensionMapModal = () => {
-        document.getElementById('tension-map-modal').classList.add('hidden');
+        document.getElementById('tension-map-modal').classList.add('
     };
 
     window.showFullAnalysisModal = () => {
-        document.getElementById('full-analysis-modal').classList.remove('hidden');
+        document.getElementById('full-analysis-modal').classList.remove('
         updateFullAnalysis();
     };
 
     window.closeFullAnalysisModal = () => {
-        document.getElementById('full-analysis-modal').classList.add('hidden');
+        document.getElementById('full-analysis-modal').classList.add('
     };
 
     // Refresh suggestions
@@ -154,12 +154,12 @@ export function updateUnifiedSuggestions() {
  */
 function updateQuickAnalysis(progression, key) {
     // Get elements from both trainer tab and melody tab
-    const romanNumeralsEl = document.getElementById('quick-roman-numerals');
-    const moodEl = document.getElementById('quick-mood');
-    const tensionEl = document.getElementById('quick-tension');
-    const romanNumeralsMelodyEl = document.getElementById('quick-roman-numerals-melody');
-    const moodMelodyEl = document.getElementById('quick-mood-melody');
-    const tensionMelodyEl = document.getElementById('quick-tension-melody');
+    const romanNumeralsEl = document.getElementById('quick-roman-
+    const moodEl = document.getElementById('quick-
+    const tensionEl = document.getElementById('quick-
+    const romanNumeralsMelodyEl = document.getElementById('quick-roman-numerals-
+    const moodMelodyEl = document.getElementById('quick-mood-
+    const tensionMelodyEl = document.getElementById('quick-tension-
 
     // Return early if no elements exist at all
     const hasTrainerElements = romanNumeralsEl && moodEl && tensionEl;

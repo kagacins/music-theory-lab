@@ -31,35 +31,35 @@ export function showChoiceDialog(options) {
     }
 
     // Create dialog overlay - z-index must be higher than unified modal (99999)
-    const overlay = document.createElement('div');
+    const overlay = document.createElement('
     overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center';
     overlay.style.zIndex = '100000';
     overlay.id = 'choice-dialog-overlay';
 
     // Create dialog container
-    const dialog = document.createElement('div');
+    const dialog = document.createElement('
     dialog.className = 'bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden';
 
     // Title
-    const titleEl = document.createElement('div');
+    const titleEl = document.createElement('
     titleEl.className = 'px-6 py-4 border-b border-gray-200 dark:border-gray-700';
     titleEl.innerHTML = `<h3 class="text-lg font-semibold text-gray-900 dark:text-white">${title}</h3>`;
     dialog.appendChild(titleEl);
 
     // Message
     if (message) {
-        const messageEl = document.createElement('div');
+        const messageEl = document.createElement('
         messageEl.className = 'px-6 py-3 text-sm text-gray-600 dark:text-gray-300';
         messageEl.innerHTML = message;
         dialog.appendChild(messageEl);
     }
 
     // Choices container
-    const choicesContainer = document.createElement('div');
+    const choicesContainer = document.createElement('
     choicesContainer.className = 'px-6 py-4 space-y-2';
 
     choices.forEach(choice => {
-        const btn = document.createElement('button');
+        const btn = document.createElement('
         btn.className = choice.primary
             ? 'w-full px-4 py-3 text-left rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors'
             : 'w-full px-4 py-3 text-left rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white transition-colors';
@@ -82,10 +82,10 @@ export function showChoiceDialog(options) {
 
     // Cancel button
     if (allowCancel) {
-        const cancelContainer = document.createElement('div');
+        const cancelContainer = document.createElement('
         cancelContainer.className = 'px-6 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900';
 
-        const cancelBtn = document.createElement('button');
+        const cancelBtn = document.createElement('
         cancelBtn.className = 'w-full px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors';
         cancelBtn.textContent = 'Cancel';
         cancelBtn.addEventListener('click', () => {
@@ -148,8 +148,8 @@ export function showNoteOverflowDialog(options) {
             },
             {
                 id: 'shift',
-                label: 'Shift downstream notes',
-                description: 'All following notes and rests will be pushed forward to make room.',
+                label: 'Shift notes in this voice',
+                description: 'Only notes in the same voice will be pushed forward. Other voices remain unchanged.',
                 primary: true,
             },
         ],
@@ -164,9 +164,9 @@ export function showNoteOverflowDialog(options) {
  * @param {boolean} showButton - Whether to show the close button
  */
 export function showModal(text, showButton = false) {
-    const modal = document.getElementById('message-modal');
-    const modalText = document.getElementById('modal-text');
-    const modalButton = document.getElementById('modal-close-btn');
+    const modal = document.getElementById('message-
+    const modalText = document.getElementById('modal-
+    const modalButton = document.getElementById('modal-close-
 
     modalText.textContent = text;
 
@@ -176,17 +176,17 @@ export function showModal(text, showButton = false) {
         modalButton.style.display = 'none';
     }
 
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
+    modal.classList.remove('
+    modal.classList.add('
 }
 
 /**
  * Hide the currently displayed modal
  */
 export function hideModal() {
-    const modal = document.getElementById('message-modal');
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
+    const modal = document.getElementById('message-
+    modal.classList.add('
+    modal.classList.remove('
 }
 
 /**
@@ -195,9 +195,9 @@ export function hideModal() {
  * @param {boolean} showButton - Whether to show the close button
  */
 export function showModalHTML(htmlContent, showButton = true) {
-    const modal = document.getElementById('message-modal');
-    const modalText = document.getElementById('modal-text');
-    const modalButton = document.getElementById('modal-close-btn');
+    const modal = document.getElementById('message-
+    const modalText = document.getElementById('modal-
+    const modalButton = document.getElementById('modal-close-
 
     modalText.innerHTML = htmlContent;
 
@@ -207,6 +207,6 @@ export function showModalHTML(htmlContent, showButton = true) {
         modalButton.style.display = 'none';
     }
 
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
+    modal.classList.remove('
+    modal.classList.add('
 }

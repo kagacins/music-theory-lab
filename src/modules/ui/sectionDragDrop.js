@@ -21,7 +21,7 @@ export function initSectionDragDrop(tabId, containerId, sectionClass) {
             container.sortableInstance.destroy();
             container.sortableInstance = null;
         } catch (e) {
-            console.warn('Error destroying Sortable:', e);
+
         }
     }
 
@@ -32,7 +32,7 @@ export function initSectionDragDrop(tabId, containerId, sectionClass) {
     }
 
     // Add event listeners to drag handles to prevent button clicks
-    const handles = container.querySelectorAll('.drag-handle');
+    const handles = container.querySelectorAll('.drag-
     handles.forEach(handle => {
         // Ensure handle can receive pointer events
         handle.style.pointerEvents = 'auto';
@@ -161,7 +161,7 @@ function saveSectionOrder(tabId, order) {
     try {
         localStorage.setItem(`sectionOrder_${tabId}`, JSON.stringify(order));
     } catch (e) {
-        console.warn('Error saving section order:', e);
+
     }
 }
 
@@ -175,7 +175,7 @@ function loadSectionOrder(tabId) {
         const saved = localStorage.getItem(`sectionOrder_${tabId}`);
         return saved ? JSON.parse(saved) : null;
     } catch (e) {
-        console.warn('Error loading section order:', e);
+
         return null;
     }
 }
@@ -185,13 +185,13 @@ function loadSectionOrder(tabId) {
  */
 export function initAllSectionDragDrop() {
     // Initialize for Chord Builder tab
-    initSectionDragDrop('builder', 'builder-sections-container', 'builder-section-item');
+    initSectionDragDrop('builder', 'builder-sections-container', 'builder-section-
 
     // Initialize for Progression Builder tab
-    initSectionDragDrop('trainer', 'trainer-sections-container', 'trainer-section-item');
+    initSectionDragDrop('trainer', 'trainer-sections-container', 'trainer-section-
 
     // Initialize for Melody Composer tab (new dashboard layout)
-    initSectionDragDrop('melody', 'melody-dashboard-sections-container', 'melody-section-item');
+    initSectionDragDrop('melody', 'melody-dashboard-sections-container', 'melody-section-
 }
 
 /**

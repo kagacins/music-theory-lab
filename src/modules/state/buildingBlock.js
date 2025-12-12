@@ -24,7 +24,7 @@ export const DEFAULT_BEATS = 4;
 
 // Duration to units mapping
 export const DURATION_UNITS = {
-    '1n': 192,      // Whole note (4 beats)
+    '1n': 192,      // Whole note (4 beats) - MUST be 192 units
     '2n': 96,       // Half note (2 beats)
     '2n.': 144,     // Dotted half (3 beats)
     '4n': 48,       // Quarter note (1 beat)
@@ -100,6 +100,10 @@ export function unitsToDuration(units) {
  * @returns {number} Number of units
  */
 export function durationToUnits(duration) {
+    // Ensure '1n' (whole note) is always 192 units (4 beats)
+    if (duration === '1n') {
+        return 192;
+    }
     return DURATION_UNITS[duration] || 48; // Default to quarter note
 }
 
@@ -353,9 +357,10 @@ export class Unit {
 
     /**
      * Check if this unit is the start of a note/rest (not a continuation)
+     * Empty units (no pitches) don't count as note starts
      */
     isNoteStart() {
-        return this.parentIndex === null;
+        return this.parentIndex === null && this.pitches.length > 0;
     }
 
     /**
@@ -509,6 +514,10 @@ export class BuildingBlock {
         // Initialize units array
         this.units = [];
         this._initializeUnits(options.initialPitches);
+
+        // MULTI-VOICE SUPPORT: Store notes by voice to support multiple voices at same position
+        // Map<voiceNumber, Array<{startUnit, durationUnits, pitches, attributes}>>
+        this.voiceNotes = new Map();
     }
 
     /**
@@ -525,6 +534,16 @@ export class BuildingBlock {
     _initializeUnits(pitches = []) {
         const totalUnits = this.beats * UNITS_PER_BEAT;
         this.units = [];
+
+        // If no pitches provided (empty array), initialize as empty units (no notes)
+        // This prevents creating a big rest that spans the entire block
+        if (pitches.length === 0) {
+            // Initialize all units as empty (no note starts)
+            for (let i = 0; i < totalUnits; i++) {
+                this.units.push(new Unit({ pitches: [] }));
+            }
+            return;
+        }
 
         // First unit is the start of the note
         this.units.push(new Unit({ pitches: [...pitches] }));
@@ -596,10 +615,38 @@ export class BuildingBlock {
      * @param {Object} attributes - All musical attributes (see Unit class for options)
      */
     setNote(startUnit, durationUnits, pitches, attributes = {}) {
-        console.log('[BuildingBlock.setNote] startUnit:', startUnit, 'pitches:', JSON.stringify(pitches));
+        console.log('[BuildingBlock.setNote] startUnit:', startUnit, 'pitches:', JSON.stringify(pitches), 'voice:', attributes.voice);
         const endUnit = Math.min(startUnit + durationUnits, this.units.length);
+        const voiceNumber = attributes.voice || 1;
 
-        // First unit is the note start - gets all attributes
+        // MULTI-VOICE: Store note in voiceNotes map
+        // This allows multiple voices to have notes at the same position
+        if (!this.voiceNotes.has(voiceNumber)) {
+            this.voiceNotes.set(voiceNumber, []);
+        }
+        const voiceArray = this.voiceNotes.get(voiceNumber);
+
+        // Remove any existing note at this position for this voice
+        const existingIndex = voiceArray.findIndex(n => n.startUnit === startUnit);
+        if (existingIndex >= 0) {
+            voiceArray.splice(existingIndex, 1);
+        }
+
+        // Add the new note to voiceNotes
+        voiceArray.push({
+            startUnit,
+            durationUnits,
+            pitches: [...pitches],
+            isRest: pitches.length === 0,
+            attributes: { ...attributes },
+        });
+
+        // Sort by startUnit
+        voiceArray.sort((a, b) => a.startUnit - b.startUnit);
+
+        // Also update units array for backwards compatibility (single-voice use cases)
+        // This will be overwritten if multiple voices write to same position,
+        // but getNotes() now uses voiceNotes for multi-voice scenarios
         this.units[startUnit] = new Unit({
             pitches: [...pitches],
             parentIndex: null, // This is the start
@@ -633,14 +680,87 @@ export class BuildingBlock {
 
     /**
      * Get all notes in this block as renderable note objects
-     * Groups consecutive units with the same parentIndex into single notes
+     * MULTI-VOICE: Uses voiceNotes map when multiple voices exist, falls back to units for single voice
      * @returns {Array} Array of note objects with all musical attributes
      */
     getNotes() {
+        // MULTI-VOICE: If we have notes stored in voiceNotes, use that
+        // This properly handles multiple voices at the same position
+        if (this.voiceNotes && this.voiceNotes.size > 0) {
+            const notes = [];
+
+            console.log(`[BuildingBlock.getNotes] Block ${this.id}: Using voiceNotes map, ${this.voiceNotes.size} voices`);
+
+            for (const [voiceNumber, voiceArray] of this.voiceNotes) {
+                for (const noteData of voiceArray) {
+                    const attrs = noteData.attributes || {};
+                    const note = {
+                        // Core
+                        startUnit: noteData.startUnit,
+                        durationUnits: noteData.durationUnits,
+                        pitches: [...noteData.pitches],
+                        isRest: noteData.isRest || noteData.pitches.length === 0,
+                        duration: unitsToDuration(noteData.durationUnits),
+                        // Dynamics & Expression
+                        dynamic: attrs.dynamic,
+                        velocity: attrs.velocity,
+                        // Articulations
+                        articulation: attrs.articulation,
+                        fermata: attrs.fermata,
+                        // Ornaments
+                        ornament: attrs.ornament,
+                        graceNotes: attrs.graceNotes,
+                        tremolo: attrs.tremolo,
+                        // Accidentals
+                        accidental: attrs.accidental,
+                        accidentals: attrs.accidentals,
+                        // Phrasing
+                        slur: attrs.slur,
+                        glissando: attrs.glissando,
+                        arpeggio: attrs.arpeggio,
+                        // Tuplets
+                        tuplet: attrs.tuplet,
+                        // Technique
+                        fingering: attrs.fingering,
+                        tablature: attrs.tablature,
+                        harmonic: attrs.harmonic,
+                        octaveShift: attrs.octaveShift,
+                        // Piano
+                        pedal: attrs.pedal,
+                        softPedal: attrs.softPedal,
+                        sostenutoPedal: attrs.sostenutoPedal,
+                        // Text
+                        text: attrs.text,
+                        tempo: attrs.tempo,
+                        rehearsalMark: attrs.rehearsalMark,
+                        // Breath
+                        breath: attrs.breath,
+                        // Voice & Stem
+                        voice: voiceNumber,
+                        stemDirection: attrs.stemDirection,
+                        beam: attrs.beam,
+                        // Lyric
+                        lyric: attrs.lyric,
+                    };
+                    notes.push(note);
+                    console.log(`[BuildingBlock.getNotes]   Voice ${voiceNumber}: startUnit=${note.startUnit}, durationUnits=${note.durationUnits}, pitches=${JSON.stringify(note.pitches)}`);
+                }
+            }
+
+            // Sort by startUnit, then by voice for consistent ordering
+            notes.sort((a, b) => {
+                if (a.startUnit !== b.startUnit) return a.startUnit - b.startUnit;
+                return (a.voice || 1) - (b.voice || 1);
+            });
+
+            return notes;
+        }
+
+        // FALLBACK: Use units array for single-voice/legacy scenarios
         const notes = [];
         let i = 0;
 
-        console.log(`[BuildingBlock.getNotes] Block ${this.id}: beats=${this.beats}, units.length=${this.units.length}`);
+        console.log(`[BuildingBlock.getNotes] Block ${this.id}: Using units array fallback, beats=${this.beats}, units.length=${this.units.length}`);
 
         while (i < this.units.length) {
             const unit = this.units[i];
@@ -734,13 +854,57 @@ export class BuildingBlock {
         });
 
         cloned.units = this.units.map(u => u.clone());
+
+        // Clone voiceNotes map
+        if (this.voiceNotes) {
+            cloned.voiceNotes = new Map();
+            for (const [voice, notes] of this.voiceNotes) {
+                cloned.voiceNotes.set(voice, notes.map(n => ({
+                    startUnit: n.startUnit,
+                    durationUnits: n.durationUnits,
+                    pitches: [...n.pitches],
+                    isRest: n.isRest,
+                    attributes: { ...n.attributes },
+                })));
+            }
+        }
+
         return cloned;
+    }
+
+    /**
+     * Clear all notes from this block (both voiceNotes and units)
+     */
+    clearNotes() {
+        // Clear voiceNotes map
+        if (this.voiceNotes) {
+            this.voiceNotes.clear();
+        }
+
+        // Clear units - make them all empty
+        for (let i = 0; i < this.units.length; i++) {
+            this.units[i] = new Unit({ pitches: [] });
+        }
     }
 
     /**
      * Export to a serializable format
      */
     toJSON() {
+        // Convert voiceNotes Map to serializable format
+        const voiceNotesData = {};
+        if (this.voiceNotes && this.voiceNotes.size > 0) {
+            for (const [voice, notes] of this.voiceNotes) {
+                voiceNotesData[voice] = notes.map(n => ({
+                    startUnit: n.startUnit,
+                    durationUnits: n.durationUnits,
+                    pitches: n.pitches,
+                    isRest: n.isRest,
+                    attributes: n.attributes,
+                }));
+            }
+        }
+
         return {
             id: this.id,
             chordIndex: this.chordIndex,
@@ -754,7 +918,10 @@ export class BuildingBlock {
                 accidental: u.accidental,
                 accidentals: u.accidentals,
                 tuplet: u.tuplet,
+                voice: u.voice,
             })),
+            // MULTI-VOICE: Include voiceNotes for proper multi-voice save/restore
+            voiceNotes: voiceNotesData,
         };
     }
 
@@ -770,6 +937,22 @@ export class BuildingBlock {
         });
 
         block.units = json.units.map(u => new Unit(u));
+
+        // MULTI-VOICE: Restore voiceNotes Map from serialized format
+        if (json.voiceNotes && Object.keys(json.voiceNotes).length > 0) {
+            block.voiceNotes = new Map();
+            for (const [voice, notes] of Object.entries(json.voiceNotes)) {
+                const voiceNumber = parseInt(voice, 10);
+                block.voiceNotes.set(voiceNumber, notes.map(n => ({
+                    startUnit: n.startUnit,
+                    durationUnits: n.durationUnits,
+                    pitches: [...n.pitches],
+                    isRest: n.isRest,
+                    attributes: { ...n.attributes },
+                })));
+            }
+        }
+
         return block;
     }
 }
@@ -792,10 +975,14 @@ export class BuildingBlockSequence {
     }
 
     /**
-     * Get beats per measure
+     * Get beats per measure (in quarter note units)
+     * This converts the time signature to beats per measure, accounting for the denominator.
+     * Examples: 4/4 = 4, 3/4 = 3, 2/4 = 2, 6/8 = 3, 2/2 = 4, 9/8 = 4.5
      */
     getBeatsPerMeasure() {
-        return this.timeSignature.num;
+        const num = this.timeSignature?.num ?? 4;
+        const denom = this.timeSignature?.denom ?? 4;
+        return num * (4 / denom);
     }
 
     /**

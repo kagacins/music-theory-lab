@@ -443,8 +443,6 @@ export function getProgressionInfo(progressionId, level = 'simple') {
     const searchNumerals = progressionId.replace(/\s/g, '').toUpperCase();
     progression = Object.values(progressionPatterns).find(p =>
       p.numerals.join('-').toUpperCase() === searchNumerals ||
-      p.numerals.join('').toUpperCase() === searchNumerals
-    );
   }
 
   if (!progression) return undefined;

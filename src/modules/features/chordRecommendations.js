@@ -488,8 +488,6 @@ export function analyzeProgression(progression, key) {
     for (let i = 0; i < progression.length - 1; i++) {
         totalVLQuality += calculateVoiceLeadingQuality(
             progression[i].notes,
-            progression[i + 1].notes
-        );
     }
     const voiceLeadingQuality = progression.length > 1
         ? Math.round(totalVLQuality / (progression.length - 1))

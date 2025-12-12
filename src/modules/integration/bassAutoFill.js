@@ -67,7 +67,7 @@ function getChordIntervalsRobust(chordType) {
     }
 
     if (!intervals) {
-        console.warn(`[bassAutoFill] Unknown chord type "${chordType}", falling back to Major`);
+
         intervals = CHORD_INTERVALS['Major'];
     }
 
@@ -204,7 +204,7 @@ function noteToMidi(note) {
     // Extract note name and octave
     const match = note.match(/^([A-G][#b]?)(-?\d+)$/);
     if (!match) {
-        console.warn('Invalid note format:', note);
+
         return 60; // Default to middle C
     }
 
@@ -213,7 +213,7 @@ function noteToMidi(note) {
 
     const noteOffset = noteMap[noteName];
     if (noteOffset === undefined) {
-        console.warn('Unknown note name:', noteName);
+
         return 60;
     }
 
@@ -551,7 +551,7 @@ function findThird(root, chord, octave = 2) {
     // Minor third = 3 semitones, Major third = 4 semitones
     const isMinor = chordType.includes('minor') || chordType.includes('min') ||
                     chordType === 'm' || chordType === 'm7' || chordType === 'm9' ||
-                    chordType.includes('dim') || chordType.startsWith('m');
+                    chordType.includes('dim') || chordType.startsWith('
     const thirdInterval = isMinor ? 3 : 4;
     const rootMidi = noteToMidi(`${root}${octave}`);
     const thirdMidi = rootMidi + thirdInterval;
@@ -572,7 +572,7 @@ function findSixth(root, chord, octave = 2) {
     // Use minor 6th for minor chords to stay diatonic
     const isMinor = chordType.includes('minor') || chordType.includes('min') ||
                     chordType === 'm' || chordType === 'm7' || chordType === 'm9' ||
-                    chordType.includes('dim') || chordType.startsWith('m');
+                    chordType.includes('dim') || chordType.startsWith('
     const sixthInterval = isMinor ? 8 : 9;
     const rootMidi = noteToMidi(`${root}${octave}`);
     const sixthMidi = rootMidi + sixthInterval;

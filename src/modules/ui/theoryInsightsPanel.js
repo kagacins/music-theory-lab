@@ -954,7 +954,6 @@ export class TheoryInsightsPanel {
      * Open a lesson from the panel
      */
     openLesson(lessonId) {
-        console.log('[TheoryInsights] Opening lesson:', lessonId);
 
         // First try the direct function if available
         if (window.renderLessonViewer && typeof window.renderLessonViewer === 'function') {
@@ -986,7 +985,6 @@ export class TheoryInsightsPanel {
             window.wtwOpenLesson(lessonId);
         } else {
             // Last resort: navigate to lessons tab
-            console.warn('[TheoryInsights] Lesson viewer not available. Lesson ID:', lessonId);
             const learnTab = document.querySelector('[data-tab="learn"]');
             if (learnTab) learnTab.click();
         }
@@ -1079,13 +1077,11 @@ export class TheoryInsightsPanel {
      * Features an interactive key selector that updates the explanation in real-time
      */
     showConceptModal(conceptType, fallbackTitle) {
-        console.log('[TheoryInsights] Showing concept modal:', conceptType);
 
         // Get the explanation from our dictionary
         const concept = CONCEPT_EXPLANATIONS[conceptType];
 
         if (!concept) {
-            console.warn('[TheoryInsights] No explanation found for:', conceptType);
             return;
         }
 
@@ -1457,17 +1453,12 @@ export class TheoryInsightsPanel {
     attachEventListeners() {
         // Learn more buttons - show concept explanation modal
         const learnMoreBtns = this.container.querySelectorAll('.learn-more-btn');
-        console.log('[TheoryInsights] Found learn-more-btn count:', learnMoreBtns.length);
         learnMoreBtns.forEach((btn, idx) => {
-            console.log(`[TheoryInsights] Button ${idx} dataset:`, btn.dataset);
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 // Use btn directly, not e.target (which could be text node)
                 const conceptType = btn.dataset.conceptType;
                 const conceptTitle = btn.dataset.conceptTitle;
-                console.log('[TheoryInsights] Learn More clicked - type:', conceptType, 'title:', conceptTitle);
-                console.log('[TheoryInsights] Button element:', btn);
-                console.log('[TheoryInsights] Button outerHTML:', btn.outerHTML);
                 this.showConceptModal(conceptType, conceptTitle);
             });
         });
@@ -1567,7 +1558,6 @@ export class TheoryInsightsPanel {
         if (this.piano) return true;
 
         if (typeof Tone === 'undefined') {
-            console.warn('[TheoryInsights] Tone.js not available');
             return false;
         }
 
@@ -1598,7 +1588,6 @@ export class TheoryInsightsPanel {
             });
             return true;
         } catch (e) {
-            console.error('[TheoryInsights] Piano sampler init error:', e);
             return false;
         }
     }
@@ -1607,7 +1596,6 @@ export class TheoryInsightsPanel {
      * Start playing a chord (hold until stopPreview is called)
      */
     async startPreview(root, type) {
-        console.log(`[TheoryInsights] Starting preview: ${root} ${type}`);
 
         // Build the chord notes
         this.currentPreviewNotes = this.buildChordNotes(root, type);
@@ -1620,7 +1608,6 @@ export class TheoryInsightsPanel {
                 this.activePreviewPiano = window.sharedPiano;
                 return;
             } catch (e) {
-                console.warn('[TheoryInsights] Shared piano error:', e);
             }
         }
 
@@ -1630,9 +1617,7 @@ export class TheoryInsightsPanel {
             try {
                 this.piano.triggerAttack(this.currentPreviewNotes);
                 this.activePreviewPiano = this.piano;
-                console.log(`[TheoryInsights] Playing chord:`, this.currentPreviewNotes);
             } catch (e) {
-                console.error('[TheoryInsights] Piano playback error:', e);
             }
         }
     }
@@ -1645,7 +1630,6 @@ export class TheoryInsightsPanel {
             try {
                 this.activePreviewPiano.triggerRelease(this.currentPreviewNotes);
             } catch (e) {
-                console.warn('[TheoryInsights] Error stopping preview:', e);
             }
         }
         this.currentPreviewNotes = null;
@@ -1694,7 +1678,6 @@ export class TheoryInsightsPanel {
      * Add a borrowed chord to the progression after the selected chord
      */
     addBorrowedChord(root, type, numeral) {
-        console.log(`[TheoryInsights] Adding borrowed chord: ${root} ${type} (${numeral})`);
 
         // Map lowercase type to proper type name
         const typeMap = {
@@ -1733,7 +1716,6 @@ export class TheoryInsightsPanel {
         if (insertIndex !== null && window.insertChordCardAt) {
             const success = window.insertChordCardAt(insertIndex, chordData, 4);
             if (success) {
-                console.log(`[TheoryInsights] Inserted ${root} ${properType} (${numeral}) at index ${insertIndex}`);
                 return;
             }
         }
@@ -1741,9 +1723,7 @@ export class TheoryInsightsPanel {
         // Fallback to addSpecificChordToProgression (adds at end)
         if (window.addSpecificChordToProgression) {
             window.addSpecificChordToProgression(properType, 0, true, root);
-            console.log(`[TheoryInsights] Added ${root} ${properType} at end of progression`);
         } else {
-            console.warn('[TheoryInsights] No method available to add chord');
         }
     }
 
@@ -1831,14 +1811,11 @@ export function initTheoryInsightsIfReady() {
                                 document.getElementById('composition-notation-panel') ||
                                 document.querySelector('.composition-studio-content');
 
-    console.log('[TheoryInsights] Init check - compositionState:', !!compositionState, 'isCompositionStudio:', !!isCompositionStudio);
 
     if (!compositionState && !isCompositionStudio) {
-        console.log('[TheoryInsights] Skipping init - not in composition studio');
         return null;
     }
 
-    console.log('[TheoryInsights] Creating panel instance...');
     panelInstance = new TheoryInsightsPanel({
         compositionState,
         onUpdate: () => {}
@@ -1846,7 +1823,6 @@ export function initTheoryInsightsIfReady() {
     panelInstance.init();
 
     window.theoryInsightsPanel = panelInstance;
-    console.log('[TheoryInsights] Panel initialized successfully');
 
     return panelInstance;
 }

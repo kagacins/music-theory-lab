@@ -69,7 +69,7 @@ function notifyListeners() {
         try {
             callback(state);
         } catch (e) {
-            console.error('[SectionIntentState] Listener error:', e);
+
         }
     });
 
@@ -114,7 +114,7 @@ export function getSectionIntentMode() {
  */
 export function setSectionIntentMode(mode) {
     if (mode !== INTENT_MODES.CONTINUE && mode !== INTENT_MODES.NEW_SECTION) {
-        console.warn('[SectionIntentState] Invalid mode:', mode);
+
         return;
     }
     setSectionIntent({ mode });
@@ -134,7 +134,7 @@ export function getContinueSubMode() {
  */
 export function setContinueSubMode(subMode) {
     if (!Object.values(CONTINUE_SUBMODES).includes(subMode)) {
-        console.warn('[SectionIntentState] Invalid subMode:', subMode);
+
         return;
     }
     setSectionIntent({ subMode });

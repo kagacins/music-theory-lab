@@ -403,8 +403,6 @@ function analyzeMelodyForMeasure(melodyData, measureIndex) {
     // Filter melody notes for this measure
     const measureNotes = melodyData.filter(note =>
         note.measure === measureIndex ||
-        note.measureIndex === measureIndex
-    );
 
     if (measureNotes.length === 0) {
         return { pitches: [], prominentPitches: [], totalWeight: 0, hasMelody: false };
@@ -672,7 +670,7 @@ export function calculateSectionContextScore(sequence, sectionInfo, key) {
 
     if (coversStart) {
         // Sequence includes section start
-        const startAdjustments = getPositionAdjustments(sectionType, 'first');
+        const startAdjustments = getPositionAdjustments(sectionType, '
         const firstChord = sequence[0];
 
         // Check if first chord aligns with section start preferences
@@ -688,7 +686,7 @@ export function calculateSectionContextScore(sequence, sectionInfo, key) {
 
     if (coversEnd) {
         // Sequence includes section end
-        const endAdjustments = getPositionAdjustments(sectionType, 'end');
+        const endAdjustments = getPositionAdjustments(sectionType, '
         const lastChord = sequence[sequence.length - 1];
 
         // Check transition preparation
@@ -704,14 +702,14 @@ export function calculateSectionContextScore(sequence, sectionInfo, key) {
                 const lastChordTension = estimateChordTension(lastChord);
                 if (lastChordTension > 0.5) {
                     score += 8 * influence;
-                    reasons.push('Builds tension for transition');
+                    reasons.push('Builds tension for 
                 }
             }
         } else if (endAdjustments.dominantBonus) {
             // Generic section end - prefer dominant function
             if (isDominantChord(lastChord.root, key)) {
                 score += 10 * influence;
-                reasons.push('Strong cadential approach');
+                reasons.push('Strong cadential 
             }
         }
     }
@@ -728,7 +726,7 @@ export function calculateSectionContextScore(sequence, sectionInfo, key) {
     } else if (borrowedRatio > 0 && borrowedRatio <= modalInterchangeBias) {
         // Appropriate use of borrowed chords
         score += 5 * influence;
-        reasons.push('Good modal color');
+        reasons.push('Good modal 
     }
 
     // 4. Section-specific behaviors
@@ -744,7 +742,7 @@ export function calculateSectionContextScore(sequence, sectionInfo, key) {
             const uniqueRoots = new Set(sequence.map(c => c.root));
             if (uniqueRoots.size >= sequence.length - 1) {
                 score += 8 * influence;
-                reasons.push('Good variety for bridge');
+                reasons.push('Good variety for 
             }
             break;
         case 'outro':
@@ -752,14 +750,14 @@ export function calculateSectionContextScore(sequence, sectionInfo, key) {
             if (sequence[sequence.length - 1] &&
                 isTonicChord(sequence[sequence.length - 1].root, key)) {
                 score += 12 * influence;
-                reasons.push('Resolves properly');
+                reasons.push('Resolves 
             }
             break;
         case 'prechorus':
             // Prechoruses should build without resolving
             if (!sequence.some(c => isTonicChord(c.root, key) && c.inversion === 0)) {
                 score += 8 * influence;
-                reasons.push('Maintains tension for chorus');
+                reasons.push('Maintains tension for 
             }
             break;
     }
@@ -834,7 +832,7 @@ function countBorrowedChords(sequence, key) {
     const keyIndex = ALL_NOTES.indexOf(keyRoot);
     if (keyIndex === -1) return 0;
 
-    const isMinor = key.includes('Minor');
+    const isMinor = key.includes('M
 
     // Diatonic roots for major/minor
     const majorDiatonicIntervals = [0, 2, 4, 5, 7, 9, 11];
@@ -918,8 +916,6 @@ export function verifyMelodyCompatibility(chords, melodyData, startMeasure = 0, 
         // Get melody notes for this measure
         const measureNotes = melodyData.filter(note =>
             (note.measure === measureIndex || note.measureIndex === measureIndex) &&
-            note.pitch && note.type !== 'rest'
-        );
 
         if (measureNotes.length === 0) {
             details.push({
@@ -982,8 +978,6 @@ export function verifyMelodyCompatibility(chords, melodyData, startMeasure = 0, 
         const measureScore = Math.round(
             (chordToneRatio * config.weights.chordToneMatch +
              strongBeatRatio * config.weights.strongBeatMatch +
-             tensionBalance * config.weights.tensionBalance) * 100
-        );
 
         totalScore += measureScore;
 
@@ -1021,7 +1015,7 @@ export function verifyMelodyCompatibility(chords, melodyData, startMeasure = 0, 
     else if (avgScore >= config.thresholds.acceptable) overallRating = 'acceptable';
     else overallRating = 'poor';
 
-    const problemChords = details.filter(d => d.result === 'poor');
+    const problemChords = details.filter(d => d.result === '
 
     return {
         compatible: avgScore >= config.thresholds.acceptable,
@@ -1086,8 +1080,6 @@ function generateMelodyCompatibleAlternatives(problemChords, melodyData, key) {
     problemChords.forEach(problem => {
         const measureNotes = melodyData.filter(note =>
             (note.measure === problem.measureIndex || note.measureIndex === problem.measureIndex) &&
-            note.pitch && note.type !== 'rest'
-        );
 
         if (measureNotes.length === 0) return;
 
@@ -1519,8 +1511,6 @@ export function generateTensionArcSequences(
         topN * 3, // Request more to filter by tension
         sectionInfo,
         contextMode,
-        melodyOptions
-    );
 
     // Score each sequence against the tension arc
     const scoredSequences = sequences.map(seq => {
@@ -1740,8 +1730,6 @@ export function generateChordSequences(
         lookbackDepth,
         null,
         true,
-        sectionInfo
-    );
 
     // Get unique roots from the recommendations
     // We accept whatever roots the recommendation engine provides (typically 4-7)
@@ -1769,8 +1757,6 @@ export function generateChordSequences(
             sectionInfo,
             contextMode,
             melodyOptions,
-            null // no exclude
-        );
 
         if (sequencesForRoot.length > 0) {
             allSequences.push(sequencesForRoot[0]);
@@ -1846,8 +1832,6 @@ function generateSequencesWithRootInternal(
         lookbackDepth,
         null,
         true,
-        sectionInfo
-    );
 
     // Filter to only chords with the constrained root
     const constrainedOptions = rawFirstStepOptions.filter(c => c.root === constrainedRoot);
@@ -1903,8 +1887,6 @@ function generateSequencesWithRootInternal(
                 lookbackDepth,
                 null,
                 true,
-                sectionInfo
-            );
 
             // Count root occurrences in partial sequence
             const rootUsageCounts = {};
@@ -1957,8 +1939,6 @@ function generateSequencesWithRootInternal(
             lookbackDepth,
             contextMode,
             melodyOptions,
-            sectionInfo
-        );
 
         return {
             chords: partial.chords,
@@ -1978,8 +1958,6 @@ function generateSequencesWithRootInternal(
         return seq1.every((chord, i) =>
             chord.root === seq2[i].root &&
             chord.type === seq2[i].type &&
-            chord.inversion === seq2[i].inversion
-        );
     };
 
     // Filter out excluded sequence
@@ -2072,8 +2050,6 @@ export function generateSequencesWithRoot(
         sectionInfo,
         contextMode,
         melodyOptions,
-        excludeSequence
-    );
 
     // Normalize scores for display
     if (sequences.length > 0) {
@@ -2207,8 +2183,6 @@ export function scoreSequenceAsUnit(
             sequence,
             melodyOptions.melodyData,
             melodyOptions.startMeasure || 0,
-            key
-        );
 
         const melodyScore = melodyAlignmentResult.score;
         const melodyContribution = melodyScore * weights.melodyAlignment;
@@ -2498,12 +2472,12 @@ export function evaluateRootVariety(sequence, style = 'balanced') {
 
             // 3. Major -> Major 7th (adding color)
             const isMajorToMaj7 =
-                (prevType === 'Major' && currType === 'Major 7th');
+                (prevType === 'Major' && currType === 'Major 7
 
             // 4. Tritone sub patterns (less common but valid)
             const isQualityEnrichment =
                 (prevType === 'Major' && currType?.includes('7th')) ||
-                (prevType === 'Minor' && currType === 'Minor 7th');
+                (prevType === 'Minor' && currType === 'Minor 7
 
             if (isMinorToDominant || isDominantToMinor || isMajorToMaj7 || isQualityEnrichment) {
                 // Recognized pattern - apply reduced penalty
@@ -2765,25 +2739,25 @@ export function generateSequenceReason(sequence, score, key) {
     if (lastDegree === 1 && lastChord.type.includes('Major')) {
         // Ends on tonic major chord
         if (functions.includes('dominant')) {
-            insights.push('This sequence resolves the progression back to the tonic (I), providing a strong sense of completion and rest');
+            insights.push('This sequence resolves the progression back to the tonic (I), providing a strong sense of completion and 
         } else if (functions.includes('subdominant')) {
-            insights.push('This sequence gently returns to the home chord (I) through plagal motion, creating a peaceful resolution');
+            insights.push('This sequence gently returns to the home chord (I) through plagal motion, creating a peaceful 
         } else {
-            insights.push('This sequence brings the progression home to the tonic, establishing a sense of stability');
+            insights.push('This sequence brings the progression home to the tonic, establishing a sense of 
         }
     } else if (lastFunction === 'dominant') {
         // Ends on dominant
         if (lastChord.type.includes('7th')) {
-            insights.push('This sequence builds tension and ends on the dominant, leaving the listener anticipating resolution to the tonic');
+            insights.push('This sequence builds tension and ends on the dominant, leaving the listener anticipating resolution to the 
         } else {
-            insights.push('This sequence creates forward momentum by ending on the dominant, suggesting more music is to come');
+            insights.push('This sequence creates forward momentum by ending on the dominant, suggesting more music is to 
         }
     } else if (lastFunction === 'subdominant') {
         // Ends on subdominant
-        insights.push('This sequence creates a sense of anticipation by moving away from the tonic, leaving room for further harmonic development');
+        insights.push('This sequence creates a sense of anticipation by moving away from the tonic, leaving room for further harmonic 
     } else if (lastDegree === 6 || lastDegree === 3) {
         // Ends on relative minor or mediant
-        insights.push('This sequence creates a bittersweet, introspective mood by moving away from the tonic center');
+        insights.push('This sequence creates a bittersweet, introspective mood by moving away from the tonic 
     }
 
     // 2. TENSION ANALYSIS
@@ -2792,13 +2766,13 @@ export function generateSequenceReason(sequence, score, key) {
     const tensionChange = tensions[tensions.length - 1] - tensions[0];
 
     if (tensionChange > 30) {
-        insights.push('Tension steadily increases throughout, creating excitement and forward drive');
+        insights.push('Tension steadily increases throughout, creating excitement and forward 
     } else if (tensionChange < -30) {
-        insights.push('Tension releases progressively, bringing a sense of calm and resolution');
+        insights.push('Tension releases progressively, bringing a sense of calm and 
     } else if (avgTension > 60) {
-        insights.push('Maintains high tension throughout, keeping the listener engaged and on edge');
+        insights.push('Maintains high tension throughout, keeping the listener engaged and on 
     } else if (avgTension < 35) {
-        insights.push('Creates a relaxed, comfortable atmosphere with low-tension harmonies');
+        insights.push('Creates a relaxed, comfortable atmosphere with low-tension 
     }
 
     // 3. BASS MOVEMENT PATTERN
@@ -2816,11 +2790,11 @@ export function generateSequenceReason(sequence, score, key) {
     const chromaticCount = bassIntervals.filter(i => i === 1 || i === 11).length;
 
     if (fifthsCount === bassIntervals.length && bassIntervals.length >= 2) {
-        insights.push('Features circle-of-fifths bass movement, one of music\'s most fundamental and satisfying progressions');
+        insights.push('Features circle-of-fifths bass movement, one of music\'s most fundamental and satisfying 
     } else if (stepwiseCount === bassIntervals.length && bassIntervals.length >= 2) {
-        insights.push('The bass moves in smooth steps, creating excellent voice leading and a singable bass line');
+        insights.push('The bass moves in smooth steps, creating excellent voice leading and a singable bass 
     } else if (chromaticCount === bassIntervals.length && bassIntervals.length >= 2) {
-        insights.push('Uses chromatic bass motion for a sophisticated, jazz-influenced sound');
+        insights.push('Uses chromatic bass motion for a sophisticated, jazz-influenced 
     }
 
     // 4. COMMON PROGRESSION PATTERNS
@@ -2830,11 +2804,11 @@ export function generateSequenceReason(sequence, score, key) {
         const func3 = functions[2];
 
         if (func1 === 'subdominant' && func2 === 'dominant' && func3 === 'tonic') {
-            insights.push('Follows the classic ii-V-I progression, the foundation of countless jazz and popular songs');
+            insights.push('Follows the classic ii-V-I progression, the foundation of countless jazz and popular 
         } else if (func1 === 'tonic' && func2 === 'subdominant' && func3 === 'dominant') {
-            insights.push('Builds tension naturally from tonic through subdominant to dominant, following traditional harmonic practice');
+            insights.push('Builds tension naturally from tonic through subdominant to dominant, following traditional harmonic 
         } else if (func1 === 'dominant' && func2 === 'subdominant') {
-            insights.push('Uses a deceptive progression (V-IV), creating surprise and extending the musical phrase');
+            insights.push('Uses a deceptive progression (V-IV), creating surprise and extending the musical 
         }
     }
 
@@ -2842,23 +2816,23 @@ export function generateSequenceReason(sequence, score, key) {
     const types = sequence.map(c => c.type);
     const has7ths = types.some(t => t.includes('7th'));
     const hasExtensions = types.some(t => t.includes('9th') || t.includes('Add'));
-    const allMajorMinor = types.every(t => t === 'Major' || t === 'Minor');
+    const allMajorMinor = types.every(t => t === 'Major' || t === 'M
 
     if (has7ths && sequence.length >= 2) {
-        insights.push('Seventh chords add harmonic color and jazz sophistication');
+        insights.push('Seventh chords add harmonic color and jazz 
     } else if (hasExtensions) {
-        insights.push('Extended harmonies create a lush, contemporary sound palette');
+        insights.push('Extended harmonies create a lush, contemporary sound 
     } else if (allMajorMinor) {
-        insights.push('Uses simple triads for a clean, classical sound');
+        insights.push('Uses simple triads for a clean, classical 
     }
 
     // 6. SCORE-BASED QUALITY ASSESSMENT
     if (score >= 85) {
         // Don't add redundant quality statement for high scores
     } else if (score >= 70) {
-        insights.push('Good balance of harmonic interest and voice leading smoothness');
+        insights.push('Good balance of harmonic interest and voice leading 
     } else if (score >= 60) {
-        insights.push('Offers an alternative harmonic path with interesting color');
+        insights.push('Offers an alternative harmonic path with interesting 
     }
 
     // Return first 2-3 insights (avoid overwhelming text)

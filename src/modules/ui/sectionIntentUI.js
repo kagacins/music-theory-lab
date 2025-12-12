@@ -24,7 +24,7 @@ let selectChordCardFn = null;
 async function getSelectChordCard() {
     if (!selectChordCardFn) {
         try {
-            const module = await import('../features/progressionBuilder.js');
+            const module = await import('../features/progressionBuilder.
             selectChordCardFn = module.selectChordCard;
         } catch (e) {
         }
@@ -50,12 +50,12 @@ export function initSectionIntentUI() {
     if (isInitialized) return;
 
     // Get DOM elements
-    selectionRequiredPrompt = document.getElementById('selection-required-prompt');
-    sectionIntentControls = document.getElementById('section-intent-controls');
-    insertPositionChord = document.getElementById('insert-position-chord');
-    continueOptions = document.getElementById('continue-section-options');
-    newSectionOptions = document.getElementById('new-section-options');
-    currentSectionName = document.getElementById('current-section-name');
+    selectionRequiredPrompt = document.getElementById('selection-required-
+    sectionIntentControls = document.getElementById('section-intent-
+    insertPositionChord = document.getElementById('insert-position-
+    continueOptions = document.getElementById('continue-section-
+    newSectionOptions = document.getElementById('new-section-
+    currentSectionName = document.getElementById('current-section-
 
     if (!selectionRequiredPrompt || !sectionIntentControls) {
         return;
@@ -75,7 +75,7 @@ export function initSectionIntentUI() {
  */
 function setupEventListeners() {
     // Select Last Chord button
-    const selectLastBtn = document.getElementById('select-last-chord-btn');
+    const selectLastBtn = document.getElementById('select-last-chord-
     if (selectLastBtn) {
         selectLastBtn.addEventListener('click', handleSelectLastChord);
     }
@@ -93,7 +93,7 @@ function setupEventListeners() {
     });
 
     // New section type select
-    const newSectionTypeSelect = document.getElementById('new-section-type-select');
+    const newSectionTypeSelect = document.getElementById('new-section-type-
     if (newSectionTypeSelect) {
         newSectionTypeSelect.addEventListener('change', handleNewSectionTypeChange);
     }
@@ -196,10 +196,10 @@ export function refreshUI() {
  */
 function showSelectionRequiredPrompt() {
     if (selectionRequiredPrompt) {
-        selectionRequiredPrompt.classList.remove('hidden');
+        selectionRequiredPrompt.classList.remove('
     }
     if (sectionIntentControls) {
-        sectionIntentControls.classList.add('hidden');
+        sectionIntentControls.classList.add('
     }
 }
 
@@ -208,10 +208,10 @@ function showSelectionRequiredPrompt() {
  */
 function hideSelectionRequiredPrompt() {
     if (selectionRequiredPrompt) {
-        selectionRequiredPrompt.classList.add('hidden');
+        selectionRequiredPrompt.classList.add('
     }
     if (sectionIntentControls) {
-        sectionIntentControls.classList.remove('hidden');
+        sectionIntentControls.classList.remove('
     }
 }
 
@@ -295,11 +295,11 @@ function updateIntentModeDisplay() {
     // Show/hide sub-options
     if (continueOptions && newSectionOptions) {
         if (intent.mode === INTENT_MODES.CONTINUE) {
-            continueOptions.classList.remove('hidden');
-            newSectionOptions.classList.add('hidden');
+            continueOptions.classList.remove('
+            newSectionOptions.classList.add('
         } else {
-            continueOptions.classList.add('hidden');
-            newSectionOptions.classList.remove('hidden');
+            continueOptions.classList.add('
+            newSectionOptions.classList.remove('
         }
     }
 
@@ -310,7 +310,7 @@ function updateIntentModeDisplay() {
     });
 
     // Update section type select
-    const sectionTypeSelect = document.getElementById('new-section-type-select');
+    const sectionTypeSelect = document.getElementById('new-section-type-
     if (sectionTypeSelect && intent.newSectionType) {
         sectionTypeSelect.value = intent.newSectionType;
     }
@@ -348,11 +348,11 @@ function handleIntentModeChange(event) {
     // Update sub-options visibility
     if (continueOptions && newSectionOptions) {
         if (mode === INTENT_MODES.CONTINUE) {
-            continueOptions.classList.remove('hidden');
-            newSectionOptions.classList.add('hidden');
+            continueOptions.classList.remove('
+            newSectionOptions.classList.add('
         } else {
-            continueOptions.classList.add('hidden');
-            newSectionOptions.classList.remove('hidden');
+            continueOptions.classList.add('
+            newSectionOptions.classList.remove('
         }
     }
 

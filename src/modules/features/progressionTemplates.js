@@ -1524,8 +1524,6 @@ export const PROGRESSION_TEMPLATES = {
  */
 export function getTemplatesByCategory(category) {
     return Object.values(PROGRESSION_TEMPLATES).filter(
-        template => template.category === category
-    );
 }
 
 /**
@@ -1535,8 +1533,6 @@ export function getTemplatesByCategory(category) {
  */
 export function getTemplatesByDifficulty(level) {
     return Object.values(PROGRESSION_TEMPLATES).filter(
-        template => template.difficulty.level === level
-    );
 }
 
 /**
@@ -1551,8 +1547,6 @@ export function searchTemplates(query) {
             template.name.toLowerCase().includes(lowerQuery) ||
             template.description.toLowerCase().includes(lowerQuery) ||
             template.tags.some(tag => tag.toLowerCase().includes(lowerQuery)) ||
-            template.examples.some(ex => ex.toLowerCase().includes(lowerQuery))
-        );
     });
 }
 
@@ -1571,7 +1565,7 @@ export function getTemplateById(templateId) {
  */
 export function getCustomTemplates() {
     const presets = getAllPresets();
-    return presets.filter(preset => preset.category === 'progression-template');
+    return presets.filter(preset => preset.category === 'progression-
 }
 
 /**

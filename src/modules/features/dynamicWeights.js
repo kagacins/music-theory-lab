@@ -318,10 +318,10 @@ function detectPatterns(context) {
 
     if (context.bassMovement) {
         if (context.bassMovement.pattern === 'circle-of-fifths') {
-            patterns.push('circle_of_fifths');
+            patterns.push('circle_of_
         }
         if (context.bassMovement.pattern === 'chromatic') {
-            patterns.push('chromatic_bass');
+            patterns.push('chromatic_
         }
     }
 
@@ -332,7 +332,7 @@ function detectPatterns(context) {
             // Check if all intervals are the same (sequence)
             const allSame = intervals.every(i => i === intervals[0]);
             if (allSame) {
-                patterns.push('sequence_detected');
+                patterns.push('sequence_
             }
         }
     }
@@ -436,29 +436,29 @@ export function explainWeightChoices(context, style) {
 
         // Generate reasoning text
         if (explanation.positionProfile === 'first_chord') {
-            explanation.reasoning.push('Starting fresh - emphasizing style and mood');
+            explanation.reasoning.push('Starting fresh - emphasizing style and 
         } else if (explanation.positionProfile === 'approaching_cadence') {
-            explanation.reasoning.push('Near cadence - voice leading is critical');
+            explanation.reasoning.push('Near cadence - voice leading is 
         } else if (explanation.positionProfile === 'at_dominant') {
-            explanation.reasoning.push('At dominant - strong pull toward resolution');
+            explanation.reasoning.push('At dominant - strong pull toward 
         }
 
         if (explanation.tensionState === 'high_tension') {
-            explanation.reasoning.push('High tension - resolution expected');
+            explanation.reasoning.push('High tension - resolution 
         }
 
         if (explanation.patterns.includes('sequence_detected')) {
-            explanation.reasoning.push('Sequence pattern detected - encouraging continuation');
+            explanation.reasoning.push('Sequence pattern detected - encouraging 
         }
         if (explanation.patterns.includes('circle_of_fifths')) {
-            explanation.reasoning.push('Circle of fifths movement - strong harmonic motion');
+            explanation.reasoning.push('Circle of fifths movement - strong harmonic 
         }
     }
 
     if (style === 'jazz') {
-        explanation.reasoning.push('Jazz style - more modal interchange and voice leading');
+        explanation.reasoning.push('Jazz style - more modal interchange and voice 
     } else if (style === 'classical') {
-        explanation.reasoning.push('Classical style - emphasis on voice leading rules');
+        explanation.reasoning.push('Classical style - emphasis on voice leading 
     }
 
     return explanation;

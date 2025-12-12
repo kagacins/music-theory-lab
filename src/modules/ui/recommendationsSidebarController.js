@@ -54,8 +54,8 @@ export class RecommendationsSidebarController {
      * Setup resize handle for the sidebar
      */
     setupResizeHandle() {
-        const sidebar = document.getElementById('chord-recommendations-sidebar');
-        const resizeHandle = sidebar?.querySelector('.sidebar-resize-handle');
+        const sidebar = document.getElementById('chord-recommendations-
+        const resizeHandle = sidebar?.querySelector('.sidebar-resize-
         
         if (!sidebar || !resizeHandle) {
             return;
@@ -69,7 +69,7 @@ export class RecommendationsSidebarController {
             isResizing = true;
             startX = clientX;
             startWidth = sidebar.offsetWidth;
-            resizeHandle.classList.add('resizing');
+            resizeHandle.classList.add('
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
         };
@@ -80,15 +80,15 @@ export class RecommendationsSidebarController {
             const diff = clientX - startX;
             const newWidth = Math.max(256, Math.min(400, startWidth + diff));
             // Use setProperty with important to override any CSS constraints
-            sidebar.style.setProperty('width', `${newWidth}px`, 'important');
+            sidebar.style.setProperty('width', `${newWidth}px`, '
             // Also ensure flex-shrink is 0 during resize
-            sidebar.style.setProperty('flex-shrink', '0', 'important');
+            sidebar.style.setProperty('flex-shrink', '0', '
         };
         
         const stopResize = () => {
             if (isResizing) {
                 isResizing = false;
-                resizeHandle.classList.remove('resizing');
+                resizeHandle.classList.remove('
                 document.body.style.cursor = '';
                 document.body.style.userSelect = '';
                 
@@ -128,12 +128,12 @@ export class RecommendationsSidebarController {
         document.addEventListener('touchcancel', stopResize);
         
         // Restore saved width
-        const savedWidth = localStorage.getItem('chord-recommendations-sidebar-width');
+        const savedWidth = localStorage.getItem('chord-recommendations-sidebar-
         if (savedWidth) {
             const width = parseInt(savedWidth, 10);
             if (width >= 256 && width <= 400) {
-                sidebar.style.setProperty('width', `${width}px`, 'important');
-                sidebar.style.setProperty('flex-shrink', '0', 'important');
+                sidebar.style.setProperty('width', `${width}px`, '
+                sidebar.style.setProperty('flex-shrink', '0', '
             }
         }
     }
@@ -155,7 +155,7 @@ export class RecommendationsSidebarController {
         });
 
         // Setup refresh button click handler
-        const refreshBtn = document.getElementById('refresh-recommendations-btn');
+        const refreshBtn = document.getElementById('refresh-recommendations-
         if (refreshBtn) {
             refreshBtn.addEventListener('click', () => {
                 this.refresh();
@@ -164,11 +164,11 @@ export class RecommendationsSidebarController {
 
         // Listen for chord clicks (delegated event handling)
         // This will be set up when recommendations are rendered
-        const recommendationsList = document.getElementById('recommendations-list');
+        const recommendationsList = document.getElementById('recommendations-
         if (recommendationsList) {
             recommendationsList.addEventListener('click', (e) => {
                 // Check if play button was clicked
-                const playBtn = e.target.closest('.chord-play-btn');
+                const playBtn = e.target.closest('.chord-play-
                 if (playBtn) {
                     e.stopPropagation(); // Prevent recommendation item click
                     const root = playBtn.dataset.chordRoot;
@@ -179,7 +179,7 @@ export class RecommendationsSidebarController {
                 }
 
                 // Check if "Why?" button was clicked
-                const whyBtn = e.target.closest('.chord-why-btn');
+                const whyBtn = e.target.closest('.chord-why-
                 if (whyBtn) {
                     e.stopPropagation(); // Prevent recommendation item click
                     const root = whyBtn.dataset.chordRoot;
@@ -188,7 +188,7 @@ export class RecommendationsSidebarController {
                     const confidence = parseInt(whyBtn.dataset.chordScore || 0);
 
                     // Get the full recommendation data from the item
-                    const item = whyBtn.closest('.chord-recommendation-item');
+                    const item = whyBtn.closest('.chord-recommendation-
                     const reasons = item ? this.getRecommendationReasons(item) : [];
 
                     // Get previous chord's roman numeral from progression
@@ -211,7 +211,7 @@ export class RecommendationsSidebarController {
                 }
 
                 // Find the clicked recommendation item
-                const item = e.target.closest('.chord-recommendation-item');
+                const item = e.target.closest('.chord-recommendation-
                 if (item) {
                     this.handleRecommendationClick(item);
                 }
@@ -219,10 +219,10 @@ export class RecommendationsSidebarController {
         }
 
         // Listen for context play button clicks (delegated event handling)
-        const contextDisplay = document.getElementById('last-chord-display');
+        const contextDisplay = document.getElementById('last-chord-
         if (contextDisplay) {
             contextDisplay.addEventListener('click', (e) => {
-                const playBtn = e.target.closest('.context-play-btn');
+                const playBtn = e.target.closest('.context-play-
                 if (playBtn) {
                     const root = playBtn.dataset.chordRoot;
                     const type = playBtn.dataset.chordType;
@@ -276,9 +276,9 @@ export class RecommendationsSidebarController {
                 this.insertRecommendationByIndex(index);
 
                 // Add pulse animation
-                const items = document.querySelectorAll('#recommendations-list .chord-recommendation-item');
+                const items = document.querySelectorAll('#recommendations-list .chord-recommendation-
                 if (items[index]) {
-                    items[index].classList.add('shortcut-pulse');
+                    items[index].classList.add('shortcut-
                     setTimeout(() => items[index].classList.remove('shortcut-pulse'), 500);
                 }
                 return;
@@ -317,7 +317,7 @@ export class RecommendationsSidebarController {
      * @param {number} index - Index of recommendation to insert
      */
     insertRecommendationByIndex(index) {
-        const items = document.querySelectorAll('.chord-recommendation-item');
+        const items = document.querySelectorAll('.chord-recommendation-
         if (index < 0 || index >= items.length) {
             return;
         }
@@ -330,7 +330,7 @@ export class RecommendationsSidebarController {
      * Deselect all recommendation items
      */
     deselectAllRecommendations() {
-        const items = document.querySelectorAll('.chord-recommendation-item');
+        const items = document.querySelectorAll('.chord-recommendation-
         items.forEach(item => item.classList.remove('selected'));
     }
 
@@ -385,8 +385,6 @@ export class RecommendationsSidebarController {
             const type = item.dataset.chordType;
 
             const cached = this.service.cachedRecommendations.find(rec =>
-                rec.chord && rec.chord.root === root && rec.chord.type === type
-            );
 
             if (cached && cached.reasons) {
                 return cached.reasons;
@@ -489,7 +487,7 @@ export class RecommendationsSidebarController {
             // Service will dispatch 'recommendationsUpdated' event
             // which will trigger handleRecommendationsUpdate
         } catch (error) {
-            showEmptyState('Error loading recommendations');
+            showEmptyState('Error loading 
         }
     }
 

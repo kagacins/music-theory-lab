@@ -424,8 +424,6 @@ export class TensionArcPlanner {
             breakdown.harmonicFunction * 0.25 +
             breakdown.chromaticism * 0.15 +
             breakdown.inversion * 0.10 +
-            breakdown.position * 0.10
-        );
 
         return {
             total: Math.max(0, Math.min(1, total)),
@@ -748,7 +746,7 @@ export class TensionArcPlanner {
             // Check if section tension is appropriate
             const isWithinRange = avgTension >= expectedRange[0] && avgTension <= expectedRange[1];
             const rangeFit = isWithinRange ? 'good' :
-                (avgTension < expectedRange[0] ? 'too-low' : 'too-high');
+                (avgTension < expectedRange[0] ? 'too-low' : 'too-
 
             return {
                 section: section,

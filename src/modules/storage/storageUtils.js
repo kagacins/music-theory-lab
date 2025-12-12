@@ -19,16 +19,16 @@ export function saveToStorage(key, data) {
 
         // Check storage size
         if (jsonString.length > MAX_STORAGE_SIZE) {
-            console.error('Data too large to store');
+
             return false;
         }
 
         localStorage.setItem(fullKey, jsonString);
         return true;
     } catch (error) {
-        console.error('Error saving to storage:', error);
+
         if (error.name === 'QuotaExceededError') {
-            console.error('Storage quota exceeded');
+
         }
         return false;
     }
@@ -51,7 +51,7 @@ export function loadFromStorage(key, defaultValue = null) {
 
         return JSON.parse(jsonString);
     } catch (error) {
-        console.error('Error loading from storage:', error);
+
         return defaultValue;
     }
 }
@@ -67,7 +67,7 @@ export function removeFromStorage(key) {
         localStorage.removeItem(fullKey);
         return true;
     } catch (error) {
-        console.error('Error removing from storage:', error);
+
         return false;
     }
 }
@@ -87,7 +87,7 @@ export function getAllKeys() {
         }
         return keys;
     } catch (error) {
-        console.error('Error getting keys:', error);
+
         return [];
     }
 }
@@ -102,7 +102,7 @@ export function clearAllStorage() {
         keys.forEach(key => removeFromStorage(key));
         return true;
     } catch (error) {
-        console.error('Error clearing storage:', error);
+
         return false;
     }
 }
@@ -132,7 +132,7 @@ export function getStorageStats() {
             percentUsed: ((totalSize / MAX_STORAGE_SIZE) * 100).toFixed(2)
         };
     } catch (error) {
-        console.error('Error getting storage stats:', error);
+
         return {
             itemCount: 0,
             totalSize: 0,

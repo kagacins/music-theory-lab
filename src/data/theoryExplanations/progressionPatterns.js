@@ -540,8 +540,6 @@ export function getProgressionsByDifficulty(difficulty) {
  */
 export function getProgressionsByGenre(genre) {
   return Object.values(progressionPatterns).filter(p =>
-    p.genres.some(g => g.toLowerCase().includes(genre.toLowerCase()))
-  );
 }
 
 /**

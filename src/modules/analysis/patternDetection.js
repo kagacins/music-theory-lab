@@ -360,11 +360,7 @@ function detectDescendingFifths(romans) {
 
         // Check if current and next are adjacent in circle of fifths
         const currentIdx = circleOrder.findIndex(r =>
-            getBaseRoman(r) === current || normalizeRoman(r) === normalizeRoman(romans[i])
-        );
         const nextIdx = circleOrder.findIndex(r =>
-            getBaseRoman(r) === next || normalizeRoman(r) === normalizeRoman(romans[i + 1])
-        );
 
         if (currentIdx !== -1 && nextIdx !== -1 && (currentIdx + 1) % circleOrder.length === nextIdx % circleOrder.length) {
             if (positions.length === 0 || positions[positions.length - 1] === i - 1 || positions[positions.length - 1] === i) {

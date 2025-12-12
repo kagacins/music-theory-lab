@@ -63,7 +63,7 @@ const SCORE_DESCRIPTIONS = {
  * @returns {HTMLElement} DOM element for the recommendation
  */
 export function renderRecommendationItem(recommendation, index = -1) {
-    const item = document.createElement('div');
+    const item = document.createElement('
     item.className = 'chord-recommendation-item';
     item.dataset.chordRoot = recommendation.chord.root;
     item.dataset.chordType = recommendation.chord.type;
@@ -167,7 +167,7 @@ export function renderRecommendationItem(recommendation, index = -1) {
     }, { passive: false });
 
     // Add mini-tooltip handlers for score elements
-    const scoreElements = item.querySelectorAll('.has-score-tooltip');
+    const scoreElements = item.querySelectorAll('.has-score-
     scoreElements.forEach(el => {
         el.addEventListener('mouseenter', (e) => {
             e.stopPropagation();
@@ -298,18 +298,18 @@ function getScoreQuality(score) {
  */
 function selectRecommendationItem(selectedItem) {
     // Remove selected class from all items
-    const allItems = document.querySelectorAll('.chord-recommendation-item');
+    const allItems = document.querySelectorAll('.chord-recommendation-
     allItems.forEach(item => item.classList.remove('selected'));
 
     // Add selected class to clicked item
-    selectedItem.classList.add('selected');
+    selectedItem.classList.add('
 }
 
 /**
  * Clear all recommendations from the list
  */
 export function clearRecommendations() {
-    const container = document.getElementById('recommendations-list');
+    const container = document.getElementById('recommendations-
     if (container) {
         container.innerHTML = '';
     }
@@ -320,7 +320,7 @@ export function clearRecommendations() {
  * @param {string} [message] - Optional custom message
  */
 export function showEmptyState(message = 'No suggestions available') {
-    const container = document.getElementById('recommendations-list');
+    const container = document.getElementById('recommendations-
     if (container) {
         container.innerHTML = `<p class="recommendations-empty">${message}</p>`;
     }
@@ -330,7 +330,7 @@ export function showEmptyState(message = 'No suggestions available') {
  * Show loading state
  */
 export function showLoadingState() {
-    const container = document.getElementById('recommendations-list');
+    const container = document.getElementById('recommendations-
     if (container) {
         container.innerHTML = `
             <div class="recommendations-loading">
@@ -346,7 +346,7 @@ export function showLoadingState() {
  * @param {Array} recommendations - Array of recommendation objects
  */
 export function renderRecommendations(recommendations) {
-    const container = document.getElementById('recommendations-list');
+    const container = document.getElementById('recommendations-
     if (!container) {
         return;
     }
@@ -374,8 +374,8 @@ export function renderRecommendations(recommendations) {
  * @param {object} [selectedChordData] - Selected chord data {root, type, inversion}
  */
 export function updateContextDisplay(key, selectedChord = null, selectedChordData = null) {
-    const keyDisplay = document.getElementById('current-key-display');
-    const selectedChordDisplay = document.getElementById('last-chord-display');
+    const keyDisplay = document.getElementById('current-key-
+    const selectedChordDisplay = document.getElementById('last-chord-
 
     if (keyDisplay) {
         keyDisplay.textContent = key + ' Major';
@@ -387,12 +387,12 @@ export function updateContextDisplay(key, selectedChord = null, selectedChordDat
 
         if (selectedChord && selectedChordData) {
             // Create text node for chord symbol
-            const chordText = document.createElement('span');
+            const chordText = document.createElement('
             chordText.textContent = selectedChord;
             chordText.style.marginRight = '4px';
 
             // Create play button
-            const playBtn = document.createElement('button');
+            const playBtn = document.createElement('
             playBtn.className = 'context-play-btn';
             playBtn.dataset.chordRoot = selectedChordData.root;
             playBtn.dataset.chordType = selectedChordData.type;
@@ -418,8 +418,8 @@ export function updateContextDisplay(key, selectedChord = null, selectedChordDat
  * @param {string} moodId - Mood ID (e.g., 'bright', 'dark', 'tense')
  */
 export function updateStyleMoodDisplay(styleId, moodId) {
-    const styleDisplay = document.getElementById('current-style-display');
-    const moodDisplay = document.getElementById('current-mood-display');
+    const styleDisplay = document.getElementById('current-style-
+    const moodDisplay = document.getElementById('current-mood-
 
     if (styleDisplay) {
         const styleLabel = getStyleLabel(styleId);
@@ -512,7 +512,7 @@ export function renderAnalysisPanel(analysis) {
  * @param {Array} functions - Array of function objects
  */
 function renderChordFunctions(functions) {
-    const container = document.getElementById('chord-functions-display');
+    const container = document.getElementById('chord-functions-
     if (!container) return;
 
     if (!functions || functions.length === 0) {
@@ -525,7 +525,7 @@ function renderChordFunctions(functions) {
 
     // Render each function as a badge
     functions.forEach((func, index) => {
-        const badge = document.createElement('span');
+        const badge = document.createElement('
         badge.className = `function-badge function-${func.function.toLowerCase()}`;
         badge.textContent = `${func.romanNumeral} (${func.function.charAt(0)})`;
         badge.title = `${func.chord}${getChordSuffix(func.type)} - ${func.function}`;
@@ -539,7 +539,7 @@ function renderChordFunctions(functions) {
  * @param {Array} patterns - Array of detected pattern objects
  */
 function renderDetectedPatterns(patterns) {
-    const container = document.getElementById('pattern-display');
+    const container = document.getElementById('pattern-
     if (!container) return;
 
     if (!patterns || patterns.length === 0) {
@@ -570,12 +570,12 @@ function renderDetectedPatterns(patterns) {
 
     // Render all patterns as badges
     container.innerHTML = '';
-    const badgeContainer = document.createElement('div');
+    const badgeContainer = document.createElement('
     badgeContainer.className = 'pattern-badges-container';
     badgeContainer.style.cssText = 'display: flex; flex-wrap: wrap; gap: 6px;';
 
     consolidatedPatterns.forEach(pattern => {
-        const badge = document.createElement('span');
+        const badge = document.createElement('
         badge.className = 'pattern-badge';
         badge.style.cssText = `
             display: inline-flex;
@@ -609,7 +609,7 @@ function renderDetectedPatterns(patterns) {
  * @param {Array} borrowedChords - Array of borrowed chord objects
  */
 function renderModalInterchange(borrowedChords) {
-    const container = document.getElementById('modal-interchange-display');
+    const container = document.getElementById('modal-interchange-
     if (!container) return;
 
     if (!borrowedChords || borrowedChords.length === 0) {
@@ -622,7 +622,7 @@ function renderModalInterchange(borrowedChords) {
 
     // Render each borrowed chord
     borrowedChords.forEach(borrowed => {
-        const badge = document.createElement('div');
+        const badge = document.createElement('
         badge.className = 'borrowed-chord';
         badge.innerHTML = `
             ${borrowed.chord}${getChordSuffix(borrowed.type)}
@@ -639,7 +639,7 @@ function renderModalInterchange(borrowedChords) {
  * @param {number} complexity - Complexity score (0-5)
  */
 function renderComplexity(complexity) {
-    const container = document.getElementById('complexity-display');
+    const container = document.getElementById('complexity-
     if (!container) return;
 
     if (complexity === undefined || complexity === null) {
@@ -648,7 +648,7 @@ function renderComplexity(complexity) {
     }
 
     // Render stars
-    const starsHTML = renderStars(complexity, 5, 'complexity-star');
+    const starsHTML = renderStars(complexity, 5, 'complexity-
 
     // Get complexity label
     let label = '';
@@ -696,10 +696,10 @@ function renderStars(filled, total, className = 'pattern-strength-star') {
  * Show empty analysis state
  */
 export function showEmptyAnalysis() {
-    const functionsContainer = document.getElementById('chord-functions-display');
-    const patternContainer = document.getElementById('pattern-display');
-    const borrowedContainer = document.getElementById('modal-interchange-display');
-    const complexityContainer = document.getElementById('complexity-display');
+    const functionsContainer = document.getElementById('chord-functions-
+    const patternContainer = document.getElementById('pattern-
+    const borrowedContainer = document.getElementById('modal-interchange-
+    const complexityContainer = document.getElementById('complexity-
 
     if (functionsContainer) functionsContainer.innerHTML = '<span class="text-xs text-gray-500">No progression to analyze</span>';
     if (patternContainer) patternContainer.innerHTML = '<span class="text-xs text-gray-500">-</span>';
@@ -773,9 +773,9 @@ export function playChordPreview(root, type, inversion = 0) {
  */
 function showRecommendationTooltip(event, recommendation, chordSymbol) {
     // Get or create tooltip element
-    let tooltip = document.getElementById('recommendation-tooltip');
+    let tooltip = document.getElementById('recommendation-
     if (!tooltip) {
-        tooltip = document.createElement('div');
+        tooltip = document.createElement('
         tooltip.id = 'recommendation-tooltip';
         tooltip.className = 'recommendation-tooltip';
         document.body.appendChild(tooltip);
@@ -886,7 +886,7 @@ function showRecommendationTooltip(event, recommendation, chordSymbol) {
 
     // Show tooltip with animation
     setTimeout(() => {
-        tooltip.classList.add('show');
+        tooltip.classList.add('
     }, 10);
 }
 
@@ -894,9 +894,9 @@ function showRecommendationTooltip(event, recommendation, chordSymbol) {
  * Hide the recommendation tooltip
  */
 function hideRecommendationTooltip() {
-    const tooltip = document.getElementById('recommendation-tooltip');
+    const tooltip = document.getElementById('recommendation-
     if (tooltip) {
-        tooltip.classList.remove('show');
+        tooltip.classList.remove('
     }
 }
 
@@ -910,9 +910,9 @@ function showScoreMiniTooltip(event, element) {
     hideRecommendationTooltip();
 
     // Get or create mini-tooltip element
-    let tooltip = document.getElementById('score-mini-tooltip');
+    let tooltip = document.getElementById('score-mini-
     if (!tooltip) {
-        tooltip = document.createElement('div');
+        tooltip = document.createElement('
         tooltip.id = 'score-mini-tooltip';
         tooltip.className = 'score-mini-tooltip';
         document.body.appendChild(tooltip);
@@ -979,7 +979,7 @@ function showScoreMiniTooltip(event, element) {
 
     // Show tooltip
     setTimeout(() => {
-        tooltip.classList.add('show');
+        tooltip.classList.add('
     }, 10);
 }
 
@@ -987,9 +987,9 @@ function showScoreMiniTooltip(event, element) {
  * Hide the score mini-tooltip
  */
 function hideScoreMiniTooltip() {
-    const tooltip = document.getElementById('score-mini-tooltip');
+    const tooltip = document.getElementById('score-mini-
     if (tooltip) {
-        tooltip.classList.remove('show');
+        tooltip.classList.remove('
     }
 }
 
@@ -1003,9 +1003,9 @@ function showBadgeMiniTooltip(event, element) {
     hideRecommendationTooltip();
 
     // Get or create mini-tooltip element
-    let tooltip = document.getElementById('badge-mini-tooltip');
+    let tooltip = document.getElementById('badge-mini-
     if (!tooltip) {
-        tooltip = document.createElement('div');
+        tooltip = document.createElement('
         tooltip.id = 'badge-mini-tooltip';
         tooltip.className = 'badge-mini-tooltip';
         document.body.appendChild(tooltip);
@@ -1033,7 +1033,7 @@ function showBadgeMiniTooltip(event, element) {
 
     // Show tooltip
     setTimeout(() => {
-        tooltip.classList.add('show');
+        tooltip.classList.add('
     }, 10);
 }
 
@@ -1041,9 +1041,9 @@ function showBadgeMiniTooltip(event, element) {
  * Hide the badge mini-tooltip
  */
 function hideBadgeMiniTooltip() {
-    const tooltip = document.getElementById('badge-mini-tooltip');
+    const tooltip = document.getElementById('badge-mini-
     if (tooltip) {
-        tooltip.classList.remove('show');
+        tooltip.classList.remove('
     }
 }
 

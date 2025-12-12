@@ -405,8 +405,6 @@ class SmartHarmonizer {
             });
             result.counterMelodyIndependence = this.scoreCounterMelodyIndependence(
                 melody,
-                result.counterMelody
-            );
         }
 
         // Step 5: Generate bass line if requested

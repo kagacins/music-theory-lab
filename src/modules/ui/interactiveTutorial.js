@@ -119,7 +119,7 @@ export function createMiniKeyboard(container, options = {}) {
     const totalKeys = octaves * 12 + 1;
 
     // Create keyboard container with modern styling matching the main keyboard
-    const keyboardEl = document.createElement('div');
+    const keyboardEl = document.createElement('
     keyboardEl.className = 'mini-keyboard modern-keyboard';
     keyboardEl.style.cssText = `
         position: relative;
@@ -159,7 +159,7 @@ export function createMiniKeyboard(container, options = {}) {
         const baseName = noteName.replace(/[0-9]/g, '');
         const isBlack = noteName.includes('#');
 
-        const keyEl = document.createElement('div');
+        const keyEl = document.createElement('
         keyEl.dataset.note = noteName;
         keyEl.dataset.midi = midi;
 
@@ -222,7 +222,7 @@ export function createMiniKeyboard(container, options = {}) {
 
             // Add label for C notes
             if (showLabels && baseName === 'C') {
-                const label = document.createElement('span');
+                const label = document.createElement('
                 label.style.cssText = `
                     font-size: 11px;
                     font-weight: 600;
@@ -260,7 +260,7 @@ export function createMiniKeyboard(container, options = {}) {
                 if (Tone.context.state !== 'running') {
                     await Tone.start();
                 }
-                piano.triggerAttackRelease(noteName, '8n');
+                piano.triggerAttackRelease(noteName, '8
             }
 
             // Track the played note
@@ -349,7 +349,7 @@ export function createSpotlight(target, options = {}) {
     // Get target element
     const targetEl = typeof target === 'string' ? document.querySelector(target) : target;
     if (!targetEl) {
-        console.warn('[Tutorial] Target element not found:', target);
+
         return null;
     }
 
@@ -357,7 +357,7 @@ export function createSpotlight(target, options = {}) {
     removeSpotlight();
 
     // Create overlay
-    const overlay = document.createElement('div');
+    const overlay = document.createElement('
     overlay.id = 'tutorial-spotlight-overlay';
     overlay.className = 'fixed inset-0 z-[99998] pointer-events-none';
     overlay.style.cssText = `
@@ -390,11 +390,11 @@ export function createSpotlight(target, options = {}) {
 
     // Add pulse effect to target
     if (pulseTarget) {
-        targetEl.classList.add('tutorial-spotlight-pulse');
+        targetEl.classList.add('tutorial-spotlight-
     }
 
     // Create tooltip
-    const tooltip = document.createElement('div');
+    const tooltip = document.createElement('
     tooltip.className = 'fixed z-[99999] bg-white rounded-xl shadow-2xl p-4 max-w-sm pointer-events-auto';
     tooltip.style.cssText = `
         animation: tutorialFadeIn 0.3s ease;
@@ -484,7 +484,7 @@ export function createSpotlight(target, options = {}) {
     return {
         remove: removeSpotlight,
         updateMessage: (newMessage) => {
-            const msgEl = tooltip.querySelector('p');
+            const msgEl = tooltip.querySelector('
             if (msgEl) msgEl.textContent = newMessage;
         }
     };
@@ -495,7 +495,7 @@ export function createSpotlight(target, options = {}) {
  */
 export function removeSpotlight() {
     if (tutorialOverlay) {
-        tutorialOverlay.targetEl?.classList.remove('tutorial-spotlight-pulse');
+        tutorialOverlay.targetEl?.classList.remove('tutorial-spotlight-
         tutorialOverlay.overlay?.remove();
         tutorialOverlay.tooltip?.remove();
         tutorialOverlay = null;
@@ -571,7 +571,7 @@ async function runStep(step, container) {
             await runGuidedBuilderStep(step, container);
             break;
         default:
-            console.warn('[Tutorial] Unknown step type:', step.type);
+
             nextStep(container);
     }
 }
@@ -580,7 +580,7 @@ async function runStep(step, container) {
  * Info step - display message with continue button
  */
 async function runInfoStep(step, container) {
-    const stepEl = document.createElement('div');
+    const stepEl = document.createElement('
     stepEl.className = 'tutorial-step bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-6 mb-4 border-2 border-indigo-200 shadow-lg';
     stepEl.innerHTML = `
         <div class="flex items-start gap-4">
@@ -612,7 +612,7 @@ async function runInfoStep(step, container) {
  * Play note step - show keyboard and wait for correct note
  */
 async function runPlayNoteStep(step, container) {
-    const stepEl = document.createElement('div');
+    const stepEl = document.createElement('
     stepEl.className = 'tutorial-step bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 mb-4 border-2 border-green-200 shadow-lg';
     stepEl.innerHTML = `
         <div class="flex items-start gap-4 mb-4">
@@ -633,8 +633,8 @@ async function runPlayNoteStep(step, container) {
     stepEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
     // Create mini keyboard
-    const keyboardContainer = stepEl.querySelector('#tutorial-mini-keyboard');
-    const feedbackEl = stepEl.querySelector('#tutorial-feedback');
+    const keyboardContainer = stepEl.querySelector('#tutorial-mini-
+    const feedbackEl = stepEl.querySelector('#tutorial-
     const targetNote = step.targetNote;
     const targetBaseName = targetNote.replace(/[0-9]/g, '');
 
@@ -654,7 +654,7 @@ async function runPlayNoteStep(step, container) {
                     <span class="text-2xl">🎉</span>
                     <span class="text-green-800 font-semibold">${step.successMessage || 'Perfect! That\'s the right note!'}</span>
                 `;
-                feedbackEl.classList.remove('hidden');
+                feedbackEl.classList.remove('
 
                 setTimeout(() => {
                     stepEl.remove();
@@ -666,7 +666,7 @@ async function runPlayNoteStep(step, container) {
                     <span class="text-2xl">🤔</span>
                     <span class="text-amber-800 font-medium">That was ${baseName} - try to find ${targetBaseName}!</span>
                 `;
-                feedbackEl.classList.remove('hidden');
+                feedbackEl.classList.remove('
             }
         }
     });
@@ -676,7 +676,7 @@ async function runPlayNoteStep(step, container) {
  * Play sequence step - wait for user to play multiple notes in order
  */
 async function runPlaySequenceStep(step, container) {
-    const stepEl = document.createElement('div');
+    const stepEl = document.createElement('
     stepEl.className = 'tutorial-step bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-6 mb-4 border-2 border-purple-200 shadow-lg';
 
     const targetNotes = step.targetNotes;
@@ -706,9 +706,9 @@ async function runPlaySequenceStep(step, container) {
     container.appendChild(stepEl);
     stepEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-    const keyboardContainer = stepEl.querySelector('#tutorial-mini-keyboard');
-    const feedbackEl = stepEl.querySelector('#tutorial-feedback');
-    const progressNotes = stepEl.querySelectorAll('.sequence-note');
+    const keyboardContainer = stepEl.querySelector('#tutorial-mini-
+    const feedbackEl = stepEl.querySelector('#tutorial-
+    const progressNotes = stepEl.querySelectorAll('.sequence-
 
     const updateProgress = () => {
         progressNotes.forEach((el, i) => {
@@ -742,7 +742,7 @@ async function runPlaySequenceStep(step, container) {
                         <span class="text-2xl">🎉</span>
                         <span class="text-green-800 font-semibold">${step.successMessage || 'Excellent! You played the whole sequence!'}</span>
                     `;
-                    feedbackEl.classList.remove('hidden');
+                    feedbackEl.classList.remove('
 
                     setTimeout(() => {
                         stepEl.remove();
@@ -751,12 +751,12 @@ async function runPlaySequenceStep(step, container) {
                 } else {
                     feedbackEl.className = 'bg-green-100 border border-green-300 rounded-lg p-2';
                     feedbackEl.innerHTML = `<span class="text-green-700">✓ ${baseName} - Keep going!</span>`;
-                    feedbackEl.classList.remove('hidden');
+                    feedbackEl.classList.remove('
                 }
             } else {
                 feedbackEl.className = 'bg-amber-100 border border-amber-300 rounded-lg p-2';
                 feedbackEl.innerHTML = `<span class="text-amber-700">Try ${expectedBase} next</span>`;
-                feedbackEl.classList.remove('hidden');
+                feedbackEl.classList.remove('
             }
         }
     });
@@ -794,7 +794,7 @@ async function runSpotlightStep(step, container) {
 async function runBuilderActionStep(step, container) {
     // This would integrate with the chord builder
     // For now, show as spotlight on the builder tab
-    const stepEl = document.createElement('div');
+    const stepEl = document.createElement('
     stepEl.className = 'tutorial-step bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl p-6 mb-4 border-2 border-orange-200 shadow-lg';
     stepEl.innerHTML = `
         <div class="flex items-start gap-4">
@@ -817,7 +817,7 @@ async function runBuilderActionStep(step, container) {
     container.appendChild(stepEl);
 
     stepEl.querySelector('.open-builder-btn').addEventListener('click', () => {
-        window.switchTab?.('builder');
+        window.switchTab?.('
         stepEl.remove();
 
         // Show spotlight on the builder after tab switch
@@ -844,7 +844,7 @@ async function runBuilderActionStep(step, container) {
  * Free explore step - let user experiment
  */
 async function runFreeExploreStep(step, container) {
-    const stepEl = document.createElement('div');
+    const stepEl = document.createElement('
     stepEl.className = 'tutorial-step bg-gradient-to-r from-cyan-50 to-teal-50 rounded-xl p-6 mb-4 border-2 border-cyan-200 shadow-lg';
     stepEl.innerHTML = `
         <div class="flex items-start gap-4 mb-4">
@@ -884,7 +884,7 @@ async function runFreeExploreStep(step, container) {
  * Guided builder step - takes user to Chord Lab with guided steps
  */
 async function runGuidedBuilderStep(step, container) {
-    const stepEl = document.createElement('div');
+    const stepEl = document.createElement('
     stepEl.className = 'tutorial-step bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-6 mb-4 border-2 border-amber-300 shadow-lg';
     stepEl.innerHTML = `
         <div class="flex items-start gap-4 mb-4">
@@ -923,12 +923,12 @@ async function runGuidedBuilderStep(step, container) {
             targetTab: step.targetTab || 'builder',
             steps: step.guidedSteps || [],
             onComplete: (actionHistory) => {
-                console.log('[Tutorial] Guided builder step completed with actions:', actionHistory);
+
                 // Continue to next step after returning
                 nextStep(container);
             },
             onCancel: () => {
-                console.log('[Tutorial] Guided builder step cancelled');
+
                 // Still continue to next step
                 nextStep(container);
             }
@@ -981,7 +981,7 @@ function completeTutorial() {
 
         const config = keyboardConfigs[tutorial?.id] || { octaves: 2, startNote: 'C4' };
 
-        const completionEl = document.createElement('div');
+        const completionEl = document.createElement('
         completionEl.className = 'tutorial-completion bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl p-6 border-2 border-emerald-300 shadow-lg';
         completionEl.innerHTML = `
             <div class="flex items-start gap-4 mb-4">
@@ -1001,14 +1001,14 @@ function completeTutorial() {
         container.appendChild(completionEl);
 
         // Create the practice keyboard
-        const keyboardContainer = completionEl.querySelector('#tutorial-completion-keyboard');
+        const keyboardContainer = completionEl.querySelector('#tutorial-completion-
         if (keyboardContainer) {
             createMiniKeyboard(keyboardContainer, {
                 ...config,
                 showLabels: true,
                 height: 150,
                 onNotePlay: (noteName, baseName) => {
-                    console.log('[Tutorial Complete] Practice mode - played:', baseName);
+
                 }
             });
         }
@@ -1046,7 +1046,7 @@ function skipTutorial() {
 
         const config = keyboardConfigs[tutorial?.id] || { octaves: 2, startNote: 'C4' };
 
-        const skippedEl = document.createElement('div');
+        const skippedEl = document.createElement('
         skippedEl.className = 'tutorial-skipped bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl p-6 border-2 border-gray-300 shadow-lg';
         skippedEl.innerHTML = `
             <div class="flex items-start gap-4 mb-4">
@@ -1064,7 +1064,7 @@ function skipTutorial() {
         container.innerHTML = '';
         container.appendChild(skippedEl);
 
-        const keyboardContainer = skippedEl.querySelector('#tutorial-skipped-keyboard');
+        const keyboardContainer = skippedEl.querySelector('#tutorial-skipped-
         if (keyboardContainer) {
             createMiniKeyboard(keyboardContainer, {
                 ...config,
@@ -1161,7 +1161,7 @@ export const whatIsANoteTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] What is a Note completed!');
+
     }
 });
 
@@ -1253,7 +1253,7 @@ export const sharpsFlatsTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Sharps & Flats completed!');
+
     }
 });
 
@@ -1381,7 +1381,7 @@ export const octavesTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Octaves & Whole Steps completed!');
+
     }
 });
 
@@ -1485,7 +1485,7 @@ export const scalesTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Introduction to Scales completed!');
+
     }
 });
 
@@ -1589,7 +1589,7 @@ export const intervalsTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Understanding Intervals completed!');
+
     }
 });
 
@@ -1742,7 +1742,7 @@ export const whatIsAChordTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] What is a Chord completed!');
+
     }
 });
 
@@ -1852,7 +1852,7 @@ export const majorVsMinorTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Major vs Minor completed!');
+
     }
 });
 
@@ -1992,7 +1992,7 @@ export const chordInversionsTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Chord Inversions completed!');
+
     }
 });
 
@@ -2032,7 +2032,7 @@ const tutorialStyles = `
 
 // Inject styles
 if (!document.getElementById('tutorial-styles')) {
-    const styleEl = document.createElement('style');
+    const styleEl = document.createElement('
     styleEl.id = 'tutorial-styles';
     styleEl.textContent = tutorialStyles;
     document.head.appendChild(styleEl);
@@ -2090,10 +2090,10 @@ export const firstProgressionTutorial = defineTutorial({
                     successMessage: null,
                     onEnter: () => {
                         // Open the Quick Add form if it's hidden
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-
                             }
                         }
                     }
@@ -2171,7 +2171,7 @@ export const firstProgressionTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Your First Progression completed!');
+
     }
 });
 
@@ -2213,10 +2213,10 @@ export const popularProgressionTutorial = defineTutorial({
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-
                             }
                         }
                     }
@@ -2380,7 +2380,7 @@ export const popularProgressionTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Popular Progression completed!');
+
     }
 });
 
@@ -2421,10 +2421,10 @@ export const voiceLeadingTutorial = defineTutorial({
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-
                             }
                         }
                     }
@@ -2576,7 +2576,7 @@ export const voiceLeadingTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Voice Leading completed!');
+
     }
 });
 
@@ -2617,10 +2617,10 @@ export const addingEmotionTutorial = defineTutorial({
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-
                             }
                         }
                     }
@@ -2861,7 +2861,7 @@ export const addingEmotionTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Adding Emotion with Minor Chords completed!');
+
     }
 });
 
@@ -2998,10 +2998,10 @@ export const seventhChordsTutorial = defineTutorial({
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-
                             }
                         }
                     }
@@ -3054,7 +3054,7 @@ export const seventhChordsTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] 7th Chords completed!');
+
     }
 });
 
@@ -3090,10 +3090,10 @@ export const secondaryDominantsTutorial = defineTutorial({
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-
                             }
                         }
                     }
@@ -3213,7 +3213,7 @@ export const secondaryDominantsTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Secondary Dominants completed!');
+
     }
 });
 
@@ -3249,10 +3249,10 @@ export const borrowedChordsTutorial = defineTutorial({
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-
                             }
                         }
                     }
@@ -3415,7 +3415,7 @@ export const borrowedChordsTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Borrowed Chords completed!');
+
     }
 });
 
@@ -3451,10 +3451,10 @@ export const tensionReleaseTutorial = defineTutorial({
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-
                             }
                         }
                     }
@@ -3619,7 +3619,7 @@ export const tensionReleaseTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Tension and Release completed!');
+
     }
 });
 
@@ -3735,10 +3735,10 @@ export const melodyChordTutorial = defineTutorial({
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-
                             }
                         }
                     }
@@ -3798,7 +3798,7 @@ export const melodyChordTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Melody-Chord Relationship completed!');
+
     }
 });
 
@@ -4030,7 +4030,7 @@ export const scaleTypesTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Scale Types completed!');
+
     }
 });
 
@@ -4070,10 +4070,10 @@ export const modesIntroTutorial = defineTutorial({
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-
                             }
                         }
                     }
@@ -4237,7 +4237,7 @@ export const modesIntroTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Introduction to Modes completed!');
+
     }
 });
 
@@ -4273,10 +4273,10 @@ export const modalHarmonyTutorial = defineTutorial({
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-
                             }
                         }
                     }
@@ -4433,7 +4433,7 @@ export const modalHarmonyTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Modal Harmony completed!');
+
     }
 });
 
@@ -4469,10 +4469,10 @@ export const advancedVoiceLeadingTutorial = defineTutorial({
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-
                             }
                         }
                     }
@@ -4638,7 +4638,7 @@ export const advancedVoiceLeadingTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Advanced Voice Leading completed!');
+
     }
 });
 
@@ -4801,10 +4801,10 @@ export const extendedChordsTutorial = defineTutorial({
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-
                             }
                         }
                     }
@@ -4857,7 +4857,7 @@ export const extendedChordsTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Extended Chords completed!');
+
     }
 });
 

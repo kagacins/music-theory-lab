@@ -561,8 +561,6 @@ function findFittingDurations(beatsRemaining, preferredDuration) {
 
     // Find durations that divide evenly into remaining beats
     const evenDividers = musicalDurations.filter(d =>
-        beatsRemaining % d === 0 && beatsRemaining / d >= 1 && beatsRemaining / d <= 4
-    );
 
     if (evenDividers.length > 0) {
         // Prefer the one closest to the preferred duration
@@ -658,7 +656,7 @@ export function explainDurationSuggestion(analysis) {
     const parts = [];
 
     // Primary reason
-    const primary = analysis.reasoning.find(r => r.impact === 'primary' || r.impact === 'high');
+    const primary = analysis.reasoning.find(r => r.impact === 'primary' || r.impact === '
     if (primary) {
         parts.push(primary.adjustment);
     }

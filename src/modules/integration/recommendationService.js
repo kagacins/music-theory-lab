@@ -101,9 +101,9 @@ export class RecommendationService {
             this._sectionGenerator = getSectionGenerator();
             this._sectionGenerator.initialize();
 
-            console.log('[Phase 5] Cross-engine coordination initialized');
+
         } catch (error) {
-            console.warn('[Phase 5] Failed to initialize coordination components:', error);
+
             this._phase5Enabled = false;
         }
     }
@@ -470,7 +470,7 @@ export class RecommendationService {
                 }
             );
         } catch (error) {
-            console.warn('[Phase 5] Failed to record user choice:', error);
+
         }
     }
 
@@ -514,7 +514,7 @@ export class RecommendationService {
      */
     generateSection(options = {}) {
         if (!this._phase5Enabled || !this._sectionGenerator) {
-            console.warn('[Phase 5] Section generator not available');
+
             return null;
         }
 
@@ -533,7 +533,7 @@ export class RecommendationService {
      */
     generateMultipleSections(options = {}) {
         if (!this._phase5Enabled || !this._sectionGenerator) {
-            console.warn('[Phase 5] Section generator not available');
+
             return [];
         }
 

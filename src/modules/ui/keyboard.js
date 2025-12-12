@@ -30,7 +30,7 @@ export let lastTouchTime = 0;
  */
 export function clearHighlights() {
     document.querySelectorAll('.key').forEach(key => {
-        key.classList.remove('active-scale', 'active-progression', 'active-builder', 'active-scale-explorer', 'active-scale-playback', 'active-builder-playback', 'active-melody-playback');
+        key.classList.remove('active-scale', 'active-progression', 'active-builder', 'active-scale-explorer', 'active-scale-playback', 'active-builder-playback', 'active-melody-
     });
 }
 
@@ -54,7 +54,7 @@ export function releaseActiveKey(noteName = null) {
             const keyEl = document.getElementById(keyId);
             if (keyEl) {
                 // Remove all playback highlighting classes
-                keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
+                keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-
             }
             activeKeyNoteNames.delete(noteName);
             if (activeKeyNoteName === noteName) {
@@ -71,7 +71,7 @@ export function releaseActiveKey(noteName = null) {
                 const keyId = getNoteKeyId(note);
                 const keyEl = document.getElementById(keyId);
                 if (keyEl) {
-                    keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
+                    keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-
                 }
             } catch (e) {
                 // Ignore errors for individual note release
@@ -130,7 +130,7 @@ export function highlightBuilderNotes(specificNotes) {
     allNotes.forEach(note => {
         const keyId = getNoteKeyId(note);
         const keyElement = document.getElementById(keyId);
-        if (keyElement) keyElement.classList.add('active-builder');
+        if (keyElement) keyElement.classList.add('active-
     });
 }
 
@@ -149,14 +149,14 @@ export function highlightTrainer(scaleNotes, chordNotes) {
     scaleNotes.forEach(note => {
         const keyId = getNoteKeyId(note);
         const keyElement = document.getElementById(keyId);
-        if (keyElement) keyElement.classList.add('active-scale');
+        if (keyElement) keyElement.classList.add('active-
     });
 
     if (chordNotes) {
          chordNotes.forEach(note => {
             const keyId = getNoteKeyId(note);
             const keyElement = document.getElementById(keyId);
-            if (keyElement) keyElement.classList.add('active-progression');
+            if (keyElement) keyElement.classList.add('active-
         });
     }
 }
@@ -175,7 +175,7 @@ export function renderKeyboard() {
     const currentTab = window.currentTab;
 
     const numOctaves = g_NumOctaves;
-    const keyboardEl = document.getElementById('piano-keyboard');
+    const keyboardEl = document.getElementById('piano-
     keyboardEl.innerHTML = '';
     g_KeyboardKeys = [];
     
@@ -189,10 +189,10 @@ export function renderKeyboard() {
     const isClassicKeyboardOn = window.isClassicKeyboardOn || false;
     if (!isClassicKeyboardOn) {
         // Classic keyboard is OFF - show modern style (default)
-        keyboardEl.classList.add('modern-keyboard');
+        keyboardEl.classList.add('modern-
     } else {
         // Classic keyboard is ON - show classic style
-        keyboardEl.classList.remove('modern-keyboard');
+        keyboardEl.classList.remove('modern-
     }
 
     const centerMidi = 60; // C4
@@ -255,15 +255,15 @@ export function renderKeyboard() {
                 const currentTabNow = window.currentTab || 'builder';
                 
                 // Add consistent playback highlighting based on current tab
-                keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
+                keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-
                 if (currentTabNow === 'builder') {
-                    keyEl.classList.add('active-builder-playback');
+                    keyEl.classList.add('active-builder-
                 } else if (currentTabNow === 'scales') {
-                    keyEl.classList.add('active-scale-playback');
+                    keyEl.classList.add('active-scale-
                 } else if (currentTabNow === 'trainer') {
-                    keyEl.classList.add('active-progression');
+                    keyEl.classList.add('active-
                 } else if (currentTabNow === 'melody') {
-                    keyEl.classList.add('active-melody-playback');
+                    keyEl.classList.add('active-melody-
                 }
 
                 // If recording melody on the melody tab, add note to interactive melody
@@ -316,15 +316,15 @@ export function renderKeyboard() {
             }
             
             // Add consistent playback highlighting based on current tab
-            keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-playback');
+            keyEl.classList.remove('active-builder-playback', 'active-scale-playback', 'active-progression', 'active-melody-
             if (currentTab === 'builder') {
-                keyEl.classList.add('active-builder-playback');
+                keyEl.classList.add('active-builder-
             } else if (currentTab === 'scales') {
-                keyEl.classList.add('active-scale-playback');
+                keyEl.classList.add('active-scale-
             } else if (currentTab === 'trainer') {
-                keyEl.classList.add('active-progression');
+                keyEl.classList.add('active-
             } else if (currentTab === 'melody') {
-                keyEl.classList.add('active-melody-playback');
+                keyEl.classList.add('active-melody-
             }
 
             // If recording on the trainer tab, capture chord (all active keys)
@@ -344,18 +344,18 @@ export function renderKeyboard() {
             }
         } catch (e) {
             // Ignore errors (e.g., if audio context is not ready)
-            console.warn('Error triggering attack:', e);
+
         }
     };
 
     g_KeyboardKeys.forEach(keyData => {
-        const keyEl = document.createElement('div');
+        const keyEl = document.createElement('
         keyEl.id = getNoteKeyId(keyData.name);
 
         if (keyData.type === 'white') {
             keyEl.className = 'key white-key';
             keyEl.style.width = `${whiteKeyWidth}%`;
-            const noteNameLabel = document.createElement('span');
+            const noteNameLabel = document.createElement('
             noteNameLabel.className = 'key-label-note text-gray-500 text-xs absolute bottom-1';
             if (keyData.name.includes('C')) {
                  noteNameLabel.textContent = keyData.name;
@@ -366,11 +366,11 @@ export function renderKeyboard() {
             keyEl.style.width = `${blackKeyWidth}%`;
         }
 
-        const romanLabel = document.createElement('span');
+        const romanLabel = document.createElement('
         romanLabel.className = 'key-label-roman text-indigo-700 text-xs font-bold absolute top-1 left-1/2 -translate-x-1/2 pointer-events-none';
         keyEl.appendChild(romanLabel);
 
-        const keyNameLabel = document.createElement('span');
+        const keyNameLabel = document.createElement('
         keyNameLabel.className = 'key-label-keyname text-gray-600 text-xs font-medium absolute bottom-1 left-1/2 -translate-x-1/2 pointer-events-none';
         keyEl.appendChild(keyNameLabel);
 
@@ -603,7 +603,7 @@ export function updateKeyboardLabels() {
             rootNoteName = trainerState.currentKey;
         } else {
             // Try to get it from the selector directly
-            const keySelect = document.getElementById('trainer-key-select');
+            const keySelect = document.getElementById('trainer-key-
             if (keySelect && keySelect.value) {
                 rootNoteName = keySelect.value;
             } else {
@@ -611,7 +611,7 @@ export function updateKeyboardLabels() {
             }
         }
         // Check if key is minor (ends with 'm')
-        isMinorKey = rootNoteName.endsWith('m');
+        isMinorKey = rootNoteName.endsWith('
         // Remove 'm' suffix for root note calculation
         if (isMinorKey) {
             rootNoteName = rootNoteName.replace(/m$/, '');
@@ -651,7 +651,7 @@ export function updateKeyboardLabels() {
         const equivalent = enharmonicMap[rootNoteName] || rootNoteName;
         keyRootIndex = ALL_NOTES.indexOf(equivalent);
         if (keyRootIndex === -1) {
-            console.warn(`Could not find root note ${rootNoteName} in ALL_NOTES`);
+
             return;
         }
     }
@@ -695,7 +695,7 @@ export function updateKeyboardLabels() {
         const scaleDegreeIndex = MAJOR_SCALE_STEPS.indexOf(interval);
 
         // Get the label element once
-        const label = keyEl.querySelector('.key-label-roman');
+        const label = keyEl.querySelector('.key-label-
         if (!label) return;
 
         // Update label if this note is part of the scale
@@ -712,11 +712,11 @@ export function updateKeyboardLabels() {
             if (romanNumeral && scaleDegreeIndex < majorDiatonicNumerals.length) {
                 label.textContent = romanNumeral;
                 if (keyData.type === 'black') {
-                    label.classList.add('text-white');
+                    label.classList.add('text-
                     label.classList.remove('text-indigo-700');
                 } else {
                     label.classList.add('text-indigo-700');
-                    label.classList.remove('text-white');
+                    label.classList.remove('text-
                 }
             }
         } else {
@@ -751,7 +751,7 @@ export function updateKeyNames() {
         const keyEl = document.getElementById(getNoteKeyId(keyData.name));
         if (!keyEl) return;
 
-        const keyNameLabel = keyEl.querySelector('.key-label-keyname');
+        const keyNameLabel = keyEl.querySelector('.key-label-
         if (!keyNameLabel) return;
 
         // Skip C keys as they already have octave labels (C4, C5, etc.)
@@ -790,9 +790,9 @@ export function updateKeyNames() {
         // Style based on key type
         if (keyData.type === 'black') {
             keyNameLabel.classList.remove('text-gray-600');
-            keyNameLabel.classList.add('text-white');
+            keyNameLabel.classList.add('text-
         } else {
-            keyNameLabel.classList.remove('text-white');
+            keyNameLabel.classList.remove('text-
             keyNameLabel.classList.add('text-gray-600');
         }
     });

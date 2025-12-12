@@ -58,7 +58,7 @@ export function playArpeggio(selectionType, type, direction) {
     // Ensure audio context is running (required for Tone.js after user interaction)
     if (Tone && Tone.context.state !== 'running') {
         Tone.context.resume().catch(err => {
-            console.warn("Could not resume audio context:", err);
+
         });
     }
     
@@ -77,7 +77,7 @@ export function playArpeggio(selectionType, type, direction) {
         }
         // Update button selection to highlight the chord button
         if (window.updateButtonSelection) {
-            window.updateButtonSelection('#builder-chord-type-selector', 'chordType', type, 'bg-teal-600', 'text-white');
+            window.updateButtonSelection('#builder-chord-type-selector', 'chordType', type, 'bg-teal-600', 'text-
             window.updateButtonSelection('#builder-interval-selector', 'intervalType', null, 'bg-emerald-600');
         }
     } else { // 'interval'
@@ -86,7 +86,7 @@ export function playArpeggio(selectionType, type, direction) {
         }
         // Update button selection to highlight the interval button
         if (window.updateButtonSelection) {
-            window.updateButtonSelection('#builder-interval-selector', 'intervalType', type, 'bg-emerald-600', 'text-white');
+            window.updateButtonSelection('#builder-interval-selector', 'intervalType', type, 'bg-emerald-600', 'text-
             window.updateButtonSelection('#builder-chord-type-selector', 'chordType', null, 'bg-teal-600');
         }
     }
@@ -124,8 +124,6 @@ export function playArpeggio(selectionType, type, direction) {
                 rootNote,
                 (window.builderOctaveShift || 0) * 12, // Convert octaves to semitones
                 window.enharmonicPreference || 'sharp',
-                window.getNotationPreference ? window.getNotationPreference() : 'full'
-            );
             notesToPlay = result.specificNotes.filter(note => !omittedNotes.includes(note));
         }
     } else {
@@ -135,8 +133,6 @@ export function playArpeggio(selectionType, type, direction) {
                 rootNote,
                 type,
                 (window.builderOctaveShift || 0) * 12, // Convert octaves to semitones
-                window.enharmonicPreference || 'sharp'
-            );
             notesToPlay = result.specificNotes.filter(note => !omittedNotes.includes(note));
         }
     }
@@ -165,12 +161,12 @@ export function playArpeggio(selectionType, type, direction) {
         // NEW: Schedule visual highlighting for each note in the arpeggio
         Tone.Draw.schedule(() => {
             const keyEl = document.getElementById(window.getNoteKeyId(note));
-            if (keyEl) keyEl.classList.add('active-builder-playback');
+            if (keyEl) keyEl.classList.add('active-builder-
         }, time);
         // Remove highlight after note duration
         Tone.Draw.schedule(() => {
             const keyEl = document.getElementById(window.getNoteKeyId(note));
-            if (keyEl) keyEl.classList.remove('active-builder-playback');
+            if (keyEl) keyEl.classList.remove('active-builder-
         }, time + noteDurationSeconds * 0.9);
     }, notesToPlay, speedValue).start(0);
 
@@ -198,7 +194,7 @@ export function stopArpeggio() {
         Tone.Transport.stop();
         // NEW: Clean up any lingering playback highlights when stopping
         document.querySelectorAll('.active-builder-playback').forEach(key => {
-            key.classList.remove('active-builder-playback');
+            key.classList.remove('active-builder-
         });
     }
 }
@@ -229,7 +225,7 @@ export function changeArpeggioSpeed(direction) {
  * Disables buttons when at min/max speed
  */
 export function updateArpeggioSpeedUI() {
-    const display = document.getElementById('arp-speed-display');
+    const display = document.getElementById('arp-speed-
     const speedLabels = Object.keys(ARPEGGIO_SPEEDS);
     const currentIndex = speedLabels.indexOf(arpeggioSpeed);
 

@@ -289,8 +289,6 @@ export class StaffLayoutManager {
    */
   getSystemForMeasure(measureIndex) {
     return this.systems.find(
-      s => measureIndex >= s.startMeasure && measureIndex < s.endMeasure
-    );
   }
 
   /**

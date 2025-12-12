@@ -391,7 +391,7 @@ function getChordTones(chord) {
 
     // Ultimate fallback with warning
     if (!intervals) {
-        console.warn(`[getChordTones] Unknown chord type "${chord.type}" for root ${chord.root}, falling back to Major. This may cause dissonant melody suggestions!`);
+
         intervals = CHORD_INTERVALS['Major'];
     }
 
@@ -939,7 +939,7 @@ export function generateMelodySuggestions({
                     anticipationBonus = anticipationResult.score;
                     reasons.push(anticipationResult.detail);
                     if (!categories.includes('anticipation')) {
-                        categories.push('anticipation');
+                        categories.push('
                     }
                 }
             }

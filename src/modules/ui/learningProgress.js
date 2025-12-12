@@ -51,7 +51,7 @@ export function loadProgress() {
         // Update streak
         updateStreak();
     } catch (err) {
-        console.error('[LearningProgress] Error loading progress:', err);
+
     }
 }
 
@@ -63,7 +63,7 @@ export function saveProgress() {
         progressData.lastActivityDate = new Date().toISOString();
         localStorage.setItem(STORAGE_KEY, JSON.stringify(progressData));
     } catch (err) {
-        console.error('[LearningProgress] Error saving progress:', err);
+
     }
 }
 

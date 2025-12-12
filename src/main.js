@@ -4416,10 +4416,29 @@ window.syncProgressionToMelodyTab = function() {
         melodyKeyDisplayText.textContent = trainerState.currentKey;
     }
 
-    // Use the same rendering function as the Progression Builder
-    // This ensures both tabs show exactly the same information
-    // Pass false for syncBothTabs to avoid infinite recursion when called from tab switch
-    if (window.renderProgressionDisplay) {
-        window.renderProgressionDisplay('melody-progression-visualization', false);
+// Use the same rendering function as the Progression Builder
+// This ensures both tabs show exactly the same information
+// Pass false for syncBothTabs to avoid infinite recursion when called from tab switch
+if (window.renderProgressionDisplay) {
+    window.renderProgressionDisplay('melody-progression-visualization', false);
+}
+};
+
+/**
+ * Change the time signature for the current composition
+ * @param {number} num - Numerator (e.g., 4 for 4/4, 3 for 3/4, 6 for 6/8)
+ * @param {number} denom - Denominator (e.g., 4 for quarter note, 8 for eighth note)
+ */
+window.setTimeSignature = function(num, denom) {
+    const compositionState = getCompositionState();
+    if (compositionState) {
+        compositionState.setTimeSignature(num, denom);
+        // Refresh the display
+        if (window.renderProgressionDisplay) {
+            window.renderProgressionDisplay('melody-progression-visualization', true);
+        }
+        console.log(`Time signature changed to ${num}/${denom}`);
+    } else {
+        console.error('Composition state not available');
     }
 };

@@ -75,8 +75,6 @@ export function migrateToCompositionState(interactiveMelody, progressionData) {
         // Add melody notes to treble staff
         if (interactiveMelody && interactiveMelody.melodyNotes) {
             const melodyNotesForMeasure = interactiveMelody.melodyNotes.filter(
-                note => note.measure === measureIndex
-            );
 
             measure.notation.treble.voices[0].notes = melodyNotesForMeasure.map(note => ({
                 type: note.type || 'note',
@@ -93,8 +91,6 @@ export function migrateToCompositionState(interactiveMelody, progressionData) {
         // Add chord notes to bass staff
         if (interactiveMelody && interactiveMelody.chordNotes) {
             const bassNotesForMeasure = interactiveMelody.chordNotes.filter(
-                note => note.measure === measureIndex
-            );
 
             if (bassNotesForMeasure.length > 0) {
                 measure.notation.bass.voices[0].notes = bassNotesForMeasure.map(note => ({
@@ -116,7 +112,7 @@ export function migrateToCompositionState(interactiveMelody, progressionData) {
         }
     }
 
-    console.log(`[Migration] Migrated ${maxMeasure + 1} measures to new format`);
+
     return composition;
 }
 
@@ -135,7 +131,7 @@ export function migrateProgressionOnly(progressionData, key) {
     // Import progression data
     composition.importFromProgressionData(progressionData, { key });
 
-    console.log(`[Migration] Migrated ${progressionData.length} chords to new format`);
+
     return composition;
 }
 
@@ -148,19 +144,19 @@ export function autoMigrateOnTabSwitch() {
     const currentKey = getCurrentKey();
 
     if (!progressionData || progressionData.length === 0) {
-        console.log('[Migration] No progression data to migrate');
+
         return null;
     }
 
     // Check if we have old interactiveMelody data in localStorage
-    const storedMelody = localStorage.getItem('interactiveMelody');
+    const storedMelody = localStorage.getItem('interactiveM
     let interactiveMelody = null;
 
     if (storedMelody) {
         try {
             interactiveMelody = JSON.parse(storedMelody);
         } catch (error) {
-            console.warn('[Migration] Failed to parse stored melody:', error);
+
         }
     }
 
@@ -171,10 +167,10 @@ export function autoMigrateOnTabSwitch() {
 
     // Perform migration
     if (interactiveMelody && interactiveMelody.melodyNotes && interactiveMelody.melodyNotes.length > 0) {
-        console.log('[Migration] Found melody data, migrating melody + progression');
+
         return migrateToCompositionState(interactiveMelody, progressionData);
     } else {
-        console.log('[Migration] Migrating progression only');
+
         return migrateProgressionOnly(progressionData, currentKey);
     }
 }
@@ -234,7 +230,7 @@ export function validateMigration(composition) {
     }
 
     if (composition.getMeasureCount() === 0) {
-        errors.push('No measures found after migration');
+        errors.push('No measures found after 
     }
 
     // Check each measure
@@ -280,10 +276,10 @@ export function backupOldData() {
 
     try {
         localStorage.setItem('compositionBackup', JSON.stringify(backup));
-        console.log('[Migration] Backup created:', timestamp);
+
         return true;
     } catch (error) {
-        console.error('[Migration] Failed to create backup:', error);
+
         return false;
     }
 }
@@ -294,17 +290,17 @@ export function backupOldData() {
  */
 export function restoreFromBackup() {
     try {
-        const backupData = localStorage.getItem('compositionBackup');
+        const backupData = localStorage.getItem('compositionB
         if (!backupData) {
-            console.log('[Migration] No backup found');
+
             return null;
         }
 
         const backup = JSON.parse(backupData);
-        console.log('[Migration] Restored backup from:', backup.timestamp);
+
         return backup;
     } catch (error) {
-        console.error('[Migration] Failed to restore backup:', error);
+
         return null;
     }
 }

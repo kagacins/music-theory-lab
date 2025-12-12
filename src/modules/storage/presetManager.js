@@ -69,7 +69,7 @@ export function savePreset(presetData) {
         }
         return null;
     } catch (error) {
-        console.error('Error saving preset:', error);
+
         return null;
     }
 }
@@ -104,7 +104,7 @@ export function updatePreset(id, updates) {
 
         return saveToStorage(PRESETS_KEY, presets);
     } catch (error) {
-        console.error('Error updating preset:', error);
+
         return false;
     }
 }
@@ -125,7 +125,7 @@ export function deletePreset(id) {
 
         return saveToStorage(PRESETS_KEY, filtered);
     } catch (error) {
-        console.error('Error deleting preset:', error);
+
         return false;
     }
 }

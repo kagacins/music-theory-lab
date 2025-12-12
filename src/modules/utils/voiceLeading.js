@@ -21,7 +21,7 @@ import {
 export function updateChordSuggestions(builderRootIndex, builderChordType, builderSelectionMode, isSuggestionEngineOn) {
     // Clear existing highlights
     document.querySelectorAll('.suggestion-highlight').forEach(el => {
-        el.classList.remove('suggestion-highlight');
+        el.classList.remove('suggestion-
     });
 
     if (builderSelectionMode !== 'chord' || !isSuggestionEngineOn) return;
@@ -50,12 +50,12 @@ export function updateChordSuggestions(builderRootIndex, builderChordType, build
 
         const rootButton = document.querySelector(`#builder-note-selector button[data-index="${targetRootIndex}"]`);
         if (rootButton) {
-            rootButton.classList.add('suggestion-highlight');
+            rootButton.classList.add('suggestion-
         }
 
         const chordButton = document.querySelector(`#builder-chord-type-selector button[data-chord-type="${targetQuality}"]`);
         if (chordButton) {
-            chordButton.classList.add('suggestion-highlight');
+            chordButton.classList.add('suggestion-
             const originalTitle = CHORD_DEFINITIONS[targetQuality]?.description || '';
             chordButton.title = `SUGGESTION: Try this chord next, using the ${suggestion.inversion} inversion for smooth voice leading.\n\n${originalTitle}`;
         }
@@ -69,7 +69,7 @@ export function updateChordSuggestions(builderRootIndex, builderChordType, build
  * @returns {boolean} New state of the suggestion engine
  */
 export function toggleSuggestionEngine() {
-    const toggle = document.getElementById('suggestion-toggle');
+    const toggle = document.getElementById('suggestion-
     const isSuggestionEngineOn = toggle.checked;
 
     // Note: updateChordSuggestions should be called after this with the new state

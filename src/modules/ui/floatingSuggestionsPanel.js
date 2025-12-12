@@ -25,7 +25,7 @@ let dragOffsetY = 0;
  */
 export function initFloatingSuggestionsPanel() {
     // Get or create the panel element
-    panel = document.getElementById('floating-suggestions-panel');
+    panel = document.getElementById('floating-suggestions-
 
     if (!panel) {
         return;
@@ -70,7 +70,7 @@ export function initFloatingSuggestionsPanel() {
  * Set up dragging functionality on panel header
  */
 function setupDragging() {
-    const header = panel.querySelector('.suggestions-banner');
+    const header = panel.querySelector('.suggestions-
     if (!header) return;
 
     // Add cursor style to indicate draggable
@@ -88,14 +88,14 @@ function setupDragging() {
         dragOffsetY = e.clientY - rect.top;
 
         // Add dragging class for visual feedback
-        panel.classList.add('dragging');
+        panel.classList.add('
         e.preventDefault();
     });
 
     document.addEventListener('mouseup', () => {
         if (isDragging) {
             isDragging = false;
-            panel.classList.remove('dragging');
+            panel.classList.remove('
         }
     });
 }
@@ -111,7 +111,7 @@ function setupKeyboardShortcuts() {
             if (!isInputElement(e.target)) {
                 e.preventDefault();
                 // Check if unified modal is already open
-                const existingModal = document.getElementById('unified-recommendation-modal');
+                const existingModal = document.getElementById('unified-recommendation-
                 if (existingModal) {
                     closeUnifiedRecommendationModal();
                 } else {
@@ -126,7 +126,7 @@ function setupKeyboardShortcuts() {
             if (!isInputElement(e.target)) {
                 e.preventDefault();
                 // Check if unified modal is already open
-                const existingModal = document.getElementById('unified-recommendation-modal');
+                const existingModal = document.getElementById('unified-recommendation-
                 if (existingModal) {
                     closeUnifiedRecommendationModal();
                 } else {
@@ -140,7 +140,7 @@ function setupKeyboardShortcuts() {
             if (!isInputElement(e.target)) {
                 e.preventDefault();
                 // Check if unified modal is already open
-                const existingModal = document.getElementById('unified-recommendation-modal');
+                const existingModal = document.getElementById('unified-recommendation-
                 if (existingModal) {
                     closeUnifiedRecommendationModal();
                 } else {
@@ -196,8 +196,8 @@ export function showPanel(mode) {
     positionPanel();
 
     // Show the panel with animation
-    panel.classList.remove('hidden');
-    panel.classList.add('visible');
+    panel.classList.remove('
+    panel.classList.add('
 
     // Phase 2.1: Refresh section intent UI when showing chord suggestions
     if (mode === 'chords') {
@@ -227,8 +227,8 @@ export function hidePanel() {
     if (!panel) return;
 
     isVisible = false;
-    panel.classList.remove('visible');
-    panel.classList.add('hidden');
+    panel.classList.remove('
+    panel.classList.add('
 
     // Dispatch event
     window.dispatchEvent(new CustomEvent('suggestionsPanelHidden'));
@@ -243,33 +243,33 @@ window.switchSuggestionMode = switchMode;
  * Update the panel to show the correct mode
  */
 function updatePanelMode(mode) {
-    const chordSection = document.getElementById('chord-suggestions-section');
-    const melodySection = document.getElementById('melody-suggestions-section');
-    const generateSection = document.getElementById('generate-suggestions-section');
-    const chordBtn = document.getElementById('suggestions-mode-chords');
-    const melodyBtn = document.getElementById('suggestions-mode-melody');
-    const generateBtn = document.getElementById('suggestions-mode-generate');
+    const chordSection = document.getElementById('chord-suggestions-
+    const melodySection = document.getElementById('melody-suggestions-
+    const generateSection = document.getElementById('generate-suggestions-
+    const chordBtn = document.getElementById('suggestions-mode-
+    const melodyBtn = document.getElementById('suggestions-mode-
+    const generateBtn = document.getElementById('suggestions-mode-
 
     // Hide all sections first
-    chordSection?.classList.add('hidden');
-    melodySection?.classList.add('hidden');
-    generateSection?.classList.add('hidden');
+    chordSection?.classList.add('
+    melodySection?.classList.add('
+    generateSection?.classList.add('
 
     // Remove active from all buttons
-    chordBtn?.classList.remove('active');
-    melodyBtn?.classList.remove('active');
-    generateBtn?.classList.remove('active');
+    chordBtn?.classList.remove('
+    melodyBtn?.classList.remove('
+    generateBtn?.classList.remove('
 
     // Show the appropriate section and activate button
     if (mode === 'chords') {
-        chordSection?.classList.remove('hidden');
-        chordBtn?.classList.add('active');
+        chordSection?.classList.remove('
+        chordBtn?.classList.add('
     } else if (mode === 'melody') {
-        melodySection?.classList.remove('hidden');
-        melodyBtn?.classList.add('active');
+        melodySection?.classList.remove('
+        melodyBtn?.classList.add('
     } else if (mode === 'generate') {
-        generateSection?.classList.remove('hidden');
-        generateBtn?.classList.add('active');
+        generateSection?.classList.remove('
+        generateBtn?.classList.add('
     }
 }
 

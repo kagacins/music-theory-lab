@@ -166,7 +166,7 @@ export function generateSmartBeams(notes, timeSignature = '4/4') {
       maintain_stem_directions: false,
     });
   } catch (e) {
-    console.warn('Error generating smart beams:', e);
+
     return [];
   }
 }
@@ -385,7 +385,7 @@ function addBeatPositions(notes) {
   let beat = 0;
   return notes.map(note => {
     const noteWithBeat = { ...note, beatPosition: beat };
-    beat += getDurationBeats(note.duration || '4n');
+    beat += getDurationBeats(note.duration || '4
     return noteWithBeat;
   });
 }

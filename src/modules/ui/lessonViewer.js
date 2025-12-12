@@ -97,7 +97,7 @@ async function playChord(root, chordType, duration = 1.2) {
 
         await new Promise(resolve => setTimeout(resolve, duration * 1000 + 100));
     } catch (err) {
-        console.error('[LessonViewer] Error playing chord:', err);
+
     } finally {
         isPlaying = false;
     }
@@ -124,7 +124,7 @@ async function playNote(note, duration = 1.0) {
         piano.triggerAttackRelease(note, duration);
         await new Promise(resolve => setTimeout(resolve, duration * 1000 + 100));
     } catch (err) {
-        console.error('[LessonViewer] Error playing note:', err);
+
     } finally {
         isPlaying = false;
     }
@@ -164,7 +164,7 @@ async function playProgression(chordNames, chordDuration = 0.8) {
 
         await new Promise(resolve => setTimeout(resolve, chordNames.length * chordDuration * 1000 + 200));
     } catch (err) {
-        console.error('[LessonViewer] Error playing progression:', err);
+
     } finally {
         isPlaying = false;
     }
@@ -232,7 +232,7 @@ async function playScaleSequence(root, scaleType = 'major') {
 
         await new Promise(resolve => setTimeout(resolve, scaleNotes.length * noteDuration * 1000 + 200));
     } catch (err) {
-        console.error('[LessonViewer] Error playing scale:', err);
+
     } finally {
         isPlaying = false;
     }
@@ -268,7 +268,7 @@ async function playVoicedProgression(voicings, chordDuration = 0.9) {
 
         await new Promise(resolve => setTimeout(resolve, voicings.length * chordDuration * 1000 + 200));
     } catch (err) {
-        console.error('[LessonViewer] Error playing voiced progression:', err);
+
     } finally {
         isPlaying = false;
     }
@@ -619,7 +619,7 @@ function hasKeyboardSteps(tutorial) {
  */
 function hasGuidedBuilderSteps(tutorial) {
     if (!tutorial?.steps) return false;
-    return tutorial.steps.some(step => step.type === 'guided_builder');
+    return tutorial.steps.some(step => step.type === 'guided_
 }
 
 /**
@@ -644,7 +644,7 @@ function extractGuidedSteps(tutorial) {
 function getGuidedTargetTab(tutorial) {
     if (!tutorial?.steps) return 'builder';
 
-    const guidedStep = tutorial.steps.find(step => step.type === 'guided_builder');
+    const guidedStep = tutorial.steps.find(step => step.type === 'guided_
     return guidedStep?.targetTab || 'builder';
 }
 
@@ -913,7 +913,7 @@ export function renderLessonViewer(lessonId, container, pushHistory = true) {
     container.innerHTML = html;
 
     // Scroll to top of the Learn tab content
-    const learnTabContent = document.getElementById('learn-tab-content');
+    const learnTabContent = document.getElementById('learn-tab-
     if (learnTabContent) {
         learnTabContent.scrollTop = 0;
     }
@@ -946,7 +946,7 @@ function updateSectionVisibility(container) {
  * Initialize the mini-keyboard in the LEARN section for certain lessons
  */
 function initLearnSectionKeyboard(container, lesson) {
-    const keyboardContainer = container.querySelector('#learn-section-mini-keyboard');
+    const keyboardContainer = container.querySelector('#learn-section-mini-
     if (!keyboardContainer) return;
 
     // Configure keyboard based on lesson
@@ -976,7 +976,7 @@ function initLearnSectionKeyboard(container, lesson) {
         createMiniKeyboard(keyboardContainer, {
             ...config,
             onNotePlay: (noteName, baseName) => {
-                console.log('[Learn Demo] User played:', baseName);
+
             }
         });
     }
@@ -994,11 +994,11 @@ function attachLessonEventListeners(container, lesson) {
         btn.addEventListener('click', () => {
             currentSection = btn.dataset.section;
             container.querySelectorAll('.section-nav-btn').forEach(b => {
-                b.classList.remove('bg-blue-600', 'text-white');
-                b.classList.add('bg-gray-200', 'dark:bg-gray-600', 'text-black', 'dark:text-white');
+                b.classList.remove('bg-blue-600', 'text-
+                b.classList.add('bg-gray-200', 'dark:bg-gray-600', 'text-black', 'dark:text-
             });
-            btn.classList.remove('bg-gray-200', 'dark:bg-gray-600', 'text-black', 'dark:text-white');
-            btn.classList.add('bg-blue-600', 'text-white');
+            btn.classList.remove('bg-gray-200', 'dark:bg-gray-600', 'text-black', 'dark:text-
+            btn.classList.add('bg-blue-600', 'text-
             updateSectionVisibility(container);
 
             // Re-initialize keyboards when switching sections (in case they need to be recreated)
@@ -1056,7 +1056,7 @@ function attachLessonEventListeners(container, lesson) {
             };
 
             // Re-render quiz section
-            const quizContainer = container.querySelector('#section-quiz');
+            const quizContainer = container.querySelector('#section-
             if (quizContainer) {
                 quizContainer.outerHTML = renderQuizSection(lesson);
                 // Re-attach listeners for new quiz elements
@@ -1069,10 +1069,10 @@ function attachLessonEventListeners(container, lesson) {
     container.querySelector('#start-interactive-tutorial-btn')?.addEventListener('click', () => {
         const tutorial = lessonTutorials[lesson.id];
         if (tutorial) {
-            const tutorialContainer = container.querySelector('#interactive-tutorial-container');
+            const tutorialContainer = container.querySelector('#interactive-tutorial-
             if (tutorialContainer) {
                 // Hide the start button section
-                container.querySelector('#start-interactive-tutorial-btn')?.closest('.bg-gradient-to-r')?.classList.add('hidden');
+                container.querySelector('#start-interactive-tutorial-btn')?.closest('.bg-gradient-to-r')?.classList.add('
                 // Start the tutorial
                 startTutorial(tutorial, tutorialContainer);
             }
@@ -1094,10 +1094,10 @@ function attachLessonEventListeners(container, lesson) {
                     targetTab: targetTab,
                     steps: guidedSteps,
                     onComplete: (actionHistory) => {
-                        console.log('[LessonViewer] Guided exercise completed');
+
                     },
                     onCancel: () => {
-                        console.log('[LessonViewer] Guided exercise cancelled');
+
                     }
                 });
             }
@@ -1113,18 +1113,16 @@ function attachLessonEventListeners(container, lesson) {
 
             // Check if all exercises complete
             const allComplete = lesson.tryIt?.exercises?.every((_, i) =>
-                exerciseProgress[`${lesson.id}-exercise-${i}`]
-            );
 
             // Re-render try-it section
-            const tryItContainer = container.querySelector('#section-tryIt');
+            const tryItContainer = container.querySelector('#section-tryI
             if (tryItContainer) {
                 tryItContainer.outerHTML = renderTryItSection(lesson);
                 attachTryItListeners(container, lesson);
 
                 if (allComplete) {
-                    const successEl = container.querySelector('#try-it-success');
-                    if (successEl) successEl.classList.remove('hidden');
+                    const successEl = container.querySelector('#try-it-
+                    if (successEl) successEl.classList.remove('
                 }
             }
         });
@@ -1132,22 +1130,22 @@ function attachLessonEventListeners(container, lesson) {
 
     // Open Chord Builder
     container.querySelector('#open-chord-builder-btn')?.addEventListener('click', () => {
-        switchTab('builder');
+        switchTab('
     });
 
     // Open Composition Studio
     container.querySelector('#open-progression-builder-btn')?.addEventListener('click', () => {
-        switchTab('melody');
+        switchTab('
     });
 
     // Free play button (for lessons that don't use embedded keyboard)
     container.querySelector('#free-play-btn')?.addEventListener('click', () => {
-        switchTab('builder');
+        switchTab('
     });
 
     // Initialize embedded keyboard for EXPERIMENT section if needed
     if (lesson.experiment?.useEmbeddedKeyboard) {
-        const keyboardContainer = container.querySelector('#experiment-embedded-keyboard');
+        const keyboardContainer = container.querySelector('#experiment-embedded-
         if (keyboardContainer) {
             const keyboardConfig = getExperimentKeyboardConfig(lesson);
             createMiniKeyboard(keyboardContainer, keyboardConfig);
@@ -1156,7 +1154,7 @@ function attachLessonEventListeners(container, lesson) {
 
     // Initialize freeplay keyboard in EXPERIMENT section if needed
     if (lesson.experiment?.freePlay?.useEmbeddedKeyboard) {
-        const freeplayContainer = container.querySelector('#experiment-freeplay-keyboard');
+        const freeplayContainer = container.querySelector('#experiment-freeplay-
         if (freeplayContainer) {
             const keyboardConfig = getExperimentKeyboardConfig(lesson);
             createMiniKeyboard(freeplayContainer, keyboardConfig);
@@ -1212,7 +1210,7 @@ function attachLessonEventListeners(container, lesson) {
             }
         });
         // Re-render quiz
-        const quizContainer = container.querySelector('#section-quiz');
+        const quizContainer = container.querySelector('#section-
         if (quizContainer) {
             quizContainer.outerHTML = renderQuizSection(lesson);
             attachQuizListeners(container, lesson);
@@ -1251,7 +1249,7 @@ function attachQuizListeners(container, lesson) {
                 isCorrect
             };
 
-            const quizContainer = container.querySelector('#section-quiz');
+            const quizContainer = container.querySelector('#section-
             if (quizContainer) {
                 quizContainer.outerHTML = renderQuizSection(lesson);
                 attachQuizListeners(container, lesson);
@@ -1275,7 +1273,7 @@ function attachQuizListeners(container, lesson) {
                 delete quizAnswers[key];
             }
         });
-        const quizContainer = container.querySelector('#section-quiz');
+        const quizContainer = container.querySelector('#section-
         if (quizContainer) {
             quizContainer.outerHTML = renderQuizSection(lesson);
             attachQuizListeners(container, lesson);
@@ -1286,7 +1284,7 @@ function attachQuizListeners(container, lesson) {
 function attachTryItListeners(container, lesson) {
     // Initialize embedded keyboard for TRY IT section if needed
     if (lesson.tryIt?.useEmbeddedKeyboard) {
-        const keyboardContainer = container.querySelector('#try-it-embedded-keyboard');
+        const keyboardContainer = container.querySelector('#try-it-embedded-
         if (keyboardContainer) {
             // Determine keyboard config based on lesson
             const keyboardConfig = getTryItKeyboardConfig(lesson);
@@ -1298,10 +1296,10 @@ function attachTryItListeners(container, lesson) {
     container.querySelector('#start-interactive-tutorial-btn')?.addEventListener('click', () => {
         const tutorial = lessonTutorials[lesson.id];
         if (tutorial) {
-            const tutorialContainer = container.querySelector('#interactive-tutorial-container');
+            const tutorialContainer = container.querySelector('#interactive-tutorial-
             if (tutorialContainer) {
                 // Hide the start button section
-                container.querySelector('#start-interactive-tutorial-btn')?.closest('.bg-gradient-to-r')?.classList.add('hidden');
+                container.querySelector('#start-interactive-tutorial-btn')?.closest('.bg-gradient-to-r')?.classList.add('
                 // Start the tutorial
                 startTutorial(tutorial, tutorialContainer);
             }
@@ -1315,28 +1313,26 @@ function attachTryItListeners(container, lesson) {
             markExerciseComplete(lesson.id, idx);
 
             const allComplete = lesson.tryIt?.exercises?.every((_, i) =>
-                exerciseProgress[`${lesson.id}-exercise-${i}`]
-            );
 
-            const tryItContainer = container.querySelector('#section-tryIt');
+            const tryItContainer = container.querySelector('#section-tryI
             if (tryItContainer) {
                 tryItContainer.outerHTML = renderTryItSection(lesson);
                 attachTryItListeners(container, lesson);
 
                 if (allComplete) {
-                    const successEl = container.querySelector('#try-it-success');
-                    if (successEl) successEl.classList.remove('hidden');
+                    const successEl = container.querySelector('#try-it-
+                    if (successEl) successEl.classList.remove('
                 }
             }
         });
     });
 
     container.querySelector('#open-chord-builder-btn')?.addEventListener('click', () => {
-        switchTab('builder');
+        switchTab('
     });
 
     container.querySelector('#open-progression-builder-btn')?.addEventListener('click', () => {
-        switchTab('melody');
+        switchTab('
     });
 }
 

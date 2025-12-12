@@ -35,8 +35,6 @@ export class SmartPositioner {
                 placement,
                 { x, y },
                 { width, height },
-                config
-            );
 
             // Check if position is within viewport
             if (!this.isWithinViewport(position, { width, height }, viewport)) {
@@ -54,8 +52,6 @@ export class SmartPositioner {
             { x, y },
             { width, height },
             existingElements,
-            viewport
-        );
     }
 
     /**
@@ -131,8 +127,6 @@ export class SmartPositioner {
             position.x >= viewport.left &&
             position.x + size.width <= viewport.right &&
             position.y >= viewport.top &&
-            position.y + size.height <= viewport.bottom
-        );
     }
 
     /**
@@ -151,8 +145,6 @@ export class SmartPositioner {
         };
 
         return existingElements.some(element =>
-            this.collisionDetector.detectCollision(rect, element)
-        );
     }
 
     /**
@@ -173,8 +165,6 @@ export class SmartPositioner {
                 placement,
                 target,
                 size,
-                this.config.settings || {}
-            );
 
             // Constrain to viewport
             const constrained = this.constrainToViewport(position, size, viewport);
@@ -183,8 +173,6 @@ export class SmartPositioner {
             const overlap = this.calculateTotalOverlap(
                 constrained,
                 size,
-                existingElements
-            );
 
             if (overlap < minOverlap) {
                 minOverlap = overlap;
@@ -282,8 +270,6 @@ export class CollisionDetector {
             rect1.right < rect2.left ||
             rect1.left > rect2.right ||
             rect1.bottom < rect2.top ||
-            rect1.top > rect2.bottom
-        );
     }
 
     /**

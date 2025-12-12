@@ -414,7 +414,7 @@ let modalState = {
  */
 function showLoadingSplash(container) {
     container.innerHTML = '';
-    const loadingDiv = document.createElement('div');
+    const loadingDiv = document.createElement('
     loadingDiv.className = 'unified-modal-loading';
     loadingDiv.style.cssText = `
         display: flex;
@@ -425,7 +425,7 @@ function showLoadingSplash(container) {
         color: #6b7280;
     `;
 
-    const iconContainer = document.createElement('div');
+    const iconContainer = document.createElement('
     iconContainer.style.cssText = `
         font-size: 48px;
         margin-bottom: 16px;
@@ -433,7 +433,7 @@ function showLoadingSplash(container) {
     `;
     iconContainer.innerHTML = '🎵 🎶';
 
-    const loadingText = document.createElement('div');
+    const loadingText = document.createElement('
     loadingText.textContent = 'Updating Suggestions...';
     loadingText.style.cssText = `
         font-size: 16px;
@@ -447,7 +447,7 @@ function showLoadingSplash(container) {
 
     // Add keyframe animation for pulse if not already added
     if (!document.getElementById('unified-pulse-animation-style')) {
-        const style = document.createElement('style');
+        const style = document.createElement('
         style.id = 'unified-pulse-animation-style';
         style.textContent = `
             @keyframes unified-pulse {
@@ -485,7 +485,7 @@ function ensureAudioReady() {
     // Check if audio is ready
     const audioIsReady = window.getAudioIsReady && window.getAudioIsReady();
     if (!audioIsReady) {
-        console.log('[UnifiedRecommendationModal] Audio not ready yet, skipping playback');
+
         return false;
     }
 
@@ -553,7 +553,7 @@ function playChord(chord) {
         _modalPlayingInstrument = instrument;
 
     } catch (e) {
-        console.warn('Could not play chord:', e);
+
     }
 }
 
@@ -940,7 +940,7 @@ export function closeUnifiedRecommendationModal() {
 
 function createModalStructure() {
     // Create overlay
-    const overlay = document.createElement('div');
+    const overlay = document.createElement('
     overlay.id = MODAL_ID;
     overlay.className = 'unified-modal-overlay rm-overlay';
 
@@ -950,7 +950,7 @@ function createModalStructure() {
     });
 
     // Create modal container
-    const modal = document.createElement('div');
+    const modal = document.createElement('
     modal.className = 'unified-modal-container rm-modal';
 
     // Prevent clicks from closing, but hide tooltips on any click within modal
@@ -979,7 +979,7 @@ function createModalStructure() {
     modal.appendChild(contextBar);
 
     // Content area
-    const content = document.createElement('div');
+    const content = document.createElement('
     content.id = 'unified-modal-content';
     content.className = 'rm-content';
     modal.appendChild(content);
@@ -994,11 +994,11 @@ function createModalStructure() {
 }
 
 function createHeader() {
-    const header = document.createElement('div');
+    const header = document.createElement('
     header.className = 'rm-header';
 
     // Left side: Title with key and selection info
-    const titleArea = document.createElement('div');
+    const titleArea = document.createElement('
     titleArea.style.cssText = 'display: flex; align-items: center; gap: 12px;';
 
     const title = document.createElement('h2');
@@ -1008,7 +1008,7 @@ function createHeader() {
 
     // Key indicator
     const key = getCurrentKey() || 'C';
-    const keyBadge = document.createElement('span');
+    const keyBadge = document.createElement('
     keyBadge.id = 'header-key-badge';
     keyBadge.style.cssText = `
         font-size: 12px;
@@ -1022,7 +1022,7 @@ function createHeader() {
     titleArea.appendChild(keyBadge);
 
     // Selection indicator
-    const selectionBadge = document.createElement('span');
+    const selectionBadge = document.createElement('
     selectionBadge.id = 'header-selection-badge';
     selectionBadge.style.cssText = `
         font-size: 11px;
@@ -1033,7 +1033,7 @@ function createHeader() {
 
     header.appendChild(titleArea);
 
-    const closeBtn = document.createElement('button');
+    const closeBtn = document.createElement('
     closeBtn.innerHTML = '&times;';
     closeBtn.className = 'rm-close-btn';
     closeBtn.addEventListener('click', closeUnifiedRecommendationModal);
@@ -1044,7 +1044,7 @@ function createHeader() {
 
 function updateHeaderSelectionBadge(badge) {
     if (!badge) {
-        badge = document.getElementById('header-selection-badge');
+        badge = document.getElementById('header-selection-
     }
     if (!badge) return;
 
@@ -1072,7 +1072,7 @@ function updateHeaderSelectionBadge(badge) {
  * This provides constant visual context of the current progression
  */
 function createPersistentProgressionBar() {
-    const bar = document.createElement('div');
+    const bar = document.createElement('
     bar.id = 'persistent-progression-bar';
     bar.className = 'rm-progression-bar';
 
@@ -1089,7 +1089,7 @@ function createPersistentProgressionBar() {
  */
 function updatePersistentProgressionBar(bar) {
     if (!bar) {
-        bar = document.getElementById('persistent-progression-bar');
+        bar = document.getElementById('persistent-progression-
     }
     if (!bar) return;
 
@@ -1119,12 +1119,12 @@ function updatePersistentProgressionBar(bar) {
     const allSectionsWithPseudo = buildSectionsWithUngrouped(sections, progressionData.length);
 
     // Main container with vertical layout
-    const mainContainer = document.createElement('div');
+    const mainContainer = document.createElement('
     mainContainer.style.cssText = 'display: flex; flex-direction: column; gap: 4px; width: 100%;';
 
     // Row 1: Section picker bar (only if sections exist)
     if (allSectionsWithPseudo.length > 0) {
-        const sectionPickerRow = document.createElement('div');
+        const sectionPickerRow = document.createElement('
         sectionPickerRow.style.cssText = `
             display: flex;
             align-items: center;
@@ -1135,13 +1135,13 @@ function updatePersistentProgressionBar(bar) {
             scrollbar-color: #cbd5e1 transparent;
         `;
 
-        const sectionLabel = document.createElement('span');
+        const sectionLabel = document.createElement('
         sectionLabel.textContent = 'Sections:';
         sectionLabel.style.cssText = 'font-size: 10px; color: #6b7280; flex-shrink: 0;';
         sectionPickerRow.appendChild(sectionLabel);
 
         // "All" button to show all chords
-        const allBtn = document.createElement('button');
+        const allBtn = document.createElement('
         const isAllSelected = modalState.selectedSectionIds.size === 0;
         allBtn.textContent = 'All';
         allBtn.title = 'Show all chords';
@@ -1169,7 +1169,7 @@ function updatePersistentProgressionBar(bar) {
             const isSelected = modalState.selectedSectionIds.has(section.id);
             const color = section.color || '#9ca3af';
 
-            const pill = document.createElement('button');
+            const pill = document.createElement('
             pill.textContent = section.label || 'Section';
             pill.title = `${section.label} (${section.chordIndices.length} chords) - Click to select, Shift+click for range, Ctrl+click to toggle`;
             pill.setAttribute('data-section-index', sectionIndex);
@@ -1230,7 +1230,7 @@ function updatePersistentProgressionBar(bar) {
     }
 
     // Row 3: Chord chips (filtered by selected sections, grouped visually)
-    const chipsWrapper = document.createElement('div');
+    const chipsWrapper = document.createElement('
     chipsWrapper.style.cssText = `
         display: flex;
         align-items: stretch;
@@ -1242,7 +1242,7 @@ function updatePersistentProgressionBar(bar) {
     `;
 
     if (progressionData.length === 0) {
-        const emptyMsg = document.createElement('span');
+        const emptyMsg = document.createElement('
         emptyMsg.textContent = 'No chords yet - add some to get recommendations';
         emptyMsg.style.cssText = 'font-size: 10px; color: #9ca3af; font-style: italic;';
         chipsWrapper.appendChild(emptyMsg);
@@ -1262,7 +1262,7 @@ function updatePersistentProgressionBar(bar) {
             const sectionColor = section.color || '#9ca3af';
 
             // Create a section group container
-            const sectionGroup = document.createElement('div');
+            const sectionGroup = document.createElement('
             sectionGroup.style.cssText = `
                 display: flex;
                 flex-direction: column;
@@ -1274,7 +1274,7 @@ function updatePersistentProgressionBar(bar) {
             `;
 
             // Section label header (compact)
-            const sectionLabel = document.createElement('div');
+            const sectionLabel = document.createElement('
             sectionLabel.style.cssText = `
                 font-size: 8px;
                 font-weight: 600;
@@ -1288,7 +1288,7 @@ function updatePersistentProgressionBar(bar) {
             sectionGroup.appendChild(sectionLabel);
 
             // Chips container within the section group
-            const sectionChips = document.createElement('div');
+            const sectionChips = document.createElement('
             sectionChips.style.cssText = `
                 display: flex;
                 align-items: center;
@@ -1314,7 +1314,7 @@ function updatePersistentProgressionBar(bar) {
                     ? idx >= Math.min(selStart, selEnd) && idx <= Math.max(selStart, selEnd)
                     : modalState.selectedProgressionIndex === idx;
 
-                const chip = document.createElement('button');
+                const chip = document.createElement('
                 chip.textContent = `${spelledRoot}${symbol}${invLabel}`;
                 chip.title = `${spelledRoot} ${chord.type}${chord.inversion ? ` (${INVERSION_NAMES[chord.inversion]})` : ''} (#${idx + 1}) - Click to select, Shift+click to select range`;
                 chip.className = 'rm-chord-chip' + (isInRange ? ' selected' : '');
@@ -1447,7 +1447,7 @@ function buildSectionsWithUngrouped(sections, totalChords) {
 }
 
 function createTabNavigation() {
-    const nav = document.createElement('div');
+    const nav = document.createElement('
     nav.id = 'unified-modal-tabs';
     nav.className = 'rm-tabs';
 
@@ -1464,7 +1464,7 @@ function createTabNavigation() {
     ];
 
     tabs.forEach(tab => {
-        const btn = document.createElement('button');
+        const btn = document.createElement('
         btn.id = `tab-btn-${tab.id}`;
         btn.dataset.tab = tab.id;
         btn.innerHTML = `${tab.icon} ${tab.label}`;
@@ -1491,7 +1491,7 @@ function createTabNavigation() {
 }
 
 function createContextBar() {
-    const bar = document.createElement('div');
+    const bar = document.createElement('
     bar.id = 'unified-context-bar';
     bar.className = 'rm-context-bar';
     bar.style.cssText = 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 12px;';
@@ -1528,20 +1528,20 @@ function createContextBar() {
 }
 
 function createSeparator() {
-    const sep = document.createElement('div');
+    const sep = document.createElement('
     sep.className = 'rm-separator';
     sep.style.cssText = 'height: 20px; width: 1px; background: #d1d5db;';
     return sep;
 }
 
 function createSectionIntentControls() {
-    const container = document.createElement('div');
+    const container = document.createElement('
     container.style.cssText = 'display: flex; align-items: center; gap: 4px;';
 
     const intent = getSectionIntent();
 
     // Mode selector (Continue / New Section) - compact
-    const modeSelect = document.createElement('select');
+    const modeSelect = document.createElement('
     modeSelect.id = 'section-mode-select';
     modeSelect.style.cssText = `
         padding: 4px 6px;
@@ -1565,7 +1565,7 @@ function createSectionIntentControls() {
     container.appendChild(modeSelect);
 
     // Sub-mode selector container (changes based on mode)
-    const subContainer = document.createElement('div');
+    const subContainer = document.createElement('
     subContainer.id = 'section-submode-container';
     subContainer.style.cssText = `display: flex; align-items: center; gap: 4px;`;
     container.appendChild(subContainer);
@@ -1577,12 +1577,12 @@ function createSectionIntentControls() {
 }
 
 function updateSubModeSelector() {
-    const container = document.getElementById('section-submode-container');
+    const container = document.getElementById('section-submode-
     if (!container) return;
     container.innerHTML = '';
 
     const intent = getSectionIntent();
-    const modeSelect = document.getElementById('section-mode-select');
+    const modeSelect = document.getElementById('section-mode-
 
     if (modeSelect?.value === INTENT_MODES.CONTINUE || intent.mode === INTENT_MODES.CONTINUE) {
         // Continue mode: show submode dropdown instead of buttons
@@ -1592,7 +1592,7 @@ function updateSubModeSelector() {
             { id: CONTINUE_SUBMODES.FINAL, label: 'Final', title: 'Last chord of section' }
         ];
 
-        const subModeSelect = document.createElement('select');
+        const subModeSelect = document.createElement('
         subModeSelect.id = 'section-submode-select';
         subModeSelect.style.cssText = `
             padding: 4px 6px;
@@ -1603,7 +1603,7 @@ function updateSubModeSelector() {
             cursor: pointer;
         `;
         submodes.forEach(sm => {
-            const opt = document.createElement('option');
+            const opt = document.createElement('
             opt.value = sm.id;
             opt.textContent = sm.label;
             opt.title = sm.title;
@@ -1617,7 +1617,7 @@ function updateSubModeSelector() {
         container.appendChild(subModeSelect);
     } else {
         // New section mode: show section type selector
-        const typeSelect = document.createElement('select');
+        const typeSelect = document.createElement('
         typeSelect.style.cssText = `
             padding: 4px 6px;
             border: 1px solid #d1d5db;
@@ -1627,7 +1627,7 @@ function updateSubModeSelector() {
             cursor: pointer;
         `;
         SECTION_TYPES.forEach(st => {
-            const opt = document.createElement('option');
+            const opt = document.createElement('
             opt.value = st.id;
             opt.textContent = `${st.icon} ${st.name}`;
             typeSelect.appendChild(opt);
@@ -1642,7 +1642,7 @@ function updateSubModeSelector() {
 }
 
 function createStyleMoodControls() {
-    const container = document.createElement('div');
+    const container = document.createElement('
     container.id = 'unified-style-mood-container';
     container.style.cssText = `
         display: flex;
@@ -1651,12 +1651,12 @@ function createStyleMoodControls() {
     `;
 
     // Style selector
-    const styleLabel = document.createElement('span');
+    const styleLabel = document.createElement('
     styleLabel.textContent = 'Style:';
     styleLabel.style.cssText = 'font-size: 11px; color: #6b7280;';
     container.appendChild(styleLabel);
 
-    const styleSelect = document.createElement('select');
+    const styleSelect = document.createElement('
     styleSelect.id = 'unified-style-select';
     styleSelect.style.cssText = `
         padding: 4px 6px;
@@ -1667,7 +1667,7 @@ function createStyleMoodControls() {
         cursor: pointer;
     `;
     SUGGESTION_STYLES.forEach(style => {
-        const opt = document.createElement('option');
+        const opt = document.createElement('
         opt.value = style.id;
         opt.textContent = style.label;
         styleSelect.appendChild(opt);
@@ -1686,12 +1686,12 @@ function createStyleMoodControls() {
     container.appendChild(styleSelect);
 
     // Mood selector
-    const moodLabel = document.createElement('span');
+    const moodLabel = document.createElement('
     moodLabel.textContent = 'Mood:';
     moodLabel.style.cssText = 'font-size: 11px; color: #6b7280; margin-left: 4px;';
     container.appendChild(moodLabel);
 
-    const moodSelect = document.createElement('select');
+    const moodSelect = document.createElement('
     moodSelect.id = 'unified-mood-select';
     moodSelect.style.cssText = `
         padding: 4px 6px;
@@ -1702,7 +1702,7 @@ function createStyleMoodControls() {
         cursor: pointer;
     `;
     SUGGESTION_MOODS.forEach(mood => {
-        const opt = document.createElement('option');
+        const opt = document.createElement('
         opt.value = mood.id;
         opt.textContent = mood.label;
         moodSelect.appendChild(opt);
@@ -1724,14 +1724,14 @@ function createStyleMoodControls() {
 }
 
 function createDurationToggle() {
-    const container = document.createElement('div');
+    const container = document.createElement('
     container.style.cssText = `
         display: flex;
         align-items: center;
         gap: 4px;
     `;
 
-    const checkbox = document.createElement('input');
+    const checkbox = document.createElement('
     checkbox.type = 'checkbox';
     checkbox.id = 'unified-duration-toggle';
     checkbox.checked = modalState.rhythmAwarenessEnabled;
@@ -1743,14 +1743,14 @@ function createDurationToggle() {
     `;
     checkbox.addEventListener('change', () => {
         modalState.rhythmAwarenessEnabled = checkbox.checked;
-        localStorage.setItem('chord-suggestion-rhythm-awareness', checkbox.checked ? 'true' : 'false');
+        localStorage.setItem('chord-suggestion-rhythm-awareness', checkbox.checked ? 'true' : '
         window.dispatchEvent(new CustomEvent('rhythmAwarenessChanged', {
             detail: { enabled: checkbox.checked }
         }));
         renderActiveTab();
     });
 
-    const label = document.createElement('label');
+    const label = document.createElement('
     label.htmlFor = 'unified-duration-toggle';
     label.textContent = 'Duration';
     label.title = 'Show suggested chord durations based on harmonic rhythm analysis';
@@ -1766,7 +1766,7 @@ function createDurationToggle() {
 }
 
 function createWeightsButton() {
-    const btn = document.createElement('button');
+    const btn = document.createElement('
     btn.innerHTML = '⚙️';
     btn.title = 'Adjust recommendation scoring weights';
     btn.style.cssText = `
@@ -1791,7 +1791,7 @@ function createWeightsButton() {
         if (window.showChordWeightsModal) {
             window.showChordWeightsModal();
         } else {
-            console.warn('Chord weights modal not available');
+
         }
     });
     return btn;
@@ -1811,9 +1811,9 @@ function switchTab(tabId) {
     document.querySelectorAll('.unified-tab-btn').forEach(btn => {
         const isActive = btn.dataset.tab === tabId;
         if (isActive) {
-            btn.classList.add('active');
+            btn.classList.add('
         } else {
-            btn.classList.remove('active');
+            btn.classList.remove('
         }
     });
 
@@ -1821,7 +1821,7 @@ function switchTab(tabId) {
 }
 
 function renderActiveTab() {
-    const content = document.getElementById('unified-modal-content');
+    const content = document.getElementById('unified-modal-
     if (!content) return;
 
     content.innerHTML = '';
@@ -1858,7 +1858,7 @@ function renderChordTab(container) {
     container.appendChild(intentNav);
 
     // Intent content area
-    const intentContent = document.createElement('div');
+    const intentContent = document.createElement('
     intentContent.id = 'chord-intent-content';
     intentContent.style.cssText = 'margin-top: 16px;';
     container.appendChild(intentContent);
@@ -1871,7 +1871,7 @@ function renderChordTab(container) {
  * Intent tabs: Suggest, Compare, Transform, Optimize, Sequence
  */
 function createChordIntentNav() {
-    const nav = document.createElement('div');
+    const nav = document.createElement('
     nav.id = 'chord-intent-nav';
     nav.style.cssText = `
         display: flex;
@@ -1921,7 +1921,7 @@ function createChordIntentNav() {
     ];
 
     intents.forEach(intent => {
-        const btn = document.createElement('button');
+        const btn = document.createElement('
         btn.dataset.intent = intent.id;
         btn.title = intent.description;
         btn.innerHTML = `${intent.icon} ${intent.label}`;
@@ -1969,7 +1969,7 @@ function createChordIntentNav() {
  * Render content for the current chord intent
  */
 function renderChordIntentContent() {
-    const container = document.getElementById('chord-intent-content');
+    const container = document.getElementById('chord-intent-
     if (!container) return;
     container.innerHTML = '';
 
@@ -2006,7 +2006,7 @@ function renderSuggestIntent(container) {
     container.innerHTML = '';
 
     // View toggle: Quick vs All Chords (Explorer)
-    const viewToggle = document.createElement('div');
+    const viewToggle = document.createElement('
     viewToggle.className = 'rm-view-toggle';
 
     const views = [
@@ -2015,7 +2015,7 @@ function renderSuggestIntent(container) {
     ];
 
     views.forEach(view => {
-        const btn = document.createElement('button');
+        const btn = document.createElement('
         btn.innerHTML = `${view.icon} ${view.label}`;
         const isActive = view.id === modalState.chordView;
         btn.className = 'rm-view-btn' + (isActive ? ' active' : '');
@@ -2030,7 +2030,7 @@ function renderSuggestIntent(container) {
     container.appendChild(viewToggle);
 
     // Content area for the selected view
-    const viewContent = document.createElement('div');
+    const viewContent = document.createElement('
     viewContent.id = 'chord-view-content';
     container.appendChild(viewContent);
 
@@ -2077,7 +2077,7 @@ function renderAdvancedIntent(container) {
     };
 
     // Header section - context-aware
-    const header = document.createElement('div');
+    const header = document.createElement('
     header.style.cssText = `
         background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
         border: 1px solid #c4b5fd;
@@ -2115,7 +2115,7 @@ function renderAdvancedIntent(container) {
     container.appendChild(header);
 
     // Create tabbed sections for different categories
-    const sections = document.createElement('div');
+    const sections = document.createElement('
     sections.style.cssText = 'display: flex; flex-direction: column; gap: 16px;';
 
     // 1. Borrowed Chords Section
@@ -2180,11 +2180,11 @@ function scoreAdvancedChordInContext(advancedChord, context, sectionType) {
         // (selected is diatonic and this V7/x would be a natural next move)
         if (interval === 5) { // Perfect 4th up (common approach)
             score += 25;
-            reasons.push('Smooth voice leading from selected chord');
+            reasons.push('Smooth voice leading from selected 
         }
         if (interval === 7) { // Perfect 5th up
             score += 20;
-            reasons.push('Strong root motion by 5th');
+            reasons.push('Strong root motion by 5
         }
     }
 
@@ -2199,25 +2199,25 @@ function scoreAdvancedChordInContext(advancedChord, context, sectionType) {
         if (advancedChord.numeral === 'bVII') {
             if (interval === 10) { // bVII is whole step below
                 score += 30;
-                reasons.push('Natural mixolydian movement');
+                reasons.push('Natural mixolydian 
             }
         }
         // iv after IV creates powerful minor plagal feel
         if (advancedChord.numeral === 'iv' && selectedChord.type === 'Major' && interval === 0) {
             score += 35;
-            reasons.push('Modal interchange: major to minor subdominant');
+            reasons.push('Modal interchange: major to minor 
         }
         // bIII after I or vi
         if (advancedChord.numeral === 'bIII') {
             if (interval === 3) {
                 score += 30;
-                reasons.push('Colorful chromatic mediant relationship');
+                reasons.push('Colorful chromatic mediant 
             }
         }
         // Smooth voice leading (step-wise root motion)
         if (interval === 1 || interval === 2 || interval === 10 || interval === 11) {
             score += 15;
-            reasons.push('Smooth chromatic/step-wise root motion');
+            reasons.push('Smooth chromatic/step-wise root 
         }
     }
 
@@ -2226,21 +2226,21 @@ function scoreAdvancedChordInContext(advancedChord, context, sectionType) {
         // Major 3rd relationships (interval 4 or 8)
         if (interval === 4 || interval === 8) {
             score += 40;
-            reasons.push('Major 3rd chromatic mediant: dramatic color shift');
+            reasons.push('Major 3rd chromatic mediant: dramatic color 
         }
         // Minor 3rd relationships (interval 3 or 9)
         if (interval === 3 || interval === 9) {
             score += 35;
-            reasons.push('Minor 3rd chromatic mediant: rich harmonic color');
+            reasons.push('Minor 3rd chromatic mediant: rich harmonic 
         }
         // Neapolitan (bII) works especially well before V or as surprise
         if (advancedChord.numeral === 'bII') {
             if (selectedChord.type?.includes('Dominant')) {
                 score += 30;
-                reasons.push('Neapolitan approach: unexpected before dominant');
+                reasons.push('Neapolitan approach: unexpected before 
             }
             score += 20;
-            reasons.push('Neapolitan chord: exotic, mysterious quality');
+            reasons.push('Neapolitan chord: exotic, mysterious 
         }
     }
 
@@ -2249,8 +2249,6 @@ function scoreAdvancedChordInContext(advancedChord, context, sectionType) {
     const selectedNotes = getChordNotesForDisplay(selectedChord.root, selectedChord.type);
     const advancedNotes = getChordNotesForDisplay(advancedChord.root, advancedChord.type);
     const commonTones = selectedNotes.filter(n =>
-        advancedNotes.some(a => normalizeNoteForComparison(a) === normalizeNoteForComparison(n))
-    );
     if (commonTones.length > 0) {
         score += commonTones.length * 8;
         reasons.push(`${commonTones.length} common tone${commonTones.length > 1 ? 's' : ''} for smooth voice leading`);
@@ -2266,7 +2264,7 @@ function scoreAdvancedChordInContext(advancedChord, context, sectionType) {
  * Create the Borrowed Chords section for the Advanced tab
  */
 function createAdvancedSection_BorrowedChords(key, context) {
-    const section = document.createElement('div');
+    const section = document.createElement('
     section.style.cssText = `
         background: white;
         border: 1px solid #e5e7eb;
@@ -2275,7 +2273,7 @@ function createAdvancedSection_BorrowedChords(key, context) {
     `;
 
     // Section header
-    const sectionHeader = document.createElement('div');
+    const sectionHeader = document.createElement('
     sectionHeader.style.cssText = `
         background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
         color: white;
@@ -2290,7 +2288,7 @@ function createAdvancedSection_BorrowedChords(key, context) {
     section.appendChild(sectionHeader);
 
     // Explanation
-    const explanation = document.createElement('div');
+    const explanation = document.createElement('
     explanation.style.cssText = `
         padding: 10px 14px;
         background: #faf5ff;
@@ -2302,7 +2300,7 @@ function createAdvancedSection_BorrowedChords(key, context) {
     section.appendChild(explanation);
 
     // Chord cards container
-    const cardsContainer = document.createElement('div');
+    const cardsContainer = document.createElement('
     cardsContainer.style.cssText = `
         padding: 12px;
         display: grid;
@@ -2334,7 +2332,7 @@ function createAdvancedSection_BorrowedChords(key, context) {
  * Create the Secondary Dominants section for the Advanced tab
  */
 function createAdvancedSection_SecondaryDominants(key, context) {
-    const section = document.createElement('div');
+    const section = document.createElement('
     section.style.cssText = `
         background: white;
         border: 1px solid #e5e7eb;
@@ -2343,7 +2341,7 @@ function createAdvancedSection_SecondaryDominants(key, context) {
     `;
 
     // Section header
-    const sectionHeader = document.createElement('div');
+    const sectionHeader = document.createElement('
     sectionHeader.style.cssText = `
         background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
         color: white;
@@ -2358,7 +2356,7 @@ function createAdvancedSection_SecondaryDominants(key, context) {
     section.appendChild(sectionHeader);
 
     // Explanation
-    const explanation = document.createElement('div');
+    const explanation = document.createElement('
     explanation.style.cssText = `
         padding: 10px 14px;
         background: #fffbeb;
@@ -2370,7 +2368,7 @@ function createAdvancedSection_SecondaryDominants(key, context) {
     section.appendChild(explanation);
 
     // Chord cards container
-    const cardsContainer = document.createElement('div');
+    const cardsContainer = document.createElement('
     cardsContainer.style.cssText = `
         padding: 12px;
         display: grid;
@@ -2402,7 +2400,7 @@ function createAdvancedSection_SecondaryDominants(key, context) {
  * Create the Chromatic Mediants section for the Advanced tab
  */
 function createAdvancedSection_ChromaticMediants(key, context) {
-    const section = document.createElement('div');
+    const section = document.createElement('
     section.style.cssText = `
         background: white;
         border: 1px solid #e5e7eb;
@@ -2411,7 +2409,7 @@ function createAdvancedSection_ChromaticMediants(key, context) {
     `;
 
     // Section header
-    const sectionHeader = document.createElement('div');
+    const sectionHeader = document.createElement('
     sectionHeader.style.cssText = `
         background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
         color: white;
@@ -2426,7 +2424,7 @@ function createAdvancedSection_ChromaticMediants(key, context) {
     section.appendChild(sectionHeader);
 
     // Explanation
-    const explanation = document.createElement('div');
+    const explanation = document.createElement('
     explanation.style.cssText = `
         padding: 10px 14px;
         background: #ecfeff;
@@ -2438,7 +2436,7 @@ function createAdvancedSection_ChromaticMediants(key, context) {
     section.appendChild(explanation);
 
     // Chord cards container
-    const cardsContainer = document.createElement('div');
+    const cardsContainer = document.createElement('
     cardsContainer.style.cssText = `
         padding: 12px;
         display: grid;
@@ -2478,7 +2476,7 @@ function createAdvancedChordCard(chordInfo, key, sectionType, context, scoring) 
     const isRecommended = scoring?.isRecommended || false;
     const reasons = scoring?.reasons || [];
 
-    const card = document.createElement('div');
+    const card = document.createElement('
 
     // Different styling for recommended vs non-recommended cards
     if (isRecommended) {
@@ -2526,7 +2524,7 @@ function createAdvancedChordCard(chordInfo, key, sectionType, context, scoring) 
         const symbol = chordDef?.symbol || '';
         const selectedDisplay = `${context.selectedChord.root}${symbol}`;
 
-        const badgeRow = document.createElement('div');
+        const badgeRow = document.createElement('
         badgeRow.style.cssText = `
             display: flex;
             align-items: center;
@@ -2550,15 +2548,15 @@ function createAdvancedChordCard(chordInfo, key, sectionType, context, scoring) 
     }
 
     // Top row: Info button, chord name, and numeral
-    const topRow = document.createElement('div');
+    const topRow = document.createElement('
     topRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center;';
 
     // Left side: Info button + chord name
-    const leftSide = document.createElement('div');
+    const leftSide = document.createElement('
     leftSide.style.cssText = 'display: flex; align-items: center; gap: 6px;';
 
     // Info button for tooltip
-    const infoBtn = document.createElement('button');
+    const infoBtn = document.createElement('
     infoBtn.textContent = '?';
     infoBtn.title = 'Learn more about this technique';
     infoBtn.style.cssText = `
@@ -2611,12 +2609,12 @@ function createAdvancedChordCard(chordInfo, key, sectionType, context, scoring) 
     });
     leftSide.appendChild(infoBtn);
 
-    const chordName = document.createElement('span');
+    const chordName = document.createElement('
     chordName.style.cssText = `font-weight: 600; font-size: 14px; color: ${isRecommended ? '#166534' : '#1f2937'};`;
     chordName.textContent = chordInfo.display;
     leftSide.appendChild(chordName);
 
-    const numeral = document.createElement('span');
+    const numeral = document.createElement('
     numeral.style.cssText = `
         font-size: 11px;
         color: white;
@@ -2633,7 +2631,7 @@ function createAdvancedChordCard(chordInfo, key, sectionType, context, scoring) 
 
     // Recommendation reasons (if recommended, show first reason)
     if (isRecommended && reasons.length > 0) {
-        const reasonsDiv = document.createElement('div');
+        const reasonsDiv = document.createElement('
         reasonsDiv.style.cssText = `
             font-size: 10px;
             color: #15803d;
@@ -2649,25 +2647,25 @@ function createAdvancedChordCard(chordInfo, key, sectionType, context, scoring) 
     }
 
     // Description
-    const description = document.createElement('div');
+    const description = document.createElement('
     description.style.cssText = `font-size: 11px; color: ${isRecommended ? '#166534' : '#6b7280'}; line-height: 1.3;`;
     description.textContent = chordInfo.description;
     card.appendChild(description);
 
     // Source/mode if applicable (hide if recommended to save space)
     if (chordInfo.source && !isRecommended) {
-        const source = document.createElement('div');
+        const source = document.createElement('
         source.style.cssText = 'font-size: 10px; color: #9ca3af; font-style: italic;';
         source.textContent = chordInfo.source;
         card.appendChild(source);
     }
 
     // Action buttons
-    const actions = document.createElement('div');
+    const actions = document.createElement('
     actions.style.cssText = 'display: flex; gap: 6px; margin-top: 4px;';
 
     // Play button
-    const playBtn = document.createElement('button');
+    const playBtn = document.createElement('
     playBtn.innerHTML = '▶';
     playBtn.title = 'Hold to preview';
     playBtn.style.cssText = `
@@ -2685,7 +2683,7 @@ function createAdvancedChordCard(chordInfo, key, sectionType, context, scoring) 
     actions.appendChild(playBtn);
 
     // Add button
-    const addBtn = document.createElement('button');
+    const addBtn = document.createElement('
     addBtn.innerHTML = '+';
     addBtn.title = 'Add to progression';
     addBtn.style.cssText = `
@@ -3021,7 +3019,7 @@ function renderCompareIntent(container) {
     const prevDisplay = prevChord ? `${spellNoteInKey(prevChord.root, key)}${CHORD_DEFINITIONS[prevChord.type]?.symbol || ''}` : null;
 
     // Explanation banner
-    const banner = document.createElement('div');
+    const banner = document.createElement('
     banner.style.cssText = `
         background: #eff6ff;
         border: 1px solid #bfdbfe;
@@ -3038,7 +3036,7 @@ function renderCompareIntent(container) {
     container.appendChild(banner);
 
     // Header showing current chord with play button
-    const header = document.createElement('div');
+    const header = document.createElement('
     header.style.cssText = `
         background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
         padding: 16px;
@@ -3052,7 +3050,7 @@ function renderCompareIntent(container) {
         gap: 12px;
     `;
 
-    const headerLeft = document.createElement('div');
+    const headerLeft = document.createElement('
     headerLeft.style.cssText = 'display: flex; align-items: center; gap: 16px;';
     headerLeft.innerHTML = `
         <div style="
@@ -3075,7 +3073,7 @@ function renderCompareIntent(container) {
     header.appendChild(headerLeft);
 
     // Play current button with explicit label
-    const playCurrentBtn = document.createElement('button');
+    const playCurrentBtn = document.createElement('
     const playLabel = prevDisplay ? `▶ Hear: ${prevDisplay} → ${currentDisplay}` : `▶ Hear: ${currentDisplay}`;
     playCurrentBtn.innerHTML = playLabel;
     playCurrentBtn.style.cssText = `
@@ -3100,7 +3098,7 @@ function renderCompareIntent(container) {
     container.appendChild(header);
 
     // Divider
-    const divider = document.createElement('div');
+    const divider = document.createElement('
     divider.style.cssText = 'display: flex; align-items: center; gap: 12px; margin-bottom: 16px;';
     divider.innerHTML = `
         <div style="flex: 1; height: 1px; background: #e5e7eb;"></div>
@@ -3201,7 +3199,7 @@ function renderCompareIntent(container) {
         .slice(0, 6);
 
     if (alternatives.length === 0) {
-        const noAlts = document.createElement('div');
+        const noAlts = document.createElement('
         noAlts.style.cssText = 'text-align: center; padding: 20px; color: #6b7280;';
         noAlts.textContent = 'No significant alternatives found for this position.';
         container.appendChild(noAlts);
@@ -3209,7 +3207,7 @@ function renderCompareIntent(container) {
     }
 
     // Alternatives grid - 3 column layout with compact cards
-    const grid = document.createElement('div');
+    const grid = document.createElement('
     grid.style.cssText = 'display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;';
 
     alternatives.forEach((alt) => {
@@ -3229,7 +3227,7 @@ function renderCompareIntent(container) {
         const altDisplay = `${altSpelled}${altSymbol}${inversionText}`;
         const score = Math.round(alt.score || alt.totalScore || 70);
 
-        const card = document.createElement('div');
+        const card = document.createElement('
         card.style.cssText = `
             background: white;
             border: 1px solid #e5e7eb;
@@ -3334,7 +3332,7 @@ function renderCompareIntent(container) {
         //   prevChord → [ALTERNATIVE] → nextChord
         // So prevChord is what LEADS INTO this position (backward context)
         // and nextChord is what FOLLOWS this position (forward context)
-        const whyBtn = card.querySelector('.compare-why-btn');
+        const whyBtn = card.querySelector('.compare-why-
         whyBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             if (typeof window.showWhyThisWorks === 'function') {
@@ -3356,14 +3354,14 @@ function renderCompareIntent(container) {
         });
 
         // Play button - plays previous chord then this alternative
-        const playBtn = card.querySelector('.compare-play-btn');
+        const playBtn = card.querySelector('.compare-play-
         playBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             await playCompareChordSequence(prevChord, { root: alt.root, type: altType, inversion: alt.inversion || 0 });
         });
 
         // Apply button - properly replace the chord
-        const applyBtn = card.querySelector('.compare-apply-btn');
+        const applyBtn = card.querySelector('.compare-apply-
         applyBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             applyCompareReplacement(chordIndex, currentChord, alt.root, altType, alt.inversion || 0, container);
@@ -3421,7 +3419,7 @@ function applyCompareReplacement(chordIndex, currentChord, newRoot, newType, new
         const notesResult = getInvertedChordNotes(newRoot, newType, newInversion, key, 0);
         newChord.notes = notesResult?.specificNotes || [];
     } catch (e) {
-        console.warn('[Compare] Could not compute notes for new chord');
+
     }
 
     // Save state for undo
@@ -3469,7 +3467,7 @@ async function playCompareChordSequence(prevChord, targetChord) {
     try {
         const piano = window.getPiano ? window.getPiano() : (window.getInstrument ? window.getInstrument() : null);
         if (!piano || typeof Tone === 'undefined') {
-            console.warn('[Compare] Piano or Tone.js not available');
+
             return;
         }
 
@@ -3497,7 +3495,7 @@ async function playCompareChordSequence(prevChord, targetChord) {
             piano.triggerAttackRelease(targetNotes, chordDuration * 0.9, now + timeOffset);
         }
     } catch (err) {
-        console.error('[Compare] Error playing sequence:', err);
+
     }
 }
 
@@ -3509,7 +3507,7 @@ function getChordNotesForPlayback(root, type, inversion) {
         const result = getInvertedChordNotes(root, type, inversion, getCurrentKey() || 'C', 0);
         return result?.specificNotes || [];
     } catch (e) {
-        console.warn('[Compare] Could not get notes for', root, type);
+
         return [];
     }
 }
@@ -3546,18 +3544,14 @@ function renderTransformIntent(container) {
     const formatProgression = (prog) => prog.map(formatChord).join(' → ');
 
     // Analyze current progression for dynamic descriptions
-    const majorChords = progressionData.filter(c => c.type === 'Major');
-    const minorChords = progressionData.filter(c => c.type === 'Minor' || c.type === 'Minor 7th');
+    const majorChords = progressionData.filter(c => c.type === 'M
+    const minorChords = progressionData.filter(c => c.type === 'Minor' || c.type === 'Minor 7
     const extendedChords = progressionData.filter(c =>
-        c.type.includes('7') || c.type.includes('9') || c.type.includes('11') || c.type.includes('13')
-    );
     const simpleChords = progressionData.filter(c =>
-        c.type === 'Major' || c.type === 'Minor'
-    );
 
     // Find potential borrowed chord candidates (for bVII, bVI, iv in major key)
     const keyRoot = key.replace('m', ''); // Get root without minor indicator
-    const isMinorKey = key.includes('m');
+    const isMinorKey = key.includes('
 
     // Calculate borrowed chord roots based on key
     const keyIndex = ALL_NOTES.indexOf(keyRoot);
@@ -3566,7 +3560,7 @@ function renderTransformIntent(container) {
     const ivRoot = ALL_NOTES[(keyIndex + 5) % 12];    // 4th (for minor iv)
 
     // Header with current progression display
-    const header = document.createElement('div');
+    const header = document.createElement('
     header.style.cssText = 'margin-bottom: 20px;';
     header.innerHTML = `
         <h3 style="margin: 0 0 8px 0; font-size: 16px; color: #374151;">What if you transformed...</h3>
@@ -3840,11 +3834,11 @@ function renderTransformIntent(container) {
     }
 
     // Grid of transformation cards
-    const grid = document.createElement('div');
+    const grid = document.createElement('
     grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;';
 
     transformations.forEach(tf => {
-        const card = document.createElement('div');
+        const card = document.createElement('
         card.style.cssText = `
             background: white;
             border: 2px solid #e5e7eb;
@@ -3912,7 +3906,7 @@ function showTransformPreview(container, original, transformed, transformation, 
     container.innerHTML = '';
 
     // Back button
-    const backBtn = document.createElement('button');
+    const backBtn = document.createElement('
     backBtn.innerHTML = '← Back to Transformations';
     backBtn.style.cssText = `
         padding: 8px 16px;
@@ -3927,7 +3921,7 @@ function showTransformPreview(container, original, transformed, transformation, 
     container.appendChild(backBtn);
 
     // Preview header
-    const header = document.createElement('div');
+    const header = document.createElement('
     header.style.cssText = `
         background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
         padding: 16px;
@@ -3957,7 +3951,7 @@ function showTransformPreview(container, original, transformed, transformation, 
     container.appendChild(header);
 
     // Before/After comparison
-    const comparison = document.createElement('div');
+    const comparison = document.createElement('
     comparison.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;';
 
     // Track chips for sequence playback highlighting
@@ -3965,14 +3959,14 @@ function showTransformPreview(container, original, transformed, transformation, 
     const afterChipElements = [];
 
     // Before column
-    const beforeCol = document.createElement('div');
+    const beforeCol = document.createElement('
 
     // Before header with play button
-    const beforeHeader = document.createElement('div');
+    const beforeHeader = document.createElement('
     beforeHeader.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 8px;';
     beforeHeader.innerHTML = `<span style="font-weight: 600; color: #6b7280; font-size: 12px;">BEFORE</span>`;
 
-    const playBeforeBtn = document.createElement('button');
+    const playBeforeBtn = document.createElement('
     playBeforeBtn.innerHTML = '▶ Play';
     playBeforeBtn.style.cssText = `
         padding: 4px 10px;
@@ -3998,12 +3992,12 @@ function showTransformPreview(container, original, transformed, transformation, 
     beforeHeader.appendChild(playBeforeBtn);
     beforeCol.appendChild(beforeHeader);
 
-    const beforeChips = document.createElement('div');
+    const beforeChips = document.createElement('
     beforeChips.style.cssText = 'display: flex; gap: 6px; flex-wrap: wrap;';
     original.forEach(chord => {
         const chordDef = CHORD_DEFINITIONS[chord.type];
         const symbol = chordDef?.symbol || '';
-        const chip = document.createElement('span');
+        const chip = document.createElement('
         chip.textContent = `${chord.root}${symbol}`;
         chip.style.cssText = `
             padding: 6px 10px;
@@ -4023,14 +4017,14 @@ function showTransformPreview(container, original, transformed, transformation, 
     comparison.appendChild(beforeCol);
 
     // After column
-    const afterCol = document.createElement('div');
+    const afterCol = document.createElement('
 
     // After header with play button
-    const afterHeader = document.createElement('div');
+    const afterHeader = document.createElement('
     afterHeader.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-bottom: 8px;';
     afterHeader.innerHTML = `<span style="font-weight: 600; color: #667eea; font-size: 12px;">AFTER</span>`;
 
-    const playAfterBtn = document.createElement('button');
+    const playAfterBtn = document.createElement('
     playAfterBtn.innerHTML = '▶ Play';
     playAfterBtn.style.cssText = `
         padding: 4px 10px;
@@ -4054,13 +4048,13 @@ function showTransformPreview(container, original, transformed, transformation, 
     afterHeader.appendChild(playAfterBtn);
     afterCol.appendChild(afterHeader);
 
-    const afterChips = document.createElement('div');
+    const afterChips = document.createElement('
     afterChips.style.cssText = 'display: flex; gap: 6px; flex-wrap: wrap;';
     transformed.forEach((chord, i) => {
         const chordDef = CHORD_DEFINITIONS[chord.type];
         const symbol = chordDef?.symbol || '';
         const changed = chord.type !== original[i]?.type || chord.root !== original[i]?.root;
-        const chip = document.createElement('span');
+        const chip = document.createElement('
         chip.textContent = `${chord.root}${symbol}`;
         chip.style.cssText = `
             padding: 6px 10px;
@@ -4085,10 +4079,10 @@ function showTransformPreview(container, original, transformed, transformation, 
     container.appendChild(comparison);
 
     // Action buttons
-    const actions = document.createElement('div');
+    const actions = document.createElement('
     actions.style.cssText = 'display: flex; gap: 12px; justify-content: center;';
 
-    const cancelBtn = document.createElement('button');
+    const cancelBtn = document.createElement('
     cancelBtn.textContent = 'Cancel';
     cancelBtn.style.cssText = `
         padding: 12px 24px;
@@ -4101,7 +4095,7 @@ function showTransformPreview(container, original, transformed, transformation, 
     cancelBtn.addEventListener('click', () => renderTransformIntent(container));
     actions.appendChild(cancelBtn);
 
-    const applyBtn = document.createElement('button');
+    const applyBtn = document.createElement('
     applyBtn.textContent = 'Apply Transformation';
     applyBtn.style.cssText = `
         padding: 12px 24px;
@@ -4510,8 +4504,6 @@ function renderTensionMismatchList(comparison) {
     }
 
     const significantMismatches = comparison.mismatches.filter(m =>
-        m.severity === 'moderate' || m.severity === 'significant'
-    );
 
     if (significantMismatches.length === 0) {
         return '';
@@ -4573,7 +4565,7 @@ function renderTensionActions() {
 
 function attachTensionEventListeners(container, progressionData, key, sections, planner) {
     // Template selector
-    const templateSelect = container.querySelector('#modal-tension-template-select');
+    const templateSelect = container.querySelector('#modal-tension-template-
     if (templateSelect) {
         templateSelect.addEventListener('change', (e) => {
             planner.setTemplate(e.target.value);
@@ -4583,7 +4575,7 @@ function attachTensionEventListeners(container, progressionData, key, sections, 
     }
 
     // Expected length input
-    const expectedLengthInput = container.querySelector('#modal-expected-length-input');
+    const expectedLengthInput = container.querySelector('#modal-expected-length-
     if (expectedLengthInput) {
         expectedLengthInput.addEventListener('change', (e) => {
             const newLength = parseInt(e.target.value, 10);
@@ -4596,37 +4588,37 @@ function attachTensionEventListeners(container, progressionData, key, sections, 
     }
 
     // Toggle checkboxes
-    const toggleTargetCurve = container.querySelector('#modal-show-target-curve');
+    const toggleTargetCurve = container.querySelector('#modal-show-target-
     if (toggleTargetCurve) {
         toggleTargetCurve.addEventListener('change', (e) => {
             tensionArcState.showTargetCurve = e.target.checked;
-            const targetCurve = container.querySelector('#modal-target-curve');
+            const targetCurve = container.querySelector('#modal-target-
             if (targetCurve) targetCurve.style.display = tensionArcState.showTargetCurve ? 'block' : 'none';
         });
     }
 
-    const toggleSectionBg = container.querySelector('#modal-show-section-bg');
+    const toggleSectionBg = container.querySelector('#modal-show-section-
     if (toggleSectionBg) {
         toggleSectionBg.addEventListener('change', (e) => {
             tensionArcState.showSectionBackground = e.target.checked;
-            const sectionBgs = container.querySelector('#modal-section-backgrounds');
+            const sectionBgs = container.querySelector('#modal-section-
             if (sectionBgs) sectionBgs.style.display = tensionArcState.showSectionBackground ? 'block' : 'none';
         });
     }
 
-    const toggleMismatches = container.querySelector('#modal-show-mismatches');
+    const toggleMismatches = container.querySelector('#modal-show-
     if (toggleMismatches) {
         toggleMismatches.addEventListener('change', (e) => {
             tensionArcState.showMismatches = e.target.checked;
-            const mismatchHighlights = container.querySelector('#modal-mismatch-highlights');
-            const mismatchList = container.querySelector('#modal-mismatch-list');
+            const mismatchHighlights = container.querySelector('#modal-mismatch-
+            const mismatchList = container.querySelector('#modal-mismatch-
             if (mismatchHighlights) mismatchHighlights.style.display = tensionArcState.showMismatches ? 'block' : 'none';
             if (mismatchList) mismatchList.style.display = tensionArcState.showMismatches ? 'block' : 'none';
         });
     }
 
     // Open full optimizer button
-    const openFullOptimizerBtn = container.querySelector('#open-full-optimizer-btn');
+    const openFullOptimizerBtn = container.querySelector('#open-full-optimizer-
     if (openFullOptimizerBtn) {
         openFullOptimizerBtn.addEventListener('click', () => {
             closeUnifiedRecommendationModal();
@@ -4636,14 +4628,14 @@ function attachTensionEventListeners(container, progressionData, key, sections, 
                 import('../tensionOptimizerModal.js').then(module => {
                     module.showTensionOptimizerModal();
                 }).catch(err => {
-                    console.error('Could not open Tension Optimizer:', err);
+
                 });
             }
         });
     }
 
     // Data point interactions
-    const dataPoints = container.querySelectorAll('.modal-tension-point');
+    const dataPoints = container.querySelectorAll('.modal-tension-
     dataPoints.forEach((circle) => {
         const index = parseInt(circle.getAttribute('data-chord-index'), 10);
 
@@ -4677,7 +4669,7 @@ function getTensionColor(tension) {
 
 // Legacy function for backward compatibility
 function createChordViewSelector() {
-    const nav = document.createElement('div');
+    const nav = document.createElement('
     nav.style.cssText = `
         display: flex;
         gap: 8px;
@@ -4692,7 +4684,7 @@ function createChordViewSelector() {
     ];
 
     views.forEach(view => {
-        const btn = document.createElement('button');
+        const btn = document.createElement('
         btn.dataset.view = view.id;
         btn.innerHTML = `${view.icon} ${view.label}`;
         const isActive = view.id === modalState.chordView;
@@ -4720,7 +4712,7 @@ function createChordViewSelector() {
 
 // Legacy function kept for any remaining references
 function renderChordView() {
-    const container = document.getElementById('chord-view-content');
+    const container = document.getElementById('chord-view-
     if (!container) return;
     container.innerHTML = '';
 
@@ -4829,8 +4821,6 @@ function renderQuickSuggestionsView(container) {
         modalState.lookbackDepth,    // lookbackDepth
         null,                        // customWeights
         true,                        // useEnhancedScoring
-        sectionInfo                  // sectionInfo - pass section intent!
-    );
 
     // Get rhythmic context if enabled
     let rhythmicContext = null;
@@ -4842,13 +4832,13 @@ function renderQuickSuggestionsView(container) {
                 insertAfterIndex: getInsertAfterIndex()
             });
         } catch (e) {
-            console.warn('Could not get rhythmic context:', e);
+
         }
     }
 
     // Rhythmic context display
     if (rhythmicContext && !rhythmicContext.isEmpty) {
-        const rhythmInfo = document.createElement('div');
+        const rhythmInfo = document.createElement('
         rhythmInfo.style.cssText = `
             margin: 12px 0;
             padding: 8px 12px;
@@ -4875,7 +4865,7 @@ function renderQuickSuggestionsView(container) {
     }
 
     // Suggestions list
-    const suggestionsContainer = document.createElement('div');
+    const suggestionsContainer = document.createElement('
     suggestionsContainer.style.cssText = `
         display: flex;
         flex-direction: column;
@@ -4900,7 +4890,7 @@ function renderQuickSuggestionsView(container) {
 }
 
 function createInversionSelector() {
-    const row = document.createElement('div');
+    const row = document.createElement('
     row.style.cssText = `
         display: flex;
         align-items: center;
@@ -4908,14 +4898,14 @@ function createInversionSelector() {
         margin-bottom: 12px;
     `;
 
-    const label = document.createElement('span');
+    const label = document.createElement('
     label.textContent = 'Inversion:';
     label.style.cssText = 'font-size: 13px; color: #6b7280;';
     row.appendChild(label);
 
     const maxInv = getMaxInversion(modalState.currentChordType);
     for (let i = 0; i <= maxInv; i++) {
-        const btn = document.createElement('button');
+        const btn = document.createElement('
         btn.textContent = INVERSION_NAMES[i] || `${i}`;
         const isActive = i === modalState.activeInversion;
         btn.style.cssText = `
@@ -4943,7 +4933,7 @@ function createInversionSelector() {
  * Shows: Progression [chips...] | Selected: Chord X
  */
 function createCompactProgressionSelector(progressionData, key, onRender) {
-    const container = document.createElement('div');
+    const container = document.createElement('
     container.style.cssText = `
         padding: 8px 12px;
         background: #f9fafb;
@@ -4956,7 +4946,7 @@ function createCompactProgressionSelector(progressionData, key, onRender) {
     `;
 
     // Label with key
-    const label = document.createElement('span');
+    const label = document.createElement('
     label.style.cssText = 'font-size: 12px; font-weight: 600; color: #374151; white-space: nowrap;';
     label.innerHTML = `Progression <span style="color: #6b7280; font-weight: normal;">(Key: ${key})</span>`;
     container.appendChild(label);
@@ -4982,11 +4972,11 @@ function createCompactProgressionSelector(progressionData, key, onRender) {
     });
 
     // Chord chips with section identifiers
-    const chipsWrapper = document.createElement('div');
+    const chipsWrapper = document.createElement('
     chipsWrapper.style.cssText = 'display: flex; gap: 4px; flex-wrap: wrap; align-items: center;';
 
     if (progressionData.length === 0) {
-        const emptyMsg = document.createElement('span');
+        const emptyMsg = document.createElement('
         emptyMsg.textContent = 'Empty';
         emptyMsg.style.cssText = 'font-size: 11px; color: #9ca3af; font-style: italic;';
         chipsWrapper.appendChild(emptyMsg);
@@ -4995,7 +4985,7 @@ function createCompactProgressionSelector(progressionData, key, onRender) {
             const sectionBadges = sectionStartMap.get(idx);
             if (sectionBadges) {
                 sectionBadges.forEach(section => {
-                    const badge = document.createElement('span');
+                    const badge = document.createElement('
                     const sectionLabel = section.label || section.type || 'Section';
                     badge.textContent = sectionLabel;
                     const color = section.color || '#c084fc';
@@ -5020,7 +5010,7 @@ function createCompactProgressionSelector(progressionData, key, onRender) {
             const invLabel = getInversionLabel(chord.inversion);
             const spelledRoot = spellNoteInKey(chord.root, key);
 
-            const chip = document.createElement('button');
+            const chip = document.createElement('
             chip.textContent = `${spelledRoot}${symbol}${invLabel}`;
             chip.title = `${spelledRoot} ${chord.type}${chord.inversion ? ` (${INVERSION_NAMES[chord.inversion]})` : ''} - Click to select`;
             let backgroundColor = isSelected ? '#eef2ff' : 'white';
@@ -5063,7 +5053,7 @@ function createCompactProgressionSelector(progressionData, key, onRender) {
     }
 
     // Add New button
-    const addBtn = document.createElement('button');
+    const addBtn = document.createElement('
     const isAddSelected = modalState.selectedProgressionIndex === -1;
     addBtn.innerHTML = '➕';
     addBtn.title = 'Add after last chord';
@@ -5090,7 +5080,7 @@ function createCompactProgressionSelector(progressionData, key, onRender) {
     container.appendChild(chipsWrapper);
 
     // Selection indicator - inline
-    const selectionInfo = document.createElement('span');
+    const selectionInfo = document.createElement('
     selectionInfo.style.cssText = 'font-size: 11px; color: #6b7280; margin-left: auto; white-space: nowrap;';
     if (modalState.selectedProgressionIndex === -1) {
         selectionInfo.innerHTML = `<strong>Selected:</strong> Add after ${progressionData.length > 0 ? `#${progressionData.length}` : 'start'}`;
@@ -5186,7 +5176,7 @@ function createAdvancedSection(rec) {
     const items = getAdvancedFeatureItems(rec, currentKey);
     if (items.length === 0) return null;
 
-    const container = document.createElement('div');
+    const container = document.createElement('
     container.className = 'rm-card-advanced-container';
     container.style.cssText = `
         width: 100%;
@@ -5194,7 +5184,7 @@ function createAdvancedSection(rec) {
     `;
 
     // Toggle button
-    const toggleBtn = document.createElement('button');
+    const toggleBtn = document.createElement('
     toggleBtn.className = 'rm-advanced-toggle';
     toggleBtn.style.cssText = `
         display: flex;
@@ -5212,7 +5202,7 @@ function createAdvancedSection(rec) {
     toggleBtn.innerHTML = `<span class="toggle-chevron" style="font-size: 8px; transition: transform 0.2s;">▶</span> Advanced`;
 
     // Expandable content
-    const content = document.createElement('div');
+    const content = document.createElement('
     content.className = 'rm-advanced-content';
     content.style.cssText = `
         display: none;
@@ -5227,7 +5217,7 @@ function createAdvancedSection(rec) {
 
     // Add feature items
     items.forEach(item => {
-        const row = document.createElement('div');
+        const row = document.createElement('
         row.style.cssText = `
             display: flex;
             align-items: center;
@@ -5237,7 +5227,7 @@ function createAdvancedSection(rec) {
         `;
 
         // Add "?" learn more button FIRST (before icon and label)
-        const learnBtn = document.createElement('button');
+        const learnBtn = document.createElement('
         learnBtn.style.cssText = `
             width: 14px;
             height: 14px;
@@ -5271,11 +5261,11 @@ function createAdvancedSection(rec) {
 
         row.appendChild(learnBtn);
 
-        const icon = document.createElement('span');
+        const icon = document.createElement('
         icon.textContent = item.icon;
         icon.style.fontSize = '12px';
 
-        const label = document.createElement('span');
+        const label = document.createElement('
         label.style.fontWeight = '500';
         label.textContent = item.label;
 
@@ -5283,7 +5273,7 @@ function createAdvancedSection(rec) {
         row.appendChild(label);
 
         if (item.detail) {
-            const detail = document.createElement('span');
+            const detail = document.createElement('
             detail.style.cssText = `
                 color: #6b7280;
                 font-style: italic;
@@ -5301,7 +5291,7 @@ function createAdvancedSection(rec) {
         e.stopPropagation();
         isExpanded = !isExpanded;
         content.style.display = isExpanded ? 'flex' : 'none';
-        const chevron = toggleBtn.querySelector('.toggle-chevron');
+        const chevron = toggleBtn.querySelector('.toggle-
         if (chevron) {
             chevron.style.transform = isExpanded ? 'rotate(90deg)' : 'rotate(0deg)';
         }
@@ -5318,7 +5308,7 @@ function createAdvancedSection(rec) {
  */
 function showAdvancedExplanationModal(item) {
     // Remove existing modal if present
-    const existingModal = document.getElementById('advanced-explanation-modal');
+    const existingModal = document.getElementById('advanced-explanation-
     if (existingModal) existingModal.remove();
 
     const { type, chordRoot, chordType, key, borrowedFrom, target, mediantDetails,
@@ -5435,11 +5425,11 @@ function showAdvancedExplanationModal(item) {
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 
     // Add event listeners
-    const modal = document.getElementById('advanced-explanation-modal');
-    const closeBtn = document.getElementById('close-advanced-modal');
-    const dismissBtn = document.getElementById('dismiss-advanced-modal');
-    const keySelector = document.getElementById('advanced-modal-key-selector');
-    const contentEl = document.getElementById('advanced-modal-content');
+    const modal = document.getElementById('advanced-explanation-
+    const closeBtn = document.getElementById('close-advanced-
+    const dismissBtn = document.getElementById('dismiss-advanced-
+    const keySelector = document.getElementById('advanced-modal-key-
+    const contentEl = document.getElementById('advanced-modal-
 
     const closeModal = () => modal.remove();
 
@@ -5725,20 +5715,20 @@ function getChordInKeyForDegree(degree, key) {
 }
 
 function createRecommendationCard(rec, index, rhythmicContext) {
-    const card = document.createElement('div');
+    const card = document.createElement('
     card.className = 'rm-card';
     card.style.borderLeftColor = getScoreColor(rec.confidence || rec.score || 70);
 
     // Shortcut badge
     if (index < 5) {
-        const shortcut = document.createElement('span');
+        const shortcut = document.createElement('
         shortcut.textContent = index + 1;
         shortcut.className = 'rm-card-shortcut';
         card.appendChild(shortcut);
     }
 
     // Main info
-    const info = document.createElement('div');
+    const info = document.createElement('
     info.className = 'rm-card-info';
 
     const invName = INVERSION_NAMES[rec.inversion] || '';
@@ -5772,7 +5762,7 @@ function createRecommendationCard(rec, index, rhythmicContext) {
     // Duration badge
     if (modalState.rhythmAwarenessEnabled && rhythmicContext) {
         const duration = rec.suggestedDuration || rhythmicContext.suggestedDuration || 4;
-        const durBadge = document.createElement('span');
+        const durBadge = document.createElement('
         durBadge.className = 'rm-badge rm-badge-duration';
         durBadge.textContent = `${duration}b`;
         durBadge.title = 'Suggested duration in beats';
@@ -5784,7 +5774,7 @@ function createRecommendationCard(rec, index, rhythmicContext) {
     const score = Math.min(100, Math.round(rawScore));
     const quality = getScoreQualityLabel(score);
 
-    const scoreBadge = document.createElement('span');
+    const scoreBadge = document.createElement('
     const scoreClass = score >= 80 ? 'excellent' : score >= 60 ? 'good' : score >= 40 ? 'fair' : 'poor';
     scoreBadge.className = `rm-badge rm-badge-score ${scoreClass} score-badge-interactive`;
     scoreBadge.textContent = `${score}%`;
@@ -5810,7 +5800,7 @@ function createRecommendationCard(rec, index, rhythmicContext) {
     card.appendChild(scoreBadge);
 
     // Why button - opens theory explanation panel
-    const whyBtn = document.createElement('button');
+    const whyBtn = document.createElement('
     whyBtn.innerHTML = '?';
     whyBtn.title = 'Why this chord works';
     whyBtn.className = 'rm-btn-why';
@@ -5844,8 +5834,8 @@ function createRecommendationCard(rec, index, rhythmicContext) {
             }
         }
 
-        console.log('[Why Button] Clicked for chord:', numeral, spelledRoot);
-        console.log('[Why Button] Context - key:', currentKey, 'prev:', prevRomanNumeral, 'next:', nextRomanNumeral);
+
+
 
         // Show the Why This Works panel with full context
         if (typeof window.showWhyThisWorks === 'function') {
@@ -5871,7 +5861,7 @@ function createRecommendationCard(rec, index, rhythmicContext) {
     card.appendChild(whyBtn);
 
     // Play button - softer style
-    const playBtn = document.createElement('button');
+    const playBtn = document.createElement('
     playBtn.innerHTML = '▶';
     playBtn.title = 'Hold to preview';
     playBtn.style.cssText = `
@@ -5891,7 +5881,7 @@ function createRecommendationCard(rec, index, rhythmicContext) {
     card.appendChild(playBtn);
 
     // Add button - softer style
-    const addBtn = document.createElement('button');
+    const addBtn = document.createElement('
     addBtn.innerHTML = '+';
     addBtn.title = 'Add to progression';
     addBtn.style.cssText = `
@@ -5957,8 +5947,6 @@ function addChordToProgression(rec, rhythmicContext, options = {}) {
     let continueSectionId = intent.targetSection?.id || null;
     if (!continueSectionId && intent.mode === INTENT_MODES.CONTINUE && insertAfterIdx >= 0) {
         const containingSection = sectionsSnapshot.find(section =>
-            section?.chordIndices?.includes(insertAfterIdx)
-        );
         if (containingSection) {
             continueSectionId = containingSection.id;
         }
@@ -5985,9 +5973,9 @@ function addChordToProgression(rec, rhythmicContext, options = {}) {
     if (isFirstOfNewSection && compositionState?.createSection && intent.mode === INTENT_MODES.NEW_SECTION) {
         try {
             compositionState.createSection(newSectionType, [newChordIndex]);
-            console.log(`[UnifiedRecommendationModal] Created new ${newSectionType} section with chord at index ${newChordIndex}`);
+
         } catch (e) {
-            console.error('[UnifiedRecommendationModal] Failed to create section:', e);
+
         }
     } else if (isNewSection && !isFirstOfNewSection && compositionState) {
         // For subsequent chords in "Add All", add to the most recent section of this type
@@ -6001,13 +5989,13 @@ function addChordToProgression(rec, rhythmicContext, options = {}) {
                 compositionState.addChordToSection?.(newChordIndex, latestSection.id);
             }
         } catch (e) {
-            console.error('[UnifiedRecommendationModal] Failed to add chord to section:', e);
+
         }
     } else if (isContinueSection && compositionState?.addChordToSection && continueSectionId) {
         try {
             compositionState.addChordToSection(newChordIndex, continueSectionId);
         } catch (e) {
-            console.error('[UnifiedRecommendationModal] Failed to continue section:', e);
+
         }
     }
 
@@ -6039,8 +6027,6 @@ function addChordToProgression(rec, rhythmicContext, options = {}) {
     if (compositionState?.getSections && compositionState?.getProgressionLength) {
         refreshInsertContext(
             compositionState.getSections(),
-            compositionState.getProgressionLength()
-        );
     }
 }
 
@@ -6099,8 +6085,6 @@ function renderExplorerView(container) {
         modalState.lookbackDepth,    // lookbackDepth
         null,                        // customWeights
         true,                        // useEnhancedScoring
-        sectionInfo                  // sectionInfo - pass section intent!
-    );
 
     // Sort by score descending
     allRecommendations.sort((a, b) => (b.score || 0) - (a.score || 0));
@@ -6118,7 +6102,7 @@ function renderExplorerView(container) {
     // Note: Progression selection uses the Progression picker at the top of the modal
 
     // Info text (more compact)
-    const info = document.createElement('div');
+    const info = document.createElement('
     info.style.cssText = `
         padding: 8px 12px;
         background: #f0fdf4;
@@ -6131,7 +6115,7 @@ function renderExplorerView(container) {
     container.appendChild(info);
 
     // Filter controls
-    const filterRow = document.createElement('div');
+    const filterRow = document.createElement('
     filterRow.style.cssText = `
         display: flex;
         gap: 12px;
@@ -6141,10 +6125,10 @@ function renderExplorerView(container) {
     `;
 
     // Root filter
-    const rootFilterLabel = document.createElement('label');
+    const rootFilterLabel = document.createElement('
     rootFilterLabel.style.cssText = 'font-size: 12px; color: #6b7280;';
     rootFilterLabel.textContent = 'Root: ';
-    const rootFilter = document.createElement('select');
+    const rootFilter = document.createElement('
     rootFilter.style.cssText = 'padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;';
     rootFilter.innerHTML = '<option value="">All</option>' +
         ALL_NOTES.map(n => `<option value="${n}">${n}</option>`).join('');
@@ -6152,10 +6136,10 @@ function renderExplorerView(container) {
     filterRow.appendChild(rootFilterLabel);
 
     // Type filter
-    const typeFilterLabel = document.createElement('label');
+    const typeFilterLabel = document.createElement('
     typeFilterLabel.style.cssText = 'font-size: 12px; color: #6b7280;';
     typeFilterLabel.textContent = 'Type: ';
-    const typeFilter = document.createElement('select');
+    const typeFilter = document.createElement('
     typeFilter.style.cssText = 'padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;';
     const types = [...new Set(allRecommendations.map(r => r.type))].sort();
     typeFilter.innerHTML = '<option value="">All</option>' +
@@ -6166,7 +6150,7 @@ function renderExplorerView(container) {
     container.appendChild(filterRow);
 
     // Table container
-    const tableContainer = document.createElement('div');
+    const tableContainer = document.createElement('
     tableContainer.style.cssText = `
         max-height: 400px;
         overflow-y: auto;
@@ -6176,7 +6160,7 @@ function renderExplorerView(container) {
     container.appendChild(tableContainer);
 
     // Pagination controls
-    const paginationRow = document.createElement('div');
+    const paginationRow = document.createElement('
     paginationRow.style.cssText = `
         display: flex;
         justify-content: space-between;
@@ -6215,13 +6199,13 @@ function renderExplorerView(container) {
         const pageData = filtered.slice(start, start + explorerState.pageSize);
 
         tableContainer.innerHTML = '';
-        const table = document.createElement('table');
+        const table = document.createElement('
         table.style.cssText = 'width: 100%; border-collapse: collapse; font-size: 12px;';
 
         // Header
-        const thead = document.createElement('thead');
+        const thead = document.createElement('
         thead.style.cssText = 'position: sticky; top: 0; background: #f3f4f6; z-index: 1;';
-        const headerRow = document.createElement('tr');
+        const headerRow = document.createElement('
 
         const columns = [
             { key: 'root', label: 'Root', tooltip: 'The root note of the chord' },
@@ -6236,7 +6220,7 @@ function renderExplorerView(container) {
         ];
 
         columns.forEach(col => {
-            const th = document.createElement('th');
+            const th = document.createElement('
             th.style.cssText = `
                 padding: 8px 6px;
                 text-align: ${col.key === 'actions' ? 'center' : 'left'};
@@ -6271,42 +6255,42 @@ function renderExplorerView(container) {
         table.appendChild(thead);
 
         // Body
-        const tbody = document.createElement('tbody');
+        const tbody = document.createElement('
         pageData.forEach((rec, idx) => {
-            const row = document.createElement('tr');
+            const row = document.createElement('
             row.style.cssText = `
                 border-bottom: 1px solid #e5e7eb;
                 ${idx % 2 === 0 ? 'background: #f9fafb;' : ''}
             `;
-            row.addEventListener('mouseenter', () => row.style.background = '#eef2ff');
+            row.addEventListener('mouseenter', () => row.style.background = '#eef2
             row.addEventListener('mouseleave', () => row.style.background = idx % 2 === 0 ? '#f9fafb' : '');
 
             // Root - spell according to key
-            const tdRoot = document.createElement('td');
+            const tdRoot = document.createElement('
             tdRoot.style.cssText = 'padding: 8px 6px; font-weight: 600;';
             const explorerKey = getCurrentKey() || 'C';
             tdRoot.textContent = spellNoteInKey(rec.root, explorerKey);
             row.appendChild(tdRoot);
 
             // Type
-            const tdType = document.createElement('td');
+            const tdType = document.createElement('
             tdType.style.cssText = 'padding: 8px 6px;';
             const chordDef = CHORD_DEFINITIONS[rec.type];
             tdType.textContent = chordDef?.symbol || rec.type;
             row.appendChild(tdType);
 
             // Inversion
-            const tdInv = document.createElement('td');
+            const tdInv = document.createElement('
             tdInv.style.cssText = 'padding: 8px 6px;';
             tdInv.textContent = INVERSION_NAMES[rec.inversion] || 'Root';
             row.appendChild(tdInv);
 
             // Score (capped at 100) with tooltip
-            const tdScore = document.createElement('td');
+            const tdScore = document.createElement('
             tdScore.style.cssText = 'padding: 8px 6px;';
             const cappedScore = Math.min(100, Math.round(rec.score || 0));
             const quality = getScoreQualityLabel(cappedScore);
-            const scoreBadge = document.createElement('span');
+            const scoreBadge = document.createElement('
             scoreBadge.className = 'score-badge-interactive';
             scoreBadge.style.cssText = `
                 padding: 2px 8px;
@@ -6338,10 +6322,10 @@ function renderExplorerView(container) {
 
             // Sub-scores with individual tooltips
             ['functionScore', 'voiceLeadingScore', 'styleFit', 'moodFit'].forEach(key => {
-                const td = document.createElement('td');
+                const td = document.createElement('
                 td.style.cssText = 'padding: 8px 6px; font-size: 11px;';
                 const subScore = Math.round(rec[key] || 0);
-                const subScoreSpan = document.createElement('span');
+                const subScoreSpan = document.createElement('
                 subScoreSpan.style.cssText = `
                     color: ${subScore >= 70 ? '#16a34a' : subScore >= 50 ? '#d97706' : '#6b7280'};
                     font-weight: ${subScore >= 70 ? '600' : '400'};
@@ -6366,11 +6350,11 @@ function renderExplorerView(container) {
             });
 
             // Actions
-            const tdActions = document.createElement('td');
+            const tdActions = document.createElement('
             tdActions.style.cssText = 'padding: 8px 6px; text-align: center; display: flex; gap: 4px; justify-content: center;';
 
             // Play button
-            const playBtn = document.createElement('button');
+            const playBtn = document.createElement('
             playBtn.innerHTML = '▶';
             playBtn.title = 'Hold to preview';
             playBtn.style.cssText = `
@@ -6386,7 +6370,7 @@ function renderExplorerView(container) {
             tdActions.appendChild(playBtn);
 
             // Add button
-            const addBtn = document.createElement('button');
+            const addBtn = document.createElement('
             addBtn.innerHTML = '➕';
             addBtn.title = 'Add chord';
             addBtn.style.cssText = `
@@ -6408,7 +6392,7 @@ function renderExplorerView(container) {
             tdActions.appendChild(addBtn);
 
             // Why This Works button
-            const whyBtn = document.createElement('button');
+            const whyBtn = document.createElement('
             whyBtn.innerHTML = '?';
             whyBtn.title = 'Why this works';
             whyBtn.style.cssText = `
@@ -6443,15 +6427,15 @@ function renderExplorerView(container) {
 
         // Update pagination
         paginationRow.innerHTML = '';
-        const pageInfo = document.createElement('span');
+        const pageInfo = document.createElement('
         pageInfo.style.cssText = 'font-size: 12px; color: #6b7280;';
         pageInfo.textContent = `Showing ${start + 1}-${Math.min(start + explorerState.pageSize, filtered.length)} of ${filtered.length}`;
         paginationRow.appendChild(pageInfo);
 
-        const pageButtons = document.createElement('div');
+        const pageButtons = document.createElement('
         pageButtons.style.cssText = 'display: flex; gap: 8px;';
 
-        const prevBtn = document.createElement('button');
+        const prevBtn = document.createElement('
         prevBtn.textContent = '← Prev';
         prevBtn.disabled = explorerState.page === 0;
         prevBtn.style.cssText = `
@@ -6471,7 +6455,7 @@ function renderExplorerView(container) {
         });
         pageButtons.appendChild(prevBtn);
 
-        const nextBtn = document.createElement('button');
+        const nextBtn = document.createElement('
         nextBtn.textContent = 'Next →';
         nextBtn.disabled = explorerState.page >= totalPages - 1;
         nextBtn.style.cssText = `
@@ -6565,7 +6549,7 @@ function renderSequencesView(container) {
     // Note: Progression selection uses the Progression picker at the top of the modal
 
     // Info and sequence length controls row
-    const controlsRow = document.createElement('div');
+    const controlsRow = document.createElement('
     controlsRow.style.cssText = `
         display: flex;
         justify-content: space-between;
@@ -6576,7 +6560,7 @@ function renderSequencesView(container) {
     `;
 
     // Info text (more compact)
-    const info = document.createElement('div');
+    const info = document.createElement('
     info.style.cssText = `
         padding: 6px 10px;
         background: #fef3c7;
@@ -6589,15 +6573,15 @@ function renderSequencesView(container) {
     controlsRow.appendChild(info);
 
     // Sequence length selector
-    const lengthControl = document.createElement('div');
+    const lengthControl = document.createElement('
     lengthControl.style.cssText = 'display: flex; align-items: center; gap: 8px;';
 
-    const lengthLabel = document.createElement('span');
+    const lengthLabel = document.createElement('
     lengthLabel.textContent = 'Chords:';
     lengthLabel.style.cssText = 'font-size: 12px; color: #6b7280;';
     lengthControl.appendChild(lengthLabel);
 
-    const lengthSelect = document.createElement('select');
+    const lengthSelect = document.createElement('
     lengthSelect.style.cssText = `
         padding: 4px 8px;
         border: 1px solid #d1d5db;
@@ -6606,7 +6590,7 @@ function renderSequencesView(container) {
         background: white;
     `;
     [2, 4, 8].forEach(len => {
-        const opt = document.createElement('option');
+        const opt = document.createElement('
         opt.value = len;
         opt.textContent = `${len} chords`;
         if (len === modalState.sequenceLength) opt.selected = true;
@@ -6625,7 +6609,7 @@ function renderSequencesView(container) {
     container.appendChild(controlsRow);
 
     // Second row: Tension arc and melody awareness controls
-    const advancedControlsRow = document.createElement('div');
+    const advancedControlsRow = document.createElement('
     advancedControlsRow.style.cssText = `
         display: flex;
         justify-content: space-between;
@@ -6639,15 +6623,15 @@ function renderSequencesView(container) {
     `;
 
     // Tension Arc selector (Enhancement H)
-    const tensionArcControl = document.createElement('div');
+    const tensionArcControl = document.createElement('
     tensionArcControl.style.cssText = 'display: flex; align-items: center; gap: 8px;';
 
-    const tensionLabel = document.createElement('span');
+    const tensionLabel = document.createElement('
     tensionLabel.textContent = 'Tension Arc:';
     tensionLabel.style.cssText = 'font-size: 12px; color: #6b7280;';
     tensionArcControl.appendChild(tensionLabel);
 
-    const tensionSelect = document.createElement('select');
+    const tensionSelect = document.createElement('
     tensionSelect.style.cssText = `
         padding: 4px 8px;
         border: 1px solid #d1d5db;
@@ -6668,7 +6652,7 @@ function renderSequencesView(container) {
     ];
 
     tensionOptions.forEach(opt => {
-        const option = document.createElement('option');
+        const option = document.createElement('
         option.value = opt.value;
         option.textContent = opt.label;
         if (opt.value === modalState.tensionArcShape) option.selected = true;
@@ -6685,16 +6669,16 @@ function renderSequencesView(container) {
     advancedControlsRow.appendChild(tensionArcControl);
 
     // Melody Awareness toggle (Enhancement B)
-    const melodyAwarenessControl = document.createElement('div');
+    const melodyAwarenessControl = document.createElement('
     melodyAwarenessControl.style.cssText = 'display: flex; align-items: center; gap: 6px;';
 
-    const melodyCheckbox = document.createElement('input');
+    const melodyCheckbox = document.createElement('
     melodyCheckbox.type = 'checkbox';
     melodyCheckbox.id = 'melody-awareness-checkbox';
     melodyCheckbox.checked = modalState.melodyAwarenessEnabled;
     melodyCheckbox.style.cssText = 'cursor: pointer;';
 
-    const melodyLabel = document.createElement('label');
+    const melodyLabel = document.createElement('
     melodyLabel.htmlFor = 'melody-awareness-checkbox';
     melodyLabel.style.cssText = 'font-size: 12px; color: #6b7280; cursor: pointer;';
 
@@ -6708,7 +6692,7 @@ function renderSequencesView(container) {
 
     melodyCheckbox.addEventListener('change', () => {
         modalState.melodyAwarenessEnabled = melodyCheckbox.checked;
-        localStorage.setItem('chord-suggestion-melody-awareness', melodyCheckbox.checked ? 'true' : 'false');
+        localStorage.setItem('chord-suggestion-melody-awareness', melodyCheckbox.checked ? 'true' : '
         showLoadingSplash(container);
         setTimeout(() => renderSequencesView(container), 50);
     });
@@ -6720,7 +6704,7 @@ function renderSequencesView(container) {
     container.appendChild(advancedControlsRow);
 
     // Create a container for the sequence cards (will be populated async)
-    const sequencesContainer = document.createElement('div');
+    const sequencesContainer = document.createElement('
     sequencesContainer.id = 'sequences-results-container';
     container.appendChild(sequencesContainer);
 
@@ -6833,8 +6817,6 @@ function renderSequencesView(container) {
                 10,             // limit - show 10 sequences
                 sectionInfo,    // pass section intent for scoring
                 getContextAwareMode(),  // pass context mode for weight calculation
-                melodyOptions   // Enhancement B: pass melody options
-            );
         }
 
         // Clear loading indicator
@@ -6865,7 +6847,7 @@ function renderSequencesView(container) {
  */
 function renderSequenceCards(container, sequences, currentChord, currentSymbol, key, progressionData, tensionDirection, sectionInfo, hasMelody = false) {
     sequences.forEach((seq, idx) => {
-        const seqCard = document.createElement('div');
+        const seqCard = document.createElement('
         seqCard.style.cssText = `
             padding: 8px 10px;
             background: white;
@@ -6875,7 +6857,7 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
         `;
 
         // Single row: sequence number, chords, and score all together
-        const mainRow = document.createElement('div');
+        const mainRow = document.createElement('
         mainRow.style.cssText = `
             display: flex;
             align-items: center;
@@ -6884,7 +6866,7 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
         `;
 
         // Sequence number badge
-        const titleSpan = document.createElement('span');
+        const titleSpan = document.createElement('
         titleSpan.style.cssText = 'font-size: 10px; font-weight: 600; color: #9ca3af; background: #f3f4f6; padding: 2px 5px; border-radius: 3px; flex-shrink: 0;';
         titleSpan.textContent = `${idx + 1}`;
         mainRow.appendChild(titleSpan);
@@ -6893,7 +6875,7 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
         const allChips = [];
 
         // Add current chord at start - compact
-        const currentChip = document.createElement('button');
+        const currentChip = document.createElement('
         currentChip.style.cssText = `
             padding: 3px 6px;
             background: #fef3c7;
@@ -6914,7 +6896,7 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
         allChips.push(currentChip);
 
         // Arrow after current chord
-        const firstArrow = document.createElement('span');
+        const firstArrow = document.createElement('
         firstArrow.textContent = '→';
         firstArrow.style.cssText = 'color: #d1d5db; font-size: 10px;';
         mainRow.appendChild(firstArrow);
@@ -6935,10 +6917,10 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
             const isFirstChord = chordIdx === 0;
 
             // Create a wrapper for the chip + why button
-            const chipWrapper = document.createElement('div');
+            const chipWrapper = document.createElement('
             chipWrapper.style.cssText = 'position: relative; display: inline-block;';
 
-            const chip = document.createElement('button');
+            const chip = document.createElement('
 
             // First chord (the "next" chord) gets a distinct teal/cyan highlight
             chip.style.cssText = isFirstChord ? `
@@ -6969,7 +6951,7 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
             setupHoldToPlay(chip, chord);
 
             // Create the "?" button that appears on hover
-            const whyBtn = document.createElement('button');
+            const whyBtn = document.createElement('
             whyBtn.textContent = '?';
             whyBtn.style.cssText = `
                 position: absolute;
@@ -7032,7 +7014,7 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
 
             // Arrow between chords (but not after the last one)
             if (chordIdx < seq.chords.length - 1) {
-                const arrow = document.createElement('span');
+                const arrow = document.createElement('
                 arrow.textContent = '→';
                 arrow.style.cssText = 'color: #d1d5db; font-size: 10px;';
                 mainRow.appendChild(arrow);
@@ -7040,7 +7022,7 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
         });
 
         // Spacer to push score to the right
-        const spacer = document.createElement('div');
+        const spacer = document.createElement('
         spacer.style.cssText = 'flex: 1; min-width: 8px;';
         mainRow.appendChild(spacer);
 
@@ -7050,7 +7032,7 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
             const compatScore = Math.round(compat.score || 0);
             let badgeColor = compatScore >= 80 ? '#10b981' : compatScore >= 60 ? '#f59e0b' : compatScore >= 40 ? '#f97316' : '#ef4444';
 
-            const melodyBadge = document.createElement('span');
+            const melodyBadge = document.createElement('
             melodyBadge.style.cssText = `
                 padding: 2px 5px;
                 background: ${badgeColor}20;
@@ -7066,7 +7048,7 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
         }
 
         // Score badge
-        const scoreBadge = document.createElement('span');
+        const scoreBadge = document.createElement('
         const scoreValue = Math.min(100, Math.round(seq.totalScore || 70));
         const quality = getScoreQualityLabel(scoreValue);
         scoreBadge.className = 'score-badge-interactive';
@@ -7100,7 +7082,7 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
         seqCard.appendChild(mainRow);
 
         // Second row: reason text and action buttons
-        const actionsRow = document.createElement('div');
+        const actionsRow = document.createElement('
         actionsRow.style.cssText = `
             display: flex;
             align-items: center;
@@ -7110,13 +7092,13 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
         `;
 
         // Reason text - compact
-        const reason = document.createElement('span');
+        const reason = document.createElement('
         reason.style.cssText = 'font-size: 10px; color: #9ca3af; flex: 1; min-width: 100px;';
         reason.textContent = seq.reason || describeSequence(seq.chords, key) || 'Smooth harmonic progression';
         actionsRow.appendChild(reason);
 
         // Play sequence button - with text
-        const playBtn = document.createElement('button');
+        const playBtn = document.createElement('
         playBtn.innerHTML = '▶ Play';
         playBtn.title = 'Play sequence';
         playBtn.style.cssText = `
@@ -7157,7 +7139,7 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
         actionsRow.appendChild(playBtn);
 
         // Add all button - compact
-        const addAllBtn = document.createElement('button');
+        const addAllBtn = document.createElement('
         addAllBtn.innerHTML = '+Add';
         addAllBtn.title = 'Add all chords to progression';
         addAllBtn.style.cssText = `
@@ -7184,7 +7166,7 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
 
         // Expand button - shows more options with the first chord (e.g., "More F7 Options")
         const firstChordRoot = seq.chords[0]?.root || '?';
-        const expandBtn = document.createElement('button');
+        const expandBtn = document.createElement('
         expandBtn.innerHTML = `More ${firstChordDisplay}`;
         expandBtn.title = `Show more sequences starting with ${firstChordDisplay}`;
         expandBtn.style.cssText = `
@@ -7199,7 +7181,7 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
         `;
 
         // Container for expanded alternatives - indented with teal left border
-        const expandedContainer = document.createElement('div');
+        const expandedContainer = document.createElement('
         expandedContainer.style.cssText = `
             display: none;
             margin-top: 8px;
@@ -7244,8 +7226,6 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
                             sectionInfo,
                             getContextAwareMode(),
                             null,  // melodyOptions
-                            seq.chords  // excludeSequence - filter out the primary
-                        );
 
                         renderExpandedAlternatives(expandedContainer, alternatives, currentChord, key, sectionInfo);
                         expandedContainer.dataset.loaded = 'true';
@@ -7277,7 +7257,7 @@ function renderExpandedAlternatives(container, alternatives, currentChord, key, 
         return;
     }
 
-    const header = document.createElement('div');
+    const header = document.createElement('
     header.style.cssText = 'font-size: 11px; color: #0f766e; margin-bottom: 6px; font-weight: 500;';
     header.textContent = `${alternatives.length} alternative${alternatives.length > 1 ? 's' : ''} starting with same chord:`;
     container.appendChild(header);
@@ -7286,7 +7266,7 @@ function renderExpandedAlternatives(container, alternatives, currentChord, key, 
 
     alternatives.forEach((alt, altIdx) => {
         // Single row layout matching primary sequence cards
-        const altRow = document.createElement('div');
+        const altRow = document.createElement('
         altRow.style.cssText = `
             padding: 6px 10px;
             background: #f0fdfa;
@@ -7302,7 +7282,7 @@ function renderExpandedAlternatives(container, alternatives, currentChord, key, 
         const altChips = [];
 
         // Current chord chip (yellow - context) - with hold-to-play
-        const currChip = document.createElement('span');
+        const currChip = document.createElement('
         const currInvLabel = getInversionLabel(currentChord.inversion);
         const spelledCurrRoot = spellNoteInKey(currentChord.root, key);
         currChip.style.cssText = `
@@ -7329,7 +7309,7 @@ function renderExpandedAlternatives(container, alternatives, currentChord, key, 
         altChips.push(currChip);
 
         // Arrow
-        const arrow1 = document.createElement('span');
+        const arrow1 = document.createElement('
         arrow1.textContent = '→';
         arrow1.style.cssText = 'color: #9ca3af; font-size: 11px;';
         altRow.appendChild(arrow1);
@@ -7342,7 +7322,7 @@ function renderExpandedAlternatives(container, alternatives, currentChord, key, 
             const spelledRoot = spellNoteInKey(chord.root, key);
             const isFirstChord = chordIdx === 0;
 
-            const chip = document.createElement('span');
+            const chip = document.createElement('
             // First chord highlighted in teal (same as primary rows)
             chip.style.cssText = isFirstChord ? `
                 padding: 3px 6px;
@@ -7382,7 +7362,7 @@ function renderExpandedAlternatives(container, alternatives, currentChord, key, 
             altChips.push(chip);
 
             if (chordIdx < alt.chords.length - 1) {
-                const arrow = document.createElement('span');
+                const arrow = document.createElement('
                 arrow.textContent = '→';
                 arrow.style.cssText = 'color: #9ca3af; font-size: 11px;';
                 altRow.appendChild(arrow);
@@ -7391,7 +7371,7 @@ function renderExpandedAlternatives(container, alternatives, currentChord, key, 
 
         // Score badge
         const scoreValue = Math.min(100, Math.round(alt.totalScore || alt.score || 70));
-        const scoreBadge = document.createElement('span');
+        const scoreBadge = document.createElement('
         scoreBadge.style.cssText = `
             padding: 2px 6px;
             background: ${getScoreColor(scoreValue)};
@@ -7408,7 +7388,7 @@ function renderExpandedAlternatives(container, alternatives, currentChord, key, 
         altRow.appendChild(scoreBadge);
 
         // Play button - soft blue style matching primary rows
-        const playAltBtn = document.createElement('button');
+        const playAltBtn = document.createElement('
         playAltBtn.innerHTML = '▶ Play';
         playAltBtn.title = 'Play this sequence';
         playAltBtn.style.cssText = `
@@ -7447,7 +7427,7 @@ function renderExpandedAlternatives(container, alternatives, currentChord, key, 
         altRow.appendChild(playAltBtn);
 
         // Add All button - soft indigo style matching primary rows
-        const addAltBtn = document.createElement('button');
+        const addAltBtn = document.createElement('
         addAltBtn.innerHTML = '+ Add';
         addAltBtn.title = 'Add all chords to progression';
         addAltBtn.style.cssText = `
@@ -7540,7 +7520,7 @@ function renderMelodyTab(container) {
     const currentChord = progressionData[selectedIndex] || null;
 
     // View toggle (Notes vs Phrases)
-    const viewToggle = document.createElement('div');
+    const viewToggle = document.createElement('
     viewToggle.style.cssText = `
         display: flex;
         gap: 4px;
@@ -7593,7 +7573,7 @@ function renderMelodyTab(container) {
     });
 
     // Context display (shared between views)
-    const contextSection = document.createElement('div');
+    const contextSection = document.createElement('
     contextSection.style.cssText = `
         display: flex;
         gap: 16px;
@@ -7662,7 +7642,7 @@ function renderMelodyNotesView(container, currentChord, key) {
 
     if (isMultiChordSelected) {
         const rangeCount = Math.abs(modalState.melodySelectedChordEnd - modalState.melodySelectedChordStart) + 1;
-        const infoBox = document.createElement('div');
+        const infoBox = document.createElement('
         infoBox.style.cssText = `
             background: #eff6ff;
             border: 1px solid #bfdbfe;
@@ -7680,7 +7660,7 @@ function renderMelodyNotesView(container, currentChord, key) {
     }
 
     // Build the controls section for single notes
-    const controlsSection = document.createElement('div');
+    const controlsSection = document.createElement('
     controlsSection.style.cssText = `
         display: flex;
         gap: 12px;
@@ -7693,19 +7673,19 @@ function renderMelodyNotesView(container, currentChord, key) {
     `;
 
     // Create contour control
-    const contourDiv = document.createElement('div');
+    const contourDiv = document.createElement('
     contourDiv.style.cssText = 'display: flex; align-items: center; gap: 8px;';
 
-    const contourLabel = document.createElement('label');
+    const contourLabel = document.createElement('
     contourLabel.style.cssText = 'font-size: 13px; color: #6b7280;';
     contourLabel.textContent = 'Contour:';
     contourDiv.appendChild(contourLabel);
 
-    const contourSelect = document.createElement('select');
+    const contourSelect = document.createElement('
     contourSelect.id = 'melody-contour-select';
     contourSelect.style.cssText = 'padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: white;';
     MELODY_CONTOUR_PRESETS.forEach(p => {
-        const option = document.createElement('option');
+        const option = document.createElement('
         option.value = p.id;
         option.textContent = p.label;
         if (p.id === modalState.melodyContourId) option.selected = true;
@@ -7720,19 +7700,19 @@ function renderMelodyNotesView(container, currentChord, key) {
     controlsSection.appendChild(contourDiv);
 
     // Create octave control
-    const octaveDiv = document.createElement('div');
+    const octaveDiv = document.createElement('
     octaveDiv.style.cssText = 'display: flex; align-items: center; gap: 8px;';
 
-    const octaveLabel = document.createElement('label');
+    const octaveLabel = document.createElement('
     octaveLabel.style.cssText = 'font-size: 13px; color: #6b7280;';
     octaveLabel.textContent = 'Octave:';
     octaveDiv.appendChild(octaveLabel);
 
-    const octaveSelect = document.createElement('select');
+    const octaveSelect = document.createElement('
     octaveSelect.id = 'melody-octave-select';
     octaveSelect.style.cssText = 'padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: white;';
     [3, 4, 5, 6].forEach(o => {
-        const option = document.createElement('option');
+        const option = document.createElement('
         option.value = o;
         option.textContent = o;
         if (o === modalState.melodyOctave) option.selected = true;
@@ -7749,7 +7729,7 @@ function renderMelodyNotesView(container, currentChord, key) {
     container.appendChild(controlsSection);
 
     // Suggestions container - no nested scrolling, let modal body handle scroll
-    const suggestionsContainer = document.createElement('div');
+    const suggestionsContainer = document.createElement('
     suggestionsContainer.id = 'melody-suggestions-container';
     suggestionsContainer.style.cssText = `
         display: flex;
@@ -7829,7 +7809,7 @@ function renderMelodyPhrasesView(container, currentChord, key) {
     }
 
     // Position Mode Toggle (Add to End vs Add for Section) - compact version
-    const positionModeSection = document.createElement('div');
+    const positionModeSection = document.createElement('
     positionModeSection.style.cssText = `
         display: flex;
         gap: 2px;
@@ -7873,7 +7853,7 @@ function renderMelodyPhrasesView(container, currentChord, key) {
 
     // Section Mode: Show current selection info and direct to Progression picker
     if (isSectionMode) {
-        const selectorWrapper = document.createElement('div');
+        const selectorWrapper = document.createElement('
         selectorWrapper.style.cssText = `
             margin-bottom: 8px;
             padding: 6px 10px;
@@ -7904,7 +7884,7 @@ function renderMelodyPhrasesView(container, currentChord, key) {
 
         const totalBeats = getSelectedDuration();
 
-        const selectorLabel = document.createElement('div');
+        const selectorLabel = document.createElement('
         selectorLabel.style.cssText = 'font-size: 11px; font-weight: 600; color: #1e40af;';
         if (hasSelection) {
             if (isMultiChord) {
@@ -7953,7 +7933,7 @@ function renderMelodyPhrasesView(container, currentChord, key) {
     });
 
     // Build the controls section for phrases - organized in logical groups
-    const controlsSection = document.createElement('div');
+    const controlsSection = document.createElement('
     controlsSection.style.cssText = `
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -8182,7 +8162,7 @@ function renderMelodyPhrasesView(container, currentChord, key) {
     container.appendChild(controlsSection);
 
     // Phrases container - no nested scrolling, let modal body handle scroll
-    const phrasesContainer = document.createElement('div');
+    const phrasesContainer = document.createElement('
     phrasesContainer.id = 'phrase-suggestions-container';
     phrasesContainer.style.cssText = `
         display: flex;
@@ -8212,14 +8192,14 @@ function renderMelodyPhrasesView(container, currentChord, key) {
 }
 
 function setupPhraseControlListeners(currentChord, key, phrasesContainer) {
-    const styleSelect = document.getElementById('phrase-style-select');
-    const sectionSelect = document.getElementById('phrase-section-select');
-    const contourSelect = document.getElementById('phrase-contour-select');
-    const lengthSelect = document.getElementById('phrase-length-select');
-    const rhythmSelect = document.getElementById('phrase-rhythm-select');
-    const densitySelect = document.getElementById('phrase-density-select');
-    const rangeSelect = document.getElementById('phrase-range-select');
-    const octaveSelect = document.getElementById('phrase-octave-select');
+    const styleSelect = document.getElementById('phrase-style-
+    const sectionSelect = document.getElementById('phrase-section-
+    const contourSelect = document.getElementById('phrase-contour-
+    const lengthSelect = document.getElementById('phrase-length-
+    const rhythmSelect = document.getElementById('phrase-rhythm-
+    const densitySelect = document.getElementById('phrase-density-
+    const rangeSelect = document.getElementById('phrase-range-
+    const octaveSelect = document.getElementById('phrase-octave-
 
     // Helper to update state and auto-regenerate
     const updateAndRegenerate = () => {
@@ -8377,11 +8357,11 @@ function generateAndDisplayPhrases(container, chord, key) {
         const styleId = modalState.style || sectionStyleMap[effectiveSectionType] || 'balanced';
 
         // Log style and mood for debugging
-        console.log(`[Melody Tab] Generating phrases with styleId: ${styleId}, mood: ${modalState.mood}`);
+
 
         // Log target beats for debugging
         if (isSectionModeWithChord) {
-            console.log(`Generating phrases for ${maxChordIdx - minChordIdx + 1} chord(s), targetBeats: ${targetBeats}`);
+
         }
 
         const candidates = generatePhraseCandidates({
@@ -8406,7 +8386,7 @@ function generateAndDisplayPhrases(container, chord, key) {
                 if (!phrase.rhythm) return;
                 const actualBeats = phrase.rhythm.reduce((sum, r) => sum + r, 0);
                 if (Math.abs(actualBeats - targetBeats) > 0.01) {
-                    console.warn(`Phrase ${idx + 1}: expected ${targetBeats} beats, got ${actualBeats.toFixed(2)}`);
+
                 }
             });
         }
@@ -8415,7 +8395,7 @@ function generateAndDisplayPhrases(container, chord, key) {
         displayPhraseCandidates(container, candidates, key);
 
     } catch (error) {
-        console.error('Error generating phrases:', error);
+
         container.innerHTML = `
             <div style="text-align: center; padding: 32px; color: #ef4444;">
                 <p>Error generating phrases. Please try again.</p>
@@ -8446,7 +8426,7 @@ function displayPhraseCandidates(container, candidates, key) {
 }
 
 function createPhraseCard(phrase, index, key) {
-    const card = document.createElement('div');
+    const card = document.createElement('
     card.className = 'phrase-card';
     const phraseKey = key || getCurrentKey() || 'C';
     card.style.cssText = `
@@ -8605,7 +8585,7 @@ function createPhraseCard(phrase, index, key) {
     });
 
     // Play button - use mousedown for immediate playback (consistent with rest of site)
-    const playBtn = card.querySelector('.play-phrase-btn');
+    const playBtn = card.querySelector('.play-phrase-
     playBtn.addEventListener('mousedown', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -8623,7 +8603,7 @@ function createPhraseCard(phrase, index, key) {
     });
 
     // Add phrase score tooltip handlers
-    const phraseScoreBadge = card.querySelector('.phrase-score-interactive');
+    const phraseScoreBadge = card.querySelector('.phrase-score-
     if (phraseScoreBadge) {
         phraseScoreBadge.addEventListener('mouseenter', (e) => {
             e.stopPropagation();
@@ -8636,13 +8616,13 @@ function createPhraseCard(phrase, index, key) {
     }
 
     // Toggle view button (line graph vs grand staff)
-    const toggleBtn = card.querySelector('.toggle-view-btn');
-    const contourView = card.querySelector('.phrase-contour-view');
-    const staffView = card.querySelector('.phrase-staff-view');
+    const toggleBtn = card.querySelector('.toggle-view-
+    const contourView = card.querySelector('.phrase-contour-
+    const staffView = card.querySelector('.phrase-staff-
 
     // If starting in staff view mode, render the staff immediately
     if (modalState.phraseViewMode === 'staff') {
-        const staffContainer = card.querySelector('.phrase-staff-container');
+        const staffContainer = card.querySelector('.phrase-staff-
         if (staffContainer && !staffContainer.dataset.rendered) {
             renderPhraseGrandStaff(staffContainer, phrase);
             staffContainer.dataset.rendered = 'true';
@@ -8657,9 +8637,9 @@ function createPhraseCard(phrase, index, key) {
 
         // Update ALL phrase cards to reflect the new mode
         document.querySelectorAll('.phrase-card').forEach(phraseCard => {
-            const cardContourView = phraseCard.querySelector('.phrase-contour-view');
-            const cardStaffView = phraseCard.querySelector('.phrase-staff-view');
-            const cardToggleBtn = phraseCard.querySelector('.toggle-view-btn');
+            const cardContourView = phraseCard.querySelector('.phrase-contour-
+            const cardStaffView = phraseCard.querySelector('.phrase-staff-
+            const cardToggleBtn = phraseCard.querySelector('.toggle-view-
 
             if (newMode === 'staff') {
                 if (cardContourView) cardContourView.style.display = 'none';
@@ -8667,7 +8647,7 @@ function createPhraseCard(phrase, index, key) {
                 if (cardToggleBtn) cardToggleBtn.innerHTML = '📈 Graph';
 
                 // Render grand staff if not already rendered
-                const staffContainer = phraseCard.querySelector('.phrase-staff-container');
+                const staffContainer = phraseCard.querySelector('.phrase-staff-
                 if (staffContainer && !staffContainer.dataset.rendered) {
                     // Get phrase data from the card's index
                     const cardIndex = parseInt(phraseCard.querySelector('.toggle-view-btn')?.dataset.index || '0');
@@ -8686,7 +8666,7 @@ function createPhraseCard(phrase, index, key) {
     });
 
     // Apply button
-    const applyBtn = card.querySelector('.apply-phrase-btn');
+    const applyBtn = card.querySelector('.apply-phrase-
     applyBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         applyPhrase(phrase);
@@ -8780,7 +8760,7 @@ function renderPhraseGrandStaff(container, phrase) {
 
     // Clear container and create canvas
     container.innerHTML = '';
-    const canvas = document.createElement('canvas');
+    const canvas = document.createElement('
     canvas.width = 450;
     canvas.height = 170;
     canvas.style.cssText = 'max-width: 100%; height: auto;';
@@ -8819,7 +8799,7 @@ function renderPhraseGrandStaff(container, phrase) {
             enableHarmonicColoring: false
         });
     } catch (e) {
-        console.warn('[Phrase Staff] Render error:', e);
+
         container.innerHTML = `<div style="color: #6b7280; text-align: center; padding: 20px;">${notes.length} notes</div>`;
     }
 }
@@ -8849,7 +8829,7 @@ function playPhrase(phrase) {
         const baseTime = window.Tone?.now?.() || 0;
 
         // Log rhythm for debugging
-        console.log('Playing phrase with rhythm:', rhythm.map(r => r.toFixed(2)).join(', '), `@ ${tempo} BPM`);
+
 
         let currentTime = baseTime;
         notes.forEach((note, i) => {
@@ -8866,7 +8846,7 @@ function playPhrase(phrase) {
         });
 
     } catch (e) {
-        console.warn('Could not play phrase:', e);
+
     }
 }
 
@@ -8914,7 +8894,7 @@ function applyPhrase(phrase) {
     try {
         saveStateBeforeChange();
     } catch (e) {
-        console.warn('[applyPhrase] Could not save state for undo:', e);
+
     }
 
     const compositionState = getCompositionState();
@@ -8964,7 +8944,7 @@ function applyPhrase(phrase) {
 
             // If phrase exceeds max, truncate notes to fit
             if (totalPhraseBeats > maxDuration + 0.01) {
-                console.log(`Truncating phrase from ${totalPhraseBeats} to ${maxDuration} beats`);
+
 
                 let accumulatedBeats = 0;
                 let truncateIndex = 0;
@@ -9004,7 +8984,7 @@ function applyPhrase(phrase) {
         // In section mode, use direct unit positioning to place notes at exact beat positions
         if (isSectionModeWithChord && insertAtBeat !== null && maxDuration !== null) {
             const totalPhraseBeats = rhythm.reduce((sum, r) => sum + r, 0);
-            console.log(`Applying phrase to section: ${notes.length} notes, ${totalPhraseBeats} beats at beat ${insertAtBeat}`);
+
 
             // Use addTrebleNoteAtUnit to place notes directly at specific positions
             if (compositionState?.addTrebleNoteAtUnit) {
@@ -9038,12 +9018,12 @@ function applyPhrase(phrase) {
                     window.renderNotation();
                 }
 
-                console.log(`Applied phrase: ${addedCount}/${notes.length} notes (${totalPhraseBeats.toFixed(1)} beats)`);
+
 
                 // Visual feedback
-                const cards = document.querySelectorAll('.phrase-card');
+                const cards = document.querySelectorAll('.phrase-
                 cards.forEach((card, idx) => {
-                    const applyBtn = card.querySelector('.apply-phrase-btn');
+                    const applyBtn = card.querySelector('.apply-phrase-
                     if (modalState.currentPhraseCandidates[idx] === phrase && applyBtn) {
                         applyBtn.textContent = `Applied ${addedCount} notes!`;
                         applyBtn.style.background = '#0284c7';
@@ -9059,12 +9039,12 @@ function applyPhrase(phrase) {
 
         // Fallback for add-to-end mode: use addNoteIntelligently
         if (!window.addNoteIntelligently) {
-            console.warn('addNoteIntelligently function not available');
+
             return;
         }
 
         const totalPhraseBeats = rhythm.reduce((sum, r) => sum + r, 0);
-        console.log(`Applying phrase (add-to-end): ${notes.length} notes, ${totalPhraseBeats} beats total`);
+
 
         let addedCount = 0;
         for (let i = 0; i < notes.length; i++) {
@@ -9078,8 +9058,6 @@ function applyPhrase(phrase) {
                 dotted,
                 'treble',
                 false,
-                null
-            );
 
             if (result) {
                 addedCount++;
@@ -9087,12 +9065,12 @@ function applyPhrase(phrase) {
         }
 
         const totalBeats = rhythm.reduce((sum, r) => sum + r, 0);
-        console.log(`Applied phrase: ${addedCount}/${notes.length} notes (${totalBeats.toFixed(1)} beats)`);
+
 
         // Visual feedback on the apply button
-        const cards = document.querySelectorAll('.phrase-card');
+        const cards = document.querySelectorAll('.phrase-
         cards.forEach((card, i) => {
-            const applyBtn = card.querySelector('.apply-phrase-btn');
+            const applyBtn = card.querySelector('.apply-phrase-
             if (modalState.currentPhraseCandidates[i] === phrase && applyBtn) {
                 applyBtn.textContent = `Applied ${addedCount} notes!`;
                 applyBtn.style.background = '#0284c7';
@@ -9106,7 +9084,7 @@ function applyPhrase(phrase) {
 
     // In section mode, we automatically clear existing notes in that section, so just apply directly
     if (isSectionModeWithChord) {
-        doApply('replace');
+        doApply('
         return;
     }
 
@@ -9139,7 +9117,7 @@ function applyPhrase(phrase) {
         });
     } else {
         // No existing notes, just apply directly
-        doApply('append');
+        doApply('
     }
 }
 
@@ -9191,7 +9169,7 @@ function generateAndDisplayMelodySuggestions(container, chord, key) {
         container.innerHTML = '';
 
         // Info about keyboard shortcuts
-        const shortcutInfo = document.createElement('div');
+        const shortcutInfo = document.createElement('
         shortcutInfo.style.cssText = `
             padding: 8px 12px;
             background: #eff6ff;
@@ -9210,7 +9188,7 @@ function generateAndDisplayMelodySuggestions(container, chord, key) {
         });
 
     } catch (error) {
-        console.error('Error generating melody suggestions:', error);
+
         container.innerHTML = `
             <div style="text-align: center; padding: 32px; color: #ef4444;">
                 <p>Error generating suggestions. Please try again.</p>
@@ -9220,7 +9198,7 @@ function generateAndDisplayMelodySuggestions(container, chord, key) {
 }
 
 function createMelodySuggestionItem(suggestion, index, key) {
-    const item = document.createElement('div');
+    const item = document.createElement('
     item.className = 'melody-suggestion-item';
     item.dataset.note = suggestion.note;
     item.dataset.index = index;
@@ -9331,7 +9309,7 @@ function createMelodySuggestionItem(suggestion, index, key) {
     `;
 
     // Add melody score tooltip handlers
-    const melodyScoreBadge = item.querySelector('.melody-score-interactive');
+    const melodyScoreBadge = item.querySelector('.melody-score-
     if (melodyScoreBadge) {
         melodyScoreBadge.addEventListener('mouseenter', (e) => {
             e.stopPropagation();
@@ -9360,14 +9338,14 @@ function createMelodySuggestionItem(suggestion, index, key) {
     });
 
     // Preview button
-    const previewBtn = item.querySelector('.preview-note-btn');
+    const previewBtn = item.querySelector('.preview-note-
     previewBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         previewMelodyNote(suggestion.note);
     });
 
     // Add note button
-    const addBtn = item.querySelector('.add-note-btn');
+    const addBtn = item.querySelector('.add-note-
     addBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         handleMelodyNoteSelection(suggestion);
@@ -9496,8 +9474,6 @@ function insertMelodyNoteAtEnd(suggestion) {
             dotted,
             'treble',
             false,
-            null
-        );
         return result && result.success;
     }
     return false;
@@ -9524,7 +9500,7 @@ function insertMelodyNoteWithShift(suggestion, selectedInfo) {
     // Get the insertion point (after selected note)
     const noteUnitInfo = compositionState.getTrebleNoteUnit?.(measureIndex, noteIndex);
     if (!noteUnitInfo) {
-        console.warn('Could not get note unit info, falling back to append');
+
         return insertMelodyNoteAtEnd(suggestion);
     }
 
@@ -9602,7 +9578,7 @@ function handleMelodyNoteSelection(suggestion) {
     try {
         saveStateBeforeChange();
     } catch (e) {
-        console.warn('[handleMelodyNoteSelection] Could not save state for undo:', e);
+
     }
 
     // Get the selected note info
@@ -9669,14 +9645,14 @@ function previewMelodyNote(noteName) {
         }
         if (window.initAudio) window.initAudio();
 
-        instrument.triggerAttackRelease(noteName, '4n');
+        instrument.triggerAttackRelease(noteName, '4
     } catch (e) {
-        console.warn('Could not preview note:', e);
+
     }
 }
 
 function refreshMelodySuggestions() {
-    const container = document.getElementById('melody-suggestions-container');
+    const container = document.getElementById('melody-suggestions-
     if (!container) return;
 
     const progressionData = getProgressionData() || [];
@@ -9705,11 +9681,11 @@ function renderSectionTab(container) {
     try {
         recommendationService = getRecommendationService();
     } catch (e) {
-        console.warn('Recommendation service not available:', e);
+
     }
 
     // Current structure visualization
-    const structureSection = document.createElement('div');
+    const structureSection = document.createElement('
     structureSection.style.cssText = `
         padding: 16px;
         background: #f9fafb;
@@ -9726,11 +9702,11 @@ function renderSectionTab(container) {
     // Get sections if available
     const sections = compositionState?.getSections?.() || compositionState?.sections || [];
     if (sections.length > 0) {
-        const sectionRow = document.createElement('div');
+        const sectionRow = document.createElement('
         sectionRow.style.cssText = 'display: flex; gap: 8px; flex-wrap: wrap;';
         sections.forEach((sec, idx) => {
             const secInfo = SECTION_TYPES.find(s => s.id === sec.type) || { name: sec.type, icon: '📄' };
-            const chip = document.createElement('span');
+            const chip = document.createElement('
             chip.style.cssText = `
                 padding: 6px 12px;
                 background: ${idx === sections.length - 1 ? '#dbeafe' : '#e5e7eb'};
@@ -9756,7 +9732,7 @@ function renderSectionTab(container) {
     container.appendChild(structureSection);
 
     // Next section suggestion
-    const suggestionSection = document.createElement('div');
+    const suggestionSection = document.createElement('
     suggestionSection.style.cssText = `
         padding: 16px;
         background: white;
@@ -9812,7 +9788,7 @@ function renderSectionTab(container) {
     container.appendChild(suggestionSection);
 
     // Generate section panel
-    const generateSection = document.createElement('div');
+    const generateSection = document.createElement('
     generateSection.style.cssText = `
         padding: 16px;
         background: white;
@@ -9875,7 +9851,7 @@ function renderSectionTab(container) {
     container.appendChild(generateSection);
 
     // Preview container (initially hidden)
-    const previewContainer = document.createElement('div');
+    const previewContainer = document.createElement('
     previewContainer.id = 'section-preview-container';
     previewContainer.style.cssText = `
         padding: 16px;
@@ -9918,7 +9894,7 @@ function setupSectionTabListeners(recommendationService) {
     });
 
     // Generate button
-    const generateBtn = document.getElementById('generate-section-btn');
+    const generateBtn = document.getElementById('generate-section-
     if (generateBtn) {
         generateBtn.addEventListener('click', () => handleGenerateSectionClick(recommendationService));
         generateBtn.addEventListener('mouseenter', () => {
@@ -9932,9 +9908,9 @@ function setupSectionTabListeners(recommendationService) {
     }
 
     // Selection change handlers
-    const typeSelect = document.getElementById('gen-section-type');
-    const styleSelect = document.getElementById('gen-style-select');
-    const lengthSelect = document.getElementById('gen-length-select');
+    const typeSelect = document.getElementById('gen-section-
+    const styleSelect = document.getElementById('gen-style-
+    const lengthSelect = document.getElementById('gen-length-
 
     if (typeSelect) {
         typeSelect.addEventListener('change', () => {
@@ -9954,7 +9930,7 @@ function setupSectionTabListeners(recommendationService) {
 }
 
 function handleGenerateSectionClick(recommendationService) {
-    const previewContainer = document.getElementById('section-preview-container');
+    const previewContainer = document.getElementById('section-preview-
     if (!previewContainer) return;
 
     const sectionType = modalState.generateSectionType;
@@ -9987,7 +9963,7 @@ function handleGenerateSectionClick(recommendationService) {
             });
         }
     } catch (e) {
-        console.error('Error generating sections:', e);
+
     }
 
     // If no results from the service, generate fallback options
@@ -10390,9 +10366,9 @@ function displaySectionOptionsPreview(container, options, key, style, length, se
     });
 
     // Set up button handlers
-    const applyBtn = document.getElementById('apply-section-btn');
-    const regenBtn = document.getElementById('regenerate-section-btn');
-    const playBtn = document.getElementById('play-preview-btn');
+    const applyBtn = document.getElementById('apply-section-
+    const regenBtn = document.getElementById('regenerate-section-
+    const playBtn = document.getElementById('play-preview-
 
     if (applyBtn) {
         applyBtn.addEventListener('click', () => {
@@ -10501,9 +10477,9 @@ function displaySectionPreview(container, result, key) {
     `;
 
     // Set up button handlers
-    const applyBtn = document.getElementById('apply-section-btn');
-    const regenBtn = document.getElementById('regenerate-section-btn');
-    const playBtn = document.getElementById('play-preview-btn');
+    const applyBtn = document.getElementById('apply-section-
+    const regenBtn = document.getElementById('regenerate-section-
+    const playBtn = document.getElementById('play-preview-
 
     if (applyBtn) {
         applyBtn.addEventListener('click', () => applySectionToComposition(result));
@@ -10536,7 +10512,7 @@ function applySectionToComposition(result) {
     }));
 
     // Show success feedback
-    const container = document.getElementById('section-preview-container');
+    const container = document.getElementById('section-preview-
     if (container) {
         container.style.background = '#dcfce7';
         container.style.borderColor = '#22c55e';
@@ -10592,7 +10568,7 @@ function renderHarmonizeTab(container) {
     }
 
     // Subtitle with key info
-    const subtitle = document.createElement('p');
+    const subtitle = document.createElement('
     subtitle.textContent = `Analyzing ${melodyNotes.length} melody note${melodyNotes.length !== 1 ? 's' : ''} in ${key}`;
     subtitle.style.cssText = `
         margin: 0 0 16px 0;
@@ -10602,7 +10578,7 @@ function renderHarmonizeTab(container) {
     container.appendChild(subtitle);
 
     // Options Panel
-    const optionsPanel = document.createElement('div');
+    const optionsPanel = document.createElement('
     optionsPanel.style.cssText = `
         background-color: #f8fafc;
         border: 1px solid #e2e8f0;
@@ -10612,7 +10588,7 @@ function renderHarmonizeTab(container) {
     `;
 
     // Options header
-    const optionsHeader = document.createElement('div');
+    const optionsHeader = document.createElement('
     optionsHeader.style.cssText = `
         display: flex;
         justify-content: space-between;
@@ -10626,7 +10602,7 @@ function renderHarmonizeTab(container) {
     optionsPanel.appendChild(optionsHeader);
 
     // Options content
-    const optionsContent = document.createElement('div');
+    const optionsContent = document.createElement('
     optionsContent.style.cssText = `
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -10635,8 +10611,8 @@ function renderHarmonizeTab(container) {
 
     // Helper to create labeled select
     const createLabeledSelect = (label, options, currentValue, onChange) => {
-        const wrapper = document.createElement('div');
-        const labelEl = document.createElement('label');
+        const wrapper = document.createElement('
+        const labelEl = document.createElement('
         labelEl.textContent = label;
         labelEl.style.cssText = `
             display: block;
@@ -10647,7 +10623,7 @@ function renderHarmonizeTab(container) {
         `;
         wrapper.appendChild(labelEl);
 
-        const select = document.createElement('select');
+        const select = document.createElement('
         select.style.cssText = `
             width: 100%;
             padding: 8px 10px;
@@ -10660,7 +10636,7 @@ function renderHarmonizeTab(container) {
         `;
 
         Object.entries(options).forEach(([value, option]) => {
-            const opt = document.createElement('option');
+            const opt = document.createElement('
             opt.value = value;
             opt.textContent = typeof option === 'string' ? option : option.name;
             if (value === currentValue) opt.selected = true;
@@ -10699,7 +10675,7 @@ function renderHarmonizeTab(container) {
     optionsContent.appendChild(sectionSelect);
 
     // Bass options row (spans full width)
-    const bassRow = document.createElement('div');
+    const bassRow = document.createElement('
     bassRow.style.cssText = `
         grid-column: 1 / -1;
         display: flex;
@@ -10710,13 +10686,13 @@ function renderHarmonizeTab(container) {
     `;
 
     // Bass checkbox
-    const bassCheckWrapper = document.createElement('div');
+    const bassCheckWrapper = document.createElement('
     bassCheckWrapper.style.cssText = 'display: flex; align-items: center; gap: 8px;';
-    const bassCheck = document.createElement('input');
+    const bassCheck = document.createElement('
     bassCheck.type = 'checkbox';
     bassCheck.checked = modalState.harmonizeGenerateBass;
     bassCheck.style.cssText = 'cursor: pointer;';
-    const bassLabel = document.createElement('span');
+    const bassLabel = document.createElement('
     bassLabel.textContent = 'Generate Bass Line';
     bassLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: #374151; cursor: pointer;';
     bassLabel.addEventListener('click', () => {
@@ -10728,9 +10704,9 @@ function renderHarmonizeTab(container) {
     bassRow.appendChild(bassCheckWrapper);
 
     // Bass style select
-    const bassStyleWrapper = document.createElement('div');
+    const bassStyleWrapper = document.createElement('
     bassStyleWrapper.style.cssText = `flex: 1; opacity: ${modalState.harmonizeGenerateBass ? '1' : '0.5'};`;
-    const bassSelect = document.createElement('select');
+    const bassSelect = document.createElement('
     bassSelect.disabled = !modalState.harmonizeGenerateBass;
     bassSelect.style.cssText = `
         width: 100%;
@@ -10742,10 +10718,10 @@ function renderHarmonizeTab(container) {
         background-color: white;
     `;
     Object.entries(BASS_STYLE_CATEGORIES).forEach(([category, patterns]) => {
-        const optgroup = document.createElement('optgroup');
+        const optgroup = document.createElement('
         optgroup.label = category;
         Object.entries(patterns).forEach(([value, name]) => {
-            const opt = document.createElement('option');
+            const opt = document.createElement('
             opt.value = value;
             opt.textContent = name;
             if (value === modalState.harmonizeBassStyle) opt.selected = true;
@@ -10770,7 +10746,7 @@ function renderHarmonizeTab(container) {
     container.appendChild(optionsPanel);
 
     // Suggestions container
-    const suggestionsContainer = document.createElement('div');
+    const suggestionsContainer = document.createElement('
     suggestionsContainer.id = 'harmonize-suggestions-container';
     suggestionsContainer.style.cssText = `
         display: flex;
@@ -10795,8 +10771,8 @@ function renderHarmonizeTab(container) {
         suggestions.forEach(measure => {
             if (measure.suggestions?.length > 1) {
                 measure.suggestions.sort((a, b) => {
-                    const aIsCurrent = a.reasons?.includes('Current chord');
-                    const bIsCurrent = b.reasons?.includes('Current chord');
+                    const aIsCurrent = a.reasons?.includes('Current 
+                    const bIsCurrent = b.reasons?.includes('Current 
                     if (aIsCurrent && !bIsCurrent) return -1;
                     if (!aIsCurrent && bIsCurrent) return 1;
                     return b.score - a.score;
@@ -10818,7 +10794,7 @@ function renderHarmonizeTab(container) {
 
     // Function to render suggestions
     function renderHarmonizeSuggestions() {
-        const container = document.getElementById('harmonize-suggestions-container');
+        const container = document.getElementById('harmonize-suggestions-
         if (!container) return;
         container.innerHTML = '';
 
@@ -10835,7 +10811,7 @@ function renderHarmonizeTab(container) {
         }
 
         suggestions.forEach((measure, measureIndex) => {
-            const measureRow = document.createElement('div');
+            const measureRow = document.createElement('
             measureRow.style.cssText = `
                 background-color: #f9fafb;
                 border-radius: 8px;
@@ -10844,7 +10820,7 @@ function renderHarmonizeTab(container) {
             `;
 
             // Measure header
-            const measureHeader = document.createElement('div');
+            const measureHeader = document.createElement('
             measureHeader.style.cssText = `
                 display: flex;
                 justify-content: space-between;
@@ -10858,7 +10834,7 @@ function renderHarmonizeTab(container) {
             measureRow.appendChild(measureHeader);
 
             // Chord options
-            const chordOptionsContainer = document.createElement('div');
+            const chordOptionsContainer = document.createElement('
             chordOptionsContainer.style.cssText = 'display: flex; gap: 8px; flex-wrap: wrap;';
 
             const isExpanded = modalState.harmonizeExpandedMeasures.has(measureIndex);
@@ -10875,9 +10851,9 @@ function renderHarmonizeTab(container) {
                 const inversionLabel = inversion > 0 ? INVERSION_NAMES[inversion] || `Inv ${inversion}` : '';
                 const chordName = `${suggestion.root}${chordSymbol}`;
                 const isSelected = selections[measureIndex] === suggestionIndex;
-                const isCurrentChord = suggestion.reasons?.includes('Current chord');
+                const isCurrentChord = suggestion.reasons?.includes('Current 
 
-                const optionBtn = document.createElement('button');
+                const optionBtn = document.createElement('
                 optionBtn.innerHTML = `
                     <div style="display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap;">
                         <span style="font-weight: 600; font-size: 14px;">${chordName}</span>
@@ -10927,7 +10903,7 @@ function renderHarmonizeTab(container) {
 
             // "See More" / "See Less" button
             if (hasMore) {
-                const seeMoreBtn = document.createElement('button');
+                const seeMoreBtn = document.createElement('
                 const hiddenCount = measure.suggestions.length - INITIAL_VISIBLE;
                 seeMoreBtn.textContent = isExpanded ? 'See Less' : `+${hiddenCount} More`;
                 seeMoreBtn.style.cssText = `
@@ -10962,7 +10938,7 @@ function renderHarmonizeTab(container) {
     regenerateHarmonizeSuggestions();
 
     // Apply button
-    const buttonContainer = document.createElement('div');
+    const buttonContainer = document.createElement('
     buttonContainer.style.cssText = `
         display: flex;
         justify-content: flex-end;
@@ -10971,7 +10947,7 @@ function renderHarmonizeTab(container) {
         border-top: 1px solid #e5e7eb;
     `;
 
-    const applyBtn = document.createElement('button');
+    const applyBtn = document.createElement('
     applyBtn.textContent = 'Apply Harmonization';
     applyBtn.style.cssText = `
         padding: 10px 20px;
@@ -10994,8 +10970,6 @@ function renderHarmonizeTab(container) {
         // Apply the selected harmonization
         const chordProgression = applyHarmonizeSuggestions(
             modalState.harmonizeSuggestions,
-            modalState.harmonizeSelections
-        );
 
         // If bass generation is requested
         if (modalState.harmonizeGenerateBass) {
@@ -11008,7 +10982,7 @@ function renderHarmonizeTab(container) {
                     compState.settings.autoGenerateBass = true;
                 }
             } catch (err) {
-                console.warn('Failed to set bass pattern:', err);
+
             }
         }
 
@@ -11112,10 +11086,10 @@ function renderHarmonizeTab(container) {
 
             // Stay on Melody Composer tab
             if (window.switchTab) {
-                window.switchTab('melody');
+                window.switchTab('
             }
         } catch (err) {
-            console.error('Failed to apply harmonization:', err);
+
         }
 
         closeUnifiedRecommendationModal();
@@ -11324,7 +11298,7 @@ function renderPolyphonyTab(container) {
     }
 
     // Header section
-    const header = document.createElement('div');
+    const header = document.createElement('
     header.style.cssText = 'padding: 16px; border-bottom: 1px solid #e5e7eb; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;';
     header.innerHTML = `
         <h3 style="margin: 0 0 4px 0; font-size: 18px;">Add Texture & Harmony</h3>
@@ -11333,7 +11307,7 @@ function renderPolyphonyTab(container) {
     container.appendChild(header);
 
     // Main content
-    const content = document.createElement('div');
+    const content = document.createElement('
     content.style.cssText = 'padding: 16px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; max-height: 500px;';
 
     // 1. Style & Mood Selector (affects texture recommendations)
@@ -11352,7 +11326,7 @@ function renderPolyphonyTab(container) {
     content.appendChild(previewSection);
 
     // 4. Generated Suggestions
-    const suggestionsSection = document.createElement('div');
+    const suggestionsSection = document.createElement('
     suggestionsSection.id = 'polyphony-suggestions';
     suggestionsSection.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;';
     suggestionsSection.innerHTML = `
@@ -11365,10 +11339,10 @@ function renderPolyphonyTab(container) {
     container.appendChild(content);
 
     // Apply button only (Generate is automatic now)
-    const buttonContainer = document.createElement('div');
+    const buttonContainer = document.createElement('
     buttonContainer.style.cssText = 'padding: 16px; border-top: 1px solid #e5e7eb; display: flex; gap: 12px; justify-content: flex-end;';
 
-    const applyBtn = document.createElement('button');
+    const applyBtn = document.createElement('
     applyBtn.id = 'polyphony-apply-btn';
     applyBtn.textContent = 'Apply to Voice 2';
     applyBtn.className = 'rm-btn rm-btn-apply';
@@ -11385,7 +11359,7 @@ function renderPolyphonyTab(container) {
 }
 
 function createStyleMoodSelector() {
-    const section = document.createElement('div');
+    const section = document.createElement('
     section.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; background: linear-gradient(135deg, #f8f9ff 0%, #fff 100%);';
 
     // Get current style preferences and highlight recommended textures
@@ -11447,14 +11421,14 @@ function createStyleMoodSelector() {
 
     // Add event listeners after DOM insertion
     setTimeout(() => {
-        const styleSelect = document.getElementById('polyphony-style-select');
-        const moodSelect = document.getElementById('polyphony-mood-select');
+        const styleSelect = document.getElementById('polyphony-style-
+        const moodSelect = document.getElementById('polyphony-mood-
 
         if (styleSelect) {
             styleSelect.addEventListener('change', (e) => {
                 polyphonyState.selectedStyle = e.target.value;
                 // Update recommendations display
-                const recsDiv = document.getElementById('style-recommendations');
+                const recsDiv = document.getElementById('style-
                 if (recsDiv) {
                     const newPrefs = STYLE_TEXTURE_PREFERENCES[polyphonyState.selectedStyle];
                     const newRecs = newPrefs?.preferredTextures?.slice(0, 3) || [];
@@ -11497,9 +11471,9 @@ function updateTextureRecommendations() {
         const isSelected = textureId === polyphonyState.selectedTextureType;
 
         // Add a "recommended" badge if this texture is recommended for the style
-        let badge = option.querySelector('.recommended-badge');
+        let badge = option.querySelector('.recommended-
         if (isRecommended && !badge) {
-            badge = document.createElement('span');
+            badge = document.createElement('
             badge.className = 'recommended-badge';
             badge.style.cssText = `
                 position: absolute;
@@ -11521,7 +11495,7 @@ function updateTextureRecommendations() {
 }
 
 function createPolyphonyChordSelector(progressionData, currentKey) {
-    const section = document.createElement('div');
+    const section = document.createElement('
     section.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;';
 
     section.innerHTML = `
@@ -11532,10 +11506,10 @@ function createPolyphonyChordSelector(progressionData, currentKey) {
         </div>
     `;
 
-    const selectorContainer = section.querySelector('#polyphony-chord-selector');
+    const selectorContainer = section.querySelector('#polyphony-chord-
 
     progressionData.forEach((chord, index) => {
-        const chordBtn = document.createElement('button');
+        const chordBtn = document.createElement('
         const isSelected = index === polyphonyState.selectedChordIndex;
         const spelledPolyRoot = spellNoteInKey(chord.root, currentKey);
         chordBtn.textContent = `${spelledPolyRoot}${chord.type || ''}`;
@@ -11565,7 +11539,7 @@ function createPolyphonyChordSelector(progressionData, currentKey) {
 }
 
 function createTextureTypeSelector() {
-    const section = document.createElement('div');
+    const section = document.createElement('
     section.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;';
 
     // Staff selector
@@ -11609,7 +11583,7 @@ function createTextureTypeSelector() {
 
     // Add event listeners after DOM insertion
     setTimeout(() => {
-        const staffSelect = document.getElementById('polyphony-staff-select');
+        const staffSelect = document.getElementById('polyphony-staff-
         if (staffSelect) {
             staffSelect.addEventListener('change', (e) => {
                 polyphonyState.selectedStaff = e.target.value;
@@ -11637,7 +11611,7 @@ function createTextureTypeSelector() {
 }
 
 function createPolyphonyPreview() {
-    const section = document.createElement('div');
+    const section = document.createElement('
     section.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;';
 
     section.innerHTML = `
@@ -11681,7 +11655,7 @@ function createPolyphonyPreview() {
 
     // Set up play button listener
     setTimeout(() => {
-        const playBtn = document.getElementById('polyphony-play-btn');
+        const playBtn = document.getElementById('polyphony-play-
         if (playBtn) {
             playBtn.addEventListener('click', () => playPolyphonyPreview());
         }
@@ -11691,7 +11665,7 @@ function createPolyphonyPreview() {
 }
 
 function updatePolyphonyPreview() {
-    const container = document.getElementById('polyphony-preview-container');
+    const container = document.getElementById('polyphony-preview-
     if (!container) return;
 
     // Get VexFlow
@@ -11752,7 +11726,7 @@ function updatePolyphonyPreview() {
 
     // Clear container and create canvas
     container.innerHTML = '';
-    const canvas = document.createElement('canvas');
+    const canvas = document.createElement('
     canvas.width = 500;
     canvas.height = 200;
     canvas.style.cssText = 'max-width: 100%; height: auto;';
@@ -11789,7 +11763,7 @@ function updatePolyphonyPreview() {
             colorSuggestedNotes: true  // Color voice 2 notes green in preview
         });
     } catch (e) {
-        console.warn('[Polyphony Preview] Render error:', e);
+
         container.innerHTML = `<div style="color: #6b7280; text-align: center; padding: 20px;">Preview: ${voice1Treble.length + voice1Bass.length} current + ${voice2Notes.length} suggested notes</div>`;
     }
 }
@@ -11818,10 +11792,10 @@ function generatePolyphonySuggestions() {
     chordNotes = chordNotes.filter(n => (n.voiceIndex || 0) === 0);
 
     // Debug logging
-    console.log('[Polyphony] Selected chord index:', polyphonyState.selectedChordIndex);
-    console.log('[Polyphony] Staff:', staff);
-    console.log('[Polyphony] Chord:', chord?.root, chord?.type);
-    console.log('[Polyphony] Notes gathered:', chordNotes.length, chordNotes.map(n => n.pitch || n.pitches?.[0]));
+
+
+
+
 
     // Generate suggestions based on texture type
     const suggestions = generateTextureNotes(
@@ -11829,13 +11803,11 @@ function generatePolyphonySuggestions() {
         chord,
         currentKey,
         polyphonyState.selectedTextureType,
-        polyphonyState.selectedStaff
-    );
 
     polyphonyState.generatedSuggestions = suggestions;
 
     // Update suggestions display
-    const suggestionsContainer = document.getElementById('polyphony-suggestions');
+    const suggestionsContainer = document.getElementById('polyphony-
     if (suggestionsContainer) {
         if (suggestions.length === 0) {
             suggestionsContainer.innerHTML = `
@@ -11982,7 +11954,7 @@ function generateTextureNotes(melodyNotes, chord, key, textureType, staff) {
                         // preserveDirection=true keeps the harmony BELOW the melody
                         const interval = getStyleAdjustedInterval(-8, true); // Minor sixth = 8 semitones down
                         let transposed = transposePitch(pitch, interval);
-                        console.log(`[Texture] Parallel sixth: ${pitch} - 8 semitones = ${transposed} (interval=${interval})`);
+
                         transposed = applyChromatic(transposed);
                         suggestions.push({
                             ...note,
@@ -12330,7 +12302,7 @@ function getSeventhFromRoot(root, isMajorSeventh = false) {
         'F#': 'E', 'G': 'F', 'G#': 'F#', 'A': 'G', 'A#': 'G#', 'B': 'A'
     };
 
-    return isMajorSeventh ? (majorSevenths[root] || 'B') : (dominantSevenths[root] || 'Bb');
+    return isMajorSeventh ? (majorSevenths[root] || 'B') : (dominantSevenths[root] || 'B
 }
 
 // Helper: Get chord tones based on style preferences
@@ -12377,16 +12349,16 @@ function playPolyphonyPreview() {
     } else if (staff === 'bass' && compositionState.gatherBassNotesForChord) {
         voice1Notes = compositionState.gatherBassNotesForChord(polyphonyState.selectedChordIndex);
     }
-    voice1Notes = voice1Notes.filter(n => (n.voiceIndex || 0) === 0 && !n.isRest && n.type !== 'rest');
+    voice1Notes = voice1Notes.filter(n => (n.voiceIndex || 0) === 0 && !n.isRest && n.type !== '
 
     // Get suggested voice 2 notes
-    const voice2Notes = (polyphonyState.generatedSuggestions || []).filter(n => !n.isRest && n.type !== 'rest');
+    const voice2Notes = (polyphonyState.generatedSuggestions || []).filter(n => !n.isRest && n.type !== '
 
     // Combine all notes and sort by beat
     const allNotes = [...voice1Notes, ...voice2Notes].sort((a, b) => (a.beat || 0) - (b.beat || 0));
 
     if (allNotes.length === 0) {
-        console.log('[Polyphony] No notes to play');
+
         return;
     }
 
@@ -12394,7 +12366,7 @@ function playPolyphonyPreview() {
     try {
         const instrument = window.getInstrument && window.getInstrument();
         if (!instrument) {
-            console.warn('[Polyphony] Instrument not available');
+
             return;
         }
 
@@ -12416,7 +12388,7 @@ function playPolyphonyPreview() {
 
             const noteBeat = note.beat || 0;
             const startTime = baseTime + noteBeat * beatDuration;
-            const durationBeats = getDurationInBeats(note.duration || 'q');
+            const durationBeats = getDurationInBeats(note.duration || '
             const noteDuration = durationBeats * beatDuration * 0.9; // 90% for articulation
 
             try {
@@ -12426,7 +12398,7 @@ function playPolyphonyPreview() {
             }
         });
     } catch (e) {
-        console.warn('[Polyphony] Could not play preview:', e);
+
     }
 }
 
@@ -12442,7 +12414,7 @@ function getDurationInBeats(duration) {
 function applyPolyphonySuggestions() {
     const compositionState = getCompositionState();
     if (!compositionState || polyphonyState.generatedSuggestions.length === 0) {
-        console.log('[Polyphony] No suggestions to apply');
+
         return;
     }
 
@@ -12450,9 +12422,9 @@ function applyPolyphonySuggestions() {
     const chordIndex = polyphonyState.selectedChordIndex;
     const staff = polyphonyState.selectedStaff;
 
-    console.log('[Polyphony] Applying suggestions:');
+
     polyphonyState.generatedSuggestions.forEach((s, i) => {
-        console.log(`  [${i}] pitch=${s.pitch}, duration=${s.duration}, beat=${s.beat}, sourceMeasure=${s.sourceMeasure}`);
+
     });
 
     // Collect unique measures that will be affected
@@ -12466,13 +12438,13 @@ function applyPolyphonySuggestions() {
     affectedMeasures.forEach(measureIndex => {
         compositionState.ensureVoiceExists(measureIndex, staff, 1);
         if (compositionState.clearVoice) {
-            console.log(`[Polyphony] Clearing existing Voice 2 in measure ${measureIndex}`);
+
             compositionState.clearVoice(measureIndex, staff, 1);
         } else {
             // Fallback: manually clear the voice notes
             const measure = compositionState.getMeasure(measureIndex);
             if (measure?.notation?.[staff]?.voices?.[1]) {
-                console.log(`[Polyphony] Clearing existing Voice 2 in measure ${measureIndex} (fallback)`);
+
                 measure.notation[staff].voices[1].notes = [];
             }
         }
@@ -12492,15 +12464,15 @@ function applyPolyphonySuggestions() {
             voiceIndex: 1
         };
 
-        console.log(`[Polyphony] Adding to measure ${sourceMeasure}:`, noteToAdd);
+
         compositionState.addNoteToVoice(sourceMeasure, staff, 1, noteToAdd);
     });
 
-    console.log(`[Polyphony] Applied ${polyphonyState.generatedSuggestions.length} notes to Voice 2 of ${staff} clef`);
+
 
     // Emit event to trigger re-render
     if (compositionState.events) {
-        compositionState.events.emit('compositionChanged');
+        compositionState.events.emit('compositionC
     }
 
     // Close modal
@@ -12522,7 +12494,7 @@ function handleKeydown(e) {
     if (modalState.activeTab === TABS.CHORD && modalState.chordView === CHORD_VIEWS.QUICK) {
         const num = parseInt(e.key, 10);
         if (num >= 1 && num <= 5) {
-            const cards = document.querySelectorAll('#chord-view-content > div:last-child > div');
+            const cards = document.querySelectorAll('#chord-view-content > div:last-child > 
             if (cards[num - 1]) {
                 cards[num - 1].click();
             }
@@ -12580,9 +12552,9 @@ function getScoreColor(score) {
  * Show enhanced tooltip for chord score badges
  */
 function showChordScoreTooltip(event, element) {
-    let tooltip = document.getElementById('modal-score-tooltip');
+    let tooltip = document.getElementById('modal-score-
     if (!tooltip) {
-        tooltip = document.createElement('div');
+        tooltip = document.createElement('
         tooltip.id = 'modal-score-tooltip';
         tooltip.className = 'modal-score-tooltip';
         document.body.appendChild(tooltip);
@@ -12659,8 +12631,8 @@ function showChordScoreTooltip(event, element) {
 
     // Hide any other tooltips first
     hideSequenceScoreTooltip();
-    const melodyTooltip = document.getElementById('modal-melody-tooltip');
-    if (melodyTooltip) melodyTooltip.classList.remove('show');
+    const melodyTooltip = document.getElementById('modal-melody-
+    if (melodyTooltip) melodyTooltip.classList.remove('
 
     setTimeout(() => tooltip.classList.add('show'), 10);
 }
@@ -12669,9 +12641,9 @@ function showChordScoreTooltip(event, element) {
  * Hide chord score tooltip
  */
 function hideChordScoreTooltip() {
-    const tooltip = document.getElementById('modal-score-tooltip');
+    const tooltip = document.getElementById('modal-score-
     if (tooltip) {
-        tooltip.classList.remove('show');
+        tooltip.classList.remove('
         // Force hide after transition
         setTimeout(() => {
             if (!tooltip.classList.contains('show')) {
@@ -12687,17 +12659,17 @@ function hideChordScoreTooltip() {
 function hideAllScoreTooltips() {
     hideChordScoreTooltip();
     hideSequenceScoreTooltip();
-    const melodyTooltip = document.getElementById('modal-melody-tooltip');
-    if (melodyTooltip) melodyTooltip.classList.remove('show');
+    const melodyTooltip = document.getElementById('modal-melody-
+    if (melodyTooltip) melodyTooltip.classList.remove('
 }
 
 /**
  * Show enhanced tooltip for melody score badges
  */
 function showMelodyScoreTooltip(event, element) {
-    let tooltip = document.getElementById('modal-melody-tooltip');
+    let tooltip = document.getElementById('modal-melody-
     if (!tooltip) {
-        tooltip = document.createElement('div');
+        tooltip = document.createElement('
         tooltip.id = 'modal-melody-tooltip';
         tooltip.className = 'modal-score-tooltip melody-tooltip';
         document.body.appendChild(tooltip);
@@ -12806,17 +12778,17 @@ function showMelodyScoreTooltip(event, element) {
  * Hide melody score tooltip
  */
 function hideMelodyScoreTooltip() {
-    const tooltip = document.getElementById('modal-melody-tooltip');
-    if (tooltip) tooltip.classList.remove('show');
+    const tooltip = document.getElementById('modal-melody-
+    if (tooltip) tooltip.classList.remove('
 }
 
 /**
  * Show enhanced tooltip for sequence score badges
  */
 function showSequenceScoreTooltip(event, element) {
-    let tooltip = document.getElementById('modal-sequence-tooltip');
+    let tooltip = document.getElementById('modal-sequence-
     if (!tooltip) {
-        tooltip = document.createElement('div');
+        tooltip = document.createElement('
         tooltip.id = 'modal-sequence-tooltip';
         tooltip.className = 'modal-score-tooltip sequence-tooltip';
         document.body.appendChild(tooltip);
@@ -12882,8 +12854,8 @@ function showSequenceScoreTooltip(event, element) {
 
     // Hide any other tooltips first
     hideChordScoreTooltip();
-    const melodyTooltip = document.getElementById('modal-melody-tooltip');
-    if (melodyTooltip) melodyTooltip.classList.remove('show');
+    const melodyTooltip = document.getElementById('modal-melody-
+    if (melodyTooltip) melodyTooltip.classList.remove('
 
     setTimeout(() => tooltip.classList.add('show'), 10);
 }
@@ -12892,9 +12864,9 @@ function showSequenceScoreTooltip(event, element) {
  * Hide sequence score tooltip
  */
 function hideSequenceScoreTooltip() {
-    const tooltip = document.getElementById('modal-sequence-tooltip');
+    const tooltip = document.getElementById('modal-sequence-
     if (tooltip) {
-        tooltip.classList.remove('show');
+        tooltip.classList.remove('
         // Force hide after transition
         setTimeout(() => {
             if (!tooltip.classList.contains('show')) {
@@ -12908,9 +12880,9 @@ function hideSequenceScoreTooltip() {
  * Show enhanced tooltip for phrase score badges
  */
 function showPhraseScoreTooltip(event, element) {
-    let tooltip = document.getElementById('modal-phrase-tooltip');
+    let tooltip = document.getElementById('modal-phrase-
     if (!tooltip) {
-        tooltip = document.createElement('div');
+        tooltip = document.createElement('
         tooltip.id = 'modal-phrase-tooltip';
         tooltip.className = 'modal-score-tooltip phrase-tooltip';
         document.body.appendChild(tooltip);
@@ -13007,8 +12979,8 @@ function showPhraseScoreTooltip(event, element) {
  * Hide phrase score tooltip
  */
 function hidePhraseScoreTooltip() {
-    const tooltip = document.getElementById('modal-phrase-tooltip');
-    if (tooltip) tooltip.classList.remove('show');
+    const tooltip = document.getElementById('modal-phrase-
+    if (tooltip) tooltip.classList.remove('
 }
 
 /**
@@ -13017,7 +12989,7 @@ function hidePhraseScoreTooltip() {
 function injectTooltipStyles() {
     if (document.getElementById('modal-tooltip-styles')) return;
 
-    const style = document.createElement('style');
+    const style = document.createElement('
     style.id = 'modal-tooltip-styles';
     style.textContent = `
         .modal-score-tooltip {

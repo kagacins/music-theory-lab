@@ -11,7 +11,7 @@ let sidebarTab = null; // Reference to the sidebar tab element
  * Toggle the suggestions sidebar collapsed/expanded state
  */
 export function toggleSuggestionsSidebar() {
-    const sidebar = document.getElementById('chord-recommendations-sidebar');
+    const sidebar = document.getElementById('chord-recommendations-
     if (!sidebar) return;
 
     isSuggestionsSidebarCollapsed = !isSuggestionsSidebarCollapsed;
@@ -75,9 +75,9 @@ function expandSuggestionsSidebar(sidebar) {
  * Add a lightbulb tab to the section sidebar
  */
 function addSuggestionTabToSectionSidebar() {
-    const sectionSidebar = document.getElementById('melody-section-sidebar');
+    const sectionSidebar = document.getElementById('melody-section-
     if (!sectionSidebar) {
-        console.warn('Section sidebar not found for melody tab');
+
         return;
     }
 
@@ -87,25 +87,25 @@ function addSuggestionTabToSectionSidebar() {
     }
 
     // Create the tab element with a lightbulb icon
-    sidebarTab = document.createElement('button');
+    sidebarTab = document.createElement('
     sidebarTab.className = 'section-sidebar-tab w-12 h-12 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white transition-all flex items-center justify-center text-xs font-semibold p-2 text-center shadow-md';
-    sidebarTab.setAttribute('data-section-id', 'suggestions-sidebar');
+    sidebarTab.setAttribute('data-section-id', 'suggestions-
     sidebarTab.style.width = '48px';
     sidebarTab.style.height = '48px';
     sidebarTab.style.minHeight = '48px';
     sidebarTab.style.minWidth = '48px';
 
     // Lightbulb SVG icon
-    const lightbulbIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const lightbulbIcon = document.createElementNS('http://www.w3.org/2000/svg', '
     lightbulbIcon.setAttribute('class', 'w-6 h-6');
-    lightbulbIcon.setAttribute('fill', 'currentColor');
+    lightbulbIcon.setAttribute('fill', 'currentC
     lightbulbIcon.setAttribute('viewBox', '0 0 20 20');
     lightbulbIcon.innerHTML = '<path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/>';
 
     sidebarTab.appendChild(lightbulbIcon);
 
     // Create tooltip
-    const tooltip = document.createElement('div');
+    const tooltip = document.createElement('
     tooltip.className = 'sidebar-section-tooltip bg-gray-900 text-white text-xs rounded py-1 px-2 pointer-events-none whitespace-nowrap';
     tooltip.textContent = 'Chord & Melody Suggestions';
     tooltip.style.position = 'fixed';
@@ -148,7 +148,7 @@ function addSuggestionTabToSectionSidebar() {
 
     // Force the section sidebar to be visible (it will now have at least one tab)
     sectionSidebar.style.display = 'flex';
-    const container = document.querySelector('#melody-sections-container');
+    const container = document.querySelector('#melody-sections-
     if (container) {
         container.style.marginLeft = '4rem';
     }
@@ -163,13 +163,13 @@ function addSuggestionTabToSectionSidebar() {
  * Remove the suggestion tab from the section sidebar
  */
 function removeSuggestionTabFromSectionSidebar() {
-    const sectionSidebar = document.getElementById('melody-section-sidebar');
+    const sectionSidebar = document.getElementById('melody-section-
     if (!sectionSidebar) return;
 
     const tab = sectionSidebar.querySelector('[data-section-id="suggestions-sidebar"]');
     if (tab) {
         // Remove tooltip
-        const tooltips = document.querySelectorAll('.sidebar-section-tooltip');
+        const tooltips = document.querySelectorAll('.sidebar-section-
         tooltips.forEach(tooltip => {
             if (tooltip.textContent === 'Chord & Melody Suggestions') {
                 tooltip.remove();
@@ -183,7 +183,7 @@ function removeSuggestionTabFromSectionSidebar() {
         const remainingTabs = sectionSidebar.querySelectorAll('[data-section-id]');
         if (remainingTabs.length === 0) {
             sectionSidebar.style.display = 'none';
-            const container = document.querySelector('#melody-sections-container');
+            const container = document.querySelector('#melody-sections-
             if (container) {
                 container.style.marginLeft = '0';
             }
@@ -216,7 +216,7 @@ function saveSidebarState() {
     try {
         localStorage.setItem('suggestionsSidebarCollapsed', JSON.stringify(isSuggestionsSidebarCollapsed));
     } catch (e) {
-        console.warn('Could not save suggestions sidebar state:', e);
+
     }
 }
 
@@ -225,11 +225,11 @@ function saveSidebarState() {
  */
 export function restoreSuggestionsSidebarState() {
     try {
-        const saved = localStorage.getItem('suggestionsSidebarCollapsed');
+        const saved = localStorage.getItem('suggestionsSidebarC
         if (saved !== null) {
             isSuggestionsSidebarCollapsed = JSON.parse(saved);
 
-            const sidebar = document.getElementById('chord-recommendations-sidebar');
+            const sidebar = document.getElementById('chord-recommendations-
             if (sidebar && isSuggestionsSidebarCollapsed) {
                 // Immediately apply collapsed state without animation
                 sidebar.style.display = 'none';
@@ -238,7 +238,7 @@ export function restoreSuggestionsSidebarState() {
             }
         }
     } catch (e) {
-        console.warn('Could not restore suggestions sidebar state:', e);
+
     }
 }
 

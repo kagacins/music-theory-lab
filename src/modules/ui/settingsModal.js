@@ -78,7 +78,7 @@ function findMatchingPreset(weights) {
  */
 export function showSettingsModal(initialTab = 'chords') {
     // Remove existing modal if any
-    const existing = document.getElementById('settings-modal');
+    const existing = document.getElementById('settings-
     if (existing) existing.remove();
 
     // Get current weights
@@ -90,7 +90,7 @@ export function showSettingsModal(initialTab = 'chords') {
     let activeTab = initialTab;
 
     // Create overlay
-    const overlay = document.createElement('div');
+    const overlay = document.createElement('
     overlay.id = 'settings-modal';
     overlay.style.position = 'fixed';
     overlay.style.top = '0';
@@ -107,7 +107,7 @@ export function showSettingsModal(initialTab = 'chords') {
     };
 
     // Create modal
-    const modal = document.createElement('div');
+    const modal = document.createElement('
     modal.style.backgroundColor = 'white';
     modal.style.borderRadius = '12px';
     modal.style.padding = '32px';
@@ -119,7 +119,7 @@ export function showSettingsModal(initialTab = 'chords') {
     modal.onclick = (e) => e.stopPropagation();
 
     // Header
-    const header = document.createElement('div');
+    const header = document.createElement('
     header.style.display = 'flex';
     header.style.justifyContent = 'space-between';
     header.style.alignItems = 'center';
@@ -132,7 +132,7 @@ export function showSettingsModal(initialTab = 'chords') {
     title.style.fontWeight = '700';
     title.style.color = '#111827';
 
-    const closeBtn = document.createElement('button');
+    const closeBtn = document.createElement('
     closeBtn.innerHTML = '×';
     closeBtn.style.background = 'none';
     closeBtn.style.border = 'none';
@@ -153,7 +153,7 @@ export function showSettingsModal(initialTab = 'chords') {
     modal.appendChild(header);
 
     // Tab navigation
-    const tabNav = document.createElement('div');
+    const tabNav = document.createElement('
     tabNav.style.display = 'flex';
     tabNav.style.gap = '8px';
     tabNav.style.marginBottom = '24px';
@@ -161,7 +161,7 @@ export function showSettingsModal(initialTab = 'chords') {
     tabNav.style.paddingBottom = '0';
 
     const createTab = (id, label, emoji) => {
-        const tab = document.createElement('button');
+        const tab = document.createElement('
         tab.dataset.tab = id;
         tab.innerHTML = `${emoji} ${label}`;
         tab.style.padding = '12px 20px';
@@ -193,13 +193,13 @@ export function showSettingsModal(initialTab = 'chords') {
     modal.appendChild(tabNav);
 
     // Content containers
-    const chordsContent = document.createElement('div');
+    const chordsContent = document.createElement('
     chordsContent.id = 'chords-tab-content';
 
-    const melodyContent = document.createElement('div');
+    const melodyContent = document.createElement('
     melodyContent.id = 'melody-tab-content';
 
-    const harmoniesContent = document.createElement('div');
+    const harmoniesContent = document.createElement('
     harmoniesContent.id = 'harmonies-tab-content';
 
     // Function to update tab styles
@@ -227,7 +227,7 @@ export function showSettingsModal(initialTab = 'chords') {
     // ==========================================================================
 
     // Description
-    const chordDescription = document.createElement('p');
+    const chordDescription = document.createElement('
     chordDescription.textContent = 'Customize how chord suggestions are scored and ranked. These settings will be used across all chord recommendation features.';
     chordDescription.style.color = '#6b7280';
     chordDescription.style.fontSize = '14px';
@@ -236,7 +236,7 @@ export function showSettingsModal(initialTab = 'chords') {
     chordsContent.appendChild(chordDescription);
 
     // Style and Mood selectors
-    const styleMoodSection = document.createElement('div');
+    const styleMoodSection = document.createElement('
     styleMoodSection.style.display = 'flex';
     styleMoodSection.style.gap = '16px';
     styleMoodSection.style.marginBottom = '24px';
@@ -247,11 +247,11 @@ export function showSettingsModal(initialTab = 'chords') {
     const savedMood = localStorage.getItem('chord-suggestion-mood') || 'bright';
 
     // Style selector
-    const styleContainer = document.createElement('div');
+    const styleContainer = document.createElement('
     styleContainer.style.flex = '1';
     styleContainer.style.minWidth = '200px';
 
-    const styleLabel = document.createElement('label');
+    const styleLabel = document.createElement('
     styleLabel.textContent = 'Musical Style';
     styleLabel.style.display = 'block';
     styleLabel.style.fontSize = '14px';
@@ -260,7 +260,7 @@ export function showSettingsModal(initialTab = 'chords') {
     styleLabel.style.marginBottom = '8px';
     styleContainer.appendChild(styleLabel);
 
-    const styleSelect = document.createElement('select');
+    const styleSelect = document.createElement('
     styleSelect.style.width = '100%';
     styleSelect.style.padding = '10px 12px';
     styleSelect.style.border = '1px solid #d1d5db';
@@ -279,7 +279,7 @@ export function showSettingsModal(initialTab = 'chords') {
     ];
 
     styles.forEach(s => {
-        const option = document.createElement('option');
+        const option = document.createElement('
         option.value = s.value;
         option.textContent = s.label;
         if (s.value === savedStyle) option.selected = true;
@@ -295,11 +295,11 @@ export function showSettingsModal(initialTab = 'chords') {
     styleMoodSection.appendChild(styleContainer);
 
     // Mood selector
-    const moodContainer = document.createElement('div');
+    const moodContainer = document.createElement('
     moodContainer.style.flex = '1';
     moodContainer.style.minWidth = '200px';
 
-    const moodLabel = document.createElement('label');
+    const moodLabel = document.createElement('
     moodLabel.textContent = 'Intended Mood';
     moodLabel.style.display = 'block';
     moodLabel.style.fontSize = '14px';
@@ -308,7 +308,7 @@ export function showSettingsModal(initialTab = 'chords') {
     moodLabel.style.marginBottom = '8px';
     moodContainer.appendChild(moodLabel);
 
-    const moodSelect = document.createElement('select');
+    const moodSelect = document.createElement('
     moodSelect.style.width = '100%';
     moodSelect.style.padding = '10px 12px';
     moodSelect.style.border = '1px solid #d1d5db';
@@ -327,7 +327,7 @@ export function showSettingsModal(initialTab = 'chords') {
     ];
 
     moods.forEach(m => {
-        const option = document.createElement('option');
+        const option = document.createElement('
         option.value = m.value;
         option.textContent = m.label;
         if (m.value === savedMood) option.selected = true;
@@ -345,7 +345,7 @@ export function showSettingsModal(initialTab = 'chords') {
     chordsContent.appendChild(styleMoodSection);
 
     // Normalization notice
-    const chordNotice = document.createElement('div');
+    const chordNotice = document.createElement('
     chordNotice.style.backgroundColor = '#eff6ff';
     chordNotice.style.border = '1px solid #bfdbfe';
     chordNotice.style.borderRadius = '8px';
@@ -366,12 +366,12 @@ export function showSettingsModal(initialTab = 'chords') {
     chordsContent.appendChild(chordNotice);
 
     // Quick save button at top
-    const chordQuickSaveRow = document.createElement('div');
+    const chordQuickSaveRow = document.createElement('
     chordQuickSaveRow.style.display = 'flex';
     chordQuickSaveRow.style.justifyContent = 'flex-end';
     chordQuickSaveRow.style.marginBottom = '20px';
 
-    const chordQuickSaveBtn = document.createElement('button');
+    const chordQuickSaveBtn = document.createElement('
     chordQuickSaveBtn.textContent = 'Save Settings';
     chordQuickSaveBtn.style.padding = '8px 16px';
     chordQuickSaveBtn.style.backgroundColor = '#3b82f6';
@@ -428,7 +428,7 @@ export function showSettingsModal(initialTab = 'chords') {
     chordsContent.appendChild(chordQuickSaveRow);
 
     // Chord presets section
-    const chordPresetsSection = document.createElement('div');
+    const chordPresetsSection = document.createElement('
     chordPresetsSection.style.marginBottom = '28px';
 
     const chordPresetsTitle = document.createElement('h3');
@@ -464,16 +464,16 @@ export function showSettingsModal(initialTab = 'chords') {
 
     // Helper function to create chord preset section
     const createChordPresetSection = (sectionTitle, presets, description, emoji) => {
-        const section = document.createElement('div');
+        const section = document.createElement('
         section.style.marginBottom = '20px';
 
-        const sectionHeader = document.createElement('div');
+        const sectionHeader = document.createElement('
         sectionHeader.style.display = 'flex';
         sectionHeader.style.alignItems = 'baseline';
         sectionHeader.style.gap = '8px';
         sectionHeader.style.marginBottom = '12px';
 
-        const titleEl = document.createElement('div');
+        const titleEl = document.createElement('
         titleEl.textContent = `${emoji} ${sectionTitle}`;
         titleEl.style.fontSize = '14px';
         titleEl.style.fontWeight = '600';
@@ -481,7 +481,7 @@ export function showSettingsModal(initialTab = 'chords') {
         sectionHeader.appendChild(titleEl);
 
         if (description) {
-            const sectionDesc = document.createElement('div');
+            const sectionDesc = document.createElement('
             sectionDesc.textContent = description;
             sectionDesc.style.fontSize = '12px';
             sectionDesc.style.color = '#9ca3af';
@@ -491,7 +491,7 @@ export function showSettingsModal(initialTab = 'chords') {
 
         section.appendChild(sectionHeader);
 
-        const grid = document.createElement('div');
+        const grid = document.createElement('
         grid.style.display = 'grid';
         grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
         grid.style.gap = '12px';
@@ -499,7 +499,7 @@ export function showSettingsModal(initialTab = 'chords') {
         Object.keys(presets).forEach(key => {
             const preset = presets[key];
 
-            const presetBtn = document.createElement('button');
+            const presetBtn = document.createElement('
             presetBtn.style.padding = '12px 16px';
             presetBtn.style.backgroundColor = '#f9fafb';
             presetBtn.style.border = '2px solid #e5e7eb';
@@ -509,14 +509,14 @@ export function showSettingsModal(initialTab = 'chords') {
             presetBtn.style.textAlign = 'left';
             presetBtn.title = preset.tooltip;
 
-            const presetName = document.createElement('div');
+            const presetName = document.createElement('
             presetName.textContent = preset.name;
             presetName.style.fontWeight = '600';
             presetName.style.color = '#111827';
             presetName.style.marginBottom = '4px';
             presetBtn.appendChild(presetName);
 
-            const presetDesc = document.createElement('div');
+            const presetDesc = document.createElement('
             presetDesc.textContent = preset.description;
             presetDesc.style.fontSize = '12px';
             presetDesc.style.color = '#6b7280';
@@ -561,7 +561,7 @@ export function showSettingsModal(initialTab = 'chords') {
     chordPresetsSection.appendChild(chordApproachesSection);
 
     // Separator
-    const chordSeparator = document.createElement('div');
+    const chordSeparator = document.createElement('
     chordSeparator.style.height = '1px';
     chordSeparator.style.backgroundColor = '#e5e7eb';
     chordSeparator.style.margin = '20px 0';
@@ -582,7 +582,7 @@ export function showSettingsModal(initialTab = 'chords') {
     updateChordPresetActiveStates();
 
     // Custom chord weights section
-    const chordWeightsSection = document.createElement('div');
+    const chordWeightsSection = document.createElement('
     chordWeightsSection.style.marginBottom = '24px';
 
     const chordWeightsTitle = document.createElement('h3');
@@ -594,7 +594,7 @@ export function showSettingsModal(initialTab = 'chords') {
     chordWeightsSection.appendChild(chordWeightsTitle);
 
     // Weight sliders container
-    const chordSlidersContainer = document.createElement('div');
+    const chordSlidersContainer = document.createElement('
     chordSlidersContainer.style.display = 'flex';
     chordSlidersContainer.style.flexDirection = 'column';
     chordSlidersContainer.style.gap = '20px';
@@ -639,21 +639,21 @@ export function showSettingsModal(initialTab = 'chords') {
     }
 
     Object.keys(chordLabels).forEach(key => {
-        const sliderGroup = document.createElement('div');
+        const sliderGroup = document.createElement('
 
-        const labelRow = document.createElement('div');
+        const labelRow = document.createElement('
         labelRow.style.display = 'flex';
         labelRow.style.justifyContent = 'space-between';
         labelRow.style.alignItems = 'center';
         labelRow.style.marginBottom = '8px';
 
-        const label = document.createElement('label');
+        const label = document.createElement('
         label.textContent = chordLabels[key];
         label.style.fontSize = '14px';
         label.style.fontWeight = '600';
         label.style.color = '#374151';
 
-        const valueLabel = document.createElement('span');
+        const valueLabel = document.createElement('
         valueLabel.textContent = `${Math.round(currentChordWeights[key] * 100)}%`;
         valueLabel.style.fontSize = '14px';
         valueLabel.style.fontWeight = '600';
@@ -664,14 +664,14 @@ export function showSettingsModal(initialTab = 'chords') {
         labelRow.appendChild(label);
         labelRow.appendChild(valueLabel);
 
-        const desc = document.createElement('div');
+        const desc = document.createElement('
         desc.textContent = chordDescriptions[key];
         desc.style.fontSize = '12px';
         desc.style.color = '#6b7280';
         desc.style.marginBottom = '8px';
         desc.style.lineHeight = '1.4';
 
-        const slider = document.createElement('input');
+        const slider = document.createElement('
         slider.type = 'range';
         slider.min = '0';
         slider.max = '100';
@@ -693,14 +693,14 @@ export function showSettingsModal(initialTab = 'chords') {
     chordsContent.appendChild(chordWeightsSection);
 
     // Chord buttons
-    const chordButtonRow = document.createElement('div');
+    const chordButtonRow = document.createElement('
     chordButtonRow.style.display = 'flex';
     chordButtonRow.style.gap = '12px';
     chordButtonRow.style.justifyContent = 'flex-end';
     chordButtonRow.style.paddingTop = '24px';
     chordButtonRow.style.borderTop = '1px solid #e5e7eb';
 
-    const chordResetBtn = document.createElement('button');
+    const chordResetBtn = document.createElement('
     chordResetBtn.textContent = 'Reset to Default';
     chordResetBtn.style.padding = '10px 20px';
     chordResetBtn.style.backgroundColor = '#f9fafb';
@@ -723,7 +723,7 @@ export function showSettingsModal(initialTab = 'chords') {
         updateChordPresetActiveStates();
     };
 
-    const chordSaveBtn = document.createElement('button');
+    const chordSaveBtn = document.createElement('
     chordSaveBtn.textContent = 'Save Settings';
     chordSaveBtn.style.padding = '10px 24px';
     chordSaveBtn.style.backgroundColor = '#3b82f6';
@@ -785,7 +785,7 @@ export function showSettingsModal(initialTab = 'chords') {
     // ==========================================================================
 
     // Description
-    const melodyDescription = document.createElement('p');
+    const melodyDescription = document.createElement('
     melodyDescription.textContent = 'Customize how melody note suggestions are scored and ranked. These weights are multipliers that boost or reduce the importance of each factor.';
     melodyDescription.style.color = '#6b7280';
     melodyDescription.style.fontSize = '14px';
@@ -794,7 +794,7 @@ export function showSettingsModal(initialTab = 'chords') {
     melodyContent.appendChild(melodyDescription);
 
     // Melody notice
-    const melodyNotice = document.createElement('div');
+    const melodyNotice = document.createElement('
     melodyNotice.style.backgroundColor = '#f0fdf4';
     melodyNotice.style.border = '1px solid #bbf7d0';
     melodyNotice.style.borderRadius = '8px';
@@ -816,12 +816,12 @@ export function showSettingsModal(initialTab = 'chords') {
 
 
     // Quick save button at top
-    const melodyQuickSaveRow = document.createElement('div');
+    const melodyQuickSaveRow = document.createElement('
     melodyQuickSaveRow.style.display = 'flex';
     melodyQuickSaveRow.style.justifyContent = 'flex-end';
     melodyQuickSaveRow.style.marginBottom = '20px';
 
-    const melodyQuickSaveBtn = document.createElement('button');
+    const melodyQuickSaveBtn = document.createElement('
     melodyQuickSaveBtn.textContent = 'Save Settings';
     melodyQuickSaveBtn.style.padding = '8px 16px';
     melodyQuickSaveBtn.style.backgroundColor = '#22c55e';
@@ -856,7 +856,7 @@ export function showSettingsModal(initialTab = 'chords') {
     melodyContent.appendChild(melodyQuickSaveRow);
 
     // Melody presets section
-    const melodyPresetsSection = document.createElement('div');
+    const melodyPresetsSection = document.createElement('
     melodyPresetsSection.style.marginBottom = '28px';
 
     const melodyPresetsTitle = document.createElement('h3');
@@ -892,16 +892,16 @@ export function showSettingsModal(initialTab = 'chords') {
 
     // Helper function to create melody preset section
     const createMelodyPresetSection = (sectionTitle, presets, description, emoji) => {
-        const section = document.createElement('div');
+        const section = document.createElement('
         section.style.marginBottom = '20px';
 
-        const sectionHeader = document.createElement('div');
+        const sectionHeader = document.createElement('
         sectionHeader.style.display = 'flex';
         sectionHeader.style.alignItems = 'baseline';
         sectionHeader.style.gap = '8px';
         sectionHeader.style.marginBottom = '12px';
 
-        const titleEl = document.createElement('div');
+        const titleEl = document.createElement('
         titleEl.textContent = `${emoji} ${sectionTitle}`;
         titleEl.style.fontSize = '14px';
         titleEl.style.fontWeight = '600';
@@ -909,7 +909,7 @@ export function showSettingsModal(initialTab = 'chords') {
         sectionHeader.appendChild(titleEl);
 
         if (description) {
-            const sectionDesc = document.createElement('div');
+            const sectionDesc = document.createElement('
             sectionDesc.textContent = description;
             sectionDesc.style.fontSize = '12px';
             sectionDesc.style.color = '#9ca3af';
@@ -919,7 +919,7 @@ export function showSettingsModal(initialTab = 'chords') {
 
         section.appendChild(sectionHeader);
 
-        const grid = document.createElement('div');
+        const grid = document.createElement('
         grid.style.display = 'grid';
         grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
         grid.style.gap = '12px';
@@ -927,7 +927,7 @@ export function showSettingsModal(initialTab = 'chords') {
         Object.keys(presets).forEach(key => {
             const preset = presets[key];
 
-            const presetBtn = document.createElement('button');
+            const presetBtn = document.createElement('
             presetBtn.style.padding = '12px 16px';
             presetBtn.style.backgroundColor = '#f9fafb';
             presetBtn.style.border = '2px solid #e5e7eb';
@@ -937,14 +937,14 @@ export function showSettingsModal(initialTab = 'chords') {
             presetBtn.style.textAlign = 'left';
             presetBtn.title = preset.tooltip;
 
-            const presetName = document.createElement('div');
+            const presetName = document.createElement('
             presetName.textContent = preset.name;
             presetName.style.fontWeight = '600';
             presetName.style.color = '#111827';
             presetName.style.marginBottom = '4px';
             presetBtn.appendChild(presetName);
 
-            const presetDesc = document.createElement('div');
+            const presetDesc = document.createElement('
             presetDesc.textContent = preset.description;
             presetDesc.style.fontSize = '12px';
             presetDesc.style.color = '#6b7280';
@@ -989,7 +989,7 @@ export function showSettingsModal(initialTab = 'chords') {
     melodyPresetsSection.appendChild(melodyApproachesSection);
 
     // Separator
-    const melodySeparator = document.createElement('div');
+    const melodySeparator = document.createElement('
     melodySeparator.style.height = '1px';
     melodySeparator.style.backgroundColor = '#e5e7eb';
     melodySeparator.style.margin = '20px 0';
@@ -1010,7 +1010,7 @@ export function showSettingsModal(initialTab = 'chords') {
     updateMelodyPresetActiveStates();
 
     // Custom melody weights section
-    const melodyWeightsSection = document.createElement('div');
+    const melodyWeightsSection = document.createElement('
     melodyWeightsSection.style.marginBottom = '24px';
 
     const melodyWeightsTitle = document.createElement('h3');
@@ -1022,7 +1022,7 @@ export function showSettingsModal(initialTab = 'chords') {
     melodyWeightsSection.appendChild(melodyWeightsTitle);
 
     // Melody sliders container
-    const melodySlidersContainer = document.createElement('div');
+    const melodySlidersContainer = document.createElement('
     melodySlidersContainer.style.display = 'flex';
     melodySlidersContainer.style.flexDirection = 'column';
     melodySlidersContainer.style.gap = '20px';
@@ -1065,21 +1065,21 @@ export function showSettingsModal(initialTab = 'chords') {
     }
 
     Object.keys(melodyLabels).forEach(key => {
-        const sliderGroup = document.createElement('div');
+        const sliderGroup = document.createElement('
 
-        const labelRow = document.createElement('div');
+        const labelRow = document.createElement('
         labelRow.style.display = 'flex';
         labelRow.style.justifyContent = 'space-between';
         labelRow.style.alignItems = 'center';
         labelRow.style.marginBottom = '8px';
 
-        const label = document.createElement('label');
+        const label = document.createElement('
         label.textContent = melodyLabels[key];
         label.style.fontSize = '14px';
         label.style.fontWeight = '600';
         label.style.color = '#374151';
 
-        const valueLabel = document.createElement('span');
+        const valueLabel = document.createElement('
         valueLabel.textContent = `${currentMelodyWeights[key].toFixed(2)}×`;
         valueLabel.style.fontSize = '14px';
         valueLabel.style.fontWeight = '600';
@@ -1090,14 +1090,14 @@ export function showSettingsModal(initialTab = 'chords') {
         labelRow.appendChild(label);
         labelRow.appendChild(valueLabel);
 
-        const desc = document.createElement('div');
+        const desc = document.createElement('
         desc.textContent = melodyDescriptions[key];
         desc.style.fontSize = '12px';
         desc.style.color = '#6b7280';
         desc.style.marginBottom = '8px';
         desc.style.lineHeight = '1.4';
 
-        const slider = document.createElement('input');
+        const slider = document.createElement('
         slider.type = 'range';
         slider.min = '25';  // 0.25×
         slider.max = '200'; // 2.0×
@@ -1119,14 +1119,14 @@ export function showSettingsModal(initialTab = 'chords') {
     melodyContent.appendChild(melodyWeightsSection);
 
     // Melody buttons
-    const melodyButtonRow = document.createElement('div');
+    const melodyButtonRow = document.createElement('
     melodyButtonRow.style.display = 'flex';
     melodyButtonRow.style.gap = '12px';
     melodyButtonRow.style.justifyContent = 'flex-end';
     melodyButtonRow.style.paddingTop = '24px';
     melodyButtonRow.style.borderTop = '1px solid #e5e7eb';
 
-    const melodyResetBtn = document.createElement('button');
+    const melodyResetBtn = document.createElement('
     melodyResetBtn.textContent = 'Reset to Default';
     melodyResetBtn.style.padding = '10px 20px';
     melodyResetBtn.style.backgroundColor = '#f9fafb';
@@ -1149,7 +1149,7 @@ export function showSettingsModal(initialTab = 'chords') {
         updateMelodyPresetActiveStates();
     };
 
-    const melodySaveBtn = document.createElement('button');
+    const melodySaveBtn = document.createElement('
     melodySaveBtn.textContent = 'Save Settings';
     melodySaveBtn.style.padding = '10px 24px';
     melodySaveBtn.style.backgroundColor = '#22c55e';
@@ -1191,7 +1191,7 @@ export function showSettingsModal(initialTab = 'chords') {
     // ==========================================================================
 
     // Description
-    const harmoniesDescription = document.createElement('p');
+    const harmoniesDescription = document.createElement('
     harmoniesDescription.textContent = 'Customize how auto-harmonization chord suggestions are scored and ranked. These weights control how the algorithm matches chords to your melody.';
     harmoniesDescription.style.color = '#6b7280';
     harmoniesDescription.style.fontSize = '14px';
@@ -1200,7 +1200,7 @@ export function showSettingsModal(initialTab = 'chords') {
     harmoniesContent.appendChild(harmoniesDescription);
 
     // Harmonies notice
-    const harmoniesNotice = document.createElement('div');
+    const harmoniesNotice = document.createElement('
     harmoniesNotice.style.backgroundColor = '#f5f3ff';
     harmoniesNotice.style.border = '1px solid #ddd6fe';
     harmoniesNotice.style.borderRadius = '8px';
@@ -1220,12 +1220,12 @@ export function showSettingsModal(initialTab = 'chords') {
     harmoniesContent.appendChild(harmoniesNotice);
 
     // Quick save button at top
-    const harmoniesQuickSaveRow = document.createElement('div');
+    const harmoniesQuickSaveRow = document.createElement('
     harmoniesQuickSaveRow.style.display = 'flex';
     harmoniesQuickSaveRow.style.justifyContent = 'flex-end';
     harmoniesQuickSaveRow.style.marginBottom = '20px';
 
-    const harmoniesQuickSaveBtn = document.createElement('button');
+    const harmoniesQuickSaveBtn = document.createElement('
     harmoniesQuickSaveBtn.textContent = 'Save Settings';
     harmoniesQuickSaveBtn.style.padding = '8px 16px';
     harmoniesQuickSaveBtn.style.backgroundColor = '#8b5cf6';
@@ -1257,7 +1257,7 @@ export function showSettingsModal(initialTab = 'chords') {
     harmoniesContent.appendChild(harmoniesQuickSaveRow);
 
     // Harmonies presets section
-    const harmoniesPresetsSection = document.createElement('div');
+    const harmoniesPresetsSection = document.createElement('
     harmoniesPresetsSection.style.marginBottom = '28px';
 
     const harmoniesPresetsTitle = document.createElement('h3');
@@ -1293,16 +1293,16 @@ export function showSettingsModal(initialTab = 'chords') {
 
     // Helper function to create harmonies preset section
     const createHarmoniesPresetSection = (sectionTitle, presets, description, emoji) => {
-        const section = document.createElement('div');
+        const section = document.createElement('
         section.style.marginBottom = '20px';
 
-        const sectionHeader = document.createElement('div');
+        const sectionHeader = document.createElement('
         sectionHeader.style.display = 'flex';
         sectionHeader.style.alignItems = 'baseline';
         sectionHeader.style.gap = '8px';
         sectionHeader.style.marginBottom = '12px';
 
-        const titleEl = document.createElement('div');
+        const titleEl = document.createElement('
         titleEl.textContent = `${emoji} ${sectionTitle}`;
         titleEl.style.fontSize = '14px';
         titleEl.style.fontWeight = '600';
@@ -1310,7 +1310,7 @@ export function showSettingsModal(initialTab = 'chords') {
         sectionHeader.appendChild(titleEl);
 
         if (description) {
-            const sectionDesc = document.createElement('div');
+            const sectionDesc = document.createElement('
             sectionDesc.textContent = description;
             sectionDesc.style.fontSize = '12px';
             sectionDesc.style.color = '#9ca3af';
@@ -1320,7 +1320,7 @@ export function showSettingsModal(initialTab = 'chords') {
 
         section.appendChild(sectionHeader);
 
-        const grid = document.createElement('div');
+        const grid = document.createElement('
         grid.style.display = 'grid';
         grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
         grid.style.gap = '12px';
@@ -1328,7 +1328,7 @@ export function showSettingsModal(initialTab = 'chords') {
         Object.keys(presets).forEach(key => {
             const preset = presets[key];
 
-            const presetBtn = document.createElement('button');
+            const presetBtn = document.createElement('
             presetBtn.style.padding = '12px 16px';
             presetBtn.style.backgroundColor = '#f9fafb';
             presetBtn.style.border = '2px solid #e5e7eb';
@@ -1338,14 +1338,14 @@ export function showSettingsModal(initialTab = 'chords') {
             presetBtn.style.textAlign = 'left';
             presetBtn.title = preset.tooltip;
 
-            const presetName = document.createElement('div');
+            const presetName = document.createElement('
             presetName.textContent = preset.name;
             presetName.style.fontWeight = '600';
             presetName.style.color = '#111827';
             presetName.style.marginBottom = '4px';
             presetBtn.appendChild(presetName);
 
-            const presetDesc = document.createElement('div');
+            const presetDesc = document.createElement('
             presetDesc.textContent = preset.description;
             presetDesc.style.fontSize = '12px';
             presetDesc.style.color = '#6b7280';
@@ -1390,7 +1390,7 @@ export function showSettingsModal(initialTab = 'chords') {
     harmoniesPresetsSection.appendChild(harmoniesApproachesSection);
 
     // Separator
-    const harmoniesSeparator = document.createElement('div');
+    const harmoniesSeparator = document.createElement('
     harmoniesSeparator.style.height = '1px';
     harmoniesSeparator.style.backgroundColor = '#e5e7eb';
     harmoniesSeparator.style.margin = '20px 0';
@@ -1411,7 +1411,7 @@ export function showSettingsModal(initialTab = 'chords') {
     updateHarmoniesPresetActiveStates();
 
     // Custom harmonies weights section
-    const harmoniesWeightsSection = document.createElement('div');
+    const harmoniesWeightsSection = document.createElement('
     harmoniesWeightsSection.style.marginBottom = '24px';
 
     const harmoniesWeightsTitle = document.createElement('h3');
@@ -1423,7 +1423,7 @@ export function showSettingsModal(initialTab = 'chords') {
     harmoniesWeightsSection.appendChild(harmoniesWeightsTitle);
 
     // Harmonies sliders container
-    const harmoniesSlidersContainer = document.createElement('div');
+    const harmoniesSlidersContainer = document.createElement('
     harmoniesSlidersContainer.style.display = 'flex';
     harmoniesSlidersContainer.style.flexDirection = 'column';
     harmoniesSlidersContainer.style.gap = '20px';
@@ -1466,21 +1466,21 @@ export function showSettingsModal(initialTab = 'chords') {
     }
 
     Object.keys(harmoniesLabels).forEach(key => {
-        const sliderGroup = document.createElement('div');
+        const sliderGroup = document.createElement('
 
-        const labelRow = document.createElement('div');
+        const labelRow = document.createElement('
         labelRow.style.display = 'flex';
         labelRow.style.justifyContent = 'space-between';
         labelRow.style.alignItems = 'center';
         labelRow.style.marginBottom = '8px';
 
-        const label = document.createElement('label');
+        const label = document.createElement('
         label.textContent = harmoniesLabels[key];
         label.style.fontSize = '14px';
         label.style.fontWeight = '600';
         label.style.color = '#374151';
 
-        const valueLabel = document.createElement('span');
+        const valueLabel = document.createElement('
         valueLabel.textContent = `${Math.round(currentHarmonizeWeights[key] * 100)}%`;
         valueLabel.style.fontSize = '14px';
         valueLabel.style.fontWeight = '600';
@@ -1491,14 +1491,14 @@ export function showSettingsModal(initialTab = 'chords') {
         labelRow.appendChild(label);
         labelRow.appendChild(valueLabel);
 
-        const desc = document.createElement('div');
+        const desc = document.createElement('
         desc.textContent = harmoniesDescriptions[key];
         desc.style.fontSize = '12px';
         desc.style.color = '#6b7280';
         desc.style.marginBottom = '8px';
         desc.style.lineHeight = '1.4';
 
-        const slider = document.createElement('input');
+        const slider = document.createElement('
         slider.type = 'range';
         slider.min = '0';
         slider.max = '100';
@@ -1520,14 +1520,14 @@ export function showSettingsModal(initialTab = 'chords') {
     harmoniesContent.appendChild(harmoniesWeightsSection);
 
     // Harmonies buttons
-    const harmoniesButtonRow = document.createElement('div');
+    const harmoniesButtonRow = document.createElement('
     harmoniesButtonRow.style.display = 'flex';
     harmoniesButtonRow.style.gap = '12px';
     harmoniesButtonRow.style.justifyContent = 'flex-end';
     harmoniesButtonRow.style.paddingTop = '24px';
     harmoniesButtonRow.style.borderTop = '1px solid #e5e7eb';
 
-    const harmoniesResetBtn = document.createElement('button');
+    const harmoniesResetBtn = document.createElement('
     harmoniesResetBtn.textContent = 'Reset to Default';
     harmoniesResetBtn.style.padding = '10px 20px';
     harmoniesResetBtn.style.backgroundColor = '#f9fafb';
@@ -1550,7 +1550,7 @@ export function showSettingsModal(initialTab = 'chords') {
         updateHarmoniesPresetActiveStates();
     };
 
-    const harmoniesSaveBtn = document.createElement('button');
+    const harmoniesSaveBtn = document.createElement('
     harmoniesSaveBtn.textContent = 'Save Settings';
     harmoniesSaveBtn.style.padding = '10px 24px';
     harmoniesSaveBtn.style.backgroundColor = '#8b5cf6';
@@ -1601,19 +1601,19 @@ export function showSettingsModal(initialTab = 'chords') {
  * Show settings modal with chord weights tab
  */
 export function showChordWeightsModal() {
-    showSettingsModal('chords');
+    showSettingsModal('
 }
 
 /**
  * Show settings modal with melody weights tab
  */
 export function showMelodyWeightsModal() {
-    showSettingsModal('melody');
+    showSettingsModal('
 }
 
 /**
  * Show settings modal with harmonies weights tab
  */
 export function showHarmoniesWeightsModal() {
-    showSettingsModal('harmonies');
+    showSettingsModal('
 }

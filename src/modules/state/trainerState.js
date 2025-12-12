@@ -187,19 +187,24 @@ export function getProgressionData() {
  * @param {Array} value - Array of chord objects to set as the new progression
  */
 export function setProgressionData(value) {
+    console.log(`🎼 [TS] setProgressionData called with ${value?.length || 0} chords`);
     // Silent delegation to compositionState (single source of truth)
     if (window.getCompositionState && Array.isArray(value)) {
         const compositionState = window.getCompositionState();
         if (compositionState) {
             // DEBUGGING: Uncomment to trace when progression data is set
-            // console.log('[setProgressionData] Setting progression with', value.length, 'chords:', value.map(c => `${c.root}${c.type}`));
+            console.log('[setProgressionData] Setting progression with', value.length, 'chords:', value.map(c => `${c.root}${c.type}`));
+            // Preserve current time signature instead of hardcoding 4/4
+            const currentTimeSignature = compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
+            console.log(`🎼 [TS] Using time signature: ${currentTimeSignature.num}/${currentTimeSignature.denom}`);
             compositionState.syncWithProgressionData(value, {
                 key: trainerState.currentKey,
-                timeSignature: { num: 4, denom: 4 }
+                timeSignature: currentTimeSignature
             });
             // Invalidate cache when progression data is set
             // This ensures next getProgressionData() call returns fresh data
             invalidateProgressionDataCache();
+            console.log(`🎼 [TS] setProgressionData completed`);
         }
     }
 }

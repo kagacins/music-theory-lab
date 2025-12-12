@@ -38,7 +38,7 @@ export class PageManager {
     const pageIndex = this.pages.length;
 
     // Create canvas element
-    const canvas = document.createElement('canvas');
+    const canvas = document.createElement('
     canvas.id = `notation-page-${pageIndex}`;
     canvas.className = 'notation-page';
     canvas.width = PAGE_CONFIG.width;
@@ -61,7 +61,7 @@ export class PageManager {
     this.container.appendChild(canvas);
 
     // Get context
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2
 
     // Create page object
     const page = {
@@ -164,7 +164,7 @@ export class PageManager {
    */
   setViewMode(mode) {
     if (!Object.values(PAGE_CONFIG.viewModes).includes(mode)) {
-      console.warn('[PageManager] Invalid view mode:', mode);
+
       return;
     }
 

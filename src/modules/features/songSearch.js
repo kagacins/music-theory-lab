@@ -72,13 +72,13 @@ async function loadSongDatabase() {
                 const data = await response.json();
                 if (Array.isArray(data) && data.length > 0) {
                     DEMO_SONG_DATABASE = data;
-                    console.log(`Loaded ${DEMO_SONG_DATABASE.length} songs from database`);
+
                     return DEMO_SONG_DATABASE;
                 }
             }
-            throw new Error('Invalid or empty database');
+            throw new Error('Invalid or empty 
         } catch (error) {
-            console.warn('Failed to load song database from JSON, using fallback:', error);
+
             // Use fallback database if JSON load fails
             DEMO_SONG_DATABASE = FALLBACK_SONG_DATABASE;
             return DEMO_SONG_DATABASE;
@@ -114,14 +114,14 @@ export function getSearchMode() {
  * Toggle between API and free search modes
  */
 export function toggleSearchMode() {
-    const toggle = document.getElementById('free-search-toggle');
+    const toggle = document.getElementById('free-search-
     currentSearchMode = toggle?.checked ? 'free' : 'api';
 
     // Update UI labels
-    const localLabel = document.getElementById('search-mode-local-label');
-    const freeLabel = document.getElementById('search-mode-free-label');
-    const description = document.getElementById('search-mode-description');
-    const searchCountDisplay = document.getElementById('search-count-display');
+    const localLabel = document.getElementById('search-mode-local-
+    const freeLabel = document.getElementById('search-mode-free-
+    const description = document.getElementById('search-mode-
+    const searchCountDisplay = document.getElementById('search-count-
 
     if (currentSearchMode === 'free') {
         localLabel?.classList.remove('text-purple-600');
@@ -145,7 +145,7 @@ export function toggleSearchMode() {
         updateSearchCountDisplay();
     }
 
-    console.log(`[SongSearch] Switched to ${currentSearchMode} mode`);
+
 }
 
 /**
@@ -207,7 +207,7 @@ function getRemainingSearches() {
  * Update the search count display in the UI
  */
 function updateSearchCountDisplay() {
-    const display = document.getElementById('search-count-display');
+    const display = document.getElementById('search-count-
     if (!display) return;
     
     const count = getDailySearchCount();
@@ -226,18 +226,18 @@ function updateSearchCountDisplay() {
  * Toggle the song search panel visibility
  */
 export function toggleSongSearchPanel() {
-    const panel = document.getElementById('song-search-panel');
-    const chevron = document.getElementById('song-search-chevron');
+    const panel = document.getElementById('song-search-
+    const chevron = document.getElementById('song-search-
     
     if (panel && chevron) {
-        const isHidden = panel.classList.contains('hidden');
+        const isHidden = panel.classList.contains('
         if (isHidden) {
-            panel.classList.remove('hidden');
+            panel.classList.remove('
             chevron.classList.add('rotate-180');
             // Update search count display when panel opens
             updateSearchCountDisplay();
         } else {
-            panel.classList.add('hidden');
+            panel.classList.add('
             chevron.classList.remove('rotate-180');
         }
         
@@ -253,8 +253,8 @@ export function toggleSongSearchPanel() {
  * Supports two modes: 'api' (local + Google API) and 'free' (DuckDuckGo scraping)
  */
 export async function searchSongChords() {
-    const searchInput = document.getElementById('song-search-input');
-    const resultsContainer = document.getElementById('song-search-results');
+    const searchInput = document.getElementById('song-search-
+    const resultsContainer = document.getElementById('song-search-
 
     if (!searchInput || !resultsContainer) return;
 
@@ -266,8 +266,8 @@ export async function searchSongChords() {
     }
 
     // Hide previous suggestions
-    const suggestionsContainer = document.getElementById('chord-suggestions-container');
-    if (suggestionsContainer) suggestionsContainer.classList.add('hidden');
+    const suggestionsContainer = document.getElementById('chord-suggestions-
+    if (suggestionsContainer) suggestionsContainer.classList.add('
 
     // Show loading state
     resultsContainer.innerHTML = '<div class="flex items-center gap-2 text-sm text-gray-600"><div class="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div> Searching...</div>';
@@ -303,7 +303,7 @@ export async function searchSongChords() {
         // No local results, search the internet (only if under daily limit)
         if (isDailyLimitReached()) {
             rateLimitReached = true;
-            console.log('Daily search limit reached. Skipping internet search.');
+
         } else {
             // Check if we have API credentials before attempting search
             const hasApiCredentials = window.GOOGLE_SEARCH_API_KEY && window.GOOGLE_SEARCH_ENGINE_ID;
@@ -314,7 +314,7 @@ export async function searchSongChords() {
                     // Increment count after successful API call attempt
                     incrementDailySearchCount();
                 } catch (error) {
-                    console.warn('Internet search failed:', error);
+
                     // Still increment on error to prevent retry loops
                     // (API call was attempted, even if it failed)
                     incrementDailySearchCount();
@@ -324,7 +324,7 @@ export async function searchSongChords() {
             }
         }
     } else {
-        console.log(`Found ${localResults.length} local result(s), skipping internet search to save API calls.`);
+
     }
     
     // Combine results (local first, then internet)
@@ -444,7 +444,7 @@ async function searchInternetForChords(query) {
         const googleResults = await searchGoogleForChords(query);
         results.push(...googleResults);
     } catch (error) {
-        console.warn('Internet search failed:', error);
+
     }
     
     return results;
@@ -468,13 +468,13 @@ async function searchGoogleForChords(query) {
             return parseGoogleSearchResults(data);
         } else if (response.status === 404) {
             // Netlify function not available, fall back to direct API call
-            console.log('Netlify function not found, using direct API call');
+
         } else {
             throw new Error(`Function error: ${response.status}`);
         }
     } catch (error) {
         // If Netlify function fails, try direct API call (for local dev or non-Netlify deployments)
-        console.log('Netlify function unavailable, trying direct API call:', error.message);
+
     }
     
     // Fallback: Direct API call (requires API keys in window object)
@@ -498,7 +498,7 @@ async function searchGoogleForChords(query) {
         const data = await response.json();
         return parseGoogleSearchResults(data);
     } catch (error) {
-        console.error('Google Custom Search error:', error);
+
         throw error;
     }
 }
@@ -590,7 +590,7 @@ function getSourceName(url) {
  */
 export function openUltimateGuitarSearch(query) {
     const searchUrl = `https://www.ultimate-guitar.com/search.php?search_type=title&value=${encodeURIComponent(query)}`;
-    window.open(searchUrl, '_blank', 'noopener,noreferrer');
+    window.open(searchUrl, '_blank', 'noopener,
 }
 
 /**
@@ -614,7 +614,7 @@ export async function importInternetSongProgression(song) {
     // Switch enharmonic preference to match the progression
     const currentPreference = window.getEnharmonicPreference ? window.getEnharmonicPreference() : 'sharp';
     if (progressionPreference !== currentPreference) {
-        console.log(`Switching enharmonic preference from ${currentPreference} to ${progressionPreference} to match chord progression`);
+
         switchEnharmonicPreference(progressionPreference);
         // Wait a bit for the preference change to take effect
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -693,7 +693,7 @@ function expandAndScrollToProgressionSection() {
     } else {
         // If not on melody tab, switch to melody tab first
         if (window.switchTab) {
-            window.switchTab('melody');
+            window.switchTab('
         }
         panelId = 'chord-progression-card-panel';
         toggleId = 'chord-progression-card-toggle';
@@ -707,7 +707,7 @@ function expandAndScrollToProgressionSection() {
     if (panel && toggle) {
         // Expand the panel if it's collapsed
         if (panel.classList.contains('hidden')) {
-            panel.classList.remove('hidden');
+            panel.classList.remove('
             if (chevron) {
                 chevron.classList.add('rotate-180');
             }
@@ -716,7 +716,7 @@ function expandAndScrollToProgressionSection() {
         // Scroll to the section with smooth behavior, accounting for keyboard height
         setTimeout(() => {
             // Get keyboard height to ensure section is visible above keyboard
-            const keyboardSection = document.getElementById('keyboard-section');
+            const keyboardSection = document.getElementById('keyboard-
             const keyboardHeight = keyboardSection ? keyboardSection.offsetHeight : 0;
             const headerHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--header-height')) || 80;
             
@@ -826,7 +826,7 @@ function detectEnharmonicPreference(chords) {
  */
 function switchEnharmonicPreference(preference) {
     if (!window.setEnharmonicPreference) {
-        console.warn('setEnharmonicPreference not available');
+
         return;
     }
     
@@ -839,13 +839,13 @@ function switchEnharmonicPreference(preference) {
     }
     
     // Update the toggle checkbox
-    const toggle = document.getElementById('enharmonic-toggle');
+    const toggle = document.getElementById('enharmonic-
     if (toggle) {
         toggle.checked = preference === 'flat';
         
         // Update indicator colors
-        const sharpIndicator = document.getElementById('sharp-indicator');
-        const flatIndicator = document.getElementById('flat-indicator');
+        const sharpIndicator = document.getElementById('sharp-
+        const flatIndicator = document.getElementById('flat-
         
         if (preference === 'sharp') {
             if (sharpIndicator) {
@@ -901,7 +901,7 @@ function convertToEnharmonicPreference(note) {
     }
     
     if (noteIndex === -1) {
-        console.warn(`Could not find note ${note} in note arrays`);
+
         return note; // Return original if can't convert
     }
     
@@ -922,7 +922,7 @@ function addParsedChordToProgression(chordSymbol, key, playShutterSound = false,
     
     const match = chordSymbol.match(/^([A-G])([#b]?)(.*)$/);
     if (!match) {
-        console.warn(`Could not parse chord symbol: ${chordSymbol}`);
+
         return;
     }
     
@@ -973,17 +973,17 @@ function addParsedChordToProgression(chordSymbol, key, playShutterSound = false,
                     const lengthAfter = trainerStateAfter.progressionData.length;
                     if (lengthAfter > lengthBefore) {
                         const inversionText = inversion > 0 ? ` (inv. ${inversion})` : '';
-                        console.log(`✓ Added chord ${chordSymbol} (${root} ${chordType}${inversionText}). Progression: ${lengthBefore} → ${lengthAfter} chords.`);
+
                     } else {
-                        console.warn(`⚠ Chord ${chordSymbol} (${root} ${chordType}) was not added. Progression length unchanged: ${lengthBefore}`);
+
                     }
                 }
             }, 50);
         } catch (error) {
-            console.error(`Error adding chord ${chordSymbol} (${root} ${chordType}):`, error);
+
         }
     } else {
-        console.warn(`Chord building functions not available for: ${chordSymbol}`);
+
     }
 }
 
@@ -1013,7 +1013,7 @@ export async function importSongProgression(songIndex) {
     // Switch enharmonic preference to match the progression
     const currentPreference = window.getEnharmonicPreference ? window.getEnharmonicPreference() : 'sharp';
     if (progressionPreference !== currentPreference) {
-        console.log(`Switching enharmonic preference from ${currentPreference} to ${progressionPreference} to match chord progression`);
+
         switchEnharmonicPreference(progressionPreference);
         // Wait a bit for the preference change to take effect
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -1096,7 +1096,7 @@ export async function importSongProgression(songIndex) {
  * @returns {string} - Escaped text
  */
 function escapeHtml(text) {
-    const div = document.createElement('div');
+    const div = document.createElement('
     div.textContent = text;
     return div.innerHTML;
 }
@@ -1143,7 +1143,7 @@ async function performFreeSearch(query, resultsContainer) {
             return;
         }
 
-        console.log(`[SongSearch] Found ${chords.length} chords online:`, chords);
+
 
         // Generate suggestions by comparing with current progression
         const suggestions = generateChordSuggestions(chords);
@@ -1187,7 +1187,7 @@ async function performFreeSearch(query, resultsContainer) {
         `;
 
     } catch (error) {
-        console.error('[SongSearch] Free search error:', error);
+
         resultsContainer.innerHTML = `
             <div class="space-y-3">
                 <div class="p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -1213,14 +1213,14 @@ async function performFreeSearch(query, resultsContainer) {
  * @param {string} chordName - Chord name to highlight
  */
 export function highlightChordInProgression(chordName) {
-    console.log(`[SongSearch] Highlighting chord: ${chordName}`);
+
 
     // Get the progression display
     const progressionDisplay = document.getElementById('progression-display') ||
-                               document.getElementById('melody-progression-display');
+                               document.getElementById('melody-progression-
 
     if (!progressionDisplay) {
-        console.log('[SongSearch] No progression display found');
+
         return;
     }
 
@@ -1268,8 +1268,6 @@ export function highlightChordInProgression(chordName) {
         const rootsMatch = targetRoot && cardRoot && (
             targetRoot === cardRoot ||
             targetRoot === enharmonicMap[cardRoot] ||
-            enharmonicMap[targetRoot] === cardRoot
-        );
 
         if (cardNormalized === targetNormalized ||
             (targetRoot && targetNormalized === targetRoot && cardNormalized === cardRoot)) {
@@ -1284,9 +1282,9 @@ export function highlightChordInProgression(chordName) {
 
     // Show a brief message
     if (matchCount > 0) {
-        console.log(`[SongSearch] Found ${matchCount} matching chord(s)`);
+
     } else if (targetRoot) {
-        console.log(`[SongSearch] No exact matches, but showing similar chords with root ${targetRoot}`);
+
     }
 }
 
@@ -1296,7 +1294,7 @@ export function highlightChordInProgression(chordName) {
  * @returns {Promise<Array<string>>} Array of chord names found
  */
 async function searchFreeOnlineChords(query) {
-    console.log(`[SongSearch] Free search for: ${query}`);
+
 
     // Use CORS proxies to fetch search results
     const corsProxies = [
@@ -1318,12 +1316,12 @@ async function searchFreeOnlineChords(query) {
                 break;
             }
         } catch (e) {
-            console.warn(`[SongSearch] Proxy ${proxy} failed:`, e.message);
+
         }
     }
 
     if (!html) {
-        throw new Error('All CORS proxies failed');
+        throw new Error('All CORS proxies 
     }
 
     // Parse the HTML to extract chords
@@ -1391,7 +1389,7 @@ export function generateChordSuggestions(onlineChords) {
     const progressionData = trainerState?.progressionData || [];
 
     if (progressionData.length === 0) {
-        console.log('[SongSearch] No current progression to compare with');
+
         return suggestions;
     }
 
@@ -1412,8 +1410,8 @@ export function generateChordSuggestions(onlineChords) {
         return null;
     }).filter(Boolean);
 
-    console.log('[SongSearch] Current progression:', currentChords);
-    console.log('[SongSearch] Online chords:', onlineChords);
+
+
 
     // Normalize chord for comparison (extract root + basic quality)
     const normalizeChord = (chord) => {
@@ -1474,8 +1472,6 @@ export function generateChordSuggestions(onlineChords) {
                 if (isUpgrade) {
                     // Check if we already have this suggestion
                     const exists = suggestions.some(s =>
-                        s.original === currentChord && s.suggested === onlineChord
-                    );
 
                     if (!exists) {
                         let reason = '';
@@ -1502,7 +1498,7 @@ export function generateChordSuggestions(onlineChords) {
         });
     });
 
-    console.log('[SongSearch] Generated suggestions:', suggestions);
+
     return suggestions;
 }
 
@@ -1511,13 +1507,13 @@ export function generateChordSuggestions(onlineChords) {
  * @param {Array<Object>} suggestions - Array of suggestion objects
  */
 function displayChordSuggestions(suggestions) {
-    const container = document.getElementById('chord-suggestions-container');
-    const list = document.getElementById('chord-suggestions-list');
+    const container = document.getElementById('chord-suggestions-
+    const list = document.getElementById('chord-suggestions-
 
     if (!container || !list) return;
 
     if (suggestions.length === 0) {
-        container.classList.add('hidden');
+        container.classList.add('
         return;
     }
 
@@ -1536,7 +1532,7 @@ function displayChordSuggestions(suggestions) {
         </div>
     `).join('');
 
-    container.classList.remove('hidden');
+    container.classList.remove('
 }
 
 /**
@@ -1545,14 +1541,14 @@ function displayChordSuggestions(suggestions) {
  * @param {string} suggested - Suggested replacement chord
  */
 export function applySuggestedChord(original, suggested) {
-    console.log(`[SongSearch] Applying suggestion: ${original} -> ${suggested}`);
+
 
     // Get current progression
     const trainerState = window.getTrainerState ? window.getTrainerState() : null;
     const progressionData = trainerState?.progressionData || [];
 
     if (progressionData.length === 0) {
-        alert('No progression to modify');
+        alert('No progression to 
         return;
     }
 
@@ -1630,9 +1626,9 @@ export function applySuggestedChord(original, suggested) {
         if (window.renderProgressionDisplay) {
             window.renderProgressionDisplay();
         }
-        console.log(`[SongSearch] Successfully applied ${suggested}`);
+
     } else {
-        console.warn(`[SongSearch] Could not find chord ${original} in progression`);
+
         alert(`Could not find ${original} in your progression to replace`);
     }
 }

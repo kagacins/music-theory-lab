@@ -51,6 +51,18 @@ export const ZOOM_LEVELS = [50, 75, 100, 125, 150, 175, 200];
  */
 export const MEASURES_PER_LINE_OPTIONS = [2, 3, 4, 5, 6, 8];
 
+/**
+ * Time signature options
+ */
+export const TIME_SIGNATURE_OPTIONS = [
+  { num: 4, denom: 4, label: '4/4', description: 'Common time' },
+  { num: 3, denom: 4, label: '3/4', description: 'Waltz time' },
+  { num: 2, denom: 4, label: '2/4', description: 'March time' },
+  { num: 6, denom: 8, label: '6/8', description: 'Compound time' },
+  { num: 2, denom: 2, label: '2/2', description: 'Cut time' },
+  { num: 9, denom: 8, label: '9/8', description: 'Compound triple' },
+];
+
 // ============================================================================
 // TOOLBAR CLASS
 // ============================================================================
@@ -69,6 +81,7 @@ export class NotationToolbar {
     this.zoom = 100;
     this.measuresPerLine = 4;
     this.voiceNumber = 1;
+    this.timeSignature = { num: 4, denom: 4 };
 
     // Selection state for contextual editing
     this.selectedNotesCount = 0;
@@ -98,6 +111,7 @@ export class NotationToolbar {
     this.onOctaveShift = options.onOctaveShift || (() => {});
     this.onTupletCreate = options.onTupletCreate || (() => {});
     this.onTupletModeToggle = options.onTupletModeToggle || (() => {});
+    this.onTimeSignatureChange = options.onTimeSignatureChange || (() => {});
     this.onTupletRemove = options.onTupletRemove || (() => {});
 
     // Tuplet mode state
@@ -109,7 +123,8 @@ export class NotationToolbar {
 
     // Multi-voice rest display settings
     this.restDisplayMode = localStorage.getItem('notation-rest-display-mode') || 'clean'; // 'clean' or 'explicit'
-    this.cueRestsForSecondaryVoice = localStorage.getItem('notation-cue-rests') !== 'false'; // default true
+    // "Hide Cue" checkbox - default to false (unchecked) so cue rests are SHOWN by default
+    this.cueRestsForSecondaryVoice = localStorage.getItem('notation-cue-rests') === 'true'; // default false (show cue rests)
     this.onRestDisplayModeChange = options.onRestDisplayModeChange || (() => {});
 
     // Voice leading visualization
@@ -125,6 +140,13 @@ export class NotationToolbar {
     this.container = container;
     this.render();
     this.attachEventListeners();
+
+    // IMPORTANT: Apply initial settings from localStorage on page load
+    // This ensures the saved "Hide Cue" setting is respected when the page loads
+    this.onRestDisplayModeChange({
+      restDisplayMode: this.restDisplayMode,
+      cueRestsForSecondaryVoice: this.cueRestsForSecondaryVoice,
+    });
   }
 
   /**
@@ -269,15 +291,20 @@ export class NotationToolbar {
                   <option value="${m}" ${m === this.measuresPerLine ? 'selected' : ''}>${m} measures</option>
                 `).join('')}
               </select>
+              <select class="time-signature-select" title="Time signature">
+                ${TIME_SIGNATURE_OPTIONS.map(ts => `
+                  <option value="${ts.num}-${ts.denom}" ${ts.num === this.timeSignature.num && ts.denom === this.timeSignature.denom ? 'selected' : ''} title="${ts.description}">${ts.label}</option>
+                `).join('')}
+              </select>
             </div>
             <div class="toolbar-section rest-display-section">
               <div class="button-group">
                 <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'clean' ? 'active' : ''}" data-rest-mode="clean" title="Clean: Hide redundant rests">Clean</button>
                 <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'explicit' ? 'active' : ''}" data-rest-mode="explicit" title="Show all rests">All</button>
               </div>
-              <label class="cue-rest-toggle" title="Show cue-sized rests for secondary voice">
+              <label class="cue-rest-toggle" title="Hide cue rests (uncheck to show grey cue rests)">
                 <input type="checkbox" class="cue-rest-checkbox" ${this.cueRestsForSecondaryVoice ? 'checked' : ''}>
-                <span class="cue-rest-label">Cue</span>
+                <span class="cue-rest-label">Hide Cue</span>
               </label>
             </div>
           </div>
@@ -706,6 +733,13 @@ export class NotationToolbar {
     this.container.querySelector('.measures-select')?.addEventListener('change', (e) => {
       this.measuresPerLine = parseInt(e.target.value, 10);
       this.onMeasuresPerLineChange(this.measuresPerLine);
+    });
+
+    // Time signature select
+    this.container.querySelector('.time-signature-select')?.addEventListener('change', (e) => {
+      const [num, denom] = e.target.value.split('-').map(Number);
+      this.timeSignature = { num, denom };
+      this.onTimeSignatureChange(num, denom);
     });
 
     // Chord symbol apply button
@@ -1156,6 +1190,29 @@ export class NotationToolbar {
     const select = this.container.querySelector('.voice-select');
     if (select) {
       select.value = this.voiceNumber.toString();
+    }
+  }
+
+  /**
+   * Set time signature
+   * @param {number} num - Numerator
+   * @param {number} denom - Denominator
+   */
+  setTimeSignature(num, denom) {
+    this.timeSignature = { num, denom };
+    this.updateTimeSignatureSelector();
+    this.onTimeSignatureChange(num, denom);
+  }
+
+  /**
+   * Update time signature selector UI to reflect current time signature
+   */
+  updateTimeSignatureSelector() {
+    if (!this.container) return;
+    const select = this.container.querySelector('.time-signature-select');
+    if (select) {
+      const value = `${this.timeSignature.num}-${this.timeSignature.denom}`;
+      select.value = value;
     }
   }
 

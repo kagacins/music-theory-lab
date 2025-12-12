@@ -299,9 +299,9 @@ function scoredInversionOptions(currentChordType, currentRoot, currentInversion,
         const bassDiff = Math.abs(nextMidi[0] - currentMidi[0]);
         const bassScore = Math.max(0, 15 - bassDiff); // 0-15 points
         score += bassScore;
-        if (bassDiff === 0) qualities.push('static bass');
-        else if (bassDiff <= 2) qualities.push('smooth bass');
-        else if (bassDiff <= 5) qualities.push('stepwise bass');
+        if (bassDiff === 0) qualities.push('static 
+        else if (bassDiff <= 2) qualities.push('smooth 
+        else if (bassDiff <= 5) qualities.push('stepwise 
 
         // 2. Common tones - notes shared between chords
         const commonTones = currentMidi.filter(n1 =>
@@ -321,8 +321,8 @@ function scoredInversionOptions(currentChordType, currentRoot, currentInversion,
         }, 0);
         const movementScore = Math.max(0, 20 - (totalMovement / 2)); // 0-20 points
         score += movementScore;
-        if (totalMovement <= 5) qualities.push('very smooth');
-        else if (totalMovement <= 10) qualities.push('smooth');
+        if (totalMovement <= 5) qualities.push('very 
+        else if (totalMovement <= 10) qualities.push('
 
         // 4. Voice range - prefer mid-range voicings
         const avgPitch = nextMidi.reduce((a, b) => a + b, 0) / nextMidi.length;
@@ -337,7 +337,7 @@ function scoredInversionOptions(currentChordType, currentRoot, currentInversion,
             if (bassMovement !== 0 && sopranoMovement !== 0 &&
                 Math.sign(bassMovement) !== Math.sign(sopranoMovement)) {
                 score += 5;
-                qualities.push('contrary motion');
+                qualities.push('contrary 
             }
         }
 

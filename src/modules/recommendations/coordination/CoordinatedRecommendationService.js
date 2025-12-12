@@ -161,13 +161,11 @@ class CoordinatedRecommendationService extends EventEmitter {
         } else {
             // Build recommendations with full context
             recommendations = this._generateContextualChordRecommendations(
-                context, style, mood, tension, limit
-            );
         }
 
         // Apply user preference adjustments if available
         if (this._preferenceLearner) {
-            recommendations = this._applyUserPreferences(recommendations, 'chord');
+            recommendations = this._applyUserPreferences(recommendations, '
         }
 
         // Format for UI
@@ -258,8 +256,6 @@ class CoordinatedRecommendationService extends EventEmitter {
 
         // Build section-appropriate progression
         const progression = this._generateSectionProgression(
-            context, sectionType, length, style, mood
-        );
 
         return {
             primary: progression.primary,
@@ -391,8 +387,6 @@ class CoordinatedRecommendationService extends EventEmitter {
             customWeights,
             true, // useEnhancedScoring
             sectionInfo,
-            tensionArcInfo
-        );
     }
 
     /**

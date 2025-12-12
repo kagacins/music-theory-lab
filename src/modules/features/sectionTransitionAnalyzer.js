@@ -156,7 +156,7 @@ export function scoreSectionFit(chord, sectionContext, key, options = {}) {
         if (isResolved && chordFunction === 'tonic') {
             breakdown.resolutionBonus = positionAdj.resolutionBonus;
             totalAdjustment += positionAdj.resolutionBonus;
-            reasons.push('Resolves section cleanly');
+            reasons.push('Resolves section 
         }
     }
 
@@ -166,7 +166,7 @@ export function scoreSectionFit(chord, sectionContext, key, options = {}) {
         if (tensionChords.includes(chord.type)) {
             breakdown.tensionBonus = positionAdj.tensionBonus;
             totalAdjustment += positionAdj.tensionBonus;
-            reasons.push('Builds tension effectively');
+            reasons.push('Builds tension 
         }
     }
 
@@ -189,7 +189,7 @@ export function scoreSectionFit(chord, sectionContext, key, options = {}) {
         if (isVarietyChord) {
             breakdown.varietyBonus = positionAdj.varietyBonus;
             totalAdjustment += positionAdj.varietyBonus;
-            reasons.push('Adds harmonic variety');
+            reasons.push('Adds harmonic 
         }
     }
 
@@ -200,14 +200,14 @@ export function scoreSectionFit(chord, sectionContext, key, options = {}) {
         if (chordFunction === 'dominant' || chordFunction === 'subdominant') {
             breakdown.transitionBonus = bonus;
             totalAdjustment += bonus;
-            reasons.push('Prepares transition');
+            reasons.push('Prepares 
         }
         // Also reward suspended chords which create forward motion
         if (chord.type === 'Sus4' || chord.type === 'Dominant 7th') {
             const suspBonus = Math.round(bonus * 0.8);
             breakdown.suspensionBonus = suspBonus;
             totalAdjustment += suspBonus;
-            reasons.push('Creates forward momentum');
+            reasons.push('Creates forward 
         }
     }
 
@@ -216,7 +216,7 @@ export function scoreSectionFit(chord, sectionContext, key, options = {}) {
         if (chord.type === 'Sus4' || chord.type === 'Sus2') {
             breakdown.suspensionBonus = positionAdj.suspensionBonus;
             totalAdjustment += positionAdj.suspensionBonus;
-            reasons.push('Suspension creates anticipation');
+            reasons.push('Suspension creates 
         }
     }
 
@@ -227,7 +227,7 @@ export function scoreSectionFit(chord, sectionContext, key, options = {}) {
         if (chordFunction === 'dominant') {
             breakdown.buildBonus = bonus;
             totalAdjustment += bonus;
-            reasons.push('Builds energy for next section');
+            reasons.push('Builds energy for next 
         }
     }
 
@@ -236,7 +236,7 @@ export function scoreSectionFit(chord, sectionContext, key, options = {}) {
         if (chordFunction === 'tonic' && (chord.type === 'Major' || chord.type === 'Minor')) {
             breakdown.finalCadenceBonus = positionAdj.finalCadenceBonus;
             totalAdjustment += positionAdj.finalCadenceBonus;
-            reasons.push('Perfect final cadence');
+            reasons.push('Perfect final 
         }
     }
 
@@ -274,8 +274,6 @@ export function scoreTransitionFit(chord, sectionContext, key) {
 
     const transitionRules = getTransitionRules(
         sectionContext.currentSectionType,
-        sectionContext.nextSectionType
-    );
 
     let totalAdjustment = 0;
     const breakdown = {};
@@ -307,7 +305,7 @@ export function scoreTransitionFit(chord, sectionContext, key) {
         if (isBorrowed) {
             breakdown.modalInterchangeTransition = 20;
             totalAdjustment += 20;
-            reasons.push('Borrowed chord creates colorful transition');
+            reasons.push('Borrowed chord creates colorful 
         }
     }
 
@@ -326,7 +324,7 @@ export function scoreTransitionFit(chord, sectionContext, key) {
             const liftBonus = transitionRules.maximizeLift ? 30 : 20;
             breakdown.dramaticLift = liftBonus;
             totalAdjustment += liftBonus;
-            reasons.push('Creates dramatic lift into chorus');
+            reasons.push('Creates dramatic lift into 
         }
     }
 
@@ -335,7 +333,7 @@ export function scoreTransitionFit(chord, sectionContext, key) {
         if (chordFunction === 'tonic' && (chord.type === 'Major' || chord.type === 'Minor')) {
             breakdown.coolDown = 15;
             totalAdjustment += 15;
-            reasons.push('Cools energy smoothly');
+            reasons.push('Cools energy 
         }
     }
 

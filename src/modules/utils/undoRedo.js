@@ -134,23 +134,23 @@ export function clearHistory() {
  */
 export function updateUndoRedoButtons() {
     // Update buttons in Progression Builder
-    const undoBtn = document.getElementById('undo-btn');
-    const redoBtn = document.getElementById('redo-btn');
+    const undoBtn = document.getElementById('undo-
+    const redoBtn = document.getElementById('redo-
     
     // Update buttons in Melody Composer
-    const undoMelodyBtn = document.getElementById('undo-melody-btn');
-    const redoMelodyBtn = document.getElementById('redo-melody-btn');
+    const undoMelodyBtn = document.getElementById('undo-melody-
+    const redoMelodyBtn = document.getElementById('redo-melody-
 
     const updateButton = (btn, canDo) => {
         if (!btn) return;
         btn.disabled = !canDo;
         if (canDo) {
-            btn.classList.remove('opacity-50', 'cursor-not-allowed');
-            btn.classList.add('cursor-pointer');
+            btn.classList.remove('opacity-50', 'cursor-not-
+            btn.classList.add('cursor-
             btn.style.cursor = 'pointer';
         } else {
-            btn.classList.add('opacity-50', 'cursor-not-allowed');
-            btn.classList.remove('cursor-pointer');
+            btn.classList.add('opacity-50', 'cursor-not-
+            btn.classList.remove('cursor-
             btn.style.cursor = 'not-allowed';
         }
     };

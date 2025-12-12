@@ -1951,7 +1951,13 @@ function renderChordNotation(chord, key, canvas) {
             }
         });
 
-        const voice = new Voice({ num_beats: 4, beat_value: 4 });
+        const tsForVoice = (() => {
+            const cs = window.getCompositionState ? window.getCompositionState() : null;
+            const ts = cs?.metadata?.timeSignature || { num: 4, denom: 4 };
+            return { num: ts.num || 4, denom: ts.denom || 4 };
+        })();
+
+        const voice = new Voice({ num_beats: tsForVoice.num, beat_value: tsForVoice.denom });
         voice.addTickables([staveNote]);
         new Formatter().joinVoices([voice]).format([voice], staveWidth - 50);
         voice.draw(ctx, stave);
@@ -2363,7 +2369,13 @@ function renderStaffNotation(chordIndex, canvas) {
                 }
             });
 
-            const voice = new Voice({ num_beats: 4, beat_value: 4 });
+            const tsForVoice = (() => {
+                const cs = window.getCompositionState ? window.getCompositionState() : null;
+                const ts = cs?.metadata?.timeSignature || { num: 4, denom: 4 };
+                return { num: ts.num || 4, denom: ts.denom || 4 };
+            })();
+
+            const voice = new Voice({ num_beats: tsForVoice.num, beat_value: tsForVoice.denom });
             voice.addTickables([staveNote]);
             // Format to fit notes within stave width (125px)
             new Formatter().joinVoices([voice]).format([voice], staveWidth);
@@ -2460,7 +2472,13 @@ function renderStaffNotation(chordIndex, canvas) {
                 }
             });
 
-            const voice = new Voice({ num_beats: 4, beat_value: 4 });
+            const tsForVoice = (() => {
+                const cs = window.getCompositionState ? window.getCompositionState() : null;
+                const ts = cs?.metadata?.timeSignature || { num: 4, denom: 4 };
+                return { num: ts.num || 4, denom: ts.denom || 4 };
+            })();
+
+            const voice = new Voice({ num_beats: tsForVoice.num, beat_value: tsForVoice.denom });
             voice.addTickables([staveNote]);
             // Format to fit notes within stave width (125px)
             new Formatter().joinVoices([voice]).format([voice], staveWidth);
@@ -2629,7 +2647,13 @@ export function renderChordStaffNotation(canvas, chordData, key) {
                 }
             });
 
-            const voice = new Voice({ num_beats: 4, beat_value: 4 });
+            const tsForVoice = (() => {
+                const cs = window.getCompositionState ? window.getCompositionState() : null;
+                const ts = cs?.metadata?.timeSignature || { num: 4, denom: 4 };
+                return { num: ts.num || 4, denom: ts.denom || 4 };
+            })();
+
+            const voice = new Voice({ num_beats: tsForVoice.num, beat_value: tsForVoice.denom });
             voice.addTickables([staveNote]);
             new Formatter().joinVoices([voice]).format([voice], staveWidth);
             voice.draw(ctx, stave);
@@ -2682,7 +2706,13 @@ export function renderChordStaffNotation(canvas, chordData, key) {
                 }
             });
 
-            const voice = new Voice({ num_beats: 4, beat_value: 4 });
+            const tsForVoice = (() => {
+                const cs = window.getCompositionState ? window.getCompositionState() : null;
+                const ts = cs?.metadata?.timeSignature || { num: 4, denom: 4 };
+                return { num: ts.num || 4, denom: ts.denom || 4 };
+            })();
+
+            const voice = new Voice({ num_beats: tsForVoice.num, beat_value: tsForVoice.denom });
             voice.addTickables([staveNote]);
             new Formatter().joinVoices([voice]).format([voice], staveWidth);
             voice.draw(ctx, stave);
@@ -12463,6 +12493,13 @@ function updateChordAndRenderPreservingTrebleNotes(index, options = {}) {
             compositionState.addMeasure({});
         }
 
+        // Calculate beats based on current time signature if not defined
+        let chordBeats = chord.beats;
+        if (chordBeats === undefined) {
+            const ts = compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
+            chordBeats = (ts.num || 4) * (4 / (ts.denom || 4));
+        }
+
         // Update the chord with ALL properties from progression
         compositionState.updateChord(index, {
             root: chord.root,
@@ -12476,7 +12513,7 @@ function updateChordAndRenderPreservingTrebleNotes(index, options = {}) {
             lhOctaveShift: chord.lhOctaveShift || 0,
             omittedNotes: chord.omittedNotes || [],
             lhOmittedNotes: chord.lhOmittedNotes || [],
-            beats: chord.beats !== undefined ? chord.beats : 4 // Add beats property
+            beats: chordBeats
         });
 
         // Regenerate bass for this building block (chord)
@@ -12612,6 +12649,11 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
         getEnharmonicPreference()
     );
 
+    // Determine default beats from current time signature (quarter-based beats per bar)
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    const ts = compositionState?.metadata?.timeSignature || { num: 4, denom: 4 };
+    const defaultBeats = (ts.num || 4) * (4 / (ts.denom || 4));
+
     // Create complete chord data with all required properties
     const newChordData = {
         name: result.name,
@@ -12629,7 +12671,10 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
         lhNotes: lhNotes,
         lhOmittedNotes: [],
         roman: roman,
-        beats: 4 // Default: 4 beats (whole note in 4/4 time)
+        beats: defaultBeats, // Default: full measure in current time signature
+        durationTicks: (compositionState?.getMeasureCapacityTicks
+            ? compositionState.getMeasureCapacityTicks(ts)
+            : undefined) // Helpful for TS-aware downstream consumers
     };
 
     // === Stable add path: reuse addToProgressionData (same as Chord Builder) ===
@@ -13470,6 +13515,15 @@ export function saveRecording() {
 export function addToProgressionData(chordData, options = {}) {
     const trainerState = getTrainerState();
 
+    // Set default beats based on time signature if not provided
+    if (chordData.beats === undefined) {
+        const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+        const ts = compositionState?.metadata?.timeSignature || { num: 4, denom: 4 };
+        // Calculate beats per measure: num * (4 / denom) gives quarter-note beats
+        // e.g., 3/4 = 3 beats, 6/8 = 3 beats, 4/4 = 4 beats, 2/2 = 4 beats
+        chordData.beats = (ts.num || 4) * (4 / (ts.denom || 4));
+    }
+
     // Save state before adding (only on first chord of batch to avoid multiple undo states)
     if (!options.skipRender) {
         saveStateBeforeChange();
@@ -13737,6 +13791,17 @@ function restoreProgressionState(state) {
         if (compositionState) {
             // Deep clone and restore the measures array
             compositionState.measures = JSON.parse(JSON.stringify(state.notationData));
+
+            // CRITICAL: Sync the treble block sequence from the restored measures
+            // This ensures the voiceNotes Map is rebuilt correctly from the measures data
+            if (compositionState.trebleBlockSequence?.blocks?.length > 0) {
+                compositionState.syncMeasuresToTrebleBlock();
+            } else if (compositionState.measures.some(m =>
+                m.notation?.treble?.voices?.some(v => v.notes?.length > 0))) {
+                // Initialize and sync if we have treble notes but no block sequence
+                compositionState.initializeTrebleBlockSequence();
+            }
+
             // Emit event to notify listeners of the change
             compositionState.events.emit('loaded', { measures: compositionState.measures });
         }

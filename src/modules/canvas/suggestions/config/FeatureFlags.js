@@ -33,7 +33,7 @@ export class FeatureFlags {
      * @param {string} flag - Feature flag name
      */
     static enable(flag) {
-        localStorage.setItem(`feature_${flag}`, 'true');
+        localStorage.setItem(`feature_${flag}`, '
         this.dispatchFlagChangeEvent(flag, true);
     }
 
@@ -42,7 +42,7 @@ export class FeatureFlags {
      * @param {string} flag - Feature flag name
      */
     static disable(flag) {
-        localStorage.setItem(`feature_${flag}`, 'false');
+        localStorage.setItem(`feature_${flag}`, '
         this.dispatchFlagChangeEvent(flag, false);
     }
 

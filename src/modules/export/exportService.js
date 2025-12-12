@@ -260,7 +260,7 @@ export function exportToPDF(options = {}) {
     const filename = `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_lead_sheet.pdf`;
     doc.save(filename);
 
-    console.log('[Export] PDF exported:', filename);
+
 }
 
 // =============================================================================
@@ -416,10 +416,10 @@ export async function exportNotationToPDF(options = {}) {
         removeLoadingToast(loadingToast);
         showToast('PDF exported successfully!');
 
-        console.log('[Export] Notation PDF exported:', filename);
+
 
     } catch (error) {
-        console.error('[Export] Notation PDF export error:', error);
+
         alert('Error exporting PDF. Please try again.');
     }
 }
@@ -625,10 +625,10 @@ export async function exportCombinedPDF(options = {}) {
         removeLoadingToast(loadingToast);
         showToast('Combined PDF exported successfully!');
 
-        console.log('[Export] Combined PDF exported:', filename);
+
 
     } catch (error) {
-        console.error('[Export] Combined PDF export error:', error);
+
         alert('Error exporting PDF. Please try again.');
     }
 }
@@ -857,7 +857,7 @@ export function exportToMIDI(options = {}) {
         const timeSignature = compositionState?.metadata?.timeSignature || { num: 4, denom: 4 };
         const beatsPerMeasure = timeSignature.num;
 
-        console.log('[Export] Starting MIDI export with options:', { tempo, includeChords, includeMelody, includeBass });
+
 
         // =================================================================
         // Track 1: Chord Progression (with embedded metadata markers)
@@ -901,9 +901,9 @@ export function exportToMIDI(options = {}) {
                 });
 
                 tracks.push(chordTrack);
-                console.log('[Export] Chord track created with', progressionData.length, 'chords (with IMTL metadata)');
+
             } catch (err) {
-                console.error('[Export] Error creating chord track:', err);
+
             }
         }
 
@@ -913,7 +913,7 @@ export function exportToMIDI(options = {}) {
         if (includeMelody && compositionState) {
             try {
                 const melodyNotes = getNotesFromComposition('treble');
-                console.log('[Export] Found', melodyNotes.length, 'melody notes');
+
 
                 if (melodyNotes.length > 0) {
                     const melodyTrack = new MidiWriter.Track();
@@ -941,15 +941,15 @@ export function exportToMIDI(options = {}) {
 
                             melodyTrack.addEvent(noteEvent);
                         } catch (noteErr) {
-                            console.warn('[Export] Skipping melody note', idx, ':', noteErr.message);
+
                         }
                     });
 
                     tracks.push(melodyTrack);
-                    console.log('[Export] Melody track created');
+
                 }
             } catch (err) {
-                console.error('[Export] Error creating melody track:', err);
+
             }
         }
 
@@ -959,7 +959,7 @@ export function exportToMIDI(options = {}) {
         if (includeBass && compositionState) {
             try {
                 const bassNotes = getNotesFromComposition('bass');
-                console.log('[Export] Found', bassNotes.length, 'bass notes');
+
 
                 if (bassNotes.length > 0) {
                     const bassTrack = new MidiWriter.Track();
@@ -987,15 +987,15 @@ export function exportToMIDI(options = {}) {
 
                             bassTrack.addEvent(noteEvent);
                         } catch (noteErr) {
-                            console.warn('[Export] Skipping bass note', idx, ':', noteErr.message);
+
                         }
                     });
 
                     tracks.push(bassTrack);
-                    console.log('[Export] Bass track created');
+
                 }
             } catch (err) {
-                console.error('[Export] Error creating bass track:', err);
+
             }
         }
 
@@ -1005,7 +1005,7 @@ export function exportToMIDI(options = {}) {
             return;
         }
 
-        console.log('[Export] Creating MIDI file with', tracks.length, 'tracks');
+
 
         // Generate MIDI file
         const writer = new MidiWriter.Writer(tracks);
@@ -1024,10 +1024,10 @@ export function exportToMIDI(options = {}) {
         if (includeMelody) trackNames.push('Melody');
         if (includeBass) trackNames.push('Bass');
 
-        console.log(`[Export] MIDI exported: ${filename}.mid (${trackNames.join(', ')})`);
+
 
     } catch (error) {
-        console.error('[Export] MIDI export error:', error);
+
         alert('Error exporting MIDI file. Please try again.');
     }
 }
@@ -1137,8 +1137,7 @@ function detectChordFromNotes(midiNotes) {
     if (matches.length > 0) {
         matches.sort((a, b) => b.score - a.score);
         const best = matches[0];
-        console.log('[Import] Detected chord:', best.root, best.type, 'inv:', best.inversion,
-            'from notes:', sorted.map(n => midiNumberToNoteName(n)).join(', '));
+
         return {
             root: best.root,
             type: best.type,
@@ -1147,7 +1146,7 @@ function detectChordFromNotes(midiNotes) {
     }
 
     // Fallback: treat as major chord based on lowest note
-    console.log('[Import] No chord match, falling back to Major based on bass');
+
     const lowestPC = sorted[0] % 12;
     return {
         root: noteNames[lowestPC],
@@ -1191,7 +1190,7 @@ function parseMidiFile(arrayBuffer) {
         // Read track chunk
         const trackChunk = String.fromCharCode(data[pos], data[pos+1], data[pos+2], data[pos+3]);
         if (trackChunk !== 'MTrk') {
-            console.warn(`Expected MTrk at position ${pos}, got ${trackChunk}`);
+
             break;
         }
 
@@ -1421,7 +1420,7 @@ function extractProgressionFromMidi(midiData) {
         }
     });
 
-    console.log('[Import] Track identification:', { chordTrackIndex, melodyTrackIndex, bassTrackIndex, isIMTLFile });
+
 
     // =========================================================================
     // STEP 1: Extract tempo and time signature from all tracks
@@ -1506,19 +1505,13 @@ function extractProgressionFromMidi(midiData) {
     const melodyNotes = extractNotesFromTrack(melodyTrackIndex);
     const bassNotes = extractNotesFromTrack(bassTrackIndex);
 
-    console.log('[Import] Extracted notes:', {
-        melodyNotes: melodyNotes.length,
-        bassNotes: bassNotes.length,
-        imtlChords: imtlChords.length
-    });
-
     // =========================================================================
     // STEP 4: Build result
     // =========================================================================
 
     // If we found IMTL markers, use them directly (perfect import)
     if (imtlChords.length > 0) {
-        console.log('[Import] Found IMTL metadata - using exact chord information');
+
         imtlChords.sort((a, b) => a.tick - b.tick);
 
         const totalMeasures = Math.max(
@@ -1541,7 +1534,7 @@ function extractProgressionFromMidi(midiData) {
     // =========================================================================
     // STEP 5: Fall back to chord detection (for external MIDI files)
     // =========================================================================
-    console.log('[Import] No IMTL metadata found - using chord detection');
+
 
     // Collect all notes with timing for chord detection
     const allNotes = [];
@@ -1652,19 +1645,12 @@ export async function importFromMIDI(file) {
                 const midiData = parseMidiFile(arrayBuffer);
                 const extracted = extractProgressionFromMidi(midiData);
 
-                console.log('[Import] Parsed MIDI:', {
-                    tracks: midiData.tracks.length,
-                    tempo: extracted.tempo,
-                    chords: extracted.chords.length
-                });
-
                 resolve({
                     success: true,
                     data: extracted
                 });
 
             } catch (error) {
-                console.error('[Import] MIDI parse error:', error);
                 reject(error);
             }
         };
@@ -1738,7 +1724,7 @@ function importNotesToComposition(notes, staff) {
         measure.notation[staff].voices[0].notes.sort((a, b) => a.beat - b.beat);
     });
 
-    console.log(`[Import] Imported ${notes.length} notes to ${staff} staff`);
+
 }
 
 /**
@@ -1874,8 +1860,8 @@ export function showMIDIImportDialog() {
                     const compositionState = getCompositionState();
                     const trainerState = getTrainerState();
 
-                    console.log('[Import] Starting import, mode:', mode);
-                    console.log('[Import] Before clear - progressionData:', trainerState.progressionData?.length, 'measures:', compositionState?.measures?.length);
+
+
 
                     // Clear if replacing
                     if (mode === 'replace') {
@@ -1887,25 +1873,25 @@ export function showMIDIImportDialog() {
                             compositionState.clear();
                         }
 
-                        console.log('[Import] After clear - progressionData:', trainerState.progressionData?.length, 'measures:', compositionState?.measures?.length);
+
                     }
 
                     // Import chords - use setTimeout to let clear fully propagate
                     setTimeout(() => {
-                        console.log('[Import] Adding', result.data.chords.length, 'chords');
+
 
                         // Import chords
                         result.data.chords.forEach((chord, index) => {
                             addSpecificChordToProgression(chord.type, chord.inversion || 0, false, chord.root);
                         });
 
-                        console.log('[Import] After adding chords - progressionData:', trainerState.progressionData?.length, 'measures:', compositionState?.measures?.length);
+
 
                         // Import melody and bass notes if this is an IMTL file and we're replacing
                         if (isIMTLFile && mode === 'replace') {
                             // Use another timeout to let chord measures settle
                             setTimeout(() => {
-                                console.log('[Import] Importing melody/bass notes');
+
 
                                 if (melodyCount > 0) {
                                     importNotesToComposition(result.data.melodyNotes, 'treble');
@@ -1914,7 +1900,7 @@ export function showMIDIImportDialog() {
                                     importNotesToComposition(result.data.bassNotes, 'bass');
                                 }
 
-                                console.log('[Import] After notes - measures:', compositionState?.measures?.length);
+
 
                                 // Render the progression cards and trigger notation re-render
                                 if (window.renderProgressionCards) {
@@ -1961,7 +1947,7 @@ export function showMIDIImportDialog() {
             }
 
         } catch (error) {
-            console.error('[Import] Error:', error);
+
             alert('Failed to import MIDI file. The file may be corrupted or in an unsupported format.');
         }
     };
@@ -2021,10 +2007,10 @@ export async function copyShareableLink() {
         // Show success feedback
         showToast('Link copied to clipboard!');
 
-        console.log('[Export] Shareable link copied:', link);
+
 
     } catch (error) {
-        console.error('[Export] Failed to copy link:', error);
+
 
         // Fallback: show the link in a prompt
         prompt('Copy this link to share your progression:', link);
@@ -2063,7 +2049,7 @@ export function parseShareableLink() {
         // Validate that all chord types exist
         const invalidChords = chords.filter(c => !CHORD_DEFINITIONS[c.type]);
         if (invalidChords.length > 0) {
-            console.warn('[Export] Invalid chord types in shared link:', invalidChords);
+
         }
 
         return {
@@ -2072,7 +2058,7 @@ export function parseShareableLink() {
         };
 
     } catch (error) {
-        console.error('[Export] Failed to parse shareable link:', error);
+
         return null;
     }
 }
@@ -2482,7 +2468,7 @@ export function initExportService() {
     const shared = parseShareableLink();
 
     if (shared) {
-        console.log('[Export] Found shared progression:', shared);
+
 
         // Return the shared data - caller should handle loading it
         return shared;

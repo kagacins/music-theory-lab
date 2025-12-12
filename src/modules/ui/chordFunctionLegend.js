@@ -83,11 +83,11 @@ const FUNCTION_LEGEND = {
  */
 export function initChordFunctionLegend() {
     // Check if user has previously dismissed the legend
-    const dismissed = localStorage.getItem('chord-function-legend-dismissed');
+    const dismissed = localStorage.getItem('chord-function-legend-
     hasBeenDismissed = dismissed === 'true';
 
     // Load visibility preference
-    const visible = localStorage.getItem('chord-function-legend-visible');
+    const visible = localStorage.getItem('chord-function-legend-
     isLegendVisible = visible !== 'false' && !hasBeenDismissed;
 
     // Expose global functions
@@ -208,16 +208,16 @@ function createLegendHTML(compact = false) {
  */
 export function showLegend(expanded = true) {
     // Remove existing
-    const existing = document.getElementById('chord-function-legend');
+    const existing = document.getElementById('chord-function-
     if (existing) existing.remove();
 
     // Create and add legend
-    const container = document.createElement('div');
+    const container = document.createElement('
     container.innerHTML = createLegendHTML(!expanded);
     document.body.appendChild(container.firstElementChild);
 
     isLegendVisible = true;
-    localStorage.setItem('chord-function-legend-visible', 'true');
+    localStorage.setItem('chord-function-legend-visible', '
 
     // Attach event listeners
     attachLegendEventListeners();
@@ -227,7 +227,7 @@ export function showLegend(expanded = true) {
  * Hide the legend
  */
 export function hideLegend(remember = false) {
-    const legend = document.getElementById('chord-function-legend');
+    const legend = document.getElementById('chord-function-
     if (legend) {
         legend.style.opacity = '0';
         legend.style.transform = 'translateY(20px)';
@@ -235,11 +235,11 @@ export function hideLegend(remember = false) {
     }
 
     isLegendVisible = false;
-    localStorage.setItem('chord-function-legend-visible', 'false');
+    localStorage.setItem('chord-function-legend-visible', '
 
     if (remember) {
         hasBeenDismissed = true;
-        localStorage.setItem('chord-function-legend-dismissed', 'true');
+        localStorage.setItem('chord-function-legend-dismissed', '
     }
 }
 
@@ -258,10 +258,10 @@ export function toggleLegend() {
  * Attach event listeners to legend buttons
  */
 function attachLegendEventListeners() {
-    const closeBtn = document.getElementById('legend-close-btn');
-    const expandBtn = document.getElementById('legend-expand-btn');
-    const collapseBtn = document.getElementById('legend-collapse-btn');
-    const dontShowCheckbox = document.getElementById('legend-dont-show');
+    const closeBtn = document.getElementById('legend-close-
+    const expandBtn = document.getElementById('legend-expand-
+    const collapseBtn = document.getElementById('legend-collapse-
+    const dontShowCheckbox = document.getElementById('legend-dont-
 
     if (closeBtn) {
         closeBtn.addEventListener('click', () => {

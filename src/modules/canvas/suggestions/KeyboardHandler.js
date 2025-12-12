@@ -142,10 +142,10 @@ export class KeyboardHandler {
     getKeyString(event) {
         const modifiers = [];
 
-        if (event.ctrlKey) modifiers.push('ctrl');
-        if (event.shiftKey) modifiers.push('shift');
-        if (event.altKey) modifiers.push('alt');
-        if (event.metaKey) modifiers.push('meta');
+        if (event.ctrlKey) modifiers.push('
+        if (event.shiftKey) modifiers.push('
+        if (event.altKey) modifiers.push('
+        if (event.metaKey) modifiers.push('
 
         const key = event.key;
 
@@ -190,7 +190,7 @@ export class KeyboardHandler {
             // This allows the note editor to handle duration changes, insertions, and articulations
             if (window.notationEditorHasSelection && window.notationEditorHasSelection()) {
                 const isNumberKey = /^[1-6]$/.test(event.key);
-                const isShiftArrow = event.shiftKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight');
+                const isShiftArrow = event.shiftKey && (event.key === 'ArrowLeft' || event.key === 'ArrowR
                 const isArticulationKey = event.shiftKey && /^[satmSATM]$/.test(event.key);
                 const isTieKey = !event.shiftKey && /^[tT]$/.test(event.key);
 

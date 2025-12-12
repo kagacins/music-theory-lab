@@ -14,7 +14,7 @@ export function exportPresetToFile(preset) {
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
 
-    const a = document.createElement('a');
+    const a = document.createElement('
     a.href = url;
     a.download = `${sanitizeFilename(preset.name)}.json`;
     document.body.appendChild(a);
@@ -39,7 +39,7 @@ export function exportAllPresetsToFile() {
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
 
-    const a = document.createElement('a');
+    const a = document.createElement('
     a.href = url;
     a.download = `music-theory-lab-presets-${new Date().toISOString().split('T')[0]}.json`;
     document.body.appendChild(a);
@@ -165,7 +165,7 @@ export function exportPresetToURL(preset) {
         const baseUrl = window.location.origin + window.location.pathname;
         return `${baseUrl}?preset=${encoded}`;
     } catch (error) {
-        console.error('Error creating share URL:', error);
+
         return null;
     }
 }
@@ -177,7 +177,7 @@ export function exportPresetToURL(preset) {
 export function importPresetFromURL() {
     try {
         const urlParams = new URLSearchParams(window.location.search);
-        const encoded = urlParams.get('preset');
+        const encoded = urlParams.get('
 
         if (!encoded) {
             return null;
@@ -194,7 +194,7 @@ export function importPresetFromURL() {
             metadata: {}
         };
     } catch (error) {
-        console.error('Error importing from URL:', error);
+
         return null;
     }
 }
@@ -211,18 +211,18 @@ export async function copyToClipboard(text) {
             return true;
         } else {
             // Fallback for older browsers
-            const textarea = document.createElement('textarea');
+            const textarea = document.createElement('
             textarea.value = text;
             textarea.style.position = 'fixed';
             textarea.style.opacity = '0';
             document.body.appendChild(textarea);
             textarea.select();
-            const success = document.execCommand('copy');
+            const success = document.execCommand('
             document.body.removeChild(textarea);
             return success;
         }
     } catch (error) {
-        console.error('Error copying to clipboard:', error);
+
         return false;
     }
 }

@@ -154,11 +154,11 @@ export class PageNavigator {
     `;
 
     // Store references to interactive elements
-    this.prevButton = this.container.querySelector('#page-nav-prev');
-    this.nextButton = this.container.querySelector('#page-nav-next');
-    this.pageIndicator = this.container.querySelector('#page-indicator');
-    this.measuresPerPageSelect = this.container.querySelector('#measures-per-page-select');
-    this.measureRange = this.container.querySelector('#measure-range');
+    this.prevButton = this.container.querySelector('#page-nav-
+    this.nextButton = this.container.querySelector('#page-nav-
+    this.pageIndicator = this.container.querySelector('#page-
+    this.measuresPerPageSelect = this.container.querySelector('#measures-per-page-
+    this.measureRange = this.container.querySelector('#measure-
   }
 
   /**

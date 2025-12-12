@@ -381,8 +381,8 @@ function analyzeChordHistory(chordHistory, candidateChord, key) {
             lastThree[1] === candidateRoot &&
             lastThree[0] !== lastThree[1]) {
             scoreAdjustment += config.patternPenalties.twoChordRepeat;
-            reasons.push('Avoids repetitive alternation');
-            patterns.push('two-chord-repeat');
+            reasons.push('Avoids repetitive 
+            patterns.push('two-chord-
         }
     }
 
@@ -393,8 +393,8 @@ function analyzeChordHistory(chordHistory, candidateChord, key) {
 
         if (prevPrev && prevPrev.root === candidateRoot && prev.root !== candidateRoot) {
             scoreAdjustment += config.patternPenalties.pendulum;
-            reasons.push('Avoids pendulum motion');
-            patterns.push('pendulum');
+            reasons.push('Avoids pendulum 
+            patterns.push('
         }
     }
 
@@ -406,8 +406,8 @@ function analyzeChordHistory(chordHistory, candidateChord, key) {
 
     if (rootCounts[candidateRoot] >= 3) {
         scoreAdjustment += config.patternPenalties.frequentRoot;
-        reasons.push('Root overused in recent history');
-        patterns.push('frequent-root');
+        reasons.push('Root overused in recent 
+        patterns.push('frequent-
     }
 
     // 4. Check for static harmony (same chord repeated)
@@ -415,8 +415,8 @@ function analyzeChordHistory(chordHistory, candidateChord, key) {
         const lastChord = chordHistory[chordHistory.length - 1];
         if (lastChord.root === candidateRoot && lastChord.type === candidateChord.type) {
             scoreAdjustment += config.patternPenalties.static;
-            reasons.push('Static harmony');
-            patterns.push('static');
+            reasons.push('Static 
+            patterns.push('
         }
     }
 
@@ -437,8 +437,8 @@ function analyzeChordHistory(chordHistory, candidateChord, key) {
                     const prevInterval = (lastIndex - prevPrevIndex + 12) % 12;
                     if (prevInterval === 5 || prevInterval === 7) {
                         scoreAdjustment += config.patternBonuses.circleOfFifths;
-                        reasons.push('Circle of fifths motion');
-                        patterns.push('circle-of-fifths');
+                        reasons.push('Circle of fifths 
+                        patterns.push('circle-of-
                     }
                 }
             }
@@ -451,8 +451,8 @@ function analyzeChordHistory(chordHistory, candidateChord, key) {
                     const prevInterval = (lastIndex - prevPrevIndex + 12) % 12;
                     if ((prevInterval >= 1 && prevInterval <= 2) || (prevInterval >= 10 && prevInterval <= 11)) {
                         scoreAdjustment += config.patternBonuses.stepwise;
-                        reasons.push('Consistent stepwise motion');
-                        patterns.push('stepwise');
+                        reasons.push('Consistent stepwise 
+                        patterns.push('
                     }
                 }
             }
@@ -463,8 +463,8 @@ function analyzeChordHistory(chordHistory, candidateChord, key) {
     const uniqueRoots = new Set(allRoots);
     if (uniqueRoots.size >= allRoots.length - 1 && allRoots.length >= 3) {
         scoreAdjustment += config.patternBonuses.rootVariety;
-        reasons.push('Good root variety');
-        patterns.push('variety');
+        reasons.push('Good root 
+        patterns.push('
     }
 
     // 7. Check for cadential approach (ii-V-I, IV-V-I)
@@ -482,8 +482,8 @@ function analyzeChordHistory(chordHistory, candidateChord, key) {
                 // Check if preceded by ii or IV
                 if (prevLastInterval === 2 || prevLastInterval === 5) {
                     scoreAdjustment += config.patternBonuses.cadentialApproach;
-                    reasons.push('Cadential resolution');
-                    patterns.push('cadence');
+                    reasons.push('Cadential 
+                    patterns.push('
                 }
             }
         }
@@ -602,13 +602,11 @@ function analyzeLookAhead(currentChord, notesByMeasure, currentMeasureIndex, key
 
         // 1. Check for common tones between current chord and upcoming melody
         const commonTones = currentChordNotes.filter(note =>
-            upcomingPitches.includes(note)
-        );
 
         if (commonTones.length > 0) {
             scoreAdjustment += config.preparationBonuses.commonTonePrep * distanceWeight;
             if (idx === 0) {
-                reasons.push('Prepares upcoming melody');
+                reasons.push('Prepares upcoming 
             }
         }
 
@@ -621,7 +619,7 @@ function analyzeLookAhead(currentChord, notesByMeasure, currentMeasureIndex, key
                 if (upcomingPitches.includes(keyIndex)) {
                     scoreAdjustment += config.preparationBonuses.leadingTonePrep * distanceWeight;
                     if (idx === 0) {
-                        reasons.push('Sets up resolution');
+                        reasons.push('Sets up 
                     }
                 }
             }
@@ -792,8 +790,6 @@ function performBackwardPass(results, notesByMeasure, key, options) {
                 nextChord,
                 notesByMeasure[currentMeasure.measureIndex],
                 key,
-                config
-            );
 
             return {
                 ...suggestion,
@@ -1069,7 +1065,7 @@ function getChordIntervalsRobust(chordType) {
     }
 
     if (!intervals) {
-        console.warn(`[autoHarmonize] Unknown chord type "${chordType}", falling back to Major`);
+
         intervals = CHORD_INTERVALS['Major'];
     }
 
@@ -1272,8 +1268,6 @@ function calculateOptimalInversion(prevChord, currentChord, melodyNotes) {
             currentChord.root,
             currentChord.type,
             inv,
-            melodyNotes
-        );
         if (score > bestScore) {
             bestScore = score;
             bestInversion = inv;
@@ -1299,8 +1293,6 @@ function expandWithInversions(suggestion, prevChord, melodyNotes) {
             suggestion.root,
             suggestion.type,
             inv,
-            melodyNotes
-        );
 
         // Blend original score with voice leading score
         // 70% original chord quality, 30% voice leading for this inversion
@@ -1325,7 +1317,7 @@ function expandWithInversions(suggestion, prevChord, melodyNotes) {
 function isDiatonicChord(root, type, key) {
     // Extract key root (handle minor keys)
     const keyRoot = key.replace(' Major', '').replace(' Minor', '').replace(' minor', '');
-    const isMinorKey = key.includes('Minor') || key.includes('minor');
+    const isMinorKey = key.includes('Minor') || key.includes('
 
     // Get diatonic chords for the key
     let diatonicChords;
@@ -1394,11 +1386,11 @@ function calculateStyleAwareVoiceLeading(chord1Notes, chord2Notes, style) {
         const parallels = detectParallelMotion(chord1Notes, chord2Notes);
         if (rules.avoidParallelFifths && parallels.fifths > 0) {
             score -= 15 * parallels.fifths;
-            violations.push('parallel fifths');
+            violations.push('parallel 
         }
         if (rules.avoidParallelOctaves && parallels.octaves > 0) {
             score -= 15 * parallels.octaves;
-            violations.push('parallel octaves');
+            violations.push('parallel 
         }
     }
 
@@ -1504,7 +1496,7 @@ function calculateContextAwareScore(root, type, context, key) {
         const tensionDiff = Math.abs(chordTension - targetTension);
         if (tensionDiff < 0.15) {
             score += 20;
-            reasons.push('matches target tension');
+            reasons.push('matches target 
         } else if (tensionDiff < 0.3) {
             score += 10;
         } else {
@@ -1514,7 +1506,7 @@ function calculateContextAwareScore(root, type, context, key) {
         const [minTension, maxTension] = profile.tensionRange;
         if (chordTension >= minTension && chordTension <= maxTension) {
             score += 15;
-            reasons.push('appropriate tension for section');
+            reasons.push('appropriate tension for 
         }
     }
 
@@ -1528,7 +1520,7 @@ function calculateContextAwareScore(root, type, context, key) {
     // Handle dominant avoidance for intro/outro
     if (profile.avoidDominant && chordFunction === 'dominant') {
         score -= 20;
-        reasons.push('avoid dominant in this section');
+        reasons.push('avoid dominant in this 
     }
 
     // Position-based adjustments
@@ -1538,13 +1530,13 @@ function calculateContextAwareScore(root, type, context, key) {
         // Prefer tonic at start of section
         if (relativePosition < 0.2 && chordFunction === 'tonic') {
             score += 10;
-            reasons.push('tonic at section start');
+            reasons.push('tonic at section 
         }
 
         // Prefer resolution at end of section
         if (profile.preferResolution && relativePosition > 0.8 && chordFunction === 'tonic') {
             score += 15;
-            reasons.push('resolution at section end');
+            reasons.push('resolution at section 
         }
     }
 
@@ -1743,7 +1735,7 @@ function scoreChordForMelody(root, type, melodyPitches, prevChordNotes, key, wei
     score += voiceLeadingScore * w.voiceLeading;
 
     if (voiceLeadingScore >= 70) {
-        reasons.push('Smooth voice leading');
+        reasons.push('Smooth voice 
     }
     if (voiceLeadingViolations.length > 0) {
         reasons.push(`Voice leading: ${voiceLeadingViolations.join(', ')}`);
@@ -1753,7 +1745,7 @@ function scoreChordForMelody(root, type, melodyPitches, prevChordNotes, key, wei
     if (isDiatonicChord(root, type, key)) {
         // Apply diatonic weight (scaled to contribute up to 100 points)
         score += 100 * w.diatonicBonus;
-        reasons.push('Diatonic to key');
+        reasons.push('Diatonic to 
     }
 
     // 4. Chord type simplicity bonus
@@ -1833,7 +1825,7 @@ function suggestChordsForMeasure(melodyNotes, prevChord, key, numSuggestions = 3
     if (analysis.prominentPitches.length === 0) {
         // No melody notes - suggest tonic chord
         const keyRoot = key.replace(' Major', '').replace(' Minor', '').replace(' minor', '');
-        const isMinor = key.includes('Minor') || key.includes('minor');
+        const isMinor = key.includes('Minor') || key.includes('
         return [{
             root: keyRoot,
             type: isMinor ? 'Minor' : 'Major',
@@ -1860,10 +1852,10 @@ function suggestChordsForMeasure(melodyNotes, prevChord, key, numSuggestions = 3
         // Add more chord types for jazz-style harmonization
         if (style === 'jazz' || style === 'rnbSoul' || style === 'gospel') {
             if (!chordTypesToUse.includes('Half-Diminished 7th')) {
-                chordTypesToUse.push('Half-Diminished 7th');
+                chordTypesToUse.push('Half-Diminished 7
             }
             if (!chordTypesToUse.includes('Diminished 7th')) {
-                chordTypesToUse.push('Diminished 7th');
+                chordTypesToUse.push('Diminished 7
             }
         }
     }
@@ -1900,8 +1892,6 @@ function suggestChordsForMeasure(melodyNotes, prevChord, key, numSuggestions = 3
         const { inversion, voiceLeadingScore } = calculateOptimalInversion(
             prevChord,
             { root: suggestion.root, type: suggestion.type },
-            melodyNotes
-        );
 
         // Incorporate voice leading into overall score
         // 70% original chord quality + 30% voice leading for inversion
@@ -2026,8 +2016,6 @@ export function autoHarmonize(melodyNotes, key, options = {}) {
             if (currentRoot && currentType) {
                 // Check if current chord is already in suggestions
                 const existingIndex = suggestions.findIndex(
-                    s => s.root === currentRoot && s.type === currentType
-                );
 
                 if (existingIndex === 0) {
                     // Already at first position - just add "Current chord" reason if not present
@@ -2052,15 +2040,11 @@ export function autoHarmonize(melodyNotes, key, options = {}) {
                         currentType,
                         allMelodyPitches,
                         prevChordNotes,
-                        key
-                    );
 
                     // Calculate optimal inversion for the current chord
                     const { inversion, voiceLeadingScore } = calculateOptimalInversion(
                         prevChord,
                         { root: currentRoot, type: currentType },
-                        notes
-                    );
 
                     const currentSuggestion = {
                         root: currentRoot,
@@ -2235,8 +2219,6 @@ export function generateVoicing(root, type, prevVoicing = null, options = {}) {
             { soprano, alto, tenor, bass },
             prevVoicing,
             chordTones,
-            style
-        );
         return optimized;
     }
 

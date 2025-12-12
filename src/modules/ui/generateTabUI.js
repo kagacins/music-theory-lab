@@ -36,9 +36,9 @@ export function initGenerateTabUI() {
         refreshUI();
 
         isInitialized = true;
-        console.log('[Phase 5] Generate Tab UI initialized');
+
     } catch (error) {
-        console.error('[Phase 5] Failed to initialize Generate Tab UI:', error);
+
         // Still mark as initialized to prevent repeated attempts
         isInitialized = true;
         // Render fallback UI
@@ -50,7 +50,7 @@ export function initGenerateTabUI() {
  * Render fallback UI when initialization fails
  */
 function renderFallbackUI() {
-    const container = document.getElementById('section-generator-buttons');
+    const container = document.getElementById('section-generator-
     if (container) {
         container.innerHTML = `
             <div class="generator-header">
@@ -91,19 +91,19 @@ export function refreshUI() {
     try {
         updateNextSectionSuggestion();
     } catch (e) {
-        console.error('[Phase 5] updateNextSectionSuggestion error:', e);
+
     }
 
     try {
         updateStyleProfile();
     } catch (e) {
-        console.error('[Phase 5] updateStyleProfile error:', e);
+
     }
 
     try {
         updateGenerateButtons();
     } catch (e) {
-        console.error('[Phase 5] updateGenerateButtons error:', e);
+
     }
 }
 
@@ -181,7 +181,7 @@ function getCurrentSectionContext() {
  * Now context-aware based on selected chord's section
  */
 function updateNextSectionSuggestion() {
-    const container = document.getElementById('next-section-suggestion');
+    const container = document.getElementById('next-section-
     if (!container) return;
 
     const context = getCurrentSectionContext();
@@ -353,7 +353,7 @@ function handleDeleteSection(sectionId) {
  * Update the user style profile display
  */
 function updateStyleProfile() {
-    const container = document.getElementById('style-profile-display');
+    const container = document.getElementById('style-profile-
     if (!container) return;
 
     const profile = recommendationService?.getUserStyleProfile();
@@ -369,7 +369,7 @@ function updateStyleProfile() {
     }
 
     // Get chord preferences
-    const chordPrefs = preferenceLearner.getPreferences('chord');
+    const chordPrefs = preferenceLearner.getPreferences('
     const topChordTypes = getTopItems(chordPrefs.chordTypes, 3);
     const topRoots = getTopItems(chordPrefs.rootNotes, 3);
 
@@ -432,7 +432,7 @@ function updateStyleProfile() {
     `;
 
     // Add clear preferences handler
-    const clearBtn = document.getElementById('clear-preferences-btn');
+    const clearBtn = document.getElementById('clear-preferences-
     if (clearBtn) {
         clearBtn.addEventListener('click', handleClearPreferences);
     }
@@ -447,7 +447,7 @@ let currentSectionType = null;
  * Update the section generation buttons
  */
 function updateGenerateButtons() {
-    const container = document.getElementById('section-generator-buttons');
+    const container = document.getElementById('section-generator-
     if (!container) return;
 
     // Only render buttons once - don't re-render on every refreshUI call
@@ -502,19 +502,19 @@ function updateGenerateButtons() {
     `;
 
     // Add click handlers for generate buttons
-    const buttons = container.querySelectorAll('.section-gen-btn');
+    const buttons = container.querySelectorAll('.section-gen-
     buttons.forEach(btn => {
         btn.addEventListener('click', () => {
             // Update visual selection
             buttons.forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
+            btn.classList.add('
             handleGenerateSection(btn.dataset.sectionType);
         });
     });
 
     // Add change handlers for style and length dropdowns
-    const styleSelect = document.getElementById('gen-style-select');
-    const lengthSelect = document.getElementById('gen-length-select');
+    const styleSelect = document.getElementById('gen-style-
+    const lengthSelect = document.getElementById('gen-length-
 
     if (styleSelect) {
         styleSelect.addEventListener('change', () => {
@@ -548,16 +548,16 @@ function handleGenerateSection(sectionType) {
     // Store current section type for regeneration when options change
     currentSectionType = sectionType;
 
-    const styleSelect = document.getElementById('gen-style-select');
-    const lengthSelect = document.getElementById('gen-length-select');
-    const previewContainer = document.getElementById('generated-section-preview');
+    const styleSelect = document.getElementById('gen-style-
+    const lengthSelect = document.getElementById('gen-length-
+    const previewContainer = document.getElementById('generated-section-
 
     const style = styleSelect?.value || 'pop';
     const length = parseInt(lengthSelect?.value || '4', 10);
 
     // Show loading state
     if (previewContainer) {
-        previewContainer.classList.remove('hidden');
+        previewContainer.classList.remove('
         previewContainer.innerHTML = `
             <div class="preview-loading">
                 <div class="loading-spinner"></div>
@@ -600,8 +600,8 @@ function handleGenerateSection(sectionType) {
  */
 function renderGeneratedOptions(sectionType, container) {
     const key = getCurrentKey() || 'C';
-    const styleSelect = document.getElementById('gen-style-select');
-    const lengthSelect = document.getElementById('gen-length-select');
+    const styleSelect = document.getElementById('gen-style-
+    const lengthSelect = document.getElementById('gen-length-
     const style = styleSelect?.value || 'pop';
     const length = lengthSelect?.value || '4';
 
@@ -690,7 +690,7 @@ function applyGeneratedSection(result) {
     }));
 
     // Show success feedback
-    const previewContainer = document.getElementById('generated-section-preview');
+    const previewContainer = document.getElementById('generated-section-
     if (previewContainer) {
         const originalContent = previewContainer.innerHTML;
         previewContainer.innerHTML = `
@@ -702,7 +702,7 @@ function applyGeneratedSection(result) {
 
         // Reset after a moment
         setTimeout(() => {
-            previewContainer.classList.add('hidden');
+            previewContainer.classList.add('
         }, 2000);
     }
 }

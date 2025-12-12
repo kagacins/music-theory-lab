@@ -36,7 +36,8 @@ export function initAudio() {
     if (piano || audioIsLoading) return;
 
     audioIsLoading = true;
-    Tone.context.resume();
+    // Note: AudioContext.resume() will be called on first user interaction
+    // to comply with browser autoplay policies
     showModal("Loading piano samples...", !audioIsReady);
 
     piano = new Tone.Sampler({

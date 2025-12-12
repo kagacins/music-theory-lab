@@ -113,7 +113,7 @@ function highlightScaleNotes(specificNotes) {
     specificNotes.forEach(note => {
         const keyId = getNoteKeyId(note);
         const keyElement = document.getElementById(keyId);
-        if (keyElement) keyElement.classList.add('active-scale-explorer');
+        if (keyElement) keyElement.classList.add('active-scale-
     });
 }
 
@@ -227,11 +227,11 @@ export function playScale(direction = 'asc') {
         }
         Tone.Draw.schedule(() => {
             const keyEl = document.getElementById(getNoteKeyId(note));
-            if (keyEl) keyEl.classList.add('active-scale-playback');
+            if (keyEl) keyEl.classList.add('active-scale-
         }, time);
         Tone.Draw.schedule(() => {
             const keyEl = document.getElementById(getNoteKeyId(note));
-            if (keyEl) keyEl.classList.remove('active-scale-playback');
+            if (keyEl) keyEl.classList.remove('active-scale-
         }, time + noteDurationSeconds * 0.9);
     }, scaleNotes, speedValue).start(0);
 
@@ -274,7 +274,7 @@ export function changeScaleSpeed(direction) {
  * Update the scale speed UI display
  */
 export function updateScaleSpeedUI() {
-    const display = document.getElementById('scale-speed-display');
+    const display = document.getElementById('scale-speed-
     const speedLabels = Object.keys(ARPEGGIO_SPEEDS);
     const currentIndex = speedLabels.indexOf(getScaleSpeed());
 
@@ -299,7 +299,7 @@ export function changeScaleOctave(amount) {
  * Update the octave shift UI display
  */
 export function updateScaleOctaveUI() {
-    const display = document.getElementById('scale-octave-display');
+    const display = document.getElementById('scale-octave-
     const shift = getScaleOctaveShift();
     display.textContent = `Oct: ${shift > 0 ? '+' : ''}${shift}`;
     document.getElementById('scale-octave-down').disabled = shift <= -3;
@@ -314,15 +314,15 @@ export function updateScaleOctaveUI() {
  * Render all scale explorer selectors (root and type)
  */
 export function renderScaleSelectors() {
-    const rootSelector = document.getElementById('scale-note-selector');
-    const typeSelector = document.getElementById('scale-type-selector');
+    const rootSelector = document.getElementById('scale-note-
+    const typeSelector = document.getElementById('scale-type-
 
     const currentNotes = getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
 
     // Always re-render the root note selector to reflect enharmonic preference
     rootSelector.innerHTML = '';
     currentNotes.forEach((note, index) => {
-        const button = document.createElement('button');
+        const button = document.createElement('
         button.textContent = note;
         button.dataset.index = index;
         button.onclick = () => selectScaleRootNote(index);
@@ -332,7 +332,7 @@ export function renderScaleSelectors() {
 
     if (typeSelector.children.length === 0) {
         Object.keys(SCALE_DEFINITIONS).forEach(type => {
-            const button = document.createElement('button');
+            const button = document.createElement('
             button.textContent = type;
             button.dataset.scaleType = type;
             button.onclick = () => selectScaleType(type);

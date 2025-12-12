@@ -39,7 +39,7 @@ const CATEGORY_COLORS = {
  * @returns {HTMLElement} DOM element for the suggestion
  */
 export function renderSuggestionItem(suggestion, index = -1) {
-    const item = document.createElement('div');
+    const item = document.createElement('
     item.className = 'melody-suggestion-item';
     item.dataset.note = suggestion.note;
     item.dataset.score = suggestion.totalScore;
@@ -93,7 +93,7 @@ export function renderSuggestionItem(suggestion, index = -1) {
     });
 
     // Preview button handler
-    const previewBtn = item.querySelector('.preview-note-btn');
+    const previewBtn = item.querySelector('.preview-note-
     previewBtn.addEventListener('click', (e) => {
         e.stopPropagation();
 
@@ -128,9 +128,9 @@ function getScoreClass(score) {
  * Mark a suggestion item as selected
  */
 function selectSuggestionItem(selectedItem) {
-    const allItems = document.querySelectorAll('.melody-suggestion-item');
+    const allItems = document.querySelectorAll('.melody-suggestion-
     allItems.forEach(item => item.classList.remove('selected'));
-    selectedItem.classList.add('selected');
+    selectedItem.classList.add('
 }
 
 // -----------------------------------------------------------------------------
@@ -142,7 +142,7 @@ let tooltipElement = null;
 function showSuggestionTooltip(event, suggestion) {
     hideSuggestionTooltip();
 
-    tooltipElement = document.createElement('div');
+    tooltipElement = document.createElement('
     tooltipElement.className = 'melody-suggestion-tooltip';
 
     const categoryInfo = NOTE_CATEGORIES[suggestion.category] || {};
@@ -202,7 +202,7 @@ function hideSuggestionTooltip() {
  * @param {Array} suggestions - Array of suggestion objects
  */
 export function renderSuggestions(suggestions) {
-    const container = document.getElementById('melody-suggestions-list');
+    const container = document.getElementById('melody-suggestions-
     if (!container) {
         return;
     }
@@ -215,7 +215,7 @@ export function renderSuggestions(suggestions) {
 
     // Show empty state if no suggestions
     if (!suggestions || suggestions.length === 0) {
-        showEmptyState('Please select a chord to see suggestions');
+        showEmptyState('Please select a chord to see 
         return;
     }
 
@@ -230,7 +230,7 @@ export function renderSuggestions(suggestions) {
  * Clear all suggestions
  */
 export function clearSuggestions() {
-    const container = document.getElementById('melody-suggestions-list');
+    const container = document.getElementById('melody-suggestions-
     if (container) {
         container.innerHTML = '';
     }
@@ -241,7 +241,7 @@ export function clearSuggestions() {
  * Show empty state message
  */
 export function showEmptyState(message = 'No suggestions available') {
-    const container = document.getElementById('melody-suggestions-list');
+    const container = document.getElementById('melody-suggestions-
     if (container) {
         container.innerHTML = `<p class="suggestions-empty">${message}</p>`;
     }
@@ -251,7 +251,7 @@ export function showEmptyState(message = 'No suggestions available') {
  * Show loading state
  */
 export function showLoadingState() {
-    const container = document.getElementById('melody-suggestions-list');
+    const container = document.getElementById('melody-suggestions-
     if (container) {
         container.innerHTML = `
             <div class="suggestions-loading">
@@ -272,9 +272,9 @@ export function updateSuggestionContext(chord, key, previousNote, nextChord = nu
     const prevDisplay = previousNote || '-';
 
     // Try compact inline elements first (new UI)
-    const ctxChord = document.getElementById('ctx-chord');
-    const ctxKey = document.getElementById('ctx-key');
-    const ctxPrev = document.getElementById('ctx-prev');
+    const ctxChord = document.getElementById('ctx-
+    const ctxKey = document.getElementById('ctx-
+    const ctxPrev = document.getElementById('ctx-
 
     if (ctxChord && ctxKey && ctxPrev) {
         // New compact inline UI
@@ -285,7 +285,7 @@ export function updateSuggestionContext(chord, key, previousNote, nextChord = nu
     }
 
     // Fall back to legacy block display
-    const contextEl = document.getElementById('melody-suggestion-context');
+    const contextEl = document.getElementById('melody-suggestion-
     if (!contextEl) return;
 
     // Build next chord display if available
@@ -338,9 +338,9 @@ export function updateSuggestions({
 }) {
     showLoadingState();
 
-    console.log('🎼 Generating melody suggestions with styleId:', styleId);
+
     if (nextChord && anticipationFactor > 0) {
-        console.log(`🎯 Anticipation active: ${(anticipationFactor * 100).toFixed(0)}% toward ${nextChord.root} ${nextChord.type}`);
+
     }
 
     // Generate suggestions
@@ -392,13 +392,13 @@ export function getCurrentSuggestions() {
  */
 export function initMelodySuggestionPanel() {
     // Check if container exists
-    const container = document.getElementById('melody-suggestions-list');
+    const container = document.getElementById('melody-suggestions-
     if (!container) {
         return false;
     }
 
     // Show initial empty state
-    showEmptyState('Select a measure to see note suggestions');
+    showEmptyState('Select a measure to see note 
 
     return true;
 }

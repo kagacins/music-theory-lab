@@ -236,8 +236,22 @@ export class NotationComposer {
             this.initVoiceLeadingOverlay();
           }
         },
+        onTimeSignatureChange: (num, denom) => {
+          // Update composition state time signature
+          if (this.compositionState) {
+            this.compositionState.setTimeSignature(num, denom);
+          }
+          // Re-render to apply new time signature to VexFlow
+          this.render();
+        },
       });
       this.toolbar.create(this.config.toolbarContainer);
+
+      // Sync initial time signature from composition state
+      if (this.compositionState && this.compositionState.metadata.timeSignature) {
+        const { num, denom } = this.compositionState.metadata.timeSignature;
+        this.toolbar.setTimeSignature(num, denom);
+      }
     }
 
     // Subscribe to composition state changes
@@ -258,6 +272,10 @@ export class NotationComposer {
       });
       // When bass is updated by compositionState directly, re-render
       this.compositionState.events.on('bassUpdated', () => {
+        this.render();
+      });
+      // When time signature changes, re-render the notation
+      this.compositionState.events.on('timeSignatureChanged', ({ num, denom }) => {
         this.render();
       });
     }
@@ -946,7 +964,7 @@ export class NotationComposer {
         showChordSpans: showChordSpans,
         // Multi-voice rest display settings
         restDisplayMode: settings.restDisplayMode || 'clean',
-        cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice !== false,
+        cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice === true, // Default false (show cue rests)
       });
     }
 
@@ -1450,7 +1468,7 @@ export class NotationComposer {
         showChordSpans: settings.showChordSpans !== false, // Default to true
         // Multi-voice rest display settings
         restDisplayMode: settings.restDisplayMode || 'clean',
-        cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice !== false,
+        cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice === true, // Default false (show cue rests)
       });
 
       // Collect rendered measures (adjust indices back to global)
@@ -1647,7 +1665,7 @@ export class NotationComposer {
       showChordSpans: settings.showChordSpans !== false, // Default to true
       // Multi-voice rest display settings
       restDisplayMode: settings.restDisplayMode || 'clean',
-      cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice !== false,
+      cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice === true, // Default false (show cue rests)
     });
 
     const allRenderedMeasures = [];

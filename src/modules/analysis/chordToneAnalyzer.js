@@ -601,7 +601,7 @@ export function getChordTones(chord) {
 
     // Ultimate fallback with warning
     if (!chordDef) {
-        console.warn(`[chordToneAnalyzer] Unknown chord type "${chordType}" for root ${chordRoot}, falling back to Major`);
+
         chordDef = CHORD_DEFINITIONS['Major'];
     }
 

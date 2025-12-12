@@ -185,7 +185,7 @@ export function startGuidedMode(config) {
     // Set up global action listeners
     setupActionListeners();
 
-    console.log('[GuidedMode] Started for lesson:', lessonId, 'Target tab:', targetTab);
+
 }
 
 /**
@@ -277,7 +277,7 @@ export function endGuidedMode(completed = false) {
         validationCallback: null
     };
 
-    console.log('[GuidedMode] Ended. Completed:', completed, 'Lesson:', lessonId);
+
 }
 
 /**
@@ -531,7 +531,7 @@ function returnToLesson() {
         validationCallback: null
     };
 
-    console.log('[GuidedMode] Returned to lesson:', lessonId);
+
 }
 
 function updateBannerInstruction(text, type = 'info') {
@@ -590,7 +590,7 @@ function showCurrentStep() {
         try {
             currentStep.onEnter();
         } catch (e) {
-            console.warn('[GuidedMode] onEnter callback error:', e);
+
         }
     }
 
@@ -807,7 +807,7 @@ function unlockScrollForExploration() {
         tabContent.style.overflowY = '';
     }
 
-    console.log('[GuidedMode] Scroll unlocked for free exploration');
+
 }
 
 // ===========================================
@@ -932,7 +932,7 @@ function saveTabState(targetTab) {
         savedTabState.progressionKey = getCurrentKey();
     }
 
-    console.log('[GuidedMode] Saved tab state:', savedTabState);
+
 }
 
 /**
@@ -1039,7 +1039,7 @@ function forceTutorialState(targetTab) {
         });
     }
 
-    console.log('[GuidedMode] Forced tutorial state for tab:', targetTab);
+
 }
 
 /**
@@ -1119,7 +1119,7 @@ function restoreTabState() {
         });
     }
 
-    console.log('[GuidedMode] Restored tab state');
+
     savedTabState = null;
 }
 
@@ -1134,7 +1134,7 @@ function showSpotlight(targetSelector, position = 'bottom', extraHeight = 0) {
 
     const targetEl = document.querySelector(targetSelector);
     if (!targetEl) {
-        console.warn('[GuidedMode] Spotlight target not found:', targetSelector);
+
         return;
     }
 
@@ -1231,7 +1231,7 @@ function ensureTargetVisible(targetEl) {
     // Get the tab content container (which we made scrollable in shiftPageForBanner)
     const tabContent = document.getElementById(`tab-${guidedModeState.targetTab}`);
     if (!tabContent) {
-        console.warn('[GuidedMode] Tab content not found for scrolling');
+
         updateSpotlightPosition(targetEl);
         return;
     }
@@ -1253,18 +1253,6 @@ function ensureTargetVisible(targetEl) {
 
     // Calculate scroll needed to put element at the desired position
     let targetScrollTop = elementOffsetInTab - targetPositionInTab;
-
-    console.log('[GuidedMode] Scrolling to show element:', {
-        elementTop: rect.top,
-        elementBottom: rect.bottom,
-        elementHeight: rect.height,
-        tabTop: tabRect.top,
-        currentScroll: tabContent.scrollTop,
-        targetScroll: targetScrollTop,
-        keyboardBottom: keyboardBottom,
-        desiredPosition: desiredTopPosition,
-        availableHeight: availableHeight
-    });
 
     // Always scroll to ensure proper positioning
     tabContent.scrollTo({
@@ -1441,7 +1429,7 @@ function handleBuilderAction(event) {
     lastBuilderAction = action;
     guidedModeState.actionHistory.push(action);
 
-    console.log('[GuidedMode] Action received:', action);
+
 
     // Check if this action satisfies the current step
     if (guidedModeState.validationCallback) {
@@ -1513,7 +1501,7 @@ function validateAction(action, validation) {
             return action.type === 'progressionPlayComplete';
 
         default:
-            console.warn('[GuidedMode] Unknown validation type:', type);
+
             return false;
     }
 }

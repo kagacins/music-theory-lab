@@ -30,17 +30,17 @@ function getSelectedIndex() {
  * Toggle the theory panel open/closed
  */
 export function toggleTheoryPanel() {
-    const panel = document.getElementById('theory-tools-panel');
-    const chevron = document.getElementById('theory-tools-chevron');
+    const panel = document.getElementById('theory-tools-
+    const chevron = document.getElementById('theory-tools-
 
     if (panel && chevron) {
-        const isHidden = panel.classList.contains('hidden');
+        const isHidden = panel.classList.contains('
 
         if (isHidden) {
-            panel.classList.remove('hidden');
+            panel.classList.remove('
             chevron.classList.add('rotate-180');
         } else {
-            panel.classList.add('hidden');
+            panel.classList.add('
             chevron.classList.remove('rotate-180');
         }
         
@@ -119,7 +119,7 @@ function calculateSecondaryDominant(key, targetRoman) {
     const notes = enharmonic === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
 
     // Remove 'm' suffix if it's a minor key
-    const isMinorKey = key.endsWith('m');
+    const isMinorKey = key.endsWith('
     const rootNote = isMinorKey ? key.replace(/m$/, '') : key;
     const rootIndex = notes.indexOf(rootNote);
 
@@ -143,7 +143,7 @@ function calculateSecondaryDominant(key, targetRoman) {
     const romanNumeral = `V/${targetRoman}`;
 
     // Build the chord using the same structure as progressionBuilder
-    const chordNotes = buildChordNotes(dominantNote, 'Dominant 7th');
+    const chordNotes = buildChordNotes(dominantNote, 'Dominant 7
 
     return {
         root: dominantNote,
@@ -212,7 +212,7 @@ function buildChordNotes(rootNote, chordType) {
  * @param {string} mode - Selected mode
  */
 export function showModalInterchangeChords(mode) {
-    const container = document.getElementById('modal-interchange-chords');
+    const container = document.getElementById('modal-interchange-
     if (!container) return;
 
     if (!mode) {
@@ -251,7 +251,7 @@ function getModalInterchangeChords(key, mode) {
     const enharmonic = getEnharmonicPreference();
     const notes = enharmonic === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
 
-    const isMinorKey = key.endsWith('m');
+    const isMinorKey = key.endsWith('
     const rootNote = isMinorKey ? key.replace(/m$/, '') : key;
     const rootIndex = notes.indexOf(rootNote);
 
@@ -454,7 +454,7 @@ export function updateSubstitutionButton() {
  * Show or hide chord substitution suggestions for the selected chord
  */
 export function showChordSubstitutions() {
-    const resultsDiv = document.getElementById('substitution-results');
+    const resultsDiv = document.getElementById('substitution-
     if (!resultsDiv) return;
 
     // Toggle: if already shown, hide it
@@ -539,7 +539,7 @@ function getChordSubstitutions(chord, key, chordIndex = null, progressionData = 
     const enharmonic = getEnharmonicPreference();
     const notes = enharmonic === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
 
-    const isMinorKey = key.endsWith('m');
+    const isMinorKey = key.endsWith('
     const rootNote = isMinorKey ? key.replace(/m$/, '') : key;
     const keyRootIndex = notes.indexOf(rootNote);
     const chordRootIndex = notes.indexOf(chord.root);
@@ -750,7 +750,7 @@ export function replaceWithSubstitution(substitutionIndex) {
         return;
     }
 
-    const resultsDiv = document.getElementById('substitution-results');
+    const resultsDiv = document.getElementById('substitution-
     if (!resultsDiv) return;
 
     const progressionData = getProgressionData();
@@ -788,7 +788,7 @@ export function replaceWithSubstitution(substitutionIndex) {
     }
     
     // Convert to minor case if key is minor
-    const isMinorKey = currentKey.endsWith('m');
+    const isMinorKey = currentKey.endsWith('
     if (isMinorKey && newRoman && newRoman !== substitution.rootNote) {
         const minorMap = {
             'I': 'i',
@@ -871,32 +871,32 @@ export function setSelectedChordIndex(index) {
     } else {
         // Fallback: Visual feedback - highlight the selected chord
         // Find by wrapper's data-index attribute to handle drag-and-drop
-        const wrappers = document.querySelectorAll('#progression-visualization > div');
+        const wrappers = document.querySelectorAll('#progression-visualization > 
 
         wrappers.forEach((wrapper) => {
-            const card = wrapper.querySelector('.progression-chord-item, .simplified-card, .detailed-card');
+            const card = wrapper.querySelector('.progression-chord-item, .simplified-card, .detailed-
             if (!card) return;
 
             const wrapperIndex = parseInt(wrapper.getAttribute('data-index') || wrapper.getAttribute('data-chord-index'));
             if (wrapperIndex === index) {
                 // Remove first to ensure clean state
                 card.classList.remove('ring-4', 'ring-purple-500', 'ring-offset-2');
-                card.removeAttribute('data-selected');
+                card.removeAttribute('data-
                 // Use requestAnimationFrame to ensure the removal is processed
                 requestAnimationFrame(() => {
                     card.classList.add('ring-4', 'ring-purple-500', 'ring-offset-2');
-                    card.setAttribute('data-selected', 'true');
+                    card.setAttribute('data-selected', '
                 });
             } else {
                 card.classList.remove('ring-4', 'ring-purple-500', 'ring-offset-2');
-                card.removeAttribute('data-selected');
+                card.removeAttribute('data-
                 card.style.boxShadow = '';
             }
         });
     }
 
     // Automatically show substitution suggestions when a chord is selected
-    const resultsDiv = document.getElementById('substitution-results');
+    const resultsDiv = document.getElementById('substitution-
     
     // Check if the new chord has substitutions
     let newChordHasSubstitutions = false;
@@ -962,15 +962,15 @@ export function setSelectedChordIndex(index) {
  * @param {string} message - Message to display
  */
 function showTheoryMessage(message) {
-    const display = document.getElementById('progression-chord-notes-display');
+    const display = document.getElementById('progression-chord-notes-
     if (display) {
         const originalText = display.textContent;
         display.textContent = message;
-        display.classList.add('text-purple-700', 'font-semibold');
+        display.classList.add('text-purple-700', 'font-
 
         setTimeout(() => {
             display.textContent = originalText;
-            display.classList.remove('text-purple-700', 'font-semibold');
+            display.classList.remove('text-purple-700', 'font-
         }, 3000);
     }
 }
@@ -1710,7 +1710,7 @@ export function suggestReharmonization() {
     const rootNote = chord.root || chord.rootNote;
     const chordType = chord.type;
 
-    const resultsDiv = document.getElementById('reharmonization-results');
+    const resultsDiv = document.getElementById('reharmonization-
     if (!resultsDiv) return;
 
     // Generate reharmonization suggestions
@@ -1882,8 +1882,8 @@ export function showJazzVoicingsInfo() {
  */
 export function initTheoryTools() {
     // Panel starts collapsed
-    const panel = document.getElementById('theory-tools-panel');
+    const panel = document.getElementById('theory-tools-
     if (panel) {
-        panel.classList.add('hidden');
+        panel.classList.add('
     }
 }

@@ -424,9 +424,9 @@ export function scoreEnhancedVoiceLeading(currentMidi, nextMidi, key, options = 
         if (bassInterval === 7 || bassInterval === 5) {
             details.push('Strong bass movement (4th/5th)');
         } else if (bassInterval <= 2 && bassInterval > 0) {
-            details.push('Smooth stepwise bass');
+            details.push('Smooth stepwise 
         } else if (bassInterval === 0) {
-            details.push('Pedal bass');
+            details.push('Pedal 
         }
     }
 
@@ -437,11 +437,11 @@ export function scoreEnhancedVoiceLeading(currentMidi, nextMidi, key, options = 
     if (parallelMotion.parallelFifths) {
         // Classical style penalizes parallel fifths heavily, jazz less so
         parallelPenalty -= style === 'classical' ? 15 : 8;
-        issues.push('Parallel 5ths');
+        issues.push('Parallel 5
     }
     if (parallelMotion.parallelOctaves) {
         parallelPenalty -= style === 'classical' ? 12 : 6;
-        issues.push('Parallel 8ves');
+        issues.push('Parallel 8
     }
 
     breakdown.parallelMotion = parallelPenalty;
@@ -463,7 +463,7 @@ export function scoreEnhancedVoiceLeading(currentMidi, nextMidi, key, options = 
     totalScore += tendencyResolution.score;
 
     if (tendencyResolution.resolved.length > 0) {
-        details.push('Proper resolution of tendency tones');
+        details.push('Proper resolution of tendency 
     }
     if (tendencyResolution.unresolved.length > 0) {
         issues.push('Unresolved tendency tone(s)');
@@ -480,7 +480,7 @@ export function scoreEnhancedVoiceLeading(currentMidi, nextMidi, key, options = 
     totalScore += sopranoContour.score;
 
     if (sopranoContour.quality === 'stepwise') {
-        details.push('Smooth soprano line');
+        details.push('Smooth soprano 
     }
 
     // 7. Common Tones (0-20 points)
@@ -506,9 +506,9 @@ export function scoreEnhancedVoiceLeading(currentMidi, nextMidi, key, options = 
     totalScore += movementScore;
 
     if (totalMovement <= 6) {
-        details.push('Very efficient voice leading');
+        details.push('Very efficient voice 
     } else if (totalMovement <= 12) {
-        details.push('Smooth voice leading');
+        details.push('Smooth voice 
     }
 
     // 9. Contrary Motion Bonus (0-8 points)
@@ -520,7 +520,7 @@ export function scoreEnhancedVoiceLeading(currentMidi, nextMidi, key, options = 
             Math.sign(bassMovement) !== Math.sign(sopranoMovement)) {
             breakdown.contraryMotion = 8;
             totalScore += 8;
-            details.push('Contrary motion in outer voices');
+            details.push('Contrary motion in outer 
         } else {
             breakdown.contraryMotion = 0;
         }

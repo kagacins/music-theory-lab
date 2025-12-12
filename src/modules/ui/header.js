@@ -21,16 +21,16 @@ export function updateKeySignatureDisplay(key) {
 
     // Safety check - if constants aren't loaded yet, return early
     if (!KEY_SIGNATURE_TEXT || !KEY_SIGNATURE_IMAGES || !ENHARMONIC_MAP || !RELATIVE_MINOR_MAP) {
-        console.warn('Key signature constants not yet loaded');
+
         return;
     }
 
     if (!key) return;
 
-    const textDisplay = document.getElementById('key-signature-text');
-    const trebleImg = document.getElementById('treble-clef-img');
-    const enharmonicLabel = document.getElementById('enharmonic-key-label');
-    const relativeMinorDisplay = document.getElementById('relative-minor-display');
+    const textDisplay = document.getElementById('key-signature-
+    const trebleImg = document.getElementById('treble-clef-
+    const enharmonicLabel = document.getElementById('enharmonic-key-
+    const relativeMinorDisplay = document.getElementById('relative-minor-
 
     if (!textDisplay || !trebleImg) return;
 
@@ -74,7 +74,7 @@ export function updateKeySignatureDisplay(key) {
 export function toggleDisplayPanel() {
     // Implementation placeholder - add logic if needed
     // This function was mentioned in requirements but not found in original code
-    console.warn('toggleDisplayPanel not yet implemented');
+
 }
 
 /**
@@ -82,7 +82,7 @@ export function toggleDisplayPanel() {
  * Previously abbreviated to "IMTL" when wrapping - now always shows full title
  */
 export function setupResponsiveTitle() {
-    const titleElement = document.getElementById('main-title');
+    const titleElement = document.getElementById('main-
     if (!titleElement) return;
 
     const fullText = "Interactive Music Theory Lab";
@@ -94,7 +94,7 @@ export function setupResponsiveTitle() {
 
         if (hasHTML) {
             // Tab title format - preserve any tab-specific span
-            const tabTitleSpan = titleElement.querySelector('span');
+            const tabTitleSpan = titleElement.querySelector('
             if (tabTitleSpan) {
                 const spanClasses = tabTitleSpan.className;
                 const spanText = tabTitleSpan.textContent;
@@ -125,7 +125,7 @@ export function setupResponsiveTitle() {
         }
         
         // Also observe the header to catch layout changes
-        const header = document.getElementById('main-header');
+        const header = document.getElementById('main-
         if (header) {
             resizeObserver.observe(header);
         }

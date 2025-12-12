@@ -178,13 +178,13 @@ function durationToBeats(duration, dotted = false) {
     let tupletType = null;
     if (duration && typeof duration === 'string') {
         if (duration.endsWith('t') && /^\d+t$/.test(duration)) {
-            baseDuration = duration.replace('t', 'n');
+            baseDuration = duration.replace('t', '
             tupletType = 'triplet';
         } else if (duration.endsWith('q') && /^\d+q$/.test(duration)) {
-            baseDuration = duration.replace('q', 'n');
+            baseDuration = duration.replace('q', '
             tupletType = 'quintuplet';
         } else if (duration.endsWith('x') && /^\d+x$/.test(duration)) {
-            baseDuration = duration.replace('x', 'n');
+            baseDuration = duration.replace('x', '
             tupletType = 'sextuplet';
         }
     }
@@ -627,7 +627,7 @@ export function setAutoGenerateBass(enabled) {
         if (!restored) {
             // No edited state available - clear bass notes as fallback
             // This happens when auto-generate was never turned on before
-            console.log('[setAutoGenerateBass] No edited state to restore, clearing bass');
+
             for (let i = 0; i < compositionState.getMeasureCount(); i++) {
                 const measure = compositionState.getMeasure(i);
                 if (measure && measure.notation && measure.notation.bass) {
@@ -691,7 +691,7 @@ export function addBassNote(measureIndex, note) {
     }
 
     // MULTI-VOICE: Use current bass voice, not always voice 0
-    const voiceIndex = compositionState.getActiveVoiceIndexForStaff('bass');
+    const voiceIndex = compositionState.getActiveVoiceIndexForStaff('
     compositionState.addNote(measureIndex, 'bass', voiceIndex, note);
 
     // Mark as not auto-generated

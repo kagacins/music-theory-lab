@@ -482,7 +482,7 @@ export function getSavedWeights(contextMode = false) {
     const defaults = contextMode ? { ...DEFAULT_CONTEXT_WEIGHTS } : { ...DEFAULT_WEIGHTS };
 
     try {
-        const saved = localStorage.getItem('chord-recommendation-weights');
+        const saved = localStorage.getItem('chord-recommendation-
 
         if (saved) {
             const parsed = JSON.parse(saved);
@@ -499,7 +499,7 @@ export function getSavedWeights(contextMode = false) {
             return normalizeWeights(merged);
         }
     } catch (e) {
-        console.error('Error loading saved weights:', e);
+
     }
 
     return defaults;
@@ -525,7 +525,7 @@ export function saveWeights(weights, dispatchEvent = true) {
             document.dispatchEvent(event);
         }
     } catch (e) {
-        console.error('Error saving weights:', e);
+
     }
 }
 
@@ -567,7 +567,7 @@ export function applyPreset(presetKey, contextMode = false) {
  */
 export function getSavedMelodyWeights() {
     try {
-        const saved = localStorage.getItem('melody-suggestion-weights');
+        const saved = localStorage.getItem('melody-suggestion-
         if (saved) {
             const parsed = JSON.parse(saved);
             // Ensure all required keys exist
@@ -578,7 +578,7 @@ export function getSavedMelodyWeights() {
             }
         }
     } catch (e) {
-        console.error('Error loading saved melody weights:', e);
+
     }
 
     return { ...DEFAULT_MELODY_WEIGHTS };
@@ -592,7 +592,7 @@ export function saveMelodyWeights(weights) {
     try {
         localStorage.setItem('melody-suggestion-weights', JSON.stringify(weights));
     } catch (e) {
-        console.error('Error saving melody weights:', e);
+
     }
 }
 
@@ -804,7 +804,7 @@ export const HARMONIZE_WEIGHT_PRESETS = {
  */
 export function getSavedHarmonizeWeights() {
     try {
-        const saved = localStorage.getItem('harmonize-weights');
+        const saved = localStorage.getItem('harmonize-
         if (saved) {
             const parsed = JSON.parse(saved);
             // Ensure all required keys exist
@@ -815,7 +815,7 @@ export function getSavedHarmonizeWeights() {
             }
         }
     } catch (e) {
-        console.error('Error loading saved harmonize weights:', e);
+
     }
 
     return { ...DEFAULT_HARMONIZE_WEIGHTS };
@@ -830,7 +830,7 @@ export function saveHarmonizeWeights(weights) {
         const normalized = normalizeWeights(weights);
         localStorage.setItem('harmonize-weights', JSON.stringify(normalized));
     } catch (e) {
-        console.error('Error saving harmonize weights:', e);
+
     }
 }
 

@@ -71,7 +71,7 @@ function findMatchingPreset(weights) {
  */
 export function showChordExplorerModal(currentRoot, currentChordType, currentInversion, key, style, mood, onAddChord, onPlayChord, onStopChord) {
     // Remove existing explorer if any
-    const existing = document.getElementById('chord-explorer-modal');
+    const existing = document.getElementById('chord-explorer-
     if (existing) existing.remove();
 
     // Track current style and mood (can be changed by user)
@@ -102,15 +102,13 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
             currentStyle,
             currentMood,
             tensionDirection,
-            customWeights
-        );
     }
 
     // Generate initial recommendations
     let allRecommendations = generateRecommendations();
 
     // Create modal overlay
-    const overlay = document.createElement('div');
+    const overlay = document.createElement('
     overlay.id = 'chord-explorer-modal';
     overlay.style.cssText = `
         position: fixed;
@@ -130,7 +128,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     };
 
     // Create modal content
-    const modal = document.createElement('div');
+    const modal = document.createElement('
     modal.style.cssText = `
         background-color: white;
         border-radius: 12px;
@@ -146,7 +144,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     modal.onclick = (e) => e.stopPropagation();
 
     // Header
-    const header = document.createElement('div');
+    const header = document.createElement('
     header.style.cssText = `
         padding: 20px 24px;
         border-bottom: 2px solid #e5e7eb;
@@ -157,11 +155,11 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
         color: white;
     `;
 
-    const titleSection = document.createElement('div');
+    const titleSection = document.createElement('
     const title = document.createElement('h2');
     title.textContent = '🔬 Comprehensive Chord Explorer';
     title.style.cssText = 'margin: 0; font-size: 24px; font-weight: 700;';
-    const subtitle = document.createElement('p');
+    const subtitle = document.createElement('
     const chordSymbol = CHORD_DEFINITIONS[currentChordType]?.symbol || '';
     subtitle.id = 'explorer-subtitle';
     subtitle.textContent = `Analyzing ALL possible next chords after ${currentRoot}${chordSymbol} (${INVERSION_NAMES[activeInversion] || activeInversion})`;
@@ -169,7 +167,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     titleSection.appendChild(title);
     titleSection.appendChild(subtitle);
 
-    const closeBtn = document.createElement('button');
+    const closeBtn = document.createElement('
     closeBtn.innerHTML = '×';
     closeBtn.style.cssText = `
         background: rgba(255, 255, 255, 0.2);
@@ -195,7 +193,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     // Function to show loading splash screen
     function showLoadingSplash() {
         contentArea.innerHTML = '';
-        const loadingDiv = document.createElement('div');
+        const loadingDiv = document.createElement('
         loadingDiv.style.display = 'flex';
         loadingDiv.style.flexDirection = 'column';
         loadingDiv.style.alignItems = 'center';
@@ -203,13 +201,13 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
         loadingDiv.style.padding = '60px 20px';
         loadingDiv.style.color = '#6b7280';
 
-        const iconContainer = document.createElement('div');
+        const iconContainer = document.createElement('
         iconContainer.style.fontSize = '48px';
         iconContainer.style.marginBottom = '16px';
         iconContainer.innerHTML = '🎵 🎶';
         iconContainer.style.animation = 'pulse 1.5s ease-in-out infinite';
 
-        const loadingText = document.createElement('div');
+        const loadingText = document.createElement('
         loadingText.textContent = 'Updating Suggestions...';
         loadingText.style.fontSize = '18px';
         loadingText.style.fontWeight = '600';
@@ -221,7 +219,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
 
         // Add keyframe animation for pulse
         if (!document.getElementById('pulse-animation-style')) {
-            const style = document.createElement('style');
+            const style = document.createElement('
             style.id = 'pulse-animation-style';
             style.textContent = `
                 @keyframes pulse {
@@ -262,7 +260,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     }
 
     // Tab navigation with inline style/mood controls
-    const tabNav = document.createElement('div');
+    const tabNav = document.createElement('
     tabNav.style.cssText = `
         display: flex;
         align-items: center;
@@ -274,7 +272,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     `;
 
     // Tab buttons container
-    const tabButtonsContainer = document.createElement('div');
+    const tabButtonsContainer = document.createElement('
     tabButtonsContainer.style.cssText = 'display: flex; gap: 8px;';
 
     const tabs = [
@@ -285,7 +283,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     let activeTab = 'visualization';
 
     tabs.forEach(tab => {
-        const btn = document.createElement('button');
+        const btn = document.createElement('
         btn.textContent = tab.label;
         btn.style.cssText = `
             padding: 8px 16px;
@@ -302,20 +300,20 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     });
 
     // Compact style/mood controls on the right
-    const controlsContainer = document.createElement('div');
+    const controlsContainer = document.createElement('
     controlsContainer.style.cssText = 'display: flex; align-items: center; gap: 8px;';
 
     // Style selector (compact)
-    const styleLabel = document.createElement('label');
+    const styleLabel = document.createElement('
     styleLabel.textContent = 'Style:';
     styleLabel.style.cssText = 'font-size: 11px; font-weight: 600; color: #6b7280; white-space: nowrap;';
     
-    const styleSelect = document.createElement('select');
+    const styleSelect = document.createElement('
     styleSelect.id = 'explorer-style-select';
     styleSelect.style.cssText = 'padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 11px; background-color: white; min-width: 100px;';
     
     SUGGESTION_STYLES.forEach(s => {
-        const option = document.createElement('option');
+        const option = document.createElement('
         option.value = s.id;
         option.textContent = s.label;
         if (s.id === currentStyle) option.selected = true;
@@ -328,16 +326,16 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     });
 
     // Mood selector (compact)
-    const moodLabel = document.createElement('label');
+    const moodLabel = document.createElement('
     moodLabel.textContent = 'Mood:';
     moodLabel.style.cssText = 'font-size: 11px; font-weight: 600; color: #6b7280; white-space: nowrap;';
     
-    const moodSelect = document.createElement('select');
+    const moodSelect = document.createElement('
     moodSelect.id = 'explorer-mood-select';
     moodSelect.style.cssText = 'padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 11px; background-color: white; min-width: 100px;';
     
     SUGGESTION_MOODS.forEach(m => {
-        const option = document.createElement('option');
+        const option = document.createElement('
         option.value = m.id;
         option.textContent = m.label;
         if (m.id === currentMood) option.selected = true;
@@ -386,7 +384,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     tabNav.appendChild(controlsContainer);
 
     // Inversion selector row
-    const inversionRow = document.createElement('div');
+    const inversionRow = document.createElement('
     inversionRow.style.cssText = `
         display: flex;
         align-items: center;
@@ -396,12 +394,12 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
         border-bottom: 1px solid #e5e7eb;
     `;
     
-    const inversionLabel = document.createElement('label');
+    const inversionLabel = document.createElement('
     inversionLabel.textContent = 'Current Chord Inversion:';
     inversionLabel.style.cssText = 'font-size: 12px; font-weight: 600; color: #374151; white-space: nowrap;';
     inversionRow.appendChild(inversionLabel);
     
-    const inversionButtonsContainer = document.createElement('div');
+    const inversionButtonsContainer = document.createElement('
     inversionButtonsContainer.style.cssText = 'display: flex; gap: 4px; flex-wrap: wrap;';
     
     // Calculate max inversions for this chord type
@@ -410,7 +408,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     
     // Create inversion buttons
     for (let inv = 0; inv <= maxInversion; inv++) {
-        const invBtn = document.createElement('button');
+        const invBtn = document.createElement('
         invBtn.textContent = INVERSION_NAMES[inv] || `Inversion ${inv}`;
         invBtn.dataset.inversion = inv;
         invBtn.style.cssText = `
@@ -551,7 +549,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     inversionRow.appendChild(inversionButtonsContainer);
 
     // Weight adjustment section (collapsible)
-    const weightSection = document.createElement('div');
+    const weightSection = document.createElement('
     weightSection.style.cssText = `
         background-color: #fefce8;
         border-bottom: 1px solid #e5e7eb;
@@ -561,7 +559,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     let currentWeights = getSavedWeights(false); // Use standard mode weights for now
 
     // Collapsible header
-    const weightHeader = document.createElement('div');
+    const weightHeader = document.createElement('
     weightHeader.style.cssText = `
         padding: 10px 24px;
         display: flex;
@@ -575,21 +573,21 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
 
     let isWeightSectionExpanded = false;
 
-    const weightHeaderTitle = document.createElement('div');
+    const weightHeaderTitle = document.createElement('
     weightHeaderTitle.style.cssText = 'display: flex; align-items: center; gap: 8px;';
 
-    const weightToggleIcon = document.createElement('span');
+    const weightToggleIcon = document.createElement('
     weightToggleIcon.textContent = '▶';
     weightToggleIcon.style.cssText = 'font-size: 10px; color: #78716c; transition: transform 0.2s;';
 
-    const weightTitle = document.createElement('span');
+    const weightTitle = document.createElement('
     weightTitle.textContent = '⚙️ Recommendation Weights';
     weightTitle.style.cssText = 'font-weight: 600; font-size: 13px; color: #78716c;';
 
     weightHeaderTitle.appendChild(weightToggleIcon);
     weightHeaderTitle.appendChild(weightTitle);
 
-    const weightSubtitle = document.createElement('span');
+    const weightSubtitle = document.createElement('
     weightSubtitle.textContent = 'Adjust scoring factors';
     weightSubtitle.style.cssText = 'font-size: 11px; color: #a8a29e;';
 
@@ -604,7 +602,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     };
 
     // Collapsible content
-    const weightContent = document.createElement('div');
+    const weightContent = document.createElement('
     weightContent.style.cssText = `
         max-height: 0;
         overflow: hidden;
@@ -632,11 +630,11 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     weightHeader.onclick = toggleWeightSection;
 
     // Inner content wrapper
-    const weightInner = document.createElement('div');
+    const weightInner = document.createElement('
     weightInner.style.cssText = 'display: flex; flex-direction: column; gap: 16px;';
 
     // Info notice
-    const weightNotice = document.createElement('div');
+    const weightNotice = document.createElement('
     weightNotice.style.cssText = `
         background-color: #fffbeb;
         border: 1px solid #fcd34d;
@@ -653,7 +651,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     weightInner.appendChild(weightNotice);
 
     // Preset buttons organized by category
-    const presetsContainer = document.createElement('div');
+    const presetsContainer = document.createElement('
     presetsContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px;';
 
     // Store button references for updating active states
@@ -681,19 +679,19 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
 
     // Helper function to create preset section
     const createPresetSection = (title, presets, description) => {
-        const section = document.createElement('div');
+        const section = document.createElement('
         section.style.cssText = 'display: flex; flex-direction: column; gap: 4px;';
 
-        const sectionHeader = document.createElement('div');
+        const sectionHeader = document.createElement('
         sectionHeader.style.cssText = 'display: flex; align-items: baseline; gap: 6px;';
 
-        const sectionLabel = document.createElement('div');
+        const sectionLabel = document.createElement('
         sectionLabel.textContent = title;
         sectionLabel.style.cssText = 'font-size: 11px; font-weight: 600; color: #78716c;';
         sectionHeader.appendChild(sectionLabel);
 
         if (description) {
-            const sectionDesc = document.createElement('div');
+            const sectionDesc = document.createElement('
             sectionDesc.textContent = description;
             sectionDesc.style.cssText = 'font-size: 9px; color: #a8a29e; font-style: italic;';
             sectionHeader.appendChild(sectionDesc);
@@ -701,13 +699,13 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
 
         section.appendChild(sectionHeader);
 
-        const grid = document.createElement('div');
+        const grid = document.createElement('
         grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 4px;';
 
         Object.keys(presets).forEach(key => {
             const preset = presets[key];
 
-            const presetBtn = document.createElement('button');
+            const presetBtn = document.createElement('
             presetBtn.textContent = preset.name;
             presetBtn.title = preset.tooltip;
             presetBtn.style.cssText = `
@@ -758,7 +756,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     presetsContainer.appendChild(approachesSection);
 
     // Separator
-    const separator = document.createElement('div');
+    const separator = document.createElement('
     separator.style.cssText = 'height: 1px; background-color: #e7e5e4; margin: 2px 0;';
     presetsContainer.appendChild(separator);
 
@@ -776,7 +774,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     updatePresetActiveStates();
 
     // Weight sliders
-    const slidersContainer = document.createElement('div');
+    const slidersContainer = document.createElement('
     slidersContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
 
     const sliders = {};
@@ -812,18 +810,18 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     }
 
     Object.keys(labels).forEach(key => {
-        const sliderGroup = document.createElement('div');
+        const sliderGroup = document.createElement('
         sliderGroup.style.cssText = 'display: flex; align-items: center; gap: 12px;';
 
         // Left side: Label and description
-        const labelColumn = document.createElement('div');
+        const labelColumn = document.createElement('
         labelColumn.style.cssText = 'flex: 0 0 140px; display: flex; flex-direction: column;';
 
-        const label = document.createElement('label');
+        const label = document.createElement('
         label.textContent = labels[key];
         label.style.cssText = 'font-size: 11px; font-weight: 600; color: #57534e; margin-bottom: 2px;';
 
-        const desc = document.createElement('div');
+        const desc = document.createElement('
         desc.textContent = descriptions[key];
         desc.style.cssText = 'font-size: 9px; color: #a8a29e; line-height: 1.2;';
 
@@ -831,10 +829,10 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
         labelColumn.appendChild(desc);
 
         // Right side: Slider and value
-        const sliderColumn = document.createElement('div');
+        const sliderColumn = document.createElement('
         sliderColumn.style.cssText = 'flex: 1; display: flex; align-items: center; gap: 8px;';
 
-        const slider = document.createElement('input');
+        const slider = document.createElement('
         slider.type = 'range';
         slider.min = '0';
         slider.max = '100';
@@ -842,7 +840,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
         slider.style.cssText = 'flex: 1; cursor: pointer;';
         slider.oninput = onWeightSliderChange;
 
-        const valueLabel = document.createElement('span');
+        const valueLabel = document.createElement('
         valueLabel.textContent = `${Math.round(currentWeights[key] * 100)}%`;
         valueLabel.style.cssText = 'font-size: 11px; font-weight: 600; color: #ca8a04; min-width: 36px; text-align: right;';
 
@@ -859,10 +857,10 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     weightInner.appendChild(slidersContainer);
 
     // Action buttons
-    const buttonRow = document.createElement('div');
+    const buttonRow = document.createElement('
     buttonRow.style.cssText = 'display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid #e7e5e4;';
 
-    const updateBtn = document.createElement('button');
+    const updateBtn = document.createElement('
     updateBtn.textContent = '🔄 Update Now';
     updateBtn.style.cssText = `
         flex: 1;
@@ -891,7 +889,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
         }, 1500);
     };
 
-    const resetBtn = document.createElement('button');
+    const resetBtn = document.createElement('
     resetBtn.textContent = 'Reset';
     resetBtn.style.cssText = `
         padding: 8px 12px;
@@ -912,7 +910,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
         updatePresetActiveStates();
     };
 
-    const saveUniversalBtn = document.createElement('button');
+    const saveUniversalBtn = document.createElement('
     saveUniversalBtn.textContent = '💾 Save as Universal';
     saveUniversalBtn.style.cssText = `
         flex: 1;
@@ -948,7 +946,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     weightSection.appendChild(weightContent);
 
     // Content area
-    const contentArea = document.createElement('div');
+    const contentArea = document.createElement('
     contentArea.style.cssText = `
         flex: 1;
         overflow-y: auto;
@@ -960,7 +958,7 @@ export function showChordExplorerModal(currentRoot, currentChordType, currentInv
     function switchTab(tabId) {
         activeTab = tabId;
         // Update button styles
-        const buttons = tabNav.querySelectorAll('button');
+        const buttons = tabNav.querySelectorAll('
         buttons.forEach((btn, idx) => {
             const isActive = tabs[idx].id === tabId;
             btn.style.backgroundColor = isActive ? '#667eea' : 'transparent';
@@ -1012,8 +1010,6 @@ function generateAllRecommendations(currentRoot, currentChordType, currentInvers
         [], // progressionData
         false, // contextMode
         4, // lookbackDepth
-        customWeights // Pass custom weights if provided
-    );
 
     return recommendations;
 }
@@ -1022,11 +1018,11 @@ function generateAllRecommendations(currentRoot, currentChordType, currentInvers
  * Render 3D visualization tab
  */
 function renderVisualization(container, recommendations) {
-    const viz = document.createElement('div');
+    const viz = document.createElement('
     viz.style.cssText = 'display: flex; flex-direction: column; gap: 24px;';
 
     // Info section
-    const info = document.createElement('div');
+    const info = document.createElement('
     info.style.cssText = 'padding: 16px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid #3b82f6;';
     info.innerHTML = `
         <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #1e40af;">3D Scoring Matrix</h3>
@@ -1053,7 +1049,7 @@ function renderVisualization(container, recommendations) {
  * Create 3D grid visualization
  */
 function create3DGrid(recommendations) {
-    const gridContainer = document.createElement('div');
+    const gridContainer = document.createElement('
     gridContainer.style.cssText = `
         display: grid;
         grid-template-columns: auto 1fr;
@@ -1074,17 +1070,17 @@ function create3DGrid(recommendations) {
         const recs = byRoot[root] || [];
 
         // Root label
-        const label = document.createElement('div');
+        const label = document.createElement('
         label.textContent = root;
         label.style.cssText = 'font-weight: 700; font-size: 18px; color: #374151; padding: 12px; text-align: right;';
         gridContainer.appendChild(label);
 
         // Chord blocks
-        const blocks = document.createElement('div');
+        const blocks = document.createElement('
         blocks.style.cssText = 'display: flex; flex-wrap: wrap; gap: 4px;';
 
         recs.forEach(rec => {
-            const block = document.createElement('div');
+            const block = document.createElement('
             const color = getScoreColor(rec.score);
             block.style.cssText = `
                 width: 32px;
@@ -1143,7 +1139,7 @@ function renderDataTable(container, recommendations, currentRoot, currentChordTy
     };
 
     // Table container
-    const tableContainer = document.createElement('div');
+    const tableContainer = document.createElement('
     container.appendChild(tableContainer);
 
     // Function to apply filters and re-render
@@ -1183,7 +1179,7 @@ function renderDataTable(container, recommendations, currentRoot, currentChordTy
  * Create Excel-style filter dropdown for a column
  */
 function createColumnFilter(columnName, allValues, activeFilterSet, applyFiltersCallback) {
-    const filterBtn = document.createElement('button');
+    const filterBtn = document.createElement('
     filterBtn.innerHTML = activeFilterSet.size > 0 ? '▼ 🔵' : '▼';
     filterBtn.style.cssText = `
         background: none;
@@ -1203,7 +1199,7 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
         e.preventDefault();
         e.stopPropagation();
 
-        console.log('Filter button clicked for column:', columnName);
+
 
         // Check if this button's menu is already open - if so, close it
         if (currentMenu && document.body.contains(currentMenu)) {
@@ -1217,7 +1213,7 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
         currentMenu = null;
 
         // Create filter menu
-        const menu = document.createElement('div');
+        const menu = document.createElement('
         menu.className = 'column-filter-menu';
         currentMenu = menu; // Track this menu
         menu.style.cssText = `
@@ -1238,10 +1234,10 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
         menu.style.left = `${rect.left}px`;
         menu.style.top = `${rect.bottom + 5}px`;
 
-        console.log('Menu positioned at:', menu.style.left, menu.style.top);
+
 
         // Search box for the column
-        const searchBox = document.createElement('input');
+        const searchBox = document.createElement('
         searchBox.type = 'text';
         searchBox.placeholder = `Search ${columnName}...`;
         searchBox.style.cssText = `
@@ -1257,15 +1253,15 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
         const uniqueValues = Array.from(new Set(allValues)).sort();
 
         // Checkbox list container
-        const checkboxContainer = document.createElement('div');
+        const checkboxContainer = document.createElement('
         checkboxContainer.style.cssText = 'max-height: 180px; overflow-y: auto; margin-bottom: 8px;';
 
         // Select All / Clear All
-        const selectAllDiv = document.createElement('div');
+        const selectAllDiv = document.createElement('
         selectAllDiv.style.cssText = 'padding: 4px; border-bottom: 1px solid #e5e7eb; margin-bottom: 4px;';
-        const selectAllLabel = document.createElement('label');
+        const selectAllLabel = document.createElement('
         selectAllLabel.style.cssText = 'display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; font-weight: 600;';
-        const selectAllCheckbox = document.createElement('input');
+        const selectAllCheckbox = document.createElement('
         selectAllCheckbox.type = 'checkbox';
         selectAllCheckbox.checked = activeFilterSet.size === 0;
         selectAllCheckbox.onchange = () => {
@@ -1283,11 +1279,11 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
             Array.from(checkboxContainer.children).slice(1).forEach(child => child.remove());
 
             valuesToShow.forEach(value => {
-                const div = document.createElement('div');
+                const div = document.createElement('
                 div.style.cssText = 'padding: 4px;';
-                const label = document.createElement('label');
+                const label = document.createElement('
                 label.style.cssText = 'display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px;';
-                const checkbox = document.createElement('input');
+                const checkbox = document.createElement('
                 checkbox.type = 'checkbox';
                 checkbox.value = value;
                 checkbox.checked = activeFilterSet.size === 0 || activeFilterSet.has(value);
@@ -1308,10 +1304,10 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
         };
 
         // Buttons
-        const btnRow = document.createElement('div');
+        const btnRow = document.createElement('
         btnRow.style.cssText = 'display: flex; gap: 6px; margin-top: 8px;';
 
-        const applyBtn = document.createElement('button');
+        const applyBtn = document.createElement('
         applyBtn.textContent = 'Apply';
         applyBtn.style.cssText = `
             flex: 1;
@@ -1327,18 +1323,18 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
         applyBtn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('Apply filter button clicked');
+
 
             // Get all checkboxes except the Select All checkbox (which is inside selectAllDiv)
             const allCheckboxDivs = Array.from(checkboxContainer.children).slice(1); // Skip first child (selectAllDiv)
             const checkboxes = allCheckboxDivs.map(div => div.querySelector('input[type="checkbox"]')).filter(cb => cb !== null);
 
-            console.log('Found', checkboxes.length, 'checkboxes');
+
 
             activeFilterSet.clear();
             let allChecked = true;
             checkboxes.forEach(cb => {
-                console.log('Checkbox:', cb.value, 'checked:', cb.checked);
+
                 if (cb.checked) {
                     activeFilterSet.add(cb.value);
                 } else {
@@ -1349,13 +1345,13 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
             if (allChecked) {
                 activeFilterSet.clear();
             }
-            console.log('Filter applied for', columnName, ':', Array.from(activeFilterSet));
+
             currentMenu = null;
             menu.remove();
             applyFiltersCallback();
         };
 
-        const clearBtn = document.createElement('button');
+        const clearBtn = document.createElement('
         clearBtn.textContent = 'Clear';
         clearBtn.style.cssText = `
             flex: 1;
@@ -1371,7 +1367,7 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
         clearBtn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('Clear filter button clicked');
+
             activeFilterSet.clear();
             currentMenu = null;
             menu.remove();
@@ -1417,14 +1413,14 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
     container.innerHTML = '';
 
     // Info section showing filter status (compact)
-    const infoBar = document.createElement('div');
+    const infoBar = document.createElement('
     infoBar.style.cssText = 'padding: 6px 10px; background: #f0f9ff; border-radius: 4px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;';
 
-    const infoText = document.createElement('div');
+    const infoText = document.createElement('
     infoText.style.cssText = 'font-size: 11px; color: #1e40af;';
     infoText.textContent = `Showing ${recommendations.length} of ${allRecommendations.length} chords`;
 
-    const clearAllBtn = document.createElement('button');
+    const clearAllBtn = document.createElement('
     clearAllBtn.textContent = '🔄 Clear All';
     clearAllBtn.style.cssText = `
         padding: 3px 8px;
@@ -1439,7 +1435,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
     clearAllBtn.onclick = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        console.log('Clear All Filters button clicked');
+
         activeFilters.root.clear();
         activeFilters.type.clear();
         activeFilters.inversion.clear();
@@ -1452,7 +1448,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
     container.appendChild(infoBar);
 
     // Create table
-    const table = document.createElement('table');
+    const table = document.createElement('
     table.style.cssText = 'width: 100%; border-collapse: collapse; font-size: 13px;';
 
     // Prepare data for filters
@@ -1461,8 +1457,8 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
     const allInversions = allRecommendations.map(r => INVERSION_NAMES[r.inversion] || `Inversion ${r.inversion}`);
 
     // Header with filter buttons
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
+    const thead = document.createElement('
+    const headerRow = document.createElement('
     headerRow.style.cssText = 'background-color: #f3f4f6; border-bottom: 2px solid #d1d5db;';
 
     // Check if rhythm awareness is enabled (Phase 5)
@@ -1485,7 +1481,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
     ];
 
     columns.forEach(col => {
-        const th = document.createElement('th');
+        const th = document.createElement('
         th.style.cssText = `padding: 6px 6px; text-align: ${col.align}; font-weight: 600; position: relative; font-size: 12px;`;
         
         // Make sortable columns clickable
@@ -1500,22 +1496,22 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
             });
         }
 
-        const headerContent = document.createElement('div');
+        const headerContent = document.createElement('
         headerContent.style.cssText = 'display: flex; align-items: center; gap: 4px;';
 
-        const text = document.createElement('span');
+        const text = document.createElement('
         text.textContent = col.name;
         headerContent.appendChild(text);
 
         // Add sort indicator if this column is sorted
         if (col.sortable && sortState.column === col.sortKey) {
-            const sortIndicator = document.createElement('span');
+            const sortIndicator = document.createElement('
             sortIndicator.textContent = sortState.direction === 'asc' ? ' ▲' : ' ▼';
             sortIndicator.style.cssText = 'color: #3b82f6; font-size: 10px;';
             headerContent.appendChild(sortIndicator);
         } else if (col.sortable) {
             // Show subtle indicator for sortable columns
-            const sortIndicator = document.createElement('span');
+            const sortIndicator = document.createElement('
             sortIndicator.textContent = ' ↕';
             sortIndicator.style.cssText = 'color: #9ca3af; font-size: 10px; opacity: 0.5;';
             headerContent.appendChild(sortIndicator);
@@ -1526,8 +1522,6 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
                 col.name,
                 col.allValues,
                 activeFilters[col.filterKey],
-                applyFiltersCallback
-            );
             headerContent.appendChild(filterBtn);
         }
 
@@ -1625,7 +1619,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
     }
 
     // Body
-    const tbody = document.createElement('tbody');
+    const tbody = document.createElement('
 
     // Piano sampler for chord playback (same as used elsewhere on the site)
     let piano = null;
@@ -1634,7 +1628,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
     // Helper function to play a chord
     async function playChord(chordType, root, inversion) {
         try {
-            console.log(`Playing chord: ${root} ${chordType} (inversion ${inversion})`);
+
 
         // Stop any currently playing notes
             if (piano && currentNotes) {
@@ -1643,14 +1637,14 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
 
             // Check if Tone is available
             if (typeof Tone === 'undefined') {
-                console.error('Tone.js is not loaded');
+
                 alert('Audio library (Tone.js) is not loaded. Cannot play chord.');
                 return;
             }
 
             // Validate chord type exists in definitions
             if (!CHORD_DEFINITIONS[chordType]) {
-                console.error(`Invalid chord type: "${chordType}". Available types:`, Object.keys(CHORD_DEFINITIONS));
+
                 alert(`Cannot play chord: "${chordType}" is not a valid chord type.`);
                 return;
             }
@@ -1678,24 +1672,24 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
                         release: 1,
                         baseUrl: "https://tonejs.github.io/audio/salamander/",
                         onload: () => {
-                            console.log('Piano samples loaded and ready');
+
                             resolve();
                         },
                         onerror: (error) => {
-                            console.error('Error loading piano samples:', error);
+
                             reject(error);
                 }
             }).toDestination();
                 });
                 
-                console.log('Piano sampler initialized, waiting for samples to load...');
+
                 // Wait for the sampler's buffers to load
                 await samplerLoaded;
             }
 
             // Get the chord notes (params: root, chordType, inversion, key, octaveShift, enharmonicPreference, notationPreference)
             const notesResult = getInvertedChordNotes(root, chordType, inversion);
-            console.log('getInvertedChordNotes returned:', notesResult);
+
 
             // Extract notes array from the result
             let notesArray;
@@ -1704,16 +1698,16 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
             } else if (Array.isArray(notesResult)) {
                 notesArray = notesResult;
             } else {
-                console.error('Invalid notes result format:', notesResult);
+
                 notesArray = [];
             }
 
-            console.log('Notes array to play:', notesArray);
+
 
             if (notesArray && notesArray.length > 0) {
                 // Ensure the piano sampler is fully loaded before playing
                 if (!piano.loaded) {
-                    console.log('Waiting for piano samples to finish loading...');
+
                     await new Promise((resolve) => {
                         const checkLoaded = setInterval(() => {
                             if (piano.loaded) {
@@ -1726,13 +1720,13 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
 
                 currentNotes = notesArray;
                 piano.triggerAttack(notesArray);
-                console.log('Playing notes:', notesArray);
+
             } else {
-                console.error('No notes generated for chord. ChordType:', chordType, 'Root:', root, 'Inversion:', inversion);
+
                 alert(`Cannot generate notes for ${root} ${chordType} (inversion ${inversion}). Check console for details.`);
             }
         } catch (error) {
-            console.error('Error playing chord:', error);
+
             // Provide more helpful error message for buffer issues
             if (error.message && error.message.includes('buffer')) {
                 alert(`Audio samples are still loading. Please wait a moment and try again.`);
@@ -1745,7 +1739,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
     // Helper function to show score breakdown
     function showScoreBreakdown(rec, weights) {
         // Create overlay
-        const overlay = document.createElement('div');
+        const overlay = document.createElement('
         overlay.style.cssText = `
             position: fixed;
             top: 0;
@@ -1763,7 +1757,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
         };
 
         // Create modal
-        const modal = document.createElement('div');
+        const modal = document.createElement('
         modal.style.cssText = `
             background-color: white;
             border-radius: 12px;
@@ -1777,7 +1771,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
         modal.onclick = (e) => e.stopPropagation();
 
         // Header
-        const header = document.createElement('div');
+        const header = document.createElement('
         header.style.cssText = `
             display: flex;
             justify-content: space-between;
@@ -1789,7 +1783,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
         title.textContent = `Score Breakdown: ${rec.root} ${rec.type}`;
         title.style.cssText = 'margin: 0; font-size: 18px; font-weight: 600; color: #111827;';
 
-        const closeBtn = document.createElement('button');
+        const closeBtn = document.createElement('
         closeBtn.innerHTML = '×';
         closeBtn.style.cssText = `
             background: none;
@@ -1812,7 +1806,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
         modal.appendChild(header);
 
         // Total score
-        const totalScoreDiv = document.createElement('div');
+        const totalScoreDiv = document.createElement('
         totalScoreDiv.style.cssText = `
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -1828,7 +1822,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
         modal.appendChild(totalScoreDiv);
 
         // Formula explanation
-        const formulaDiv = document.createElement('div');
+        const formulaDiv = document.createElement('
         formulaDiv.style.cssText = `
             background-color: #f9fafb;
             padding: 16px;
@@ -1878,13 +1872,13 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
             });
         }
 
-        const componentsDiv = document.createElement('div');
+        const componentsDiv = document.createElement('
         componentsDiv.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
 
         components.forEach(comp => {
             const contribution = Math.round(comp.score * comp.weight * 100) / 100;
 
-            const row = document.createElement('div');
+            const row = document.createElement('
             row.style.cssText = `
                 background-color: white;
                 border: 1px solid #e5e7eb;
@@ -1914,7 +1908,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
 
         // Calculation summary
         const total = components.reduce((sum, comp) => sum + (comp.score * comp.weight), 0);
-        const summaryDiv = document.createElement('div');
+        const summaryDiv = document.createElement('
         summaryDiv.style.cssText = `
             margin-top: 20px;
             padding-top: 16px;
@@ -1949,15 +1943,15 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
             if (piano && currentNotes) {
                 piano.triggerRelease(currentNotes);
             currentNotes = null;
-                console.log('Stopped playing');
+
             }
         } catch (error) {
-            console.error('Error stopping chord:', error);
+
         }
     }
 
     sortedRecommendations.forEach((rec, idx) => {
-        const tr = document.createElement('tr');
+        const tr = document.createElement('
         tr.style.cssText = `border-bottom: 1px solid #e5e7eb; ${idx % 2 === 0 ? 'background-color: #f9fafb;' : ''}`;
 
         const invName = INVERSION_NAMES[rec.inversion] || `Inversion ${rec.inversion}`;
@@ -1995,7 +1989,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
         tbody.appendChild(tr);
 
         // Add hover effects to score badge
-        const scoreBadge = tr.querySelector('.score-badge');
+        const scoreBadge = tr.querySelector('.score-
         if (scoreBadge) {
             scoreBadge.addEventListener('mouseenter', () => {
                 scoreBadge.style.transform = 'scale(1.1)';
@@ -2029,7 +2023,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
             const rec = sortedRecommendations[idx];
 
             if (action === 'add') {
-                console.log('Add chord:', rec);
+
                 addChordToProgression(rec.root, rec.type, rec.inversion);
                 overlay.remove();
             }
@@ -2045,16 +2039,16 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
             const idx = parseInt(target.dataset.index);
             const rec = sortedRecommendations[idx];
 
-            console.log('Button pressed:', action, 'index:', idx, 'rec:', rec);
+
 
             if (action === 'play-current') {
-                console.log('Play current chord (hold)');
+
                 e.preventDefault();
                 e.stopPropagation();
                 // Play the current chord
                 await playChord(currentChordType, currentRoot, currentInversion);
             } else if (action === 'play-this') {
-                console.log('Play suggested chord (hold)');
+
                 e.preventDefault();
                 e.stopPropagation();
                 // Play the suggested chord (from the recommendation)
@@ -2071,7 +2065,7 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
             const action = target.dataset.action;
 
             if (action === 'play-current' || action === 'play-this') {
-                console.log('Button released, stopping chord');
+
                 e.preventDefault();
                 e.stopPropagation();
                 stopChord();
@@ -2095,11 +2089,11 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
                 const idx = parseInt(target.dataset.index);
                 const rec = recommendations[idx];
 
-                console.log('Add chord to progression');
+
                 if (onAddChord) {
                 onAddChord(rec.type, rec.root, rec.inversion);
                 } else {
-                    console.error('onAddChord callback not provided');
+
                 }
             }
         }

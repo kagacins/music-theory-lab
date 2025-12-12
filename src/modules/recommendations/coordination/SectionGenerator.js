@@ -416,15 +416,11 @@ class SectionGenerator extends EventEmitter {
 
         // Step 1: Generate chord progression with context awareness
         const progressionResult = this._generateProgression(
-            sectionType, length, style, context.key, compositionAnalysis
-        );
 
         // Step 2: Plan tension arc for the section (considering overall composition arc)
         const tensionArc = this._planTensionArc(
             profile.tensionProfile,
             length,
-            compositionAnalysis
-        );
 
         // Step 2.5: Plan duration arc for the section (rhythmic awareness)
         const durationArc = this._planDurationArc(
@@ -432,30 +428,22 @@ class SectionGenerator extends EventEmitter {
             length,
             style,
             compositionAnalysis,
-            tensionArc
-        );
 
         // Apply durations to progression chords
         const progressionWithDurations = this._applyDurationsToProgression(
             progressionResult.primary,
-            durationArc
-        );
 
         // Step 3: Generate melody contours aligned with tension
         const melodyPlan = this._generateMelodyPlan(
             sectionType,
             progressionWithDurations,
             tensionArc,
-            style
-        );
 
         // Step 4: Generate bass line
         const bassLine = this._generateBassLine(
             progressionWithDurations,
             style,
             sectionType,
-            context.key
-        );
 
         // Step 5: Apply user preferences if available
         const result = this._applyPreferences({
@@ -739,8 +727,6 @@ class SectionGenerator extends EventEmitter {
             const tensionArc = this._planTensionArc(
                 profile.tensionProfile,
                 length,
-                compositionAnalysis
-            );
 
             // Plan duration arc
             const durationArc = this._planDurationArc(
@@ -748,38 +734,28 @@ class SectionGenerator extends EventEmitter {
                 length,
                 style,
                 compositionAnalysis,
-                tensionArc
-            );
 
             // Convert template to chords
             const progression = this._degreesToChordsWithContext(
                 template.degrees,
                 context.key,
                 length,
-                compositionAnalysis
-            );
 
             // Apply durations
             const progressionWithDurations = this._applyDurationsToProgression(
                 progression,
-                durationArc
-            );
 
             // Generate melody plan
             const melodyPlan = this._generateMelodyPlan(
                 sectionType,
                 progressionWithDurations,
                 tensionArc,
-                style
-            );
 
             // Generate bass line
             const bassLine = this._generateBassLine(
                 progressionWithDurations,
                 style,
                 sectionType,
-                context.key
-            );
 
             results.push({
                 sectionType,
@@ -804,8 +780,6 @@ class SectionGenerator extends EventEmitter {
             const variedProgression = this._createProgressionVariation(
                 baseResult.progression,
                 context.key,
-                results.length
-            );
 
             results.push({
                 ...baseResult,
@@ -882,7 +856,7 @@ class SectionGenerator extends EventEmitter {
         }
 
         const lastSection = existingSections[existingSections.length - 1];
-        const hasChorus = existingSections.some(s => s.type === 'chorus');
+        const hasChorus = existingSections.some(s => s.type === '
         const sectionCount = existingSections.length;
 
         // Simple song structure logic
@@ -934,8 +908,6 @@ class SectionGenerator extends EventEmitter {
         const scoredTemplates = this._scoreTemplates(
             allTemplates,
             compositionAnalysis,
-            sectionType
-        );
 
         // Select primary template (highest scored)
         const primaryTemplate = scoredTemplates[0].template;
@@ -945,13 +917,9 @@ class SectionGenerator extends EventEmitter {
             primaryTemplate.degrees,
             key,
             length,
-            compositionAnalysis
-        );
 
         // Generate alternatives from other high-scoring templates
         const alternatives = scoredTemplates.slice(1, 3).map(scored =>
-            this._degreesToChordsWithContext(scored.template.degrees, key, length, compositionAnalysis)
-        );
 
         // Build reasoning that includes context
         const reasoning = this._buildReasoning(primaryTemplate, compositionAnalysis, scoredTemplates[0].reasons);
@@ -974,14 +942,14 @@ class SectionGenerator extends EventEmitter {
             // Bonus for starting with a smooth transition from last chord
             if (!analysis.isEmpty && analysis.suggestedStartDegrees.includes(template.degrees[0])) {
                 score += 20;
-                reasons.push('smooth transition from previous chord');
+                reasons.push('smooth transition from previous 
             }
 
             // Penalty for using same progression pattern already in composition
             const patternStr = template.degrees.join('-');
             if (analysis.usedProgressions.includes(patternStr)) {
                 score -= 30;
-                reasons.push('avoiding repetition');
+                reasons.push('avoiding 
             }
 
             // Adjust based on section type and what's already been composed
@@ -991,27 +959,27 @@ class SectionGenerator extends EventEmitter {
             if (sectionCounts[sectionType] > 0) {
                 // Slight randomization to get variety on repeat sections
                 score += Math.random() * 15;
-                reasons.push('adding variety for repeat section');
+                reasons.push('adding variety for repeat 
             }
 
             // For chorus after verse, prefer strong progressions
             if (sectionType === 'chorus' && analysis.sectionHistory?.slice(-1)[0]?.type === 'verse') {
                 if (template.degrees.includes(5) && template.degrees.includes(1)) {
                     score += 10;
-                    reasons.push('strong resolution for chorus');
+                    reasons.push('strong resolution for 
                 }
             }
 
             // For bridge, prefer templates that don't start on I
             if (sectionType === 'bridge' && template.degrees[0] !== 1) {
                 score += 10;
-                reasons.push('contrast for bridge section');
+                reasons.push('contrast for bridge 
             }
 
             // For outro, prefer templates ending on I
             if (sectionType === 'outro' && template.degrees[template.degrees.length - 1] === 1) {
                 score += 15;
-                reasons.push('resolving ending');
+                reasons.push('resolving 
             }
 
             return {
@@ -1235,15 +1203,15 @@ class SectionGenerator extends EventEmitter {
             const avgSecond = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
 
             if (avgSecond < avgFirst * 0.9) {
-                reasoning.push('Accelerating toward section end');
+                reasoning.push('Accelerating toward section 
             } else if (avgSecond > avgFirst * 1.1) {
-                reasoning.push('Decelerating through section');
+                reasoning.push('Decelerating through 
             }
         }
 
         // Check coordination with tension
         if (tensionArc) {
-            reasoning.push('Durations coordinated with tension arc');
+            reasoning.push('Durations coordinated with tension 
         }
 
         return {
@@ -1358,7 +1326,7 @@ class SectionGenerator extends EventEmitter {
     _applyPreferences(result) {
         if (!this._preferenceLearner) return result;
 
-        const prefs = this._preferenceLearner.getPreferences('progression');
+        const prefs = this._preferenceLearner.getPreferences('
 
         // Could boost progressions that match user's preferred patterns
         // For now, just return as-is

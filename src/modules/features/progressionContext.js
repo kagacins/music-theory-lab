@@ -347,7 +347,7 @@ export function scoreContextAwareness(nextChord, context, key) {
 
         if (context.cadence.expectsTonic && nextFunction === HARMONIC_FUNCTIONS.TONIC) {
             score += 30;
-            reasons.push('Resolves cadence');
+            reasons.push('Resolves 
         } else if (context.cadence.type === 'ii-V') {
             // In ii-V progression, tonic is strongly expected
             if (nextFunction === HARMONIC_FUNCTIONS.TONIC) {
@@ -362,7 +362,7 @@ export function scoreContextAwareness(nextChord, context, key) {
         const nextFunction = getHarmonicFunction(nextChord.root, key);
         if (nextFunction !== HARMONIC_FUNCTIONS.TONIC) {
             score += 15;
-            reasons.push('Moves away after cadence');
+            reasons.push('Moves away after 
         }
     }
 
@@ -374,10 +374,10 @@ export function scoreContextAwareness(nextChord, context, key) {
         // If tension is rising, reward continued rise or plateau
         if (nextTension >= currentTension) {
             score += 20;
-            reasons.push('Continues tension rise');
+            reasons.push('Continues tension 
         } else if (nextTension < currentTension - 20) {
             score += 15; // Big release can also be good
-            reasons.push('Releases tension dramatically');
+            reasons.push('Releases tension 
         } else {
             score -= 10; // Awkward partial release
         }
@@ -385,7 +385,7 @@ export function scoreContextAwareness(nextChord, context, key) {
         // If tension is falling, reward continued fall or arrival
         if (nextTension <= currentTension) {
             score += 20;
-            reasons.push('Continues tension release');
+            reasons.push('Continues tension 
         } else {
             score -= 5; // Slight penalty for reversing trend
         }
@@ -393,7 +393,7 @@ export function scoreContextAwareness(nextChord, context, key) {
         // Stable tension - prefer some movement
         if (Math.abs(nextTension - currentTension) > 15) {
             score += 10;
-            reasons.push('Adds dynamic contrast');
+            reasons.push('Adds dynamic 
         }
     }
 
@@ -402,10 +402,10 @@ export function scoreContextAwareness(nextChord, context, key) {
 
     if (repetition.isImmediate) {
         score -= 25; // Strong penalty for immediate repetition
-        reasons.push('Repeats previous chord');
+        reasons.push('Repeats previous 
     } else if (repetition.isRepeat && repetition.lastSeen <= 2) {
         score -= 15; // Moderate penalty for recent repetition
-        reasons.push('Recently used');
+        reasons.push('Recently 
     } else if (repetition.repeatCount >= 2) {
         score -= 10; // Small penalty for frequent use
     }
@@ -428,10 +428,10 @@ export function scoreContextAwareness(nextChord, context, key) {
             // Prefer circle of fifths or stepwise
             if (interval === 5 || interval === 7) {
                 score += 15; // Perfect for circle of fifths
-                reasons.push('Circle of fifths motion');
+                reasons.push('Circle of fifths 
             } else if (interval <= 2) {
                 score += 12; // Good for stepwise
-                reasons.push('Smooth bass line');
+                reasons.push('Smooth bass 
             } else if (interval >= 6) {
                 score -= 5; // Large leaps are less smooth
             }
@@ -450,7 +450,7 @@ export function scoreContextAwareness(nextChord, context, key) {
 
             if (interval === 7 || interval === 5) {
                 score += 10;
-                reasons.push('Continues circle of fifths');
+                reasons.push('Continues circle of 
             }
         }
     }

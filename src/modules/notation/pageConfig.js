@@ -98,7 +98,7 @@ export function getMeasurePagePosition(measureIndex) {
 export function applyPaginationPreset(presetName) {
   const preset = PAGE_CONFIG.paginationPresets[presetName];
   if (!preset) {
-    console.warn(`Unknown pagination preset: ${presetName}`);
+
     return;
   }
 

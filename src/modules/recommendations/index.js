@@ -101,7 +101,7 @@ export function initializeRecommendationSystem(options = {}) {
     // Connect preference learner to coordinated service
     coordinatedService.setPreferenceLearner(preferenceLearner);
 
-    console.log('[Phase 5 & 6] Recommendation system initialized with harmony features');
+
 
     return {
         context,

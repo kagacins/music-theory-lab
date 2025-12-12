@@ -285,7 +285,7 @@ function transposeChordName(chordName, semitones) {
     // Find the pitch class index
     let rootIndex = PITCH_CLASSES.indexOf(normalizedRoot);
     if (rootIndex === -1) {
-        console.warn('[SongAnalyzer] Unknown root note:', root);
+
         return chordName; // Return original if we can't parse it
     }
 
@@ -394,7 +394,7 @@ function applyEnharmonicSpelling(chordName, preference = 'auto', keyContext = nu
 export function setEnharmonicPreference(preference) {
     if (['auto', 'sharps', 'flats'].includes(preference)) {
         enharmonicPreference = preference;
-        console.log(`[SongAnalyzer] Enharmonic preference set to: ${preference}`);
+
 
         // Update button styles
         const autoBtn = document.getElementById('enharmonic-auto-btn');
@@ -435,7 +435,7 @@ export function getEnharmonicPreference() {
  */
 export function setExpectedKeyHint(key) {
     expectedKeyHint = key;
-    console.log(`[SongAnalyzer] Expected key hint set to: ${key}`);
+
 }
 
 /**
@@ -461,7 +461,7 @@ async function initEssentia() {
 
         // Check if Essentia is loaded via CDN
         if (typeof EssentiaWASM === 'undefined') {
-            console.error('[SongAnalyzer] Essentia WASM not loaded');
+
             throw new Error('Audio analysis library not loaded. Please refresh the page.');
         }
 
@@ -470,10 +470,10 @@ async function initEssentia() {
         essentia = new Essentia(essentiaWasm);
 
         essentiaInitialized = true;
-        console.log('[SongAnalyzer] Essentia initialized successfully');
+
         return true;
     } catch (error) {
-        console.error('[SongAnalyzer] Failed to initialize Essentia:', error);
+
         throw error;
     }
 }
@@ -501,7 +501,7 @@ async function loadAudioFile(file) {
 
     // Decode audio data
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    console.log(`[SongAnalyzer] Audio loaded: ${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz`);
+
 
     return audioBuffer;
 }
@@ -539,7 +539,7 @@ async function resampleAudioBuffer(audioBuffer, targetSampleRate) {
 
     // Render and return
     const resampledBuffer = await offlineCtx.startRendering();
-    console.log(`[SongAnalyzer] Resampled: ${audioBuffer.numberOfChannels}ch ${audioBuffer.length} samples @ ${audioBuffer.sampleRate}Hz -> 1ch ${resampledBuffer.length} samples @ ${resampledBuffer.sampleRate}Hz`);
+
 
     return resampledBuffer;
 }
@@ -587,7 +587,7 @@ async function analyzeChords(audioBuffer) {
     // CRITICAL FIX: Use OfflineAudioContext for proper resampling
     // Simple decimation (taking every Nth sample) causes pitch shift!
     if (audioBuffer.sampleRate !== targetSampleRate || audioBuffer.numberOfChannels !== 1) {
-        console.log(`[SongAnalyzer] Resampling from ${audioBuffer.sampleRate}Hz ${audioBuffer.numberOfChannels}ch to ${targetSampleRate}Hz mono using OfflineAudioContext`);
+
         const resampledBuffer = await resampleAudioBuffer(audioBuffer, targetSampleRate);
         samples = resampledBuffer.getChannelData(0);
         sampleRate = targetSampleRate;
@@ -596,7 +596,7 @@ async function analyzeChords(audioBuffer) {
         sampleRate = audioBuffer.sampleRate;
     }
 
-    console.log(`[SongAnalyzer] Audio: ${audioBuffer.duration.toFixed(2)}s at ${sampleRate}Hz`);
+
 
     // Convert to Essentia vector
     const audioVector = essentia.arrayToVector(samples);
@@ -606,20 +606,20 @@ async function analyzeChords(audioBuffer) {
     try {
         beats = await detectBeats(audioVector, sampleRate);
         if (beats.length > 0) {
-            console.log(`[SongAnalyzer] Detected ${beats.length} beats, BPM: ${estimateBPM(beats).toFixed(1)}`);
+
             detectedTempo = estimateBPM(beats);
         }
     } catch (error) {
-        console.warn('[SongAnalyzer] Beat detection failed:', error.message);
+
     }
 
     // Step 2: Detect chords (beat-aligned if beats available, otherwise frame-based)
     let rawChords = [];
     if (beats.length > 2) {
-        console.log('[SongAnalyzer] Using beat-aligned chord detection');
+
         rawChords = await analyzeChordsWithBeats(samples, sampleRate, beats, audioBuffer.duration);
     } else {
-        console.log('[SongAnalyzer] Using frame-based chord detection (no beats detected)');
+
         rawChords = await analyzeChordsWithHPCP(samples, sampleRate, audioBuffer.duration);
     }
 
@@ -630,18 +630,18 @@ async function analyzeChords(audioBuffer) {
 
     updateProgress('Post-processing results...', 90);
 
-    console.log(`[SongAnalyzer] Raw chords: ${rawChords.length}, After HMM: ${chords.length}`);
+
     if (chords.length > 0) {
-        console.log('[SongAnalyzer] First few chords:', chords.slice(0, 5));
+
     }
 
     // Filter out very short chords (less than 0.3 seconds)
     const filteredChords = chords.filter(c => (c.endTime - c.startTime) >= 0.3);
-    console.log(`[SongAnalyzer] After duration filter: ${filteredChords.length}`);
+
 
     // Merge consecutive same chords
     const mergedChords = mergeConsecutiveChords(filteredChords);
-    console.log(`[SongAnalyzer] After merging: ${mergedChords.length}`);
+
 
     return mergedChords;
 }
@@ -659,7 +659,7 @@ async function detectBeats(audioVector, sampleRate) {
     for (const algName of beatAlgorithms) {
         if (typeof essentia[algName] === 'function') {
             try {
-                console.log(`[SongAnalyzer] Trying ${algName} for beat detection`);
+
                 const result = essentia[algName](audioVector);
 
                 // Different algorithms return beats differently
@@ -669,13 +669,13 @@ async function detectBeats(audioVector, sampleRate) {
                     return essentia.vectorToArray(result.beats);
                 }
             } catch (e) {
-                console.warn(`[SongAnalyzer] ${algName} failed:`, e.message);
+
             }
         }
     }
 
     // Fallback: Try OnsetDetection + simple beat inference
-    console.log('[SongAnalyzer] No beat tracker available, skipping beat alignment');
+
     return [];
 }
 
@@ -779,9 +779,9 @@ async function analyzeChordsWithChordsDetectionBeats(samples, sampleRate, beats,
         }
     }
 
-    console.log(`[SongAnalyzer] ChordsDetectionBeats found ${chords.length} chords`);
+
     if (chords.length > 0) {
-        console.log('[SongAnalyzer] First chords from ChordsDetectionBeats:', chords.slice(0, 5).map(c => c.chord));
+
     }
 
     return chords;
@@ -944,13 +944,6 @@ function applyHMMSmoothing(chords) {
         });
     }
 
-    // Log any changes made by HMM
-    const changes = smoothed.filter(c => c.originalChord);
-    if (changes.length > 0) {
-        console.log(`[SongAnalyzer] HMM made ${changes.length} corrections:`,
-            changes.map(c => `${c.originalChord}→${c.chord}`).join(', '));
-    }
-
     return smoothed;
 }
 
@@ -1094,16 +1087,16 @@ async function initBasicPitch() {
     updateProgress('Loading AI model (first time may take a moment)...', 10);
 
     try {
-        console.log('[SongAnalyzer] Loading Basic Pitch model from:', basicPitchModelUrl);
+
         // BasicPitch constructor takes the model path
         basicPitchModel = new BasicPitch(basicPitchModelUrl);
-        console.log('[SongAnalyzer] Basic Pitch model ready');
+
 
         basicPitchLoading = false;
         return basicPitchModel;
     } catch (error) {
         basicPitchLoading = false;
-        console.error('[SongAnalyzer] Failed to load Basic Pitch:', error);
+
         throw error;
     }
 }
@@ -1124,13 +1117,13 @@ async function analyzeChordsWithBasicPitch(audioBuffer) {
     // Basic Pitch requires 22050 Hz mono audio - resample and convert if needed
     let resampledBuffer = audioBuffer;
     if (audioBuffer.sampleRate !== 22050 || audioBuffer.numberOfChannels !== 1) {
-        console.log(`[SongAnalyzer] Converting to 22050 Hz mono (from ${audioBuffer.sampleRate} Hz, ${audioBuffer.numberOfChannels} channels)`);
+
         resampledBuffer = await resampleAudioBuffer(audioBuffer, 22050);
     }
 
     updateProgress('Transcribing audio to notes (this may take a while)...', 25);
 
-    console.log('[SongAnalyzer] Running Basic Pitch transcription...');
+
 
     // Collect frames, onsets, and contours from the model
     const frames = [];
@@ -1158,13 +1151,13 @@ async function analyzeChordsWithBasicPitch(audioBuffer) {
 
     try {
         await runInference();
-        console.log(`[SongAnalyzer] Basic Pitch processed ${frames.length} frames`);
+
     } catch (error) {
-        console.error('[SongAnalyzer] Basic Pitch inference failed:', error);
+
 
         // For GPU/shader errors, fall back to Essentia DSP (much faster than CPU TensorFlow)
         if (error.message && (error.message.includes('shader') || error.message.includes('WebGL'))) {
-            console.warn('[SongAnalyzer] WebGL failed, falling back to Essentia DSP method...');
+
             updateProgress('GPU failed, using DSP method instead...', 30);
 
             // Return null to signal caller to use Essentia fallback
@@ -1186,14 +1179,14 @@ async function analyzeChordsWithBasicPitch(audioBuffer) {
         const rawNotes = outputToNotesPoly(frames, onsets, 0.6, 0.5, 12);
         const notesWithBends = addPitchBendsToNoteEvents(contours, rawNotes);
         noteEvents = noteFramesToTime(notesWithBends);
-        console.log(`[SongAnalyzer] Basic Pitch detected ${noteEvents.length} note events`);
+
     } catch (error) {
-        console.error('[SongAnalyzer] Note conversion failed:', error);
+
         throw new Error('Note conversion failed: ' + error.message);
     }
 
     if (!noteEvents || noteEvents.length === 0) {
-        console.warn('[SongAnalyzer] No notes detected by Basic Pitch');
+
         return [];
     }
 
@@ -1204,7 +1197,7 @@ async function analyzeChordsWithBasicPitch(audioBuffer) {
 
     updateProgress('Post-processing results...', 85);
 
-    console.log(`[SongAnalyzer] Basic Pitch + Tonal.js detected ${chords.length} chords`);
+
 
     return chords;
 }
@@ -1358,7 +1351,7 @@ function detectChordsFromNotes(noteEvents, duration) {
                         confidence = bassMatchedChord ? 0.9 : 0.75;
                     }
                 } catch (e) {
-                    console.warn('[SongAnalyzer] Tonal chord detection error:', e);
+
                 }
             }
 
@@ -1523,11 +1516,11 @@ async function analyzeChordsWithServer(audioBuffer) {
 
     // Log analysis metadata
     if (result.tempo) {
-        console.log(`[SongAnalyzer] Detected tempo: ${result.tempo} BPM`);
+
         detectedTempo = result.tempo;
     }
     if (result.beat_count) {
-        console.log(`[SongAnalyzer] Detected ${result.beat_count} beats`);
+
     }
 
     return result.chords.filter(c => c.chord !== 'N').map(chord => {
@@ -1744,8 +1737,8 @@ async function analyzeChordsWithHPCP(samples, sampleRate, duration) {
 
         // Debug: log first frame's HPCP
         if (frame === 0) {
-            console.log('[SongAnalyzer] Sample HPCP:', hpcpArray);
-            console.log('[SongAnalyzer] Using frame size:', frameSize, 'hop size:', hopSize);
+
+
         }
 
         const chordResult = detectChordFromHPCP(hpcpArray);
@@ -1814,7 +1807,7 @@ function detectChordFromHPCP(hpcp) {
 
     // Check length
     if (hpcpArr.length !== 12) {
-        console.warn('[SongAnalyzer] HPCP has wrong length:', hpcpArr.length);
+
         return { chord: 'N', confidence: 0 };
     }
 
@@ -1901,9 +1894,9 @@ function detectChordFromHPCP(hpcp) {
     if (detectChordFromHPCP.logCount < 5 && bestMatch.chord !== 'N') {
         // Sort by adjusted confidence and show top matches
         allMatches.sort((a, b) => parseFloat(b.adjConf) - parseFloat(a.adjConf));
-        console.log(`[SongAnalyzer] Chord detection #${detectChordFromHPCP.logCount + 1}:`);
-        console.log('  Top 8:', allMatches.slice(0, 8).map(m => `${m.chord}:${m.adjConf}`).join(', '));
-        console.log('  Winner:', bestMatch.chord, 'adj:', bestMatch.confidence.toFixed(3), 'raw:', bestMatch.rawConfidence.toFixed(3));
+
+
+
         detectChordFromHPCP.logCount++;
     }
 
@@ -2200,7 +2193,7 @@ export async function startAudioAnalysis() {
 
     // Get selected detection method
     const method = getSelectedDetectionMethod();
-    console.log(`[SongAnalyzer] Using detection method: ${method}`);
+
 
     try {
         showSection('audio-analysis-progress');
@@ -2211,22 +2204,22 @@ export async function startAudioAnalysis() {
 
         // Detect chords based on selected method
         if (method === 'server') {
-            console.log('[SongAnalyzer] Starting server-side analysis...');
+
             detectedChords = await analyzeChordsWithServer(audioBuffer);
         } else if (method === 'basicpitch') {
             // Use Basic Pitch + Tonal.js (AI/ML method)
-            console.log('[SongAnalyzer] Starting Basic Pitch + Tonal.js analysis...');
+
             detectedChords = await analyzeChordsWithBasicPitch(audioBuffer);
 
             // If Basic Pitch failed (returned null), fall back to Essentia
             if (detectedChords === null) {
-                console.log('[SongAnalyzer] Basic Pitch failed, falling back to Essentia DSP...');
+
                 await initEssentia();
                 detectedChords = await analyzeChords(audioBuffer);
             }
         } else {
             // Use Essentia DSP method (default)
-            console.log('[SongAnalyzer] Starting Essentia DSP analysis...');
+
             await initEssentia();
             detectedChords = await analyzeChords(audioBuffer);
         }
@@ -2254,7 +2247,7 @@ export async function startAudioAnalysis() {
         }, 500);
 
     } catch (error) {
-        console.error('[SongAnalyzer] Analysis failed:', error);
+
         alert(`Analysis failed: ${error.message}`);
         showSection('audio-upload-section');
     }
@@ -2425,7 +2418,7 @@ export async function importDetectedChords() {
             } else if (baseChord.includes('7')) {
                 chordType = 'Dominant 7th';
             }
-            console.warn(`[SongAnalyzer] Unmapped chord: ${transposedChordName} -> ${chordRoot} ${chordType} (inv: ${inversion})`);
+
         }
 
         if (window.addSpecificChordToProgression) {
@@ -2458,7 +2451,7 @@ export async function importDetectedChords() {
 
     // Show success message
     const countText = `${totalChords} chord${totalChords !== 1 ? 's' : ''}`;
-    console.log(`[SongAnalyzer] Successfully imported ${countText}`);
+
 }
 
 /**
@@ -2516,7 +2509,7 @@ export function showLastAnalysis() {
         }
     }
 
-    console.log(`[SongAnalyzer] Showing last analysis: ${lastAnalysisFileName}`);
+
 }
 
 /**
@@ -2537,7 +2530,7 @@ export function transposeDetectedChords(semitones) {
     // Re-render the chord timeline with new transposition
     renderDetectedChords();
 
-    console.log(`[SongAnalyzer] Transpose offset: ${transposeOffset > 0 ? '+' : ''}${transposeOffset} semitones`);
+
 }
 
 /**
@@ -2547,7 +2540,7 @@ export function resetTranspose() {
     transposeOffset = 0;
     updateTransposeDisplay();
     renderDetectedChords();
-    console.log('[SongAnalyzer] Transpose reset to 0');
+
 }
 
 /**
@@ -2576,7 +2569,7 @@ export function getTransposeOffset() {
  */
 export function setExpectedKey(expectedKey) {
     if (!expectedKey || !detectedKey) {
-        console.warn('[SongAnalyzer] Cannot set expected key - no detected key available');
+
         return;
     }
 
@@ -2585,7 +2578,7 @@ export function setExpectedKey(expectedKey) {
     const detectedRoot = parseKeyRoot(detectedKey);
 
     if (!expectedRoot || !detectedRoot) {
-        console.warn('[SongAnalyzer] Could not parse key roots:', expectedKey, detectedKey);
+
         return;
     }
 
@@ -2594,7 +2587,7 @@ export function setExpectedKey(expectedKey) {
     const detectedIndex = PITCH_CLASSES.indexOf(detectedRoot);
 
     if (expectedIndex === -1 || detectedIndex === -1) {
-        console.warn('[SongAnalyzer] Unknown pitch class:', expectedRoot, detectedRoot);
+
         return;
     }
 
@@ -2606,7 +2599,7 @@ export function setExpectedKey(expectedKey) {
     if (offset > 6) offset -= 12;
     if (offset < -6) offset += 12;
 
-    console.log(`[SongAnalyzer] Key calibration: detected "${detectedKey}" (${detectedRoot}), expected "${expectedKey}" (${expectedRoot}), offset: ${offset}`);
+
 
     // Set the transpose offset
     transposeOffset = offset;
@@ -2677,7 +2670,7 @@ export async function searchOnlineChords() {
 
     try {
         const query = `${songName} ${artistName} chords`.trim();
-        console.log(`[SongAnalyzer] Searching online for: ${query}`);
+
 
         // Use a CORS proxy to fetch search results
         // Try multiple proxies in case one is down
@@ -2702,7 +2695,7 @@ export async function searchOnlineChords() {
                     break;
                 }
             } catch (e) {
-                console.warn(`[SongAnalyzer] Proxy ${proxy} failed:`, e.message);
+
             }
         }
 
@@ -2710,11 +2703,11 @@ export async function searchOnlineChords() {
             throw new Error('Could not fetch search results. Try again later.');
         }
 
-        console.log(`[SongAnalyzer] Fetched ${html.length} characters via ${proxyUsed}`);
+
 
         // Check if we got actual search results (DuckDuckGo specific check)
         if (html.includes('No results found') || html.length < 1000) {
-            console.warn('[SongAnalyzer] Search returned no/few results');
+
         }
 
         // Parse the HTML to extract chord information
@@ -2772,10 +2765,10 @@ export async function searchOnlineChords() {
         `;
 
         resultsContainer.classList.remove('hidden');
-        console.log(`[SongAnalyzer] Found ${chords.length} chords online:`, chords);
+
 
     } catch (error) {
-        console.error('[SongAnalyzer] Online chord search error:', error);
+
         loadingEl.classList.add('hidden');
         errorEl.textContent = error.message || 'Search failed. Try again.';
         errorEl.classList.remove('hidden');
@@ -2797,7 +2790,7 @@ function parseChordSearchResults(html, songName, artistName) {
         .replace(/&[^;]+;/g, ' ')                          // Remove HTML entities
         .replace(/\s+/g, ' ');                             // Normalize whitespace
 
-    console.log('[SongAnalyzer] Parsing search results, text length:', plainText.length);
+
 
     // Common chord pattern: Letter + optional sharp/flat + optional quality + optional bass note
     // Examples: C, Am, F#m, Bb7, Cmaj7, Dsus4, G/B, Em7, A7
@@ -2842,7 +2835,7 @@ function parseChordSearchResults(html, songName, artistName) {
         if (match[3].length > 1) chords.add(match[3]);
     }
 
-    console.log('[SongAnalyzer] Found chords before filtering:', Array.from(chords));
+
 
     // Convert to array and sort by musical order
     const sortOrder = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B'];
@@ -2865,7 +2858,7 @@ function parseChordSearchResults(html, songName, artistName) {
         })
         .slice(0, 20); // Limit to 20 chords
 
-    console.log('[SongAnalyzer] Final chord list:', result);
+
     return result;
 }
 
@@ -2873,7 +2866,7 @@ function parseChordSearchResults(html, songName, artistName) {
  * Apply an online chord suggestion - highlights matching/different chords in the timeline
  */
 export function applyOnlineChord(chordName) {
-    console.log(`[SongAnalyzer] Applying online chord: ${chordName}`);
+
 
     // Find and highlight matching chords in the detected timeline
     const timeline = document.getElementById('detected-chords-timeline');
@@ -2931,7 +2924,7 @@ export function applyOnlineChord(chordName) {
 }
 
 export function initSongAnalyzer() {
-    console.log('[SongAnalyzer] Initializing...');
+
 
     // Set up drag and drop
     const dropZone = document.getElementById('audio-drop-zone');
@@ -2996,11 +2989,11 @@ export function initSongAnalyzer() {
         const serverLabel = document.getElementById('server-method-label');
         if (serverLabel) {
             serverLabel.classList.remove('hidden');
-            console.log('[SongAnalyzer] Server analysis option enabled');
+
         }
     }
 
-    console.log('[SongAnalyzer] Initialized successfully');
+
 }
 
 export default {

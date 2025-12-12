@@ -190,7 +190,7 @@ class CompositionContext extends EventEmitter {
                     context: this.getSnapshot()
                 });
             } catch (error) {
-                console.error(`Error notifying engine ${engineId}:`, error);
+
             }
         }
 
@@ -319,8 +319,6 @@ class CompositionContext extends EventEmitter {
         const snapshot = this.getSnapshot();
         const analysis = this._harmonyAnalyzer.analyzeProgression(
             snapshot.progression,
-            snapshot.key
-        );
 
         this._analysisCache.harmonyAnalysis = analysis;
         this._analysisCache.fingerprint = this._snapshotFingerprint;
@@ -348,8 +346,6 @@ class CompositionContext extends EventEmitter {
         const analysis = this._tensionPlanner.analyzeProgression(
             snapshot.progression,
             snapshot.key,
-            genre
-        );
 
         this._analysisCache[cacheKey] = analysis;
         this._analysisCache.fingerprint = this._snapshotFingerprint;
@@ -374,8 +370,6 @@ class CompositionContext extends EventEmitter {
         const snapshot = this.getSnapshot();
         const patterns = this._harmonyAnalyzer.detectPatterns(
             snapshot.progression,
-            snapshot.key
-        );
 
         this._analysisCache.patternAnalysis = patterns;
         this._analysisCache.fingerprint = this._snapshotFingerprint;

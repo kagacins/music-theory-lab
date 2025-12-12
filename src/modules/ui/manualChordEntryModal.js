@@ -8,30 +8,30 @@
  */
 export function openManualChordEntryModal() {
     // Create modal if it doesn't exist
-    let modal = document.getElementById('manual-chord-entry-modal');
+    let modal = document.getElementById('manual-chord-entry-
     if (!modal) {
         createModal();
-        modal = document.getElementById('manual-chord-entry-modal');
+        modal = document.getElementById('manual-chord-entry-
     }
 
     // Clear input
-    const input = document.getElementById('modal-chord-list-input');
+    const input = document.getElementById('modal-chord-list-
     if (input) {
         input.value = '';
         input.focus();
     }
 
     // Show modal
-    modal.classList.remove('hidden');
+    modal.classList.remove('
 }
 
 /**
  * Close the manual chord entry modal
  */
 export function closeManualChordEntryModal() {
-    const modal = document.getElementById('manual-chord-entry-modal');
+    const modal = document.getElementById('manual-chord-entry-
     if (modal) {
-        modal.classList.add('hidden');
+        modal.classList.add('
     }
 }
 
@@ -140,7 +140,7 @@ function createModal() {
  * Handle replace action from modal
  */
 function manualChordEntryReplace() {
-    const input = document.getElementById('modal-chord-list-input');
+    const input = document.getElementById('modal-chord-list-
     if (!input || !input.value.trim()) {
         alert('Please enter some chords first!');
         return;
@@ -149,10 +149,10 @@ function manualChordEntryReplace() {
     // Call the existing importChordList function
     if (window.importChordList) {
         // Temporarily set the old input value
-        const oldInput = document.getElementById('chord-list-input');
+        const oldInput = document.getElementById('chord-list-
         if (oldInput) {
             oldInput.value = input.value;
-            window.importChordList('replace');
+            window.importChordList('
             oldInput.value = ''; // Clear after import
         }
     }
@@ -165,7 +165,7 @@ function manualChordEntryReplace() {
  * Handle append action from modal
  */
 function manualChordEntryAppend() {
-    const input = document.getElementById('modal-chord-list-input');
+    const input = document.getElementById('modal-chord-list-
     if (!input || !input.value.trim()) {
         alert('Please enter some chords first!');
         return;
@@ -174,10 +174,10 @@ function manualChordEntryAppend() {
     // Call the existing importChordList function
     if (window.importChordList) {
         // Temporarily set the old input value
-        const oldInput = document.getElementById('chord-list-input');
+        const oldInput = document.getElementById('chord-list-
         if (oldInput) {
             oldInput.value = input.value;
-            window.importChordList('append');
+            window.importChordList('
             oldInput.value = ''; // Clear after import
         }
     }

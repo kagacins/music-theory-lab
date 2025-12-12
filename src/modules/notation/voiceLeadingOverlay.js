@@ -76,15 +76,15 @@ export class VoiceLeadingDiagram {
         this.showNewDropped = true;
 
         // Load saved preferences (no longer load isVisible - always visible now)
-        const savedExpanded = localStorage.getItem('voice-leading-panel-expanded');
+        const savedExpanded = localStorage.getItem('voice-leading-panel-
         if (savedExpanded !== null) {
             this.isPanelExpanded = savedExpanded === 'true';
         }
-        const savedWarningsOnly = localStorage.getItem('voice-leading-warnings-only');
+        const savedWarningsOnly = localStorage.getItem('voice-leading-warnings-
         if (savedWarningsOnly !== null) {
             this.showWarningsOnly = savedWarningsOnly === 'true';
         }
-        const savedNewDropped = localStorage.getItem('voice-leading-show-new-dropped');
+        const savedNewDropped = localStorage.getItem('voice-leading-show-new-
         if (savedNewDropped !== null) {
             this.showNewDropped = savedNewDropped === 'true';
         }
@@ -138,15 +138,15 @@ export class VoiceLeadingDiagram {
         this.isPanelExpanded = !this.isPanelExpanded;
         localStorage.setItem('voice-leading-panel-expanded', this.isPanelExpanded.toString());
 
-        const content = document.getElementById('voice-leading-panel');
-        const chevron = document.getElementById('voice-leading-chevron');
-        const headerBtn = document.getElementById('voice-leading-toggle');
+        const content = document.getElementById('voice-leading-
+        const chevron = document.getElementById('voice-leading-
+        const headerBtn = document.getElementById('voice-leading-
 
         if (this.isPanelExpanded) {
             // Expanding - animate icon from sidebar to panel, then show panel
             this.animateFromSidebar(() => {
                 if (content) {
-                    content.classList.remove('hidden');
+                    content.classList.remove('
                     chevron?.classList.add('rotate-180');
                 }
                 if (this.container) {
@@ -156,7 +156,7 @@ export class VoiceLeadingDiagram {
         } else {
             // Collapsing - hide panel content, animate icon to sidebar
             if (content) {
-                content.classList.add('hidden');
+                content.classList.add('
                 chevron?.classList.remove('rotate-180');
             }
             this.animateToSidebar(headerBtn);
@@ -167,8 +167,8 @@ export class VoiceLeadingDiagram {
      * Animate icon flying from panel header to sidebar (collapse)
      */
     animateToSidebar(headerBtn) {
-        const sectionSidebar = document.getElementById('melody-section-sidebar');
-        const container = document.getElementById('melody-dashboard-sections-container');
+        const sectionSidebar = document.getElementById('melody-section-
+        const container = document.getElementById('melody-dashboard-sections-
 
         if (!sectionSidebar || !headerBtn) {
             if (this.container) this.container.style.display = 'none';
@@ -179,7 +179,7 @@ export class VoiceLeadingDiagram {
         const headerRect = headerBtn.getBoundingClientRect();
 
         // Create animated icon clone
-        const animContainer = document.createElement('div');
+        const animContainer = document.createElement('
         animContainer.style.cssText = `
             position: fixed;
             left: ${headerRect.left + headerRect.width / 2 - 14}px;
@@ -197,9 +197,9 @@ export class VoiceLeadingDiagram {
             justify-content: center;
         `;
 
-        const iconClone = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        const iconClone = document.createElementNS('http://www.w3.org/2000/svg', '
         iconClone.setAttribute('class', 'w-6 h-6');
-        iconClone.setAttribute('fill', 'none');
+        iconClone.setAttribute('fill', '
         iconClone.setAttribute('stroke', '#6366f1');
         iconClone.setAttribute('viewBox', '0 0 24 24');
         iconClone.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>';
@@ -258,10 +258,10 @@ export class VoiceLeadingDiagram {
      * Animate icon flying from sidebar to panel header (expand)
      */
     animateFromSidebar(onComplete) {
-        const sectionSidebar = document.getElementById('melody-section-sidebar');
-        const container = document.getElementById('melody-dashboard-sections-container');
+        const sectionSidebar = document.getElementById('melody-section-
+        const container = document.getElementById('melody-dashboard-sections-
         const tab = sectionSidebar?.querySelector('[data-section-id="voice-leading"]');
-        const headerBtn = document.getElementById('voice-leading-toggle');
+        const headerBtn = document.getElementById('voice-leading-
 
         if (!tab || !headerBtn) {
             this.removeFromSidebar();
@@ -271,7 +271,7 @@ export class VoiceLeadingDiagram {
 
         const tabRect = tab.getBoundingClientRect();
 
-        const animContainer = document.createElement('div');
+        const animContainer = document.createElement('
         animContainer.style.cssText = `
             position: fixed;
             left: ${tabRect.left + tabRect.width / 2 - 14}px;
@@ -289,9 +289,9 @@ export class VoiceLeadingDiagram {
             justify-content: center;
         `;
 
-        const iconClone = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        const iconClone = document.createElementNS('http://www.w3.org/2000/svg', '
         iconClone.setAttribute('class', 'w-6 h-6');
-        iconClone.setAttribute('fill', 'none');
+        iconClone.setAttribute('fill', '
         iconClone.setAttribute('stroke', '#6366f1');
         iconClone.setAttribute('viewBox', '0 0 24 24');
         iconClone.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>';
@@ -301,7 +301,7 @@ export class VoiceLeadingDiagram {
         tab.style.opacity = '0';
 
         if (onComplete) onComplete();
-        const headerIcon = headerBtn.querySelector('svg');
+        const headerIcon = headerBtn.querySelector('
         if (headerIcon) headerIcon.style.opacity = '0';
 
         requestAnimationFrame(() => {
@@ -339,7 +339,7 @@ export class VoiceLeadingDiagram {
      * Add a tab to the section sidebar when collapsed
      */
     addToSidebar(retryCount = 0) {
-        const sectionSidebar = document.getElementById('melody-section-sidebar');
+        const sectionSidebar = document.getElementById('melody-section-
         if (!sectionSidebar) {
             // Retry a few times if sidebar doesn't exist yet (it may be created with a delay)
             if (retryCount < 5) {
@@ -350,23 +350,23 @@ export class VoiceLeadingDiagram {
 
         if (sectionSidebar.querySelector('[data-section-id="voice-leading"]')) return;
 
-        const tab = document.createElement('button');
+        const tab = document.createElement('
         tab.className = 'section-sidebar-tab w-12 h-12 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white transition-all flex items-center justify-center shadow-md';
-        tab.setAttribute('data-section-id', 'voice-leading');
+        tab.setAttribute('data-section-id', 'voice-
         tab.style.width = '48px';
         tab.style.height = '48px';
         tab.style.minHeight = '48px';
         tab.style.minWidth = '48px';
 
-        const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        const icon = document.createElementNS('http://www.w3.org/2000/svg', '
         icon.setAttribute('class', 'w-6 h-6');
-        icon.setAttribute('fill', 'none');
-        icon.setAttribute('stroke', 'currentColor');
+        icon.setAttribute('fill', '
+        icon.setAttribute('stroke', 'currentC
         icon.setAttribute('viewBox', '0 0 24 24');
         icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>';
         tab.appendChild(icon);
 
-        const tooltip = document.createElement('div');
+        const tooltip = document.createElement('
         tooltip.className = 'sidebar-section-tooltip';
         tooltip.textContent = 'Voice Leading';
         tooltip.style.cssText = 'position: fixed; background-color: #111827; color: white; font-size: 12px; border-radius: 4px; padding: 4px 8px; pointer-events: none; white-space: nowrap; z-index: 9999; opacity: 0; visibility: hidden;';
@@ -399,7 +399,7 @@ export class VoiceLeadingDiagram {
 
         // Show the sidebar and set container margin
         sectionSidebar.style.display = 'flex';
-        const container = document.getElementById('melody-dashboard-sections-container');
+        const container = document.getElementById('melody-dashboard-sections-
         if (container) {
             container.style.marginLeft = '4rem';
         }
@@ -414,8 +414,8 @@ export class VoiceLeadingDiagram {
      * Remove the tab from the section sidebar when expanded
      */
     removeFromSidebar() {
-        const sectionSidebar = document.getElementById('melody-section-sidebar');
-        const container = document.getElementById('melody-dashboard-sections-container');
+        const sectionSidebar = document.getElementById('melody-section-
+        const container = document.getElementById('melody-dashboard-sections-
         if (!sectionSidebar) return;
 
         const tab = sectionSidebar.querySelector('[data-section-id="voice-leading"]');
@@ -459,8 +459,8 @@ export class VoiceLeadingDiagram {
      * Update filter button states
      */
     updateFilterButtons() {
-        const warningsBtn = document.getElementById('vl-filter-warnings');
-        const newDroppedBtn = document.getElementById('vl-filter-new-dropped');
+        const warningsBtn = document.getElementById('vl-filter-
+        const newDroppedBtn = document.getElementById('vl-filter-new-
 
         if (warningsBtn) {
             if (this.showWarningsOnly) {
@@ -489,11 +489,11 @@ export class VoiceLeadingDiagram {
     createContainer() {
         // Check if already exists
         if (document.getElementById('voice-leading-section')) {
-            this.container = document.getElementById('voice-leading-section');
+            this.container = document.getElementById('voice-leading-
             return;
         }
 
-        this.container = document.createElement('div');
+        this.container = document.createElement('
         this.container.id = 'voice-leading-section';
         this.container.className = 'mb-3 melody-section-item';
         this.container.style.display = 'none';
@@ -608,7 +608,7 @@ export class VoiceLeadingDiagram {
 
         // Add tooltip styles if not already present
         if (!document.getElementById('vl-tooltip-styles')) {
-            const style = document.createElement('style');
+            const style = document.createElement('
             style.id = 'vl-tooltip-styles';
             style.textContent = `
                 .vl-legend-item {
@@ -698,14 +698,14 @@ export class VoiceLeadingDiagram {
 
         // Create arc tooltip container if not present
         if (!document.getElementById('vl-arc-tooltip')) {
-            const tooltip = document.createElement('div');
+            const tooltip = document.createElement('
             tooltip.id = 'vl-arc-tooltip';
             document.body.appendChild(tooltip);
         }
 
         // Attach event listeners
         setTimeout(() => {
-            const headerBtn = document.getElementById('voice-leading-toggle');
+            const headerBtn = document.getElementById('voice-leading-
             if (headerBtn) {
                 headerBtn.addEventListener('click', (e) => {
                     if (!e.target.closest('.drag-handle')) {
@@ -714,18 +714,18 @@ export class VoiceLeadingDiagram {
                 });
             }
 
-            const warningsBtn = document.getElementById('vl-filter-warnings');
+            const warningsBtn = document.getElementById('vl-filter-
             if (warningsBtn) {
                 warningsBtn.addEventListener('click', () => this.toggleWarningsOnly());
             }
 
-            const newDroppedBtn = document.getElementById('vl-filter-new-dropped');
+            const newDroppedBtn = document.getElementById('vl-filter-new-
             if (newDroppedBtn) {
                 newDroppedBtn.addEventListener('click', () => this.toggleNewDropped());
             }
 
             // Set up drag handle listeners (matching sectionDragDrop.js pattern)
-            const dragHandle = this.container.querySelector('.drag-handle');
+            const dragHandle = this.container.querySelector('.drag-
             if (dragHandle) {
                 dragHandle.style.pointerEvents = 'auto';
                 dragHandle.style.userSelect = 'none';
@@ -746,11 +746,11 @@ export class VoiceLeadingDiagram {
 
         // Insert into the page - find the best container
         // Priority: 1) Staff Notation Card panel, 2) Melody sections, 3) Trainer container
-        const staffNotationPanel = document.getElementById('staff-notation-card-panel');
-        const staffNotationCard = document.getElementById('staff-notation-card-toggle')?.closest('.melody-section-item');
-        const melodySectionsContainer = document.getElementById('melody-dashboard-sections-container');
-        const trainerContainer = document.querySelector('#trainer-sections-container');
-        const compositionNotationPanel = document.getElementById('composition-notation-panel');
+        const staffNotationPanel = document.getElementById('staff-notation-card-
+        const staffNotationCard = document.getElementById('staff-notation-card-toggle')?.closest('.melody-section-
+        const melodySectionsContainer = document.getElementById('melody-dashboard-sections-
+        const trainerContainer = document.querySelector('#trainer-sections-
+        const compositionNotationPanel = document.getElementById('composition-notation-
 
         if (staffNotationCard && staffNotationCard.parentElement) {
             // Insert after the Staff Notation card as a new section
@@ -776,7 +776,7 @@ export class VoiceLeadingDiagram {
         // Reinitialize drag-drop for the melody tab to recognize this new section
         setTimeout(() => {
             if (window.reinitSectionDragDrop) {
-                window.reinitSectionDragDrop('melody');
+                window.reinitSectionDragDrop('
             }
         }, 100);
     }
@@ -806,7 +806,7 @@ export class VoiceLeadingDiagram {
         // Collect chord data
         for (let i = 0; i < measures.length; i++) {
             const measure = measures[i];
-            const notes = this.getMeasureNotes(measure, 'bass');
+            const notes = this.getMeasureNotes(measure, '
             const midi = this.extractAllMidiValues(notes);
 
             // Get chord name from progression data - use simpleName to match chord cards
@@ -894,14 +894,14 @@ export class VoiceLeadingDiagram {
                     const [v1, v2] = pair.split('-').map(Number);
                     if (motion.fromVoice === v1 || motion.fromVoice === v2) {
                         if (!motion.warnings.includes('crossing')) {
-                            motion.warnings.push('crossing');
+                            motion.warnings.push('
                         }
                     }
                 }
 
                 // Large leap warning (only for actual motion, not common tones)
                 if (!isCommonTone && motion.interval !== null && motion.interval >= MOTION_THRESHOLDS.leapWarning) {
-                    motion.warnings.push('leap');
+                    motion.warnings.push('
                 }
             });
 
@@ -1136,20 +1136,20 @@ export class VoiceLeadingDiagram {
     render() {
         if (!this.analysisData || !this.container) return;
 
-        const diagramArea = document.getElementById('voice-leading-diagram-area');
+        const diagramArea = document.getElementById('voice-leading-diagram-
         if (!diagramArea) return;
 
         const { chords, transitions, warnings, quality } = this.analysisData;
 
         // Update quality badge
-        const badge = document.getElementById('voice-leading-quality-badge');
+        const badge = document.getElementById('voice-leading-quality-
         if (badge) {
             badge.textContent = quality.label;
             badge.style.background = quality.color;
         }
 
         // Update warning summary - count individual arcs with warnings
-        const warningSummary = document.getElementById('vl-warning-summary');
+        const warningSummary = document.getElementById('vl-warning-
         if (warningSummary) {
             // Count warnings from actual arc motions, not just transitions
             const arcWarningCounts = { P5: 0, P8: 0, crossing: 0, leap: 0 };
@@ -1191,7 +1191,7 @@ export class VoiceLeadingDiagram {
         const height = Math.max(DIAGRAM.minHeight, DIAGRAM.topPadding + maxNotes * DIAGRAM.noteSpacing + DIAGRAM.bottomPadding + 20);
 
         // Create SVG
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', '
         svg.setAttribute('width', width);
         svg.setAttribute('height', height);
         svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
@@ -1229,8 +1229,6 @@ export class VoiceLeadingDiagram {
                     toX - DIAGRAM.noteRadius,
                     toY,
                     motion,
-                    voiceIdx
-                );
                 svg.appendChild(path);
             });
         });
@@ -1285,13 +1283,13 @@ export class VoiceLeadingDiagram {
      * Create visual representation of a chord
      */
     createChordVisual(chord, x, height) {
-        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        const group = document.createElementNS('http://www.w3.org/2000/svg', '
 
         // Chord label background
         const labelText = chord.name;
         const labelWidth = Math.max(30, labelText.length * 7 + 8);
 
-        const labelBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        const labelBg = document.createElementNS('http://www.w3.org/2000/svg', '
         labelBg.setAttribute('x', x - labelWidth / 2);
         labelBg.setAttribute('y', 4);
         labelBg.setAttribute('width', labelWidth);
@@ -1300,13 +1298,13 @@ export class VoiceLeadingDiagram {
         labelBg.setAttribute('fill', '#4F46E5');
         group.appendChild(labelBg);
 
-        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        const label = document.createElementNS('http://www.w3.org/2000/svg', '
         label.setAttribute('x', x);
         label.setAttribute('y', 17);
-        label.setAttribute('text-anchor', 'middle');
+        label.setAttribute('text-anchor', '
         label.setAttribute('font-size', '11');
         label.setAttribute('font-weight', '600');
-        label.setAttribute('fill', 'white');
+        label.setAttribute('fill', '
         label.textContent = labelText;
         group.appendChild(label);
 
@@ -1314,32 +1312,32 @@ export class VoiceLeadingDiagram {
         chord.midi.forEach((midi, i) => {
             const y = this.getNoteY(i, chord.midi.length, height);
 
-            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', '
             circle.setAttribute('cx', x);
             circle.setAttribute('cy', y);
             circle.setAttribute('r', DIAGRAM.noteRadius);
             circle.setAttribute('fill', '#6366f1');
-            circle.setAttribute('stroke', 'white');
+            circle.setAttribute('stroke', '
             circle.setAttribute('stroke-width', '2');
             group.appendChild(circle);
 
             // Note name
-            const noteText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            const noteText = document.createElementNS('http://www.w3.org/2000/svg', '
             noteText.setAttribute('x', x);
             noteText.setAttribute('y', y + 4);
-            noteText.setAttribute('text-anchor', 'middle');
+            noteText.setAttribute('text-anchor', '
             noteText.setAttribute('font-size', '9');
             noteText.setAttribute('font-weight', '600');
-            noteText.setAttribute('fill', 'white');
+            noteText.setAttribute('fill', '
             noteText.textContent = this.midiToNoteName(midi);
             group.appendChild(noteText);
 
             // Octave subscript
             const octave = Math.floor(midi / 12) - 1;
-            const octaveText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            const octaveText = document.createElementNS('http://www.w3.org/2000/svg', '
             octaveText.setAttribute('x', x + DIAGRAM.noteRadius + 3);
             octaveText.setAttribute('y', y + 6);
-            octaveText.setAttribute('text-anchor', 'start');
+            octaveText.setAttribute('text-anchor', '
             octaveText.setAttribute('font-size', '8');
             octaveText.setAttribute('fill', '#6b7280');
             octaveText.textContent = octave;
@@ -1411,12 +1409,12 @@ export class VoiceLeadingDiagram {
             d = `M ${x1} ${y1} Q ${midX} ${ctrlY} ${x2} ${y2}`;
         }
 
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', '
         path.setAttribute('d', d);
-        path.setAttribute('fill', 'none');
+        path.setAttribute('fill', '
         path.setAttribute('stroke', color);
         path.setAttribute('stroke-width', hasWarnings ? DIAGRAM.lineWidth + 1.5 : (isNewOrDropped ? 1.5 : DIAGRAM.lineWidth));
-        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linecap', '
         path.setAttribute('opacity', isNewOrDropped ? '0.4' : (hasWarnings ? '1' : '0.8'));
 
         // Build tooltip text
@@ -1456,10 +1454,10 @@ export class VoiceLeadingDiagram {
             element.style.cursor = 'help';
 
             element.addEventListener('mouseenter', (e) => {
-                const tooltip = document.getElementById('vl-arc-tooltip');
+                const tooltip = document.getElementById('vl-arc-
                 if (tooltip) {
                     tooltip.textContent = text;
-                    tooltip.classList.add('visible');
+                    tooltip.classList.add('
                     // Position above the cursor
                     const rect = element.getBoundingClientRect();
                     const tooltipRect = tooltip.getBoundingClientRect();
@@ -1469,7 +1467,7 @@ export class VoiceLeadingDiagram {
             });
 
             element.addEventListener('mousemove', (e) => {
-                const tooltip = document.getElementById('vl-arc-tooltip');
+                const tooltip = document.getElementById('vl-arc-
                 if (tooltip && tooltip.classList.contains('visible')) {
                     const tooltipRect = tooltip.getBoundingClientRect();
                     tooltip.style.left = `${e.clientX - tooltipRect.width / 2}px`;
@@ -1478,34 +1476,34 @@ export class VoiceLeadingDiagram {
             });
 
             element.addEventListener('mouseleave', () => {
-                const tooltip = document.getElementById('vl-arc-tooltip');
+                const tooltip = document.getElementById('vl-arc-
                 if (tooltip) {
-                    tooltip.classList.remove('visible');
+                    tooltip.classList.remove('
                 }
             });
         };
 
         // Add glow effect for warnings
         if (hasWarnings) {
-            const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            const group = document.createElementNS('http://www.w3.org/2000/svg', '
 
-            const glow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const glow = document.createElementNS('http://www.w3.org/2000/svg', '
             glow.setAttribute('d', d);
-            glow.setAttribute('fill', 'none');
+            glow.setAttribute('fill', '
             glow.setAttribute('stroke', color);
             glow.setAttribute('stroke-width', DIAGRAM.lineWidth + 6);
-            glow.setAttribute('stroke-linecap', 'round');
+            glow.setAttribute('stroke-linecap', '
             glow.setAttribute('opacity', '0.2');
             group.appendChild(glow);
 
             // For multi-warning arcs, add a secondary colored stroke
             if (hasMultipleWarnings && secondaryColor) {
-                const secondaryPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                const secondaryPath = document.createElementNS('http://www.w3.org/2000/svg', '
                 secondaryPath.setAttribute('d', d);
-                secondaryPath.setAttribute('fill', 'none');
+                secondaryPath.setAttribute('fill', '
                 secondaryPath.setAttribute('stroke', secondaryColor);
                 secondaryPath.setAttribute('stroke-width', DIAGRAM.lineWidth + 0.5);
-                secondaryPath.setAttribute('stroke-linecap', 'round');
+                secondaryPath.setAttribute('stroke-linecap', '
                 secondaryPath.setAttribute('stroke-dasharray', '2,6'); // Dots along the line
                 secondaryPath.setAttribute('opacity', '0.9');
                 group.appendChild(secondaryPath);
@@ -1523,7 +1521,7 @@ export class VoiceLeadingDiagram {
 
         // Non-warning arcs: add tooltip if there's text
         if (tooltipText) {
-            const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            const group = document.createElementNS('http://www.w3.org/2000/svg', '
             group.appendChild(path);
             addTooltipEvents(group, tooltipText);
             return group;
@@ -1536,29 +1534,29 @@ export class VoiceLeadingDiagram {
      * Create a warning badge
      */
     createWarningBadge(x, y, type) {
-        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        const group = document.createElementNS('http://www.w3.org/2000/svg', '
 
         const color = type === 'P5' ? WARNING_COLORS.parallelFifth :
                       type === 'P8' ? WARNING_COLORS.parallelOctave :
                       type === 'crossing' ? WARNING_COLORS.voiceCrossing :
                       WARNING_COLORS.largeleap;
 
-        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', '
         circle.setAttribute('cx', x);
         circle.setAttribute('cy', y);
         circle.setAttribute('r', '10');
         circle.setAttribute('fill', color);
-        circle.setAttribute('stroke', 'white');
+        circle.setAttribute('stroke', '
         circle.setAttribute('stroke-width', '2');
         group.appendChild(circle);
 
-        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        const text = document.createElementNS('http://www.w3.org/2000/svg', '
         text.setAttribute('x', x);
         text.setAttribute('y', y + 3);
-        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('text-anchor', '
         text.setAttribute('font-size', '8');
-        text.setAttribute('font-weight', 'bold');
-        text.setAttribute('fill', 'white');
+        text.setAttribute('font-weight', '
+        text.setAttribute('fill', '
         text.textContent = type === 'crossing' ? 'X' : type;
         group.appendChild(text);
 
@@ -1570,18 +1568,18 @@ export class VoiceLeadingDiagram {
 
         group.style.cursor = 'help';
         group.addEventListener('mouseenter', (e) => {
-            const tooltip = document.getElementById('vl-arc-tooltip');
+            const tooltip = document.getElementById('vl-arc-
             if (tooltip) {
                 tooltip.textContent = tooltipText;
-                tooltip.classList.add('visible');
+                tooltip.classList.add('
                 tooltip.style.left = `${e.clientX - 100}px`;
                 tooltip.style.top = `${e.clientY - 50}px`;
             }
         });
         group.addEventListener('mouseleave', () => {
-            const tooltip = document.getElementById('vl-arc-tooltip');
+            const tooltip = document.getElementById('vl-arc-
             if (tooltip) {
-                tooltip.classList.remove('visible');
+                tooltip.classList.remove('
             }
         });
 
@@ -1694,7 +1692,7 @@ export class VoiceLeadingDiagram {
         if (measure?.progressionChord?.symbol) {
             return measure.progressionChord.symbol;
         }
-        const bassNotes = this.getMeasureNotes(measure, 'bass');
+        const bassNotes = this.getMeasureNotes(measure, '
         if (bassNotes.length > 0) {
             const pitches = bassNotes[0].pitches || [bassNotes[0].pitch];
             if (pitches && pitches.length > 0 && pitches[0]) {
@@ -1777,7 +1775,7 @@ export function initVoiceLeadingIfReady() {
     // Only create if we have composition state or if we're on the composition studio page
     const isCompositionStudio = document.getElementById('staff-notation-card-panel') ||
                                 document.getElementById('composition-notation-panel') ||
-                                document.querySelector('.composition-studio-content');
+                                document.querySelector('.composition-studio-
 
     if (!compositionState && !isCompositionStudio) {
         return null;

@@ -283,12 +283,12 @@ function getChordQualitySuffix(chordType, baseRoman) {
  * @returns {boolean} New state of the Roman numeral engine
  */
 export function toggleRomanNumeralEngine() {
-    const toggle = document.getElementById('roman-numeral-toggle');
+    const toggle = document.getElementById('roman-numeral-
     const isRomanNumeralEngineOn = toggle.checked;
 
     // Update indicator colors
-    const offIndicator = document.getElementById('roman-off-indicator');
-    const onIndicator = document.getElementById('roman-on-indicator');
+    const offIndicator = document.getElementById('roman-off-
+    const onIndicator = document.getElementById('roman-on-
 
     if (isRomanNumeralEngineOn) {
         onIndicator.classList.remove('text-gray-500');

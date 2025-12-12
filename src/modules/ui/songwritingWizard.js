@@ -414,7 +414,7 @@ function romanToChord(roman, key, style = 'pop') {
     };
 
     // Determine if we're in a minor key
-    const isMinor = key.includes('m') && !key.includes('maj');
+    const isMinor = key.includes('m') && !key.includes('
     const scaleChords = isMinor ? minorScaleChords[key] : majorScaleChords[key];
 
     // Fallback to C major if key not found
@@ -666,7 +666,7 @@ async function playProgression(chordNames, duration = 0.8, loop = false) {
         }
 
     } catch (err) {
-        console.error('[SongwritingWizard] Error playing:', err);
+
     } finally {
         isPlaying = false;
         document.querySelectorAll('.play-btn-icon').forEach(icon => {
@@ -1607,8 +1607,8 @@ function attachWizardListeners(container) {
     });
 
     // Tempo slider
-    const tempoSlider = container.querySelector('#tempo-slider');
-    const tempoDisplay = container.querySelector('#tempo-display');
+    const tempoSlider = container.querySelector('#tempo-
+    const tempoDisplay = container.querySelector('#tempo-
     if (tempoSlider && tempoDisplay) {
         tempoSlider.addEventListener('input', () => {
             customizations.tempo = parseInt(tempoSlider.value);
@@ -1634,7 +1634,7 @@ function attachWizardListeners(container) {
         if (tapTimes.length > 4) tapTimes.shift();
 
         // Visual feedback - pulse animation
-        const pulse = container.querySelector('#tap-pulse');
+        const pulse = container.querySelector('#tap-
         if (pulse) {
             pulse.style.transition = 'none';
             pulse.style.opacity = '0.3';
@@ -1645,7 +1645,7 @@ function attachWizardListeners(container) {
         }
 
         // Update tap dots
-        const tapDots = container.querySelectorAll('.tap-dot');
+        const tapDots = container.querySelectorAll('.tap-
         tapDots.forEach((dot, idx) => {
             if (idx < tapTimes.length) {
                 dot.classList.remove('bg-gray-300', 'dark:bg-gray-600');
@@ -1657,7 +1657,7 @@ function attachWizardListeners(container) {
         });
 
         // Show message
-        const tapMessage = container.querySelector('#tap-message');
+        const tapMessage = container.querySelector('#tap-
         if (tapMessage) {
             if (tapTimes.length < 2) {
                 tapMessage.textContent = 'Keep tapping...';
@@ -1680,7 +1680,7 @@ function attachWizardListeners(container) {
                 if (tempoDisplay) tempoDisplay.textContent = bpm;
 
                 // Update tempo label
-                const tempoLabel = container.querySelector('#tempo-label');
+                const tempoLabel = container.querySelector('#tempo-
                 if (tempoLabel) {
                     const getTempoLabel = (bpm) => {
                         if (bpm < 60) return 'Very Slow (Largo)';
@@ -1696,7 +1696,7 @@ function attachWizardListeners(container) {
 
                 if (tapMessage && tapTimes.length >= 4) {
                     tapMessage.textContent = `Detected: ${bpm} BPM`;
-                    tapMessage.classList.add('text-green-600', 'dark:text-green-400', 'font-medium');
+                    tapMessage.classList.add('text-green-600', 'dark:text-green-400', 'font-
                     tapMessage.classList.remove('text-gray-500');
                 }
             }
@@ -1706,14 +1706,14 @@ function attachWizardListeners(container) {
         clearTimeout(tapResetTimeout);
         tapResetTimeout = setTimeout(() => {
             tapTimes = [];
-            const tapDots = container.querySelectorAll('.tap-dot');
+            const tapDots = container.querySelectorAll('.tap-
             tapDots.forEach(dot => {
                 dot.classList.remove('bg-blue-500');
                 dot.classList.add('bg-gray-300', 'dark:bg-gray-600');
             });
             if (tapMessage) {
                 tapMessage.textContent = '';
-                tapMessage.classList.remove('text-green-600', 'dark:text-green-400', 'font-medium');
+                tapMessage.classList.remove('text-green-600', 'dark:text-green-400', 'font-
                 tapMessage.classList.add('text-gray-500');
             }
         }, 3000);
@@ -1781,12 +1781,12 @@ function attachWizardListeners(container) {
 
     // Load to trainer
     container.querySelector('#load-to-trainer-btn')?.addEventListener('click', () => {
-        loadToComposition('melody');
+        loadToComposition('
     });
 
     // Load to melody
     container.querySelector('#load-to-melody-btn')?.addEventListener('click', () => {
-        loadToComposition('melody');
+        loadToComposition('
     });
 
     // Start over
@@ -1889,8 +1889,6 @@ function loadToComposition(targetTab) {
                         sectionDef.type,
                         key,
                         measuresNeeded,
-                        styleId
-                    );
 
                     // Convert chord names to progression data objects
                     chordsForSection = sectionChordNames.map(chordName => {
@@ -1953,7 +1951,7 @@ function loadToComposition(targetTab) {
 
     if (typeof window.setBassPattern === 'function') {
         window.setBassPattern(effectiveBassPattern);
-        console.log('[SongwritingWizard] Set bass pattern to:', effectiveBassPattern);
+
     }
 
     // Enable auto-generate bass so the pattern is applied
@@ -1961,7 +1959,7 @@ function loadToComposition(targetTab) {
         const compositionState = window.getCompositionState();
         if (compositionState && typeof compositionState.updateSettings === 'function') {
             compositionState.updateSettings({ autoGenerateBass: true });
-            console.log('[SongwritingWizard] Enabled auto-generate bass');
+
         }
     }
 
@@ -1986,7 +1984,7 @@ function loadToComposition(targetTab) {
                             chordIndices.push(i);
                         }
                         compositionState.createSection(secDef.type, chordIndices);
-                        console.log('[SongwritingWizard] Created section:', secDef.type, 'with chords:', chordIndices);
+
                     }
 
                     // Refresh UI to show sections on chord cards
@@ -1994,12 +1992,12 @@ function loadToComposition(targetTab) {
                         if (typeof window.renderProgressionDisplay === 'function') {
                             window.renderProgressionDisplay('progression-visualization', true);
                             window.renderProgressionDisplay('melody-progression-visualization', false);
-                            console.log('[SongwritingWizard] Refreshed progression display to show sections');
+
                         }
                     }, 50);
                 }
             } catch (err) {
-                console.error('[SongwritingWizard] Error creating sections:', err);
+
             }
         }, 100);
     }
@@ -2074,7 +2072,7 @@ export function showSongwritingWizard() {
 
 export function openWizardInModal() {
     // Could be used to open wizard in a modal overlay from main screen
-    const modal = document.createElement('div');
+    const modal = document.createElement('
     modal.id = 'wizard-modal';
     modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
     modal.innerHTML = `
@@ -2089,7 +2087,7 @@ export function openWizardInModal() {
     `;
     document.body.appendChild(modal);
 
-    const content = modal.querySelector('#wizard-modal-content');
+    const content = modal.querySelector('#wizard-modal-
     renderSongwritingWizard(content);
 
     modal.querySelector('#close-wizard-modal').addEventListener('click', () => {

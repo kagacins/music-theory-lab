@@ -66,31 +66,31 @@ export function updateButtonVisibility() {
  */
 function setupPresetButtonInSidebar() {
     // Find the sidebar element
-    const sidebar = document.getElementById('sidebar');
+    const sidebar = document.getElementById('
     if (!sidebar) {
-        console.warn('Sidebar not found for preset button');
+
         return;
     }
 
     // Find the scrollable content area (the div with overflow-y-auto)
-    const scrollableArea = sidebar.querySelector('.overflow-y-auto');
+    const scrollableArea = sidebar.querySelector('.overflow-y-
     if (!scrollableArea) {
-        console.warn('Sidebar scrollable area not found');
+
         return;
     }
     
     // Find the inner container (div.p-4.pt-0 inside the scrollable area)
     const sidebarContent = scrollableArea.querySelector('.p-4.pt-0') || scrollableArea.querySelector('.p-4');
     if (!sidebarContent) {
-        console.warn('Sidebar content container not found');
+
         return;
     }
 
     // Check if projects section already exists
-    const existingProjectsSection = document.getElementById('projects-section');
+    const existingProjectsSection = document.getElementById('projects-
     if (existingProjectsSection) {
         // Check if it's in the correct position (after nav)
-        const nav = sidebarContent.querySelector('nav');
+        const nav = sidebarContent.querySelector('
         if (nav && nav.compareDocumentPosition(existingProjectsSection) === Node.DOCUMENT_POSITION_FOLLOWING) {
             // Projects section is already after nav, we're good
             return;
@@ -101,13 +101,13 @@ function setupPresetButtonInSidebar() {
     }
 
     // Also remove old library-section if it exists (from previous version)
-    const oldLibrarySection = document.getElementById('library-section');
+    const oldLibrarySection = document.getElementById('library-
     if (oldLibrarySection) {
         oldLibrarySection.remove();
     }
 
     // Create Projects section
-    const projectsSection = document.createElement('div');
+    const projectsSection = document.createElement('
     projectsSection.id = 'projects-section';
     projectsSection.className = 'mt-6 border-t border-gray-700 pt-4';
 
@@ -117,7 +117,7 @@ function setupPresetButtonInSidebar() {
     heading.textContent = 'Projects';
 
     // Create Load Projects button - triggers OS file picker
-    const loadProjectButton = document.createElement('button');
+    const loadProjectButton = document.createElement('
     loadProjectButton.id = 'load-project-btn';
     loadProjectButton.className = 'sidebar-btn text-left p-3 rounded-lg font-semibold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white flex items-center gap-2 w-full';
     loadProjectButton.innerHTML = '<span>📂</span><span>Load Project</span>';
@@ -126,7 +126,7 @@ function setupPresetButtonInSidebar() {
         if (window.loadProject) {
             window.loadProject();
         } else {
-            console.error('loadProject function not available');
+
         }
     };
     loadProjectButton.title = 'Load a project from file';
@@ -136,7 +136,7 @@ function setupPresetButtonInSidebar() {
     projectsSection.appendChild(loadProjectButton);
 
     // Insert right after the nav element (tab names)
-    const nav = sidebarContent.querySelector('nav');
+    const nav = sidebarContent.querySelector('
     if (nav && nav.parentNode) {
         // Insert right after the nav element
         if (nav.nextSibling) {
@@ -155,7 +155,7 @@ function setupPresetButtonInSidebar() {
         settingsSection.parentNode.insertBefore(projectsSection, settingsSection);
     } else {
             // Final fallback: find by border-t class and insert before the first one
-        const firstBorderTSection = sidebarContent.querySelector('div.border-t');
+        const firstBorderTSection = sidebarContent.querySelector('div.border-
         if (firstBorderTSection && firstBorderTSection.parentNode) {
             firstBorderTSection.parentNode.insertBefore(projectsSection, firstBorderTSection);
             } else {
@@ -170,7 +170,7 @@ function setupPresetButtonInSidebar() {
  * Setup preset panel HTML structure
  */
 function setupPresetPanel() {
-    const panel = document.createElement('div');
+    const panel = document.createElement('
     panel.id = 'preset-panel';
     panel.className = 'preset-panel hidden';
     panel.innerHTML = `
@@ -236,9 +236,9 @@ export function togglePresetPanel() {
  * Open preset panel
  */
 export function openPresetPanel() {
-    const panel = document.getElementById('preset-panel');
+    const panel = document.getElementById('preset-
     if (panel) {
-        panel.classList.remove('hidden');
+        panel.classList.remove('
         isPresetPanelOpen = true;
         refreshPresetList();
         updatePresetStats();
@@ -249,9 +249,9 @@ export function openPresetPanel() {
  * Close preset panel
  */
 export function closePresetPanel() {
-    const panel = document.getElementById('preset-panel');
+    const panel = document.getElementById('preset-
     if (panel) {
-        panel.classList.add('hidden');
+        panel.classList.add('
         isPresetPanelOpen = false;
     }
 }
@@ -277,10 +277,8 @@ function refreshPresetList() {
 
     // Sort by most recent
     presets.sort((a, b) =>
-        new Date(b.metadata.modified) - new Date(a.metadata.modified)
-    );
 
-    const listContainer = document.getElementById('preset-list');
+    const listContainer = document.getElementById('preset-
     if (!listContainer) return;
 
     if (presets.length === 0) {
@@ -388,7 +386,7 @@ function quickSave(category) {
             updatePresetStats();
         }
     } else {
-        alert('Failed to save preset');
+        alert('Failed to save 
     }
 }
 
@@ -430,9 +428,9 @@ function extractMetadata(category) {
                 // Get chord type to determine major/minor
                 const chordType = window.builderChordType || 'Major';
                 const isMinor = chordType.toLowerCase().includes('minor') ||
-                               chordType.toLowerCase().includes('dim');
+                               chordType.toLowerCase().includes('
 
-                key = rootNote + (isMinor ? ' minor' : ' Major');
+                key = rootNote + (isMinor ? ' minor' : ' M
             } else if (category === 'progression') {
                 // Try to get key from trainer state
                 const trainerState = getTrainerState();
@@ -454,7 +452,7 @@ function extractMetadata(category) {
             }
         }
     } catch (error) {
-        console.warn('Error extracting metadata:', error);
+
     }
 
     return {
@@ -471,12 +469,12 @@ function extractMetadata(category) {
 function loadPreset(id) {
     const preset = getPresetById(id);
     if (!preset) {
-        console.error('Preset not found:', id);
+
         alert('Preset not found!');
         return;
     }
 
-    console.log('Loading preset:', preset);
+
 
     if (!confirm(`Load preset "${preset.name}"? This will replace your current work.`)) {
         return;
@@ -485,17 +483,17 @@ function loadPreset(id) {
     // Load the preset data based on category
     if (window.loadPresetData) {
         try {
-            console.log('Calling loadPresetData with:', preset.category, preset.data);
+
             window.loadPresetData(preset.category, preset.data);
             closePresetPanel();
             alert(`Preset "${preset.name}" loaded!`);
         } catch (error) {
-            console.error('Error loading preset:', error);
+
             alert(`Failed to load preset: ${error.message}`);
         }
     } else {
-        console.error('window.loadPresetData not found');
-        alert('Load function not available - please refresh the page');
+
+        alert('Load function not available - please refresh the 
     }
 }
 
@@ -536,7 +534,7 @@ function handleDuplicate(id) {
 async function handleShare(preset) {
     const url = exportPresetToURL(preset);
     if (!url) {
-        alert('Failed to create share link');
+        alert('Failed to create share 
         return;
     }
 
@@ -588,7 +586,7 @@ function handleFilter(e) {
  * Handle import button click
  */
 function handleImport() {
-    const input = document.createElement('input');
+    const input = document.createElement('
     input.type = 'file';
     input.accept = '.json';
     input.onchange = async (e) => {
@@ -611,7 +609,7 @@ function handleImport() {
  * Update preset statistics display
  */
 function updatePresetStats() {
-    const statsEl = document.getElementById('preset-stats');
+    const statsEl = document.getElementById('preset-
     if (!statsEl) return;
 
     const presets = getAllPresets();
@@ -629,7 +627,7 @@ function updatePresetStats() {
  * @returns {string} Escaped text
  */
 function escapeHtml(text) {
-    const div = document.createElement('div');
+    const div = document.createElement('
     div.textContent = text;
     return div.innerHTML;
 }

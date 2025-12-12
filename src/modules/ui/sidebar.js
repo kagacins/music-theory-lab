@@ -13,15 +13,15 @@
  * Toggle the sidebar visibility
  */
 export function toggleSidebar() {
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.getElementById('sidebar-overlay');
-    const header = document.getElementById('main-header');
-    sidebar.classList.toggle('-translate-x-full');
-    overlay.classList.toggle('hidden');
+    const sidebar = document.getElementById('
+    const overlay = document.getElementById('sidebar-
+    const header = document.getElementById('main-
+    sidebar.classList.toggle('-translate-x-
+    overlay.classList.toggle('
     
     // Fade the header when sidebar is open
     if (header) {
-        const isOpen = !sidebar.classList.contains('-translate-x-full');
+        const isOpen = !sidebar.classList.contains('-translate-x-
         header.style.opacity = isOpen ? '0.5' : '1';
     }
 }
@@ -31,13 +31,13 @@ export function toggleSidebar() {
  * Depends on: global enharmonicPreference, refreshAllTabs function
  */
 export function toggleEnharmonic() {
-    const toggle = document.getElementById('enharmonic-toggle');
+    const toggle = document.getElementById('enharmonic-
     // Access and modify global state
     window.enharmonicPreference = toggle.checked ? 'flat' : 'sharp'; // REVERSED: checked = flat, unchecked = sharp
 
     // Update indicator colors
-    const sharpIndicator = document.getElementById('sharp-indicator');
-    const flatIndicator = document.getElementById('flat-indicator');
+    const sharpIndicator = document.getElementById('sharp-
+    const flatIndicator = document.getElementById('flat-
 
     if (window.enharmonicPreference === 'sharp') {
         sharpIndicator.classList.remove('text-gray-500');
@@ -61,13 +61,13 @@ export function toggleEnharmonic() {
  * Depends on: global notationPreference, updateBuilderDisplay, updateChordTypeButtonCaptions, loadProgression, trainerState
  */
 export function toggleNotationStyle() {
-    const toggle = document.getElementById('notation-toggle');
+    const toggle = document.getElementById('notation-
     // Access and modify global state
     window.notationPreference = toggle.checked ? 'symbol' : 'full';
 
     // Update indicator colors
-    const fullIndicator = document.getElementById('notation-full-indicator');
-    const symbolIndicator = document.getElementById('notation-symbol-indicator');
+    const fullIndicator = document.getElementById('notation-full-
+    const symbolIndicator = document.getElementById('notation-symbol-
 
     if (window.notationPreference === 'full') {
         fullIndicator.classList.remove('text-gray-500');
@@ -103,8 +103,8 @@ export function toggleCompactControls() {
     window.isCompactModeOn = isCompactModeOn;
 
     // Update indicator colors
-    const offIndicator = document.getElementById('compact-off-indicator');
-    const onIndicator = document.getElementById('compact-on-indicator');
+    const offIndicator = document.getElementById('compact-off-
+    const onIndicator = document.getElementById('compact-on-
 
     if (isCompactModeOn) {
         onIndicator.classList.remove('text-gray-500');
@@ -133,11 +133,11 @@ export function toggleCompactControls() {
  * Depends on: global isFloatingControlsVisible
  */
 export function toggleFloatingControls() {
-    const builderControls = document.getElementById('floating-builder-controls');
-    const trainerControls = document.getElementById('floating-trainer-controls');
-    const melodyControls = document.getElementById('floating-melody-controls');
-    const scaleControls = document.getElementById('floating-scale-controls');
-    const expandButton = document.getElementById('expand-controls-btn');
+    const builderControls = document.getElementById('floating-builder-
+    const trainerControls = document.getElementById('floating-trainer-
+    const melodyControls = document.getElementById('floating-melody-
+    const scaleControls = document.getElementById('floating-scale-
+    const expandButton = document.getElementById('expand-controls-
 
     // Access global state
     let isFloatingControlsVisible = window.isFloatingControlsVisible;
@@ -189,11 +189,11 @@ export function handleOctaveRangeChange(value) {
 export function toggleSettingsGroup(groupName) {
     const group = document.querySelector(`.settings-group[data-group="${groupName}"]`);
     if (group) {
-        group.classList.toggle('collapsed');
+        group.classList.toggle('
 
         // Save collapsed state to localStorage
         const collapsedGroups = JSON.parse(localStorage.getItem('collapsedSettingsGroups') || '[]');
-        const isCollapsed = group.classList.contains('collapsed');
+        const isCollapsed = group.classList.contains('
 
         if (isCollapsed && !collapsedGroups.includes(groupName)) {
             collapsedGroups.push(groupName);
@@ -214,7 +214,7 @@ export function restoreSettingsGroupStates() {
     collapsedGroups.forEach(groupName => {
         const group = document.querySelector(`.settings-group[data-group="${groupName}"]`);
         if (group) {
-            group.classList.add('collapsed');
+            group.classList.add('
         }
     });
 }
@@ -223,13 +223,13 @@ export function restoreSettingsGroupStates() {
  * Toggle header displays panel visibility (collapsible center section)
  */
 export function toggleHeaderDisplays() {
-    const container = document.getElementById('header-display-panels');
-    const chevron = document.getElementById('header-displays-chevron');
-    const header = document.getElementById('main-header');
+    const container = document.getElementById('header-display-
+    const chevron = document.getElementById('header-displays-
+    const header = document.getElementById('main-
 
     if (container) {
-        container.classList.toggle('collapsed');
-        const isCollapsed = container.classList.contains('collapsed');
+        container.classList.toggle('
+        const isCollapsed = container.classList.contains('
 
         // Rotate chevron
         if (chevron) {
@@ -242,7 +242,7 @@ export function toggleHeaderDisplays() {
         }
 
         // Save state to localStorage
-        localStorage.setItem('headerDisplaysCollapsed', isCollapsed ? 'true' : 'false');
+        localStorage.setItem('headerDisplaysCollapsed', isCollapsed ? 'true' : '
     }
 }
 
@@ -252,18 +252,18 @@ export function toggleHeaderDisplays() {
 export function restoreHeaderDisplaysState() {
     const isCollapsed = localStorage.getItem('headerDisplaysCollapsed') === 'true';
     if (isCollapsed) {
-        const container = document.getElementById('header-display-panels');
-        const chevron = document.getElementById('header-displays-chevron');
-        const header = document.getElementById('main-header');
+        const container = document.getElementById('header-display-
+        const chevron = document.getElementById('header-displays-
+        const header = document.getElementById('main-
 
         if (container) {
-            container.classList.add('collapsed');
+            container.classList.add('
         }
         if (chevron) {
             chevron.style.transform = 'rotate(180deg)';
         }
         if (header) {
-            header.classList.add('header-displays-collapsed');
+            header.classList.add('header-displays-
         }
     }
 }

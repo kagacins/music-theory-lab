@@ -49,7 +49,7 @@ export class TensionArcUI {
         document.querySelectorAll('#tension-curve-container').forEach(el => el.remove());
 
         // Only render in the main progression-visualization-panel
-        const targetPanel = document.getElementById('progression-visualization-panel');
+        const targetPanel = document.getElementById('progression-visualization-
         if (!targetPanel) {
             return; // Don't render if the target panel doesn't exist
         }
@@ -61,7 +61,7 @@ export class TensionArcUI {
         const comparison = this.planner.compareToTarget(progressionData, key, this.convertSections(sections));
 
         // Build the UI
-        const uiContainer = document.createElement('div');
+        const uiContainer = document.createElement('
         uiContainer.id = 'tension-arc-container';
         uiContainer.className = 'mb-4 px-2';
 
@@ -99,7 +99,7 @@ export class TensionArcUI {
      * Render empty state
      */
     renderEmpty(container) {
-        const emptyContainer = document.createElement('div');
+        const emptyContainer = document.createElement('
         emptyContainer.id = 'tension-arc-container';
         emptyContainer.className = 'mb-4 px-2 py-4 text-center text-gray-500 text-sm';
         emptyContainer.innerHTML = `
@@ -109,7 +109,7 @@ export class TensionArcUI {
             <p>Add chords to see tension analysis</p>
         `;
 
-        const existing = container.querySelector('#tension-arc-container');
+        const existing = container.querySelector('#tension-arc-
         if (existing) existing.remove();
         container.insertBefore(emptyContainer, container.firstChild);
     }
@@ -464,8 +464,6 @@ export class TensionArcUI {
         }
 
         const significantMismatches = comparison.mismatches.filter(m =>
-            m.severity === 'moderate' || m.severity === 'significant'
-        );
 
         if (significantMismatches.length === 0) {
             return '';
@@ -508,7 +506,7 @@ export class TensionArcUI {
      */
     attachEventListeners(container, progressionData, key, sections) {
         // Template selector
-        const templateSelect = container.querySelector('#tension-template-select');
+        const templateSelect = container.querySelector('#tension-template-
         if (templateSelect) {
             templateSelect.addEventListener('change', (e) => {
                 this.planner.setTemplate(e.target.value);
@@ -518,37 +516,37 @@ export class TensionArcUI {
         }
 
         // Toggle checkboxes
-        const toggleTargetCurve = container.querySelector('#show-target-curve');
+        const toggleTargetCurve = container.querySelector('#show-target-
         if (toggleTargetCurve) {
             toggleTargetCurve.addEventListener('change', (e) => {
                 this.showTargetCurve = e.target.checked;
-                const targetCurve = container.querySelector('#target-curve');
+                const targetCurve = container.querySelector('#target-
                 if (targetCurve) targetCurve.style.display = this.showTargetCurve ? 'block' : 'none';
             });
         }
 
-        const toggleSectionBg = container.querySelector('#show-section-bg');
+        const toggleSectionBg = container.querySelector('#show-section-
         if (toggleSectionBg) {
             toggleSectionBg.addEventListener('change', (e) => {
                 this.showSectionBackground = e.target.checked;
-                const sectionBgs = container.querySelector('#section-backgrounds');
+                const sectionBgs = container.querySelector('#section-
                 if (sectionBgs) sectionBgs.style.display = this.showSectionBackground ? 'block' : 'none';
             });
         }
 
-        const toggleMismatches = container.querySelector('#show-mismatches');
+        const toggleMismatches = container.querySelector('#show-
         if (toggleMismatches) {
             toggleMismatches.addEventListener('change', (e) => {
                 this.showMismatches = e.target.checked;
-                const mismatchHighlights = container.querySelector('#mismatch-highlights');
-                const mismatchList = container.querySelector('#mismatch-list');
+                const mismatchHighlights = container.querySelector('#mismatch-
+                const mismatchList = container.querySelector('#mismatch-
                 if (mismatchHighlights) mismatchHighlights.style.display = this.showMismatches ? 'block' : 'none';
                 if (mismatchList) mismatchList.style.display = this.showMismatches ? 'block' : 'none';
             });
         }
 
         // Expected length input - re-renders the graph with new expected length
-        const expectedLengthInput = container.querySelector('#expected-length-input');
+        const expectedLengthInput = container.querySelector('#expected-length-
         if (expectedLengthInput) {
             expectedLengthInput.addEventListener('change', (e) => {
                 const newLength = parseInt(e.target.value, 10);
@@ -561,7 +559,7 @@ export class TensionArcUI {
         }
 
         // Data point interactions
-        const dataPoints = container.querySelectorAll('.tension-arc-point');
+        const dataPoints = container.querySelectorAll('.tension-arc-
         dataPoints.forEach((circle, index) => {
             circle.addEventListener('mouseenter', () => {
                 circle.setAttribute('r', '8');

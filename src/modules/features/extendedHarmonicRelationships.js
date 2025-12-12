@@ -199,11 +199,11 @@ export function detectChromaticMediant(currentChord, nextChord) {
     const currentIsMajor = currentChord.type === 'Major' ||
                           currentChord.type === 'Major 7th' ||
                           currentChord.type === 'Major 6th' ||
-                          currentChord.type.includes('Dominant');
+                          currentChord.type.includes('D
     const nextIsMajor = nextChord.type === 'Major' ||
                         nextChord.type === 'Major 7th' ||
                         nextChord.type === 'Major 6th' ||
-                        nextChord.type.includes('Dominant');
+                        nextChord.type.includes('D
 
     const currentIsMinor = currentChord.type === 'Minor' ||
                           currentChord.type === 'Minor 7th' ||
@@ -681,7 +681,7 @@ export function scoreExtendedHarmonicRelationships(currentChord, nextChord, key,
     } else if (chromaticMediant.isDiatonicMediant) {
         breakdown.chromaticMediant = chromaticMediant.score;
         totalScore += chromaticMediant.score;
-        relationships.push('Diatonic mediant');
+        relationships.push('Diatonic 
     } else {
         breakdown.chromaticMediant = 0;
     }
@@ -705,7 +705,7 @@ export function scoreExtendedHarmonicRelationships(currentChord, nextChord, key,
     } else if (sequence.sequenceDetected && !sequence.continuesSequence) {
         breakdown.sequence = -5;
         totalScore -= 5;
-        relationships.push('Breaks sequence pattern');
+        relationships.push('Breaks sequence 
     } else {
         breakdown.sequence = 0;
     }
@@ -719,11 +719,11 @@ export function scoreExtendedHarmonicRelationships(currentChord, nextChord, key,
     totalScore += resolutionAnalysis.score;
 
     if (resolutionAnalysis.satisfied.length > 0) {
-        relationships.push('Resolves harmonic expectation');
+        relationships.push('Resolves harmonic 
     }
     if (resolutionAnalysis.ignored.length > 0 &&
         resolutionAnalysis.ignored.some(e => e.urgency === 'high')) {
-        relationships.push('Ignores strong resolution expectation');
+        relationships.push('Ignores strong resolution 
     }
 
     return {

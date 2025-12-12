@@ -659,8 +659,6 @@ export function generateComprehensiveRecommendations(
                                 currentChord,
                                 nextChord,
                                 key,
-                                progressionData || []
-                            );
                             extendedHarmonicScore = harmonicResult.score;
                             harmonicDetails = harmonicResult;
                         } catch (e) {
@@ -685,8 +683,6 @@ export function generateComprehensiveRecommendations(
                     contextScore = scoreContextAwareness(
                         { root: nextRoot, type: nextType, inversion: nextInversion },
                         context,
-                        key
-                    );
                 }
 
                 // Calculate modal interchange score
@@ -696,8 +692,6 @@ export function generateComprehensiveRecommendations(
                     key,
                     style,
                     mood,
-                    context
-                );
 
                 // Phase 2: Calculate section-aware score
                 let sectionScore = 0;
@@ -712,8 +706,6 @@ export function generateComprehensiveRecommendations(
                             nextChordIndex,
                             sectionInfo.sections,
                             key,
-                            sectionContext  // Pass the intent context for position override
-                        );
                         sectionScore = sectionScoreDetails.totalAdjustment;
                     } catch (e) {
                         // Fall back to no section score
@@ -908,8 +900,6 @@ export function generateComprehensiveRecommendations(
                     contextScore, context, modalInterchangeScore, borrowedInfo,
                     key, nextDegree,  // Add key and degree for accurate cadence text
                     harmonicDetails, voiceLeadingDetails,  // Phase 1 enhanced scoring details
-                    sectionReasons  // Phase 2: Section-aware reasons
-                );
 
                 // Calculate chord-specific duration adjustments
                 // Some chord types/functions may warrant different durations
@@ -917,8 +907,6 @@ export function generateComprehensiveRecommendations(
                 if (rhythmicAnalysis) {
                     chordDurationAdjustment = calculateChordDurationAdjustment(
                         nextRoot, nextType, nextFunction, nextDegree,
-                        tensionDirection, rhythmicAnalysis, sectionContext
-                    );
                 }
 
                 recommendations.push({
@@ -1093,10 +1081,10 @@ function scoreVoiceLeading(currentMidi, nextMidi, nextInversion) {
     const bassScore = Math.max(0, 25 - bassDiff);
     score += bassScore;
 
-    if (bassDiff === 0) qualities.push('static bass');
-    else if (bassDiff <= 2) qualities.push('smooth bass');
-    else if (bassDiff <= 5) qualities.push('stepwise bass');
-    else if (bassDiff <= 7) qualities.push('skip in bass');
+    if (bassDiff === 0) qualities.push('static 
+    else if (bassDiff <= 2) qualities.push('smooth 
+    else if (bassDiff <= 5) qualities.push('stepwise 
+    else if (bassDiff <= 7) qualities.push('skip in 
 
     // 2. Common tones (0-25 points) - prefer shared notes
     const commonTones = currentMidi.filter(n1 =>
@@ -1116,8 +1104,8 @@ function scoreVoiceLeading(currentMidi, nextMidi, nextInversion) {
     const movementScore = Math.max(0, 30 - (totalMovement / 2));
     score += movementScore;
 
-    if (totalMovement <= 5) qualities.push('very smooth');
-    else if (totalMovement <= 10) qualities.push('smooth');
+    if (totalMovement <= 5) qualities.push('very 
+    else if (totalMovement <= 10) qualities.push('
 
     // 4. Voice range (0-10 points) - prefer mid-range voicings
     const avgPitch = nextMidi.reduce((a, b) => a + b, 0) / nextMidi.length;
@@ -1132,7 +1120,7 @@ function scoreVoiceLeading(currentMidi, nextMidi, nextInversion) {
         if (bassMovement !== 0 && sopranoMovement !== 0 &&
             Math.sign(bassMovement) !== Math.sign(sopranoMovement)) {
             score += 10;
-            qualities.push('contrary motion');
+            qualities.push('contrary 
         }
     }
 
@@ -1265,7 +1253,7 @@ function generateReason(
 
     // Phase 1 Enhanced: Sequence continuation
     if (harmonicDetails && harmonicDetails.continuesSequence) {
-        reasons.push('Continues harmonic sequence');
+        reasons.push('Continues harmonic 
     }
 
     // Phase 1 Enhanced: Voice leading quality reasons
@@ -1274,10 +1262,10 @@ function generateReason(
             // Note: these are typically penalized, but if score is still high, chord has other merits
         }
         if (voiceLeadingDetails.tendencyToneResolved) {
-            reasons.push('Resolves leading tone');
+            reasons.push('Resolves leading 
         }
         if (voiceLeadingDetails.contraryMotion && voiceLeadingScore >= 75) {
-            reasons.push('Strong contrary motion');
+            reasons.push('Strong contrary 
         }
     }
 
@@ -1298,35 +1286,35 @@ function generateReason(
     if (context && context.hasContext) {
         if (context.cadence.approaching && contextScore >= 70) {
             if (context.cadence.type === 'ii-V') {
-                reasons.push('Completes ii-V-I progression');
+                reasons.push('Completes ii-V-I 
             } else if (context.cadence.type === 'authentic') {
                 // Check if it's actually resolving to I (degree 1)
                 if (nextDegree === 1) {
-                    reasons.push('Resolves V-I cadence');
+                    reasons.push('Resolves V-I 
                 } else if (nextFunction === HARMONIC_FUNCTIONS.TONIC) {
                     // Resolving to another tonic-function chord (iii or vi)
-                    reasons.push('Resolves to tonic-function chord');
+                    reasons.push('Resolves to tonic-function 
                 }
             } else if (context.cadence.type === 'plagal') {
                 // Check if it's actually resolving to I (degree 1)
                 if (nextDegree === 1) {
-                    reasons.push('Plagal (IV-I) resolution');
+                    reasons.push('Plagal (IV-I) 
                 } else if (nextFunction === HARMONIC_FUNCTIONS.TONIC) {
                     // Resolving to another tonic-function chord (iii or vi)
                     // Don't call it "plagal IV-I" when it's not actually going to I
-                    reasons.push('Resolves to tonic-function chord');
+                    reasons.push('Resolves to tonic-function 
                 }
             }
         }
 
         if (context.tension.trend === 'rising' && contextScore >= 65) {
-            reasons.push('continues tension arc');
+            reasons.push('continues tension 
         } else if (context.tension.trend === 'falling' && contextScore >= 65) {
-            reasons.push('releases tension smoothly');
+            reasons.push('releases tension 
         }
 
         if (context.bassMovement.pattern === 'circle-of-fifths' && contextScore >= 60) {
-            reasons.push('follows circle of fifths');
+            reasons.push('follows circle of 
         }
     }
 
@@ -1335,41 +1323,41 @@ function generateReason(
         if (nextFunction === HARMONIC_FUNCTIONS.TONIC && tensionDirection === 'resolve') {
             // Only say "Strong resolution to tonic" if it's actually the I chord (degree 1)
             if (nextDegree === 1) {
-                reasons.push('Strong resolution to tonic');
+                reasons.push('Strong resolution to 
             } else {
                 // For iii or vi (also tonic function but not degree 1)
-                reasons.push('Resolution to tonic-function chord');
+                reasons.push('Resolution to tonic-function 
             }
         } else if (nextFunction === HARMONIC_FUNCTIONS.DOMINANT && tensionDirection === 'build') {
-            reasons.push('Builds tension toward dominant');
+            reasons.push('Builds tension toward 
         } else if (nextFunction === HARMONIC_FUNCTIONS.SUBDOMINANT) {
-            reasons.push('Classic subdominant motion');
+            reasons.push('Classic subdominant 
         } else {
-            reasons.push('Excellent harmonic progression');
+            reasons.push('Excellent harmonic 
         }
     } else if (functionScore >= 70) {
-        reasons.push('Good harmonic flow');
+        reasons.push('Good harmonic 
     }
 
     // Voice leading reason
     if (voiceLeadingScore >= 80) {
-        reasons.push('excellent voice leading');
+        reasons.push('excellent voice 
     } else if (voiceLeadingScore >= 60) {
-        reasons.push('smooth voice leading');
+        reasons.push('smooth voice 
     }
 
     // Style/mood reason
     if (styleFit >= 85 && moodFit >= 85) {
-        reasons.push('perfect for style and mood');
+        reasons.push('perfect for style and 
     } else if (styleFit >= 85) {
-        reasons.push('fits musical style well');
+        reasons.push('fits musical style 
     } else if (moodFit >= 85) {
-        reasons.push('matches desired mood');
+        reasons.push('matches desired 
     }
 
     // Fallback
     if (reasons.length === 0) {
-        reasons.push('Interesting harmonic choice');
+        reasons.push('Interesting harmonic 
     }
 
     return reasons.join(', ');
@@ -1440,8 +1428,6 @@ export function analyzeChordTransition(currentChord, nextChord, key, progression
         currentChord,
         nextChord,
         key,
-        progressionData
-    );
 
     // Detect specific patterns
     const secondaryDominant = detectSecondaryDominant(currentChord, nextChord, key);
@@ -1491,11 +1477,11 @@ function generateTransitionAssessment(voiceLeading, harmony, secondaryDominant, 
 
     // Voice leading quality
     if (voiceLeading.score >= 80) {
-        assessments.push('Excellent voice leading with smooth motion');
+        assessments.push('Excellent voice leading with smooth 
     } else if (voiceLeading.score >= 60) {
-        assessments.push('Good voice leading');
+        assessments.push('Good voice 
     } else if (voiceLeading.score < 40) {
-        assessments.push('Voice leading could be smoother');
+        assessments.push('Voice leading could be 
     }
 
     // Parallel motion warnings
@@ -1516,11 +1502,11 @@ function generateTransitionAssessment(voiceLeading, harmony, secondaryDominant, 
 
     // Harmonic quality
     if (harmony.score >= 75) {
-        assessments.push('Strong harmonic connection');
+        assessments.push('Strong harmonic 
     } else if (harmony.score >= 50) {
-        assessments.push('Acceptable harmonic progression');
+        assessments.push('Acceptable harmonic 
     } else {
-        assessments.push('Unusual harmonic relationship');
+        assessments.push('Unusual harmonic 
     }
 
     return assessments;

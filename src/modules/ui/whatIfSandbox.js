@@ -276,7 +276,7 @@ async function playProgression(progression, chordDuration = 0.8) {
 
         await new Promise(resolve => setTimeout(resolve, progression.length * chordDuration * 1000 + 200));
     } catch (err) {
-        console.error('[WhatIfSandbox] Error playing progression:', err);
+
     } finally {
         isPlaying = false;
     }
@@ -319,13 +319,13 @@ export function showWhatIfSandbox() {
     originalProgression = JSON.parse(JSON.stringify(progression));
 
     // Remove existing modal
-    const existingModal = document.getElementById('whatif-sandbox-modal');
+    const existingModal = document.getElementById('whatif-sandbox-
     if (existingModal) existingModal.remove();
-    const existingOverlay = document.getElementById('whatif-sandbox-overlay');
+    const existingOverlay = document.getElementById('whatif-sandbox-
     if (existingOverlay) existingOverlay.remove();
 
     // Create modal
-    const modal = document.createElement('div');
+    const modal = document.createElement('
     modal.id = 'whatif-sandbox-modal';
     modal.style.cssText = `
         position: fixed;
@@ -408,7 +408,7 @@ export function showWhatIfSandbox() {
     `;
 
     // Create overlay
-    const overlay = document.createElement('div');
+    const overlay = document.createElement('
     overlay.id = 'whatif-sandbox-overlay';
     overlay.style.cssText = `
         position: fixed;
@@ -446,8 +446,6 @@ export function showWhatIfSandbox() {
             // Apply transformation to preview
             previewProgression = transform.transform(
                 JSON.parse(JSON.stringify(originalProgression)),
-                key
-            );
             currentPreview = transform;
 
             // Update preview area

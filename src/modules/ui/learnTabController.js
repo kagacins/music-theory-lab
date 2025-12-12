@@ -236,7 +236,7 @@ function attachBrowserListeners(container) {
  */
 function showBrowser(pushHistory = true) {
     currentView = 'browser';
-    const container = document.getElementById('learn-tab-content');
+    const container = document.getElementById('learn-tab-
     if (container) {
         renderLessonBrowser(container);
     }
@@ -244,8 +244,8 @@ function showBrowser(pushHistory = true) {
     // Push to browser history
     if (pushHistory) {
         const url = new URL(window.location);
-        url.searchParams.delete('lesson');
-        url.searchParams.set('tab', 'learn');
+        url.searchParams.delete('
+        url.searchParams.set('tab', '
         window.history.pushState({ view: 'browser' }, '', url);
     }
 }
@@ -257,7 +257,7 @@ function showBrowser(pushHistory = true) {
  */
 function showLesson(lessonId, pushHistory = true) {
     currentView = 'lesson';
-    const container = document.getElementById('learn-tab-content');
+    const container = document.getElementById('learn-tab-
     if (container) {
         renderLessonViewer(lessonId, container, pushHistory);
     }
@@ -268,7 +268,7 @@ function showLesson(lessonId, pushHistory = true) {
  */
 function showWizard() {
     currentView = 'wizard';
-    const container = document.getElementById('learn-tab-content');
+    const container = document.getElementById('learn-tab-
     if (container) {
         renderSongwritingWizard(container);
     }
@@ -319,8 +319,8 @@ window.addEventListener('showSongwritingWizard', () => {
 // Handle browser back/forward buttons
 window.addEventListener('popstate', (event) => {
     const url = new URL(window.location);
-    const lessonId = url.searchParams.get('lesson');
-    const tab = url.searchParams.get('tab');
+    const lessonId = url.searchParams.get('
+    const tab = url.searchParams.get('
 
     // Only handle if we're on the learn tab
     if (tab === 'learn' || lessonId) {
@@ -337,7 +337,7 @@ window.addEventListener('popstate', (event) => {
 // Check URL on page load for direct lesson links
 function checkUrlForLesson() {
     const url = new URL(window.location);
-    const lessonId = url.searchParams.get('lesson');
+    const lessonId = url.searchParams.get('
     if (lessonId) {
         showLesson(lessonId, false);
     }

@@ -71,8 +71,6 @@ export class PageLayoutManager {
       const systemStartMeasure = startMeasure + (systemIndex * measuresPerSystem);
       const systemEndMeasure = Math.min(
         systemStartMeasure + measuresPerSystem - 1,
-        endMeasure
-      );
 
       systems.push({
         systemIndex,

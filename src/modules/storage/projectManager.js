@@ -194,7 +194,7 @@ export async function saveProjectToFile(compositionState, suggestedName) {
 
         // Fallback for browsers without File System Access API (Firefox, Safari)
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        const a = document.createElement('
         a.href = url;
         a.download = `${defaultName}${PROJECT_FILE_EXTENSION}`;
         document.body.appendChild(a);
@@ -208,7 +208,7 @@ export async function saveProjectToFile(compositionState, suggestedName) {
         };
 
     } catch (error) {
-        console.error('[projectManager] Error saving project:', error);
+
         return {
             success: false,
             error: error.message || 'Failed to save project'
@@ -286,7 +286,7 @@ export async function loadProjectFromFile() {
         };
 
     } catch (error) {
-        console.error('[projectManager] Error loading project:', error);
+
         return {
             success: false,
             error: error.message || 'Failed to load project'
@@ -304,7 +304,7 @@ export async function loadProjectFromFile() {
  */
 export function applyProjectToState(projectData, compositionState, trainerState, callbacks = {}) {
     try {
-        console.log('[projectManager] Applying project to state:', projectData.metadata?.title);
+
 
         // 1. Update composition metadata
         if (projectData.metadata) {
@@ -355,7 +355,7 @@ export function applyProjectToState(projectData, compositionState, trainerState,
                     compositionState.renderBassBlocksToMeasures();
                 }
             } else {
-                console.warn('[projectManager] BuildingBlockSequence not available, skipping bass block restore');
+
             }
         }
 
@@ -369,7 +369,7 @@ export function applyProjectToState(projectData, compositionState, trainerState,
                     compositionState.renderTrebleBlocksToMeasures();
                 }
             } else {
-                console.warn('[projectManager] BuildingBlockSequence not available, skipping treble block restore');
+
             }
         }
 
@@ -377,7 +377,7 @@ export function applyProjectToState(projectData, compositionState, trainerState,
         // The BuildingBlockSequence cannot represent simultaneous voices (Voice 1 & Voice 2)
         // so we need to restore Voice 2 data directly from the saved measures
         if (projectData.measures && Array.isArray(projectData.measures)) {
-            console.log('[projectManager] Restoring multi-voice notation data from saved measures');
+
 
             for (let i = 0; i < projectData.measures.length && i < compositionState.measures.length; i++) {
                 const savedMeasure = projectData.measures[i];
@@ -415,6 +415,12 @@ export function applyProjectToState(projectData, compositionState, trainerState,
                     }
                 }
             }
+
+            // MULTI-VOICE: Sync treble block sequence to rebuild voiceNotes Map from measures
+            // This ensures the voiceNotes Map is populated correctly after loading
+            if (compositionState.trebleBlockSequence?.blocks?.length > 0) {
+                compositionState.syncMeasuresToTrebleBlock();
+            }
         }
 
         // 8. Trigger notation refresh
@@ -427,11 +433,11 @@ export function applyProjectToState(projectData, compositionState, trainerState,
             callbacks.onMetadataUpdated(projectData.metadata);
         }
 
-        console.log('[projectManager] Project applied successfully');
+
         return { success: true };
 
     } catch (error) {
-        console.error('[projectManager] Error applying project:', error);
+
         return {
             success: false,
             error: error.message || 'Failed to apply project data'
@@ -445,7 +451,7 @@ export function applyProjectToState(projectData, compositionState, trainerState,
  */
 function selectFileViaInput() {
     return new Promise((resolve) => {
-        const input = document.createElement('input');
+        const input = document.createElement('
         input.type = 'file';
         input.accept = `${PROJECT_FILE_EXTENSION},.json`;
 

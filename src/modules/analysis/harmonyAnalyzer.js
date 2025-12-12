@@ -477,7 +477,7 @@ export class HarmonyAnalyzer {
         const minorRomanNumerals = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii'];
 
         const index = degree - 1;
-        const isMinor = chord.type && (chord.type === 'Minor' || chord.type === 'Diminished');
+        const isMinor = chord.type && (chord.type === 'Minor' || chord.type === 'D
 
         let numeral = isMinor ? minorRomanNumerals[index] : romanNumerals[index];
 
@@ -528,7 +528,7 @@ export class HarmonyAnalyzer {
     getMajorScaleChords(key) {
         // Major scale: I II III IV V VI VII
         // Qualities:   M m  m   M  M m  dim
-        const scaleNotes = this.getScaleNotes(key, 'Major');
+        const scaleNotes = this.getScaleNotes(key, 'M
         return scaleNotes.map((note, index) => {
             const degree = index + 1;
             let type;
@@ -549,7 +549,7 @@ export class HarmonyAnalyzer {
     getMinorScaleChords(key) {
         // Natural minor: i II III iv v VI VII
         // Qualities:     m dim M   m  m M  M
-        const scaleNotes = this.getScaleNotes(key, 'Minor');
+        const scaleNotes = this.getScaleNotes(key, 'M
         return scaleNotes.map((note, index) => {
             const degree = index + 1;
             let type;
@@ -590,8 +590,6 @@ export class HarmonyAnalyzer {
     isChordInKey(chord, scaleChords) {
         return scaleChords.some(scaleChord =>
             scaleChord.root === chord.root &&
-            scaleChord.type === chord.type
-        );
     }
 
     /**
@@ -665,8 +663,6 @@ export class HarmonyAnalyzer {
         if (!progression || progression.length === 0) return [];
 
         return progression.map((chord, index) =>
-            this.calculateChordTension(chord, key, index, progression.length)
-        );
     }
 
     /**

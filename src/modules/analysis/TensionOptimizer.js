@@ -329,8 +329,6 @@ export class TensionOptimizer {
                         optimizedChord,
                         targetTension,
                         key,
-                        extensionOptions
-                    );
 
                     if (suggestions.length > 0 && suggestions[0].improvement > 0) {
                         modification.extensionSuggestions = suggestions.slice(0, 3);
@@ -397,8 +395,6 @@ export class TensionOptimizer {
             newType,
             chord.inversion || 0,
             key,
-            chord.octaveShift || 0
-        );
 
         return {
             ...chord,

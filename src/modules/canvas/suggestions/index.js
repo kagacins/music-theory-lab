@@ -62,7 +62,7 @@ export function initializeIntegratedSuggestions(options) {
     } = options;
 
     if (!canvas || !context) {
-        throw new Error('Canvas and context are required to initialize suggestions');
+        throw new Error('Canvas and context are required to initialize 
     }
 
     const manager = new CanvasSuggestionManager({
@@ -81,16 +81,16 @@ export function initializeIntegratedSuggestions(options) {
     const chord = chordEngine || new ChordSuggestionEngine(config.chord);
     manager.setChordEngine(chord);
 
-    console.log('✅ Integrated Suggestions System Initialized');
-    console.log('📋 Keyboard Shortcuts:');
-    console.log('  Tab           - Show melody suggestions');
-    console.log('  Shift+Tab     - Show chord suggestions');
-    console.log('  1-9           - Quick select suggestion');
-    console.log('  ↑/↓           - Navigate suggestions');
-    console.log('  Enter         - Apply suggestion');
-    console.log('  Space (hold)  - Preview suggestion');
-    console.log('  Escape        - Dismiss suggestions');
-    console.log('  Ctrl/Cmd+I    - Toggle assist mode');
+
+
+
+
+
+
+
+
+
+
 
     return manager;
 }

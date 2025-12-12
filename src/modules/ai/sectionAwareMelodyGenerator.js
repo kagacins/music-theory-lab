@@ -344,19 +344,19 @@ function applySectionProcessing(phrase, melodyProfile, sectionPosition) {
     // Apply embellishment based on profile, BUT skip if user chose sparse
     // Embellishment adds notes and shortens rhythm, which contradicts sparse intent
     if (!isSparse && Math.random() < melodyProfile.embellishmentLevel) {
-        processedPhrase = createPhraseVariation(processedPhrase, 'embellish');
+        processedPhrase = createPhraseVariation(processedPhrase, '
     }
 
     // For low density SECTIONS (not user settings), potentially simplify
     // Note: User's sparse setting already reduces note count via densityMultiplier,
     // so we don't want to double-reduce. Only apply simplify based on section profile.
     if (!isSparse && melodyProfile.melodicDensity < 0.4 && Math.random() < 0.4) {
-        processedPhrase = createPhraseVariation(processedPhrase, 'simplify');
+        processedPhrase = createPhraseVariation(processedPhrase, '
     }
 
     // For dense settings, potentially add embellishment even if section doesn't call for it
     if (isDense && !processedPhrase.variationType && Math.random() < 0.3) {
-        processedPhrase = createPhraseVariation(processedPhrase, 'embellish');
+        processedPhrase = createPhraseVariation(processedPhrase, '
     }
 
     // Ensure strong resolution at section ends if required

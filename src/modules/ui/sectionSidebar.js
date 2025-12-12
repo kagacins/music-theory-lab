@@ -16,7 +16,7 @@ let sectionSidebarInstances = new Map(); // Track sidebar instances per tab
 export function initSectionSidebar(tabId, containerId, sectionClass) {
     const container = document.getElementById(containerId);
     if (!container) {
-        console.warn(`Section sidebar: Container ${containerId} not found`);
+
         return;
     }
 
@@ -24,7 +24,7 @@ export function initSectionSidebar(tabId, containerId, sectionClass) {
     let sidebar = document.getElementById(`${tabId}-section-sidebar`);
     if (!sidebar) {
         sidebar = createSidebar(tabId);
-        const tabContent = container.closest('.tab-content');
+        const tabContent = container.closest('.tab-
         if (tabContent) {
             // Ensure tab content has relative positioning
             if (getComputedStyle(tabContent).position === 'static') {
@@ -36,7 +36,7 @@ export function initSectionSidebar(tabId, containerId, sectionClass) {
             container.style.marginLeft = '0';
             container.style.transition = 'margin-left 0.3s ease';
         } else {
-            console.warn(`Section sidebar: Tab content not found for ${tabId}`);
+
         }
     }
 
@@ -122,7 +122,7 @@ export function initSectionSidebar(tabId, containerId, sectionClass) {
  * @returns {HTMLElement} The sidebar element
  */
 function createSidebar(tabId) {
-    const sidebar = document.createElement('div');
+    const sidebar = document.createElement('
     sidebar.id = `${tabId}-section-sidebar`;
     sidebar.className = 'section-sidebar absolute left-0 top-0 w-16 bg-gray-800/90 backdrop-blur-sm text-white z-[1] flex flex-col items-center py-2 gap-2 transition-all duration-300 border-r border-gray-700';
     sidebar.style.display = 'none'; // Hidden by default, shown when sections are collapsed
@@ -131,10 +131,10 @@ function createSidebar(tabId) {
     sidebar.style.overflow = 'visible'; // Ensure tooltips are not clipped
     
     // Add separate collapse/expand all buttons at the top
-    const collapseAllBtn = document.createElement('button');
+    const collapseAllBtn = document.createElement('
     collapseAllBtn.className = 'w-12 bg-gray-700 hover:bg-gray-600 text-white text-[9px] font-semibold transition-colors flex items-center justify-center shadow-sm';
-    collapseAllBtn.setAttribute('data-toggle-all', 'true');
-    collapseAllBtn.setAttribute('data-action', 'collapse');
+    collapseAllBtn.setAttribute('data-toggle-all', '
+    collapseAllBtn.setAttribute('data-action', '
     collapseAllBtn.textContent = '−';
     collapseAllBtn.title = 'Collapse All';
     collapseAllBtn.style.height = '20px';
@@ -142,10 +142,10 @@ function createSidebar(tabId) {
     collapseAllBtn.style.lineHeight = '1';
     collapseAllBtn.style.minHeight = '20px';
     
-    const expandAllBtn = document.createElement('button');
+    const expandAllBtn = document.createElement('
     expandAllBtn.className = 'w-12 bg-gray-700 hover:bg-gray-600 text-white text-[9px] font-semibold transition-colors flex items-center justify-center shadow-sm';
-    expandAllBtn.setAttribute('data-toggle-all', 'true');
-    expandAllBtn.setAttribute('data-action', 'expand');
+    expandAllBtn.setAttribute('data-toggle-all', '
+    expandAllBtn.setAttribute('data-action', '
     expandAllBtn.textContent = '+';
     expandAllBtn.title = 'Expand All';
     expandAllBtn.style.height = '20px';
@@ -155,7 +155,7 @@ function createSidebar(tabId) {
     
     // Update button visibility based on current sections
     const updateToggleAllButtons = () => {
-        const tabContent = sidebar.closest('.tab-content');
+        const tabContent = sidebar.closest('.tab-
         if (!tabContent) return;
         
         // Get all sections in this tab
@@ -203,7 +203,7 @@ function createSidebar(tabId) {
     });
     
     // Create container for the buttons
-    const buttonContainer = document.createElement('div');
+    const buttonContainer = document.createElement('
     buttonContainer.className = 'flex flex-col gap-0.5 mb-1';
     buttonContainer.style.padding = '0';
     buttonContainer.appendChild(collapseAllBtn);
@@ -234,7 +234,7 @@ function updateSectionState(section, sidebar, collapsedSections, container, save
     
     if (!panel) return;
 
-    const isCollapsed = panel.classList.contains('hidden');
+    const isCollapsed = panel.classList.contains('
     
     // Save panel state to localStorage (skip during initialization to preserve restored states)
     if (saveState) {
@@ -327,7 +327,7 @@ function animateToSidebar(section, toggle, sidebar, sectionId, collapsedSections
 
     // Get positions
     const toggleRect = toggle.getBoundingClientRect();
-    const tabContent = sidebar.closest('.tab-content');
+    const tabContent = sidebar.closest('.tab-
     if (!tabContent) {
         section.style.display = 'none';
         addToSidebar(section, sidebar, sectionId, collapsedSections, container);
@@ -343,7 +343,7 @@ function animateToSidebar(section, toggle, sidebar, sectionId, collapsedSections
     clone.style.filter = 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 3px rgba(255, 255, 255, 0.9))';
     
     // Wrap in container for background
-    const animContainer = document.createElement('div');
+    const animContainer = document.createElement('
     animContainer.style.position = 'fixed';
     animContainer.style.left = `${toggleRect.left + toggleRect.width / 2 - 14}px`;
     animContainer.style.top = `${toggleRect.top + toggleRect.height / 2 - 14}px`;
@@ -438,7 +438,7 @@ function animateFromSidebar(section, sidebar, sectionId, collapsedSections, cont
     }
 
     // Get the icon from the tab
-    const tabIcon = tab.querySelector('svg');
+    const tabIcon = tab.querySelector('
     if (!tabIcon) {
         section.style.display = '';
         removeFromSidebar(section, sidebar, sectionId, collapsedSections);
@@ -464,7 +464,7 @@ function animateFromSidebar(section, sidebar, sectionId, collapsedSections, cont
     clone.style.filter = 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 3px rgba(255, 255, 255, 0.9))';
     
     // Wrap in container for background
-    const animContainer = document.createElement('div');
+    const animContainer = document.createElement('
     animContainer.style.position = 'fixed';
     animContainer.style.left = `${tabRect.left + tabRect.width / 2 - 14}px`;
     animContainer.style.top = `${tabRect.top + tabRect.height / 2 - 14}px`;
@@ -559,7 +559,7 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     const hoverClasses = hoverMatch ? hoverMatch[0] : '';
 
     // Create sidebar tab with matching colors
-    const tab = document.createElement('button');
+    const tab = document.createElement('
     if (gradientClasses) {
         tab.className = `section-sidebar-tab w-12 h-12 rounded-lg ${gradientClasses} ${hoverClasses} text-white transition-all flex items-center justify-center text-xs font-semibold p-2 text-center shadow-md`;
     } else {
@@ -593,10 +593,10 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     sectionName = sectionName.replace(/\s*[Dd]rag\s+to\s+reorder\s*/g, '').trim();
     const tooltipText = `${sectionName} - drag to reorder`;
     // Remove title attribute to prevent browser default tooltip delay
-    tab.removeAttribute('title');
+    tab.removeAttribute('
     
     // Add custom tooltip for immediate display (fixed positioning to avoid clipping)
-    const tooltip = document.createElement('div');
+    const tooltip = document.createElement('
     tooltip.className = 'sidebar-section-tooltip bg-gray-900 text-white text-xs rounded py-1 px-2 pointer-events-none whitespace-nowrap';
     tooltip.textContent = tooltipText;
     // Pre-configure for instant display with fixed positioning
@@ -781,7 +781,7 @@ function updateSidebarHeight(sidebar) {
     if (!sidebar || sidebar.style.display === 'none') return;
     
     // Get the tab content container (parent of sidebar)
-    const tabContent = sidebar.closest('.tab-content');
+    const tabContent = sidebar.closest('.tab-
     if (!tabContent) return;
     
     // Find the white container element with the specific classes
@@ -920,7 +920,7 @@ function reorderSectionsFromSidebar(sidebar, container, sectionClass) {
             }).filter(id => id !== null);
             localStorage.setItem(`sectionOrder_${tabId}`, JSON.stringify(finalOrder));
         } catch (e) {
-            console.warn('Error saving section order:', e);
+
         }
     }
 }
@@ -938,11 +938,11 @@ export function initInstantTooltips() {
         // Skip if already has a tooltip child
         if (element.querySelector('.instant-tooltip')) return;
         
-        const titleText = element.getAttribute('title');
+        const titleText = element.getAttribute('
         if (!titleText) return;
         
         // Create tooltip element
-        const tooltip = document.createElement('div');
+        const tooltip = document.createElement('
         // Use normal whitespace for longer descriptions (chord/interval tooltips)
         const isLongDescription = titleText.length > 50;
         tooltip.className = `instant-tooltip absolute bottom-full mb-2 bg-gray-900 text-white text-xs rounded py-1 px-2 pointer-events-none ${isLongDescription ? '' : 'whitespace-nowrap'}`;
@@ -983,7 +983,7 @@ export function initInstantTooltips() {
         element.appendChild(tooltip);
         
         // Remove title attribute to prevent browser default tooltip
-        element.removeAttribute('title');
+        element.removeAttribute('
         
         // Add event listeners for instant display
         element.addEventListener('mouseenter', () => {
@@ -1009,9 +1009,9 @@ export function initInstantTooltips() {
  * Initialize sidebar for all tabs
  */
 export function initAllSectionSidebars() {
-    initSectionSidebar('builder', 'builder-sections-container', 'builder-section-item');
-    initSectionSidebar('trainer', 'trainer-sections-container', 'trainer-section-item');
-    initSectionSidebar('melody', 'melody-dashboard-sections-container', 'melody-section-item');
+    initSectionSidebar('builder', 'builder-sections-container', 'builder-section-
+    initSectionSidebar('trainer', 'trainer-sections-container', 'trainer-section-
+    initSectionSidebar('melody', 'melody-dashboard-sections-container', 'melody-section-
     
     // Initialize instant tooltips for all floating controls and other buttons
     initInstantTooltips();

@@ -508,7 +508,7 @@ export function initGuitarFretboard() {
  * Create Guitar Fretboard panel
  */
 function createGuitarFretboardPanel() {
-    const panel = document.createElement('div');
+    const panel = document.createElement('
     panel.id = 'guitar-fretboard-panel';
     panel.className = 'guitar-fretboard-panel hidden';
 
@@ -578,7 +578,7 @@ function createGuitarFretboardPanel() {
  * Draw the guitar fretboard (inline version, not modal)
  */
 function drawGuitarFretboard() {
-    const container = document.getElementById('guitar-fretboard-container');
+    const container = document.getElementById('guitar-fretboard-
     if (!container) return;
 
     // Get current notes based on active tab
@@ -733,8 +733,6 @@ function drawGuitarFretboard() {
                 const isBarre = barrePatterns.some(barre => 
                     barre.fret === fret && 
                     stringIndex >= barre.startString && 
-                    stringIndex <= barre.endString
-                );
                 
                 html += `<div class="fret-position ${fret === 0 ? 'open-string' : ''} ${isBarre ? 'barre-fret' : ''}" data-fret="${fret}" data-note="${noteAtFret}" data-string-index="${stringIndex}">`;
                 
@@ -783,7 +781,7 @@ function drawGuitarFretboard() {
         addFretDotClickHandlers();
         
         // Add fingering selector change handler
-        const fingeringSelect = document.getElementById('guitar-fingering-select');
+        const fingeringSelect = document.getElementById('guitar-fingering-
         if (fingeringSelect) {
             fingeringSelect.addEventListener('change', (e) => {
                 currentFingeringIndex = parseInt(e.target.value, 10);
@@ -836,7 +834,7 @@ function getNoteAtFret(openNote, fret) {
  * Toggle Guitar Fretboard panel
  */
 export function toggleGuitarFretboardPanel() {
-    const panel = document.getElementById('guitar-fretboard-panel');
+    const panel = document.getElementById('guitar-fretboard-
     if (!panel) return;
 
     if (isPanelOpen) {
@@ -850,9 +848,9 @@ export function toggleGuitarFretboardPanel() {
  * Open Guitar Fretboard panel
  */
 export function openGuitarFretboardPanel() {
-    const panel = document.getElementById('guitar-fretboard-panel');
+    const panel = document.getElementById('guitar-fretboard-
     if (panel) {
-        panel.classList.remove('hidden');
+        panel.classList.remove('
         isPanelOpen = true;
 
         // Draw the fretboard with current notes
@@ -864,9 +862,9 @@ export function openGuitarFretboardPanel() {
  * Close Guitar Fretboard panel
  */
 export function closeGuitarFretboardPanel() {
-    const panel = document.getElementById('guitar-fretboard-panel');
+    const panel = document.getElementById('guitar-fretboard-
     if (panel) {
-        panel.classList.add('hidden');
+        panel.classList.add('
         isPanelOpen = false;
     }
 }
@@ -881,7 +879,7 @@ let activeFretNotes = new Set();
  * Now enables clicking ANY fret position, not just where dots are visible
  */
 function addFretDotClickHandlers() {
-    const fretPositions = document.querySelectorAll('#guitar-fretboard-container .fret-position');
+    const fretPositions = document.querySelectorAll('#guitar-fretboard-container .fret-
     
     // Remove old listeners by cloning and replacing
     fretPositions.forEach(position => {
@@ -890,7 +888,7 @@ function addFretDotClickHandlers() {
     });
     
     // Get fresh references after cloning
-    const freshFretPositions = document.querySelectorAll('#guitar-fretboard-container .fret-position');
+    const freshFretPositions = document.querySelectorAll('#guitar-fretboard-container .fret-
     
     // Add handlers to ALL fret positions (not just ones with dots)
     freshFretPositions.forEach(position => {
@@ -942,7 +940,7 @@ function addFretDotClickHandlers() {
         position.dataset.noteWithOctave = noteWithOctave;
 
         // Get the guitar string element for animation
-        const guitarString = position.closest('.guitar-string');
+        const guitarString = position.closest('.guitar-
 
         // Mouse/touch handlers for hold-to-play
         const startNote = (e) => {
@@ -955,7 +953,7 @@ function addFretDotClickHandlers() {
             // Ensure audio context is running (required for Tone.js after user interaction)
             if (Tone && Tone.context.state !== 'running') {
                 Tone.context.resume().catch(err => {
-                    console.warn("Could not resume audio context:", err);
+
                 });
             }
             
@@ -966,7 +964,7 @@ function addFretDotClickHandlers() {
             // For guitar, we don't need to wait for audioIsReady (piano samples)
             // The guitar synth is ready immediately after creation
             if (!instrument) {
-                console.warn("Guitar instrument not available");
+
                 return;
             }
             
@@ -977,9 +975,9 @@ function addFretDotClickHandlers() {
                 
                 // Trigger string wiggle animation
                 if (guitarString) {
-                    guitarString.classList.add('playing');
+                    guitarString.classList.add('
                     setTimeout(() => {
-                        guitarString.classList.remove('playing');
+                        guitarString.classList.remove('
                     }, 300);
                 }
             }
@@ -1012,7 +1010,7 @@ function addFretDotClickHandlers() {
     });
     
     // Global mouse/touch release handlers
-    const container = document.getElementById('guitar-fretboard-container');
+    const container = document.getElementById('guitar-fretboard-
     if (container) {
         const handleGlobalRelease = () => {
             const getInstrument = window.getInstrument || (() => window.getGuitar ? window.getGuitar() : null);
@@ -1026,7 +1024,7 @@ function addFretDotClickHandlers() {
             
             // Remove all playing classes
             document.querySelectorAll('.guitar-string.playing').forEach(str => {
-                str.classList.remove('playing');
+                str.classList.remove('
             });
         };
         

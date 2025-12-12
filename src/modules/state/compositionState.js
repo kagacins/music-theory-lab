@@ -16,7 +16,8 @@
 import { EventEmitter } from '../utils/eventEmitter.js';
 import { generateBassVoicing, generateBuildingBlockBass, splitBlockBassIntoMeasures } from '../integration/bassAutoFill.js';
 import { getChordNotes } from '../utils/noteUtils.js';
-import { BuildingBlockSequence, BuildingBlock, durationToUnits, unitsToDuration, UNITS_PER_BEAT } from './buildingBlock.js';
+import { BuildingBlockSequence, BuildingBlock, Unit, durationToUnits, unitsToDuration, UNITS_PER_BEAT } from './buildingBlock.js';
+console.log(`🎼 [INIT] UNITS_PER_BEAT = ${UNITS_PER_BEAT}`);
 
 // ============================================================================
 // BASS NOTE STORE - Single Source of Truth for Bass Notes
@@ -215,6 +216,95 @@ const BEATS_TO_DURATION = {
 };
 
 /**
+ * Get beats-per-measure in quarter-note units for a time signature.
+ * Example: 6/8 => 6 * (4/8) = 3 (i.e., three quarter-note beats per bar).
+ */
+export function getBeatsPerMeasureFromTimeSignature(timeSignature = { num: 4, denom: 4 }) {
+    const num = timeSignature?.num ?? 4;
+    const denom = timeSignature?.denom ?? 4;
+    return num * (4 / denom);
+}
+
+/**
+ * Convert a raw beats value (quarter-based) to ticks (TS-aware).
+ * Preserves existing beats-based callers while we migrate to ticks.
+ */
+function beatsToTicksInTS(beats, timeSignature = { num: 4, denom: 4 }) {
+    // Beats in code are quarter-based; convert via PPQ
+    return beats * TS_PPQ;
+}
+
+// ============================================================================
+// TIME SIGNATURE TICK HELPERS (TS-aware)
+// ============================================================================
+// Use a fixed PPQ for consistency; VexFlow’s default is 4096, but we’ll pick 480 PPQ
+// for readable math and keep conversions contained here.
+export const TS_PPQ = 480; // ticks per quarter note
+
+export function getTicksPerDenominator(timeSignature = { num: 4, denom: 4 }) {
+    const denom = timeSignature?.denom ?? 4;
+    return TS_PPQ * (4 / denom); // ticks for one “denominator” unit (e.g., 8th in 6/8)
+}
+
+export function getMeasureCapacityTicks(timeSignature = { num: 4, denom: 4 }) {
+    const num = timeSignature?.num ?? 4;
+    return num * getTicksPerDenominator(timeSignature);
+}
+
+export function durationStringToTicks(durationStr, timeSignature = { num: 4, denom: 4 }) {
+    // duration strings use standard note values (1n, 2n, 4n, 8n, etc.)
+    // Convert to ticks based on denominator mapping
+    if (!durationStr) return getTicksPerDenominator(timeSignature); // default to one denom unit
+    const base = durationStr.replace('.', '');
+    const isDotted = durationStr.includes('.');
+    let denomValue = 4; // default quarter note
+    if (base.endsWith('1n')) denomValue = 1;
+    else if (base.endsWith('2n')) denomValue = 2;
+    else if (base.endsWith('4n')) denomValue = 4;
+    else if (base.endsWith('8n')) denomValue = 8;
+    else if (base.endsWith('16n')) denomValue = 16;
+    else if (base.endsWith('32n')) denomValue = 32;
+    else if (base.endsWith('64n')) denomValue = 64;
+
+    const ticks = TS_PPQ * (4 / denomValue);
+    return isDotted ? ticks * 1.5 : ticks;
+}
+
+export function beatsToTicks(beats, timeSignature = { num: 4, denom: 4 }) {
+    // Beats here are “quarter-note” beats; convert via PPQ
+    return beats * TS_PPQ;
+}
+
+export function ticksToBeats(ticks) {
+    return ticks / TS_PPQ;
+}
+
+/**
+ * Compute total ticks for an array of notes (duration strings) respecting TS.
+ */
+export function sumNoteTicks(notes, timeSignature = { num: 4, denom: 4 }) {
+    if (!notes) return 0;
+    return notes.reduce((acc, n) => acc + durationStringToTicks(n.duration, timeSignature), 0);
+}
+
+/**
+ * Convert ticks to the closest duration string using existing beat helpers.
+ */
+export function ticksToDurationString(ticks, timeSignature = { num: 4, denom: 4 }) {
+    const beats = ticksToBeats(ticks);
+    return beatsToDuration(beats);
+}
+
+/**
+ * Return overflow ticks over measure capacity (0 if fits).
+ */
+export function getNotesOverflowTicks(notes, timeSignature = { num: 4, denom: 4 }) {
+    const cap = getMeasureCapacityTicks(timeSignature);
+    const total = sumNoteTicks(notes, timeSignature);
+    return Math.max(0, total - cap);
+}
+
+/**
  * Get duration in beats from duration string
  * @param {string} duration - Duration string like '4n', '2n.'
  * @returns {number} - Duration in beats
@@ -309,7 +399,7 @@ export class CompositionState {
             showChordSpans: true,          // Show chord span shading and brackets (default ON)
             // Multi-voice rest display settings
             restDisplayMode: 'clean',      // 'clean' = smart omission, 'explicit' = show all rests
-            cueRestsForSecondaryVoice: true, // Use smaller (cue-sized) rests for secondary voices
+            cueRestsForSecondaryVoice: false, // When true, HIDE cue rests; when false, SHOW them (grey/small)
         };
 
         // Current editing state
@@ -441,7 +531,6 @@ export class CompositionState {
      */
     buildChordSegments() {
         const progressionData = this.exportToProgressionData();
-        console.log('[buildChordSegments] Building from progressionData:', progressionData.map(c => `${c.root} ${c.type}`));
         this.chordSegments = [];
 
         let currentBeat = 0;
@@ -553,24 +642,27 @@ export class CompositionState {
             return { truncatedNotes: [], adjustedNote: null, newBassNotes: [] };
         }
 
+        const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
+        const newDurationTicks = beatsToTicksInTS(newDurationBeats, timeSignature);
+
         const notes = segment.bassNotes;
         const truncatedNotes = [];
         const newBassNotes = [];
-        let currentBeat = 0;
+        let currentTick = 0;
         let adjustedNote = null;
 
         for (const note of notes) {
-            const noteDuration = getDurationInBeats(note.duration);
-            const noteEndBeat = currentBeat + noteDuration;
+            const noteTicks = durationStringToTicks(note.duration, timeSignature);
+            const noteEndTick = currentTick + noteTicks;
 
-            if (noteEndBeat <= newDurationBeats) {
+            if (noteEndTick <= newDurationTicks) {
                 // Note fits completely
-                newBassNotes.push({ ...note, beat: currentBeat });
-                currentBeat = noteEndBeat;
-            } else if (currentBeat < newDurationBeats) {
+                newBassNotes.push({ ...note, beat: ticksToBeats(currentTick, timeSignature) });
+                currentTick = noteEndTick;
+            } else if (currentTick < newDurationTicks) {
                 // Note partially fits - truncate it
-                const remainingBeats = newDurationBeats - currentBeat;
-                const newDuration = beatsToDuration(remainingBeats);
+                const remainingTicks = newDurationTicks - currentTick;
+                const newDuration = ticksToDurationString(remainingTicks, timeSignature);
 
                 // Create adjusted note
                 adjustedNote = {
@@ -579,13 +671,13 @@ export class CompositionState {
                         ...note,
                         duration: newDuration,
                         dotted: newDuration.includes('.'),
-                        beat: currentBeat,
+                        beat: ticksToBeats(currentTick, timeSignature),
                     },
-                    beatsLost: noteDuration - remainingBeats,
+                    beatsLost: ticksToBeats(noteTicks - remainingTicks, timeSignature),
                 };
 
                 newBassNotes.push(adjustedNote.adjusted);
-                currentBeat = newDurationBeats;
+                currentTick = newDurationTicks;
 
                 // All remaining notes are truncated
                 const remainingIndex = notes.indexOf(note) + 1;
@@ -618,6 +710,7 @@ export class CompositionState {
             return [];
         }
 
+        const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
         const notes = [...segment.bassNotes];
         const currentBeats = this.calculateSegmentBassBeats(segment);
         let additionalBeats = newDurationBeats - currentBeats;
@@ -627,24 +720,26 @@ export class CompositionState {
         }
 
         // Calculate the beat position for the rest
-        let restStartBeat = currentBeats;
+        let restStartTick = beatsToTicksInTS(currentBeats, timeSignature);
 
         // Add rests to fill the additional duration
         while (additionalBeats > 0) {
-            // Find largest rest that fits
-            const restDuration = beatsToDuration(Math.min(additionalBeats, 4));
-            const restBeats = getDurationInBeats(restDuration);
+            // Find largest rest that fits (up to 4 beats to avoid overly long rests)
+            const restBeatsToAdd = Math.min(additionalBeats, 4);
+            const restTicksToAdd = beatsToTicksInTS(restBeatsToAdd, timeSignature);
+            const restDuration = ticksToDurationString(restTicksToAdd, timeSignature);
+            const actualRestBeats = ticksToBeats(restTicksToAdd, timeSignature);
 
             notes.push({
                 type: 'rest',
                 isRest: true,
                 duration: restDuration,
-                beat: restStartBeat,
+                beat: ticksToBeats(restStartTick, timeSignature),
                 dotted: restDuration.includes('.'),
             });
 
-            additionalBeats -= restBeats;
-            restStartBeat += restBeats;
+            additionalBeats -= actualRestBeats;
+            restStartTick += restTicksToAdd;
         }
 
         return notes;
@@ -667,7 +762,7 @@ export class CompositionState {
      * Recombine tied notes that now fit in a single measure
      * This handles the case where a chord moves to a position where split notes can be combined
      * @param {Array} bassNotes - Array of bass notes
-     * @param {number} newDurationBeats - The new chord duration in beats
+     * @param {number} newDurationBeats - The new chord duration in beats (quarter-based)
      * @returns {Array} - Recombined bass notes
      */
     recombineTiedNotes(bassNotes, newDurationBeats) {
@@ -676,7 +771,8 @@ export class CompositionState {
         }
 
         const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
-        const beatsPerMeasure = timeSignature.num || 4;
+        const measureCapacityTicks = getMeasureCapacityTicks(timeSignature);
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
         // If the new duration fits in one measure, we may need to recombine
         if (newDurationBeats > beatsPerMeasure) {
@@ -863,14 +959,12 @@ export class CompositionState {
      * for multi-voice bass notation support.
      */
     renderBassBlocksToMeasures() {
-        console.log('[renderBassBlocksToMeasures] === CALLED ===');
         if (this.bassBlockSequence.blocks.length === 0) {
             return;
         }
 
         // Get rendered measures from the sequence
         const renderedMeasures = this.bassBlockSequence.renderToMeasures();
-        console.log('[renderBassBlocksToMeasures] Rendered from blocks:', renderedMeasures.map((m, i) => ({ measureIndex: i, pitches: m.bassNotes.map(n => n.pitches) })));
 
         // Ensure we have enough measures
         while (this.measures.length < renderedMeasures.length) {
@@ -964,12 +1058,11 @@ export class CompositionState {
      * IMPORTANT: Call this BEFORE reordering blocks to capture current edits
      */
     syncMeasuresToBuildingBlocks() {
-        console.log('[syncMeasuresToBuildingBlocks] === CALLED ===');
         if (this.bassBlockSequence.blocks.length === 0) {
             return;
         }
 
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
 
         // Calculate where each chord starts in absolute beats
         const chordStartBeats = [];
@@ -1014,7 +1107,6 @@ export class CompositionState {
 
 
                 const pitchesToSave = note.pitches || (note.pitch ? [note.pitch] : []);
-                console.log('[syncMeasuresToBuildingBlocks] Collecting note from measure', measureIndex, '- chordIndex:', noteChordIndex, 'pitches:', JSON.stringify(pitchesToSave), 'note.pitch:', note.pitch);
                 chordNotes.get(noteChordIndex).push({
                     pitches: pitchesToSave,
                     duration: note.duration || '4n',
@@ -1141,7 +1233,7 @@ export class CompositionState {
         }
 
         const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
-        const beatsPerMeasure = timeSignature.num || 4;
+        const measureCapacityTicks = getMeasureCapacityTicks(timeSignature);
 
         // First, clear all bass notes from measures
         this.measures.forEach(measure => {
@@ -1155,30 +1247,31 @@ export class CompositionState {
         }
         const sortedChordIndices = Array.from(chordIndices).sort((a, b) => a - b);
 
-        // Calculate each chord's start beat
-        let currentBeat = 0;
-        const chordStartBeats = new Map();
+        // Calculate each chord's start ticks
+        let currentTicks = 0;
+        const chordStartTicks = new Map();
 
         for (const chordIndex of sortedChordIndices) {
-            chordStartBeats.set(chordIndex, currentBeat);
+            chordStartTicks.set(chordIndex, currentTicks);
 
             // Get total duration for this chord from its notes
             const notes = this.bassNoteStore.getNotesForChord(chordIndex);
-            const chordBeats = notes.reduce((sum, n) => sum + getDurationInBeats(n.duration), 0);
-            currentBeat += chordBeats;
+            const chordTicks = notes.reduce((sum, n) => sum + durationStringToTicks(n.duration, timeSignature), 0);
+            currentTicks += chordTicks;
         }
 
         // Now render each chord's notes to measures
         for (const chordIndex of sortedChordIndices) {
             const notes = this.bassNoteStore.getNotesForChord(chordIndex);
-            let noteStartBeat = chordStartBeats.get(chordIndex);
+            let noteStartTicks = chordStartTicks.get(chordIndex);
 
 
             for (const noteEntry of notes) {
-                const noteDuration = getDurationInBeats(noteEntry.duration);
-                const measureIndex = Math.floor(noteStartBeat / beatsPerMeasure);
-                const beatInMeasure = noteStartBeat % beatsPerMeasure;
-                const remainingInMeasure = beatsPerMeasure - beatInMeasure;
+                const noteTicks = durationStringToTicks(noteEntry.duration, timeSignature);
+                const measureIndex = Math.floor(noteStartTicks / measureCapacityTicks);
+                const beatInMeasureTicks = noteStartTicks % measureCapacityTicks;
+
+                const remainingInMeasureTicks = measureCapacityTicks - beatInMeasureTicks;
 
                 // Ensure measure exists
                 while (this.measures.length <= measureIndex) {
@@ -1186,14 +1279,14 @@ export class CompositionState {
                 }
 
 
-                if (noteDuration <= remainingInMeasure) {
+                if (noteTicks <= remainingInMeasureTicks + 0.001) {
                     // Note fits in current measure - no split needed
                     const noteToAdd = {
                         type: noteEntry.type || 'note',
                         pitch: noteEntry.pitches?.[0] || null, // Keep pitch in sync with pitches[0]
                         pitches: [...noteEntry.pitches],
                         duration: noteEntry.duration,
-                        beat: beatInMeasure,
+                        beat: ticksToBeats(beatInMeasureTicks),
                         dotted: noteEntry.dotted,
                         isTied: false,
                         isRest: noteEntry.isRest,
@@ -1208,16 +1301,18 @@ export class CompositionState {
                     noteEntry.isSplit = true;
                     noteEntry.splitParts = [];
 
-                    // First part in current measure
-                    const firstPartDuration = beatsToDuration(remainingInMeasure);
+                    const firstPartTicks = remainingInMeasureTicks;
+                    const secondPartTicks = noteTicks - remainingInMeasureTicks;
+                    const firstPartDuration = ticksToDurationString(firstPartTicks, timeSignature);
                     const firstNote = {
                         type: noteEntry.type || 'note',
                         pitch: noteEntry.pitches?.[0] || null, // Keep pitch in sync with pitches[0]
                         pitches: [...noteEntry.pitches],
                         duration: firstPartDuration,
-                        beat: beatInMeasure,
+                        beat: ticksToBeats(beatInMeasureTicks),
                         dotted: firstPartDuration.includes('.'),
                         isTied: false, // First part is NOT tied (it's the start of the tie)
+                        tied: true, // First part ties TO the next note
                         isRest: noteEntry.isRest,
                         bassNoteId: noteEntry.id,
                         chordIndex: chordIndex,
@@ -1226,14 +1321,14 @@ export class CompositionState {
                     noteEntry.splitParts.push({ measureIndex, duration: firstPartDuration, isTied: false });
 
                     // Second part in next measure
-                    const secondPartBeats = noteDuration - remainingInMeasure;
+                    const secondPartBeats = ticksToBeats(secondPartTicks);
                     const nextMeasureIndex = measureIndex + 1;
 
                     while (this.measures.length <= nextMeasureIndex) {
                         this.addMeasure({});
                     }
 
-                    const secondPartDuration = beatsToDuration(secondPartBeats);
+                    const secondPartDuration = ticksToDurationString(secondPartTicks, timeSignature);
                     const secondNote = {
                         type: noteEntry.type || 'note',
                         pitch: noteEntry.pitches?.[0] || null, // Keep pitch in sync with pitches[0]
@@ -1242,6 +1337,7 @@ export class CompositionState {
                         beat: 0,
                         dotted: secondPartDuration.includes('.'),
                         isTied: true, // Second part IS tied (continuation of the tie)
+                        tied: false, // Second part does not tie to another note
                         isRest: noteEntry.isRest,
                         bassNoteId: noteEntry.id,
                         chordIndex: chordIndex,
@@ -1250,7 +1346,7 @@ export class CompositionState {
                     noteEntry.splitParts.push({ measureIndex: nextMeasureIndex, duration: secondPartDuration, isTied: true });
                 }
 
-                noteStartBeat += noteDuration;
+                noteStartTicks += noteTicks;
             }
         }
 
@@ -1316,6 +1412,8 @@ export class CompositionState {
     combineRenderedNotes(notes) {
         if (notes.length === 0) return [];
 
+        const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
+
         // Sort by measureIndex then by beat
         notes.sort((a, b) => {
             if (a.measureIndex !== b.measureIndex) {
@@ -1330,10 +1428,13 @@ export class CompositionState {
         for (const note of notes) {
             if (note.isTied && currentNote) {
                 // This is a continuation - add its duration to the current note
-                const currentBeats = getDurationInBeats(currentNote.duration);
-                const addedBeats = getDurationInBeats(note.duration);
-                currentNote.duration = beatsToDuration(currentBeats + addedBeats);
-                currentNote.dotted = currentNote.duration.includes('.');
+                const currentTicks = durationStringToTicks(currentNote.duration, timeSignature);
+                const addedTicks = durationStringToTicks(note.duration, timeSignature);
+                const totalTicks = currentTicks + addedTicks;
+                const combinedDuration = ticksToDurationString(totalTicks, timeSignature);
+
+                currentNote.duration = combinedDuration;
+                currentNote.dotted = combinedDuration.includes('.');
             } else {
                 // This is a new note (not tied)
                 if (currentNote) {
@@ -1363,7 +1464,7 @@ export class CompositionState {
      */
     applySegmentsToMeasures() {
         const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
-        const beatsPerMeasure = timeSignature.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
         // First, clear all bass notes
         this.measures.forEach(measure => {
@@ -1460,7 +1561,7 @@ export class CompositionState {
         this.trebleBlockSequence.blocks = [];
 
         // Calculate total beats from all measures
-        const beatsPerMeasure = timeSignature.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
         const totalBeats = this.measures.length * beatsPerMeasure;
 
         if (totalBeats === 0) {
@@ -1488,52 +1589,29 @@ export class CompositionState {
      * This reads notes from measures and writes them into the unit-based timeline
      * IMPORTANT: Handles tied notes by combining them into single notes with full duration
      *
-     * MULTI-VOICE: The block sequence is a flat structure that cannot represent
-     * multiple voices at the same time position. When Voice 2 has notes, we skip
-     * the sync entirely and let the treble data stay directly in the measures.
+     * MULTI-VOICE: The block sequence now supports multiple voices. Each note
+     * stores its voice attribute, allowing proper sync and render of all voices.
      */
     syncMeasuresToTrebleBlock() {
         if (this.trebleBlockSequence.blocks.length === 0) {
             return;
         }
 
-        // MULTI-VOICE CHECK: Skip sync if Voice 2 has any notes
-        // The block sequence cannot represent multiple voices at the same position
-        const hasMultipleVoices = this.measures.some(m => {
-            const voices = m.notation?.treble?.voices || [];
-            return voices.length > 1 && voices[1]?.notes?.length > 0;
-        });
-
-        if (hasMultipleVoices) {
-            console.log(`[syncMeasuresToTrebleBlock] SKIPPING sync - multiple voices detected, measures are source of truth`);
-            return;
-        }
+        // Multi-voice is now fully supported - the block sequence can store notes from
+        // all voices with their voice attribute. This allows time signature changes to
+        // properly sync and re-render all voices.
 
         const block = this.trebleBlockSequence.blocks[0]; // Single treble block
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
-
-        console.log(`[syncMeasuresToTrebleBlock] Syncing ${this.measures.length} measures to treble block`);
-
-        // Ensure block has correct duration for all measures
-        const requiredBeats = this.measures.length * beatsPerMeasure;
-        if (block.beats !== requiredBeats) {
-            console.log(`[syncMeasuresToTrebleBlock] Resizing block from ${block.beats} to ${requiredBeats} beats`);
-            block.setDuration(requiredBeats);
-        }
-
-        // Clear the block - reinitialize all units as rests
-        const totalUnits = block.beats * UNITS_PER_BEAT;
-        for (let i = 0; i < block.units.length; i++) {
-            block.units[i].pitches = [];
-            block.units[i].parentIndex = i === 0 ? null : 0;
-        }
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
 
         // First, collect all notes with their absolute positions and combine tied notes
+        // We need to do this BEFORE resizing the block to know how much space we need
         const allNotes = [];
 
         for (let measureIndex = 0; measureIndex < this.measures.length; measureIndex++) {
             const measure = this.measures[measureIndex];
             const voices = measure.notation?.treble?.voices || [];
+            // Use beatsPerMeasure for position calculation - this converts old measure positions to absolute beats
             const measureStartBeat = measureIndex * beatsPerMeasure;
 
             // Iterate through ALL voices, not just voice 0
@@ -1632,10 +1710,33 @@ export class CompositionState {
             });
         }
 
-        console.log(`[syncMeasuresToTrebleBlock] Found ${combinedNotes.length} combined notes to write:`,
-            combinedNotes.map(n => `v${(n.voiceIndex || 0) + 1}:${n.pitches?.join(',') || 'rest'} at unit ${n.startUnit} (${n.durationUnits} units)`));
+        // Calculate required block size based on actual note content
+        // This ensures notes aren't truncated during time signature changes
+        let maxEndUnit = 0;
+        for (const note of combinedNotes) {
+            const endUnit = note.startUnit + note.durationUnits;
+            if (endUnit > maxEndUnit) {
+                maxEndUnit = endUnit;
+            }
+        }
+
+        // Also ensure block is at least as large as the current measures require
+        const measureRequiredBeats = this.measures.length * beatsPerMeasure;
+        const measureRequiredUnits = measureRequiredBeats * UNITS_PER_BEAT;
+        const requiredUnits = Math.max(maxEndUnit, measureRequiredUnits, 1);
+        const requiredBeats = Math.ceil(requiredUnits / UNITS_PER_BEAT);
+
+        // Resize block if needed
+        if (block.beats !== requiredBeats) {
+            block.setDuration(requiredBeats);
+        }
+
+        // Clear the block - uses clearNotes() which handles both units and voiceNotes map
+        block.clearNotes();
+        const totalUnits = block.beats * UNITS_PER_BEAT;
 
         // Now write the combined notes to the block
+        // setNote() stores in voiceNotes map for proper multi-voice support
         for (const note of combinedNotes) {
             if (note.startUnit >= 0 && note.startUnit < totalUnits) {
                 block.setNote(note.startUnit, note.durationUnits, note.isRest ? [] : note.pitches, note.attributes);
@@ -1644,8 +1745,6 @@ export class CompositionState {
 
         // Debug: verify notes after sync
         const notesAfterSync = block.getNotes();
-        console.log(`[syncMeasuresToTrebleBlock] After sync, block has ${notesAfterSync.length} notes:`,
-            notesAfterSync.map(n => `${n.pitches?.join(',') || 'rest'} at unit ${n.startUnit} (${n.durationUnits} units)`));
     }
 
     /**
@@ -1676,7 +1775,7 @@ export class CompositionState {
         }
 
         const block = this.trebleBlockSequence.blocks[0];
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
 
         // Calculate the absolute beat position of this note
         const measure = this.measures[measureIndex];
@@ -1703,30 +1802,27 @@ export class CompositionState {
      * Render treble notes from trebleBlockSequence to measures
      * This is similar to renderBassBlocksToMeasures but for treble
      *
-     * MULTI-VOICE: When Voice 2 has notes, the measures are the source of truth
-     * (not the block sequence), so we skip rendering from the block.
+     * MULTI-VOICE: The block sequence now fully supports multiple voices. Each note
+     * has a voice attribute, and the render logic only clears voices present in the block.
      */
     renderTrebleBlocksToMeasures() {
+        console.log(`🎼 [RenderTreble] Starting render, timeSignature: ${this.metadata.timeSignature.num}/${this.metadata.timeSignature.denom}`);
         if (this.trebleBlockSequence.blocks.length === 0) {
+            console.log(`🎼 [RenderTreble] No treble blocks to render`);
             return;
         }
 
-        // MULTI-VOICE CHECK: Skip render if Voice 2 has any notes in measures
-        // In multi-voice mode, measures are the source of truth, not the block
-        const hasMultipleVoices = this.measures.some(m => {
-            const voices = m.notation?.treble?.voices || [];
-            return voices.length > 1 && voices[1]?.notes?.length > 0;
-        });
-
-        if (hasMultipleVoices) {
-            console.log(`[renderTrebleBlocksToMeasures] SKIPPING render - multiple voices detected, measures are source of truth`);
-            return;
-        }
+        // Multi-voice is now supported - the block sequence stores voice attribute for each note
+        // and the render logic only clears voices that are present in the block, preserving others.
+        // This allows time signature changes to work correctly with multiple voices.
 
         const block = this.trebleBlockSequence.blocks[0]; // Single treble block
         const notes = block.getNotes();
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
         const unitsPerMeasure = beatsPerMeasure * UNITS_PER_BEAT;
+        console.log(`🎼 [RenderTreble] Block: beats=${block.beats}, timeSig=${this.trebleBlockSequence.timeSignature.num}/${this.trebleBlockSequence.timeSignature.denom}`);
+        console.log(`🎼 [RenderTreble] Block has ${notes.length} notes, beatsPerMeasure: ${beatsPerMeasure}, unitsPerMeasure: ${unitsPerMeasure}, measures: ${this.measures.length}`);
+        console.log(`🎼 [RenderTreble] Metadata timeSig: ${this.metadata.timeSignature.num}/${this.metadata.timeSignature.denom}`);
 
         // Determine which voices are present in the block data
         const voicesInBlock = new Set();
@@ -1756,6 +1852,7 @@ export class CompositionState {
         // Walk through notes and place them in measures
         // Handle cross-measure splitting with ties
         for (const note of notes) {
+            console.log(`🎼 [RenderTreble] Processing note: startUnit=${note.startUnit}, durationUnits=${note.durationUnits}, pitches=${note.pitches?.length || 0}`);
             let remainingUnits = note.durationUnits;
             let currentUnit = note.startUnit;
             let isFirstPart = true;
@@ -1768,6 +1865,8 @@ export class CompositionState {
                 const unitsAvailableInMeasure = unitsPerMeasure - unitInMeasure;
                 const unitsToPlace = Math.min(remainingUnits, unitsAvailableInMeasure);
                 const isLastPart = remainingUnits <= unitsAvailableInMeasure;
+
+                console.log(`🎼 [RenderTreble]   Splitting: measureIndex=${measureIndex}, currentUnit=${currentUnit}, remainingUnits=${remainingUnits}, unitsToPlace=${unitsToPlace}, isFirstPart=${isFirstPart}, isLastPart=${isLastPart}`);
 
                 // Ensure measure exists
                 while (this.measures.length <= measureIndex) {
@@ -1784,6 +1883,9 @@ export class CompositionState {
                 }
 
                 // Create note for this measure
+                // MULTI-VOICE: Voice 2+ rests should be cue-sized (smaller, lighter)
+                const isCueRest = note.isRest && voiceIndex >= 1;
+
                 const measureNote = {
                     type: note.isRest ? 'rest' : 'note',
                     pitches: note.pitches,
@@ -1791,9 +1893,12 @@ export class CompositionState {
                     duration: duration,
                     beat: beat,
                     dotted: duration.includes('.'),
-                    isTied: !isFirstPart, // Tied if continuation from previous measure
+                    tied: !isLastPart && !note.isRest, // First/middle parts tie TO next (not on last part or rests)
+                    isTied: !isFirstPart, // Continuation parts are tied FROM previous
                     isRest: note.isRest,
                     voiceIndex: voiceIndex, // Include 0-based voice index for rendering
+                    // Cue rest display for secondary voices
+                    _restDisplay: isCueRest ? { hidden: false, isCue: true } : undefined,
                     // Musical attributes - only on first part
                     dynamic: isFirstPart ? note.dynamic : null,
                     velocity: note.velocity,
@@ -1851,7 +1956,7 @@ export class CompositionState {
             block.setDuration(requiredBeats);
 
             // Also ensure we have enough measures
-            const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+            const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
             const requiredMeasures = Math.ceil(requiredBeats / beatsPerMeasure);
             while (this.measures.length < requiredMeasures) {
                 this.addMeasure({});
@@ -1885,18 +1990,17 @@ export class CompositionState {
         const block = this.trebleBlockSequence.blocks[0];
         const totalUnits = block.units.length;
 
-        // Debug: log existing notes before modification
-        const notesBefore = block.getNotes();
-        console.log(`[insertTrebleNoteWithShift] BEFORE: ${notesBefore.length} notes in block:`,
-            notesBefore.map(n => `${n.pitches.join(',')} at unit ${n.startUnit} (${n.durationUnits} units)`));
-        console.log(`[insertTrebleNoteWithShift] Inserting at unit ${insertUnit}, duration ${durationUnits} units, pitches: ${pitches}`);
+        console.log(`[DEBUG] insertTrebleNoteWithShift: Inserting at unit ${insertUnit}, duration ${durationUnits} units, pitches: ${pitches}`);
 
         // Step 1: Extend the block by the duration of the new note
         const newTotalUnits = totalUnits + durationUnits;
         const newTotalBeats = Math.ceil(newTotalUnits / UNITS_PER_BEAT);
         block.setDuration(newTotalBeats);
 
-        // Step 2: Shift all units at and after insertUnit forward by durationUnits
+        // Step 2: Shift all notes at and after insertUnit forward by durationUnits
+        // MULTI-VOICE: Must shift both units array AND voiceNotes Map
+
+        // Shift units array (for backwards compatibility)
         // Work backwards to avoid overwriting
         for (let i = block.units.length - 1; i >= insertUnit + durationUnits; i--) {
             const sourceIndex = i - durationUnits;
@@ -1911,7 +2015,20 @@ export class CompositionState {
             }
         }
 
+        // MULTI-VOICE: Shift notes in voiceNotes Map
+        // All notes at or after insertUnit need their startUnit increased by durationUnits
+        if (block.voiceNotes && block.voiceNotes.size > 0) {
+            for (const [voiceNumber, voiceArray] of block.voiceNotes) {
+                for (const note of voiceArray) {
+                    if (note.startUnit >= insertUnit) {
+                        note.startUnit += durationUnits;
+                    }
+                }
+            }
+        }
+
         // Step 3: Insert the new note at insertUnit
+        // setNote() adds to voiceNotes at the correct position
         block.setNote(insertUnit, durationUnits, pitches, attributes);
 
         // Debug: log notes after modification
@@ -1920,7 +2037,7 @@ export class CompositionState {
             notesAfter.map(n => `${n.pitches.join(',')||'rest'} at unit ${n.startUnit} (${n.durationUnits} units)`));
 
         // Step 4: Ensure we have enough measures
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
         const requiredMeasures = Math.ceil(newTotalBeats / beatsPerMeasure);
         while (this.measures.length < requiredMeasures) {
             this.addMeasure({});
@@ -1953,6 +2070,7 @@ export class CompositionState {
 
         if (shiftBack) {
             // Shift downstream notes back to fill the gap
+            // MULTI-VOICE: Must update both units array AND voiceNotes Map
 
             // Step 1: Shift all units after the deleted note back by deleteDurationUnits
             const shiftStart = noteStartUnit + deleteDurationUnits;
@@ -1969,12 +2087,44 @@ export class CompositionState {
                 }
             }
 
+            // MULTI-VOICE: Update voiceNotes Map
+            // Remove the deleted note and shift notes after it back
+            if (block.voiceNotes && block.voiceNotes.size > 0) {
+                const voiceOfDeletedNote = noteToDelete.voice || 1;
+                for (const [voiceNumber, voiceArray] of block.voiceNotes) {
+                    // Remove the deleted note (for this voice only)
+                    if (voiceNumber === voiceOfDeletedNote) {
+                        const deleteIndex = voiceArray.findIndex(n => n.startUnit === noteStartUnit);
+                        if (deleteIndex >= 0) {
+                            voiceArray.splice(deleteIndex, 1);
+                        }
+                    }
+                    // Shift all notes that were after the deleted note back
+                    for (const note of voiceArray) {
+                        if (note.startUnit >= shiftStart) {
+                            note.startUnit -= deleteDurationUnits;
+                        }
+                    }
+                }
+            }
+
             // Step 2: Truncate the block
             const newTotalUnits = block.units.length - deleteDurationUnits;
             const newTotalBeats = Math.ceil(newTotalUnits / UNITS_PER_BEAT);
             block.setDuration(Math.max(1, newTotalBeats)); // At least 1 beat
         } else {
             // Replace the note with a rest (no shift)
+            // MULTI-VOICE: Remove from voiceNotes but don't shift
+            if (block.voiceNotes && block.voiceNotes.size > 0) {
+                const voiceOfDeletedNote = noteToDelete.voice || 1;
+                const voiceArray = block.voiceNotes.get(voiceOfDeletedNote);
+                if (voiceArray) {
+                    const deleteIndex = voiceArray.findIndex(n => n.startUnit === noteStartUnit);
+                    if (deleteIndex >= 0) {
+                        voiceArray.splice(deleteIndex, 1);
+                    }
+                }
+            }
             block.setRest(noteStartUnit, deleteDurationUnits);
         }
 
@@ -2017,7 +2167,7 @@ export class CompositionState {
      * @returns {Object|null} - { startUnit, durationUnits, note, isTiedContinuation } or null
      */
     getTrebleNoteUnit(measureIndex, noteIndex) {
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
         const measureStartUnit = measureIndex * beatsPerMeasure * UNITS_PER_BEAT;
 
         const measure = this.measures[measureIndex];
@@ -2114,7 +2264,7 @@ export class CompositionState {
      */
     addTrebleNote(measureIndex, beat, noteData, options = {}) {
         const { useBlockSequence = true, insertWithShift = false } = options;
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
 
         // Ensure measure exists
         while (this.measures.length <= measureIndex) {
@@ -2123,8 +2273,15 @@ export class CompositionState {
 
         // Calculate unit position
         const absoluteBeat = measureIndex * beatsPerMeasure + beat;
+        console.log(`🎼 [addTrebleNote] noteData:`, JSON.stringify(noteData));
         const insertUnit = Math.round(absoluteBeat * UNITS_PER_BEAT);
-        const durationUnits = durationToUnits(noteData.duration || '4n');
+        let durationUnits;
+        if (noteData.duration === '1n') {
+            durationUnits = 192; // Whole note = 4 beats * 48 units/beat
+        } else {
+            durationUnits = durationToUnits(noteData.duration || '4n');
+        }
+        console.log(`🎼 [addTrebleNote] duration: ${noteData.duration}, durationUnits: ${durationUnits}`);
         const pitches = noteData.pitches || (noteData.pitch ? [noteData.pitch] : []);
         const isRest = noteData.isRest || noteData.type === 'rest' || pitches.length === 0;
 
@@ -2461,7 +2618,7 @@ export class CompositionState {
             this.buildChordSegments();
         }
 
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
         const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
         let previousChord = null;
 
@@ -2554,7 +2711,7 @@ export class CompositionState {
         }
 
         const { startBeat, durationBeats, chord } = segment;
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
         const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
 
         // Get previous chord for voice leading
@@ -3016,6 +3173,99 @@ export class CompositionState {
     // ========================================================================
 
     /**
+     * Set time signature for the composition
+     * @param {number} num - Numerator (e.g., 4 for 4/4, 3 for 3/4, 6 for 6/8)
+     * @param {number} denom - Denominator (e.g., 4 for quarter note, 8 for eighth note)
+     */
+    setTimeSignature(num, denom) {
+        const oldTimeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
+        console.log(`🎼 [TS] setTimeSignature called: ${oldTimeSignature.num}/${oldTimeSignature.denom} → ${num}/${denom}`);
+
+        // CRITICAL: Sync treble notes BEFORE updating metadata time signature
+        // The sync uses beatsPerMeasure from metadata, and we need the OLD value
+        // to correctly calculate absolute positions from the old measure structure
+        const hasTrebleNotes = this.measures.some(m => {
+            const voices = m.notation?.treble?.voices || [];
+            return voices.some(v => v.notes && v.notes.length > 0);
+        });
+
+        if (hasTrebleNotes) {
+            // Initialize block sequence if needed (still using OLD time signature)
+            if (this.trebleBlockSequence.blocks.length === 0) {
+                console.log(`🎼 [TS] Initializing treble block sequence for sync (using old TS)`);
+                this.initializeTrebleBlockSequence();
+            }
+            console.log(`🎼 [TS] Syncing treble notes from measures to block sequence (using old TS)`);
+            this.syncMeasuresToTrebleBlock();
+            const trebleNotesBeforeChange = this.trebleBlockSequence.blocks[0].getNotes();
+            console.log(`🎼 [TS] Treble block has ${trebleNotesBeforeChange.length} notes after sync`);
+        }
+
+        // NOW update metadata time signature
+        this.metadata.timeSignature = { num, denom };
+
+        // Update block sequences with new time signature
+        if (this.bassBlockSequence) {
+            this.bassBlockSequence.setTimeSignature(num, denom);
+        }
+        if (this.trebleBlockSequence) {
+            this.trebleBlockSequence.setTimeSignature(num, denom);
+        }
+
+        console.log(`🎼 [TS] Block sequences updated to ${num}/${denom}. Bass blocks: ${this.bassBlockSequence.blocks.length}, Treble blocks: ${this.trebleBlockSequence.blocks.length}`);
+
+        // Re-sync progression data to re-split chords across measures based on new time signature
+        // Get the current progression data from trainer state
+        const trainerState = window.getTrainerState ? window.getTrainerState() : null;
+        if (trainerState && trainerState.progressionData) {
+            console.log(`🎼 [TS] Starting time signature change process...`);
+            // Check if we already have manually edited bass notes in the store
+            const hadExistingNotes = this.bassNoteStore.hasNotes();
+            console.log(`🎼 [TS] Bass note store has existing notes: ${hadExistingNotes}`);
+
+            // If no manually edited notes, try to capture auto-generated bass from current measures
+            if (!hadExistingNotes) {
+                console.log(`🎼 [TS] Capturing auto-generated bass notes from measures`);
+                // Ensure bass notes are rendered to measures first
+                this.renderBassNotesToMeasures();
+                // Then capture them into the store
+                this.initializeBassNoteStoreFromMeasures();
+            }
+
+            const storedNoteCount = this.bassNoteStore.notes.size;
+            console.log(`🎼 [TS] Bass note store now has ${storedNoteCount} notes`);
+
+            console.log(`🎼 [TS] Re-importing progression data with new time signature`);
+            console.log(`🎼 [TS] Before re-import: ${this.measures.length} measures`);
+            // Re-import with new time signature to properly split chords across measures
+            this.importFromProgressionData(trainerState.progressionData, {
+                key: this.metadata.key,
+                tempo: this.metadata.tempo,
+                timeSignature: { num, denom }
+            });
+            console.log(`🎼 [TS] After re-import: ${this.measures.length} measures`);
+
+            // Re-render stored bass notes into the new measure layout
+            if (storedNoteCount > 0) {
+                console.log(`🎼 [TS] Re-rendering ${storedNoteCount} bass notes to new measure layout`);
+                this.renderBassNotesToMeasures();
+            }
+
+            console.log(`🎼 [TS] Preserving treble notes during time signature change`);
+            // Preserve treble notes by keeping the block sequence as-is
+            // The block maintains its absolute duration, just gets re-rendered to new measure boundaries
+            if (this.trebleBlockSequence.blocks.length > 0) {
+                const trebleNotes = this.trebleBlockSequence.blocks[0].getNotes();
+                console.log(`🎼 [TS] Preserving ${trebleNotes.length} treble notes with existing block structure`);
+                // Don't reinitialize - just re-render the existing block to the new measure structure
+                this.renderTrebleBlocksToMeasures();
+            }
+        }
+
+        this.events.emit('timeSignatureChanged', { num, denom });
+    }
+
+    /**
      * Import from existing progressionData array (from trainerState)
      * @param {array} progressionData - Array of chord objects
      * @param {object} options - Import options
@@ -3031,7 +3281,10 @@ export class CompositionState {
 
         // Get time signature to determine beats per measure
         const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
-        const beatsPerMeasure = timeSignature.num || timeSignature.numerator || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature({
+            num: timeSignature.num ?? timeSignature.numerator ?? 4,
+            denom: timeSignature.denom ?? timeSignature.denominator ?? 4
+        });
 
         // Process each chord, potentially splitting across multiple measures
         progressionData.forEach((chordData, chordIndex) => {
@@ -3115,7 +3368,10 @@ export class CompositionState {
 
         // Get time signature to determine beats per measure
         const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
-        const beatsPerMeasure = timeSignature.num || timeSignature.numerator || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature({
+            num: timeSignature.num ?? timeSignature.numerator ?? 4,
+            denom: timeSignature.denom ?? timeSignature.denominator ?? 4
+        });
 
         // Calculate how many measures we need based on chord durations
         let requiredMeasures = 0;
@@ -3558,7 +3814,7 @@ export class CompositionState {
             melodyNotes,
             chordNotes,
             timeSignature: `${this.metadata.timeSignature.num}/${this.metadata.timeSignature.denom}`,
-            beatsPerMeasure: this.metadata.timeSignature.num,
+            beatsPerMeasure: getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature),
             beatDuration: this.metadata.timeSignature.denom === 4 ? '4n' : '8n',
             tempo: this.metadata.tempo,
             key: this.metadata.key
@@ -3870,7 +4126,7 @@ export class CompositionState {
 
             // Advance by measure's total beats
             const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
-            currentBeat += timeSignature.num || 4;
+            currentBeat += getBeatsPerMeasureFromTimeSignature(timeSignature);
         }
 
         return trebleNotes;
@@ -4167,7 +4423,7 @@ export class CompositionState {
             return;
         }
 
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
 
         // Get foundational chord pitches - exact pitches from chord card
         const bassPitches = this.getFoundationalBassPitches(chordData);

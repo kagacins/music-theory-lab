@@ -678,7 +678,7 @@ export function getRelevantChordTypes(context = {}) {
                 }
                 if (consecutiveCount >= profile.contextRules.maxConsecutive) {
                     score *= 0.3;
-                    reasons.push('Max consecutive reached');
+                    reasons.push('Max consecutive 
                 }
             }
 
@@ -687,7 +687,7 @@ export function getRelevantChordTypes(context = {}) {
                 const count = progression.filter(c => c.type === type).length;
                 if (count >= profile.contextRules.maxInProgression) {
                     score *= 0.4;
-                    reasons.push('Used frequently already');
+                    reasons.push('Used frequently 
                 }
             }
         }
@@ -695,13 +695,13 @@ export function getRelevantChordTypes(context = {}) {
         // Tension direction alignment
         if (tensionDirection === 'build' && profile.tensionLevel > 0.6) {
             score *= 1.15;
-            reasons.push('Builds tension');
+            reasons.push('Builds 
         } else if (tensionDirection === 'resolve' && profile.contextRules?.resolvesTension) {
             score *= 1.2;
-            reasons.push('Provides resolution');
+            reasons.push('Provides 
         } else if (tensionDirection === 'resolve' && profile.contextRules?.expectsResolution) {
             score *= 0.8;
-            reasons.push('Creates more tension');
+            reasons.push('Creates more 
         }
 
         results.push({

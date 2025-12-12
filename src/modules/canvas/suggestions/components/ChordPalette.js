@@ -146,7 +146,7 @@ export class ChordPalette extends FloatingPalette {
      * @returns {HTMLElement}
      */
     createItemContent(suggestion) {
-        const content = document.createElement('div');
+        const content = document.createElement('
         content.className = 'suggestion-palette__item-content suggestion-palette__item-content--chord';
         content.style.flex = '1';
         content.style.display = 'flex';
@@ -154,13 +154,13 @@ export class ChordPalette extends FloatingPalette {
         content.style.gap = '4px';
 
         // Top row: Chord name and confidence
-        const topRow = document.createElement('div');
+        const topRow = document.createElement('
         topRow.style.display = 'flex';
         topRow.style.alignItems = 'center';
         topRow.style.justifyContent = 'space-between';
 
         // Chord name
-        const chordName = document.createElement('span');
+        const chordName = document.createElement('
         chordName.className = 'chord-suggestion__name';
         chordName.textContent = this.formatChordName(suggestion);
         chordName.style.fontWeight = 'bold';
@@ -178,7 +178,7 @@ export class ChordPalette extends FloatingPalette {
 
         // Bottom row: Reason/description
         if (suggestion.reason || suggestion.description) {
-            const reason = document.createElement('div');
+            const reason = document.createElement('
             reason.className = 'chord-suggestion__reason';
             reason.textContent = suggestion.reason || suggestion.description;
             reason.style.fontSize = '11px';
@@ -189,7 +189,7 @@ export class ChordPalette extends FloatingPalette {
 
         // Inversion indicator (if applicable)
         if (suggestion.nextInversion !== undefined && suggestion.nextInversion !== 0) {
-            const inversionBadge = document.createElement('span');
+            const inversionBadge = document.createElement('
             inversionBadge.className = 'chord-suggestion__inversion';
             inversionBadge.textContent = this.getInversionLabel(suggestion.nextInversion);
             inversionBadge.style.fontSize = '9px';
@@ -242,7 +242,7 @@ export class ChordPalette extends FloatingPalette {
      * @returns {HTMLElement}
      */
     createStarRating(confidence) {
-        const container = document.createElement('div');
+        const container = document.createElement('
         container.className = 'chord-suggestion__stars';
         container.style.display = 'flex';
         container.style.gap = '2px';
@@ -251,7 +251,7 @@ export class ChordPalette extends FloatingPalette {
         const filledStars = Math.round((confidence / 100) * maxStars);
 
         for (let i = 0; i < maxStars; i++) {
-            const star = document.createElement('span');
+            const star = document.createElement('
             star.textContent = i < filledStars ? '★' : '☆';
             star.style.color = LayoutConstants.COLORS.ACCENT;
             star.style.fontSize = '12px';
@@ -269,7 +269,7 @@ export class ChordPalette extends FloatingPalette {
         const header = super.createHeader();
 
         // Add mood selector
-        const controls = document.createElement('div');
+        const controls = document.createElement('
         controls.className = 'chord-suggestion__controls';
         controls.style.marginTop = '8px';
         controls.style.display = 'flex';
@@ -277,18 +277,18 @@ export class ChordPalette extends FloatingPalette {
         controls.style.gap = '6px';
 
         // Mood selector
-        const moodRow = document.createElement('div');
+        const moodRow = document.createElement('
         moodRow.style.display = 'flex';
         moodRow.style.alignItems = 'center';
         moodRow.style.gap = '6px';
 
-        const moodLabel = document.createElement('span');
+        const moodLabel = document.createElement('
         moodLabel.textContent = 'Mood:';
         moodLabel.style.fontSize = '11px';
         moodLabel.style.fontWeight = '500';
         moodRow.appendChild(moodLabel);
 
-        const moodSelect = document.createElement('select');
+        const moodSelect = document.createElement('
         moodSelect.style.flex = '1';
         moodSelect.style.fontSize = '11px';
         moodSelect.style.padding = '3px';
@@ -296,7 +296,7 @@ export class ChordPalette extends FloatingPalette {
         moodSelect.style.border = `1px solid ${LayoutConstants.COLORS.BORDER}`;
 
         ['Bright', 'Dark', 'Jazzy', 'Tense', 'Calm', 'Energetic'].forEach(mood => {
-            const option = document.createElement('option');
+            const option = document.createElement('
             option.value = mood.toLowerCase();
             option.textContent = mood;
             moodSelect.appendChild(option);
@@ -310,18 +310,18 @@ export class ChordPalette extends FloatingPalette {
         controls.appendChild(moodRow);
 
         // Style selector
-        const styleRow = document.createElement('div');
+        const styleRow = document.createElement('
         styleRow.style.display = 'flex';
         styleRow.style.alignItems = 'center';
         styleRow.style.gap = '6px';
 
-        const styleLabel = document.createElement('span');
+        const styleLabel = document.createElement('
         styleLabel.textContent = 'Style:';
         styleLabel.style.fontSize = '11px';
         styleLabel.style.fontWeight = '500';
         styleRow.appendChild(styleLabel);
 
-        const styleSelect = document.createElement('select');
+        const styleSelect = document.createElement('
         styleSelect.style.flex = '1';
         styleSelect.style.fontSize = '11px';
         styleSelect.style.padding = '3px';
@@ -329,7 +329,7 @@ export class ChordPalette extends FloatingPalette {
         styleSelect.style.border = `1px solid ${LayoutConstants.COLORS.BORDER}`;
 
         ['Balanced', 'Pop', 'Jazz', 'Classical', 'Rock', 'Indie'].forEach(style => {
-            const option = document.createElement('option');
+            const option = document.createElement('
             option.value = style.toLowerCase();
             option.textContent = style;
             styleSelect.appendChild(option);
@@ -357,7 +357,7 @@ export class ChordPalette extends FloatingPalette {
         // Add visual hint for hold-to-preview
         const item = this.itemElements[index];
         if (item && !item.querySelector('.preview-hint')) {
-            const hint = document.createElement('span');
+            const hint = document.createElement('
             hint.className = 'preview-hint';
             hint.textContent = 'Hold to preview';
             hint.style.fontSize = '9px';

@@ -66,8 +66,6 @@ export class ChordSuggestionEngine {
             currentRoot,
             style,
             mood,
-            currentInversion
-        );
 
         // Transform to canvas-friendly format
         const suggestions = this.transformSuggestions(coreSuggestions, currentRoot);
@@ -92,8 +90,6 @@ export class ChordSuggestionEngine {
             const chordName = this.formatChordName(
                 suggestion.nextRoot || currentRoot,
                 suggestion.nextChord,
-                suggestion.nextInversion
-            );
 
             return {
                 // Canvas-specific fields

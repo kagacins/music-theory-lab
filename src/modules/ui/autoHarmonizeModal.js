@@ -108,11 +108,11 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     const { onApplyBassLine = null, onApplyCounterMelody = null } = callbacks;
 
     // Remove existing modal if any
-    const existingModal = document.getElementById('auto-harmonize-modal');
+    const existingModal = document.getElementById('auto-harmonize-
     if (existingModal) existingModal.remove();
 
     // Remove any existing tooltips
-    const existingTooltip = document.getElementById('harmonize-tooltip');
+    const existingTooltip = document.getElementById('harmonize-
     if (existingTooltip) existingTooltip.remove();
 
     // Phase 6: State for new options
@@ -170,7 +170,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     const selections = suggestions.map(() => 0);
 
     // Create modal overlay
-    const overlay = document.createElement('div');
+    const overlay = document.createElement('
     overlay.id = 'auto-harmonize-modal';
     overlay.style.cssText = `
         position: fixed;
@@ -189,7 +189,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     };
 
     // Create modal content
-    const modal = document.createElement('div');
+    const modal = document.createElement('
     modal.style.cssText = `
         background-color: white;
         border-radius: 8px;
@@ -203,7 +203,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     modal.onclick = (e) => e.stopPropagation();
 
     // Title container
-    const titleContainer = document.createElement('div');
+    const titleContainer = document.createElement('
     titleContainer.style.cssText = `
         display: flex;
         justify-content: space-between;
@@ -222,7 +222,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     titleContainer.appendChild(title);
 
     // Close button
-    const closeBtn = document.createElement('button');
+    const closeBtn = document.createElement('
     closeBtn.innerHTML = '&times;';
     closeBtn.style.cssText = `
         background: none;
@@ -252,7 +252,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     modal.appendChild(titleContainer);
 
     // Subtitle with key info
-    const subtitle = document.createElement('p');
+    const subtitle = document.createElement('
     subtitle.textContent = `Analyzing melody in ${key} and suggesting chord progressions`;
     subtitle.style.cssText = `
         margin: 0 0 16px 0;
@@ -264,7 +264,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     // =========================================================================
     // Phase 6: Options Panel
     // =========================================================================
-    const optionsPanel = document.createElement('div');
+    const optionsPanel = document.createElement('
     optionsPanel.style.cssText = `
         background-color: #f8fafc;
         border: 1px solid #e2e8f0;
@@ -274,7 +274,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     `;
 
     // Options header with toggle
-    const optionsHeader = document.createElement('div');
+    const optionsHeader = document.createElement('
     optionsHeader.style.cssText = `
         display: flex;
         justify-content: space-between;
@@ -282,7 +282,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
         cursor: pointer;
     `;
 
-    const optionsTitle = document.createElement('span');
+    const optionsTitle = document.createElement('
     optionsTitle.textContent = '⚙️ Harmonization Options';
     optionsTitle.style.cssText = `
         font-weight: 600;
@@ -291,7 +291,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     `;
     optionsHeader.appendChild(optionsTitle);
 
-    const expandIcon = document.createElement('span');
+    const expandIcon = document.createElement('
     expandIcon.textContent = '▼';
     expandIcon.style.cssText = `
         font-size: 10px;
@@ -302,7 +302,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     optionsPanel.appendChild(optionsHeader);
 
     // Options content (collapsible)
-    const optionsContent = document.createElement('div');
+    const optionsContent = document.createElement('
     optionsContent.style.cssText = `
         margin-top: 12px;
         display: grid;
@@ -320,9 +320,9 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
 
     // Helper to create labeled select
     const createLabeledSelect = (label, options, defaultValue, onChange) => {
-        const container = document.createElement('div');
+        const container = document.createElement('
 
-        const labelEl = document.createElement('label');
+        const labelEl = document.createElement('
         labelEl.textContent = label;
         labelEl.style.cssText = `
             display: block;
@@ -333,7 +333,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
         `;
         container.appendChild(labelEl);
 
-        const select = document.createElement('select');
+        const select = document.createElement('
         select.style.cssText = `
             width: 100%;
             padding: 8px 10px;
@@ -346,7 +346,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
         `;
 
         Object.entries(options).forEach(([value, option]) => {
-            const opt = document.createElement('option');
+            const opt = document.createElement('
             opt.value = value;
             opt.textContent = option.name;
             if (value === defaultValue) opt.selected = true;
@@ -361,14 +361,14 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
 
     // Helper to create checkbox option
     const createCheckboxOption = (label, description, checked, onChange) => {
-        const container = document.createElement('div');
+        const container = document.createElement('
         container.style.cssText = `
             display: flex;
             align-items: flex-start;
             gap: 8px;
         `;
 
-        const checkbox = document.createElement('input');
+        const checkbox = document.createElement('
         checkbox.type = 'checkbox';
         checkbox.checked = checked;
         checkbox.style.cssText = `
@@ -378,8 +378,8 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
         checkbox.onchange = (e) => onChange(e.target.checked);
         container.appendChild(checkbox);
 
-        const textContainer = document.createElement('div');
-        const labelEl = document.createElement('span');
+        const textContainer = document.createElement('
+        const labelEl = document.createElement('
         labelEl.textContent = label;
         labelEl.style.cssText = `
             font-size: 13px;
@@ -394,7 +394,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
         textContainer.appendChild(labelEl);
 
         if (description) {
-            const descEl = document.createElement('div');
+            const descEl = document.createElement('
             descEl.textContent = description;
             descEl.style.cssText = `
                 font-size: 11px;
@@ -445,7 +445,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     optionsContent.appendChild(sectionSelect);
 
     // Bass line checkbox and style (spans full width)
-    const bassContainer = document.createElement('div');
+    const bassContainer = document.createElement('
     bassContainer.style.cssText = `
         grid-column: 1 / -1;
         display: flex;
@@ -456,10 +456,10 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     `;
 
     // Create categorized bass style select FIRST (before checkbox that references it)
-    const bassStyleSelectContainer = document.createElement('div');
+    const bassStyleSelectContainer = document.createElement('
     bassStyleSelectContainer.style.cssText = `flex: 1; opacity: 0.5;`;
 
-    const bassLabel = document.createElement('label');
+    const bassLabel = document.createElement('
     bassLabel.textContent = 'Bass Style';
     bassLabel.style.cssText = `
         display: block;
@@ -470,7 +470,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     `;
     bassStyleSelectContainer.appendChild(bassLabel);
 
-    const bassSelect = document.createElement('select');
+    const bassSelect = document.createElement('
     bassSelect.disabled = true;
     bassSelect.style.cssText = `
         width: 100%;
@@ -485,10 +485,10 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
 
     // Add categorized options
     Object.entries(BASS_STYLE_CATEGORIES).forEach(([category, patterns]) => {
-        const optgroup = document.createElement('optgroup');
+        const optgroup = document.createElement('
         optgroup.label = category;
         Object.entries(patterns).forEach(([value, name]) => {
-            const opt = document.createElement('option');
+            const opt = document.createElement('
             opt.value = value;
             opt.textContent = name;
             if (value === bassStyle) opt.selected = true;
@@ -516,7 +516,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     optionsContent.appendChild(bassContainer);
 
     // Counter melody checkbox
-    const counterMelodyContainer = document.createElement('div');
+    const counterMelodyContainer = document.createElement('
     counterMelodyContainer.style.cssText = `
         grid-column: 1 / -1;
     `;
@@ -537,7 +537,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     // =========================================================================
 
     // Suggestions container
-    const suggestionsContainer = document.createElement('div');
+    const suggestionsContainer = document.createElement('
     suggestionsContainer.style.cssText = `
         display: flex;
         flex-direction: column;
@@ -549,7 +549,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     // Function to build suggestions UI (can be called to rebuild after option changes)
     const buildSuggestionsUI = (container) => {
         suggestions.forEach((measure, measureIndex) => {
-            const measureRow = document.createElement('div');
+            const measureRow = document.createElement('
             measureRow.style.cssText = `
                 background-color: #f9fafb;
                 border-radius: 8px;
@@ -558,7 +558,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
             `;
 
             // Measure header
-            const measureHeader = document.createElement('div');
+            const measureHeader = document.createElement('
             measureHeader.style.cssText = `
                 display: flex;
                 justify-content: space-between;
@@ -566,14 +566,14 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
                 margin-bottom: 8px;
             `;
 
-            const measureLabelContainer = document.createElement('div');
+            const measureLabelContainer = document.createElement('
             measureLabelContainer.style.cssText = `
                 display: flex;
                 align-items: center;
                 gap: 8px;
             `;
 
-            const measureLabel = document.createElement('span');
+            const measureLabel = document.createElement('
             measureLabel.textContent = `Measure ${measure.measureIndex + 1}`;
             measureLabel.style.cssText = `
                 font-weight: 600;
@@ -584,7 +584,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
 
             measureHeader.appendChild(measureLabelContainer);
 
-            const noteCount = document.createElement('span');
+            const noteCount = document.createElement('
             noteCount.textContent = `${measure.noteCount} note${measure.noteCount !== 1 ? 's' : ''}`;
             noteCount.style.cssText = `
                 font-size: 12px;
@@ -594,7 +594,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
             measureRow.appendChild(measureHeader);
 
             // Chord options
-            const chordOptionsContainer = document.createElement('div');
+            const chordOptionsContainer = document.createElement('
             chordOptionsContainer.style.cssText = `
                 display: flex;
                 gap: 8px;
@@ -610,12 +610,12 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
             const hasMore = totalSuggestions > INITIAL_SUGGESTIONS_VISIBLE;
 
             suggestionsToShow.forEach((suggestion, suggestionIndex) => {
-                const optionBtn = document.createElement('button');
+                const optionBtn = document.createElement('
                 const chordSymbol = CHORD_DEFINITIONS[suggestion.type]?.symbol || '';
                 const chordName = `${suggestion.root}${chordSymbol}`;
 
                 // Check if this is the current chord
-                const isCurrentChord = suggestion.reasons && suggestion.reasons.includes('Current chord');
+                const isCurrentChord = suggestion.reasons && suggestion.reasons.includes('Current 
 
                 // Check for style-specific reasons
                 const hasStyleReason = suggestion.reasons && suggestion.reasons.some(r => r.includes('style') || r.includes('Style'));
@@ -665,17 +665,17 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
                         btn.style.backgroundColor = '#3b82f6';
                         btn.style.color = 'white';
                         btn.style.borderColor = '#3b82f6';
-                        const scoreText = btn.querySelector('.score-text');
+                        const scoreText = btn.querySelector('.score-
                         if (scoreText) scoreText.style.color = 'rgba(255, 255, 255, 0.8)';
-                        const infoIcon = btn.querySelector('.info-icon');
+                        const infoIcon = btn.querySelector('.info-
                         if (infoIcon) infoIcon.style.color = 'rgba(255, 255, 255, 0.6)';
                     } else {
                         btn.style.backgroundColor = 'white';
                         btn.style.color = '#374151';
                         btn.style.borderColor = '#e5e7eb';
-                        const scoreText = btn.querySelector('.score-text');
+                        const scoreText = btn.querySelector('.score-
                         if (scoreText) scoreText.style.color = '#6b7280';
-                        const infoIcon = btn.querySelector('.info-icon');
+                        const infoIcon = btn.querySelector('.info-
                         if (infoIcon) infoIcon.style.color = '#9ca3af';
                     }
                 };
@@ -733,7 +733,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
                     if (!isPlayingWithMelody && onStopChord) onStopChord();
                     // Hide tooltip on mouse leave (with small delay to allow moving to tooltip)
                     setTimeout(() => {
-                        const tooltip = document.getElementById('harmonize-tooltip');
+                        const tooltip = document.getElementById('harmonize-
                         if (tooltip && !tooltip.matches(':hover')) {
                             tooltip.remove();
                         }
@@ -741,7 +741,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
                 };
 
                 // Hover support for info icon tooltip
-                const infoIcon = optionBtn.querySelector('.info-icon');
+                const infoIcon = optionBtn.querySelector('.info-
                 if (infoIcon) {
                     infoIcon.onmouseenter = (e) => {
                         showHarmonizeTooltip(e, suggestion, chordName);
@@ -758,7 +758,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
 
             // Add "See More" / "See Less" button if there are more suggestions
             if (hasMore) {
-                const seeMoreBtn = document.createElement('button');
+                const seeMoreBtn = document.createElement('
                 const hiddenCount = totalSuggestions - INITIAL_SUGGESTIONS_VISIBLE;
                 seeMoreBtn.textContent = isExpanded ? 'See Less' : `+${hiddenCount} More`;
                 seeMoreBtn.style.cssText = `
@@ -822,7 +822,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     modal.appendChild(suggestionsContainer);
 
     // Button container
-    const buttonContainer = document.createElement('div');
+    const buttonContainer = document.createElement('
     buttonContainer.style.cssText = `
         display: flex;
         justify-content: flex-end;
@@ -832,7 +832,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     `;
 
     // Cancel button
-    const cancelBtn = document.createElement('button');
+    const cancelBtn = document.createElement('
     cancelBtn.textContent = 'Cancel';
     cancelBtn.style.cssText = `
         padding: 10px 20px;
@@ -855,7 +855,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
     buttonContainer.appendChild(cancelBtn);
 
     // Apply button
-    const applyBtn = document.createElement('button');
+    const applyBtn = document.createElement('
     applyBtn.textContent = 'Apply Harmonization';
     applyBtn.style.cssText = `
         padding: 10px 20px;
@@ -894,7 +894,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
                     }
                 }
             } catch (err) {
-                console.warn('Failed to set bass pattern:', err);
+
             }
         }
 
@@ -914,7 +914,7 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
                 });
                 onApplyCounterMelody(counterMelody);
             } catch (err) {
-                console.warn('Failed to generate counter melody:', err);
+
             }
         }
 
@@ -944,11 +944,11 @@ export function showAutoHarmonizeModal(melodyNotes, key, onApply, onPlayChord, o
  */
 function showHarmonizeTooltip(event, suggestion, chordName) {
     // Remove existing tooltip
-    const existingTooltip = document.getElementById('harmonize-tooltip');
+    const existingTooltip = document.getElementById('harmonize-
     if (existingTooltip) existingTooltip.remove();
 
     // Create tooltip
-    const tooltip = document.createElement('div');
+    const tooltip = document.createElement('
     tooltip.id = 'harmonize-tooltip';
     tooltip.style.cssText = `
         position: fixed;
@@ -968,7 +968,7 @@ function showHarmonizeTooltip(event, suggestion, chordName) {
         : '<li>An interesting harmonic choice</li>';
 
     // Check if this is the current chord
-    const isCurrentChord = suggestion.reasons && suggestion.reasons.includes('Current chord');
+    const isCurrentChord = suggestion.reasons && suggestion.reasons.includes('Current 
 
     // Check for inversion
     const hasInversion = suggestion.inversion && suggestion.inversion > 0;
@@ -1052,7 +1052,7 @@ function showHarmonizeTooltip(event, suggestion, chordName) {
     tooltip.style.top = `${top}px`;
 
     // Close button handler
-    const closeBtn = tooltip.querySelector('.tooltip-close');
+    const closeBtn = tooltip.querySelector('.tooltip-
     closeBtn.onclick = (e) => {
         e.stopPropagation();
         tooltip.remove();

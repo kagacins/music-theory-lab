@@ -48,12 +48,12 @@ export class SuggestionConfig {
      * Load settings from localStorage
      */
     loadSettings() {
-        const saved = localStorage.getItem('integratedSuggestionsConfig');
+        const saved = localStorage.getItem('integratedSuggestionsC
         if (saved) {
             try {
                 this.settings = { ...SuggestionConfig.DEFAULTS, ...JSON.parse(saved) };
             } catch (e) {
-                console.warn('Failed to load suggestion settings, using defaults', e);
+
                 this.settings = { ...SuggestionConfig.DEFAULTS };
             }
         } else {
@@ -74,7 +74,7 @@ export class SuggestionConfig {
         try {
             localStorage.setItem('integratedSuggestionsConfig', JSON.stringify(this.settings));
         } catch (e) {
-            console.error('Failed to save suggestion settings', e);
+
         }
     }
 

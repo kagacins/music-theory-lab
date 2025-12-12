@@ -121,7 +121,7 @@ let onMotifDetected = null;
 export function initEnhancedMelodyController(options = {}) {
     compositionState = getCompositionState();
     if (!compositionState) {
-        console.warn('Enhanced Melody Controller: No composition state available');
+
         return false;
     }
 
@@ -142,7 +142,7 @@ export function initEnhancedMelodyController(options = {}) {
     setupEnhancedEventListeners();
 
     isInitialized = true;
-    console.log('✅ Enhanced Melody Controller initialized');
+
 
     return true;
 }
@@ -160,7 +160,7 @@ function initEnhancedMelodyUI() {
                           document.getElementById('floating-suggestions-container');
 
     if (!mainContainer && !phrasesContainer) {
-        console.warn('Enhanced Melody UI: Container not found, will retry on next initialization');
+
         return;
     }
 
@@ -169,7 +169,7 @@ function initEnhancedMelodyUI() {
         return;
     }
 
-    console.log('✅ Injecting Phase 4 Enhanced Melody UI');
+
 
     // Set up mode toggle listeners if the new UI layout exists
     setupModeToggle();
@@ -427,7 +427,7 @@ function attachControlListeners() {
         if (styleSelect) {
             styleSelect.addEventListener('change', (e) => {
                 phraseSettings.styleId = e.target.value;
-                console.log('🎼 Phrase style updated:', phraseSettings.styleId);
+
                 // Regenerate phrases if currently viewing phrases section
                 const phrasesSection = document.getElementById('phrases-section');
                 if (phrasesSection && !phrasesSection.classList.contains('hidden')) {
@@ -1028,7 +1028,7 @@ function insertPhrase(phrase) {
 function appendPhraseAtEnd(phrase) {
     const notationComposer = window.getNotationComposer && window.getNotationComposer();
 
-    console.log(`[appendPhraseAtEnd] Inserting ${phrase.notes.length} notes with rhythm:`, phrase.rhythm);
+
 
     // Insert each note using the standard method
     phrase.notes.forEach((note, i) => {
@@ -1036,7 +1036,7 @@ function appendPhraseAtEnd(phrase) {
         // Use proper duration conversion that supports dotted notes
         const { duration, dotted } = rhythmValueToDurationWithDotted(rhythmValue);
 
-        console.log(`[appendPhraseAtEnd] Note ${i}: ${note}, rhythmValue=${rhythmValue}, duration=${duration}, dotted=${dotted}`);
+
 
         if (window.addNoteIntelligently) {
             window.addNoteIntelligently(note, duration, dotted, 'treble', false, null);
@@ -1066,7 +1066,7 @@ function insertPhraseWithShift(phrase, selectedInfo) {
     const UNITS_PER_BEAT = 48;
     const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
 
-    console.log(`[insertPhraseWithShift] Inserting ${phrase.notes.length} notes with rhythm:`, phrase.rhythm);
+
 
     // Ensure treble block sequence is initialized
     if (!compositionState.trebleBlockSequence?.blocks?.length) {
@@ -1076,7 +1076,7 @@ function insertPhraseWithShift(phrase, selectedInfo) {
     // Calculate the insertion point (after the selected note)
     const noteUnitInfo = compositionState.getTrebleNoteUnit?.(measureIndex, noteIndex);
     if (!noteUnitInfo) {
-        console.warn('Could not get note unit info, falling back to append');
+
         appendPhraseAtEnd(phrase);
         return;
     }
@@ -1094,7 +1094,7 @@ function insertPhraseWithShift(phrase, selectedInfo) {
 
         const durationUnits = durationToUnitsLocal(duration, dotted);
 
-        console.log(`[insertPhraseWithShift] Note ${i}: ${note}, rhythmValue=${rhythmValue}, duration=${duration}, dotted=${dotted}, units=${durationUnits}`);
+
 
         // Use the composition state's shift method
         if (compositionState.insertTrebleNoteWithShift) {
@@ -1240,7 +1240,7 @@ function handleAnalyzeMotifs() {
     }
 
     if (allNotes.length < 4) {
-        showMotifMessage('Need at least 4 notes to detect motifs');
+        showMotifMessage('Need at least 4 notes to detect 
         return;
     }
 
@@ -1267,23 +1267,50 @@ function updateMotifDisplay() {
         return;
     }
 
-    container.innerHTML = topMotifs.map((motif, i) => `
-        <div class="motif-item p-2 bg-gray-50 rounded border border-gray-200 hover:border-purple-400 cursor-pointer"
-             data-motif-id="${motif.id}">
-            <div class="flex justify-between items-center">
-                <span class="text-xs font-medium text-purple-600">Motif ${i + 1}</span>
-                <span class="text-xs text-gray-500">${motif.occurrences}× used</span>
-            </div>
-            <div class="text-xs text-gray-600 mt-1">
-                ${motif.notes.slice(0, 4).join(' ')}${motif.notes.length > 4 ? '...' : ''}
-            </div>
-            <div class="text-xs text-gray-400">Contour: ${motif.contour}</div>
-            <button class="use-motif-btn mt-1 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
-                    data-motif-id="${motif.id}">
-                Use Motif
-            </button>
-        </div>
-    `).join('');
+    // Clear container and build DOM elements to avoid Vite parser issues with HTML strings
+    container.innerHTML = '';
+    
+    topMotifs.forEach((motif, i) => {
+        const notesDisplay = motif.notes.slice(0, 4).join(' ') + (motif.notes.length > 4 ? '...' : '');
+        
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'motif-item p-2 bg-gray-50 rounded border border-gray-200 hover:border-purple-400 cursor-pointer';
+        itemDiv.setAttribute('data-motif-id', motif.id);
+        
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'flex justify-between items-center';
+        
+        const motifSpan = document.createElement('span');
+        motifSpan.className = 'text-xs font-medium text-purple-600';
+        motifSpan.textContent = 'Motif ' + (i + 1);
+        
+        const occurrencesSpan = document.createElement('span');
+        occurrencesSpan.className = 'text-xs text-gray-500';
+        occurrencesSpan.textContent = motif.occurrences + '× used';
+        
+        headerDiv.appendChild(motifSpan);
+        headerDiv.appendChild(occurrencesSpan);
+        
+        const notesDiv = document.createElement('div');
+        notesDiv.className = 'text-xs text-gray-600 mt-1';
+        notesDiv.textContent = notesDisplay;
+        
+        const contourDiv = document.createElement('div');
+        contourDiv.className = 'text-xs text-gray-400';
+        contourDiv.textContent = 'Contour: ' + motif.contour;
+        
+        const button = document.createElement('button');
+        button.className = 'use-motif-btn mt-1 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200';
+        button.setAttribute('data-motif-id', motif.id);
+        button.textContent = 'Use Motif';
+        
+        itemDiv.appendChild(headerDiv);
+        itemDiv.appendChild(notesDiv);
+        itemDiv.appendChild(contourDiv);
+        itemDiv.appendChild(button);
+        
+        container.appendChild(itemDiv);
+    });
 
     // Attach event listeners
     container.querySelectorAll('.use-motif-btn').forEach(btn => {

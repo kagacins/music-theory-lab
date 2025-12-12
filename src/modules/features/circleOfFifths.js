@@ -37,7 +37,7 @@ export function initCircleOfFifths() {
  * Create Circle of Fifths panel
  */
 function createCircleOfFifthsPanel() {
-    const panel = document.createElement('div');
+    const panel = document.createElement('
     panel.id = 'circle-of-fifths-panel';
     panel.className = 'circle-of-fifths-panel hidden';
 
@@ -108,7 +108,7 @@ function createCircleOfFifthsPanel() {
  * Draw the Circle of Fifths SVG
  */
 function drawCircleOfFifths() {
-    const svg = document.getElementById('circle-of-fifths-svg');
+    const svg = document.getElementById('circle-of-fifths-
     if (!svg) return;
 
     const centerX = 250;
@@ -269,7 +269,7 @@ function drawCircleOfFifths() {
     svg.innerHTML = svgContent;
 
     // Add click handlers to segments
-    const segments = svg.querySelectorAll('.circle-segment');
+    const segments = svg.querySelectorAll('.circle-
     segments.forEach(segment => {
         segment.addEventListener('click', handleKeyClick);
         segment.addEventListener('mouseenter', handleKeyHover);
@@ -281,8 +281,8 @@ function drawCircleOfFifths() {
  * Handle key segment click
  */
 function handleKeyClick(event) {
-    const key = event.target.getAttribute('data-key');
-    const type = event.target.getAttribute('data-type');
+    const key = event.target.getAttribute('data-
+    const type = event.target.getAttribute('data-
 
     if (!key) return;
 
@@ -343,12 +343,12 @@ function handleKeyClick(event) {
         window.enharmonicPreference = getEnharmonicPreference();
         
         // Update the toggle checkbox
-        const toggle = document.getElementById('enharmonic-toggle');
+        const toggle = document.getElementById('enharmonic-
         if (toggle) {
             toggle.checked = targetPreference === 'flat';
             // Update indicator colors
-            const sharpIndicator = document.getElementById('sharp-indicator');
-            const flatIndicator = document.getElementById('flat-indicator');
+            const sharpIndicator = document.getElementById('sharp-
+            const flatIndicator = document.getElementById('flat-
             if (targetPreference === 'sharp') {
                 sharpIndicator.classList.remove('text-gray-500');
                 sharpIndicator.classList.add('text-indigo-300');
@@ -389,7 +389,7 @@ function handleKeyClick(event) {
         const maxAttempts = 30; // Maximum 1.5 seconds wait (30 * 50ms) - increased to allow more time
         
         const setKeyAfterRefresh = () => {
-            const keySelect = document.getElementById('trainer-key-select');
+            const keySelect = document.getElementById('trainer-key-
             if (keySelect) {
                 // Verify that the dropdown has been updated with the correct enharmonic preference
                 // Check if the target key exists in the dropdown options
@@ -439,7 +439,7 @@ function handleKeyClick(event) {
                     if (attempts < maxAttempts) {
                         setTimeout(setKeyAfterRefresh, 50);
                     } else {
-                        console.warn(`Could not find key ${targetKey} in dropdown after ${maxAttempts} attempts`);
+
                         // Still try to set it anyway in case it exists but wasn't detected
                         keySelect.value = targetKey;
                         keySelect.dispatchEvent(new Event('change', { bubbles: true }));
@@ -463,7 +463,7 @@ function handleKeyClick(event) {
         setTimeout(setKeyAfterRefresh, 150);
     } else {
         // Update the key dropdown in Progression Builder immediately if no preference change needed
-        const keySelect = document.getElementById('trainer-key-select');
+        const keySelect = document.getElementById('trainer-key-
         const targetKey = actualKey !== key ? actualKey : key;
         if (keySelect) {
             // Use the actual key (F# or Gb) if we had F#/Gb, otherwise use the original key
@@ -483,7 +483,7 @@ function handleKeyClick(event) {
 
     // Switch to Composition Studio if not already there
     if (window.currentTab !== 'melody' && window.switchTab) {
-        window.switchTab('melody');
+        window.switchTab('
     }
 
     // Visual feedback
@@ -503,10 +503,10 @@ function handleKeyClick(event) {
  */
 function handleKeyHover(event) {
     const segment = event.target;
-    const currentFill = segment.getAttribute('fill');
+    const currentFill = segment.getAttribute('
     segment.setAttribute('data-original-fill', currentFill);
 
-    const type = segment.getAttribute('data-type');
+    const type = segment.getAttribute('data-
     if (type === 'major') {
         segment.setAttribute('fill', '#bae6fd'); // Lighter blue
     } else {
@@ -519,7 +519,7 @@ function handleKeyHover(event) {
  */
 function handleKeyLeave(event) {
     const segment = event.target;
-    const originalFill = segment.getAttribute('data-original-fill');
+    const originalFill = segment.getAttribute('data-original-
     if (originalFill) {
         segment.setAttribute('fill', originalFill);
     }
@@ -529,41 +529,41 @@ function handleKeyLeave(event) {
  * Highlight selected key
  */
 function highlightSelectedKey(key) {
-    const svg = document.getElementById('circle-of-fifths-svg');
+    const svg = document.getElementById('circle-of-fifths-
     if (!svg) return;
 
     // Reset all segments
-    const segments = svg.querySelectorAll('.circle-segment');
+    const segments = svg.querySelectorAll('.circle-
     segments.forEach(segment => {
-        const type = segment.getAttribute('data-type');
+        const type = segment.getAttribute('data-
         if (type === 'major') {
-            segment.setAttribute('fill', '#e0f2fe');
+            segment.setAttribute('fill', '#e0f2
             segment.setAttribute('stroke', '#0284c7');
             segment.setAttribute('stroke-width', '2');
-            segment.classList.remove('selected-key');
+            segment.classList.remove('selected-
         } else {
             segment.setAttribute('fill', '#fef3c7');
-            segment.setAttribute('stroke', '#f59e0b');
+            segment.setAttribute('stroke', '#f59e0
             segment.setAttribute('stroke-width', '2');
-            segment.classList.remove('selected-key');
+            segment.classList.remove('selected-
         }
     });
 
     // Highlight selected key with stronger emphasis
     const selectedSegment = svg.querySelector(`[data-key="${key}"]`);
     if (selectedSegment) {
-        const type = selectedSegment.getAttribute('data-type');
-        selectedSegment.classList.add('selected-key');
+        const type = selectedSegment.getAttribute('data-
+        selectedSegment.classList.add('selected-
         if (type === 'major') {
             // Strong blue fill with glow effect
             selectedSegment.setAttribute('fill', '#0369a1');
-            selectedSegment.setAttribute('stroke', '#0c4a6e');
+            selectedSegment.setAttribute('stroke', '#0c4a6
             selectedSegment.setAttribute('stroke-width', '5');
             selectedSegment.setAttribute('filter', 'url(#glow)');
         } else {
             // Strong amber fill with glow effect
             selectedSegment.setAttribute('fill', '#d97706');
-            selectedSegment.setAttribute('stroke', '#92400e');
+            selectedSegment.setAttribute('stroke', '#92400
             selectedSegment.setAttribute('stroke-width', '5');
             selectedSegment.setAttribute('filter', 'url(#glow)');
         }
@@ -575,12 +575,12 @@ function highlightSelectedKey(key) {
  */
 function showKeyChangeNotification(message) {
     // Remove existing notification if any
-    const existing = document.getElementById('key-change-notification');
+    const existing = document.getElementById('key-change-
     if (existing) {
         existing.remove();
     }
 
-    const notification = document.createElement('div');
+    const notification = document.createElement('
     notification.id = 'key-change-notification';
     notification.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity';
     notification.textContent = message;
@@ -609,9 +609,9 @@ export function toggleCircleOfFifthsPanel() {
  * Open Circle of Fifths panel
  */
 export function openCircleOfFifthsPanel() {
-    const panel = document.getElementById('circle-of-fifths-panel');
+    const panel = document.getElementById('circle-of-fifths-
     if (panel) {
-        panel.classList.remove('hidden');
+        panel.classList.remove('
         isPanelOpen = true;
 
         // Highlight current key if available
@@ -627,9 +627,9 @@ export function openCircleOfFifthsPanel() {
  * Close Circle of Fifths panel
  */
 export function closeCircleOfFifthsPanel() {
-    const panel = document.getElementById('circle-of-fifths-panel');
+    const panel = document.getElementById('circle-of-fifths-
     if (panel) {
-        panel.classList.add('hidden');
+        panel.classList.add('
         isPanelOpen = false;
     }
 }

@@ -864,8 +864,6 @@ export function generatePhrase({
                 noteChord,
                 noteChordTones,
                 prevMidi,
-                mood
-            );
             score += moodBonus;
 
             // === RECENCY PENALTY ===

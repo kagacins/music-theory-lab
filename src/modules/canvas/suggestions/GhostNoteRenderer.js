@@ -31,7 +31,7 @@ export class GhostNoteRenderer {
         } = { ...noteData, ...options };
 
         if (!this.canvas || !this.context) {
-            console.warn('Ghost note renderer not properly initialized');
+
             return null;
         }
 

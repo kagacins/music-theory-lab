@@ -40,17 +40,17 @@ export class FloatingPalette {
      * Create the palette DOM element
      */
     createElement() {
-        this.element = document.createElement('div');
+        this.element = document.createElement('
         this.element.className = `suggestion-palette suggestion-palette--${this.type}`;
         this.element.id = this.id;
-        this.element.setAttribute('role', 'listbox');
+        this.element.setAttribute('role', '
         this.element.setAttribute('aria-label', `${this.type} suggestions`);
 
         // Apply styling
         this.applyStyles();
 
         // Create content
-        this.contentElement = document.createElement('div');
+        this.contentElement = document.createElement('
         this.contentElement.className = 'suggestion-palette__content';
         this.element.appendChild(this.contentElement);
 
@@ -116,7 +116,7 @@ export class FloatingPalette {
      * @returns {HTMLElement|null}
      */
     createHeader() {
-        const header = document.createElement('div');
+        const header = document.createElement('
         header.className = 'suggestion-palette__header';
 
         // CRITICAL: Force flexbox layout with inline styles
@@ -131,7 +131,7 @@ export class FloatingPalette {
             boxSizing: 'border-box'
         });
 
-        const title = document.createElement('div');
+        const title = document.createElement('
         title.className = 'suggestion-palette__title';
         title.textContent = `${this.type.charAt(0).toUpperCase() + this.type.slice(1)} Suggestions`;
 
@@ -146,10 +146,10 @@ export class FloatingPalette {
         });
 
         // Close button
-        const closeButton = document.createElement('button');
+        const closeButton = document.createElement('
         closeButton.className = 'suggestion-palette__close';
         closeButton.innerHTML = '&times;';
-        closeButton.setAttribute('aria-label', 'Close suggestions');
+        closeButton.setAttribute('aria-label', 'Close 
         closeButton.title = 'Close (Esc)';
         Object.assign(closeButton.style, {
             background: 'none',
@@ -189,7 +189,7 @@ export class FloatingPalette {
      * @returns {HTMLElement}
      */
     createSuggestionsList() {
-        const list = document.createElement('div');
+        const list = document.createElement('
         list.className = 'suggestion-palette__list';
         list.style.flex = '1';
         list.style.overflowY = 'auto';
@@ -211,9 +211,9 @@ export class FloatingPalette {
      * @returns {HTMLElement}
      */
     createSuggestionItem(suggestion, index) {
-        const item = document.createElement('div');
+        const item = document.createElement('
         item.className = 'suggestion-palette__item';
-        item.setAttribute('role', 'option');
+        item.setAttribute('role', '
         item.setAttribute('aria-selected', index === this.selectedIndex);
         item.dataset.index = index;
 
@@ -237,7 +237,7 @@ export class FloatingPalette {
 
         // Number indicator
         if (index < 9 && this.config?.settings?.quickSelectNumbers) {
-            const number = document.createElement('span');
+            const number = document.createElement('
             number.className = 'suggestion-palette__number';
             number.textContent = index + 1;
             number.style.marginRight = '8px';
@@ -261,7 +261,7 @@ export class FloatingPalette {
      * @returns {HTMLElement}
      */
     createItemContent(suggestion) {
-        const content = document.createElement('div');
+        const content = document.createElement('
         content.className = 'suggestion-palette__item-content';
         content.style.flex = '1';
         content.textContent = JSON.stringify(suggestion);
@@ -273,7 +273,7 @@ export class FloatingPalette {
      * @returns {HTMLElement|null}
      */
     createFooter() {
-        const footer = document.createElement('div');
+        const footer = document.createElement('
         footer.className = 'suggestion-palette__footer';
         footer.style.padding = `${LayoutConstants.PADDING / 2}px ${LayoutConstants.PADDING}px`;
         footer.style.borderTop = `1px solid ${LayoutConstants.COLORS.BORDER}`;
@@ -297,7 +297,7 @@ export class FloatingPalette {
     attachEventHandlers() {
         // Click on items
         this.element.addEventListener('click', (e) => {
-            const item = e.target.closest('.suggestion-palette__item');
+            const item = e.target.closest('.suggestion-palette__
             if (item) {
                 const index = parseInt(item.dataset.index);
                 this.selectItem(index);
@@ -306,7 +306,7 @@ export class FloatingPalette {
 
         // Hover on items
         this.element.addEventListener('mouseover', (e) => {
-            const item = e.target.closest('.suggestion-palette__item');
+            const item = e.target.closest('.suggestion-palette__
             if (item) {
                 const index = parseInt(item.dataset.index);
                 this.hoverItem(index);
@@ -318,7 +318,7 @@ export class FloatingPalette {
 
         // Mouse out from items
         this.element.addEventListener('mouseout', (e) => {
-            const item = e.target.closest('.suggestion-palette__item');
+            const item = e.target.closest('.suggestion-palette__
             if (item) {
                 const index = parseInt(item.dataset.index);
                 // Reset to default or selected state - OUTLINE ONLY, no background
@@ -542,9 +542,9 @@ export class FloatingPalette {
      * @param {string} message - Message to announce
      */
     announce(message) {
-        const announcement = document.createElement('div');
-        announcement.setAttribute('role', 'status');
-        announcement.setAttribute('aria-live', 'polite');
+        const announcement = document.createElement('
+        announcement.setAttribute('role', '
+        announcement.setAttribute('aria-live', '
         announcement.style.position = 'absolute';
         announcement.style.left = '-10000px';
         announcement.textContent = message;

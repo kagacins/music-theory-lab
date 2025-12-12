@@ -69,7 +69,7 @@ export class SectionIntentSelector {
      * Create the selector DOM element
      */
     createElement() {
-        this.element = document.createElement('div');
+        this.element = document.createElement('
         this.element.className = 'section-intent-selector';
 
         Object.assign(this.element.style, {
@@ -122,7 +122,7 @@ export class SectionIntentSelector {
      * Create section header
      */
     createHeader() {
-        const header = document.createElement('div');
+        const header = document.createElement('
         header.className = 'section-intent-selector__header';
 
         Object.assign(header.style, {
@@ -132,13 +132,13 @@ export class SectionIntentSelector {
             marginBottom: '8px'
         });
 
-        const title = document.createElement('span');
+        const title = document.createElement('
         title.textContent = 'Section Context';
         title.style.fontWeight = '600';
         title.style.color = LayoutConstants.COLORS.TEXT;
 
         // Help icon/tooltip
-        const helpIcon = document.createElement('span');
+        const helpIcon = document.createElement('
         helpIcon.textContent = '?';
         helpIcon.title = 'Choose how the next chord relates to your song structure';
         Object.assign(helpIcon.style, {
@@ -164,7 +164,7 @@ export class SectionIntentSelector {
      * Create insert position indicator
      */
     createInsertIndicator() {
-        const container = document.createElement('div');
+        const container = document.createElement('
         container.className = 'section-intent-selector__insert-indicator';
 
         Object.assign(container.style, {
@@ -202,7 +202,7 @@ export class SectionIntentSelector {
      * Create mode selector (Continue vs New Section)
      */
     createModeSelector() {
-        const container = document.createElement('div');
+        const container = document.createElement('
         container.className = 'section-intent-selector__mode';
 
         Object.assign(container.style, {
@@ -217,15 +217,11 @@ export class SectionIntentSelector {
         const continueBtn = this.createModeButton(
             'Continue Section',
             INTENT_MODES.CONTINUE,
-            currentMode === INTENT_MODES.CONTINUE
-        );
 
         // New Section button
         const newBtn = this.createModeButton(
             'New Section',
             INTENT_MODES.NEW_SECTION,
-            currentMode === INTENT_MODES.NEW_SECTION
-        );
 
         container.appendChild(continueBtn);
         container.appendChild(newBtn);
@@ -237,7 +233,7 @@ export class SectionIntentSelector {
      * Create a mode button
      */
     createModeButton(label, mode, isActive) {
-        const button = document.createElement('button');
+        const button = document.createElement('
         button.className = `section-intent-selector__mode-btn ${isActive ? 'active' : ''}`;
         button.textContent = label;
 
@@ -281,7 +277,7 @@ export class SectionIntentSelector {
      * Create continue section options
      */
     createContinueOptions() {
-        const container = document.createElement('div');
+        const container = document.createElement('
         container.className = 'section-intent-selector__continue-options';
 
         Object.assign(container.style, {
@@ -310,14 +306,14 @@ export class SectionIntentSelector {
         // Show current section info
         const intent = getSectionIntent();
         if (intent.targetSection) {
-            const sectionInfo = document.createElement('div');
+            const sectionInfo = document.createElement('
             sectionInfo.style.marginTop = '6px';
             sectionInfo.style.fontSize = '10px';
             sectionInfo.style.color = LayoutConstants.COLORS.TEXT_SECONDARY;
             sectionInfo.innerHTML = `Current section: <strong>${intent.targetSection.label}</strong> (${intent.targetSection.chordIndices.length} chords)`;
             container.appendChild(sectionInfo);
         } else if (intent.ungroupedRange) {
-            const rangeInfo = document.createElement('div');
+            const rangeInfo = document.createElement('
             rangeInfo.style.marginTop = '6px';
             rangeInfo.style.fontSize = '10px';
             rangeInfo.style.color = LayoutConstants.COLORS.TEXT_SECONDARY;
@@ -332,7 +328,7 @@ export class SectionIntentSelector {
      * Create new section options
      */
     createNewSectionOptions() {
-        const container = document.createElement('div');
+        const container = document.createElement('
         container.className = 'section-intent-selector__new-options';
 
         Object.assign(container.style, {
@@ -343,14 +339,14 @@ export class SectionIntentSelector {
         });
 
         // Section type label
-        const label = document.createElement('label');
+        const label = document.createElement('
         label.textContent = 'Section type:';
         label.style.fontSize = '11px';
         label.style.fontWeight = '500';
         label.style.color = LayoutConstants.COLORS.TEXT_SECONDARY;
 
         // Section type dropdown
-        const select = document.createElement('select');
+        const select = document.createElement('
         select.className = 'section-intent-selector__type-select';
 
         Object.assign(select.style, {
@@ -366,7 +362,7 @@ export class SectionIntentSelector {
 
         // Add section type options
         SECTION_TYPE_LIST.forEach(type => {
-            const option = document.createElement('option');
+            const option = document.createElement('
             option.value = type;
             option.textContent = SECTION_TYPE_LABELS[type] || type;
             option.selected = type === currentType;
@@ -379,7 +375,7 @@ export class SectionIntentSelector {
         });
 
         // Info text
-        const info = document.createElement('div');
+        const info = document.createElement('
         info.style.fontSize = '10px';
         info.style.color = LayoutConstants.COLORS.TEXT_SECONDARY;
         info.style.marginTop = '4px';
@@ -396,7 +392,7 @@ export class SectionIntentSelector {
      * Create a radio option
      */
     createRadioOption(name, value, label, isChecked, onChange) {
-        const container = document.createElement('label');
+        const container = document.createElement('
         container.className = 'section-intent-selector__radio';
 
         Object.assign(container.style, {
@@ -407,7 +403,7 @@ export class SectionIntentSelector {
             padding: '4px 0'
         });
 
-        const radio = document.createElement('input');
+        const radio = document.createElement('
         radio.type = 'radio';
         radio.name = name;
         radio.value = value;
@@ -420,7 +416,7 @@ export class SectionIntentSelector {
 
         radio.addEventListener('change', onChange);
 
-        const labelText = document.createElement('span');
+        const labelText = document.createElement('
         labelText.textContent = label;
         labelText.style.fontSize = '11px';
         labelText.style.color = LayoutConstants.COLORS.TEXT;
@@ -441,7 +437,7 @@ export class SectionIntentSelector {
         });
 
         // Warning icon
-        const icon = document.createElement('div');
+        const icon = document.createElement('
         icon.textContent = '!';
         Object.assign(icon.style, {
             width: '32px',
@@ -458,27 +454,27 @@ export class SectionIntentSelector {
         });
 
         // Message
-        const message = document.createElement('div');
+        const message = document.createElement('
         message.textContent = 'Select a chord card first';
         message.style.fontWeight = '600';
         message.style.marginBottom = '4px';
         message.style.color = LayoutConstants.COLORS.TEXT;
 
         // Sub-message
-        const subMessage = document.createElement('div');
+        const subMessage = document.createElement('
         subMessage.textContent = 'Click on a chord in your progression to indicate where to insert the next chord.';
         subMessage.style.fontSize = '11px';
         subMessage.style.color = LayoutConstants.COLORS.TEXT_SECONDARY;
         subMessage.style.marginBottom = '12px';
 
         // Buttons
-        const buttonContainer = document.createElement('div');
+        const buttonContainer = document.createElement('
         buttonContainer.style.display = 'flex';
         buttonContainer.style.gap = '8px';
         buttonContainer.style.justifyContent = 'center';
 
         // Select last chord button
-        const selectLastBtn = document.createElement('button');
+        const selectLastBtn = document.createElement('
         selectLastBtn.textContent = 'Select Last Chord';
         Object.assign(selectLastBtn.style, {
             padding: '6px 12px',
@@ -490,11 +486,11 @@ export class SectionIntentSelector {
             cursor: 'pointer'
         });
         selectLastBtn.addEventListener('click', () => {
-            this.onSelectChordRequest('last');
+            this.onSelectChordRequest('
         });
 
         // Cancel button
-        const cancelBtn = document.createElement('button');
+        const cancelBtn = document.createElement('
         cancelBtn.textContent = 'Cancel';
         Object.assign(cancelBtn.style, {
             padding: '6px 12px',
@@ -506,7 +502,7 @@ export class SectionIntentSelector {
             cursor: 'pointer'
         });
         cancelBtn.addEventListener('click', () => {
-            this.onSelectChordRequest('cancel');
+            this.onSelectChordRequest('
         });
 
         buttonContainer.appendChild(selectLastBtn);

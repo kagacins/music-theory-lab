@@ -26,7 +26,7 @@ export class MelodyPalette extends FloatingPalette {
      * @returns {HTMLElement}
      */
     createItemContent(suggestion) {
-        const content = document.createElement('div');
+        const content = document.createElement('
         content.className = 'suggestion-palette__item-content suggestion-palette__item-content--melody';
         content.style.flex = '1';
         content.style.display = 'flex';
@@ -34,13 +34,13 @@ export class MelodyPalette extends FloatingPalette {
         content.style.justifyContent = 'space-between';
 
         // Left side: Note name and category
-        const leftSide = document.createElement('div');
+        const leftSide = document.createElement('
         leftSide.style.display = 'flex';
         leftSide.style.alignItems = 'center';
         leftSide.style.gap = '8px';
 
         // Note name
-        const noteName = document.createElement('span');
+        const noteName = document.createElement('
         noteName.className = 'melody-suggestion__note';
         noteName.textContent = suggestion.note || suggestion.pitch || 'Unknown';
         noteName.style.fontWeight = 'bold';
@@ -50,7 +50,7 @@ export class MelodyPalette extends FloatingPalette {
 
         // Category badge
         if (suggestion.category || suggestion.type) {
-            const category = document.createElement('span');
+            const category = document.createElement('
             category.className = 'melody-suggestion__category';
             category.textContent = suggestion.category || suggestion.type;
             category.style.fontSize = '10px';
@@ -64,7 +64,7 @@ export class MelodyPalette extends FloatingPalette {
         content.appendChild(leftSide);
 
         // Right side: Score/confidence indicator
-        const rightSide = document.createElement('div');
+        const rightSide = document.createElement('
         rightSide.style.display = 'flex';
         rightSide.style.alignItems = 'center';
         rightSide.style.gap = '4px';
@@ -91,7 +91,7 @@ export class MelodyPalette extends FloatingPalette {
      * @returns {HTMLElement}
      */
     createScoreDisplay(score) {
-        const container = document.createElement('div');
+        const container = document.createElement('
         container.className = 'melody-suggestion__score';
         container.style.display = 'flex';
         container.style.gap = '2px';
@@ -101,7 +101,7 @@ export class MelodyPalette extends FloatingPalette {
         const filledDots = Math.round((score / 100) * maxDots);
 
         for (let i = 0; i < maxDots; i++) {
-            const dot = document.createElement('span');
+            const dot = document.createElement('
             dot.className = 'score-dot';
             dot.style.width = '6px';
             dot.style.height = '6px';
@@ -162,7 +162,7 @@ export class MelodyPalette extends FloatingPalette {
         header.style.gap = '0';
 
         // Wrap existing title and close button in a row
-        const titleRow = document.createElement('div');
+        const titleRow = document.createElement('
         titleRow.style.display = 'flex';
         titleRow.style.flexDirection = 'row';
         titleRow.style.justifyContent = 'space-between';
@@ -171,8 +171,8 @@ export class MelodyPalette extends FloatingPalette {
         titleRow.style.marginBottom = '8px';
 
         // Move title and close button into the title row
-        const title = header.querySelector('.suggestion-palette__title');
-        const closeBtn = header.querySelector('.suggestion-palette__close');
+        const title = header.querySelector('.suggestion-palette__
+        const closeBtn = header.querySelector('.suggestion-palette__
         if (title) titleRow.appendChild(title);
         if (closeBtn) titleRow.appendChild(closeBtn);
 
@@ -184,7 +184,7 @@ export class MelodyPalette extends FloatingPalette {
 
         // Add quick filter buttons (if configured)
         if (this.config?.settings?.showCategories) {
-            const filterContainer = document.createElement('div');
+            const filterContainer = document.createElement('
             filterContainer.className = 'melody-suggestion__filters';
             filterContainer.style.display = 'flex';
             filterContainer.style.gap = '6px';
@@ -194,7 +194,7 @@ export class MelodyPalette extends FloatingPalette {
 
             const categories = ['All', 'Chord Tones', 'Scale', 'Passing'];
             categories.forEach(cat => {
-                const btn = document.createElement('button');
+                const btn = document.createElement('
                 btn.textContent = cat;
                 btn.dataset.category = cat;
 
@@ -239,7 +239,7 @@ export class MelodyPalette extends FloatingPalette {
             } else {
                 // "All" is not selected - select all categories
                 this.activeFilters.clear();
-                this.activeFilters.add('All');
+                this.activeFilters.add('A
                 specificCategories.forEach(cat => this.activeFilters.add(cat));
             }
         } else {
@@ -248,7 +248,7 @@ export class MelodyPalette extends FloatingPalette {
                 // Already selected - deselect it
                 this.activeFilters.delete(category);
                 // Always deselect "All" when deselecting any specific category
-                this.activeFilters.delete('All');
+                this.activeFilters.delete('A
             } else {
                 // Not selected - select it
                 this.activeFilters.add(category);
@@ -263,7 +263,7 @@ export class MelodyPalette extends FloatingPalette {
                     // Check if all specific categories are now selected
                     const allSpecificSelected = specificCategories.every(cat => this.activeFilters.has(cat));
                     if (allSpecificSelected) {
-                        this.activeFilters.add('All');
+                        this.activeFilters.add('A
                     }
                 }
             }
@@ -328,18 +328,18 @@ export class MelodyPalette extends FloatingPalette {
         const footer = super.createFooter();
 
         // Add style selector if configured
-        const styleSelector = document.createElement('div');
+        const styleSelector = document.createElement('
         styleSelector.style.marginTop = '4px';
         styleSelector.style.fontSize = '10px';
 
-        const label = document.createElement('span');
+        const label = document.createElement('
         label.textContent = 'Style: ';
         label.style.marginRight = '6px';
         label.style.fontWeight = '600';
         label.style.color = '#1f2937';  // Better contrast
         styleSelector.appendChild(label);
 
-        const select = document.createElement('select');
+        const select = document.createElement('
         Object.assign(select.style, {
             fontSize: '11px',
             padding: '3px 6px',
@@ -351,7 +351,7 @@ export class MelodyPalette extends FloatingPalette {
         });
 
         ['Any', 'Pop', 'Jazz', 'Classical', 'Rock'].forEach(style => {
-            const option = document.createElement('option');
+            const option = document.createElement('
             option.value = style.toLowerCase();
             option.textContent = style;
             select.appendChild(option);

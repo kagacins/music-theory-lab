@@ -371,8 +371,6 @@ class BassLineGenerator {
             const measureNotes = this._generateMelodicMeasure(
                 chordTones,
                 prevPitch,
-                chord.measureIndex || i
-            );
 
             bassLine.push(...measureNotes);
             prevPitch = measureNotes[measureNotes.length - 1].pitch;
@@ -543,7 +541,7 @@ class BassLineGenerator {
         }
 
         if (!intervals) {
-            console.warn(`[BassLineGenerator] Unknown chord type "${chordType}", falling back to Major`);
+
             intervals = CHORD_INTERVALS['Major'];
         }
 

@@ -410,7 +410,7 @@ class UserPreferenceLearner extends EventEmitter {
 
         this._clearStorage();
 
-        this.emit('preferencesCleared');
+        this.emit('preferencesC
     }
 
     /**
@@ -446,7 +446,7 @@ class UserPreferenceLearner extends EventEmitter {
         }
 
         this._saveToStorage();
-        this.emit('preferencesImported');
+        this.emit('preferencesI
     }
 
     // =========================================================================
@@ -578,7 +578,7 @@ class UserPreferenceLearner extends EventEmitter {
                 lastSessionTime: this._lastSessionTime
             }));
         } catch (e) {
-            console.warn('Failed to save preferences to storage:', e);
+
         }
     }
 
@@ -614,7 +614,7 @@ class UserPreferenceLearner extends EventEmitter {
                 this._lastSessionTime = parsed.lastSessionTime || Date.now();
             }
         } catch (e) {
-            console.warn('Failed to load preferences from storage:', e);
+
         }
     }
 
@@ -629,7 +629,7 @@ class UserPreferenceLearner extends EventEmitter {
             localStorage.removeItem(STORAGE_KEYS.STYLE_PROFILE);
             localStorage.removeItem(STORAGE_KEYS.CHOICE_HISTORY);
         } catch (e) {
-            console.warn('Failed to clear preferences from storage:', e);
+
         }
     }
 }

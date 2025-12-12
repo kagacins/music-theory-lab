@@ -39,7 +39,7 @@ export function showTensionOptimizerModal() {
     }
 
     // Show modal
-    modalElement.classList.remove('hidden');
+    modalElement.classList.remove('
     document.body.style.overflow = 'hidden';
 
     // Initialize UI
@@ -52,7 +52,7 @@ export function showTensionOptimizerModal() {
  */
 export function hideTensionOptimizerModal() {
     if (modalElement) {
-        modalElement.classList.add('hidden');
+        modalElement.classList.add('
         document.body.style.overflow = '';
     }
     previewResult = null;
@@ -62,7 +62,7 @@ export function hideTensionOptimizerModal() {
  * Create the modal DOM structure
  */
 function createModal() {
-    modalElement = document.createElement('div');
+    modalElement = document.createElement('
     modalElement.id = 'tension-optimizer-modal';
     modalElement.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center';
 
@@ -221,11 +221,11 @@ function attachEventListeners() {
 
     // Extension toggle
     modalElement.querySelector('#opt-extensions').addEventListener('change', (e) => {
-        const extOptions = modalElement.querySelector('#extension-options');
+        const extOptions = modalElement.querySelector('#extension-
         if (e.target.checked) {
-            extOptions.classList.remove('hidden');
+            extOptions.classList.remove('
         } else {
-            extOptions.classList.add('hidden');
+            extOptions.classList.add('
         }
         runPreview();
     });
@@ -247,14 +247,14 @@ function attachEventListeners() {
  * Update template selector options
  */
 function updateTemplateSelector() {
-    const select = modalElement.querySelector('#tension-template-select');
+    const select = modalElement.querySelector('#tension-template-
     const planner = getTensionArcPlanner();
     const currentTemplate = planner.currentTemplate;
 
     select.innerHTML = '';
 
     for (const [key, template] of Object.entries(TENSION_ARC_TEMPLATES)) {
-        const option = document.createElement('option');
+        const option = document.createElement('
         option.value = key;
         option.textContent = template.name;
         option.selected = key === currentTemplate;
@@ -270,7 +270,7 @@ function updateTemplateSelector() {
  */
 function updateTemplateDescription(templateKey) {
     const template = TENSION_ARC_TEMPLATES[templateKey];
-    const descEl = modalElement.querySelector('#template-description');
+    const descEl = modalElement.querySelector('#template-
     if (template && descEl) {
         descEl.textContent = template.description || '';
     }
@@ -464,7 +464,7 @@ function updatePreviewUI() {
     if (!previewResult) return;
 
     // Update summary
-    const summaryEl = modalElement.querySelector('#optimization-summary');
+    const summaryEl = modalElement.querySelector('#optimization-
     const { summary } = previewResult;
 
     // Count how many selections have been made
@@ -488,7 +488,7 @@ function updatePreviewUI() {
     `;
 
     // Update chord changes table
-    const tbody = modalElement.querySelector('#chord-changes-body');
+    const tbody = modalElement.querySelector('#chord-changes-
     tbody.innerHTML = '';
 
     const progression = getProgressionData();
@@ -513,7 +513,7 @@ function updatePreviewUI() {
         // Determine row color
         const rowClass = hasSuggestions ? 'bg-green-50 cursor-pointer hover:bg-green-100' : 'bg-white';
 
-        const row = document.createElement('tr');
+        const row = document.createElement('
         row.className = rowClass;
         row.dataset.index = i;
         row.dataset.hasSuggestions = hasSuggestions ? 'true' : 'false';
@@ -544,11 +544,11 @@ function updatePreviewUI() {
 
         // Create expandable row for alternatives (hidden by default)
         if (hasSuggestions) {
-            const expandRow = document.createElement('tr');
+            const expandRow = document.createElement('
             expandRow.className = 'expansion-row hidden';
             expandRow.dataset.parentIndex = i;
 
-            const expandCell = document.createElement('td');
+            const expandCell = document.createElement('
             expandCell.colSpan = 6;
             expandCell.className = 'px-3 py-3 bg-green-50 border-t border-green-200';
 
@@ -627,7 +627,7 @@ function updatePreviewUI() {
 function toggleExpansion(index) {
     const expansionRow = modalElement.querySelector(`tr.expansion-row[data-parent-index="${index}"]`);
     if (expansionRow) {
-        expansionRow.classList.toggle('hidden');
+        expansionRow.classList.toggle('
     }
 }
 
@@ -756,8 +756,6 @@ function applyOptimization() {
             newType,
             newInversion,
             key,
-            chord.octaveShift || 0
-        );
 
         return {
             ...chord,
@@ -783,7 +781,7 @@ function applyOptimization() {
     }
 
     // Show success message
-    console.log(`[TensionOptimizer] Applied optimization: ${selectionCount} chord(s) modified`);
+
 
     // Close modal
     hideTensionOptimizerModal();

@@ -11,9 +11,9 @@ import { getProgressionData, getCurrentKey } from '../state/trainerState.js';
  */
 export function initRecommendationsPanel() {
     // Find the trainer sections container
-    const trainerContainer = document.querySelector('#trainer-sections-container');
+    const trainerContainer = document.querySelector('#trainer-sections-
     if (!trainerContainer) {
-        console.warn('Trainer sections container not found');
+
         return;
     }
 
@@ -24,7 +24,7 @@ export function initRecommendationsPanel() {
     trainerContainer.insertAdjacentHTML('afterbegin', panelHTML);
     attachEventListeners();
 
-    console.log('Smart Recommendations panel initialized successfully');
+
 }
 
 /**
@@ -90,14 +90,14 @@ function createRecommendationsPanelHTML() {
 function attachEventListeners() {
     // Toggle panel visibility
     window.toggleRecommendationsPanel = function() {
-        const content = document.getElementById('recommendations-content');
-        const chevron = document.getElementById('recommendations-chevron');
+        const content = document.getElementById('recommendations-
+        const chevron = document.getElementById('recommendations-
 
         if (content.classList.contains('hidden')) {
-            content.classList.remove('hidden');
+            content.classList.remove('
             chevron.classList.remove('rotate-180');
         } else {
-            content.classList.add('hidden');
+            content.classList.add('
             chevron.classList.add('rotate-180');
         }
     };
@@ -129,7 +129,7 @@ export function updateRecommendations() {
  * Update the analysis display
  */
 function updateAnalysisDisplay(progression, key) {
-    const analysisContent = document.getElementById('analysis-content');
+    const analysisContent = document.getElementById('analysis-
     if (!analysisContent) return;
 
     if (progression.length === 0) {
@@ -191,7 +191,7 @@ function updateAnalysisDisplay(progression, key) {
  * Update the suggestions display
  */
 function updateSuggestionsDisplay(progression, key) {
-    const suggestionsList = document.getElementById('suggestions-list');
+    const suggestionsList = document.getElementById('suggestions-
     if (!suggestionsList) return;
 
     const recommendations = generateChordRecommendations(progression, key);
@@ -267,6 +267,6 @@ window.addRecommendedChord = function(root, type, inversion) {
     if (window.addChordFromRecommendation) {
         window.addChordFromRecommendation(root, type, inversion);
     } else {
-        console.warn('addChordFromRecommendation not available');
+
     }
 };

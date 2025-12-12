@@ -142,7 +142,7 @@ function openLesson(lessonId) {
     } else if (window.showLessonViewer && typeof window.showLessonViewer === 'function') {
         window.showLessonViewer(lessonId);
     } else {
-        console.warn('[WhyThisWorks] Lesson viewer not available');
+
     }
 }
 
@@ -277,7 +277,7 @@ export function initWhyThisWorksPanel() {
   // Find the trainer sections container
   const trainerContainer = document.querySelector('#trainer-sections-container');
   if (!trainerContainer) {
-    console.warn('[WhyThisWorks] Trainer sections container not found - panel will be created on demand');
+
     return;
   }
 
@@ -292,7 +292,7 @@ export function initWhyThisWorksPanel() {
     trainerContainer.insertAdjacentHTML('beforeend', panelHTML);
   }
 
-  console.log('[WhyThisWorks] Panel initialized successfully');
+
 }
 
 // ===========================================
@@ -483,7 +483,7 @@ function playChordPreview(root, type, duration = 1) {
     const notes = chordInfo?.specificNotes || [];
 
     if (notes.length === 0) {
-      console.warn('[WhyThisWorks] No notes found for chord:', root, type);
+
       return;
     }
 
@@ -493,10 +493,10 @@ function playChordPreview(root, type, duration = 1) {
       const now = Tone.now();
       piano.triggerAttackRelease(notes, duration, now);
     } else {
-      console.warn('[WhyThisWorks] Piano or Tone.js not available');
+
     }
   } catch (err) {
-    console.error('[WhyThisWorks] Error playing chord:', err);
+
   }
 }
 
@@ -509,7 +509,7 @@ function playChordSequence(chords, chordDuration = 0.8) {
   try {
     const piano = window.getPiano ? window.getPiano() : null;
     if (!piano || typeof Tone === 'undefined') {
-      console.warn('[WhyThisWorks] Piano or Tone.js not available');
+
       return;
     }
 
@@ -522,7 +522,7 @@ function playChordSequence(chords, chordDuration = 0.8) {
       }
     });
   } catch (err) {
-    console.error('[WhyThisWorks] Error playing sequence:', err);
+
   }
 }
 
@@ -746,9 +746,9 @@ function getAlternativeResolutions(romanNumeral, key, prevChordData) {
  * - "Tell me more" expansion with voice leading details
  */
 function showFallbackExplanation(context, explanation) {
-  console.log('[WhyThisWorks] showFallbackExplanation called');
-  console.log('[WhyThisWorks] Context:', JSON.stringify(context, null, 2));
-  console.log('[WhyThisWorks] Explanation:', JSON.stringify(explanation, null, 2));
+
+
+
 
   try {
     // Remove existing modal
@@ -760,11 +760,11 @@ function showFallbackExplanation(context, explanation) {
     const functionColor = explanation?.color || FUNCTION_COLORS[explanation?.function] || '#6b7280';
     const functionName = getFunctionDisplayName(explanation?.function);
 
-    console.log('[WhyThisWorks] Function:', explanation?.function, 'Color:', functionColor);
+
 
     // Build key-aware explanation
     const keyAwareExplanation = buildKeyAwareExplanation(context, explanation);
-    console.log('[WhyThisWorks] Key-aware explanation:', keyAwareExplanation);
+
 
     // Get alternative resolutions with playback data
     const alternatives = getAlternativeResolutions(context.romanNumeral, context.key, context.prevChordData);
@@ -814,10 +814,6 @@ function showFallbackExplanation(context, explanation) {
     const isSubdominant = chordFunction === 'subdominant' ||
       ['IV', 'ii', 'II'].includes(baseNumeral) ||
       numeral.startsWith('IV') || numeral.startsWith('ii');
-
-    console.log('[WhyThisWorks] Chord detection:', {
-      numeral, baseNumeral, chordFunction, isDominant, isSubdominant
-    });
 
     // Get tonic chord for resolution playback
     const keyRoot = context.key?.replace('m', '') || 'C';
@@ -1190,10 +1186,8 @@ function showFallbackExplanation(context, explanation) {
       });
     }
 
-    console.log('[WhyThisWorks] Enhanced popup created successfully');
-
   } catch (err) {
-    console.error('[WhyThisWorks] Error in showFallbackExplanation:', err);
+    // Fallback: show simple alert if popup creation fails
     alert(`${context.chord || ''} (${context.romanNumeral})\n\n${explanation?.explanation || context.reason || 'This chord works well here.'}`);
   }
 }
@@ -1231,7 +1225,7 @@ function openWhyThisWorksPanel() {
  * @param {number} context.confidence - Confidence score (optional)
  */
 function showWhyThisWorks(context) {
-  console.log('[WhyThisWorks] Called with context:', context);
+
   currentChordContext = context;
 
   // Get the theory explanation
@@ -1243,9 +1237,9 @@ function showWhyThisWorks(context) {
       context.nextChord,
       currentSkillLevel
     );
-    console.log('[WhyThisWorks] Got explanation:', explanation);
+
   } catch (err) {
-    console.error('[WhyThisWorks] Error getting explanation:', err);
+
     explanation = {
       title: 'Chord Information',
       explanation: context.reason || 'This chord works well in this context.',

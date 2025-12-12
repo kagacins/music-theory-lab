@@ -20,6 +20,12 @@ import {
   createTupletAttribute,
   getTupletDuration,
 } from '../state/buildingBlock.js';
+import {
+  getBeatsPerMeasureFromTimeSignature,
+  getMeasureCapacityTicks,
+  durationStringToTicks,
+  sumNoteTicks,
+} from '../state/compositionState.js';
 
 // ============================================================================
 // CONSTANTS
@@ -623,7 +629,6 @@ export class NoteEditor {
     if (e.key === 'Escape') {
       if (this.selectedNotes.size > 0) {
         e.preventDefault();
-        console.log('[NoteEditor] Esc pressed - deselecting all notes');
         this.selectedNotes.clear();
         this.hideSelectionHighlight = false;
         this.renderOverlay();
@@ -647,11 +652,9 @@ export class NoteEditor {
       }
       // Move notes up/down (Arrow Up/Down)
       else if (e.key === 'ArrowUp') {
-        console.log('[NoteEditor] ArrowUp pressed, moving notes up');
         e.preventDefault();
         this.moveSelectedNotes(1); // Up one step
       } else if (e.key === 'ArrowDown') {
-        console.log('[NoteEditor] ArrowDown pressed, moving notes down');
         e.preventDefault();
         this.moveSelectedNotes(-1); // Down one step
       }
@@ -1321,8 +1324,12 @@ export class NoteEditor {
         return;
       }
 
-      // MULTI-VOICE: Use the voice from the insertion point (the clicked note's voice)
-      const insertVoiceIndex = insertionPoint.voiceIndex ?? this.getVoiceIndexForStaff(staff);
+      // MULTI-VOICE: Prefer the selected note's voice; fallback to active voice for this staff
+      let insertVoiceIndex = this.getVoiceIndexForStaff(staff);
+      const selected = this.getSelectedRegion?.();
+      if (selected && selected.staff === staff && typeof selected.voiceIndex === 'number') {
+        insertVoiceIndex = selected.voiceIndex;
+      }
       console.log(`[NoteEditor] Insertion point found: action=${insertionPoint.action}, noteIndex=${insertionPoint.noteIndex}, voiceIndex=${insertVoiceIndex}`);
 
       // Check if the note fits in the measure (duration validation)
@@ -1372,12 +1379,14 @@ export class NoteEditor {
           availableBeats = maxBeats - usedInBlock;
         } else {
           // Fallback to measure-based if no segment found
-          maxBeats = 4;
+          const timeSignature = compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
+          maxBeats = getBeatsPerMeasureFromTimeSignature(timeSignature);
           availableBeats = maxBeats - usedBeats;
         }
       } else {
         // TREBLE CLEF: Use measure boundaries
-        maxBeats = 4; // 4/4 time
+        const timeSignature = compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
+        maxBeats = getBeatsPerMeasureFromTimeSignature(timeSignature);
         availableBeats = maxBeats - usedBeats;
       }
 
@@ -1422,7 +1431,7 @@ export class NoteEditor {
                 insertBeat += beats;
               }
 
-              const maxBeats = 4; // 4/4 time
+              // Use the time-signature-aware maxBeats from outer scope
               const spaceAfterInsertPoint = maxBeats - insertBeat;
 
               if (spaceAfterInsertPoint <= 0) {
@@ -1458,7 +1467,7 @@ export class NoteEditor {
               }
 
               this.composerIntegration.render();
-              console.log('[NoteEditor] ✅ Truncated note inserted, overflow removed');
+              // Note truncated due to measure constraints
             } else if (choice === 'shift') {
               // Shift: use the treble block sequence to insert with shift
               this.insertTrebleNoteWithShiftAtPosition(
@@ -1501,6 +1510,7 @@ export class NoteEditor {
         dotted: dottedToUse,
         accidental: this.currentAccidental,
         articulation: this.currentArticulation, // Include articulation from toolbar
+        voiceIndex: insertVoiceIndex, // Pin to the resolved voice for insertion
       };
       console.log('[NoteEditor] Inserting note with duration:', durationToUse, '(toolbar currentDuration:', this.currentDuration, ')');
 
@@ -1509,7 +1519,7 @@ export class NoteEditor {
       voice.notes.splice(targetIndex, 0, noteData);
 
       this.composerIntegration.render();
-      console.log('[NoteEditor] ✅ Successfully inserted note at position');
+      // Note inserted successfully
       return;
     }
 
@@ -1597,6 +1607,26 @@ export class NoteEditor {
       return;
     }
 
+    // Handle case where measure is completely full - move to next measure
+    if (effectiveRemainingBeats <= 0.001) {
+      console.log(`[NoteEditor] Measure ${targetMeasureIndex} is full (${effectiveRemainingBeats} beats remaining), moving to next measure`);
+      const nextMeasureIndex = targetMeasureIndex + 1;
+
+      // Ensure next measure exists
+      const compositionState = window.getCompositionState?.();
+      if (compositionState) {
+        while (compositionState.measures.length <= nextMeasureIndex) {
+          compositionState.addMeasure({});
+        }
+      }
+
+      // Recursively call addNoteAtPosition with the next measure
+      const nextStaffPosition = { ...staffPosition, measure: { index: nextMeasureIndex } };
+      console.log(`[NoteEditor] Redirecting to measure ${nextMeasureIndex}`);
+      this.addNoteAtPosition(nextStaffPosition);
+      return;
+    }
+
     // If the note fits completely, add it normally
     console.log(`[NoteEditor] Checking fit: noteBeats=${noteBeats} <= effectiveRemainingBeats=${effectiveRemainingBeats}? ${noteBeats <= effectiveRemainingBeats}`);
     if (noteBeats <= effectiveRemainingBeats) {
@@ -1613,6 +1643,7 @@ export class NoteEditor {
         accidental: this.currentAccidental,
         articulation: this.currentArticulation, // Include articulation from toolbar
         beat: beatPosition,
+        voiceIndex: this.getVoiceIndexForStaff(staff), // Pin to active voice
       };
 
       // Apply tuplet attributes if in tuplet insert mode
@@ -1765,7 +1796,7 @@ export class NoteEditor {
       return voices.length > 1 && voices[1]?.notes?.length > 0;
     });
 
-    console.log(`[NoteEditor] insertTrebleNoteWithShiftAtPosition: voiceIndex=${voiceIndex} (from insertionPoint), hasMultipleVoices=${hasMultipleVoices}`);
+    // Targeting specific voice for insertion
 
     // Check if we're trying to insert relative to a tied note continuation
     const targetNoteIndex = insertionPoint.noteIndex;
@@ -1819,26 +1850,21 @@ export class NoteEditor {
 
     // MULTI-VOICE: Use direct voice-based shifting to preserve voice separation
     if (hasMultipleVoices) {
-      console.log('[NoteEditor] Using direct voice-based shift (multi-voice mode)');
-      console.log(`[NoteEditor] voiceIndex=${voiceIndex}, beatPosition=${beatPosition}, measureIndex=${measureIndex}`);
+      // Multi-voice insertion logic
 
-      // DEBUG: Log state before shift
+      // Shift notes forward
       const allVoices = measure.notation?.treble?.voices || [];
-      allVoices.forEach((v, idx) => {
-        console.log(`[NoteEditor] BEFORE shift - Voice ${idx + 1} notes:`, v?.notes?.map(n => `beat=${n.beat}, pitch=${n.pitch || n.pitches?.join(',')}`));
-      });
 
       // Calculate note duration in beats
       let durationBeats = this.durationToBeats(noteData.duration);
       if (noteData.dotted) durationBeats *= 1.5;
 
-      // Shift notes forward in ALL voices from the insertion point
-      this.shiftNotesForward(measureIndex, beatPosition, durationBeats, 'treble', compositionState, beatsPerMeasure);
+      console.log(`[insert] Inserting note into voice ${voiceIndex} at measure ${measureIndex}, beat ${beatPosition}, shift ${durationBeats} beats`);
 
-      // DEBUG: Log state after shift
-      allVoices.forEach((v, idx) => {
-        console.log(`[NoteEditor] AFTER shift - Voice ${idx + 1} notes:`, v?.notes?.map(n => `beat=${n.beat}, pitch=${n.pitch || n.pitches?.join(',')}`));
-      });
+      // Shifting notes forward to make space - ONLY shift the target voice, not all voices
+      this.shiftNotesForward(measureIndex, beatPosition, durationBeats, 'treble', compositionState, beatsPerMeasure, voiceIndex);
+
+      // Continue with insertion
 
       // Insert the new note at the insertion point in the CURRENT voice
       const newNote = {
@@ -1855,18 +1881,22 @@ export class NoteEditor {
         velocity: noteData.velocity,
       };
 
-      console.log(`[NoteEditor] Inserting new note into voice ${voiceIndex + 1}:`, newNote);
+      // Inserting note into specified voice and position
       voice.notes.push(newNote);
       voice.notes.sort((a, b) => (a.beat || 0) - (b.beat || 0));
 
-      // DEBUG: Log final state
-      allVoices.forEach((v, idx) => {
-        console.log(`[NoteEditor] FINAL - Voice ${idx + 1} notes:`, v?.notes?.map(n => `beat=${n.beat}, pitch=${n.pitch || n.pitches?.join(',')}`));
-      });
+      // Insertion complete
+
+      // Check for overflow to next measure (handled by shiftNotesForward)
+
+      // Sync treble block sequence to match the updated measures
+      // This prevents ghost notes from stale block sequence data
+      if (compositionState.trebleBlockSequence?.blocks?.length > 0) {
+        compositionState.syncMeasuresToTrebleBlock();
+      }
 
       // Render the changes
       this.composerIntegration.render();
-      console.log('[NoteEditor] ✅ Inserted note with direct voice-based shift');
       return;
     }
 
@@ -1893,7 +1923,7 @@ export class NoteEditor {
 
     // Render the changes
     this.composerIntegration.render();
-    console.log('[NoteEditor] ✅ Inserted note with shift at position');
+    // Single-voice note insertion completed
   }
 
   /**
@@ -1917,14 +1947,16 @@ export class NoteEditor {
 
     // MULTI-VOICE: Use direct voice-based shifting to preserve voice separation
     if (hasMultipleVoices) {
-      console.log('[NoteEditor] insertTrebleNoteWithShiftAtEnd: Using direct voice-based shift (multi-voice mode)');
+      // Get the current voice index from the toolbar
+      const voiceIndex = this.getVoiceIndexForStaff('treble');
+      console.log(`[NoteEditor] insertTrebleNoteWithShiftAtEnd: Using direct voice-based shift (multi-voice mode, voice ${voiceIndex + 1})`);
 
       // Calculate note duration in beats
       let durationBeats = this.durationToBeats(noteData.duration);
       if (noteData.dotted) durationBeats *= 1.5;
 
-      // Shift notes forward in ALL voices from the end of this measure
-      this.shiftNotesForward(measureIndex, usedBeats, durationBeats, 'treble', compositionState, beatsPerMeasure);
+      // Shift notes forward in TARGET voice only from the end of this measure
+      this.shiftNotesForward(measureIndex, usedBeats, durationBeats, 'treble', compositionState, beatsPerMeasure, voiceIndex);
 
       // Insert the new note at the end in the CURRENT voice
       const measure = compositionState.measures[measureIndex];
@@ -1949,7 +1981,7 @@ export class NoteEditor {
 
       // Render the changes
       this.composerIntegration.render();
-      console.log('[NoteEditor] ✅ Inserted note with direct voice-based shift at end');
+      // Note inserted at end of measure
       return;
     }
 
@@ -2230,18 +2262,21 @@ export class NoteEditor {
    * Insert a note before the first selected note
    */
   insertNoteBeforeSelected() {
-    console.log('[NoteEditor] insertNoteBeforeSelected called, selectedNotes:', this.selectedNotes.size);
-
     if (this.selectedNotes.size === 0) {
       console.warn('[NoteEditor] No notes selected for insert before');
       return;
+    }
+
+    // Save state for undo before making changes
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
     }
 
     // Get the first selected note
     const firstNoteId = Array.from(this.selectedNotes)[0];
     const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(firstNoteId);
 
-    console.log(`[NoteEditor] Inserting before: measure=${measureIndex}, staff=${staff}, voice=${voiceIndex}, noteIndex=${noteIndex}`);
+    // Debug: Log which note was selected for insertion
 
     // Check if the selected note is a tied continuation
     const compositionStateCheck = window.getCompositionState?.();
@@ -2270,6 +2305,7 @@ export class NoteEditor {
     };
 
     console.log('[NoteEditor] Note data to insert:', noteData);
+    console.log(`[NoteEditor] Inserting before: measure=${measureIndex}, staff=${staff}, voiceIndex=${voiceIndex}, noteIndex=${noteIndex}`);
 
     const compositionState = window.getCompositionState?.();
     if (!compositionState || !compositionState.measures[measureIndex]) {
@@ -2278,7 +2314,15 @@ export class NoteEditor {
     }
 
     const measure = compositionState.measures[measureIndex];
-    const voice = this.getVoice(measure, staff);
+
+    // CRITICAL: Use the voiceIndex from the selected note, NOT the active voice from toolbar
+    // This ensures we insert into the same voice as the selected note
+    const voices = staff === 'treble' ? measure.notation?.treble?.voices : measure.notation?.bass?.voices;
+    if (!voices || voices.length <= voiceIndex) {
+      console.warn('[NoteEditor] ❌ Voice not found:', voiceIndex);
+      return;
+    }
+    const voice = voices[voiceIndex];
 
     // Calculate current beats used in measure
     let usedBeats = 0;
@@ -2293,7 +2337,10 @@ export class NoteEditor {
       usedBeats += beats;
     }
 
-    const maxBeats = 4; // 4/4 time
+    // Get time-signature-aware max beats
+    const timeSignature = compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
+    const maxBeats = getBeatsPerMeasureFromTimeSignature(timeSignature);
+
     // Calculate requested beats, accounting for tuplet insert mode
     let requestedBeats = this.durationToBeats(this.currentDuration, this.isDotted);
     if (this.tupletInsertMode && TUPLET_RATIOS[this.tupletInsertMode]) {
@@ -2302,10 +2349,21 @@ export class NoteEditor {
     }
     const availableBeats = maxBeats - usedBeats;
 
-    // Check for overflow - for treble clef, show dialog; for bass, just block
-    if (requestedBeats > availableBeats) {
+    // Check if measure is already full
+    const measureIsFull = Math.abs(usedBeats - maxBeats) < 0.01;
+
+    // When inserting BEFORE a note, we're inserting at the same beat as the selected note.
+    // This ALWAYS requires shifting notes forward (or truncating/deleting).
+    // Calculate if shifting would cause overflow:
+    const hasNotesAfterInsertPoint = noteIndex < voice.notes.length; // Always true for "insert before"
+    const wouldOverflow = hasNotesAfterInsertPoint && (usedBeats + requestedBeats > maxBeats);
+
+    // Show dialog if: overflow would occur, OR measure is already full, OR there's no room at all
+    const needsDialog = wouldOverflow || measureIsFull || requestedBeats > availableBeats;
+
+    if (needsDialog) {
       if (staff === 'treble') {
-        const overflowBeats = requestedBeats - availableBeats;
+        const overflowBeats = Math.max(0, requestedBeats - availableBeats);
 
         showNoteOverflowDialog({
           overflowBeats,
@@ -2326,7 +2384,7 @@ export class NoteEditor {
                 insertBeat += beats;
               }
 
-              const maxBeats = 4; // 4/4 time
+              // Use time-signature-aware max beats (maxBeats already calculated above)
               const spaceAfterInsertPoint = maxBeats - insertBeat;
 
               if (spaceAfterInsertPoint <= 0) {
@@ -2362,12 +2420,12 @@ export class NoteEditor {
               }
 
               this.composerIntegration.render();
-              console.log('[NoteEditor] ✅ Truncated note inserted, overflow removed');
+              // Note truncated due to measure constraints
             } else if (choice === 'shift') {
               // Shift: use treble block sequence
               this.insertTrebleNoteWithShiftAtPosition(
                 measureIndex,
-                { action: 'before', noteIndex },
+                { action: 'before', noteIndex, voiceIndex },
                 noteData,
                 compositionState
               );
@@ -2382,10 +2440,38 @@ export class NoteEditor {
       }
     }
 
-    // No overflow - insert directly
-    voice.notes.splice(noteIndex, 0, noteData);
-    this.composerIntegration.render();
-    console.log('[NoteEditor] ✅ Successfully inserted note before selected');
+    // No overflow - insert directly at the position
+    // But we still need to shift notes forward properly, so use the shift function
+    if (staff === 'treble') {
+      this.insertTrebleNoteWithShiftAtPosition(
+        measureIndex,
+        { action: 'before', noteIndex, voiceIndex },
+        noteData,
+        compositionState
+      );
+    } else {
+      // Bass clef - simple splice (single voice)
+      // Calculate beat position for the new note
+      let insertBeat = 0;
+      for (let i = 0; i < noteIndex; i++) {
+        let beats = this.durationToBeats(voice.notes[i].duration || '4n');
+        if (voice.notes[i].dotted) beats *= 1.5;
+        insertBeat += beats;
+      }
+      noteData.beat = insertBeat;
+
+      // Update beats of notes that will be shifted
+      let currentBeat = insertBeat + requestedBeats;
+      for (let i = noteIndex; i < voice.notes.length; i++) {
+        voice.notes[i].beat = currentBeat;
+        let beats = this.durationToBeats(voice.notes[i].duration || '4n');
+        if (voice.notes[i].dotted) beats *= 1.5;
+        currentBeat += beats;
+      }
+
+      voice.notes.splice(noteIndex, 0, noteData);
+      this.composerIntegration.render();
+    }
   }
 
   /**
@@ -2394,10 +2480,17 @@ export class NoteEditor {
   insertNoteAfterSelected() {
     if (this.selectedNotes.size === 0) return;
 
+    // Save state for undo before making changes
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
     // Get the last selected note
     const noteIds = Array.from(this.selectedNotes);
     const lastNoteId = noteIds[noteIds.length - 1];
     const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(lastNoteId);
+
+    // Inserting after selected note
 
     // Create new note with current toolbar settings
     const noteData = {
@@ -2440,7 +2533,10 @@ export class NoteEditor {
       usedBeats += beats;
     }
 
-    const maxBeats = 4; // 4/4 time
+    // Get time-signature-aware max beats
+    const timeSignature = compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
+    const maxBeats = getBeatsPerMeasureFromTimeSignature(timeSignature);
+
     // Calculate requested beats, accounting for tuplet insert mode
     let requestedBeats = this.durationToBeats(this.currentDuration, this.isDotted);
     if (this.tupletInsertMode && TUPLET_RATIOS[this.tupletInsertMode]) {
@@ -2454,6 +2550,9 @@ export class NoteEditor {
     const isLastNote = noteIndex === voice.notes.length - 1;
     const measureIsFull = Math.abs(usedBeats - maxBeats) < 0.01;
 
+    // Check if inserting in the middle of existing notes (not at end)
+    const hasNotesAfterInsertPoint = noteIndex < voice.notes.length - 1;
+
     if (isLastNote && measureIsFull) {
       console.log('[NoteEditor] Measure is full and trying to insert after last note - no space in this measure');
       // The measure is completely full - inserting after the last note means the new note
@@ -2462,8 +2561,12 @@ export class NoteEditor {
       return;
     }
 
-    // Check for overflow - for treble clef, show dialog; for bass, just block
-    if (requestedBeats > availableBeats) {
+    // Show dialog when:
+    // 1. There's overflow (requestedBeats > availableBeats), OR
+    // 2. We're inserting in the middle and have notes after that would be displaced
+    const needsDialog = requestedBeats > availableBeats || (hasNotesAfterInsertPoint && measureIsFull);
+
+    if (needsDialog) {
       if (staff === 'treble') {
         const overflowBeats = requestedBeats - availableBeats;
 
@@ -2486,7 +2589,7 @@ export class NoteEditor {
                 insertBeat += beats;
               }
 
-              const maxBeats = 4; // 4/4 time
+              // Use time-signature-aware max beats (maxBeats already calculated above)
               const spaceAfterInsertPoint = maxBeats - insertBeat;
 
               if (spaceAfterInsertPoint <= 0) {
@@ -2548,7 +2651,7 @@ export class NoteEditor {
               // Shift: use treble block sequence
               this.insertTrebleNoteWithShiftAtPosition(
                 measureIndex,
-                { action: 'after', noteIndex },
+                { action: 'after', noteIndex, voiceIndex },
                 noteData,
                 compositionState
               );
@@ -2566,7 +2669,7 @@ export class NoteEditor {
     // No overflow - insert directly
     voice.notes.splice(noteIndex + 1, 0, noteData);
     this.composerIntegration.render();
-    console.log('[NoteEditor] ✅ Successfully inserted note after selected');
+    // Note inserted after selected note
   }
 
   /**
@@ -2705,7 +2808,9 @@ export class NoteEditor {
               }
             }
 
-            const maxBeats = 4; // 4/4 time
+            // Get time-signature-aware max beats
+            const timeSignature = compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
+            const maxBeats = getBeatsPerMeasureFromTimeSignature(timeSignature);
             const availableBeats = maxBeats - usedBeats;
 
             if (newBeats > availableBeats) {
@@ -4227,9 +4332,10 @@ export class NoteEditor {
    * @returns {boolean} - True if note can be added
    */
   canAddNoteToBeat(measureIndex, staff, duration, isDotted) {
-    // Get time signature (hardcoded to 4/4 for now)
-    // TODO: Get from compositionState metadata
-    const maxBeats = 4;
+    // Get time signature from compositionState
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    const timeSignature = compositionState?.metadata?.timeSignature || { num: 4, denom: 4 };
+    const maxBeats = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
     // Calculate current beats used
     const currentBeats = this.getMeasureBeatsUsed(measureIndex, staff);
@@ -4252,7 +4358,10 @@ export class NoteEditor {
    * @returns {number} - Remaining beats
    */
   getRemainingBeats(measureIndex, staff) {
-    const maxBeats = 4; // 4/4 time
+    // Get time signature from compositionState
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    const timeSignature = compositionState?.metadata?.timeSignature || { num: 4, denom: 4 };
+    const maxBeats = getBeatsPerMeasureFromTimeSignature(timeSignature);
     const usedBeats = this.getMeasureBeatsUsed(measureIndex, staff);
     return maxBeats - usedBeats;
   }
@@ -4264,7 +4373,11 @@ export class NoteEditor {
    * @returns {number} - Beat position (0-4 for 4/4 time)
    */
   getCurrentBeat(measureIndex, staff) {
-    return 4 - this.getRemainingBeats(measureIndex, staff);
+    // Get time signature from compositionState
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    const timeSignature = compositionState?.metadata?.timeSignature || { num: 4, denom: 4 };
+    const maxBeats = getBeatsPerMeasureFromTimeSignature(timeSignature);
+    return maxBeats - this.getRemainingBeats(measureIndex, staff);
   }
 
   /**
@@ -5394,9 +5507,18 @@ export class NoteEditor {
 
   /**
    * Shift notes forward by a given number of beats
+   * @param {number} fromMeasure - Starting measure index
+   * @param {number} fromBeat - Starting beat position
+   * @param {number} shiftBeats - Number of beats to shift forward
+   * @param {string} staff - 'treble' or 'bass'
+   * @param {Object} compositionState - The composition state
+   * @param {number} beatsPerMeasure - Beats per measure
+   * @param {number|null} targetVoiceIndex - If provided, only shift this voice. If null/undefined, shift all voices.
    */
-  shiftNotesForward(fromMeasure, fromBeat, shiftBeats, staff, compositionState, beatsPerMeasure) {
-    // Collect all notes that need to be shifted from ALL voices
+  shiftNotesForward(fromMeasure, fromBeat, shiftBeats, staff, compositionState, beatsPerMeasure, targetVoiceIndex = null) {
+    const voiceInfo = targetVoiceIndex !== null ? `voice ${targetVoiceIndex + 1} only` : 'all voices';
+    console.log(`[shift] Shifting notes in ${staff} (${voiceInfo}) from measure ${fromMeasure}, beat ${fromBeat} by ${shiftBeats} beats`);
+    // Collect notes that need to be shifted
     const notesToShift = [];
 
     for (let m = fromMeasure; m < compositionState.measures.length; m++) {
@@ -5407,8 +5529,11 @@ export class NoteEditor {
       const voices = staff === 'treble' ? measure.notation.treble?.voices : measure.notation.bass?.voices;
       if (!voices) continue;
 
-      // Iterate through all voices
+      // Iterate through voices (only target voice if specified, otherwise all)
       voices.forEach((voice, voiceIndex) => {
+        // Skip if we're targeting a specific voice and this isn't it
+        if (targetVoiceIndex !== null && voiceIndex !== targetVoiceIndex) return;
+
         if (!voice || !voice.notes) return;
 
         for (let i = voice.notes.length - 1; i >= 0; i--) {
@@ -5430,9 +5555,15 @@ export class NoteEditor {
       });
     }
 
-    console.log(`[shiftNotesForward] Collected ${notesToShift.length} notes to shift by ${shiftBeats} beats from measure ${fromMeasure} beat ${fromBeat}`);
+    // Preparing to shift notes forward
+    const voiceCounts = {};
     notesToShift.forEach(item => {
-      console.log(`  - Voice ${item.voiceIndex + 1}: ${item.note.pitch || item.note.pitches?.join(',')} at beat ${item.note.beat}`);
+      const voiceNum = item.voiceIndex + 1;
+      if (!voiceCounts[voiceNum]) voiceCounts[voiceNum] = [];
+      voiceCounts[voiceNum].push(`${item.note.pitch || item.note.pitches?.join(',')}@beat${item.note.beat}`);
+    });
+    Object.keys(voiceCounts).forEach(voiceNum => {
+      console.log(`  Voice ${voiceNum}: ${voiceCounts[voiceNum].join(' | ')}`);
     });
 
     // Re-insert notes at shifted positions

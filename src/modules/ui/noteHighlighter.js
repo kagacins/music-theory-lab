@@ -127,7 +127,7 @@ export function showNoteTooltip(container, analysis, x, y) {
 
     if (!analysis || !analysis.tooltip) return;
 
-    const tooltip = document.createElement('div');
+    const tooltip = document.createElement('
     tooltip.className = 'chord-tone-tooltip';
     tooltip.style.cssText = `
         position: fixed;
@@ -194,7 +194,7 @@ export function isHighlightingEnabled() {
         return settings.highlightChordTones !== false; // Default to true
     } catch (e) {
         // If compositionState is not available, check localStorage
-        const stored = localStorage.getItem('chord-tone-highlighting');
+        const stored = localStorage.getItem('chord-tone-
         return stored !== 'false';
     }
 }
@@ -274,7 +274,7 @@ export function getColorLegend() {
  * @returns {HTMLElement} Legend element
  */
 export function createColorLegendElement() {
-    const legend = document.createElement('div');
+    const legend = document.createElement('
     legend.className = 'chord-tone-legend';
     legend.style.cssText = `
         display: flex;
@@ -289,14 +289,14 @@ export function createColorLegendElement() {
     const legendItems = getColorLegend();
 
     legendItems.forEach(item => {
-        const itemEl = document.createElement('div');
+        const itemEl = document.createElement('
         itemEl.style.cssText = `
             display: flex;
             align-items: center;
             gap: 6px;
         `;
 
-        const colorDot = document.createElement('div');
+        const colorDot = document.createElement('
         colorDot.style.cssText = `
             width: 10px;
             height: 10px;
@@ -304,7 +304,7 @@ export function createColorLegendElement() {
             background: ${item.color};
         `;
 
-        const label = document.createElement('span');
+        const label = document.createElement('
         label.textContent = item.name;
         label.style.color = '#374151';
 

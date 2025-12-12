@@ -39,14 +39,14 @@ export function showTemplateBrowser(onSelect) {
     document.body.appendChild(modal);
 
     // Initialize with all templates
-    renderTemplateList('All');
+    renderTemplateList('A
 
     // Add event listeners
     attachEventListeners(modal);
 
     // Focus search input
     setTimeout(() => {
-        const searchInput = modal.querySelector('#template-search');
+        const searchInput = modal.querySelector('#template-
         if (searchInput) searchInput.focus();
     }, 100);
 }
@@ -55,7 +55,7 @@ export function showTemplateBrowser(onSelect) {
  * Hide and remove the template browser modal
  */
 export function hideTemplateBrowser() {
-    const modal = document.getElementById('template-browser-modal');
+    const modal = document.getElementById('template-browser-
     if (modal) {
         modal.remove();
     }
@@ -67,7 +67,7 @@ export function hideTemplateBrowser() {
  * @returns {HTMLElement} Modal element
  */
 function createTemplateModal() {
-    const modal = document.createElement('div');
+    const modal = document.createElement('
     modal.id = 'template-browser-modal';
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
 
@@ -145,7 +145,7 @@ function createTemplateModal() {
     `;
 
     // Add styles for category tabs
-    const style = document.createElement('style');
+    const style = document.createElement('
     style.textContent = `
         .category-tab {
             padding: 0.625rem 1rem;
@@ -219,8 +219,8 @@ function createTemplateModal() {
  * @param {string} category - Category to filter by
  */
 function renderTemplateList(category) {
-    const container = document.getElementById('template-list-container');
-    const countElement = document.getElementById('template-count');
+    const container = document.getElementById('template-list-
+    const countElement = document.getElementById('template-
 
     currentCategory = category;
 
@@ -267,7 +267,7 @@ function renderTemplateList(category) {
         if (loadBtn) {
             loadBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                selectTemplate(template, 'load');
+                selectTemplate(template, '
             });
         }
 
@@ -276,7 +276,7 @@ function renderTemplateList(category) {
         if (appendBtn) {
             appendBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                selectTemplate(template, 'append');
+                selectTemplate(template, '
             });
         }
     });
@@ -487,8 +487,8 @@ function selectTemplate(template, action = 'load') {
  */
 function attachEventListeners(modal) {
     // Close button
-    const closeBtn = modal.querySelector('#template-close-btn');
-    const cancelBtn = modal.querySelector('#template-cancel-btn');
+    const closeBtn = modal.querySelector('#template-close-
+    const cancelBtn = modal.querySelector('#template-cancel-
 
     closeBtn.addEventListener('click', hideTemplateBrowser);
     cancelBtn.addEventListener('click', hideTemplateBrowser);
@@ -504,19 +504,19 @@ function attachEventListeners(modal) {
     document.addEventListener('keydown', handleEscapeKey);
 
     // Search input
-    const searchInput = modal.querySelector('#template-search');
+    const searchInput = modal.querySelector('#template-
     searchInput.addEventListener('input', (e) => {
         currentSearchQuery = e.target.value;
         renderTemplateList(currentCategory);
     });
 
     // Category tabs
-    const categoryTabs = modal.querySelectorAll('.category-tab');
+    const categoryTabs = modal.querySelectorAll('.category-
     categoryTabs.forEach(tab => {
         tab.addEventListener('click', () => {
             // Update active state
             categoryTabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
+            tab.classList.add('
 
             // Clear search when changing category
             currentSearchQuery = '';
@@ -529,7 +529,7 @@ function attachEventListeners(modal) {
     });
 
     // Save current template button
-    const saveBtn = modal.querySelector('#save-current-template-btn');
+    const saveBtn = modal.querySelector('#save-current-template-
     saveBtn.addEventListener('click', showSaveTemplateDialog);
 }
 

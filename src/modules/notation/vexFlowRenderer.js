@@ -665,6 +665,7 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
     accidental = null, // Explicit accidental override
     articulation = null, // Articulation: 'staccato', 'accent', 'tenuto', 'marcato'
     stemDirection = null, // Optional stem direction: 1 (up), -1 (down), null (auto)
+    isCue = false,   // Create as cue-sized (smaller) note/rest
   } = noteData;
 
   // Convert duration if needed
@@ -698,6 +699,19 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
     noteConfig = { keys, duration: vexDuration, clef };
   }
 
+  // For cue-sized notes/rests, set glyph_font_scale at construction time
+  // VexFlow 5.x requires this to be in the constructor config, not set after
+  if (isCue) {
+    // Make cue rests noticeably smaller - about 60% of normal size
+    // VexFlow default is typically 39, so 39 * 0.6 = ~23
+    // Hardcode the value since VF.DEFAULT_NOTATION_FONT_SCALE may not exist in all versions
+    const CUE_FONT_SCALE = 23; // ~60% of normal (39)
+    noteConfig.glyph_font_scale = CUE_FONT_SCALE;
+    // Smaller ledger lines for cue notes
+    noteConfig.stroke_px = 1;
+    console.log(`[createStaveNote] Creating cue note/rest with glyph_font_scale=${CUE_FONT_SCALE}`);
+  }
+
   // Determine stem direction for non-rest notes
   let finalStemDirection = null;
   if (!isRest) {
@@ -709,7 +723,17 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
     }
   }
 
+  // Debug: log noteConfig when creating cue notes
+  if (isCue) {
+    console.log('[createStaveNote] noteConfig for cue:', JSON.stringify(noteConfig));
+  }
+
   const staveNote = new VF.StaveNote(noteConfig);
+
+  // Debug: check if render_options has glyph_font_scale
+  if (isCue && staveNote.render_options) {
+    console.log('[createStaveNote] staveNote.render_options:', staveNote.render_options);
+  }
 
   // Set stem direction AFTER creation using setStemDirection() - config property gets ignored
   if (finalStemDirection !== null && staveNote.setStemDirection) {
@@ -867,76 +891,85 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
 export function createRest(duration = '4n', clef = 'treble', options = {}) {
   const { isCue = false, hidden = false } = options;
 
+  // Pass isCue to createStaveNote so it can set glyph_font_scale at construction time
+  // VexFlow 5.x requires scale to be set in constructor, not after
   const restNote = createStaveNote({
     pitch: null,
     duration,
     isRest: true,
+    isCue, // Pass cue flag to constructor
   }, 'C', clef);
 
   if (!restNote) return null;
 
-  // Mark as hidden FIRST (takes priority - invisible spacer)
+  // Mark as hidden FIRST (priority: invisible spacer but selectable)
   if (hidden) {
-    if (restNote.setStyle) {
-      restNote.setStyle({
-        fillStyle: 'transparent',
-        strokeStyle: 'transparent',
-      });
-    }
+    restNote.glyph = null; // Remove glyph to make it not render
     restNote._isHiddenRest = true;
     restNote._isCueRest = isCue;
     return restNote;
   }
 
-  // Apply cue-sized styling (smaller rest) - only if NOT hidden
-  if (isCue) {
-    // Lighter color for secondary voice cue rests
-    if (restNote.setStyle) {
-      restNote.setStyle({
-        fillStyle: '#aaaaaa',
-        strokeStyle: '#aaaaaa',
-      });
+  // Apply cue color styling AFTER creation (color can be set post-construction)
+  if (isCue && restNote.setStyle) {
+    restNote.setStyle({
+      fillStyle: 'rgba(0, 0, 0, 0.4)',
+      strokeStyle: 'rgba(0, 0, 0, 0.4)',
+    });
+    // Try to add CSS class for post-render scaling
+    if (restNote.addClass) {
+      restNote.addClass('vf-cue-rest');
     }
-
-    // VexFlow 5.x: Scale the glyph using multiple approaches
-    // Use much smaller values for noticeable cue size (default is ~38)
-    const cueScale = 20; // Much smaller than default
-    const cueScaleRatio = 0.55; // 55% of normal size
-
-    // Approach 1: render_options.glyph_font_scale (VexFlow internal)
-    if (restNote.render_options) {
-      restNote.render_options.glyph_font_scale = cueScale;
+    // Also set attribute for finding in DOM
+    if (restNote.setAttribute) {
+      restNote.setAttribute('data-cue-rest', 'true');
     }
-
-    // Approach 2: setRenderOptions if available
-    if (typeof restNote.setRenderOptions === 'function') {
-      restNote.setRenderOptions({ glyph_font_scale: cueScale });
-    }
-
-    // Approach 3: Direct glyph scale property (VexFlow 5.x)
-    if (restNote.glyph) {
-      restNote.glyph.scale = cueScaleRatio;
-    }
-
-    // Approach 4: Set font info for scaling
-    try {
-      if (restNote.fontInfo) {
-        restNote.fontInfo.size = cueScale;
-      }
-    } catch (e) {
-      // Font info access may fail
-    }
-
-    // Approach 5: Try setting scale on the note itself
-    if (typeof restNote.setFontSize === 'function') {
-      restNote.setFontSize(cueScale);
-    }
-
-    restNote._isCueSize = true;
   }
 
   restNote._isCueRest = isCue;
   return restNote;
+}
+
+/**
+ * Create a VexFlow GhostNote - an invisible note that maintains rhythmic spacing
+ * Use this for hidden rests in multi-voice notation to keep voices aligned
+ * @param {string} duration - Duration string (e.g., '4n', 'q')
+ * @returns {Object} - VexFlow GhostNote
+ */
+export function createGhostNote(duration = '4n') {
+  const VF = getVF();
+  if (!VF) {
+    console.error('[createGhostNote] VexFlow not available!');
+    return null;
+  }
+
+  // Check if GhostNote class exists
+  if (!VF.GhostNote) {
+    console.error('[createGhostNote] VF.GhostNote class not found! VexFlow version issue?');
+    return null;
+  }
+
+  // Convert duration to VexFlow format
+  let vexDuration = DURATION_MAP[duration] || duration || 'q';
+
+  // GhostNote doesn't use 'r' suffix - it's inherently a spacer
+  // Remove any 'r' suffix if present
+  vexDuration = vexDuration.replace(/r$/, '');
+
+  console.log(`[createGhostNote] Creating ghost note with duration: ${vexDuration}`);
+
+  try {
+    const ghostNote = new VF.GhostNote({ duration: vexDuration });
+    ghostNote._isGhostNote = true;
+    ghostNote._isHiddenRest = true;
+    console.log('[createGhostNote] SUCCESS - GhostNote created');
+    return ghostNote;
+  } catch (e) {
+    console.error('[createGhostNote] FAILED to create GhostNote:', e);
+    // Fallback: create a rest and hide it
+    const fallbackRest = createRest(duration, 'treble', { hidden: true });
+    return fallbackRest;
+  }
 }
 
 // ============================================================================

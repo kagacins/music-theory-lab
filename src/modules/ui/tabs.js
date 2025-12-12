@@ -55,7 +55,7 @@ export function initTabHistory() {
                 setTimeout(() => {
                     if (window.renderLessonViewer) {
                         // Use learn-tab-content (the inner container) not tab-learn (the outer wrapper)
-                        const learnContainer = document.getElementById('learn-tab-content');
+                        const learnContainer = document.getElementById('learn-tab-
                         if (learnContainer) {
                             window.renderLessonViewer(event.state.lessonId, learnContainer, false);
                         }
@@ -110,7 +110,7 @@ export function switchTab(tabId, options = {}) {
     document.body.setAttribute('data-active-tab', tabId);
 
     // Show/hide sticky action bar based on tab (builder and melody tabs)
-    const actionBar = document.getElementById('action-bar');
+    const actionBar = document.getElementById('action-
     if (actionBar) {
         const showActionBar = tabId === 'builder' || tabId === 'melody';
         actionBar.classList.toggle('hidden', !showActionBar);
@@ -118,8 +118,8 @@ export function switchTab(tabId, options = {}) {
 
     const tabs = ['builder', 'melody', 'scales', 'learn'];
     // Also hide the old trainer tab content
-    const trainerTab = document.getElementById('tab-trainer');
-    if (trainerTab) trainerTab.classList.add('hidden');
+    const trainerTab = document.getElementById('tab-
+    if (trainerTab) trainerTab.classList.add('
 
     tabs.forEach(id => {
         document.getElementById(`tab-${id}`).classList.toggle('hidden', id !== tabId);
@@ -155,12 +155,12 @@ export function switchTab(tabId, options = {}) {
         const headerBtn = document.getElementById(`header-tab-btn-${id}`);
         if (headerBtn) {
             // Remove old styling classes
-            headerBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-violet-600', 'bg-indigo-500', 'text-white', 'text-gray-500', 'text-gray-600', 'hover:bg-gray-100', 'active');
+            headerBtn.classList.remove('bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-teal-600', 'bg-lime-400', 'bg-violet-600', 'bg-indigo-500', 'text-white', 'text-gray-500', 'text-gray-600', 'hover:bg-gray-100', '
             if (id === tabId) {
                 // Add active class for new pill styling (CSS handles the gradient)
-                headerBtn.classList.add('active');
+                headerBtn.classList.add('
                 // Also add legacy classes for backwards compatibility
-                headerBtn.classList.add(activeColor, 'text-white');
+                headerBtn.classList.add(activeColor, 'text-
             } else {
                 headerBtn.classList.add('text-gray-600', 'hover:bg-gray-100');
             }
@@ -185,13 +185,13 @@ export function switchTab(tabId, options = {}) {
     }
 
     // Show/hide expand/collapse header buttons based on active tab
-    const headerExpandCollapse = document.getElementById('header-expand-collapse-group');
+    const headerExpandCollapse = document.getElementById('header-expand-collapse-
     if (headerExpandCollapse) {
         // Show controls for tabs that have collapsible sections
         if (tabId === 'builder' || tabId === 'melody') {
-            headerExpandCollapse.classList.remove('hidden');
+            headerExpandCollapse.classList.remove('
         } else {
-            headerExpandCollapse.classList.add('hidden');
+            headerExpandCollapse.classList.add('
         }
     }
 
@@ -199,24 +199,24 @@ export function switchTab(tabId, options = {}) {
     // Note: Stop all playback functionality would go here if needed
 
     // Restore visibility logic for the correct display panel
-    document.getElementById('builder-info-display').classList.toggle('hidden', tabId !== 'builder');
+    document.getElementById('builder-info-display').classList.toggle('hidden', tabId !== '
     document.getElementById('progression-chord-display').classList.add('hidden'); // Always hidden (trainer tab removed)
-    document.getElementById('scale-info-display').classList.toggle('hidden', tabId !== 'scales');
+    document.getElementById('scale-info-display').classList.toggle('hidden', tabId !== '
 
     // Manage visibility of floating controls
-    document.getElementById('floating-builder-controls').classList.add('hidden');
-    document.getElementById('floating-melody-controls').classList.toggle('hidden', tabId !== 'melody');
-    document.getElementById('floating-scale-controls').classList.toggle('hidden', tabId !== 'scales');
-    document.getElementById('floating-learn-controls').classList.toggle('hidden', tabId !== 'learn');
+    document.getElementById('floating-builder-controls').classList.add('
+    document.getElementById('floating-melody-controls').classList.toggle('hidden', tabId !== '
+    document.getElementById('floating-scale-controls').classList.toggle('hidden', tabId !== '
+    document.getElementById('floating-learn-controls').classList.toggle('hidden', tabId !== '
 
     // Show/hide the correct action button containers
-    const builderActions = document.getElementById('builder-actions-container');
-    const trainerActions = document.getElementById('trainer-main-actions');
-    const builderCentral = document.getElementById('builder-central-actions');
-    const scaleCentral = document.getElementById('scale-central-actions');
-    const builderOctave = document.getElementById('builder-octave-controls-container');
-    const trainerOctave = document.getElementById('trainer-octave-controls-container');
-    const scaleOctave = document.getElementById('scale-octave-controls-container');
+    const builderActions = document.getElementById('builder-actions-
+    const trainerActions = document.getElementById('trainer-main-
+    const builderCentral = document.getElementById('builder-central-
+    const scaleCentral = document.getElementById('scale-central-
+    const builderOctave = document.getElementById('builder-octave-controls-
+    const trainerOctave = document.getElementById('trainer-octave-controls-
+    const scaleOctave = document.getElementById('scale-octave-controls-
 
     if (tabId === 'builder') {
         updateBuilderDisplay();
@@ -225,7 +225,7 @@ export function switchTab(tabId, options = {}) {
             window.renderBuilderProgressionCards();
         }
         // Reset shared-chord-display width for Chord Builder
-        const sharedChordDisplay = document.getElementById('shared-chord-display');
+        const sharedChordDisplay = document.getElementById('shared-chord-
         if (sharedChordDisplay) {
             sharedChordDisplay.classList.remove('w-80');
             sharedChordDisplay.classList.add('w-64');
@@ -288,7 +288,7 @@ export function switchTab(tabId, options = {}) {
             updateKeySignatureDisplay(trainerState.currentKey);
         }
         // Reset shared-chord-display width for Melody Composer
-        const sharedChordDisplay = document.getElementById('shared-chord-display');
+        const sharedChordDisplay = document.getElementById('shared-chord-
         if (sharedChordDisplay) {
             sharedChordDisplay.classList.remove('w-80');
             sharedChordDisplay.classList.add('w-64');
@@ -296,10 +296,10 @@ export function switchTab(tabId, options = {}) {
         updateKeyboardLabels();
         // Refresh notation if in Free mode and progression exists (Phase 4.4+)
         setTimeout(() => {
-            const panel = document.getElementById('melody-controls-panel');
-            const freeModeControls = document.getElementById('free-mode-controls');
+            const panel = document.getElementById('melody-controls-
+            const freeModeControls = document.getElementById('free-mode-
             // Only refresh if panel is visible and Free mode is active
-            const panelVisible = !panel || !panel.classList.contains('hidden');
+            const panelVisible = !panel || !panel.classList.contains('
             if (panelVisible && freeModeControls && !freeModeControls.classList.contains('hidden')) {
                 if (window.refreshNotationFromProgression) {
                     // Wait a bit to ensure notation system is ready
@@ -316,7 +316,7 @@ export function switchTab(tabId, options = {}) {
             window.scaleRootIndex = window.getScaleRootIndex();
         }
         // Use same width as other tabs to prevent layout shift
-        const sharedChordDisplay = document.getElementById('shared-chord-display');
+        const sharedChordDisplay = document.getElementById('shared-chord-
         if (sharedChordDisplay) {
             sharedChordDisplay.classList.remove('w-72', 'w-80');
             sharedChordDisplay.classList.add('w-64');
@@ -328,7 +328,7 @@ export function switchTab(tabId, options = {}) {
             window.initLearnTab();
         }
         // Use same width as other tabs
-        const sharedChordDisplay = document.getElementById('shared-chord-display');
+        const sharedChordDisplay = document.getElementById('shared-chord-
         if (sharedChordDisplay) {
             sharedChordDisplay.classList.remove('w-72', 'w-80');
             sharedChordDisplay.classList.add('w-64');
@@ -336,7 +336,7 @@ export function switchTab(tabId, options = {}) {
     }
 
     // Update the tab subtitle to show current tab name
-    const tabSubtitle = document.getElementById('tab-subtitle');
+    const tabSubtitle = document.getElementById('tab-
     if (tabSubtitle) {
         const tabNames = {
             'builder': 'Chord Lab',

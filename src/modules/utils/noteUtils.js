@@ -38,7 +38,7 @@ export function getEnharmonicPreferenceForKey(key) {
     // Check for minor keys
     const isMinor = normalizedKey.toLowerCase().includes('minor') ||
                     normalizedKey.toLowerCase().includes('min') ||
-                    normalizedKey.endsWith('m');
+                    normalizedKey.endsWith('
 
     // Extract just the root note
     let root = normalizedKey
@@ -122,17 +122,17 @@ export function spellNoteInKey(note, key) {
  */
 export function noteToMidi(note) {
     if (!note || typeof note !== 'string') {
-        console.warn(`Invalid note passed to noteToMidi: ${note}`);
+
         return NaN;
     }
     try {
         const midi = Tone.Midi(note).toMidi();
         if (isNaN(midi)) {
-            console.warn(`noteToMidi returned NaN for note: ${note}`);
+
         }
         return midi;
     } catch (e) {
-        console.warn(`Error converting note to MIDI: ${note}`, e);
+
         return NaN;
     }
 }
@@ -215,7 +215,7 @@ export function getChordNotes(rootNoteName, chordType, key, octave = 3, enharmon
     const rootMidi = noteToMidi(`${rootNoteName}${octave}`);
     // Validate rootMidi - if it's NaN or invalid, return empty notes
     if (isNaN(rootMidi) || rootMidi === null || rootMidi === undefined) {
-        console.warn(`Invalid root note for chord: ${rootNoteName}${octave}`);
+
         return { baseNotes: [], specificNotes: [] };
     }
 
@@ -259,7 +259,7 @@ export function getChordNotes(rootNoteName, chordType, key, octave = 3, enharmon
         const noteMidi = rootMidi + interval;
         // Validate noteMidi before converting
         if (isNaN(noteMidi) || noteMidi === null || noteMidi === undefined) {
-            console.warn(`Invalid MIDI value: ${rootMidi} + ${interval} = ${noteMidi}`);
+
             return null;
         }
 
@@ -269,7 +269,7 @@ export function getChordNotes(rootNoteName, chordType, key, octave = 3, enharmon
         // Get raw note from Tone.js (may have wrong enharmonic spelling)
         const rawNote = Tone.Midi(noteMidi).toNote();
         if (!rawNote || typeof rawNote !== 'string') {
-            console.warn(`Invalid note from MIDI ${noteMidi}: ${rawNote}`);
+
             return null;
         }
 
@@ -277,7 +277,7 @@ export function getChordNotes(rootNoteName, chordType, key, octave = 3, enharmon
 
         // Validate noteOctave
         if (isNaN(noteOctave) || noteOctave === null || noteOctave === undefined) {
-            console.warn(`Invalid octave parsed from note ${rawNote}`);
+
             return null;
         }
 
@@ -358,21 +358,21 @@ export function getInvertedChordNotes(rootNote, chordType, inversion, key, octav
     for (let i = 0; i < inversion; i++) {
         const noteToShift = invertedNotes.shift();
         if (!noteToShift) {
-            console.warn(`No note to shift for inversion ${i} of chord ${rootNote} ${chordType}`);
+
             break;
         }
         
         const shiftedMidi = noteToMidi(noteToShift) + 12;
         // Validate shiftedMidi before converting
         if (isNaN(shiftedMidi) || shiftedMidi === null || shiftedMidi === undefined) {
-            console.warn(`Invalid MIDI value for shifted note: ${noteToShift} -> ${shiftedMidi}`);
+
             break;
         }
         
         // Convert the new MIDI value back to a note name. Tone.js handles the octave correctly.
         const rawShiftedNote = Tone.Midi(shiftedMidi).toNote();
         if (!rawShiftedNote || typeof rawShiftedNote !== 'string') {
-            console.warn(`Invalid note from MIDI ${shiftedMidi}: ${rawShiftedNote}`);
+
             break;
         }
         
@@ -381,7 +381,7 @@ export function getInvertedChordNotes(rootNote, chordType, inversion, key, octav
         if (resolvedNote && typeof resolvedNote === 'string') {
             invertedNotes.push(resolvedNote);
         } else {
-            console.warn(`Invalid resolved note: ${resolvedNote} from ${rawShiftedNote}`);
+
         }
     }
 
@@ -467,7 +467,7 @@ export function getLHNotes(rootNote, lhType, lhInversion = 0, key, lhOctaveShift
         intervals = [...CHORD_DEFINITIONS['Dominant 7th'].intervals]; // Create a copy
     } else if (lhType === 'spread') {
         // Determine if the RH chord is major or minor to select the correct 10th
-        const isMinor = rhChordType.includes('Minor') || rhChordType.includes('Diminished');
+        const isMinor = rhChordType.includes('Minor') || rhChordType.includes('D
         const tenth = isMinor ? 3 + 12 : 4 + 12; // Minor 10th (m3 + octave) or Major 10th (M3 + octave)
         intervals = [0, 7, tenth]; // R-5-10
     } else if (lhType === 'quartal') {
