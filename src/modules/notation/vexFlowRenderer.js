@@ -939,6 +939,51 @@ export function createRest(duration = '4n', clef = 'treble', options = {}) {
   return restNote;
 }
 
+/**
+ * Create a VexFlow GhostNote - an invisible note that maintains rhythmic spacing
+ * Use this for hidden rests in multi-voice notation to keep voices aligned.
+ *
+ * GhostNotes are the preferred way to handle "hidden" rests because they:
+ * 1. Properly participate in tick calculations for voice alignment
+ * 2. Are completely invisible (no styling hacks needed)
+ * 3. Work seamlessly with VexFlow's Formatter
+ *
+ * @param {string} duration - Duration string (e.g., '4n', 'q', '2n')
+ * @returns {Object} - VexFlow GhostNote, or null on error
+ */
+export function createGhostNote(duration = '4n') {
+  const VF = getVF();
+  if (!VF) {
+    console.error('[createGhostNote] VexFlow not available!');
+    return null;
+  }
+
+  // Check if GhostNote class exists
+  if (!VF.GhostNote) {
+    console.error('[createGhostNote] VF.GhostNote class not found! VexFlow version issue?');
+    // Fallback: create a transparent rest
+    return createRest(duration, 'treble', { hidden: true });
+  }
+
+  // Convert duration to VexFlow format
+  let vexDuration = DURATION_MAP[duration] || duration || 'q';
+
+  // GhostNote doesn't use 'r' suffix - it's inherently a spacer
+  // Remove any 'r' suffix if present
+  vexDuration = vexDuration.replace(/r$/, '');
+
+  try {
+    const ghostNote = new VF.GhostNote({ duration: vexDuration });
+    ghostNote._isGhostNote = true;
+    ghostNote._isHiddenRest = true;
+    return ghostNote;
+  } catch (e) {
+    console.error('[createGhostNote] FAILED to create GhostNote:', e);
+    // Fallback: create a transparent rest
+    return createRest(duration, 'treble', { hidden: true });
+  }
+}
+
 // ============================================================================
 // VOICE AND FORMATTING
 // ============================================================================
@@ -1223,6 +1268,7 @@ export default {
   createStaveNote,
   createChordNote,
   createRest,
+  createGhostNote,
   createVoice,
   formatAndDraw,
   generateBeams,
