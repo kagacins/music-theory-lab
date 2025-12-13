@@ -485,7 +485,6 @@ function ensureAudioReady() {
     // Check if audio is ready
     const audioIsReady = window.getAudioIsReady && window.getAudioIsReady();
     if (!audioIsReady) {
-        console.log('[UnifiedRecommendationModal] Audio not ready yet, skipping playback');
         return false;
     }
 
@@ -5844,8 +5843,6 @@ function createRecommendationCard(rec, index, rhythmicContext) {
             }
         }
 
-        console.log('[Why Button] Clicked for chord:', numeral, spelledRoot);
-        console.log('[Why Button] Context - key:', currentKey, 'prev:', prevRomanNumeral, 'next:', nextRomanNumeral);
 
         // Show the Why This Works panel with full context
         if (typeof window.showWhyThisWorks === 'function') {
@@ -5985,7 +5982,6 @@ function addChordToProgression(rec, rhythmicContext, options = {}) {
     if (isFirstOfNewSection && compositionState?.createSection && intent.mode === INTENT_MODES.NEW_SECTION) {
         try {
             compositionState.createSection(newSectionType, [newChordIndex]);
-            console.log(`[UnifiedRecommendationModal] Created new ${newSectionType} section with chord at index ${newChordIndex}`);
         } catch (e) {
             console.error('[UnifiedRecommendationModal] Failed to create section:', e);
         }
@@ -8377,7 +8373,6 @@ function generateAndDisplayPhrases(container, chord, key) {
         const styleId = modalState.style || sectionStyleMap[effectiveSectionType] || 'balanced';
 
         // Log style and mood for debugging
-        console.log(`[Melody Tab] Generating phrases with styleId: ${styleId}, mood: ${modalState.mood}`);
 
         // Log target beats for debugging
         if (isSectionModeWithChord) {
@@ -8964,7 +8959,6 @@ function applyPhrase(phrase) {
 
             // If phrase exceeds max, truncate notes to fit
             if (totalPhraseBeats > maxDuration + 0.01) {
-                console.log(`Truncating phrase from ${totalPhraseBeats} to ${maxDuration} beats`);
 
                 let accumulatedBeats = 0;
                 let truncateIndex = 0;
@@ -9004,7 +8998,6 @@ function applyPhrase(phrase) {
         // In section mode, use direct unit positioning to place notes at exact beat positions
         if (isSectionModeWithChord && insertAtBeat !== null && maxDuration !== null) {
             const totalPhraseBeats = rhythm.reduce((sum, r) => sum + r, 0);
-            console.log(`Applying phrase to section: ${notes.length} notes, ${totalPhraseBeats} beats at beat ${insertAtBeat}`);
 
             // Use addTrebleNoteAtUnit to place notes directly at specific positions
             if (compositionState?.addTrebleNoteAtUnit) {
@@ -11818,9 +11811,6 @@ function generatePolyphonySuggestions() {
     chordNotes = chordNotes.filter(n => (n.voiceIndex || 0) === 0);
 
     // Debug logging
-    console.log('[Polyphony] Selected chord index:', polyphonyState.selectedChordIndex);
-    console.log('[Polyphony] Staff:', staff);
-    console.log('[Polyphony] Chord:', chord?.root, chord?.type);
     console.log('[Polyphony] Notes gathered:', chordNotes.length, chordNotes.map(n => n.pitch || n.pitches?.[0]));
 
     // Generate suggestions based on texture type
@@ -12386,7 +12376,6 @@ function playPolyphonyPreview() {
     const allNotes = [...voice1Notes, ...voice2Notes].sort((a, b) => (a.beat || 0) - (b.beat || 0));
 
     if (allNotes.length === 0) {
-        console.log('[Polyphony] No notes to play');
         return;
     }
 
@@ -12442,7 +12431,6 @@ function getDurationInBeats(duration) {
 function applyPolyphonySuggestions() {
     const compositionState = getCompositionState();
     if (!compositionState || polyphonyState.generatedSuggestions.length === 0) {
-        console.log('[Polyphony] No suggestions to apply');
         return;
     }
 
@@ -12450,9 +12438,7 @@ function applyPolyphonySuggestions() {
     const chordIndex = polyphonyState.selectedChordIndex;
     const staff = polyphonyState.selectedStaff;
 
-    console.log('[Polyphony] Applying suggestions:');
     polyphonyState.generatedSuggestions.forEach((s, i) => {
-        console.log(`  [${i}] pitch=${s.pitch}, duration=${s.duration}, beat=${s.beat}, sourceMeasure=${s.sourceMeasure}`);
     });
 
     // Collect unique measures that will be affected
@@ -12466,7 +12452,6 @@ function applyPolyphonySuggestions() {
     affectedMeasures.forEach(measureIndex => {
         compositionState.ensureVoiceExists(measureIndex, staff, 1);
         if (compositionState.clearVoice) {
-            console.log(`[Polyphony] Clearing existing Voice 2 in measure ${measureIndex}`);
             compositionState.clearVoice(measureIndex, staff, 1);
         } else {
             // Fallback: manually clear the voice notes
@@ -12492,11 +12477,9 @@ function applyPolyphonySuggestions() {
             voiceIndex: 1
         };
 
-        console.log(`[Polyphony] Adding to measure ${sourceMeasure}:`, noteToAdd);
         compositionState.addNoteToVoice(sourceMeasure, staff, 1, noteToAdd);
     });
 
-    console.log(`[Polyphony] Applied ${polyphonyState.generatedSuggestions.length} notes to Voice 2 of ${staff} clef`);
 
     // Emit event to trigger re-render
     if (compositionState.events) {

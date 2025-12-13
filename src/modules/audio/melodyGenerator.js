@@ -817,7 +817,6 @@ export function renderMelodyNotation(canvasElement, melody, key) {
             ? `, octave brackets: ${[...new Set(vexNotesData.filter(i => i.octaveLabel).map(i => i.octaveLabel))].join(', ')}`
             : '';
 
-        console.log('VexFlow rendering:', vexNotes.length, 'notes, totalBeats:', totalBeats + bracketInfo);
 
         // Create voice and add notes - use totalBeats directly without ceiling or buffer
         const voice = new Voice({
@@ -840,7 +839,6 @@ export function renderMelodyNotation(canvasElement, melody, key) {
         try {
             // VexFlow's Beam.generateBeams automatically groups consecutive beamable notes
             beams = Beam.generateBeams(vexNotes);
-            console.log('Generated', beams.length, 'beam groups for', vexNotes.length, 'notes');
         } catch (e) {
             console.warn('Beaming error:', e);
         }
@@ -855,7 +853,6 @@ export function renderMelodyNotation(canvasElement, melody, key) {
         beams.forEach((beam, idx) => {
             try {
                 beam.setContext(context).draw();
-                console.log('Drew beam group', idx, 'with', beam.notes.length, 'notes');
             } catch (e) {
                 console.error('Error drawing beam', idx, ':', e);
             }
@@ -1060,7 +1057,6 @@ export function addRestToMelody(duration = '4n', dotted = false) {
             true, // isRest
             null  // No accidental for rests
         );
-        console.log('[MelodyGenerator] Intelligent rest placement result:', result);
     }
 
     // Advance beat position
@@ -1305,7 +1301,6 @@ export function addNoteToInteractiveMelody(noteName, skipPlayback = false) {
         dotted = notationState.isDotted;
         // If notation toolbar has an accidental selected, use it; otherwise use melody generator's
         accidentalToUse = notationState.accidental !== null ? notationState.accidental : currentAccidental;
-        console.log('[MelodyGenerator] Using notation toolbar settings:', notationState);
     } else {
         duration = currentNoteDuration;
         dotted = currentNoteDotted;
@@ -1392,7 +1387,6 @@ export function addNoteToInteractiveMelody(noteName, skipPlayback = false) {
             false, // isRest
             accidentalForBridge
         );
-        console.log('[MelodyGenerator] Intelligent note placement result:', result);
     }
 
     // Advance beat position based on note duration
@@ -2131,7 +2125,6 @@ function playNotesInBeat(canvas, measure, beat, clickedType) {
         if (window.getCompositionState) {
             const compositionState = window.getCompositionState();
             beat0MelodyNotes = compositionState.getNotesByBeat(measure, 0, 'treble');
-            console.log(`[playNotesInBeat] Got ${beat0MelodyNotes.length} melody notes from compositionState for measure ${measure}, beat 0`);
         }
         beat0MelodyNotes.forEach(note => {
             // Handle polyphony - push each pitch separately
@@ -2146,7 +2139,6 @@ function playNotesInBeat(canvas, measure, beat, clickedType) {
         if (window.getCompositionState) {
             const compositionState = window.getCompositionState();
             beatMelodyNotes = compositionState.getNotesByBeat(measure, beat, 'treble');
-            console.log(`[playNotesInBeat] Got ${beatMelodyNotes.length} melody notes from compositionState for measure ${measure}, beat ${beat}`);
         }
 
         beatMelodyNotes.forEach(note => {
@@ -2466,7 +2458,6 @@ function startMeasurePlayback(canvas, measureIndex) {
     if (window.getCompositionState) {
         const compositionState = window.getCompositionState();
         measureMelodyNotes = compositionState.getMelodyNotesInMeasure(measureIndex);
-        console.log(`[startMeasurePlayback] Got ${measureMelodyNotes.length} melody notes from compositionState for measure ${measureIndex}`);
     }
 
     // Set active measure for highlighting
@@ -2601,7 +2592,6 @@ function stopMeasurePlayback(canvas) {
         if (window.getCompositionState) {
             const compositionState = window.getCompositionState();
             measureMelodyNotes = compositionState.getMelodyNotesInMeasure(previousMeasureIndex);
-            console.log(`[stopMeasurePlayback] Got ${measureMelodyNotes.length} melody notes from compositionState for measure ${previousMeasureIndex}`);
         }
         measureMelodyNotes.forEach(note => {
             const noteBeat = typeof note.beat === 'number' ? note.beat : 0;
@@ -3009,7 +2999,6 @@ export function playFromSelectedMeasure() {
         if (notesFromStart.length > 0) {
             // Filter out tied continuation notes - they should not be played as new attacks
             const playableNotes = notesFromStart.filter(note => !note.isTied);
-            console.log(`[playFromSelectedMeasure] After filtering ties: ${playableNotes.length} playable notes`);
 
             melodyPart = new Tone.Part((time, noteData) => {
                 // Handle polyphony - play all pitches
@@ -3040,14 +3029,12 @@ export function playFromSelectedMeasure() {
     
     // Schedule chord whole notes (from start measure onwards)
     const chordsFromStart = progressionData.slice(startMeasure);
-    console.log(`[melodyGenerator] playAllMeasures: Scheduling ${chordsFromStart.length} chords starting from measure ${startMeasure}`);
 
     const chordPart = new Tone.Part((time, chordData) => {
         const chord = chordData.chord;
         const measureIndex = chordData.measureIndex;
 
         // DEBUG: Log when chordPart callback fires
-        console.log(`[melodyGenerator] chordPart callback: measureIndex=${measureIndex}, time=${time}`);
 
         const rhNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
         const lhNotes = getLHNotes(
@@ -3062,7 +3049,6 @@ export function playFromSelectedMeasure() {
         const chordNotes = [...rhNotes, ...lhNotes];
 
         // DEBUG: Log chord notes count
-        console.log(`[melodyGenerator] chordPart: chordNotes.length=${chordNotes.length}`);
 
         if (chordNotes.length > 0) {
             piano.triggerAttackRelease(chordNotes, '1n', time);
@@ -3075,7 +3061,6 @@ export function playFromSelectedMeasure() {
             Tone.Draw.schedule(() => {
                 // DEBUG: Log when Draw.schedule callback fires
                 const isInit = window.isNotationInitialized && window.isNotationInitialized();
-                console.log(`[melodyGenerator] playAllMeasures Draw.schedule fired: measureIndex=${measureIndex}, isNotationInitialized=${isInit}`);
 
                 if (isInit) {
                     // Use new notation system
@@ -3330,7 +3315,6 @@ export function playMeasure(measureIndex) {
     if (window.getCompositionState) {
         const compositionState = window.getCompositionState();
         measureMelodyNotes = compositionState.getMelodyNotesInMeasure(measureIndex);
-        console.log(`[playMeasure] Got ${measureMelodyNotes.length} melody notes from compositionState for measure ${measureIndex}`);
     }
 
     // Get common start time for perfect synchronization
@@ -3357,19 +3341,14 @@ export function playMeasure(measureIndex) {
 
     // Play melody notes with Tone.js scheduling for perfect sync
     if (measureMelodyNotes.length > 0) {
-        console.log(`[playMeasure] ===== TUPLET DEBUG: Measure ${measureIndex} =====`);
-        console.log(`[playMeasure] Tempo: ${tempo} BPM, beatDuration: ${beatDuration}s`);
-        console.log(`[playMeasure] Total melody notes: ${measureMelodyNotes.length}`);
 
         measureMelodyNotes.forEach((note, index) => {
             if (note.type === 'rest') {
-                console.log(`[playMeasure] Note ${index}: REST, beat=${note.beat}, duration=${note.duration}`);
                 return; // Skip rests
             }
 
             // Skip tied notes - they are continuations from previous measures, not new attacks
             if (note.isTied) {
-                console.log(`[playMeasure] Note ${index}: TIED CONTINUATION, skipping`);
                 return;
             }
 
@@ -3963,7 +3942,6 @@ export function playAllMelody() {
         if (window.getCompositionState) {
             const compositionState = window.getCompositionState();
             const melodyNotes = compositionState.getAllMelodyNotes();
-            console.log(`[playAllMelody] Got ${melodyNotes.length} melody notes from compositionState`);
 
             // Helper to compare pitches (handles both single notes and chords)
             const samePitches = (a, b) => {
@@ -3982,8 +3960,6 @@ export function playAllMelody() {
             let exportedIndex = 0;
 
             // Debug: Log all melody notes with their beat positions
-            console.log('[playAllMelody] ===== TUPLET DEBUG =====');
-            console.log(`[playAllMelody] Tempo: ${tempo} BPM, beatDuration: ${beatDuration}s, measureDuration: ${measureDuration}s`);
             melodyNotes.forEach((n, idx) => {
                 console.log(`[playAllMelody] Note ${idx}: measure=${n.measure}, beat=${n.beat?.toFixed?.(3) || n.beat}, duration=${n.duration}, pitch=${n.pitch || n.pitches?.[0]}, tuplet=${JSON.stringify(n.tuplet)}`);
             });
@@ -4100,7 +4076,6 @@ export function playAllMelody() {
             }
             currentlyPlayingChordNotes = [];
         } else {
-            console.log(`[PlayAll] Playing chord ${chordIndex} at measure ${measureIndex}, beat ${specificNote?.beat || 0}, isNewChord=${isNewChord}, lastChordIndex=${lastChordIndex}`);
         }
 
         // Update last chord index
@@ -4113,7 +4088,6 @@ export function playAllMelody() {
         // If a specific note was provided in the event, only play that note
         if (chordData.specificNote) {
             bassNoteData = [chordData.specificNote];
-            console.log(`[PlayAll] Playing specific bass note at beat ${chordData.specificNote.beat} for measure ${measureIndex}`);
         } else if (window.getCompositionState) {
             // Fallback: play all bass notes in the measure (old behavior)
             const compositionState = window.getCompositionState();
@@ -4126,7 +4100,6 @@ export function playAllMelody() {
                     const allBassNotes = bassVoices.flatMap(voice => voice?.notes || []);
                     if (allBassNotes.length > 0) {
                         bassNoteData = allBassNotes.filter(note => note.type !== 'rest');
-                        console.log(`[PlayAll] Playing ${bassNoteData.length} bass notes from compositionState for measure ${measureIndex}`);
                     }
                 }
             }
@@ -4164,7 +4137,6 @@ export function playAllMelody() {
 
                 if (bassNoteIndex === 0 && !bassNote.isTied && window.getCompositionState) {
                     const compositionState = window.getCompositionState();
-                    console.log(`[Duration] Chord ${chordIndex} at measure ${measureIndex}: calculating total duration, starting with ${totalDuration}s`);
                     // Look ahead to find tied continuations of this chord
                     let nextMeasureIndex = measureIndex + 1;
                     while (nextMeasureIndex < compositionState.getMeasureCount()) {
@@ -4190,7 +4162,6 @@ export function playAllMelody() {
                         }
                     }
                     chordTotalDuration = totalDuration;
-                    console.log(`[Duration] Chord ${chordIndex} total duration: ${chordTotalDuration}s`);
                 }
 
                 // Play the bass note(s) with the exact calculated duration
@@ -4203,9 +4174,7 @@ export function playAllMelody() {
                     // Only track notes for chord release on the first bass note of a new chord
                     if (bassNoteIndex === 0 && isNewChord) {
                         currentlyPlayingChordNotes.push(...notesToPlay);
-                        console.log(`[Track] Added notes to tracking for chord ${chordIndex}:`, notesToPlay, `total tracked: ${currentlyPlayingChordNotes.length}`);
                     } else {
-                        console.log(`[Track] NOT tracking notes: bassNoteIndex=${bassNoteIndex}, isNewChord=${isNewChord}`);
                     }
 
                     notesToPlay.forEach(pitch => {
@@ -4394,7 +4363,6 @@ export function playAllMelody() {
             }
         }
     }
-    console.log(`[playAllMelody] Total duration will cover ${maxMeasure + 1} measures`);
     // Add small buffer to ensure last chord finishes (reverb will decay naturally)
     // No need for large buffer since we're releasing notes at exact measure boundaries
     const totalDuration = (maxMeasure + 1) * measureDuration + 0.5;
@@ -4427,33 +4395,25 @@ let editMode = false;
  * Toggle melody edit mode (works for both Progression Builder and Melody Composer tabs)
  */
 export function toggleMelodyEditMode() {
-    console.log('=== toggleMelodyEditMode called ===');
-    console.log('Edit mode before toggle:', editMode);
 
     // Check if there's a melody to edit
     const melody = getCurrentMelody();
-    console.log('Current melody:', melody);
-    console.log('Melody has notes?', melody && melody.notes && melody.notes.length);
 
     if (!melody || !melody.notes || melody.notes.length === 0) {
-        console.log('No melody found - showing alert');
         alert('Please generate a melody first before editing.');
         return;
     }
 
-    console.log('Melody found with', melody.notes.length, 'notes');
 
     // Try to find both editor and button elements (check both tabs)
     let editor = document.getElementById('melody-editor');
     let btn = document.getElementById('edit-melody-btn');
 
-    console.log('Trying Progression Builder tab - editor:', editor, 'btn:', btn);
 
     // If not found in first tab, try second tab
     if (!editor || !btn) {
         editor = document.getElementById('melody-editor-main');
         btn = document.getElementById('edit-melody-btn-main');
-        console.log('Trying Melody Composer tab - editor:', editor, 'btn:', btn);
     }
 
     if (!editor) {
@@ -4470,7 +4430,6 @@ export function toggleMelodyEditMode() {
 
     // Toggle edit mode
     editMode = !editMode;
-    console.log('Edit mode toggled to:', editMode);
 
     if (editMode) {
         editor.classList.remove('hidden');

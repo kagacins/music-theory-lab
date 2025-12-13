@@ -3445,10 +3445,7 @@ function createViewModeToggle() {
     container.querySelectorAll('.view-mode-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const mode = btn.getAttribute('data-mode');
-            console.log('[SectionView] View mode toggle clicked:', mode);
-            console.log('[SectionView] Previous mode was:', progressionViewMode);
             setProgressionViewMode(mode);
-            console.log('[SectionView] Mode after set:', progressionViewMode);
             // Re-render both progression displays
             renderProgressionDisplay('melody-progression-visualization', true);
             renderProgressionDisplay('melody-progression-visualization', false);
@@ -3494,7 +3491,6 @@ function createCompactViewModeToggle() {
         btn.addEventListener('click', (e) => {
             e.stopPropagation(); // Prevent header collapse
             const mode = btn.getAttribute('data-mode');
-            console.log('[SectionView] Compact toggle clicked:', mode);
             setProgressionViewMode(mode);
             // Re-render progression display
             renderProgressionDisplay('melody-progression-visualization', true);
@@ -3703,7 +3699,6 @@ function buildSectionChipsWithUngrouped(sections) {
  * @param {boolean} isCtrlClick - Whether ctrl/cmd key was held
  */
 function handleSectionChipClick(sectionId, isShiftClick, isCtrlClick = false) {
-    console.log('[SectionView] Chip clicked:', sectionId, 'shift:', isShiftClick, 'ctrl:', isCtrlClick);
 
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
     const realSections = compositionState ? compositionState.getSections() : [];
@@ -3718,34 +3713,26 @@ function handleSectionChipClick(sectionId, isShiftClick, isCtrlClick = false) {
         // Ctrl+click: toggle this section in the selection
         if (selectedSectionIds.has(sectionId)) {
             selectedSectionIds.delete(sectionId);
-            console.log('[SectionView] Ctrl-deselected section:', sectionId);
         } else {
             selectedSectionIds.add(sectionId);
-            console.log('[SectionView] Ctrl-added section:', sectionId);
         }
     } else {
         // Normal click: toggle selection or select single
         if (selectedSectionIds.has(sectionId) && selectedSectionIds.size === 1) {
             // Clicking the only selected section - deselect it
             selectedSectionIds.delete(sectionId);
-            console.log('[SectionView] Deselected section:', sectionId);
         } else {
             // Select only this section
             selectedSectionIds.clear();
             selectedSectionIds.add(sectionId);
-            console.log('[SectionView] Selected section:', sectionId);
         }
     }
 
-    console.log('[SectionView] Selected IDs after click:', [...selectedSectionIds]);
-    console.log('[SectionView] Current view mode:', progressionViewMode);
 
     // Re-render with new selection
-    console.log('[SectionView] Calling renderProgressionDisplay for melody-progression-visualization');
     renderProgressionDisplay('melody-progression-visualization', true);
 
     // Update notation to show only selected section measures
-    console.log('[SectionView] Calling updateNotationForSelectedSections');
     updateNotationForSelectedSections();
 }
 
@@ -3823,33 +3810,26 @@ function navigateToNextSection() {
  * Update notation display to show only measures for selected sections
  */
 function updateNotationForSelectedSections() {
-    console.log('[SectionView] updateNotationForSelectedSections called, viewMode:', progressionViewMode);
 
     if (progressionViewMode !== 'section') {
-        console.log('[SectionView] Not in section mode, skipping notation update');
         return;
     }
 
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
     if (!compositionState) {
-        console.log('[SectionView] No compositionState, skipping');
         return;
     }
 
     const selectedIds = getSelectedSectionIds();
-    console.log('[SectionView] Selected IDs for notation:', selectedIds);
 
     // Get notation composer instance via the getter function
     const notationComposer = window.getNotationComposer ? window.getNotationComposer() : null;
-    console.log('[SectionView] notationComposer exists:', !!notationComposer);
     if (!notationComposer) {
-        console.log('[SectionView] No notation composer found - ensure getNotationComposer is available');
         return;
     }
 
     if (selectedIds.length === 0) {
         // Show all measures when no section selected
-        console.log('[SectionView] No section selected, clearing filter and rendering all');
         // Clear any existing measure filter
         if (typeof notationComposer.clearMeasureFilter === 'function') {
             notationComposer.clearMeasureFilter();
@@ -3875,7 +3855,6 @@ function updateNotationForSelectedSections() {
     });
 
     if (allChordIndices.length === 0) {
-        console.log('[SectionView] No chord indices found for selected sections');
         if (typeof notationComposer.render === 'function') {
             notationComposer.render();
         }
@@ -3886,7 +3865,6 @@ function updateNotationForSelectedSections() {
     const startMeasure = Math.min(...allChordIndices);
     const endMeasure = Math.max(...allChordIndices);
 
-    console.log('[SectionView] Calculated measure range:', startMeasure, 'to', endMeasure);
 
     // Set the persistent measure filter so that subsequent render() calls respect it
     // This allows canvas interactions (hover, click, edit) to work within the filtered view
@@ -3895,9 +3873,7 @@ function updateNotationForSelectedSections() {
     }
 
     // Render the filtered measures
-    console.log('[SectionView] renderFilteredMeasures exists:', typeof notationComposer.renderFilteredMeasures === 'function');
     if (typeof notationComposer.renderFilteredMeasures === 'function') {
-        console.log('[SectionView] Calling renderFilteredMeasures:', startMeasure, 'to', endMeasure);
         notationComposer.renderFilteredMeasures(startMeasure, endMeasure);
     } else {
         // Fallback: just render normally (filter is set, render() will use it)
@@ -3926,7 +3902,6 @@ function renderSectionViewMode(container, progressionData, key, sections) {
     // Create section picker bar
     const pickerBar = createSectionPickerBar(sections);
     container.appendChild(pickerBar);
-    console.log('[SectionView] Section picker bar created');
 
     // Create cards container with horizontal scroll wrapper
     const cardsWrapper = document.createElement('div');
@@ -3947,7 +3922,6 @@ function renderSectionViewMode(container, progressionData, key, sections) {
     // Collect visible chord indices based on selected sections
     let visibleChordIndices = new Set();
     const selectedIds = getSelectedSectionIds();
-    console.log('[SectionView] Selected section IDs:', selectedIds);
 
     // Build the combined sections list (including pseudo-sections for ungrouped chords)
     const allSectionsWithPseudo = buildSectionChipsWithUngrouped(sections);
@@ -3955,18 +3929,15 @@ function renderSectionViewMode(container, progressionData, key, sections) {
     if (selectedIds.length === 0) {
         // No section selected - show all cards
         progressionData.forEach((_, idx) => visibleChordIndices.add(idx));
-        console.log('[SectionView] No section selected, showing all', progressionData.length, 'cards');
     } else {
         // Show only cards from selected sections (including pseudo-sections)
         selectedIds.forEach(sectionId => {
             // Look up in combined list that includes pseudo-sections
             const section = allSectionsWithPseudo.find(s => s.id === sectionId);
-            console.log('[SectionView] Finding section:', sectionId, 'found:', !!section, 'chordIndices:', section?.chordIndices);
             if (section && section.chordIndices) {
                 section.chordIndices.forEach(idx => visibleChordIndices.add(idx));
             }
         });
-        console.log('[SectionView] Visible chord indices:', [...visibleChordIndices]);
     }
 
     // Add "Add Chord", "Section" and "Clear All" buttons
@@ -4072,11 +4043,9 @@ function renderSectionViewMode(container, progressionData, key, sections) {
         animationIndex++;
     });
 
-    console.log('[SectionView] Rendered', animationIndex, 'section containers');
 
     cardsWrapper.appendChild(cardsContainer);
     container.appendChild(cardsWrapper);
-    console.log('[SectionView] Cards wrapper appended to container');
 
     // Initialize sortable on the main container (for section dragging)
     initializeSimplifiedSortable(cardsContainer);
@@ -4084,7 +4053,6 @@ function renderSectionViewMode(container, progressionData, key, sections) {
     // Also initialize sortable on each section's cards area for card dragging within sections
     initializeSectionCardsAreaSortables(cardsContainer);
 
-    console.log('[SectionView] renderSectionViewMode complete');
 }
 
 /**
@@ -4098,7 +4066,6 @@ function initializeSectionCardsAreaSortables(container) {
     }
 
     const sectionContainers = container.querySelectorAll('.section-unified-container');
-    console.log('[SectionView] Initializing sortables on', sectionContainers.length, 'section cards areas');
 
     sectionContainers.forEach(sectionContainer => {
         const cardsArea = sectionContainer.querySelector('.section-cards-area');
@@ -8134,7 +8101,6 @@ function handleCardDragWithinSection(evt, originalSectionId) {
         // Remove from old section
         if (fromSectionId) {
             compositionState.removeChordFromSection(oldChordIndex, fromSectionId);
-            console.log('[handleCardDragWithinSection] Removed chord', oldChordIndex, 'from section', fromSectionId);
         }
         // Add to new section (if dropping into a section, not to main container)
         if (toSectionId) {
@@ -8144,17 +8110,14 @@ function handleCardDragWithinSection(evt, originalSectionId) {
                 const sectionCards = toContainer.querySelectorAll('.chord-card-wrapper[data-chord-index]');
                 const positionInSection = Array.from(sectionCards).indexOf(draggedItem);
                 compositionState.addChordToSection(oldChordIndex, toSectionId, positionInSection);
-                console.log('[handleCardDragWithinSection] Added chord', oldChordIndex, 'to section', toSectionId, 'at position', positionInSection);
             }
         } else {
-            console.log('[handleCardDragWithinSection] Card', oldChordIndex, 'is now ungrouped');
         }
     }
 
     // In filtered view (Section View mode), DON'T do global reorder
     // Just update section membership and re-render
     if (isFilteredView) {
-        console.log('[handleCardDragWithinSection] Filtered view - skipping global reorder');
         // Still re-render to update section visuals
         renderProgressionDisplay('melody-progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
@@ -9306,15 +9269,12 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             toolbar.appendChild(createViewModeToggle());
             container.appendChild(toolbar);
 
-            console.log('[ViewMode] Toolbar added to container:', containerId, 'sections:', sections.length);
 
             // Debug: verify it's actually in the DOM
             setTimeout(() => {
                 const toolbarCheck = document.getElementById('view-mode-toolbar');
-                console.log('[ViewMode] After 100ms, toolbar in DOM:', !!toolbarCheck);
             }, 100);
         } else {
-            console.log('[ViewMode] No sections found for container:', containerId);
         }
 
         // Create container for cards
@@ -9396,7 +9356,6 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
                 headerToggle.innerHTML = '';
                 headerToggle.className = 'flex items-center gap-1 ml-2';
                 headerToggle.appendChild(createCompactViewModeToggle());
-                console.log('[ViewMode] Header toggle populated with', sections.length, 'sections');
             } else {
                 headerToggle.innerHTML = '';
                 headerToggle.className = 'hidden ml-2';
@@ -9418,12 +9377,10 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         // Branch based on view mode
         if (progressionViewMode === 'section' && sections.length > 0) {
             // Section View Mode: show section picker and filtered cards
-            console.log('[SectionView] >>> Entering Section View Mode branch');
             gridContainer.className = 'flex flex-col gap-2';
             renderSectionViewMode(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', sections);
         } else if (progressionViewMode === 'scroll') {
             // Scroll View Mode: horizontal scrolling
-            console.log('[SectionView] >>> Entering Scroll View Mode branch');
             renderScrollViewMode(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
                 showActionButtons: true
             });
@@ -9431,7 +9388,6 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             initializeSimplifiedSortable(gridContainer);
         } else {
             // Default: Use flexbox with wrapping
-            console.log('[SectionView] >>> Entering Default/Wrap View Mode branch');
             gridContainer.className = 'flex flex-wrap items-start gap-2';
             if (hasSections) {
                 renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {

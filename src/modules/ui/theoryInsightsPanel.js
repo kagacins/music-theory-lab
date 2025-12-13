@@ -954,7 +954,6 @@ export class TheoryInsightsPanel {
      * Open a lesson from the panel
      */
     openLesson(lessonId) {
-        console.log('[TheoryInsights] Opening lesson:', lessonId);
 
         // First try the direct function if available
         if (window.renderLessonViewer && typeof window.renderLessonViewer === 'function') {
@@ -1079,7 +1078,6 @@ export class TheoryInsightsPanel {
      * Features an interactive key selector that updates the explanation in real-time
      */
     showConceptModal(conceptType, fallbackTitle) {
-        console.log('[TheoryInsights] Showing concept modal:', conceptType);
 
         // Get the explanation from our dictionary
         const concept = CONCEPT_EXPLANATIONS[conceptType];
@@ -1463,9 +1461,6 @@ export class TheoryInsightsPanel {
                 // Use btn directly, not e.target (which could be text node)
                 const conceptType = btn.dataset.conceptType;
                 const conceptTitle = btn.dataset.conceptTitle;
-                console.log('[TheoryInsights] Learn More clicked - type:', conceptType, 'title:', conceptTitle);
-                console.log('[TheoryInsights] Button element:', btn);
-                console.log('[TheoryInsights] Button outerHTML:', btn.outerHTML);
                 this.showConceptModal(conceptType, conceptTitle);
             });
         });
@@ -1605,7 +1600,6 @@ export class TheoryInsightsPanel {
      * Start playing a chord (hold until stopPreview is called)
      */
     async startPreview(root, type) {
-        console.log(`[TheoryInsights] Starting preview: ${root} ${type}`);
 
         // Build the chord notes
         this.currentPreviewNotes = this.buildChordNotes(root, type);
@@ -1628,7 +1622,6 @@ export class TheoryInsightsPanel {
             try {
                 this.piano.triggerAttack(this.currentPreviewNotes);
                 this.activePreviewPiano = this.piano;
-                console.log(`[TheoryInsights] Playing chord:`, this.currentPreviewNotes);
             } catch (e) {
                 console.error('[TheoryInsights] Piano playback error:', e);
             }
@@ -1739,7 +1732,6 @@ export class TheoryInsightsPanel {
         // Fallback to addSpecificChordToProgression (adds at end)
         if (window.addSpecificChordToProgression) {
             window.addSpecificChordToProgression(properType, 0, true, root);
-            console.log(`[TheoryInsights] Added ${root} ${properType} at end of progression`);
         } else {
             console.warn('[TheoryInsights] No method available to add chord');
         }
@@ -1829,14 +1821,11 @@ export function initTheoryInsightsIfReady() {
                                 document.getElementById('composition-notation-panel') ||
                                 document.querySelector('.composition-studio-content');
 
-    console.log('[TheoryInsights] Init check - compositionState:', !!compositionState, 'isCompositionStudio:', !!isCompositionStudio);
 
     if (!compositionState && !isCompositionStudio) {
-        console.log('[TheoryInsights] Skipping init - not in composition studio');
         return null;
     }
 
-    console.log('[TheoryInsights] Creating panel instance...');
     panelInstance = new TheoryInsightsPanel({
         compositionState,
         onUpdate: () => {}
@@ -1844,7 +1833,6 @@ export function initTheoryInsightsIfReady() {
     panelInstance.init();
 
     window.theoryInsightsPanel = panelInstance;
-    console.log('[TheoryInsights] Panel initialized successfully');
 
     return panelInstance;
 }

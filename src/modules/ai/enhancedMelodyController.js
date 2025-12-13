@@ -142,7 +142,6 @@ export function initEnhancedMelodyController(options = {}) {
     setupEnhancedEventListeners();
 
     isInitialized = true;
-    console.log('✅ Enhanced Melody Controller initialized');
 
     return true;
 }
@@ -169,7 +168,6 @@ function initEnhancedMelodyUI() {
         return;
     }
 
-    console.log('✅ Injecting Phase 4 Enhanced Melody UI');
 
     // Set up mode toggle listeners if the new UI layout exists
     setupModeToggle();
@@ -1028,7 +1026,6 @@ function insertPhrase(phrase) {
 function appendPhraseAtEnd(phrase) {
     const notationComposer = window.getNotationComposer && window.getNotationComposer();
 
-    console.log(`[appendPhraseAtEnd] Inserting ${phrase.notes.length} notes with rhythm:`, phrase.rhythm);
 
     // Insert each note using the standard method
     phrase.notes.forEach((note, i) => {
@@ -1036,7 +1033,6 @@ function appendPhraseAtEnd(phrase) {
         // Use proper duration conversion that supports dotted notes
         const { duration, dotted } = rhythmValueToDurationWithDotted(rhythmValue);
 
-        console.log(`[appendPhraseAtEnd] Note ${i}: ${note}, rhythmValue=${rhythmValue}, duration=${duration}, dotted=${dotted}`);
 
         if (window.addNoteIntelligently) {
             window.addNoteIntelligently(note, duration, dotted, 'treble', false, null);
@@ -1066,7 +1062,6 @@ function insertPhraseWithShift(phrase, selectedInfo) {
     const UNITS_PER_BEAT = 48;
     const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
 
-    console.log(`[insertPhraseWithShift] Inserting ${phrase.notes.length} notes with rhythm:`, phrase.rhythm);
 
     // Ensure treble block sequence is initialized
     if (!compositionState.trebleBlockSequence?.blocks?.length) {
@@ -1094,7 +1089,6 @@ function insertPhraseWithShift(phrase, selectedInfo) {
 
         const durationUnits = durationToUnitsLocal(duration, dotted);
 
-        console.log(`[insertPhraseWithShift] Note ${i}: ${note}, rhythmValue=${rhythmValue}, duration=${duration}, dotted=${dotted}, units=${durationUnits}`);
 
         // Use the composition state's shift method
         if (compositionState.insertTrebleNoteWithShift) {

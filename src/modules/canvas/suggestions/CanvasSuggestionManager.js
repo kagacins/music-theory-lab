@@ -193,7 +193,6 @@ export class CanvasSuggestionManager {
      */
     handleNoteClick(noteElement, position) {
         // Could show suggestions for the next note after this one
-        console.log('Note clicked:', noteElement);
     }
 
     /**
@@ -346,7 +345,6 @@ export class CanvasSuggestionManager {
      * @param {Object} intent - New intent state
      */
     handleSectionIntentChange(intent) {
-        console.log('[CanvasSuggestionManager] Section intent changed:', intent);
         // Refresh recommendations with new intent
         // The recommendationService listens for sectionIntentChanged events
     }
@@ -391,7 +389,6 @@ export class CanvasSuggestionManager {
      * @param {number} index - Suggestion index
      */
     handleMelodySuggestionSelect(suggestion, index) {
-        console.log('Melody suggestion selected:', suggestion);
 
         // Apply the suggestion using the global addNoteIntelligently function
         if (window.addNoteIntelligently) {
@@ -401,7 +398,6 @@ export class CanvasSuggestionManager {
             const isRest = suggestion.isRest || false;
             const accidental = suggestion.accidental;
 
-            console.log('Adding note:', { pitch, duration, dotted, isRest, accidental });
 
             const result = window.addNoteIntelligently(
                 pitch,
@@ -411,7 +407,6 @@ export class CanvasSuggestionManager {
                 accidental
             );
 
-            console.log('Note added, result:', result);
 
             // Hide palette after selection
             this.hidePalette('melody');
@@ -454,7 +449,6 @@ export class CanvasSuggestionManager {
      * @param {number} index - Suggestion index
      */
     handleChordSuggestionSelect(suggestion, index) {
-        console.log('Chord suggestion selected:', suggestion);
 
         // TODO: Implement chord application
         // The compositionState needs a method to set the chord for the current measure
@@ -504,7 +498,6 @@ export class CanvasSuggestionManager {
      * @param {string} style - New style
      */
     async handleMelodyStyleChange(style) {
-        console.log('Melody style changed:', style);
 
         // Get the existing melody palette
         const palette = this.activePalettes.get('melody');
@@ -537,7 +530,6 @@ export class CanvasSuggestionManager {
      * @param {string} mood - New mood
      */
     async handleMoodChange(mood) {
-        console.log('Mood changed:', mood);
         // Regenerate chord suggestions with new mood
         const palette = this.activePalettes.get('chord');
         if (palette) {
@@ -551,7 +543,6 @@ export class CanvasSuggestionManager {
      * @param {string} style - New style
      */
     async handleStyleChange(style) {
-        console.log('Style changed:', style);
         // Regenerate chord suggestions with new style
         const palette = this.activePalettes.get('chord');
         if (palette) {
@@ -792,7 +783,6 @@ export class CanvasSuggestionManager {
      */
     showContextMenu(element, position) {
         // Would show radial context menu as per design
-        console.log('Show context menu', element, position);
     }
 
     /**
@@ -802,7 +792,6 @@ export class CanvasSuggestionManager {
         const currentValue = FeatureFlags.isEnabled(FeatureFlags.FLAGS.AUTO_SHOW_SUGGESTIONS);
         FeatureFlags.toggle(FeatureFlags.FLAGS.AUTO_SHOW_SUGGESTIONS);
 
-        console.log('Auto-show suggestions:', !currentValue);
     }
 
     /**

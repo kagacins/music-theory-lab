@@ -1203,7 +1203,6 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
         e.preventDefault();
         e.stopPropagation();
 
-        console.log('Filter button clicked for column:', columnName);
 
         // Check if this button's menu is already open - if so, close it
         if (currentMenu && document.body.contains(currentMenu)) {
@@ -1238,7 +1237,6 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
         menu.style.left = `${rect.left}px`;
         menu.style.top = `${rect.bottom + 5}px`;
 
-        console.log('Menu positioned at:', menu.style.left, menu.style.top);
 
         // Search box for the column
         const searchBox = document.createElement('input');
@@ -1327,18 +1325,15 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
         applyBtn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('Apply filter button clicked');
 
             // Get all checkboxes except the Select All checkbox (which is inside selectAllDiv)
             const allCheckboxDivs = Array.from(checkboxContainer.children).slice(1); // Skip first child (selectAllDiv)
             const checkboxes = allCheckboxDivs.map(div => div.querySelector('input[type="checkbox"]')).filter(cb => cb !== null);
 
-            console.log('Found', checkboxes.length, 'checkboxes');
 
             activeFilterSet.clear();
             let allChecked = true;
             checkboxes.forEach(cb => {
-                console.log('Checkbox:', cb.value, 'checked:', cb.checked);
                 if (cb.checked) {
                     activeFilterSet.add(cb.value);
                 } else {
@@ -1371,7 +1366,6 @@ function createColumnFilter(columnName, allValues, activeFilterSet, applyFilters
         clearBtn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('Clear filter button clicked');
             activeFilterSet.clear();
             currentMenu = null;
             menu.remove();
@@ -1439,7 +1433,6 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
     clearAllBtn.onclick = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        console.log('Clear All Filters button clicked');
         activeFilters.root.clear();
         activeFilters.type.clear();
         activeFilters.inversion.clear();
@@ -1678,7 +1671,6 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
                         release: 1,
                         baseUrl: "https://tonejs.github.io/audio/salamander/",
                         onload: () => {
-                            console.log('Piano samples loaded and ready');
                             resolve();
                         },
                         onerror: (error) => {
@@ -1688,14 +1680,12 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
             }).toDestination();
                 });
                 
-                console.log('Piano sampler initialized, waiting for samples to load...');
                 // Wait for the sampler's buffers to load
                 await samplerLoaded;
             }
 
             // Get the chord notes (params: root, chordType, inversion, key, octaveShift, enharmonicPreference, notationPreference)
             const notesResult = getInvertedChordNotes(root, chordType, inversion);
-            console.log('getInvertedChordNotes returned:', notesResult);
 
             // Extract notes array from the result
             let notesArray;
@@ -1708,12 +1698,10 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
                 notesArray = [];
             }
 
-            console.log('Notes array to play:', notesArray);
 
             if (notesArray && notesArray.length > 0) {
                 // Ensure the piano sampler is fully loaded before playing
                 if (!piano.loaded) {
-                    console.log('Waiting for piano samples to finish loading...');
                     await new Promise((resolve) => {
                         const checkLoaded = setInterval(() => {
                             if (piano.loaded) {
@@ -1726,7 +1714,6 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
 
                 currentNotes = notesArray;
                 piano.triggerAttack(notesArray);
-                console.log('Playing notes:', notesArray);
             } else {
                 console.error('No notes generated for chord. ChordType:', chordType, 'Root:', root, 'Inversion:', inversion);
                 alert(`Cannot generate notes for ${root} ${chordType} (inversion ${inversion}). Check console for details.`);
@@ -1949,7 +1936,6 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
             if (piano && currentNotes) {
                 piano.triggerRelease(currentNotes);
             currentNotes = null;
-                console.log('Stopped playing');
             }
         } catch (error) {
             console.error('Error stopping chord:', error);
@@ -2029,7 +2015,6 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
             const rec = sortedRecommendations[idx];
 
             if (action === 'add') {
-                console.log('Add chord:', rec);
                 addChordToProgression(rec.root, rec.type, rec.inversion);
                 overlay.remove();
             }
@@ -2045,7 +2030,6 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
             const idx = parseInt(target.dataset.index);
             const rec = sortedRecommendations[idx];
 
-            console.log('Button pressed:', action, 'index:', idx, 'rec:', rec);
 
             if (action === 'play-current') {
                 console.log('Play current chord (hold)');
@@ -2071,7 +2055,6 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
             const action = target.dataset.action;
 
             if (action === 'play-current' || action === 'play-this') {
-                console.log('Button released, stopping chord');
                 e.preventDefault();
                 e.stopPropagation();
                 stopChord();
@@ -2095,7 +2078,6 @@ function renderTable(container, recommendations, currentRoot, currentChordType, 
                 const idx = parseInt(target.dataset.index);
                 const rec = recommendations[idx];
 
-                console.log('Add chord to progression');
                 if (onAddChord) {
                 onAddChord(rec.type, rec.root, rec.inversion);
                 } else {

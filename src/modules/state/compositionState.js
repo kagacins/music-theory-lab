@@ -530,7 +530,6 @@ export function redistributeNotesToNewMeasures(compositionState, staff, collecte
         const voiceIndex = parseInt(voiceKey.replace('voice', ''), 10);
         const notes = collectedNotes[voiceKey];
 
-        console.log(`[redistributeNotesToNewMeasures] Processing ${voiceKey} with ${notes.length} notes`);
 
         for (const note of notes) {
             const absoluteBeat = note.absoluteBeat;
@@ -1366,7 +1365,6 @@ export class CompositionState {
      * for multi-voice bass notation support.
      */
     renderBassBlocksToMeasures() {
-        console.log('[renderBassBlocksToMeasures] === CALLED ===');
         if (this.bassBlockSequence.blocks.length === 0) {
             return;
         }
@@ -1467,7 +1465,6 @@ export class CompositionState {
      * IMPORTANT: Call this BEFORE reordering blocks to capture current edits
      */
     syncMeasuresToBuildingBlocks() {
-        console.log('[syncMeasuresToBuildingBlocks] === CALLED ===');
         if (this.bassBlockSequence.blocks.length === 0) {
             return;
         }
@@ -2010,19 +2007,16 @@ export class CompositionState {
         });
 
         if (hasMultipleVoices) {
-            console.log(`[syncMeasuresToTrebleBlock] SKIPPING sync - multiple voices detected, measures are source of truth`);
             return;
         }
 
         const block = this.trebleBlockSequence.blocks[0]; // Single treble block
         const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
 
-        console.log(`[syncMeasuresToTrebleBlock] Syncing ${this.measures.length} measures to treble block`);
 
         // Ensure block has correct duration for all measures
         const requiredBeats = this.measures.length * beatsPerMeasure;
         if (block.beats !== requiredBeats) {
-            console.log(`[syncMeasuresToTrebleBlock] Resizing block from ${block.beats} to ${requiredBeats} beats`);
             block.setDuration(requiredBeats);
         }
 
@@ -2224,7 +2218,6 @@ export class CompositionState {
         });
 
         if (hasMultipleVoices) {
-            console.log(`[renderTrebleBlocksToMeasures] SKIPPING render - multiple voices detected, measures are source of truth`);
             return;
         }
 
@@ -2380,11 +2373,9 @@ export class CompositionState {
         // ALWAYS sync from measures before modifying the block sequence
         // This ensures we have the latest notes, even if they were added via keyboard
         if (this.trebleBlockSequence.blocks.length === 0) {
-            console.log('[insertTrebleNoteWithShift] Initializing treble block sequence');
             this.initializeTrebleBlockSequence();
         } else {
             // Block exists but might be stale - force a re-sync from measures
-            console.log('[insertTrebleNoteWithShift] Re-syncing treble block from measures');
             this.syncMeasuresToTrebleBlock();
         }
 
@@ -2395,7 +2386,6 @@ export class CompositionState {
         const notesBefore = block.getNotes();
         console.log(`[insertTrebleNoteWithShift] BEFORE: ${notesBefore.length} notes in block:`,
             notesBefore.map(n => `${n.pitches.join(',')} at unit ${n.startUnit} (${n.durationUnits} units)`));
-        console.log(`[insertTrebleNoteWithShift] Inserting at unit ${insertUnit}, duration ${durationUnits} units, pitches: ${pitches}`);
 
         // Step 1: Extend the block by the duration of the new note
         const newTotalUnits = totalUnits + durationUnits;
@@ -2495,7 +2485,6 @@ export class CompositionState {
      */
     clearTrebleBeatRange(startBeat, durationBeats) {
         if (this.trebleBlockSequence.blocks.length === 0) {
-            console.log('No treble block to clear');
             return;
         }
 
@@ -3293,11 +3282,9 @@ export class CompositionState {
      */
     setTimeSignature(num, denom) {
         const oldTS = this.metadata.timeSignature || { num: 4, denom: 4 };
-        console.log(`[CompositionState] setTimeSignature: ${oldTS.num}/${oldTS.denom} -> ${num}/${denom}`);
 
         // Skip if no change
         if (oldTS.num === num && oldTS.denom === denom) {
-            console.log(`[CompositionState] Time signature unchanged, skipping`);
             return;
         }
 
@@ -3335,7 +3322,6 @@ export class CompositionState {
 
         // PHASE 5: Multi-voice redistribution
         if (hasTrebleMultiVoice && hasTrebleNotes) {
-            console.log(`[CompositionState] MULTI-VOICE detected - using full redistribution for treble`);
 
             // 1. Collect ALL notes from ALL voices with absolute positions (using OLD time signature)
             const collectedTrebleNotes = collectAllNotesWithAbsolutePositions(this.measures, 'treble', oldTS);
@@ -3360,7 +3346,6 @@ export class CompositionState {
 
         } else if (hasTrebleBlock && hasTrebleNotes) {
             // PHASE 4: Single-voice - use block-based sync/render (simpler and well-tested)
-            console.log(`[CompositionState] Single-voice treble - using block-based redistribution`);
 
             // 1. Sync treble notes to block BEFORE updating metadata
             this.syncMeasuresToTrebleBlock(); // Uses OLD time signature
@@ -3395,7 +3380,6 @@ export class CompositionState {
         // PHASE 5: If bass has multi-voice, use full redistribution (like treble)
         // Otherwise, re-render from block (simpler for single-voice)
         if (hasBassMultiVoice && hasBassNotes) {
-            console.log(`[CompositionState] BASS MULTI-VOICE detected - using full redistribution`);
 
             // Collect ALL bass notes from ALL voices with absolute positions (using OLD time signature)
             const collectedBassNotes = collectAllNotesWithAbsolutePositions(this.measures, 'bass', oldTS);
@@ -3409,7 +3393,6 @@ export class CompositionState {
 
         } else if (hasBassBlock) {
             // Single-voice bass - re-render from block (simpler and well-tested)
-            console.log(`[CompositionState] Re-rendering bass block to measures with NEW time signature`);
             this.renderBassBlocksToMeasures(); // Uses NEW time signature
         }
 
@@ -3728,7 +3711,6 @@ export class CompositionState {
     syncWithProgressionData(progressionData, options = {}) {
         // Prevent recursive calls
         if (this._isSyncing) {
-            console.log('[syncWithProgressionData] BLOCKED - already syncing');
             return;
         }
 
@@ -3919,7 +3901,6 @@ export class CompositionState {
             const notes = block.getNotes ? block.getNotes() : [];
             return notes.length > 0 ? notes[0].pitches : null;
         });
-        console.log('[syncWithProgressionData] Saved existing bass pitches:', existingBlockPitches);
 
         // Detect if this is a completely new progression (different chord count or different roots)
         // In that case, we need to reinitialize the bass blocks from scratch
@@ -3933,7 +3914,6 @@ export class CompositionState {
         console.log(`[syncWithProgressionData] needsReinitialize=${needsReinitialize} (blockCount: ${this.bassBlockSequence.blocks.length}->${progressionData.length}, rootsDiffer=${rootsDiffer})`);
 
         if (needsReinitialize) {
-            console.log('[syncWithProgressionData] REINITIALIZING bass blocks - edits may be lost unless preserved in lhNotes');
             // Clear existing blocks and reinitialize from progression
             this.bassBlockSequence.blocks = [];
             this.initializeBassBlockSequence(progressionData);
@@ -3954,7 +3934,6 @@ export class CompositionState {
                     if (block && block.setNote) {
                         const totalUnits = block.beats * UNITS_PER_BEAT;
                         block.setNote(0, totalUnits, chord.lhNotes, {});
-                        console.log(`[syncWithProgressionData] Restored lhNotes for block ${i}:`, chord.lhNotes);
                     }
                 }
             }
@@ -3967,7 +3946,6 @@ export class CompositionState {
                     const newBeats = chord.beats !== undefined ? chord.beats : 4;
                     if (block.beats !== newBeats) {
                         block.setDuration(newBeats);
-                        console.log(`[syncWithProgressionData] Updated block ${i} duration: ${block.beats} -> ${newBeats}`);
                     }
 
                     // Check if chord TYPE, INVERSION, or OCTAVE has changed
@@ -3985,7 +3963,6 @@ export class CompositionState {
                     const notesChanged = JSON.stringify(oldNotes) !== JSON.stringify(newNotes);
 
                     if (oldType !== newType || oldInversion !== newInversion || oldOctaveShift !== newOctaveShift || notesChanged) {
-                        console.log(`[syncWithProgressionData] Chord changed at ${i}: type=${oldType}->${newType}, inv=${oldInversion}->${newInversion}, octave=${oldOctaveShift}->${newOctaveShift}, notesChanged=${notesChanged}`);
 
                         // Update the block's chord data with ALL properties
                         block.chord = {
@@ -3999,7 +3976,6 @@ export class CompositionState {
                         if (chord.notes && chord.notes.length > 0) {
                             // Use the provided notes (already octave-shifted)
                             bassNotes = [...chord.notes];
-                            console.log(`[syncWithProgressionData] Using provided notes for block ${i}:`, bassNotes);
                         } else {
                             // Fallback: Regenerate bass notes from chord type
                             const chordNotesObj = getChordNotes(chord.root, newType, this.metadata?.key || 'C');
@@ -4020,7 +3996,6 @@ export class CompositionState {
                                         }
                                     }
                                 }
-                                console.log(`[syncWithProgressionData] Regenerated bass for block ${i}:`, bassNotes);
                             }
                         }
 
@@ -5437,7 +5412,6 @@ export class CompositionState {
 
                 // Auto-delete section if it becomes empty
                 if (section.chordIndices.length === 0) {
-                    console.log('[CompositionState] Auto-deleting empty section:', sectionId);
                     this.deleteSection(sectionId);
                 }
 
@@ -5491,7 +5465,6 @@ export class CompositionState {
         const originalSection = this.getSection(sectionId);
         if (!originalSection) return null;
 
-        console.log(`[duplicateSection] Starting duplication of section ${sectionId}, mode=${mode}`);
 
         // ================================================================
         // STEP 0: Sync measures to building blocks to capture any pending edits
@@ -5499,7 +5472,6 @@ export class CompositionState {
         // ================================================================
         if (this.bassBlockSequence?.blocks?.length > 0) {
             this.syncMeasuresToBuildingBlocks();
-            console.log(`[duplicateSection] Synced measures to bass blocks`);
         }
 
         // Get the progression data to duplicate chords
@@ -5554,11 +5526,9 @@ export class CompositionState {
                     cumulativeBeats += chordBeats;
                 }
 
-                console.log(`[duplicateSection] Section unit range: ${sectionStartUnit} to ${sectionEndUnit}`);
 
                 // Get all notes from the treble block
                 const allTrebleNotes = trebleBlock.getNotes ? trebleBlock.getNotes() : [];
-                console.log(`[duplicateSection] Total treble notes in composition: ${allTrebleNotes.length}`);
 
                 // Filter notes that fall within our section's range
                 trebleNotesToDuplicate = allTrebleNotes.filter(note => {
@@ -5572,7 +5542,6 @@ export class CompositionState {
                     relativeStartUnit: note.startUnit - sectionStartUnit
                 }));
 
-                console.log(`[duplicateSection] Treble notes in section: ${trebleNotesToDuplicate.length}`);
             }
         }
 
@@ -5625,7 +5594,6 @@ export class CompositionState {
                 if (newBlock && clonedBlock.units) {
                     // Copy all units from the clone
                     newBlock.units = clonedBlock.units.map(u => u.clone ? u.clone() : { ...u });
-                    console.log(`[duplicateSection] Restored bass to new block ${newChordIdx}`);
                 }
             }
 
@@ -5634,7 +5602,6 @@ export class CompositionState {
                 const origBlock = this.bassBlockSequence.blocks[origChordIdx];
                 if (origBlock && clonedBlock.units) {
                     origBlock.units = clonedBlock.units.map(u => u.clone ? u.clone() : { ...u });
-                    console.log(`[duplicateSection] Restored bass to original block ${origChordIdx}`);
                 }
             }
         });
@@ -5659,7 +5626,6 @@ export class CompositionState {
                 cumulativeBeats += progressionData[i].beats || 4;
             }
 
-            console.log(`[duplicateSection] New section starts at unit ${newSectionStartUnit}`);
 
             // Insert each treble note at its new position
             trebleNotesToDuplicate.forEach(note => {
@@ -5680,7 +5646,6 @@ export class CompositionState {
                     if (note.tuplet) attributes.tuplet = note.tuplet;
 
                     trebleBlock.setNote(newStartUnit, note.durationUnits, note.pitches || [], attributes);
-                    console.log(`[duplicateSection] Added treble note at unit ${newStartUnit}`);
                 }
             });
 

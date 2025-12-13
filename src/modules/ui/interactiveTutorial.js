@@ -923,12 +923,10 @@ async function runGuidedBuilderStep(step, container) {
             targetTab: step.targetTab || 'builder',
             steps: step.guidedSteps || [],
             onComplete: (actionHistory) => {
-                console.log('[Tutorial] Guided builder step completed with actions:', actionHistory);
                 // Continue to next step after returning
                 nextStep(container);
             },
             onCancel: () => {
-                console.log('[Tutorial] Guided builder step cancelled');
                 // Still continue to next step
                 nextStep(container);
             }
@@ -1008,7 +1006,6 @@ function completeTutorial() {
                 showLabels: true,
                 height: 150,
                 onNotePlay: (noteName, baseName) => {
-                    console.log('[Tutorial Complete] Practice mode - played:', baseName);
                 }
             });
         }
@@ -1161,7 +1158,6 @@ export const whatIsANoteTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] What is a Note completed!');
     }
 });
 
@@ -1253,7 +1249,6 @@ export const sharpsFlatsTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Sharps & Flats completed!');
     }
 });
 
@@ -1381,7 +1376,6 @@ export const octavesTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Octaves & Whole Steps completed!');
     }
 });
 
@@ -1485,7 +1479,6 @@ export const scalesTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Introduction to Scales completed!');
     }
 });
 
@@ -1589,7 +1582,6 @@ export const intervalsTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Understanding Intervals completed!');
     }
 });
 
@@ -1742,7 +1734,6 @@ export const whatIsAChordTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] What is a Chord completed!');
     }
 });
 
@@ -1852,7 +1843,6 @@ export const majorVsMinorTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Major vs Minor completed!');
     }
 });
 
@@ -1992,7 +1982,6 @@ export const chordInversionsTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Chord Inversions completed!');
     }
 });
 
@@ -2171,7 +2160,6 @@ export const firstProgressionTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Your First Progression completed!');
     }
 });
 
@@ -2380,7 +2368,6 @@ export const popularProgressionTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Popular Progression completed!');
     }
 });
 
@@ -2576,7 +2563,6 @@ export const voiceLeadingTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Voice Leading completed!');
     }
 });
 
@@ -2861,7 +2847,6 @@ export const addingEmotionTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Adding Emotion with Minor Chords completed!');
     }
 });
 
@@ -3054,7 +3039,6 @@ export const seventhChordsTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] 7th Chords completed!');
     }
 });
 
@@ -3213,7 +3197,6 @@ export const secondaryDominantsTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Secondary Dominants completed!');
     }
 });
 
@@ -3415,7 +3398,6 @@ export const borrowedChordsTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Borrowed Chords completed!');
     }
 });
 
@@ -3619,7 +3601,6 @@ export const tensionReleaseTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Tension and Release completed!');
     }
 });
 
@@ -3798,7 +3779,6 @@ export const melodyChordTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Melody-Chord Relationship completed!');
     }
 });
 
@@ -4030,7 +4010,6 @@ export const scaleTypesTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Scale Types completed!');
     }
 });
 
@@ -4237,7 +4216,6 @@ export const modesIntroTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Introduction to Modes completed!');
     }
 });
 
@@ -4433,7 +4411,6 @@ export const modalHarmonyTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Modal Harmony completed!');
     }
 });
 
@@ -4638,7 +4615,6 @@ export const advancedVoiceLeadingTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Advanced Voice Leading completed!');
     }
 });
 
@@ -4857,7 +4833,6 @@ export const extendedChordsTutorial = defineTutorial({
         }
     ],
     onComplete: () => {
-        console.log('[Tutorial] Extended Chords completed!');
     }
 });
 

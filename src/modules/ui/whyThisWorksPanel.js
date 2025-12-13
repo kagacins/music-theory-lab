@@ -292,7 +292,6 @@ export function initWhyThisWorksPanel() {
     trainerContainer.insertAdjacentHTML('beforeend', panelHTML);
   }
 
-  console.log('[WhyThisWorks] Panel initialized successfully');
 }
 
 // ===========================================
@@ -746,7 +745,6 @@ function getAlternativeResolutions(romanNumeral, key, prevChordData) {
  * - "Tell me more" expansion with voice leading details
  */
 function showFallbackExplanation(context, explanation) {
-  console.log('[WhyThisWorks] showFallbackExplanation called');
   console.log('[WhyThisWorks] Context:', JSON.stringify(context, null, 2));
   console.log('[WhyThisWorks] Explanation:', JSON.stringify(explanation, null, 2));
 
@@ -760,11 +758,9 @@ function showFallbackExplanation(context, explanation) {
     const functionColor = explanation?.color || FUNCTION_COLORS[explanation?.function] || '#6b7280';
     const functionName = getFunctionDisplayName(explanation?.function);
 
-    console.log('[WhyThisWorks] Function:', explanation?.function, 'Color:', functionColor);
 
     // Build key-aware explanation
     const keyAwareExplanation = buildKeyAwareExplanation(context, explanation);
-    console.log('[WhyThisWorks] Key-aware explanation:', keyAwareExplanation);
 
     // Get alternative resolutions with playback data
     const alternatives = getAlternativeResolutions(context.romanNumeral, context.key, context.prevChordData);
@@ -1190,7 +1186,6 @@ function showFallbackExplanation(context, explanation) {
       });
     }
 
-    console.log('[WhyThisWorks] Enhanced popup created successfully');
 
   } catch (err) {
     console.error('[WhyThisWorks] Error in showFallbackExplanation:', err);
@@ -1231,7 +1226,6 @@ function openWhyThisWorksPanel() {
  * @param {number} context.confidence - Confidence score (optional)
  */
 function showWhyThisWorks(context) {
-  console.log('[WhyThisWorks] Called with context:', context);
   currentChordContext = context;
 
   // Get the theory explanation
@@ -1243,7 +1237,6 @@ function showWhyThisWorks(context) {
       context.nextChord,
       currentSkillLevel
     );
-    console.log('[WhyThisWorks] Got explanation:', explanation);
   } catch (err) {
     console.error('[WhyThisWorks] Error getting explanation:', err);
     explanation = {

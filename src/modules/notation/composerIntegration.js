@@ -1153,16 +1153,13 @@ export class NotationComposer {
    * @param {number} endMeasure - Last measure to render (0-based index, inclusive)
    */
   renderFilteredMeasures(startMeasure, endMeasure) {
-    console.log('[NotationComposer] renderFilteredMeasures called:', startMeasure, 'to', endMeasure);
 
     if (!this.config.container) {
-      console.log('[NotationComposer] No container, returning');
       return;
     }
 
     // Get measures to render from compositionState
     const hasCompositionState = this.compositionState && this.compositionState.measures.length > 0;
-    console.log('[NotationComposer] hasCompositionState:', hasCompositionState, 'measures:', this.compositionState?.measures?.length);
     if (!hasCompositionState) {
       this.renderEmptyState();
       return;
@@ -1282,7 +1279,6 @@ export class NotationComposer {
     };
 
     // Use multi-page or single canvas rendering
-    console.log('[NotationComposer] Rendering', measures.length, 'measures, pageManager:', !!this.pageManager);
     if (this.pageManager) {
       // Multi-page rendering with filtered measures
       // Pass highlighting overrides for section view mode
@@ -1296,7 +1292,6 @@ export class NotationComposer {
       // Single canvas rendering
       this.renderedSystem = renderGrandStaffSystem(this.config.container, measures, renderOptions);
     }
-    console.log('[NotationComposer] Render complete, renderedSystem:', !!this.renderedSystem);
 
     // Update layout manager positions
     if (this.renderedSystem?.measures && this.layoutManager) {
@@ -1379,7 +1374,6 @@ export class NotationComposer {
    * @param {number} endMeasure - Last measure to render (0-based index, inclusive)
    */
   setMeasureFilter(startMeasure, endMeasure) {
-    console.log('[NotationComposer] setMeasureFilter:', startMeasure, 'to', endMeasure);
     // Store both the range AND the offset so we can map local indices back to global
     this.measureFilter = {
       startMeasure,
@@ -1392,7 +1386,6 @@ export class NotationComposer {
    * Clear measure filter - render() will go back to rendering all measures
    */
   clearMeasureFilter() {
-    console.log('[NotationComposer] clearMeasureFilter');
     this.measureFilter = null;
   }
 
@@ -2163,7 +2156,6 @@ export class NotationComposer {
     for (const region of this.chordBracketRegions) {
       if (x >= region.x && x <= region.x + region.width &&
           y >= region.y && y <= region.y + region.height) {
-        console.log('[ComposerIntegration] Chord bracket clicked:', region);
         this.handleChordBracketClick(region);
         return true;
       }

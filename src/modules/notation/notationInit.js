@@ -135,29 +135,18 @@ function getOrCreateOverlayCanvas(baseCanvas) {
     resizeObserver.observe(baseCanvas);
 
     // DEBUG: Log canvas and parent info
-    console.log('=== CANVAS DEBUG INFO ===');
-    console.log('Canvas ID:', baseCanvas.id);
     console.log('Canvas position:', window.getComputedStyle(baseCanvas).position);
     console.log('Canvas left:', window.getComputedStyle(baseCanvas).left);
     console.log('Canvas top:', window.getComputedStyle(baseCanvas).top);
-    console.log('Canvas offsetLeft:', baseCanvas.offsetLeft);
-    console.log('Canvas offsetTop:', baseCanvas.offsetTop);
-    console.log('Canvas width:', baseCanvas.width);
-    console.log('Canvas height:', baseCanvas.height);
-    console.log('---');
-    console.log('Parent element:', baseCanvas.parentElement.tagName);
-    console.log('Parent class:', baseCanvas.parentElement.className);
     console.log('Parent position:', window.getComputedStyle(baseCanvas.parentElement).position);
     console.log('Parent overflow:', window.getComputedStyle(baseCanvas.parentElement).overflow);
     console.log('Parent overflowX:', window.getComputedStyle(baseCanvas.parentElement).overflowX);
     console.log('Parent overflowY:', window.getComputedStyle(baseCanvas.parentElement).overflowY);
     console.log('Parent width:', window.getComputedStyle(baseCanvas.parentElement).width);
     console.log('Parent height:', window.getComputedStyle(baseCanvas.parentElement).height);
-    console.log('---');
     console.log('Overlay position:', window.getComputedStyle(overlay).position);
     console.log('Overlay left:', window.getComputedStyle(overlay).left);
     console.log('Overlay top:', window.getComputedStyle(overlay).top);
-    console.log('========================');
   }
 
   return overlay;
@@ -346,7 +335,6 @@ export function initEnhancedNotation(options = {}) {
       }
     },
     onNoteMove: (moves) => {
-      console.log('[NotationInit] onNoteMove called with', moves.length, 'moves');
 
       // Handle note pitch changes (drag operations) - update both data sources
       moves.forEach(move => {
@@ -354,8 +342,6 @@ export function initEnhancedNotation(options = {}) {
 
         // BASS TRANSPOSITION DEBUG LOGGING
         if (move.staff === 'bass') {
-          console.log('[BASS TRANSPOSE] === START ===');
-          console.log('[BASS TRANSPOSE] Move request:', { measureIndex: move.measureIndex, noteIndex: move.noteIndex, steps: move.steps, pitchIndex: move.pitchIndex });
         }
 
         // 1. Update compositionState
@@ -371,7 +357,6 @@ export function initEnhancedNotation(options = {}) {
             // BASS DEBUG: Log state before transposition
             if (move.staff === 'bass') {
               console.log('[BASS TRANSPOSE] Note BEFORE:', JSON.stringify({ pitch: note?.pitch, pitches: note?.pitches }));
-              console.log('[BASS TRANSPOSE] Measure chord:', measure.chord?.name, 'chordIndex:', measure.chord?.chordIndex);
             }
 
             if (note && move.steps !== 0) {
@@ -382,7 +367,6 @@ export function initEnhancedNotation(options = {}) {
                 // Pitch-specific transposition: only transpose the selected pitch within the chord
                 const currentPitch = note.pitches[move.pitchIndex];
                 const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff, keySignature);
-                console.log('[NotationInit] Transposing single pitch in chord from', currentPitch, 'to', newPitch, 'at index', move.pitchIndex);
                 note.pitches[move.pitchIndex] = newPitch;
                 // Update pitch property to the transposed pitch (for playback highlighting)
                 note.pitch = note.pitches[0];
@@ -390,7 +374,6 @@ export function initEnhancedNotation(options = {}) {
                 // Whole note/chord transposition: transpose all pitches
                 const currentPitch = note.pitch || note.pitches?.[0] || 'C4';
                 const newPitch = transposePitchBySteps(currentPitch, move.steps, move.staff, keySignature);
-                console.log('[NotationInit] Transposing whole note/chord from', currentPitch, 'to', newPitch);
 
                 if (note.pitches) {
                   note.pitches = note.pitches.map(p => transposePitchBySteps(p, move.steps, move.staff, keySignature));
@@ -405,7 +388,6 @@ export function initEnhancedNotation(options = {}) {
                 // Verify the note object is the same as measure.notation.bass.voices[0].notes[0]
                 const measureNote = measure.notation.bass?.voices?.[0]?.notes?.[move.noteIndex];
                 console.log('[BASS TRANSPOSE] measureNote AFTER:', JSON.stringify({ pitch: measureNote?.pitch, pitches: measureNote?.pitches }));
-                console.log('[BASS TRANSPOSE] Same object?', note === measureNote);
                 // Log IMMEDIATELY after to catch any mutation
                 setTimeout(() => {
                   console.log('[BASS TRANSPOSE] 0ms later - measureNote:', JSON.stringify({ pitch: measureNote?.pitch, pitches: measureNote?.pitches }));
@@ -434,7 +416,6 @@ export function initEnhancedNotation(options = {}) {
             if (move.staff === 'bass') {
               console.log('[BASS TRANSPOSE] measureManager note pitches:', JSON.stringify(mmNote?.pitches));
               console.log('[BASS TRANSPOSE] compositionState note pitches:', JSON.stringify(csNote?.pitches));
-              console.log('[BASS TRANSPOSE] Same pitches array?', sameArray);
             }
 
             // ONLY transpose if the arrays are different (not shared references)
@@ -460,7 +441,6 @@ export function initEnhancedNotation(options = {}) {
                 mmNote.pitch = newPitch;
               }
             } else if (sameArray && move.staff === 'bass') {
-              console.log('[BASS TRANSPOSE] SKIPPING measureManager transposition - same array reference!');
             }
           }
         }
@@ -519,7 +499,6 @@ export function initEnhancedNotation(options = {}) {
         });
 
         // BASS DEBUG: Log final state before render
-        console.log('[BASS TRANSPOSE] === BEFORE RENDER ===');
         moves.forEach(move => {
           if (move.staff === 'bass') {
             const measure = notationComposer.compositionState.getMeasure(move.measureIndex);
@@ -533,7 +512,6 @@ export function initEnhancedNotation(options = {}) {
 
       // BASS DEBUG: Log what got rendered
       if (hasBassMoves && notationComposer.compositionState) {
-        console.log('[BASS TRANSPOSE] === AFTER RENDER ===');
         moves.forEach(move => {
           if (move.staff === 'bass') {
             const measure = notationComposer.compositionState.getMeasure(move.measureIndex);
@@ -541,7 +519,6 @@ export function initEnhancedNotation(options = {}) {
             console.log('[BASS TRANSPOSE] Rendered measure', move.measureIndex, 'bass:', bassNotes.map(n => ({ pitch: n.pitch, pitches: n.pitches })));
           }
         });
-        console.log('[BASS TRANSPOSE] === END ===');
       }
 
       // Update note regions after move
@@ -574,14 +551,12 @@ export function initEnhancedNotation(options = {}) {
               const voiceKey = staff;
               // Use the correct voice index from the note ID
               const notes = measure.notation[voiceKey]?.voices[voiceIndex]?.notes;
-              console.log(`[onNoteSelectionChanged] Looking up note: voiceKey=${voiceKey}, voiceIndex=${voiceIndex}, noteIndex=${noteIndex}, notes.length=${notes?.length}`);
 
               // Handle auto-generated rests (noteIndex === -1) - these don't exist in compositionState
               if (noteIndex === -1) {
                 console.log(`[onNoteSelectionChanged] Auto-generated rest selected (noteIndex=-1)`);
                 // Get the rest info from noteEditor (includes duration, beat, etc.)
                 const restInfo = noteEditor.getAutoGeneratedRestInfo(noteId);
-                console.log(`[onNoteSelectionChanged] Auto-generated rest info:`, restInfo);
                 // Create a synthetic note object for the toolbar to recognize this as a rest
                 const syntheticRest = {
                   isRest: true,
@@ -599,7 +574,6 @@ export function initEnhancedNotation(options = {}) {
               }
 
               const note = notes?.[noteIndex];
-              console.log(`[onNoteSelectionChanged] Found note:`, note ? { isRest: note.isRest, beat: note.beat, type: note.type } : 'undefined');
               if (note) {
                 // Create note object for toolbar
                 const noteObj = {
@@ -648,13 +622,11 @@ export function initEnhancedNotation(options = {}) {
     onNoteDelete: (deletion) => {
       // Get voice index from deletion (default to 0 for backward compatibility)
       const voiceIndex = deletion.voiceIndex ?? 0;
-      console.log(`[onNoteDelete] Deleting note: measureIndex=${deletion.measureIndex}, staff=${deletion.staff}, voiceIndex=${voiceIndex}, noteIndex=${deletion.noteIndex}`);
 
       // Handle auto-generated rest deletion (noteIndex === -1)
       // These rests don't exist in compositionState - they're created by fillGapsWithRests during rendering
       // Deleting a rest is a no-op - rests maintain rhythmic structure
       if (deletion.noteIndex === -1) {
-        console.log(`[onNoteDelete] Skipping auto-generated rest deletion - rests maintain rhythmic structure`);
         notationComposer.render(); // Re-render to clear selection highlighting
         return;
       }
@@ -815,13 +787,10 @@ export function initEnhancedNotation(options = {}) {
         if (measure) {
           const voiceKey = deletion.staff === 'treble' ? 'treble' : 'bass';
           const notes = measure.notation[voiceKey]?.voices[voiceIndex]?.notes;
-          console.log(`[onNoteDelete] Checking voice ${voiceIndex}: notes array length=${notes?.length}, noteIndex=${deletion.noteIndex}`);
           if (notes && deletion.noteIndex < notes.length) {
             const originalNote = notes[deletion.noteIndex];
             isAlreadyRest = originalNote.isRest || originalNote.type === 'rest';
-            console.log(`[onNoteDelete] Note at index ${deletion.noteIndex}:`, { isRest: originalNote.isRest, type: originalNote.type, beat: originalNote.beat, isAlreadyRest });
           } else {
-            console.log(`[onNoteDelete] Note index ${deletion.noteIndex} out of bounds or notes array missing`);
           }
         }
       }
@@ -829,7 +798,6 @@ export function initEnhancedNotation(options = {}) {
       // If it's already a rest, do nothing - rests maintain rhythmic structure
       // Users who want to "fill" a rest should add a note there instead
       if (isAlreadyRest) {
-        console.log(`[onNoteDelete] Skipping deletion - item is already a rest, preserving rhythmic structure`);
         notationComposer.render(); // Re-render to clear selection highlighting
         return;
       }
@@ -914,7 +882,6 @@ export function initEnhancedNotation(options = {}) {
           const note = measure.notation[voiceKey]?.voices[voiceIndex]?.notes[data.noteIndex];
 
           if (note) {
-            console.log(`[onPolyphonyAdd] Adding pitch ${data.pitch} to voice ${voiceIndex}, note ${data.noteIndex}`);
             if (note.pitches && Array.isArray(note.pitches)) {
               if (!note.pitches.includes(data.pitch)) {
                 note.pitches.push(data.pitch);
@@ -1023,8 +990,6 @@ export function initEnhancedNotation(options = {}) {
         suggestionManager.keyboardHandler.unregisterShortcut('Tab');
         suggestionManager.keyboardHandler.unregisterShortcut('Shift+Tab');
         suggestionManager.keyboardHandler.disable();
-        console.log('✅ Old palette keyboard handler disabled');
-        console.log('✅ Tab/Shift+Tab now use floating suggestions panel');
       }
     }
   } catch (error) {
@@ -1144,7 +1109,6 @@ export function initEnhancedNotation(options = {}) {
 
     // Handle chord symbol application
     notationComposer.toolbar.onChordSymbolApply = (chordSymbol) => {
-      console.log('[NotationInit] Applying chord symbol:', chordSymbol);
 
       // Find measure containing selected notes, or first measure if no selection
       let targetMeasureIndex = 0;
@@ -1166,7 +1130,6 @@ export function initEnhancedNotation(options = {}) {
           }
           measure.metadata.chordSymbol = chordSymbol;
 
-          console.log('[NotationInit] Chord symbol applied to measure', targetMeasureIndex, ':', chordSymbol);
 
           // Re-render to show chord symbol (force render to ensure it appears)
           notationComposer.render(true);

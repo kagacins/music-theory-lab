@@ -185,7 +185,6 @@ export function startGuidedMode(config) {
     // Set up global action listeners
     setupActionListeners();
 
-    console.log('[GuidedMode] Started for lesson:', lessonId, 'Target tab:', targetTab);
 }
 
 /**
@@ -277,7 +276,6 @@ export function endGuidedMode(completed = false) {
         validationCallback: null
     };
 
-    console.log('[GuidedMode] Ended. Completed:', completed, 'Lesson:', lessonId);
 }
 
 /**
@@ -531,7 +529,6 @@ function returnToLesson() {
         validationCallback: null
     };
 
-    console.log('[GuidedMode] Returned to lesson:', lessonId);
 }
 
 function updateBannerInstruction(text, type = 'info') {
@@ -807,7 +804,6 @@ function unlockScrollForExploration() {
         tabContent.style.overflowY = '';
     }
 
-    console.log('[GuidedMode] Scroll unlocked for free exploration');
 }
 
 // ===========================================
@@ -932,7 +928,6 @@ function saveTabState(targetTab) {
         savedTabState.progressionKey = getCurrentKey();
     }
 
-    console.log('[GuidedMode] Saved tab state:', savedTabState);
 }
 
 /**
@@ -1039,7 +1034,6 @@ function forceTutorialState(targetTab) {
         });
     }
 
-    console.log('[GuidedMode] Forced tutorial state for tab:', targetTab);
 }
 
 /**
@@ -1119,7 +1113,6 @@ function restoreTabState() {
         });
     }
 
-    console.log('[GuidedMode] Restored tab state');
     savedTabState = null;
 }
 
@@ -1441,7 +1434,6 @@ function handleBuilderAction(event) {
     lastBuilderAction = action;
     guidedModeState.actionHistory.push(action);
 
-    console.log('[GuidedMode] Action received:', action);
 
     // Check if this action satisfies the current step
     if (guidedModeState.validationCallback) {
