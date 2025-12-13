@@ -284,6 +284,15 @@
     border-bottom: none;
     border-radius: 8px;
     margin: 0 12px 0 12px;
+    justify-content: stretch;
+}
+
+/* Tab container (wraps tab button + info button) - equal spacing */
+.rm-tabs > div {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .rm-tab {

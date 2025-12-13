@@ -174,6 +174,24 @@ import {
     PROJECT_FORMAT_VERSION
 } from './modules/storage/projectManager.js';
 import {
+    initAutoSave,
+    markDirty as markAutoSaveDirty,
+    saveNow as saveAutoSaveNow,
+    checkForRecovery,
+    loadAutoSave,
+    clearAutoSave,
+    getAutoSaveStatus,
+    onAutoSave
+} from './modules/storage/autoSave.js';
+import {
+    initVersionHistory,
+    createVersion,
+    createCheckpoint,
+    getVersions,
+    getVersionSnapshot
+} from './modules/storage/versionHistory.js';
+import { showVersionHistoryPanel } from './modules/ui/versionHistoryPanel.js';
+import {
     getCurrentTab,
     getEnharmonicPreference,
     setEnharmonicPreference,
@@ -2541,6 +2559,93 @@ window.onload = () => {
         tabHintBanner.classList.add('hidden');
     }
 
+    // ===========================
+    // AUTO-SAVE & VERSION HISTORY INITIALIZATION
+    // ===========================
+    // Initialize after a short delay to ensure compositionState is ready
+    setTimeout(() => {
+        const compositionState = getCompositionState();
+        if (compositionState) {
+            // Initialize auto-save system
+            initAutoSave(compositionState);
+
+            // Initialize version history
+            initVersionHistory(compositionState);
+
+            // Check for crash recovery
+            const recovery = checkForRecovery();
+            if (recovery.hasRecovery) {
+                const shouldRecover = confirm(
+                    `Unsaved work detected from ${recovery.metadata.timeSince}.\n\n` +
+                    `Title: ${recovery.metadata.title}\n` +
+                    `Chords: ${recovery.metadata.chordCount}\n` +
+                    `Key: ${recovery.metadata.key}\n\n` +
+                    `Would you like to recover this work?`
+                );
+
+                if (shouldRecover) {
+                    const loaded = loadAutoSave();
+                    if (loaded.success) {
+                        const trainerState = getTrainerState();
+                        applyProjectToState(
+                            loaded.project,
+                            compositionState,
+                            trainerState,
+                            {
+                                onProgressionLoaded: (progressionData) => {
+                                    if (trainerState) {
+                                        trainerState.progressionData = [...progressionData];
+                                    }
+                                    if (typeof window.updateProgressionVisualization === 'function') {
+                                        window.updateProgressionVisualization();
+                                    }
+                                    if (typeof window.renderBuilderProgressionCards === 'function') {
+                                        window.renderBuilderProgressionCards();
+                                    }
+                                },
+                                onNotationRefresh: () => {
+                                    if (typeof window.refreshNotationFromProgression === 'function') {
+                                        window.refreshNotationFromProgression();
+                                    }
+                                },
+                                onMetadataUpdated: (metadata) => {
+                                    const tempoDisplay = document.getElementById('tempo-display');
+                                    if (tempoDisplay && metadata.tempo) {
+                                        tempoDisplay.textContent = metadata.tempo;
+                                    }
+                                    if (metadata.key && typeof window.updateKeySignatureDisplay === 'function') {
+                                        window.updateKeySignatureDisplay(metadata.key);
+                                    }
+                                }
+                            }
+                        );
+                        showToast('Previous work recovered successfully!', 'success');
+                    }
+                } else {
+                    // User chose not to recover - clear the auto-save
+                    clearAutoSave();
+                }
+            }
+
+            // Update auto-save status indicator
+            updateAutoSaveStatusIndicator();
+
+            // Subscribe to auto-save events for status updates
+            onAutoSave((event) => {
+                updateAutoSaveStatusIndicator();
+                if (event.success) {
+                    // Also create a version snapshot periodically (every 5 auto-saves)
+                    const status = getAutoSaveStatus();
+                    if (status.lastSaveTime && Math.random() < 0.2) {
+                        createVersion({ trigger: 'auto' });
+                    }
+                }
+            });
+
+            console.log('[Main] Auto-save and version history initialized');
+        }
+    }, 1000);
+
     // Check for shared progression link
     const sharedProgression = initExportService();
     if (sharedProgression) {
@@ -3822,6 +3927,137 @@ function showToast(message, type = 'info') {
         setTimeout(() => toast.remove(), 300);
     }, 4000);
 }
+
+// ===========================
+// AUTO-SAVE & VERSION HISTORY UI
+// ===========================
+
+/**
+ * Update the auto-save status indicator in the UI
+ */
+function updateAutoSaveStatusIndicator() {
+    const indicator = document.getElementById('auto-save-indicator');
+    if (!indicator) return;
+
+    const status = getAutoSaveStatus();
+
+    if (status.enabled) {
+        if (status.isDirty) {
+            indicator.innerHTML = `
+                <span class="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
+                <span class="text-yellow-400 text-xs">Unsaved</span>
+            `;
+        } else if (status.lastSaveTimeFormatted) {
+            indicator.innerHTML = `
+                <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                <span class="text-gray-400 text-xs">Saved ${status.lastSaveTimeFormatted}</span>
+            `;
+        } else {
+            indicator.innerHTML = `
+                <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                <span class="text-gray-400 text-xs">Auto-save on</span>
+            `;
+        }
+    } else {
+        indicator.innerHTML = `
+            <span class="w-2 h-2 bg-gray-500 rounded-full"></span>
+            <span class="text-gray-500 text-xs">Auto-save off</span>
+        `;
+    }
+}
+
+/**
+ * Show the version history panel
+ */
+window.showVersionHistory = function() {
+    showVersionHistoryPanel((project) => {
+        // Restore callback - get fresh references inside callback
+        const compositionState = getCompositionState();
+        const trainerState = getTrainerState();
+
+        if (project) {
+            const result = applyProjectToState(
+                project,
+                compositionState,
+                trainerState,
+                {
+                    onProgressionLoaded: (progressionData) => {
+                        if (trainerState) {
+                            trainerState.progressionData = [...progressionData];
+                        }
+                        // Refresh all progression displays
+                        if (typeof window.renderProgressionDisplay === 'function') {
+                            window.renderProgressionDisplay();
+                        }
+                        if (typeof window.updateProgressionVisualization === 'function') {
+                            window.updateProgressionVisualization();
+                        }
+                        if (typeof window.renderBuilderProgressionCards === 'function') {
+                            window.renderBuilderProgressionCards();
+                        }
+                    },
+                    onNotationRefresh: () => {
+                        if (typeof window.refreshNotationFromProgression === 'function') {
+                            window.refreshNotationFromProgression();
+                        }
+                        if (typeof window.renderMelodyNotation === 'function') {
+                            window.renderMelodyNotation();
+                        }
+                    },
+                    onMetadataUpdated: (metadata) => {
+                        const tempoDisplay = document.getElementById('tempo-display');
+                        if (tempoDisplay && metadata.tempo) {
+                            tempoDisplay.textContent = metadata.tempo;
+                        }
+                        if (metadata.key && typeof window.updateKeySignatureDisplay === 'function') {
+                            window.updateKeySignatureDisplay(metadata.key);
+                        }
+                        // Update key select dropdown
+                        const keySelect = document.getElementById('key-select');
+                        if (keySelect && metadata.key) {
+                            keySelect.value = metadata.key;
+                        }
+                    }
+                }
+            );
+
+            if (result.success) {
+                showToast('Version restored successfully!', 'success');
+            } else {
+                showToast('Failed to restore version: ' + (result.error || 'Unknown error'), 'error');
+            }
+        }
+    });
+};
+
+/**
+ * Create a named checkpoint
+ */
+window.createCheckpoint = function(name) {
+    if (!name) {
+        name = prompt('Enter a name for this checkpoint:');
+    }
+    if (name && name.trim()) {
+        const result = createCheckpoint(name.trim());
+        if (result.success) {
+            showToast(`Checkpoint "${name}" created`, 'success');
+        } else {
+            showToast(result.error || 'Failed to create checkpoint', 'error');
+        }
+        return result;
+    }
+    return { success: false, error: 'No name provided' };
+};
+
+/**
+ * Get auto-save status for external access
+ */
+window.getAutoSaveStatus = getAutoSaveStatus;
+
+/**
+ * Force an immediate auto-save
+ */
+window.saveAutoSaveNow = saveAutoSaveNow;
 
 // ===========================
 // PHASE 2.2: CHORD RECOMMENDATIONS SIDEBAR

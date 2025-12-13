@@ -2826,10 +2826,13 @@ export function renderBuilderSelectors() {
 export function renderVoicingEditor(notes, editorId, containerId, omittedNotes, onToggle, onSelectAll = null, onSelectNone = null, options = {}) {
     const editor = document.getElementById(editorId);
     const editorContainer = document.getElementById(containerId);
+    // Optional parent section container to show/hide entire section
+    const parentSection = options.parentSectionId ? document.getElementById(options.parentSectionId) : null;
     editor.innerHTML = '';
 
     if (!notes || notes.length === 0) {
         editorContainer.classList.add('hidden');
+        if (parentSection) parentSection.classList.add('hidden');
         // Also hide external buttons container if provided
         if (options.externalButtonsContainerId) {
             const extBtns = document.getElementById(options.externalButtonsContainerId);
@@ -2838,6 +2841,7 @@ export function renderVoicingEditor(notes, editorId, containerId, omittedNotes, 
         return;
     }
     editorContainer.classList.remove('hidden');
+    if (parentSection) parentSection.classList.remove('hidden');
 
     // Handle external buttons (in header)
     if (options.externalButtonsContainerId && onSelectAll && onSelectNone) {

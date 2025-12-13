@@ -85,6 +85,9 @@ import {
     initAudio
 } from '../audio/audioEngine.js';
 
+// Import auto-save for dirty marking
+import { markDirty as markAutoSaveDirty } from '../storage/autoSave.js';
+
 // Track last step time to determine if we're in a stepping sequence
 let lastStepTime = 0;
 
@@ -13947,6 +13950,14 @@ export function handleRedo() {
 export function saveStateBeforeChange() {
     const currentState = captureProgressionState();
     saveState(currentState);
+
+    // Mark composition as dirty for auto-save
+    // This triggers the debounced auto-save mechanism
+    try {
+        markAutoSaveDirty();
+    } catch (e) {
+        // Auto-save may not be initialized yet, ignore
+    }
 }
 
 /**

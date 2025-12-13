@@ -2758,16 +2758,9 @@ body:has(#piano-keyboard.modern-keyboard) #guitar-fretboard-container {
    Chord Builder - Fixed Layout for RH Note Selection
    ============================================================================ */
 
-/* Ensure the RH Note Selection container always reserves space for 3 rows
-   This prevents the "Select Chord or Interval Type" section from jumping
-   when the RH Note Selection expands from 2 to 3 rows */
+/* Voicing editor container - no min-height needed with current layout */
 #voicing-editor-container {
-    min-height: 120px; /* Height for 3 rows of notes + padding */
-}
-
-/* Ensure the grid cell containing RH Note Selection has consistent height */
-#tab-builder .grid.grid-cols-1.md\:grid-cols-2.gap-3 > div:nth-child(2) {
-    min-height: 120px;
+    min-height: auto;
 }
 
 /* Ensure the Chord Voicing section container has consistent height */

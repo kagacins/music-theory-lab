@@ -210,17 +210,17 @@ Modes are rotations of the major scale - same seven notes, different starting po
         {
           label: 'Natural Minor (Aeolian) - Sad and serious',
           description: 'The relative minor. Darker, more somber than major.',
-          playAction: { type: 'scale', root: 'A', scaleType: 'minor' }
+          playAction: { type: 'scale', root: 'C', scaleType: 'minor' }
         },
         {
           label: 'Harmonic Minor - Exotic and dramatic',
           description: 'The raised 7th creates that Middle Eastern/classical flavor.',
-          playAction: { type: 'scale', root: 'A', scaleType: 'harmonic-minor' }
+          playAction: { type: 'scale', root: 'C', scaleType: 'harmonic-minor' }
         },
         {
           label: 'Melodic Minor - Smooth jazz minor',
           description: 'Like harmonic minor but with raised 6th too. Very smooth.',
-          playAction: { type: 'scale', root: 'A', scaleType: 'melodic-minor' }
+          playAction: { type: 'scale', root: 'C', scaleType: 'melodic-minor' }
         },
         {
           label: 'Major Pentatonic - Universal folk sound',
@@ -230,37 +230,37 @@ Modes are rotations of the major scale - same seven notes, different starting po
         {
           label: 'Minor Pentatonic - Rock/blues foundation',
           description: 'The scale of rock guitar solos worldwide.',
-          playAction: { type: 'scale', root: 'A', scaleType: 'minor-pentatonic' }
+          playAction: { type: 'scale', root: 'C', scaleType: 'minor-pentatonic' }
         },
         {
           label: 'Blues Scale - Raw and soulful',
           description: 'Minor pentatonic + the "blue note" (♭5). Pure emotion.',
-          playAction: { type: 'scale', root: 'A', scaleType: 'blues' }
+          playAction: { type: 'scale', root: 'C', scaleType: 'blues' }
         },
         {
           label: 'Dorian - Jazzy minor',
           description: 'Minor with a brighter 6th. The "So What" sound.',
-          playAction: { type: 'scale', root: 'D', scaleType: 'dorian' }
+          playAction: { type: 'scale', root: 'C', scaleType: 'dorian' }
         },
         {
           label: 'Phrygian - Spanish/dark',
           description: 'The ♭2 creates instant flamenco drama.',
-          playAction: { type: 'scale', root: 'E', scaleType: 'phrygian' }
+          playAction: { type: 'scale', root: 'C', scaleType: 'phrygian' }
         },
         {
           label: 'Lydian - Dreamy/floating',
           description: 'Major with #4. Otherworldly and magical.',
-          playAction: { type: 'scale', root: 'F', scaleType: 'lydian' }
+          playAction: { type: 'scale', root: 'C', scaleType: 'lydian' }
         },
         {
           label: 'Mixolydian - Bluesy major/rock',
           description: 'Major with ♭7. Classic rock sound.',
-          playAction: { type: 'scale', root: 'G', scaleType: 'mixolydian' }
+          playAction: { type: 'scale', root: 'C', scaleType: 'mixolydian' }
         },
         {
           label: 'Locrian - Unstable/dark',
           description: 'The ♭5 makes it nearly impossible to use as a key center.',
-          playAction: { type: 'scale', root: 'B', scaleType: 'locrian' }
+          playAction: { type: 'scale', root: 'C', scaleType: 'locrian' }
         },
         {
           label: 'Whole Tone - Floating/dreamlike',

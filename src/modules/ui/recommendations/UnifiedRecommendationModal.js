@@ -1457,12 +1457,16 @@ function createTabNavigation() {
     const tabs = [
         { id: TABS.CHORD, label: 'Chords', icon: '🎹' },
         { id: TABS.MELODY, label: 'Melody', icon: '🎵' },
-        { id: TABS.SECTION, label: 'Section', icon: '📝' },
+        { id: TABS.SECTION, label: 'Add Section', icon: '📝' },
         { id: TABS.HARMONIZE, label: 'Harmonize', icon: '🎼', disabled: !hasMelodyNotes },
         { id: TABS.POLYPHONY, label: 'Texture', icon: '🎭' }
     ];
 
     tabs.forEach(tab => {
+        // Container for tab button + info button
+        const tabContainer = document.createElement('div');
+        tabContainer.style.cssText = 'display: flex; align-items: center; position: relative;';
+
         const btn = document.createElement('button');
         btn.id = `tab-btn-${tab.id}`;
         btn.dataset.tab = tab.id;
@@ -1483,7 +1487,36 @@ function createTabNavigation() {
             btn.addEventListener('click', () => switchTab(tab.id));
         }
 
-        nav.appendChild(btn);
+        tabContainer.appendChild(btn);
+
+        // Add info button (?) for each tab
+        const infoBtn = document.createElement('button');
+        infoBtn.className = 'tab-info-btn';
+        infoBtn.innerHTML = '?';
+        infoBtn.title = `About ${tab.label}`;
+        infoBtn.style.cssText = `
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 1px solid #d1d5db;
+            background: #f3f4f6;
+            color: #6b7280;
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 2px;
+            flex-shrink: 0;
+        `;
+        infoBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showTabInfo(tab.id);
+        });
+
+        tabContainer.appendChild(infoBtn);
+        nav.appendChild(tabContainer);
     });
 
     return nav;
@@ -9685,7 +9718,7 @@ function refreshMelodySuggestions() {
 }
 
 // ============================================================================
-// SECTION TAB (GENERATE)
+// SECTION TAB (ADD SECTION)
 // ============================================================================
 
 function renderSectionTab(container) {
@@ -9705,14 +9738,15 @@ function renderSectionTab(container) {
     const structureSection = document.createElement('div');
     structureSection.style.cssText = `
         padding: 16px;
-        background: #f9fafb;
+        background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
         border-radius: 8px;
         margin-bottom: 16px;
+        border: 1px solid #e0e7ff;
     `;
 
     structureSection.innerHTML = `
         <h4 style="margin: 0 0 12px 0; font-size: 14px; color: #374151; display: flex; align-items: center; gap: 8px;">
-            <span>📋</span> Current Structure
+            <span>📋</span> Current Song Structure
         </h4>
     `;
 
@@ -9815,15 +9849,15 @@ function renderSectionTab(container) {
     `;
     generateSection.innerHTML = `
         <h4 style="margin: 0 0 16px 0; font-size: 14px; color: #374151; display: flex; align-items: center; gap: 8px;">
-            <span>🎲</span> Generate Section
+            <span>🎲</span> Add New Section
         </h4>
         <p style="font-size: 12px; color: #6b7280; margin: 0 0 16px 0;">
-            Create a complete section with chords. Click a section type above or configure below.
+            Generate a complete section with chords using AI. Click a section type above or configure below.
         </p>
-        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <label style="font-size: 13px; color: #6b7280;">Type:</label>
-                <select id="gen-section-type" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: white;">
+        <div style="display: flex; gap: 8px; align-items: stretch; margin-bottom: 16px;">
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                <label style="font-size: 11px; color: #6b7280; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Type</label>
+                <select id="gen-section-type" style="padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: white; width: 100%;">
                     ${SECTION_TYPES.map(st => `
                         <option value="${st.id}" ${st.id === modalState.generateSectionType ? 'selected' : ''}>
                             ${st.icon} ${st.name}
@@ -9831,18 +9865,18 @@ function renderSectionTab(container) {
                     `).join('')}
                 </select>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <label style="font-size: 13px; color: #6b7280;">Style:</label>
-                <select id="gen-style-select" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: white;">
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                <label style="font-size: 11px; color: #6b7280; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Style</label>
+                <select id="gen-style-select" style="padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: white; width: 100%;">
                     <option value="pop" ${modalState.generateStyle === 'pop' ? 'selected' : ''}>Pop</option>
                     <option value="rock" ${modalState.generateStyle === 'rock' ? 'selected' : ''}>Rock</option>
                     <option value="jazz" ${modalState.generateStyle === 'jazz' ? 'selected' : ''}>Jazz</option>
                     <option value="ballad" ${modalState.generateStyle === 'ballad' ? 'selected' : ''}>Ballad</option>
                 </select>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <label style="font-size: 13px; color: #6b7280;">Length:</label>
-                <select id="gen-length-select" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: white;">
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                <label style="font-size: 11px; color: #6b7280; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Length</label>
+                <select id="gen-length-select" style="padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: white; width: 100%;">
                     <option value="4" ${modalState.generateLength === 4 ? 'selected' : ''}>4 chords</option>
                     <option value="8" ${modalState.generateLength === 8 ? 'selected' : ''}>8 chords</option>
                 </select>
@@ -10251,14 +10285,26 @@ function displaySectionOptionsPreview(container, options, key, style, length, se
 
     const sectionInfo = SECTION_TYPES.find(s => s.id === sectionType) || { icon: '📄', name: sectionType };
 
-    // Build options HTML with key-aware spelling
+    // Build options HTML with key-aware spelling and Roman numerals
     const optionsHtml = options.map((option, index) => {
-        const progressionStr = option.progression.map(c => {
+        // Build chord names and Roman numerals
+        const chordDetails = option.progression.map(c => {
             const suffix = c.type === 'Minor' ? 'm' : c.type === 'Diminished' ? 'dim' : c.type === 'Dominant7' ? '7' : c.type === 'Major7' ? 'maj7' : c.type === 'Minor7' ? 'm7' : '';
             const spelledRoot = spellNoteInKey(c.root, key);
-            return `${spelledRoot}${suffix}`;
-        }).join(' → ');
+            const romanNum = noteToRomanNumeral(c.root, key, c.type) || '?';
+            return { name: `${spelledRoot}${suffix}`, roman: romanNum };
+        });
+        const progressionStr = chordDetails.map(cd => cd.name).join(' → ');
+        const romanStr = chordDetails.map(cd => cd.roman).join(' → ');
         const isSelected = index === modalState.selectedOptionIndex;
+
+        // Tension arc visualization (if available)
+        const tensionArc = option.tensionArc?.values || [];
+        const tensionBars = tensionArc.length > 0 ? tensionArc.map(t => {
+            const height = Math.round(t * 20) + 4; // 4-24px height
+            const color = t > 0.7 ? '#ef4444' : t > 0.4 ? '#f59e0b' : '#22c55e';
+            return `<div style="width: 8px; height: ${height}px; background: ${color}; border-radius: 2px;"></div>`;
+        }).join('') : '';
 
         return `
             <div class="section-option ${isSelected ? 'selected' : ''}" data-option-index="${index}" style="
@@ -10280,10 +10326,33 @@ function displaySectionOptionsPreview(container, options, key, style, length, se
                         border-radius: 4px;
                     ">#${index + 1}</span>
                     <span style="font-size: 11px; color: #6b7280;">${option.moodLabel || 'Option'}</span>
-                    ${isSelected ? '<span style="margin-left: auto; font-size: 11px; font-weight: 600; color: #059669;">✓ Selected</span>' : ''}
+                    ${tensionBars ? `
+                        <span style="display: flex; align-items: flex-end; gap: 2px; padding: 2px 6px; background: #f9fafb; border-radius: 4px;" title="Tension arc">
+                            ${tensionBars}
+                        </span>
+                    ` : ''}
+                    <button class="section-preview-btn" data-preview-index="${index}" style="
+                        margin-left: auto;
+                        padding: 4px 10px;
+                        background: ${isSelected ? '#059669' : '#6b7280'};
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        font-size: 11px;
+                        font-weight: 500;
+                        cursor: pointer;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 4px;
+                        transition: background 0.15s ease;
+                    ">▶ Preview</button>
+                    ${isSelected ? '<span style="font-size: 11px; font-weight: 600; color: #059669; margin-left: 8px;">✓ Selected</span>' : ''}
                 </div>
                 <div style="font-family: monospace; font-size: 13px; color: #1e293b; font-weight: 500;">
                     ${progressionStr}
+                </div>
+                <div style="font-family: monospace; font-size: 11px; color: #8b5cf6; margin-top: 2px;">
+                    ${romanStr}
                 </div>
                 <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">
                     ${option.reasoning || ''}
@@ -10339,27 +10408,15 @@ function displaySectionOptionsPreview(container, options, key, style, length, se
             ">
                 🔄 Regenerate All
             </button>
-            <button id="play-preview-btn" style="
-                padding: 10px 20px;
-                background: white;
-                color: #374151;
-                border: 1px solid #d1d5db;
-                border-radius: 6px;
-                font-size: 13px;
-                font-weight: 500;
-                cursor: pointer;
-                display: inline-flex;
-                align-items: center;
-                gap: 6px;
-            ">
-                ▶ Preview Selected
-            </button>
         </div>
     `;
 
     // Set up option click handlers
     container.querySelectorAll('.section-option').forEach(optionEl => {
-        optionEl.addEventListener('click', () => {
+        optionEl.addEventListener('click', (e) => {
+            // Don't trigger selection if clicking the preview button
+            if (e.target.closest('.section-preview-btn')) return;
+
             const index = parseInt(optionEl.dataset.optionIndex, 10);
             modalState.selectedOptionIndex = index;
             modalState.generatedPreview = options[index];
@@ -10382,10 +10439,31 @@ function displaySectionOptionsPreview(container, options, key, style, length, se
         });
     });
 
-    // Set up button handlers
+    // Set up preview button handlers (inside each option card)
+    container.querySelectorAll('.section-preview-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent triggering the card selection
+            const index = parseInt(btn.dataset.previewIndex, 10);
+            const option = options[index];
+            if (option) {
+                playGeneratedSection(option.progression);
+            }
+        });
+
+        // Hover effect for preview buttons
+        btn.addEventListener('mouseenter', () => {
+            btn.style.background = '#4f46e5';
+        });
+        btn.addEventListener('mouseleave', () => {
+            const index = parseInt(btn.dataset.previewIndex, 10);
+            const isSelected = index === modalState.selectedOptionIndex;
+            btn.style.background = isSelected ? '#059669' : '#6b7280';
+        });
+    });
+
+    // Set up bottom button handlers
     const applyBtn = document.getElementById('apply-section-btn');
     const regenBtn = document.getElementById('regenerate-section-btn');
-    const playBtn = document.getElementById('play-preview-btn');
 
     if (applyBtn) {
         applyBtn.addEventListener('click', () => {
@@ -10400,21 +10478,18 @@ function displaySectionOptionsPreview(container, options, key, style, length, se
             handleGenerateSectionClick(recommendationService);
         });
     }
-    if (playBtn) {
-        playBtn.addEventListener('click', () => {
-            const selectedOption = options[modalState.selectedOptionIndex];
-            if (selectedOption) {
-                playGeneratedSection(selectedOption.progression);
-            }
-        });
-    }
 }
 
 function displaySectionPreview(container, result, key) {
-    const progressionStr = result.progression.map(c => {
-        const suffix = c.type === 'Minor' ? 'm' : c.type === 'Diminished' ? 'dim' : '';
-        return `${c.root}${suffix}`;
-    }).join(' → ');
+    // Build chord names and Roman numerals
+    const chordDetails = result.progression.map(c => {
+        const suffix = c.type === 'Minor' ? 'm' : c.type === 'Diminished' ? 'dim' : c.type === 'Dominant7' ? '7' : c.type === 'Major7' ? 'maj7' : c.type === 'Minor7' ? 'm7' : '';
+        const spelledRoot = spellNoteInKey(c.root, key);
+        const romanNum = noteToRomanNumeral(c.root, key, c.type) || '?';
+        return { name: `${spelledRoot}${suffix}`, roman: romanNum };
+    });
+    const progressionStr = chordDetails.map(cd => cd.name).join(' → ');
+    const romanStr = chordDetails.map(cd => cd.roman).join(' → ');
 
     const sectionInfo = SECTION_TYPES.find(s => s.id === result.sectionType) || { icon: '📄', name: result.sectionType };
 
@@ -10432,12 +10507,14 @@ function displaySectionPreview(container, result, key) {
             background: white;
             border-radius: 6px;
             margin-bottom: 12px;
-            font-family: monospace;
-            font-size: 14px;
-            color: #1e293b;
             text-align: center;
         ">
-            ${progressionStr}
+            <div style="font-family: monospace; font-size: 14px; color: #1e293b; font-weight: 500;">
+                ${progressionStr}
+            </div>
+            <div style="font-family: monospace; font-size: 12px; color: #8b5cf6; margin-top: 4px;">
+                ${romanStr}
+            </div>
         </div>
         ${result.reasoning ? `
             <div style="font-size: 12px; color: #6b7280; margin-bottom: 16px;">
@@ -11268,11 +11345,131 @@ let polyphonyState = {
     targetVoice: 2,                 // Always voice 2 for texture
     selectedTextureType: 'parallel_thirds',
     selectedChordIndex: 0,          // Which chord/building block
-    selectedStyle: 'pop',           // Musical style
-    selectedMood: 'bright',         // Current mood
+    selectedStyle: 'pop',           // Musical style (synced from global)
+    selectedMood: 'bright',         // Current mood (synced from global)
     generatedSuggestions: [],       // Array of generated notes
     previewCanvas: null             // VexFlow preview canvas
 };
+
+/**
+ * Show info popup for a section
+ */
+function showSectionInfo(sectionId, title, description) {
+    // Remove existing info popup if any
+    const existing = document.getElementById('section-info-popup');
+    if (existing) existing.remove();
+
+    const popup = document.createElement('div');
+    popup.id = 'section-info-popup';
+    popup.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        padding: 24px;
+        max-width: 400px;
+        z-index: 100001;
+    `;
+    popup.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <h3 style="margin: 0; font-size: 18px; color: #374151;">${title}</h3>
+            <button id="close-section-info" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #9ca3af; padding: 4px;">&times;</button>
+        </div>
+        <p style="margin: 0; color: #6b7280; line-height: 1.6; font-size: 14px;">${description}</p>
+    `;
+
+    // Backdrop
+    const backdrop = document.createElement('div');
+    backdrop.id = 'section-info-backdrop';
+    backdrop.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 100000;';
+    backdrop.onclick = () => { popup.remove(); backdrop.remove(); };
+
+    document.body.appendChild(backdrop);
+    document.body.appendChild(popup);
+
+    popup.querySelector('#close-section-info').onclick = () => {
+        popup.remove();
+        backdrop.remove();
+    };
+}
+
+/**
+ * Tab info descriptions
+ */
+const TAB_INFO = {
+    chord: {
+        title: '🎹 Chords Tab',
+        description: 'Get intelligent chord suggestions based on music theory and your selected style. ' +
+            'Use Quick Suggest for fast recommendations, Compare to see alternatives side-by-side, ' +
+            'or Transform to modify existing chords with substitutions, extensions, and borrowed chords. ' +
+            'The AI considers voice leading, harmonic function, and genre conventions.'
+    },
+    melody: {
+        title: '🎵 Melody Tab',
+        description: 'Generate melodic ideas that fit your chord progression. ' +
+            'Choose between single notes for step-by-step composition or phrases for complete melodic fragments. ' +
+            'The generator considers chord tones, passing tones, and rhythmic patterns appropriate for your selected style and mood.'
+    },
+    section: {
+        title: '📝 Section Tab',
+        description: 'Plan your song structure with section suggestions. ' +
+            'Get recommendations for what section should come next (verse, chorus, bridge, etc.) based on common song forms. ' +
+            'You can also generate complete chord progressions for new sections that complement your existing material.'
+    },
+    harmonize: {
+        title: '🎼 Harmonize Tab',
+        description: 'Automatically generate chord progressions that harmonize your existing melody. ' +
+            'The system analyzes your melody notes and suggests chords that support them musically. ' +
+            'Great for when you have a melody idea but need help finding the right chords to accompany it.'
+    },
+    polyphony: {
+        title: '🎭 Texture Tab',
+        description: 'Add a second voice to complement your existing melody or bass line. ' +
+            'Choose from texture types like parallel thirds, contrary motion, or counter-melody. ' +
+            'The generated notes follow voice leading principles and are added to Voice 2 of your selected staff.'
+    }
+};
+
+/**
+ * Show info popup for a tab
+ */
+function showTabInfo(tabId) {
+    const info = TAB_INFO[tabId];
+    if (info) {
+        showSectionInfo(tabId, info.title, info.description);
+    }
+}
+
+/**
+ * Create compact texture recommendations display (uses global style from context bar)
+ */
+function createTextureRecommendationsDisplay() {
+    const section = document.createElement('div');
+    section.id = 'texture-style-recs';
+    section.style.cssText = 'padding: 8px 12px; background: #f0f4ff; border-radius: 6px; font-size: 12px;';
+
+    // Sync polyphonyState with global modalState
+    polyphonyState.selectedStyle = modalState.style || 'pop';
+    polyphonyState.selectedMood = modalState.mood || 'bright';
+
+    const stylePrefs = STYLE_TEXTURE_PREFERENCES[polyphonyState.selectedStyle];
+    const recommendedTextures = stylePrefs?.preferredTextures?.slice(0, 3) || [];
+
+    section.innerHTML = `
+        <strong style="color: #667eea;">Recommended for ${HARMONY_STYLES[polyphonyState.selectedStyle]?.name || 'Pop'}:</strong>
+        <span style="color: #6b7280; margin-left: 4px;">
+            ${recommendedTextures.map(t => {
+                const texture = Object.values(TEXTURE_TYPES).find(tx => tx.id === t);
+                return texture ? `${texture.icon} ${texture.name}` : t;
+            }).join(', ')}
+        </span>
+    `;
+
+    return section;
+}
 
 function renderPolyphonyTab(container) {
     container.innerHTML = '';
@@ -11316,27 +11513,16 @@ function renderPolyphonyTab(container) {
         return;
     }
 
-    // Header section
-    const header = document.createElement('div');
-    header.style.cssText = 'padding: 16px; border-bottom: 1px solid #e5e7eb; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;';
-    header.innerHTML = `
-        <h3 style="margin: 0 0 4px 0; font-size: 18px;">Add Texture & Harmony</h3>
-        <p style="margin: 0; font-size: 13px; opacity: 0.9;">Add a second voice to complement your existing melody or bass line</p>
-    `;
-    container.appendChild(header);
-
-    // Main content
+    // Main content (no header - info is available via ? button on tab)
     const content = document.createElement('div');
-    content.style.cssText = 'padding: 16px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; max-height: 500px;';
+    content.style.cssText = 'padding: 12px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; max-height: 500px;';
 
-    // 1. Style & Mood Selector (affects texture recommendations)
-    const styleMoodSelector = createStyleMoodSelector();
-    content.appendChild(styleMoodSelector);
+    // Note: Style & Mood now uses the global selector in the context bar
+    // Show recommended textures based on current style
+    const styleRecsSection = createTextureRecommendationsDisplay();
+    content.appendChild(styleRecsSection);
 
-    // Note: Chord selection now uses the Progression picker at the top of the modal
-    // The selected chord(s) from the progression bar are used for texture generation
-
-    // 2. Staff & Texture Type Selector
+    // Staff & Texture Type Selector (combined, more compact)
     const textureSelector = createTextureTypeSelector();
     content.appendChild(textureSelector);
 
@@ -11377,108 +11563,7 @@ function renderPolyphonyTab(container) {
     }, 100);
 }
 
-function createStyleMoodSelector() {
-    const section = document.createElement('div');
-    section.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; background: linear-gradient(135deg, #f8f9ff 0%, #fff 100%);';
-
-    // Get current style preferences and highlight recommended textures
-    const stylePrefs = STYLE_TEXTURE_PREFERENCES[polyphonyState.selectedStyle];
-    const recommendedTextures = stylePrefs?.preferredTextures?.slice(0, 3) || [];
-
-    section.innerHTML = `
-        <div style="font-weight: 600; margin-bottom: 12px; color: #374151; display: flex; align-items: center; gap: 8px;">
-            <span>🎨</span> Style & Mood
-            <span style="font-weight: normal; font-size: 11px; color: #6b7280;">(affects texture recommendations)</span>
-        </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div>
-                <label style="font-size: 12px; color: #6b7280; display: block; margin-bottom: 4px;">Musical Style</label>
-                <select id="polyphony-style-select" style="
-                    width: 100%;
-                    padding: 8px 12px;
-                    border: 1px solid #d1d5db;
-                    border-radius: 6px;
-                    font-size: 13px;
-                    background: white;
-                    cursor: pointer;
-                ">
-                    ${Object.entries(HARMONY_STYLES).map(([id, style]) => `
-                        <option value="${id}" ${polyphonyState.selectedStyle === id ? 'selected' : ''}>
-                            ${style.name}
-                        </option>
-                    `).join('')}
-                </select>
-            </div>
-            <div>
-                <label style="font-size: 12px; color: #6b7280; display: block; margin-bottom: 4px;">Mood</label>
-                <select id="polyphony-mood-select" style="
-                    width: 100%;
-                    padding: 8px 12px;
-                    border: 1px solid #d1d5db;
-                    border-radius: 6px;
-                    font-size: 13px;
-                    background: white;
-                    cursor: pointer;
-                ">
-                    <option value="bright" ${polyphonyState.selectedMood === 'bright' ? 'selected' : ''}>☀️ Bright</option>
-                    <option value="dark" ${polyphonyState.selectedMood === 'dark' ? 'selected' : ''}>🌙 Dark</option>
-                    <option value="tense" ${polyphonyState.selectedMood === 'tense' ? 'selected' : ''}>⚡ Tense</option>
-                    <option value="calm" ${polyphonyState.selectedMood === 'calm' ? 'selected' : ''}>🌊 Calm</option>
-                </select>
-            </div>
-        </div>
-        <div id="style-recommendations" style="margin-top: 12px; padding: 8px; background: #f0f4ff; border-radius: 6px; font-size: 12px;">
-            <strong style="color: #667eea;">Recommended for ${HARMONY_STYLES[polyphonyState.selectedStyle]?.name || 'Pop'}:</strong>
-            <span style="color: #6b7280;">
-                ${recommendedTextures.map(t => {
-                    const texture = Object.values(TEXTURE_TYPES).find(tx => tx.id === t);
-                    return texture ? `${texture.icon} ${texture.name}` : t;
-                }).join(', ')}
-            </span>
-        </div>
-    `;
-
-    // Add event listeners after DOM insertion
-    setTimeout(() => {
-        const styleSelect = document.getElementById('polyphony-style-select');
-        const moodSelect = document.getElementById('polyphony-mood-select');
-
-        if (styleSelect) {
-            styleSelect.addEventListener('change', (e) => {
-                polyphonyState.selectedStyle = e.target.value;
-                // Update recommendations display
-                const recsDiv = document.getElementById('style-recommendations');
-                if (recsDiv) {
-                    const newPrefs = STYLE_TEXTURE_PREFERENCES[polyphonyState.selectedStyle];
-                    const newRecs = newPrefs?.preferredTextures?.slice(0, 3) || [];
-                    recsDiv.innerHTML = `
-                        <strong style="color: #667eea;">Recommended for ${HARMONY_STYLES[polyphonyState.selectedStyle]?.name || 'Pop'}:</strong>
-                        <span style="color: #6b7280;">
-                            ${newRecs.map(t => {
-                                const texture = Object.values(TEXTURE_TYPES).find(tx => tx.id === t);
-                                return texture ? `${texture.icon} ${texture.name}` : t;
-                            }).join(', ')}
-                        </span>
-                    `;
-                }
-                // Highlight recommended texture types in the texture selector
-                updateTextureRecommendations();
-                // Auto-regenerate suggestions when style changes
-                generatePolyphonySuggestions();
-            });
-        }
-
-        if (moodSelect) {
-            moodSelect.addEventListener('change', (e) => {
-                polyphonyState.selectedMood = e.target.value;
-                // Auto-regenerate suggestions when mood changes
-                generatePolyphonySuggestions();
-            });
-        }
-    }, 0);
-
-    return section;
-}
+// Note: createStyleMoodSelector removed - Texture tab now uses global style/mood from context bar
 
 function updateTextureRecommendations() {
     const stylePrefs = STYLE_TEXTURE_PREFERENCES[polyphonyState.selectedStyle];
@@ -11559,43 +11644,39 @@ function createPolyphonyChordSelector(progressionData, currentKey) {
 
 function createTextureTypeSelector() {
     const section = document.createElement('div');
-    section.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px;';
+    section.style.cssText = 'border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px;';
 
-    // Staff selector
-    const staffOptions = `
-        <div style="margin-bottom: 12px;">
-            <label style="font-weight: 600; color: #374151; display: block; margin-bottom: 8px;">Target Staff</label>
-            <select id="polyphony-staff-select" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; width: 100%;">
-                <option value="treble" ${polyphonyState.selectedStaff === 'treble' ? 'selected' : ''}>Treble Clef</option>
-                <option value="bass" ${polyphonyState.selectedStaff === 'bass' ? 'selected' : ''}>Bass Clef</option>
-            </select>
-        </div>
-    `;
-
-    // Texture type grid
+    // Texture type grid - more compact 4 columns
     const textureOptions = Object.values(TEXTURE_TYPES).map(type => `
         <div class="texture-type-option" data-type="${type.id}" style="
-            padding: 8px 10px;
+            padding: 6px 8px;
             border: 2px solid ${polyphonyState.selectedTextureType === type.id ? '#667eea' : '#e5e7eb'};
-            border-radius: 6px;
+            border-radius: 5px;
             background: ${polyphonyState.selectedTextureType === type.id ? '#f0f4ff' : 'white'};
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.15s;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
+            font-size: 11px;
         ">
-            <span style="font-size: 16px;">${type.icon}</span>
-            <div style="flex: 1; min-width: 0;">
-                <div style="font-weight: 600; font-size: 12px; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${type.name}</div>
-            </div>
+            <span style="font-size: 14px;">${type.icon}</span>
+            <span style="font-weight: 500; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${type.name}</span>
         </div>
     `).join('');
 
     section.innerHTML = `
-        ${staffOptions}
-        <div style="font-weight: 600; margin-bottom: 8px; color: #374151;">Texture Type</div>
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <span style="font-weight: 600; font-size: 13px; color: #374151;">Texture Type</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <label style="font-size: 11px; color: #6b7280;">Staff:</label>
+                <select id="polyphony-staff-select" style="padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 11px; background: white;">
+                    <option value="treble" ${polyphonyState.selectedStaff === 'treble' ? 'selected' : ''}>Treble</option>
+                    <option value="bass" ${polyphonyState.selectedStaff === 'bass' ? 'selected' : ''}>Bass</option>
+                </select>
+            </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;">
             ${textureOptions}
         </div>
     `;

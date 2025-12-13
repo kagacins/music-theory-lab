@@ -192,16 +192,39 @@ async function playScaleSequence(root, scaleType = 'major') {
 
         // Define scale intervals (semitones from root)
         const scaleIntervals = {
-            'major': [0, 2, 4, 5, 7, 9, 11, 12],           // W-W-H-W-W-W-H
-            'minor': [0, 2, 3, 5, 7, 8, 10, 12],           // W-H-W-W-H-W-W (natural minor)
-            'natural_minor': [0, 2, 3, 5, 7, 8, 10, 12],   // W-H-W-W-H-W-W
-            'harmonic_minor': [0, 2, 3, 5, 7, 8, 11, 12],  // W-H-W-W-H-3H-H
-            'melodic_minor': [0, 2, 3, 5, 7, 9, 11, 12],   // W-H-W-W-W-W-H (ascending)
-            'pentatonic': [0, 2, 4, 7, 9, 12],             // Major pentatonic
-            'blues': [0, 3, 5, 6, 7, 10, 12]               // Blues scale
+            // Major/Minor family
+            'major': [0, 2, 4, 5, 7, 9, 11, 12],                    // W-W-H-W-W-W-H (Ionian)
+            'minor': [0, 2, 3, 5, 7, 8, 10, 12],                    // W-H-W-W-H-W-W (natural minor/Aeolian)
+            'natural-minor': [0, 2, 3, 5, 7, 8, 10, 12],            // Same as minor
+            'harmonic-minor': [0, 2, 3, 5, 7, 8, 11, 12],           // W-H-W-W-H-3H-H
+            'melodic-minor': [0, 2, 3, 5, 7, 9, 11, 12],            // W-H-W-W-W-W-H (ascending)
+
+            // Pentatonic scales
+            'pentatonic': [0, 2, 4, 7, 9, 12],                      // Major pentatonic
+            'major-pentatonic': [0, 2, 4, 7, 9, 12],                // Major pentatonic
+            'minor-pentatonic': [0, 3, 5, 7, 10, 12],               // Minor pentatonic
+
+            // Blues
+            'blues': [0, 3, 5, 6, 7, 10, 12],                       // Minor pentatonic + b5
+
+            // Modes
+            'ionian': [0, 2, 4, 5, 7, 9, 11, 12],                   // Same as major
+            'dorian': [0, 2, 3, 5, 7, 9, 10, 12],                   // W-H-W-W-W-H-W
+            'phrygian': [0, 1, 3, 5, 7, 8, 10, 12],                 // H-W-W-W-H-W-W
+            'lydian': [0, 2, 4, 6, 7, 9, 11, 12],                   // W-W-W-H-W-W-H
+            'mixolydian': [0, 2, 4, 5, 7, 9, 10, 12],               // W-W-H-W-W-H-W
+            'aeolian': [0, 2, 3, 5, 7, 8, 10, 12],                  // Same as natural minor
+            'locrian': [0, 1, 3, 5, 6, 8, 10, 12],                  // H-W-W-H-W-W-W
+
+            // Exotic/Symmetric scales
+            'whole-tone': [0, 2, 4, 6, 8, 10, 12],                  // W-W-W-W-W-W
+            'diminished': [0, 2, 3, 5, 6, 8, 9, 11, 12],            // W-H-W-H-W-H-W-H
+            'chromatic': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] // All semitones
         };
 
-        const intervals = scaleIntervals[scaleType.toLowerCase()] || scaleIntervals['major'];
+        // Normalize scaleType: convert underscores to hyphens for lookup
+        const normalizedType = scaleType.toLowerCase().replace(/_/g, '-');
+        const intervals = scaleIntervals[normalizedType] || scaleIntervals['major'];
 
         // Map root note to semitone offset
         const noteMap = {
