@@ -3386,6 +3386,12 @@ export class CompositionState {
             this.renderBassBlocksToMeasures(); // Uses NEW time signature
         }
 
+        // CRITICAL: Rebuild chord segments after time signature change
+        // This ensures chord bracket/label positions are recalculated for the new
+        // beats-per-measure value (e.g., a 4-beat chord spans 1 measure in 4/4
+        // but 1.33 measures in 3/4)
+        this.buildChordSegments();
+
         // Emit event for any listeners
         this.events.emit('timeSignatureChanged', { num, denom });
     }
