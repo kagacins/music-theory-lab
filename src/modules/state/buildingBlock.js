@@ -620,6 +620,38 @@ export class BuildingBlock {
                 octaveShift: attributes.octaveShift,
             });
         }
+
+        // CRITICAL FIX: If there are units AFTER this note that have parentIndex pointing
+        // to any unit within this note, they need to be updated to form a proper rest.
+        // Make the first such unit a note start, and update subsequent units to point to it.
+        if (endUnit < this.units.length) {
+            const nextUnit = this.units[endUnit];
+            // If the next unit's parentIndex points to any unit within the note we just wrote,
+            // it needs to become a new note start and subsequent units need to point to it
+            if (nextUnit.parentIndex !== null && nextUnit.parentIndex >= startUnit && nextUnit.parentIndex < endUnit) {
+                // Make this unit a new note start (rest with empty pitches)
+                this.units[endUnit] = new Unit({
+                    pitches: nextUnit.pitches, // Preserve existing pitches (likely empty = rest)
+                    parentIndex: null, // This is now a note start
+                });
+
+                // Update all subsequent units that also pointed to the old note to point to this new rest
+                for (let j = endUnit + 1; j < this.units.length; j++) {
+                    const unit = this.units[j];
+                    // If this unit pointed to something within the note we wrote, update it
+                    if (unit.parentIndex !== null && unit.parentIndex >= startUnit && unit.parentIndex < endUnit) {
+                        this.units[j] = new Unit({
+                            pitches: unit.pitches,
+                            parentIndex: endUnit, // Point to the new rest start
+                        });
+                    } else {
+                        // Once we hit a unit that doesn't point to our note range, stop
+                        // (it's either a new note start or points to something else)
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -746,15 +778,8 @@ export class BuildingBlock {
             chordIndex: this.chordIndex,
             chord: this.chord,
             beats: this.beats,
-            units: this.units.map(u => ({
-                pitches: u.pitches,
-                parentIndex: u.parentIndex,
-                articulation: u.articulation,
-                dynamic: u.dynamic,
-                accidental: u.accidental,
-                accidentals: u.accidentals,
-                tuplet: u.tuplet,
-            })),
+            // Use Unit.toJSON() to capture all musical attributes
+            units: this.units.map(u => u.toJSON()),
         };
     }
 

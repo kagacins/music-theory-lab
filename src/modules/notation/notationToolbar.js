@@ -1289,11 +1289,14 @@ export class NotationToolbar {
       const indicator = this.container?.querySelector('.selection-indicator');
       if (indicator) indicator.style.display = 'none';
 
-      // Reset accidental buttons to show current toolbar state
+      // CRITICAL FIX: Must update ALL button states to show toolbar defaults
+      // Previously these were skipped due to early return, causing stale visual state
+      this.updateDurationButtonsForSelection();
+      this.updateArticulationButtonsForSelection();
+      this.updateDotButtonForSelection();
+      this.updateRestButtonForSelection();
       this.updateAccidentalButtons();
-      // Reset tie button
       this.updateTieButtonForSelection();
-      // Reset tuplet buttons
       this.updateTupletButtonsForSelection();
 
       return;
@@ -1338,6 +1341,20 @@ export class NotationToolbar {
       tuplet: this.selectionTuplet
     });
 
+    // CRITICAL FIX: Sync internal state to match what's being shown visually
+    // This ensures that if the user adds a new note while something is selected,
+    // the new note will have the same properties as shown in the toolbar
+    // Only sync when there's a consistent value (not 'mixed')
+    if (this.selectionDuration && this.selectionDuration !== 'mixed') {
+      this.currentDuration = this.selectionDuration;
+    }
+    if (this.selectionIsRest !== null && this.selectionIsRest !== 'mixed') {
+      this.isRestMode = this.selectionIsRest;
+    }
+    if (this.selectionDotted !== null && this.selectionDotted !== 'mixed') {
+      this.isDotted = this.selectionDotted;
+    }
+
     // Update selection indicator
     const indicator = this.container?.querySelector('.selection-indicator');
     if (indicator) {
@@ -1368,8 +1385,17 @@ export class NotationToolbar {
     if (!this.container) return;
 
     this.container.querySelectorAll('.duration-btn').forEach(btn => {
-      const isActive = this.selectionDuration && this.selectionDuration === btn.dataset.duration;
-      const isMixed = this.selectionDuration === 'mixed';
+      // CRITICAL FIX: When no selection, show the toolbar's default state (currentDuration)
+      // When there IS a selection, show the selection state (selectionDuration)
+      let isActive, isMixed;
+      if (this.selectedNotesCount > 0) {
+        isActive = this.selectionDuration && this.selectionDuration === btn.dataset.duration;
+        isMixed = this.selectionDuration === 'mixed';
+      } else {
+        // No selection - show the toolbar's default state for new notes
+        isActive = btn.dataset.duration === this.currentDuration;
+        isMixed = false;
+      }
 
       btn.classList.toggle('active', isActive);
       btn.classList.toggle('mixed', isMixed);
@@ -1417,8 +1443,17 @@ export class NotationToolbar {
     const btn = this.container.querySelector('.dot-btn');
     if (!btn) return;
 
-    const isActive = this.selectionDotted === true;
-    const isMixed = this.selectionDotted === 'mixed';
+    // CRITICAL FIX: When no selection, show the toolbar's default state (isDotted)
+    // When there IS a selection, show the selection state (selectionDotted)
+    let isActive, isMixed;
+    if (this.selectedNotesCount > 0) {
+      isActive = this.selectionDotted === true;
+      isMixed = this.selectionDotted === 'mixed';
+    } else {
+      // No selection - show the toolbar's default state for new notes
+      isActive = this.isDotted;
+      isMixed = false;
+    }
 
     btn.classList.toggle('active', isActive);
     btn.classList.toggle('mixed', isMixed);
@@ -1440,8 +1475,17 @@ export class NotationToolbar {
     const btn = this.container.querySelector('.rest-btn');
     if (!btn) return;
 
-    const isActive = this.selectionIsRest === true;
-    const isMixed = this.selectionIsRest === 'mixed';
+    // CRITICAL FIX: When no selection, show the toolbar's default state (isRestMode)
+    // When there IS a selection, show the selection state (selectionIsRest)
+    let isActive, isMixed;
+    if (this.selectedNotesCount > 0) {
+      isActive = this.selectionIsRest === true;
+      isMixed = this.selectionIsRest === 'mixed';
+    } else {
+      // No selection - show the toolbar's default state for new notes
+      isActive = this.isRestMode;
+      isMixed = false;
+    }
 
     btn.classList.toggle('active', isActive);
     btn.classList.toggle('mixed', isMixed);

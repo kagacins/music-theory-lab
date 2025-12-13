@@ -1056,12 +1056,10 @@ export function initEnhancedNotation(options = {}) {
     };
 
     notationComposer.toolbar.onRestModeChange = (isRest) => {
-      // Always set rest mode for new notes
-      noteEditor.setRestMode(isRest);
-      originalCallbacks.onRestModeChange(isRest);
-
+      // When notes are selected, we're converting existing notes, not setting mode for new notes
+      // So we need special handling
       if (noteEditor.selectedNotes.size > 0) {
-        // Also toggle rest mode on selected notes
+        // Toggle rest mode on selected notes
         noteEditor.toggleRestOnSelected();
 
         // Refresh toolbar selection state after toggling rest
@@ -1090,7 +1088,24 @@ export function initEnhancedNotation(options = {}) {
             }
           }
         }
+
+        // CRITICAL FIX: After converting selected notes, sync isRestMode to match the RESULT
+        // If we converted rests to notes, user probably wants to continue adding notes (isRestMode=false)
+        // If we converted notes to rests, user probably wants to continue adding rests (isRestMode=true)
+        // The new state is the OPPOSITE of what the notes WERE (since we toggled them)
+        // So we set isRestMode to match what the notes ARE NOW
+        const newRestState = selectedNoteObjects.length > 0 ?
+          (selectedNoteObjects[0].isRest || selectedNoteObjects[0].type === 'rest') : false;
+
+        // Update both toolbar and noteEditor to match the resulting state
+        notationComposer.toolbar.isRestMode = newRestState;
+        noteEditor.setRestMode(newRestState);
+
         notationComposer.toolbar.updateSelectionState(selectedNoteObjects);
+      } else {
+        // No notes selected - this is setting mode for new notes
+        noteEditor.setRestMode(isRest);
+        originalCallbacks.onRestModeChange(isRest);
       }
     };
 

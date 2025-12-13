@@ -719,9 +719,10 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
     return false;
   }
 
-  // Look for tied notes across measure boundaries
+  // Look for tied bass notes across measure boundaries
   // Semantic: note.tied=true means "tie FROM this note TO the next note"
-  // So we check the LAST note of the current measure for the tied flag
+  // So we check the LAST note of each voice in the current measure for the tied flag
+  // MULTI-VOICE: Check all voices, not just voice 0
   for (let i = 0; i < renderedMeasures.length - 1; i++) {
     const currentMeasure = renderedMeasures[i];
     const nextMeasure = renderedMeasures[i + 1];
@@ -734,49 +735,66 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
       continue;
     }
 
-    // Get measure data for the CURRENT measure (where the tie starts)
+    // Get measure data for the CURRENT and NEXT measures
     const currentMeasureData = measures[currentMeasure.index];
+    const nextMeasureData = measures[nextMeasure.index];
 
-    // Try both paths to get the bass note data for current measure
-    let currentBassNoteData = currentMeasureData?.notation?.bass?.voices?.[0]?.notes;
-    if (!currentBassNoteData || currentBassNoteData.length === 0) {
-      currentBassNoteData = currentMeasureData?.bassNotes;
-    }
+    // Get flat bassNotes arrays (the renderer uses flat arrays with voiceIndex property)
+    const currentAllNotes = currentMeasureData?.bassNotes || [];
+    const nextAllNotes = nextMeasureData?.bassNotes || [];
 
-    if (!currentBassNoteData || currentBassNoteData.length === 0) {
-      continue;
-    }
+    // Check each voice for ties (voice 0 and voice 1)
+    for (let voiceIndex = 0; voiceIndex < 2; voiceIndex++) {
+      // Filter notes by voiceIndex
+      const currentVoiceNotes = currentAllNotes.filter(n => (n.voiceIndex || 0) === voiceIndex);
+      const nextVoiceNotes = nextAllNotes.filter(n => (n.voiceIndex || 0) === voiceIndex);
 
-    // Check the LAST note of current measure for tied flag
-    const lastNoteData = currentBassNoteData[currentBassNoteData.length - 1];
+      if (currentVoiceNotes.length === 0) continue;
 
-    // Check if this note is tied TO the next measure
-    // Skip ties for rests - rests don't need tie markings
-    if (lastNoteData && (lastNoteData.isTied === true || lastNoteData.tied === true) && !lastNoteData.isRest) {
-      const lastCurrentNote = currentBassNotes[currentBassNotes.length - 1];
-      const firstNextNote = nextBassNotes[0];
-
-      // Also check if the next note is a rest - skip tie if so
-      const nextMeasureData = measures[nextMeasure.index];
-      let nextBassNoteData = nextMeasureData?.notation?.bass?.voices?.[0]?.notes;
-      if (!nextBassNoteData || nextBassNoteData.length === 0) {
-        nextBassNoteData = nextMeasureData?.bassNotes;
+      // Find the last non-rest note in this voice (by beat position, not array order)
+      const sortedCurrentNotes = [...currentVoiceNotes].sort((a, b) => (b.beat || 0) - (a.beat || 0));
+      let lastNoteData = null;
+      for (const note of sortedCurrentNotes) {
+        if (!note.isRest && note.type !== 'rest') {
+          lastNoteData = note;
+          break;
+        }
       }
-      const firstNextNoteData = nextBassNoteData?.[0];
-      if (firstNextNoteData?.isRest) {
-        continue; // Skip tie if next note is a rest
+
+      if (!lastNoteData || lastNoteData.tied !== true) continue;
+
+      // Find the first non-rest note in the next measure's same voice (by beat position)
+      const sortedNextNotes = [...nextVoiceNotes].sort((a, b) => (a.beat || 0) - (b.beat || 0));
+      let firstNextNoteData = null;
+      for (const note of sortedNextNotes) {
+        if (!note.isRest && note.type !== 'rest') {
+          firstNextNoteData = note;
+          break;
+        }
       }
+
+      if (!firstNextNoteData || firstNextNoteData.isRest) continue;
 
       // IMPORTANT: Only draw tie if pitches match - ties connect same pitches only
       if (!pitchesMatch(lastNoteData, firstNextNoteData)) {
-        continue; // Skip tie if pitches don't match (different chords)
+        continue;
       }
+
+      // VexFlow has separate arrays: bassNotes for voice 0, bassNotes2 for voice 1
+      const currentVexNotes = voiceIndex === 0 ? currentBassNotes : (currentMeasure.bassNotes2 || []);
+      const nextVexNotes = voiceIndex === 0 ? nextBassNotes : (nextMeasure.bassNotes2 || []);
+
+      if (currentVexNotes.length === 0 || nextVexNotes.length === 0) continue;
+
+      // Get the last note from current measure and first from next
+      const lastCurrentNote = currentVexNotes[currentVexNotes.length - 1];
+      const firstNextNote = nextVexNotes[0];
+
+      if (!lastCurrentNote || !firstNextNote) continue;
 
       // Check if measures are on the same row
       if (!areMeasuresOnSameRow(currentMeasure, nextMeasure)) {
         // Cross-row tie: draw two partial ties
-        // 1. "Tie to nowhere" - from last note to right edge of current row
-        // 2. "Tie from nowhere" - from left edge of next row to first note
         try {
           const startBox = lastCurrentNote.getBoundingBox();
           const endBox = firstNextNote.getBoundingBox();
@@ -784,7 +802,6 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
           if (startBox) {
             const direction = getTieDirection(lastCurrentNote);
             const startX = startBox.getX() + startBox.getW();
-            // End at right edge of measure (about 30px past the note)
             const endX = startX + 30;
 
             let startY;
@@ -794,14 +811,12 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
               startY = startBox.getY() + startBox.getH() + 5;
             }
 
-            // Draw partial tie going to the right (tie to nowhere)
             drawPartialTieCurve(ctx, startX, startY, endX, startY, direction, 'end');
           }
 
           if (endBox) {
             const direction = getTieDirection(firstNextNote);
             const endX = endBox.getX();
-            // Start from left edge of measure (about 30px before the note)
             const startX = endX - 30;
 
             let endY;
@@ -811,80 +826,19 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
               endY = endBox.getY() + endBox.getH() + 5;
             }
 
-            // Draw partial tie coming from the left (tie from nowhere)
             drawPartialTieCurve(ctx, startX, endY, endX, endY, direction, 'start');
           }
         } catch (e) {
-          // Could not get bounding box - skip this tie
+          // Could not draw cross-row bass tie
         }
-        continue;
-      }
-
-      // Same-row tie: draw full tie between notes
-      try {
-        const startBox = lastCurrentNote.getBoundingBox();
-        const endBox = firstNextNote.getBoundingBox();
-
-        if (startBox && endBox) {
-          // Determine tie direction based on the notes
-          const direction = getTieDirection(lastCurrentNote);
-
-          const startX = startBox.getX() + startBox.getW();
-          const endX = endBox.getX();
-
-          let startY, endY;
-          if (direction === 'above') {
-            // Tie above the notes
-            startY = startBox.getY() - 5;
-            endY = endBox.getY() - 5;
-          } else {
-            // Tie below the notes
-            startY = startBox.getY() + startBox.getH() + 5;
-            endY = endBox.getY() + endBox.getH() + 5;
-          }
-
-          drawTieCurve(ctx, startX, startY, endX, endY, direction);
-        }
-      } catch (e) {
-        // Could not get bounding box - skip this tie
-      }
-    }
-  }
-
-  // Also check for ties within measures (for split notes)
-  // Semantic: note.tied=true means "tie FROM this note TO the next note"
-  // So we check each note (except the last) for the tied flag
-  for (const renderedMeasure of renderedMeasures) {
-    const bassNotes = renderedMeasure.bassNotes;
-    if (!bassNotes || bassNotes.length < 2) continue;
-
-    const measureData = measures[renderedMeasure.index];
-
-    let bassNoteData = measureData?.notation?.bass?.voices?.[0]?.notes;
-    if (!bassNoteData) {
-      bassNoteData = measureData?.bassNotes;
-    }
-
-    if (!bassNoteData || bassNoteData.length < 2) continue;
-
-    // Check each note (except the last) for tied flag
-    for (let j = 0; j < bassNotes.length - 1 && j < bassNoteData.length - 1; j++) {
-      const noteData = bassNoteData[j];
-      const nextNoteData = bassNoteData[j + 1];
-
-      // Skip ties for rests - rests don't need tie markings
-      // Check if THIS note has tied=true (meaning tie TO the next note)
-      // Also verify pitches match - ties only connect same pitches
-      if (noteData && (noteData.isTied === true || noteData.tied === true) && !noteData.isRest && !nextNoteData?.isRest && pitchesMatch(noteData, nextNoteData)) {
-        const currNote = bassNotes[j];
-        const nextNote = bassNotes[j + 1];
-
+      } else {
+        // Same row - draw normal tie
         try {
-          const startBox = currNote.getBoundingBox();
-          const endBox = nextNote.getBoundingBox();
+          const startBox = lastCurrentNote.getBoundingBox();
+          const endBox = firstNextNote.getBoundingBox();
 
           if (startBox && endBox) {
-            const direction = getTieDirection(currNote);
+            const direction = getTieDirection(lastCurrentNote);
 
             const startX = startBox.getX() + startBox.getW();
             const endX = endBox.getX();
@@ -901,7 +855,74 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
             drawTieCurve(ctx, startX, startY, endX, endY, direction);
           }
         } catch (e) {
-          // Could not get bounding box for intra-measure tie - skip
+          // Could not get bounding box - skip this tie
+        }
+      }
+    }
+  }
+
+  // Also check for bass ties within measures (for split notes)
+  // Semantic: note.tied=true means "tie FROM this note TO the next note"
+  // MULTI-VOICE: Check all voices, not just voice 0
+  for (const renderedMeasure of renderedMeasures) {
+    const bassNotes = renderedMeasure.bassNotes;
+    if (!bassNotes || bassNotes.length < 2) continue;
+
+    const measureData = measures[renderedMeasure.index];
+
+    // Get flat bassNotes array with voiceIndex property
+    const allBassNoteData = measureData?.bassNotes || [];
+
+    // Check each voice for within-measure ties
+    for (let voiceIndex = 0; voiceIndex < 2; voiceIndex++) {
+      // Filter notes by voiceIndex and sort by beat position
+      const voiceNotes = allBassNoteData
+        .filter(n => (n.voiceIndex || 0) === voiceIndex)
+        .sort((a, b) => (a.beat || 0) - (b.beat || 0));
+
+      if (voiceNotes.length < 2) continue;
+
+      // VexFlow has separate arrays: bassNotes for voice 0, bassNotes2 for voice 1
+      const vexNotes = voiceIndex === 0 ? bassNotes : (renderedMeasure.bassNotes2 || []);
+
+      if (vexNotes.length < 2) continue;
+
+      // Check each note (except the last) for tied flag
+      for (let j = 0; j < voiceNotes.length - 1 && j < vexNotes.length - 1; j++) {
+        const noteData = voiceNotes[j];
+        const nextNoteData = voiceNotes[j + 1];
+
+        // Skip ties for rests - rests don't need tie markings
+        // Check if THIS note has tied=true (meaning tie TO the next note)
+        // Also verify pitches match - ties only connect same pitches
+        if (noteData && noteData.tied === true && !noteData.isRest && !nextNoteData?.isRest && pitchesMatch(noteData, nextNoteData)) {
+          const currNote = vexNotes[j];
+          const nextNote = vexNotes[j + 1];
+
+          try {
+            const startBox = currNote.getBoundingBox();
+            const endBox = nextNote.getBoundingBox();
+
+            if (startBox && endBox) {
+              const direction = getTieDirection(currNote);
+
+              const startX = startBox.getX() + startBox.getW();
+              const endX = endBox.getX();
+
+              let startY, endY;
+              if (direction === 'above') {
+                startY = startBox.getY() - 5;
+                endY = endBox.getY() - 5;
+              } else {
+                startY = startBox.getY() + startBox.getH() + 5;
+                endY = endBox.getY() + endBox.getH() + 5;
+              }
+
+              drawTieCurve(ctx, startX, startY, endX, endY, direction);
+            }
+          } catch (e) {
+            // Could not get bounding box for intra-measure tie - skip
+          }
         }
       }
     }
@@ -910,6 +931,7 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
   // =====================================================================
   // BASS TIES - Cross-page partial ties
   // These handle ties that continue to/from another page
+  // MULTI-VOICE: Check all voices, not just voice 0
   // =====================================================================
 
   // Check FIRST measure of page for "tie from nowhere" (note has isTied=true)
@@ -920,35 +942,47 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
 
     if (firstBassNotes && firstBassNotes.length > 0) {
       const firstMeasureData = measures[firstMeasure.index];
-      let firstBassNoteData = firstMeasureData?.notation?.bass?.voices?.[0]?.notes;
-      if (!firstBassNoteData || firstBassNoteData.length === 0) {
-        firstBassNoteData = firstMeasureData?.bassNotes;
-      }
+      const allBassNoteData = firstMeasureData?.bassNotes || [];
 
-      const firstNoteData = firstBassNoteData?.[0];
+      // Check each voice for cross-page ties
+      for (let voiceIndex = 0; voiceIndex < 2; voiceIndex++) {
+        // Filter notes by voiceIndex and sort by beat position
+        const voiceNotes = allBassNoteData
+          .filter(n => (n.voiceIndex || 0) === voiceIndex)
+          .sort((a, b) => (a.beat || 0) - (b.beat || 0));
 
-      // If first note has isTied=true, it's a continuation from previous page
-      if (firstNoteData && firstNoteData.isTied === true && !firstNoteData.isRest) {
-        const firstNote = firstBassNotes[0];
-        try {
-          const box = firstNote.getBoundingBox();
-          if (box) {
-            const direction = getTieDirection(firstNote);
-            const endX = box.getX();
-            const startX = endX - 30; // "From nowhere" - left of the note
+        if (voiceNotes.length === 0) continue;
 
-            let endY;
-            if (direction === 'above') {
-              endY = box.getY() - 5;
-            } else {
-              endY = box.getY() + box.getH() + 5;
+        const firstNoteData = voiceNotes[0];
+
+        // If first note has isTied=true, it's a continuation from previous page
+        if (firstNoteData && firstNoteData.isTied === true && !firstNoteData.isRest) {
+          // VexFlow has separate arrays: bassNotes for voice 0, bassNotes2 for voice 1
+          const vexNotes = voiceIndex === 0 ? firstBassNotes : (firstMeasure.bassNotes2 || []);
+
+          if (vexNotes.length === 0) continue;
+
+          const firstNote = vexNotes[0];
+          try {
+            const box = firstNote.getBoundingBox();
+            if (box) {
+              const direction = getTieDirection(firstNote);
+              const endX = box.getX();
+              const startX = endX - 30; // "From nowhere" - left of the note
+
+              let endY;
+              if (direction === 'above') {
+                endY = box.getY() - 5;
+              } else {
+                endY = box.getY() + box.getH() + 5;
+              }
+
+              // Draw partial tie coming from the left
+              drawPartialTieCurve(ctx, startX, endY, endX, endY, direction, 'start');
             }
-
-            // Draw partial tie coming from the left
-            drawPartialTieCurve(ctx, startX, endY, endX, endY, direction, 'start');
+          } catch (e) {
+            // Could not get bounding box - skip
           }
-        } catch (e) {
-          // Could not get bounding box - skip
         }
       }
     }
@@ -962,35 +996,47 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
 
     if (lastBassNotes && lastBassNotes.length > 0) {
       const lastMeasureData = measures[lastMeasure.index];
-      let lastBassNoteData = lastMeasureData?.notation?.bass?.voices?.[0]?.notes;
-      if (!lastBassNoteData || lastBassNoteData.length === 0) {
-        lastBassNoteData = lastMeasureData?.bassNotes;
-      }
+      const allBassNoteData = lastMeasureData?.bassNotes || [];
 
-      const lastNoteData = lastBassNoteData?.[lastBassNoteData.length - 1];
+      // Check each voice for cross-page ties
+      for (let voiceIndex = 0; voiceIndex < 2; voiceIndex++) {
+        // Filter notes by voiceIndex and sort by beat position (descending to get last note)
+        const voiceNotes = allBassNoteData
+          .filter(n => (n.voiceIndex || 0) === voiceIndex)
+          .sort((a, b) => (b.beat || 0) - (a.beat || 0));
 
-      // If last note has tied=true, it continues to the next page
-      if (lastNoteData && lastNoteData.tied === true && !lastNoteData.isRest) {
-        const lastNote = lastBassNotes[lastBassNotes.length - 1];
-        try {
-          const box = lastNote.getBoundingBox();
-          if (box) {
-            const direction = getTieDirection(lastNote);
-            const startX = box.getX() + box.getW();
-            const endX = startX + 30; // "To nowhere" - right of the note
+        if (voiceNotes.length === 0) continue;
 
-            let startY;
-            if (direction === 'above') {
-              startY = box.getY() - 5;
-            } else {
-              startY = box.getY() + box.getH() + 5;
+        const lastNoteData = voiceNotes[0]; // First after descending sort = last by beat
+
+        // If last note has tied=true, it continues to the next page
+        if (lastNoteData && lastNoteData.tied === true && !lastNoteData.isRest) {
+          // VexFlow has separate arrays: bassNotes for voice 0, bassNotes2 for voice 1
+          const vexNotes = voiceIndex === 0 ? lastBassNotes : (lastMeasure.bassNotes2 || []);
+
+          if (vexNotes.length === 0) continue;
+
+          const lastNote = vexNotes[vexNotes.length - 1];
+          try {
+            const box = lastNote.getBoundingBox();
+            if (box) {
+              const direction = getTieDirection(lastNote);
+              const startX = box.getX() + box.getW();
+              const endX = startX + 30; // "To nowhere" - right of the note
+
+              let startY;
+              if (direction === 'above') {
+                startY = box.getY() - 5;
+              } else {
+                startY = box.getY() + box.getH() + 5;
+              }
+
+              // Draw partial tie going to the right
+              drawPartialTieCurve(ctx, startX, startY, endX, startY, direction, 'end');
             }
-
-            // Draw partial tie going to the right
-            drawPartialTieCurve(ctx, startX, startY, endX, startY, direction, 'end');
+          } catch (e) {
+            // Could not get bounding box - skip
           }
-        } catch (e) {
-          // Could not get bounding box - skip
         }
       }
     }
@@ -1030,7 +1076,8 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
 
   // Look for tied treble notes across measure boundaries
   // Semantic: note.tied=true means "tie FROM this note TO the next note"
-  // So we check the LAST note of the current measure for the tied flag
+  // So we check the LAST note of each voice in the current measure for the tied flag
+  // MULTI-VOICE: Check all voices, not just voice 0
   for (let i = 0; i < renderedMeasures.length - 1; i++) {
     const currentMeasure = renderedMeasures[i];
     const nextMeasure = renderedMeasures[i + 1];
@@ -1043,42 +1090,62 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
       continue;
     }
 
-    // Get measure data for the CURRENT measure (where the tie starts)
+    // Get measure data for the CURRENT and NEXT measures
     const currentMeasureData = measures[currentMeasure.index];
+    const nextMeasureData = measures[nextMeasure.index];
 
-    // Try both paths to get the treble note data for current measure
-    let currentTrebleNoteData = currentMeasureData?.notation?.treble?.voices?.[0]?.notes;
-    if (!currentTrebleNoteData || currentTrebleNoteData.length === 0) {
-      currentTrebleNoteData = currentMeasureData?.trebleNotes;
-    }
+    // Get flat trebleNotes arrays (the renderer uses flat arrays with voiceIndex property)
+    const currentAllNotes = currentMeasureData?.trebleNotes || [];
+    const nextAllNotes = nextMeasureData?.trebleNotes || [];
 
-    if (!currentTrebleNoteData || currentTrebleNoteData.length === 0) {
-      continue;
-    }
+    // Check each voice for ties (voice 0 and voice 1)
+    for (let voiceIndex = 0; voiceIndex < 2; voiceIndex++) {
+      // Filter notes by voiceIndex
+      const currentVoiceNotes = currentAllNotes.filter(n => (n.voiceIndex || 0) === voiceIndex);
+      const nextVoiceNotes = nextAllNotes.filter(n => (n.voiceIndex || 0) === voiceIndex);
 
-    // Check the LAST note of current measure for tied flag
-    const lastNoteData = currentTrebleNoteData[currentTrebleNoteData.length - 1];
+      if (currentVoiceNotes.length === 0) continue;
 
-    // Check if this note is tied TO the next measure
-    if (lastNoteData && (lastNoteData.isTied === true || lastNoteData.tied === true) && !lastNoteData.isRest) {
-      const lastCurrentNote = currentTrebleNotes[currentTrebleNotes.length - 1];
-      const firstNextNote = nextTrebleNotes[0];
-
-      // Check if next note is a rest
-      const nextMeasureData = measures[nextMeasure.index];
-      let nextTrebleNoteData = nextMeasureData?.notation?.treble?.voices?.[0]?.notes;
-      if (!nextTrebleNoteData || nextTrebleNoteData.length === 0) {
-        nextTrebleNoteData = nextMeasureData?.trebleNotes;
+      // Find the last non-rest note in this voice (by beat position, not array order)
+      const sortedCurrentNotes = [...currentVoiceNotes].sort((a, b) => (b.beat || 0) - (a.beat || 0));
+      let lastNoteData = null;
+      for (const note of sortedCurrentNotes) {
+        if (!note.isRest && note.type !== 'rest') {
+          lastNoteData = note;
+          break;
+        }
       }
-      const firstNextNoteData = nextTrebleNoteData?.[0];
-      if (firstNextNoteData?.isRest) {
-        continue; // Skip tie if next note is a rest
+
+      if (!lastNoteData || lastNoteData.tied !== true) continue;
+
+      // Find the first non-rest note in the next measure's same voice (by beat position)
+      const sortedNextNotes = [...nextVoiceNotes].sort((a, b) => (a.beat || 0) - (b.beat || 0));
+      let firstNextNoteData = null;
+      for (const note of sortedNextNotes) {
+        if (!note.isRest && note.type !== 'rest') {
+          firstNextNoteData = note;
+          break;
+        }
       }
+
+      if (!firstNextNoteData || firstNextNoteData.isRest) continue;
 
       // IMPORTANT: Only draw tie if pitches match - ties connect same pitches only
       if (!pitchesMatch(lastNoteData, firstNextNoteData)) {
-        continue; // Skip tie if pitches don't match (different chords)
+        continue;
       }
+
+      // VexFlow has separate arrays: trebleNotes for voice 0, trebleNotes2 for voice 1
+      const currentVexNotes = voiceIndex === 0 ? currentTrebleNotes : (currentMeasure.trebleNotes2 || []);
+      const nextVexNotes = voiceIndex === 0 ? nextTrebleNotes : (nextMeasure.trebleNotes2 || []);
+
+      if (currentVexNotes.length === 0 || nextVexNotes.length === 0) continue;
+
+      // Get the last note from current measure and first from next
+      const lastCurrentNote = currentVexNotes[currentVexNotes.length - 1];
+      const firstNextNote = nextVexNotes[0];
+
+      if (!lastCurrentNote || !firstNextNote) continue;
 
       // Check if measures are on the same row
       if (!areMeasuresOnSameRow(currentMeasure, nextMeasure)) {
@@ -1152,53 +1219,66 @@ function drawManualTiesOnContext(ctx, renderedMeasures, measures) {
   // Also check for treble ties within measures (for split notes)
   // Semantic: note.tied=true means "tie FROM this note TO the next note"
   // So we check each note (except the last) for the tied flag
+  // MULTI-VOICE: Check all voices, not just voice 0
   for (const renderedMeasure of renderedMeasures) {
     const trebleNotes = renderedMeasure.trebleNotes;
     if (!trebleNotes || trebleNotes.length < 2) continue;
 
     const measureData = measures[renderedMeasure.index];
+    // Use flat trebleNotes array (the renderer uses flat arrays with voiceIndex property)
+    const allNotes = measureData?.trebleNotes || [];
 
-    let trebleNoteData = measureData?.notation?.treble?.voices?.[0]?.notes;
-    if (!trebleNoteData) {
-      trebleNoteData = measureData?.trebleNotes;
-    }
+    // Check each voice for within-measure ties
+    for (let voiceIndex = 0; voiceIndex < 2; voiceIndex++) {
+      // Filter notes by voiceIndex and sort by beat
+      const voiceNoteData = allNotes
+        .filter(n => (n.voiceIndex || 0) === voiceIndex)
+        .sort((a, b) => (a.beat || 0) - (b.beat || 0));
 
-    if (!trebleNoteData || trebleNoteData.length < 2) continue;
+      if (voiceNoteData.length < 2) continue;
 
-    // Check each note (except the last) for tied flag
-    for (let j = 0; j < trebleNotes.length - 1 && j < trebleNoteData.length - 1; j++) {
-      const noteData = trebleNoteData[j];
-      const nextNoteData = trebleNoteData[j + 1];
+      // Check each note (except the last) for tied flag
+      for (let j = 0; j < voiceNoteData.length - 1; j++) {
+        const noteData = voiceNoteData[j];
+        const nextNoteData = voiceNoteData[j + 1];
 
-      // Check if THIS note has tied=true (meaning tie TO the next note)
-      // Also verify pitches match - ties only connect same pitches
-      if (noteData && (noteData.isTied === true || noteData.tied === true) && !noteData.isRest && !nextNoteData?.isRest && pitchesMatch(noteData, nextNoteData)) {
-        const currNote = trebleNotes[j];
-        const nextNote = trebleNotes[j + 1];
+        // Check if THIS note has tied=true (meaning tie TO the next note)
+        // Also verify pitches match - ties only connect same pitches
+        // IMPORTANT: Only check 'tied' (ties TO next), NOT 'isTied' (continuation FROM previous)
+        if (noteData && noteData.tied === true && !noteData.isRest && !nextNoteData?.isRest && pitchesMatch(noteData, nextNoteData)) {
+          // VexFlow has separate arrays: trebleNotes for voice 0, trebleNotes2 for voice 1
+          const vexNotesForVoice = voiceIndex === 0 ? trebleNotes : (renderedMeasure.trebleNotes2 || []);
 
-        try {
-          const startBox = currNote.getBoundingBox();
-          const endBox = nextNote.getBoundingBox();
+          // Find the VexFlow notes at positions j and j+1 within this voice
+          if (vexNotesForVoice.length > j + 1) {
+            const currNote = vexNotesForVoice[j];
+            const nextNote = vexNotesForVoice[j + 1];
 
-          if (startBox && endBox) {
-            const direction = getTrebleTieDirection(currNote);
+            try {
+              const startBox = currNote.getBoundingBox();
+              const endBox = nextNote.getBoundingBox();
 
-            const startX = startBox.getX() + startBox.getW();
-            const endX = endBox.getX();
+              if (startBox && endBox) {
+                const direction = getTrebleTieDirection(currNote);
 
-            let startY, endY;
-            if (direction === 'above') {
-              startY = startBox.getY() - 5;
-              endY = endBox.getY() - 5;
-            } else {
-              startY = startBox.getY() + startBox.getH() + 5;
-              endY = endBox.getY() + endBox.getH() + 5;
+                const startX = startBox.getX() + startBox.getW();
+                const endX = endBox.getX();
+
+                let startY, endY;
+                if (direction === 'above') {
+                  startY = startBox.getY() - 5;
+                  endY = endBox.getY() - 5;
+                } else {
+                  startY = startBox.getY() + startBox.getH() + 5;
+                  endY = endBox.getY() + endBox.getH() + 5;
+                }
+
+                drawTieCurve(ctx, startX, startY, endX, endY, direction);
+              }
+            } catch (e) {
+              // Could not get bounding box for intra-measure treble tie - skip
             }
-
-            drawTieCurve(ctx, startX, startY, endX, endY, direction);
           }
-        } catch (e) {
-          // Could not get bounding box for intra-measure treble tie - skip
         }
       }
     }

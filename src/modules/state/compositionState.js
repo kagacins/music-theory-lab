@@ -331,6 +331,359 @@ export function getNotesOverflowTicks(notes, timeSignature = { num: 4, denom: 4 
 }
 
 // ============================================================================
+// MULTI-VOICE TIME SIGNATURE REDISTRIBUTION HELPERS
+// ============================================================================
+
+/**
+ * Convert beats to a duration string (Tone.js format)
+ * @param {number} beats - Number of beats
+ * @returns {string} - Duration string like '4n', '2n.', etc.
+ */
+function beatsToDurationString(beats) {
+    // Map of beats to duration strings
+    const beatMap = [
+        { beats: 4, duration: '1n' },
+        { beats: 3, duration: '2n.' },
+        { beats: 2, duration: '2n' },
+        { beats: 1.5, duration: '4n.' },
+        { beats: 1, duration: '4n' },
+        { beats: 0.75, duration: '8n.' },
+        { beats: 0.5, duration: '8n' },
+        { beats: 0.375, duration: '16n.' },
+        { beats: 0.25, duration: '16n' },
+    ];
+
+    // Find the closest match
+    let closest = beatMap[0];
+    let closestDiff = Math.abs(beats - closest.beats);
+
+    for (const entry of beatMap) {
+        const diff = Math.abs(beats - entry.beats);
+        if (diff < closestDiff) {
+            closestDiff = diff;
+            closest = entry;
+        }
+    }
+
+    return closest.duration;
+}
+
+/**
+ * Get the duration in beats from a duration string
+ * @param {string} duration - Duration string like '4n', '2n.', etc.
+ * @returns {number} - Duration in beats
+ */
+function durationToBeats(duration) {
+    const map = {
+        '1n': 4,
+        '2n.': 3,
+        '2n': 2,
+        '4n.': 1.5,
+        '4n': 1,
+        '8n.': 0.75,
+        '8n': 0.5,
+        '16n.': 0.375,
+        '16n': 0.25,
+        '32n': 0.125,
+    };
+    return map[duration] || 1;
+}
+
+/**
+ * Collect all notes from all voices in a staff with their absolute beat positions
+ * This is used for multi-voice time signature redistribution
+ *
+ * @param {Array} measures - The measures array from compositionState
+ * @param {string} staff - 'treble' or 'bass'
+ * @param {Object} timeSignature - Current time signature for calculating absolute positions
+ * @returns {Object} - { voice0: [...notes], voice1: [...notes] } with absoluteBeat on each note
+ */
+export function collectAllNotesWithAbsolutePositions(measures, staff, timeSignature) {
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
+    const result = { voice0: [], voice1: [] };
+
+    for (let measureIndex = 0; measureIndex < measures.length; measureIndex++) {
+        const measure = measures[measureIndex];
+        const voices = measure?.notation?.[staff]?.voices || [];
+        const measureStartBeat = measureIndex * beatsPerMeasure;
+
+        for (let voiceIndex = 0; voiceIndex < voices.length; voiceIndex++) {
+            const voiceNotes = voices[voiceIndex]?.notes || [];
+            const voiceKey = `voice${voiceIndex}`;
+
+            if (!result[voiceKey]) {
+                result[voiceKey] = [];
+            }
+
+            for (const note of voiceNotes) {
+                // Skip rests - they'll be regenerated during redistribution
+                if (note.isRest || note.type === 'rest') continue;
+
+                // Skip tied continuations - we only want the first part of tied notes
+                if (note.isTied) continue;
+
+                const noteBeat = note.beat || 0;
+                const absoluteBeat = measureStartBeat + noteBeat;
+                const noteDuration = durationToBeats(note.duration);
+
+                // If this note has tied=true, it ties to the next note
+                // We need to combine tied notes into a single logical note with full duration
+                let totalDuration = noteDuration;
+
+                if (note.tied) {
+                    // Look ahead for tied continuations
+                    totalDuration = collectTiedDuration(measures, staff, voiceIndex, measureIndex, noteBeat, noteDuration, beatsPerMeasure);
+                }
+
+                result[voiceKey].push({
+                    pitch: note.pitch,
+                    pitches: note.pitches ? [...note.pitches] : (note.pitch ? [note.pitch] : []),
+                    duration: beatsToDurationString(totalDuration),
+                    durationBeats: totalDuration,
+                    absoluteBeat,
+                    voiceIndex,
+                    // Preserve other properties
+                    originalDuration: note.duration,
+                    ...(note.velocity !== undefined && { velocity: note.velocity }),
+                });
+            }
+        }
+    }
+
+    // Sort notes by absolute beat position within each voice
+    result.voice0.sort((a, b) => a.absoluteBeat - b.absoluteBeat);
+    result.voice1.sort((a, b) => a.absoluteBeat - b.absoluteBeat);
+
+    return result;
+}
+
+/**
+ * Helper to collect the total duration of a tied note chain
+ */
+function collectTiedDuration(measures, staff, voiceIndex, startMeasureIndex, startBeat, startDuration, beatsPerMeasure) {
+    let totalDuration = startDuration;
+    let currentMeasure = startMeasureIndex;
+    let expectedBeat = startBeat + startDuration;
+
+    // Look for continuation notes (isTied=true) that follow
+    while (currentMeasure < measures.length) {
+        // Check if we've moved to the next measure
+        if (expectedBeat >= beatsPerMeasure) {
+            currentMeasure++;
+            expectedBeat -= beatsPerMeasure;
+            if (currentMeasure >= measures.length) break;
+        }
+
+        const measure = measures[currentMeasure];
+        const voiceNotes = measure?.notation?.[staff]?.voices?.[voiceIndex]?.notes || [];
+
+        // Find a tied continuation at the expected beat
+        const continuation = voiceNotes.find(n =>
+            n.isTied &&
+            Math.abs((n.beat || 0) - expectedBeat) < 0.001
+        );
+
+        if (continuation) {
+            const contDuration = durationToBeats(continuation.duration);
+            totalDuration += contDuration;
+            expectedBeat += contDuration;
+
+            // If this continuation also ties forward, keep going
+            if (!continuation.tied) {
+                break; // End of tie chain
+            }
+        } else {
+            break; // No continuation found
+        }
+    }
+
+    return totalDuration;
+}
+
+/**
+ * Redistribute collected notes to measures based on a new time signature
+ * Handles splitting notes at measure boundaries and creating ties
+ *
+ * @param {Object} compositionState - The composition state instance
+ * @param {string} staff - 'treble' or 'bass'
+ * @param {Object} collectedNotes - Result from collectAllNotesWithAbsolutePositions
+ * @param {Object} newTimeSignature - The new time signature to redistribute to
+ */
+export function redistributeNotesToNewMeasures(compositionState, staff, collectedNotes, newTimeSignature) {
+    const newBeatsPerMeasure = getBeatsPerMeasureFromTimeSignature(newTimeSignature);
+
+    console.log(`[redistributeNotesToNewMeasures] Redistributing ${staff} notes to ${newTimeSignature.num}/${newTimeSignature.denom} (${newBeatsPerMeasure} beats/measure)`);
+
+    // Clear existing notes in this staff for all measures (but keep measure structure)
+    for (const measure of compositionState.measures) {
+        if (measure.notation?.[staff]?.voices) {
+            for (const voice of measure.notation[staff].voices) {
+                if (voice) {
+                    voice.notes = [];
+                }
+            }
+        }
+    }
+
+    // Process each voice
+    for (const voiceKey of Object.keys(collectedNotes)) {
+        const voiceIndex = parseInt(voiceKey.replace('voice', ''), 10);
+        const notes = collectedNotes[voiceKey];
+
+        console.log(`[redistributeNotesToNewMeasures] Processing ${voiceKey} with ${notes.length} notes`);
+
+        for (const note of notes) {
+            const absoluteBeat = note.absoluteBeat;
+            const noteDurationBeats = note.durationBeats;
+
+            // Calculate which measure and beat position this note starts in
+            let measureIndex = Math.floor(absoluteBeat / newBeatsPerMeasure);
+            let beatInMeasure = absoluteBeat - (measureIndex * newBeatsPerMeasure);
+
+            // Ensure measure exists
+            while (compositionState.measures.length <= measureIndex) {
+                compositionState.addMeasure({});
+            }
+
+            // Ensure voice exists in the measure
+            compositionState.ensureVoiceExists(measureIndex, staff, voiceIndex);
+
+            // Check if note fits in current measure or needs to be split
+            const remainingInMeasure = newBeatsPerMeasure - beatInMeasure;
+
+            if (noteDurationBeats <= remainingInMeasure) {
+                // Note fits entirely in this measure
+                const newNote = {
+                    type: 'note',
+                    pitch: note.pitch || note.pitches?.[0],
+                    pitches: note.pitches,
+                    duration: beatsToDurationString(noteDurationBeats),
+                    beat: beatInMeasure,
+                    dotted: beatsToDurationString(noteDurationBeats).includes('.'),
+                    isRest: false,
+                    isTied: false,
+                    tied: false,
+                    voiceIndex: voiceIndex, // Track which voice this note belongs to
+                };
+
+                compositionState.measures[measureIndex].notation[staff].voices[voiceIndex].notes.push(newNote);
+            } else {
+                // Note needs to be split across measure boundaries
+                let remainingDuration = noteDurationBeats;
+                let currentMeasureIndex = measureIndex;
+                let currentBeat = beatInMeasure;
+                let isFirstPart = true;
+
+                while (remainingDuration > 0.001 && currentMeasureIndex < compositionState.measures.length + 10) {
+                    // Ensure measure exists
+                    while (compositionState.measures.length <= currentMeasureIndex) {
+                        compositionState.addMeasure({});
+                    }
+                    compositionState.ensureVoiceExists(currentMeasureIndex, staff, voiceIndex);
+
+                    const spaceInMeasure = newBeatsPerMeasure - currentBeat;
+                    const durationThisMeasure = Math.min(remainingDuration, spaceInMeasure);
+                    const isLastPart = (remainingDuration - durationThisMeasure) < 0.001;
+
+                    const partNote = {
+                        type: 'note',
+                        pitch: note.pitch || note.pitches?.[0],
+                        pitches: note.pitches,
+                        duration: beatsToDurationString(durationThisMeasure),
+                        beat: currentBeat,
+                        dotted: beatsToDurationString(durationThisMeasure).includes('.'),
+                        isRest: false,
+                        isTied: !isFirstPart, // Continuation from previous
+                        tied: !isLastPart,    // Ties to next
+                        voiceIndex: voiceIndex, // Track which voice this note belongs to
+                    };
+
+                    compositionState.measures[currentMeasureIndex].notation[staff].voices[voiceIndex].notes.push(partNote);
+
+                    remainingDuration -= durationThisMeasure;
+                    currentMeasureIndex++;
+                    currentBeat = 0; // Subsequent parts start at beat 0
+                    isFirstPart = false;
+                }
+            }
+        }
+    }
+
+    // Fill gaps with rests for each voice
+    fillGapsWithRests(compositionState, staff, newTimeSignature);
+}
+
+/**
+ * Fill gaps in measures with rests
+ * Called after redistribution to ensure measures have proper rest structure
+ */
+function fillGapsWithRests(compositionState, staff, timeSignature) {
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
+
+    for (let measureIndex = 0; measureIndex < compositionState.measures.length; measureIndex++) {
+        const voices = compositionState.measures[measureIndex]?.notation?.[staff]?.voices || [];
+
+        for (let voiceIndex = 0; voiceIndex < voices.length; voiceIndex++) {
+            const voice = voices[voiceIndex];
+            if (!voice) continue;
+
+            const notes = voice.notes || [];
+            if (notes.length === 0) {
+                // Empty voice - fill with a single rest
+                voice.notes = [{
+                    type: 'rest',
+                    duration: beatsToDurationString(beatsPerMeasure),
+                    beat: 0,
+                    isRest: true,
+                    voiceIndex: voiceIndex,
+                }];
+                continue;
+            }
+
+            // Sort notes by beat
+            notes.sort((a, b) => (a.beat || 0) - (b.beat || 0));
+
+            // Calculate gaps and fill with rests
+            const newNotes = [];
+            let currentBeat = 0;
+
+            for (const note of notes) {
+                const noteBeat = note.beat || 0;
+
+                // If there's a gap before this note, fill with rest
+                if (noteBeat > currentBeat + 0.001) {
+                    const gapDuration = noteBeat - currentBeat;
+                    newNotes.push({
+                        type: 'rest',
+                        duration: beatsToDurationString(gapDuration),
+                        beat: currentBeat,
+                        isRest: true,
+                        voiceIndex: voiceIndex,
+                    });
+                }
+
+                newNotes.push(note);
+                currentBeat = noteBeat + durationToBeats(note.duration);
+            }
+
+            // Fill remaining space with rest
+            if (currentBeat < beatsPerMeasure - 0.001) {
+                const remainingDuration = beatsPerMeasure - currentBeat;
+                newNotes.push({
+                    type: 'rest',
+                    duration: beatsToDurationString(remainingDuration),
+                    beat: currentBeat,
+                    isRest: true,
+                    voiceIndex: voiceIndex,
+                });
+            }
+
+            voice.notes = newNotes;
+        }
+    }
+}
+
+// ============================================================================
 // CHORD SEGMENT MODEL
 // ============================================================================
 
@@ -1368,6 +1721,7 @@ export class CompositionState {
                         beat: beatInMeasure,
                         dotted: firstPartDuration.includes('.'),
                         isTied: false, // First part is NOT tied (it's the start of the tie)
+                        tied: !noteEntry.isRest, // First part ties TO the next part (for rendering)
                         isRest: noteEntry.isRest,
                         bassNoteId: noteEntry.id,
                         chordIndex: chordIndex,
@@ -1392,6 +1746,7 @@ export class CompositionState {
                         beat: 0,
                         dotted: secondPartDuration.includes('.'),
                         isTied: true, // Second part IS tied (continuation of the tie)
+                        tied: false, // Second part does NOT tie to anything after (it's the end)
                         isRest: noteEntry.isRest,
                         bassNoteId: noteEntry.id,
                         chordIndex: chordIndex,
@@ -1941,7 +2296,8 @@ export class CompositionState {
                     duration: duration,
                     beat: beat,
                     dotted: duration.includes('.'),
-                    isTied: !isFirstPart, // Tied if continuation from previous measure
+                    isTied: !isFirstPart, // True if this is a continuation FROM the previous note
+                    tied: !isLastPart && !note.isRest, // True if this note ties TO the next part (for rendering)
                     isRest: note.isRest,
                     voiceIndex: voiceIndex, // Include 0-based voice index for rendering
                     // Musical attributes - only on first part
@@ -2930,21 +3286,131 @@ export class CompositionState {
 
     /**
      * Set the time signature for the composition
+     * Preserves notes by syncing to block before change and re-rendering after
+     * For multi-voice content, uses full redistribution to preserve all voices
      * @param {number} num - Numerator (e.g., 4 for 4/4)
      * @param {number} denom - Denominator (e.g., 4 for 4/4)
      */
     setTimeSignature(num, denom) {
-        console.log(`[CompositionState] setTimeSignature called: ${num}/${denom}`);
+        const oldTS = this.metadata.timeSignature || { num: 4, denom: 4 };
+        console.log(`[CompositionState] setTimeSignature: ${oldTS.num}/${oldTS.denom} -> ${num}/${denom}`);
 
-        // Update metadata
-        this.metadata.timeSignature = { num, denom };
-
-        // Update block sequences
-        if (this.bassBlockSequence) {
-            this.bassBlockSequence.setTimeSignature(num, denom);
+        // Skip if no change
+        if (oldTS.num === num && oldTS.denom === denom) {
+            console.log(`[CompositionState] Time signature unchanged, skipping`);
+            return;
         }
-        if (this.trebleBlockSequence) {
-            this.trebleBlockSequence.setTimeSignature(num, denom);
+
+        // Check for multi-voice content in treble
+        const hasTrebleMultiVoice = this.measures.some(m => {
+            const voices = m.notation?.treble?.voices || [];
+            return voices.length > 1 && voices[1]?.notes?.some(n => !n.isRest && n.type !== 'rest');
+        });
+
+        // Check for treble notes (any voice)
+        const hasTrebleNotes = this.measures.some(m => {
+            const voices = m.notation?.treble?.voices || [];
+            return voices.some(voice =>
+                voice?.notes?.some(n => !n.isRest && n.type !== 'rest')
+            );
+        });
+
+        // Check for multi-voice content in bass
+        const hasBassMultiVoice = this.measures.some(m => {
+            const voices = m.notation?.bass?.voices || [];
+            return voices.length > 1 && voices[1]?.notes?.some(n => !n.isRest && n.type !== 'rest');
+        });
+
+        // Check for bass notes (any voice)
+        const hasBassNotes = this.measures.some(m => {
+            const voices = m.notation?.bass?.voices || [];
+            return voices.some(voice =>
+                voice?.notes?.some(n => !n.isRest && n.type !== 'rest')
+            );
+        });
+
+        const hasTrebleBlock = this.trebleBlockSequence?.blocks?.length > 0;
+        const hasBassBlock = this.bassBlockSequence?.blocks?.length > 0;
+        const newTS = { num, denom };
+
+        // PHASE 5: Multi-voice redistribution
+        if (hasTrebleMultiVoice && hasTrebleNotes) {
+            console.log(`[CompositionState] MULTI-VOICE detected - using full redistribution for treble`);
+
+            // 1. Collect ALL notes from ALL voices with absolute positions (using OLD time signature)
+            const collectedTrebleNotes = collectAllNotesWithAbsolutePositions(this.measures, 'treble', oldTS);
+            console.log(`[CompositionState] Collected treble notes:`, {
+                voice0: collectedTrebleNotes.voice0.length,
+                voice1: collectedTrebleNotes.voice1.length
+            });
+
+            // 2. Update metadata to new time signature
+            this.metadata.timeSignature = newTS;
+
+            // 3. Update block sequences
+            if (this.bassBlockSequence) {
+                this.bassBlockSequence.setTimeSignature(num, denom);
+            }
+            if (this.trebleBlockSequence) {
+                this.trebleBlockSequence.setTimeSignature(num, denom);
+            }
+
+            // 4. Redistribute treble notes to new measure structure
+            redistributeNotesToNewMeasures(this, 'treble', collectedTrebleNotes, newTS);
+
+        } else if (hasTrebleBlock && hasTrebleNotes) {
+            // PHASE 4: Single-voice - use block-based sync/render (simpler and well-tested)
+            console.log(`[CompositionState] Single-voice treble - using block-based redistribution`);
+
+            // 1. Sync treble notes to block BEFORE updating metadata
+            this.syncMeasuresToTrebleBlock(); // Uses OLD time signature
+
+            // 2. Update metadata to new time signature
+            this.metadata.timeSignature = newTS;
+
+            // 3. Update block sequences
+            if (this.bassBlockSequence) {
+                this.bassBlockSequence.setTimeSignature(num, denom);
+            }
+            if (this.trebleBlockSequence) {
+                this.trebleBlockSequence.setTimeSignature(num, denom);
+            }
+
+            // 4. Re-render treble block to measures using NEW time signature
+            this.renderTrebleBlocksToMeasures();
+
+        } else {
+            // No treble notes - just update metadata
+            this.metadata.timeSignature = newTS;
+
+            if (this.bassBlockSequence) {
+                this.bassBlockSequence.setTimeSignature(num, denom);
+            }
+            if (this.trebleBlockSequence) {
+                this.trebleBlockSequence.setTimeSignature(num, denom);
+            }
+        }
+
+        // 5. Handle bass notes during time signature change
+        // PHASE 5: If bass has multi-voice, use full redistribution (like treble)
+        // Otherwise, re-render from block (simpler for single-voice)
+        if (hasBassMultiVoice && hasBassNotes) {
+            console.log(`[CompositionState] BASS MULTI-VOICE detected - using full redistribution`);
+
+            // Collect ALL bass notes from ALL voices with absolute positions (using OLD time signature)
+            const collectedBassNotes = collectAllNotesWithAbsolutePositions(this.measures, 'bass', oldTS);
+            console.log(`[CompositionState] Collected bass notes:`, {
+                voice0: collectedBassNotes.voice0.length,
+                voice1: collectedBassNotes.voice1.length
+            });
+
+            // Redistribute bass notes to new measure structure
+            redistributeNotesToNewMeasures(this, 'bass', collectedBassNotes, newTS);
+
+        } else if (hasBassBlock) {
+            // Single-voice bass - re-render from block (simpler and well-tested)
+            console.log(`[CompositionState] Re-rendering bass block to measures with NEW time signature`);
+            this.renderBassBlocksToMeasures(); // Uses NEW time signature
         }
 
         // Emit event for any listeners

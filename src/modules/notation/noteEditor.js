@@ -1304,6 +1304,32 @@ export class NoteEditor {
       return;
     }
 
+    // IMPORTANT: Sync ALL tool state from toolbar before adding note
+    // This ensures we always use the current toolbar state, not potentially stale cached values
+    if (window.getCurrentNoteIsRest) {
+      const currentRestMode = window.getCurrentNoteIsRest();
+      if (this.isRestMode !== currentRestMode) {
+        console.log(`[NoteEditor] Syncing rest mode from toolbar: ${currentRestMode} (was ${this.isRestMode})`);
+        this.isRestMode = currentRestMode;
+      }
+    }
+    if (window.getCurrentNoteDuration) {
+      const currentDuration = window.getCurrentNoteDuration();
+      // Duration from toolbar may have dotted suffix, strip it
+      const durationWithoutDot = currentDuration.replace('.', '');
+      if (this.currentDuration !== durationWithoutDot) {
+        console.log(`[NoteEditor] Syncing duration from toolbar: ${durationWithoutDot} (was ${this.currentDuration})`);
+        this.currentDuration = durationWithoutDot;
+      }
+    }
+    if (window.getCurrentNoteDotted) {
+      const currentDotted = window.getCurrentNoteDotted();
+      if (this.isDotted !== currentDotted) {
+        console.log(`[NoteEditor] Syncing dotted from toolbar: ${currentDotted} (was ${this.isDotted})`);
+        this.isDotted = currentDotted;
+      }
+    }
+
     // Save state for undo before making changes
     if (typeof window.saveStateBeforeChange === 'function') {
       window.saveStateBeforeChange();
@@ -2616,18 +2642,27 @@ export class NoteEditor {
       sextuplet: { actual: 6, normal: 4 },    // 6 notes in time of 4
     };
 
-    // Check for tuplet duration suffix (t=triplet, q=quintuplet, x=sextuplet)
     let baseDuration = duration;
     let tupletType = null;
+    let dottedFromString = false;
+
     if (duration && typeof duration === 'string') {
-      if (duration.endsWith('t') && /^\d+t$/.test(duration)) {
-        baseDuration = duration.replace('t', 'n');
+      // Check for dotted notation in string (e.g., '2n.' -> '2n' + dotted)
+      // IMPORTANT: Strip the dot FIRST before checking tuplet suffixes
+      if (duration.includes('.')) {
+        baseDuration = duration.replace('.', '');
+        dottedFromString = true;
+      }
+
+      // Check for tuplet duration suffix (t=triplet, q=quintuplet, x=sextuplet)
+      if (baseDuration.endsWith('t') && /^\d+t$/.test(baseDuration)) {
+        baseDuration = baseDuration.replace('t', 'n');
         tupletType = 'triplet';
-      } else if (duration.endsWith('q') && /^\d+q$/.test(duration)) {
-        baseDuration = duration.replace('q', 'n');
+      } else if (baseDuration.endsWith('q') && /^\d+q$/.test(baseDuration)) {
+        baseDuration = baseDuration.replace('q', 'n');
         tupletType = 'quintuplet';
-      } else if (duration.endsWith('x') && /^\d+x$/.test(duration)) {
-        baseDuration = duration.replace('x', 'n');
+      } else if (baseDuration.endsWith('x') && /^\d+x$/.test(baseDuration)) {
+        baseDuration = baseDuration.replace('x', 'n');
         tupletType = 'sextuplet';
       }
     }
@@ -2640,8 +2675,10 @@ export class NoteEditor {
       beats = beats * (ratio.normal / ratio.actual);
     }
 
-    if (dotted) {
-      beats *= 1.5; // Dotted notes are 1.5x their base duration
+    // Apply dotted multiplier - use dottedFromString OR dotted parameter
+    // but NOT both (avoid double-counting)
+    if (dottedFromString || dotted) {
+      beats *= 1.5;
     }
     return beats;
   }
@@ -2691,68 +2728,75 @@ export class NoteEditor {
       return;
     }
 
-    // Check for overflow scenarios in treble clef
-    const trebleOverflows = [];
+    // Check for overflow scenarios in both treble and bass clef
+    const overflows = [];
+
+    // Get the actual time signature for proper beat calculation
+    const timeSignature = compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
+    const maxBeats = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
     for (const noteId of this.selectedNotes) {
       const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
 
-      if (staff === 'treble') {
-        const measure = compositionState.measures[measureIndex];
-        if (measure) {
-          const voice = measure.notation.treble.voices?.[voiceIndex] || this.getVoice(measure, 'treble');
-          if (voice && voice.notes[noteIndex]) {
-            const currentNote = voice.notes[noteIndex];
-            const currentDuration = currentNote.duration || '4n';
-            const currentDotted = currentNote.dotted || false;
+      const measure = compositionState.measures[measureIndex];
+      if (measure) {
+        const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+        const voice = measure.notation[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+        if (voice && voice.notes[noteIndex]) {
+          const currentNote = voice.notes[noteIndex];
+          const currentDuration = currentNote.duration || '4n';
+          const currentDotted = currentNote.dotted || false;
 
-            // When changing duration, preserve the note's current dotted state
-            // (User must explicitly toggle dotted separately if they want to change it)
-            const newDotted = currentDotted;
+          // PREDICTABLE BEHAVIOR: When changing duration, use non-dotted by default.
+          // This way clicking "whole note" gives you 4 beats, not 6 beats.
+          // If the user wants a dotted whole, they click whole, then click dot.
+          // This prevents confusion when a dotted note is selected (which auto-syncs
+          // the toolbar's dotted state to ON) and user just wants to change duration.
+          const newDotted = false;
 
-            // Skip if nothing is changing
-            if (currentDuration === newDuration) {
-              console.log('[NoteEditor] Duration unchanged, skipping:', noteId);
-              continue;
+          // Skip if nothing is changing
+          if (currentDuration === newDuration) {
+            console.log('[NoteEditor] Duration unchanged, skipping:', noteId);
+            continue;
+          }
+
+          const currentBeats = this.durationToBeats(currentDuration, currentDotted);
+          const newBeats = this.durationToBeats(newDuration, newDotted);
+
+          // Calculate current measure beats used (excluding this note)
+          let usedBeats = 0;
+          for (let i = 0; i < voice.notes.length; i++) {
+            if (i !== noteIndex) {
+              let beats = this.durationToBeats(voice.notes[i].duration || '4n');
+              if (voice.notes[i].dotted) beats *= 1.5;
+              usedBeats += beats;
             }
+          }
 
-            const currentBeats = this.durationToBeats(currentDuration, currentDotted);
-            const newBeats = this.durationToBeats(newDuration, newDotted);
+          const availableBeats = maxBeats - usedBeats;
 
-            // Calculate current measure beats used (excluding this note)
-            let usedBeats = 0;
-            for (let i = 0; i < voice.notes.length; i++) {
-              if (i !== noteIndex) {
-                let beats = this.durationToBeats(voice.notes[i].duration || '4n');
-                if (voice.notes[i].dotted) beats *= 1.5;
-                usedBeats += beats;
-              }
-            }
-
-            const maxBeats = 4; // 4/4 time
-            const availableBeats = maxBeats - usedBeats;
-
-            if (newBeats > availableBeats) {
-              trebleOverflows.push({
-                noteId,
-                measureIndex,
-                noteIndex,
-                overflowBeats: newBeats - availableBeats,
-                availableBeats,
-                newBeats,
-                currentNote,
-                newDotted,
-              });
-            }
+          if (newBeats > availableBeats) {
+            overflows.push({
+              noteId,
+              measureIndex,
+              noteIndex,
+              voiceIndex, // Include voiceIndex for bass shift support
+              staff,
+              overflowBeats: newBeats - availableBeats,
+              availableBeats,
+              newBeats,
+              currentNote,
+              newDotted,
+            });
           }
         }
       }
     }
 
-    // If there are treble overflows, show dialog for the first one
+    // If there are overflows, show dialog for the first one
     // (For simplicity, handle one at a time)
-    if (trebleOverflows.length > 0) {
-      const overflow = trebleOverflows[0];
+    if (overflows.length > 0) {
+      const overflow = overflows[0];
 
       showNoteOverflowDialog({
         overflowBeats: overflow.overflowBeats,
@@ -2768,8 +2812,13 @@ export class NoteEditor {
             const fitDuration = this.beatsToDuration(overflow.availableBeats);
             this.applyDurationChange(newDuration, fitDuration.duration, fitDuration.dotted, [overflow.noteId]);
           } else if (choice === 'shift') {
-            // Shift: use treble block sequence to handle the shift
-            this.applyDurationChangeWithShift(overflow.measureIndex, overflow.noteIndex, newDuration, overflow.newDotted, compositionState);
+            // Shift: push downstream notes forward to make room
+            if (overflow.staff === 'treble') {
+              this.applyDurationChangeWithShift(overflow.measureIndex, overflow.noteIndex, newDuration, overflow.newDotted, compositionState);
+            } else {
+              // Bass clef shift support
+              this.applyDurationChangeWithShiftBass(overflow.measureIndex, overflow.noteIndex, overflow.voiceIndex, newDuration, overflow.newDotted, compositionState);
+            }
           }
         },
       });
@@ -2827,6 +2876,18 @@ export class NoteEditor {
       // Sync treble changes to block sequence
       if (compositionState.trebleBlockSequence?.blocks?.length > 0) {
         compositionState.syncMeasuresToTrebleBlock();
+      }
+
+      // Save bass edits to preserve changes across chord operations
+      for (const key of measuresToRecalculate) {
+        const [measureIdx, staffName] = key.split('-');
+        if (staffName === 'bass') {
+          const measure = compositionState.measures[parseInt(measureIdx)];
+          if (measure && measure.notation?.bass) {
+            measure.notation.bass.autoGenerated = false;
+            compositionState.saveEditedBassNotesForMeasure(parseInt(measureIdx));
+          }
+        }
       }
     }
 
@@ -2933,79 +2994,326 @@ export class NoteEditor {
     const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
     const UNITS_PER_BEAT = 48;
 
-    // Get the note's unit position
+    // CRITICAL: Sync measures to block FIRST to ensure block reflects current measure state
+    if (compositionState.trebleBlockSequence?.blocks?.length > 0) {
+      compositionState.syncMeasuresToTrebleBlock();
+    }
+
+    // Get the note's unit position AFTER sync
     const noteUnit = compositionState.getTrebleNoteUnit(measureIndex, noteIndex);
     if (!noteUnit) {
       console.warn('[NoteEditor] Could not find note unit for duration change with shift');
       return;
     }
 
-    // Calculate the duration difference in units
+    // Calculate the duration difference
     const currentBeats = this.durationToBeats(noteUnit.note.duration || '4n', noteUnit.note.dotted);
     let newBeats = this.durationToBeats(newDuration);
     if (isDotted) newBeats *= 1.5;
-    const beatDelta = newBeats - currentBeats;
 
-    if (beatDelta <= 0) {
-      // Duration is being reduced - just apply it directly
+    console.log(`[NoteEditor] Duration change with shift: ${currentBeats} beats -> ${newBeats} beats`);
+
+    if (newBeats <= currentBeats) {
       this.applyDurationChange(newDuration, newDuration, isDotted, [`${measureIndex}-treble-${noteIndex}`]);
       return;
     }
 
-    // Duration is being increased - need to shift downstream notes
-    const shiftUnits = Math.round(beatDelta * UNITS_PER_BEAT);
+    const currentDurationUnits = Math.round(currentBeats * UNITS_PER_BEAT);
+    const newDurationUnits = Math.round(newBeats * UNITS_PER_BEAT);
+    const shiftUnits = newDurationUnits - currentDurationUnits;
 
-    // Get the treble block and shift units from the end of this note forward
+    // SIMPLER APPROACH: Get all notes, modify positions, and rewrite
     if (compositionState.trebleBlockSequence?.blocks?.length > 0) {
       const block = compositionState.trebleBlockSequence.blocks[0];
-      const noteEndUnit = noteUnit.startUnit + Math.round(currentBeats * UNITS_PER_BEAT);
 
-      // First, update the note's duration in the measure
-      const measure = compositionState.measures[measureIndex];
-      const voice = this.getVoice(measure, 'treble');
-      voice.notes[noteIndex].duration = newDuration;
-      voice.notes[noteIndex].dotted = isDotted;
+      // Step 1: Get all current notes from the block
+      const currentNotes = block.getNotes();
+      console.log(`[NoteEditor] Current notes in block:`, currentNotes.map(n =>
+        `unit ${n.startUnit}: ${n.durationUnits} units, pitches: ${n.pitches?.join(',') || 'rest'}`));
 
-      // Then sync to block sequence (this will recalculate everything)
-      compositionState.syncMeasuresToTrebleBlock();
+      // Step 2: Build new notes array with modified positions
+      const newNotes = [];
+      const targetStartUnit = noteUnit.startUnit;
 
-      // Expand the block and shift downstream content
-      const totalUnits = block.units.length;
-      const newTotalUnits = totalUnits + shiftUnits;
-      const newTotalBeats = Math.ceil(newTotalUnits / UNITS_PER_BEAT);
-      block.setDuration(newTotalBeats);
-
-      // Shift units from noteEndUnit forward
-      for (let i = block.units.length - 1; i >= noteEndUnit + shiftUnits; i--) {
-        const sourceIndex = i - shiftUnits;
-        if (sourceIndex >= noteEndUnit && sourceIndex < totalUnits) {
-          const sourceUnit = block.units[sourceIndex];
-          block.units[i] = sourceUnit.clone();
-          if (block.units[i].parentIndex !== null && block.units[i].parentIndex >= noteEndUnit) {
-            block.units[i].parentIndex += shiftUnits;
-          }
+      for (const note of currentNotes) {
+        if (note.startUnit === targetStartUnit) {
+          // This is the note we're changing - use new duration
+          newNotes.push({
+            ...note,
+            durationUnits: newDurationUnits,
+            pitches: note.pitches || [],
+          });
+        } else if (note.startUnit > targetStartUnit) {
+          // Notes after the target - shift forward
+          newNotes.push({
+            ...note,
+            startUnit: note.startUnit + shiftUnits,
+          });
+        } else {
+          // Notes before the target - keep as is
+          newNotes.push({ ...note });
         }
       }
 
-      // Fill the gap with the extended note
-      const pitches = noteUnit.note.pitches || (noteUnit.note.pitch ? [noteUnit.note.pitch] : []);
-      block.setNote(noteUnit.startUnit, Math.round(newBeats * UNITS_PER_BEAT), pitches, {
-        articulation: noteUnit.note.articulation,
-        accidental: noteUnit.note.accidental,
-      });
+      console.log(`[NoteEditor] New notes after shift:`, newNotes.map(n =>
+        `unit ${n.startUnit}: ${n.durationUnits} units, pitches: ${n.pitches?.join(',') || 'rest'}`));
 
-      // Ensure we have enough measures
+      // Step 3: Calculate new total duration and resize block
+      let maxEndUnit = 0;
+      for (const note of newNotes) {
+        const endUnit = note.startUnit + note.durationUnits;
+        if (endUnit > maxEndUnit) maxEndUnit = endUnit;
+      }
+      const newTotalBeats = Math.ceil(maxEndUnit / UNITS_PER_BEAT);
+
+      console.log(`[NoteEditor] Resizing block to ${newTotalBeats} beats (${maxEndUnit} units max)`);
+      block.setDuration(newTotalBeats);
+
+      // Step 4: Clear block and write all notes fresh
+      // First clear all units to rests
+      for (let i = 0; i < block.units.length; i++) {
+        block.units[i].pitches = [];
+        block.units[i].parentIndex = i === 0 ? null : 0;
+      }
+
+      // Then write each note
+      for (const note of newNotes) {
+        if (note.startUnit >= 0 && note.startUnit < block.units.length) {
+          const pitches = note.isRest ? [] : (note.pitches || []);
+          block.setNote(note.startUnit, note.durationUnits, pitches, {
+            articulation: note.articulation,
+            accidental: note.accidental,
+            accidentals: note.accidentals,
+            dynamic: note.dynamic,
+            velocity: note.velocity,
+          });
+        }
+      }
+
+      // Step 5: Ensure we have enough measures and render
       const requiredMeasures = Math.ceil(newTotalBeats / beatsPerMeasure);
       while (compositionState.measures.length < requiredMeasures) {
         compositionState.addMeasure({});
       }
 
-      // Re-render to measures
       compositionState.renderTrebleBlocksToMeasures();
     }
 
     this.composerIntegration.render(true);
     console.log('[NoteEditor] ✅ Applied duration change with shift');
+
+    setTimeout(() => {
+      this.renderOverlay();
+    }, 50);
+  }
+
+  /**
+   * Apply duration change with shift for bass notes
+   * @param {number} measureIndex - Measure index
+   * @param {number} noteIndex - Note index in measure
+   * @param {number} voiceIndex - Voice index (0-based)
+   * @param {string} newDuration - New duration
+   * @param {boolean} isDotted - Whether dotted
+   * @param {Object} compositionState - CompositionState instance
+   */
+  applyDurationChangeWithShiftBass(measureIndex, noteIndex, voiceIndex, newDuration, isDotted, compositionState) {
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
+    const UNITS_PER_BEAT = 48;
+
+    // Get the note from the measure
+    const measure = compositionState.measures[measureIndex];
+    if (!measure) {
+      console.warn('[NoteEditor] Could not find measure for bass duration change with shift');
+      return;
+    }
+
+    const voice = measure.notation?.bass?.voices?.[voiceIndex];
+    if (!voice || !voice.notes || noteIndex >= voice.notes.length) {
+      console.warn('[NoteEditor] Could not find voice/note for bass duration change with shift');
+      return;
+    }
+
+    const note = voice.notes[noteIndex];
+
+    // Calculate durations in beats
+    const currentBeats = this.durationToBeats(note.duration || '4n', note.dotted);
+    let newBeats = this.durationToBeats(newDuration);
+    if (isDotted) newBeats *= 1.5;
+    const beatDelta = newBeats - currentBeats;
+
+    console.log(`[NoteEditor] Bass duration change with shift: ${currentBeats} beats -> ${newBeats} beats (delta: ${beatDelta})`);
+
+    if (beatDelta <= 0) {
+      // Duration is being reduced - just apply it directly
+      this.applyDurationChange(newDuration, newDuration, isDotted, [`${measureIndex}-bass-${voiceIndex}-${noteIndex}`]);
+      return;
+    }
+
+    // Calculate the beat position of this note within the measure
+    let noteBeatInMeasure = 0;
+    for (let i = 0; i < noteIndex; i++) {
+      const prevNote = voice.notes[i];
+      let prevBeats = this.durationToBeats(prevNote.duration || '4n');
+      if (prevNote.dotted) prevBeats *= 1.5;
+      noteBeatInMeasure += prevBeats;
+    }
+
+    // Calculate how much space is left in this measure after the note starts
+    const availableBeatsInMeasure = beatsPerMeasure - noteBeatInMeasure;
+
+    // Collect all notes from this voice across all measures (for shifting)
+    const allNotes = [];
+    const absoluteBeatStart = measureIndex * beatsPerMeasure;
+    let absoluteBeat = absoluteBeatStart;
+
+    // Get notes before the target note in this measure
+    for (let i = 0; i < noteIndex; i++) {
+      const n = voice.notes[i];
+      let beats = this.durationToBeats(n.duration || '4n');
+      if (n.dotted) beats *= 1.5;
+      allNotes.push({
+        ...n,
+        absoluteBeat,
+        beats,
+      });
+      absoluteBeat += beats;
+    }
+
+    // The target note with new duration
+    const targetNoteAbsoluteBeat = absoluteBeat;
+    allNotes.push({
+      ...note,
+      absoluteBeat,
+      beats: newBeats,
+      duration: newDuration,
+      dotted: isDotted,
+    });
+    absoluteBeat += newBeats;
+
+    // Get notes after the target note in this measure (shifted)
+    for (let i = noteIndex + 1; i < voice.notes.length; i++) {
+      const n = voice.notes[i];
+      let beats = this.durationToBeats(n.duration || '4n');
+      if (n.dotted) beats *= 1.5;
+      allNotes.push({
+        ...n,
+        absoluteBeat,
+        beats,
+      });
+      absoluteBeat += beats;
+    }
+
+    // Get notes from subsequent measures in this voice and shift them
+    for (let m = measureIndex + 1; m < compositionState.measures.length; m++) {
+      const mVoice = compositionState.measures[m].notation?.bass?.voices?.[voiceIndex];
+      if (!mVoice || !mVoice.notes) continue;
+
+      for (const n of mVoice.notes) {
+        if (n.isTied) continue; // Skip tied continuations, they'll be recreated
+        let beats = this.durationToBeats(n.duration || '4n');
+        if (n.dotted) beats *= 1.5;
+        allNotes.push({
+          ...n,
+          absoluteBeat,
+          beats,
+        });
+        absoluteBeat += beats;
+      }
+    }
+
+    console.log(`[NoteEditor] Bass shift: collected ${allNotes.length} notes, total beats: ${absoluteBeat - absoluteBeatStart}`);
+
+    // Calculate required measures
+    const totalBeats = absoluteBeat - (measureIndex * beatsPerMeasure);
+    const requiredMeasuresFromThis = Math.ceil(totalBeats / beatsPerMeasure);
+    const totalRequiredMeasures = measureIndex + requiredMeasuresFromThis;
+
+    // Add measures if needed
+    while (compositionState.measures.length < totalRequiredMeasures) {
+      compositionState.addMeasure({});
+    }
+
+    // Clear notes from affected measures and voices
+    for (let m = measureIndex; m < compositionState.measures.length; m++) {
+      const mVoice = compositionState.measures[m].notation?.bass?.voices?.[voiceIndex];
+      if (mVoice) {
+        mVoice.notes = [];
+      }
+    }
+
+    // Redistribute notes to measures with proper splitting
+    for (const noteData of allNotes) {
+      let remainingBeats = noteData.beats;
+      let currentAbsoluteBeat = noteData.absoluteBeat;
+      let isFirstPart = true;
+
+      while (remainingBeats > 0) {
+        const currentMeasureIdx = Math.floor(currentAbsoluteBeat / beatsPerMeasure);
+        const beatInMeasure = currentAbsoluteBeat - (currentMeasureIdx * beatsPerMeasure);
+        const beatsAvailableInMeasure = beatsPerMeasure - beatInMeasure;
+        const beatsToPlace = Math.min(remainingBeats, beatsAvailableInMeasure);
+        const isLastPart = remainingBeats <= beatsAvailableInMeasure;
+
+        // Find duration for this portion
+        const durationInfo = this.beatsToDuration(beatsToPlace);
+
+        // Get or create measure voice
+        if (currentMeasureIdx >= compositionState.measures.length) {
+          compositionState.addMeasure({});
+        }
+        const mVoice = compositionState.measures[currentMeasureIdx].notation?.bass?.voices?.[voiceIndex];
+        if (!mVoice) {
+          compositionState.ensureVoiceExists(currentMeasureIdx, 'bass', voiceIndex);
+        }
+        const targetVoice = compositionState.measures[currentMeasureIdx].notation.bass.voices[voiceIndex];
+
+        // Create the note
+        const measureNote = {
+          type: noteData.isRest || noteData.type === 'rest' ? 'rest' : 'note',
+          pitch: noteData.pitch,
+          pitches: noteData.pitches || (noteData.pitch ? [noteData.pitch] : []),
+          duration: durationInfo.duration,
+          dotted: durationInfo.dotted,
+          beat: beatInMeasure,
+          isRest: noteData.isRest || noteData.type === 'rest',
+          isTied: !isFirstPart, // Continuation from previous
+          tied: !isLastPart && !(noteData.isRest || noteData.type === 'rest'), // Ties to next
+          voiceIndex: voiceIndex,
+          chordIndex: noteData.chordIndex,
+          // Preserve attributes on first part only
+          dynamic: isFirstPart ? noteData.dynamic : null,
+          articulation: isFirstPart ? noteData.articulation : null,
+          accidental: isFirstPart ? noteData.accidental : null,
+          accidentals: isFirstPart ? noteData.accidentals : null,
+        };
+
+        targetVoice.notes.push(measureNote);
+
+        currentAbsoluteBeat += beatsToPlace;
+        remainingBeats -= beatsToPlace;
+        isFirstPart = false;
+      }
+    }
+
+    // Sort notes in each measure by beat position
+    for (let m = measureIndex; m < compositionState.measures.length; m++) {
+      const mVoice = compositionState.measures[m].notation?.bass?.voices?.[voiceIndex];
+      if (mVoice && mVoice.notes) {
+        mVoice.notes.sort((a, b) => (a.beat || 0) - (b.beat || 0));
+      }
+    }
+
+    // Mark bass as edited and save
+    for (let m = measureIndex; m < compositionState.measures.length; m++) {
+      const mMeasure = compositionState.measures[m];
+      if (mMeasure && mMeasure.notation?.bass) {
+        mMeasure.notation.bass.autoGenerated = false;
+        compositionState.saveEditedBassNotesForMeasure(m);
+      }
+    }
+
+    this.composerIntegration.render(true);
+    console.log('[NoteEditor] ✅ Applied bass duration change with shift');
 
     setTimeout(() => {
       this.renderOverlay();
@@ -3084,40 +3392,72 @@ export class NoteEditor {
     }
 
     let changedCount = 0;
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
 
     for (const noteId of this.selectedNotes) {
       const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
 
-      // Update compositionState directly (single source of truth)
-      if (window.getCompositionState) {
-        const compositionState = window.getCompositionState();
-        if (compositionState && compositionState.measures[measureIndex]) {
-          const measure = compositionState.measures[measureIndex];
-          const voiceKey = staff === 'treble' ? 'treble' : 'bass';
-          const voice = measure.notation[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
-          if (voice && voice.notes[noteIndex]) {
-            const note = voice.notes[noteIndex];
-            // Toggle tied state
-            note.tied = !note.tied;
-            changedCount++;
-            console.log('[NoteEditor] ✅ Updated tie in compositionState');
+      if (compositionState.measures[measureIndex]) {
+        const measure = compositionState.measures[measureIndex];
+        const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+        const voice = measure.notation[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+        if (voice && voice.notes[noteIndex]) {
+          const note = voice.notes[noteIndex];
+          // Toggle tied state
+          const newTiedState = !note.tied;
+          note.tied = newTiedState;
+          changedCount++;
+          console.log(`[NoteEditor] ✅ Set tie on note to ${newTiedState}`);
+
+          // CRITICAL: Also update isTied on the next note to keep tie state consistent
+          // This prevents sync from incorrectly merging notes after tie is removed
+          let nextNote = null;
+          let nextMeasureIdx = measureIndex;
+          let nextNoteIdx = noteIndex + 1;
+
+          // Check if next note is in this measure
+          if (nextNoteIdx < voice.notes.length) {
+            nextNote = voice.notes[nextNoteIdx];
+          } else {
+            // Check the next measure for continuation
+            nextMeasureIdx = measureIndex + 1;
+            if (nextMeasureIdx < compositionState.measures.length) {
+              const nextMeasure = compositionState.measures[nextMeasureIdx];
+              const nextVoice = nextMeasure.notation[voiceKey]?.voices?.[voiceIndex];
+              if (nextVoice && nextVoice.notes && nextVoice.notes.length > 0) {
+                nextNote = nextVoice.notes[0];
+              }
+            }
+          }
+
+          // If the next note exists and has the same pitches, update its isTied
+          if (nextNote) {
+            const samePitches = this.pitchArraysMatch(
+              note.pitches || (note.pitch ? [note.pitch] : []),
+              nextNote.pitches || (nextNote.pitch ? [nextNote.pitch] : [])
+            );
+            if (samePitches) {
+              nextNote.isTied = newTiedState;
+              console.log(`[NoteEditor] ✅ Set isTied on next note to ${newTiedState}`);
+            }
           }
         }
       }
     }
 
     if (changedCount > 0) {
-      const compositionState = window.getCompositionState?.();
-
       // Sync treble changes to block sequence (if using treble block sequence)
-      if (compositionState?.trebleBlockSequence?.blocks?.length > 0) {
+      if (compositionState.trebleBlockSequence?.blocks?.length > 0) {
         compositionState.syncMeasuresToTrebleBlock();
       }
 
       // Save bass edits to preserve the entire building block
       for (const noteId of this.selectedNotes) {
         const [measureIndex, staff, voiceIndex] = this.parseNoteId(noteId);
-        if (staff === 'bass' && compositionState) {
+        if (staff === 'bass') {
           const measure = compositionState.measures[measureIndex];
           if (measure && measure.notation?.bass) {
             measure.notation.bass.autoGenerated = false;
@@ -3129,6 +3469,17 @@ export class NoteEditor {
       this.composerIntegration.render(true); // Force immediate render
       console.log(`[NoteEditor] Toggled tie on ${changedCount} note(s)`);
     }
+  }
+
+  /**
+   * Check if two pitch arrays have the same pitches
+   */
+  pitchArraysMatch(pitches1, pitches2) {
+    if (!pitches1 || !pitches2) return false;
+    if (pitches1.length !== pitches2.length) return false;
+    const sorted1 = [...pitches1].sort();
+    const sorted2 = [...pitches2].sort();
+    return sorted1.every((p, i) => p === sorted2[i]);
   }
 
   /**
@@ -4185,8 +4536,8 @@ export class NoteEditor {
   // ============================================================================
 
   /**
-   * Convert duration string to beats (quarter notes) - with tuplet support
-   * @param {string} duration - Duration like "4n", "2n", "8n", "8t" (triplet), etc.
+   * Convert duration string to beats (quarter notes) - with tuplet and dotted support
+   * @param {string} duration - Duration like "4n", "2n", "8n", "8t" (triplet), "2n." (dotted), etc.
    * @returns {number} - Number of beats
    */
   durationToBeats(duration) {
@@ -4206,18 +4557,26 @@ export class NoteEditor {
       sextuplet: { actual: 6, normal: 4 },
     };
 
-    // Check for tuplet duration suffix
     let baseDuration = duration;
     let tupletType = null;
+    let isDotted = false;
+
     if (duration && typeof duration === 'string') {
-      if (duration.endsWith('t') && /^\d+t$/.test(duration)) {
-        baseDuration = duration.replace('t', 'n');
+      // Check for dotted notation in string (e.g., '2n.' -> '2n' + dotted)
+      if (duration.includes('.')) {
+        baseDuration = duration.replace('.', '');
+        isDotted = true;
+      }
+
+      // Check for tuplet duration suffix
+      if (baseDuration.endsWith('t') && /^\d+t$/.test(baseDuration)) {
+        baseDuration = baseDuration.replace('t', 'n');
         tupletType = 'triplet';
-      } else if (duration.endsWith('q') && /^\d+q$/.test(duration)) {
-        baseDuration = duration.replace('q', 'n');
+      } else if (baseDuration.endsWith('q') && /^\d+q$/.test(baseDuration)) {
+        baseDuration = baseDuration.replace('q', 'n');
         tupletType = 'quintuplet';
-      } else if (duration.endsWith('x') && /^\d+x$/.test(duration)) {
-        baseDuration = duration.replace('x', 'n');
+      } else if (baseDuration.endsWith('x') && /^\d+x$/.test(baseDuration)) {
+        baseDuration = baseDuration.replace('x', 'n');
         tupletType = 'sextuplet';
       }
     }
@@ -4228,6 +4587,11 @@ export class NoteEditor {
     if (tupletType && tupletRatios[tupletType]) {
       const ratio = tupletRatios[tupletType];
       beats = beats * (ratio.normal / ratio.actual);
+    }
+
+    // Apply dotted multiplier if duration string had a dot
+    if (isDotted) {
+      beats *= 1.5;
     }
 
     return beats;
@@ -4374,8 +4738,8 @@ export class NoteEditor {
 
   /**
    * Convert duration to beats (with tuplet support)
-   * Note: This is a duplicate method - the primary one is at line ~2011
-   * @param {string} duration - Duration like '4n', '8n', '8t' (triplet), etc.
+   * Note: This is a duplicate method - the primary one is at line ~2628
+   * @param {string} duration - Duration like '4n', '8n', '8t' (triplet), '2n.' (dotted), etc.
    * @param {boolean} dotted - Whether the note is dotted
    * @returns {number} - Number of beats
    */
@@ -4396,18 +4760,27 @@ export class NoteEditor {
       sextuplet: { actual: 6, normal: 4 },
     };
 
-    // Check for tuplet duration suffix
     let baseDuration = duration;
     let tupletType = null;
+    let dottedFromString = false;
+
     if (duration && typeof duration === 'string') {
-      if (duration.endsWith('t') && /^\d+t$/.test(duration)) {
-        baseDuration = duration.replace('t', 'n');
+      // Check for dotted notation in string (e.g., '2n.' -> '2n' + dotted)
+      // IMPORTANT: Strip the dot FIRST before checking tuplet suffixes
+      if (duration.includes('.')) {
+        baseDuration = duration.replace('.', '');
+        dottedFromString = true;
+      }
+
+      // Check for tuplet duration suffix
+      if (baseDuration.endsWith('t') && /^\d+t$/.test(baseDuration)) {
+        baseDuration = baseDuration.replace('t', 'n');
         tupletType = 'triplet';
-      } else if (duration.endsWith('q') && /^\d+q$/.test(duration)) {
-        baseDuration = duration.replace('q', 'n');
+      } else if (baseDuration.endsWith('q') && /^\d+q$/.test(baseDuration)) {
+        baseDuration = baseDuration.replace('q', 'n');
         tupletType = 'quintuplet';
-      } else if (duration.endsWith('x') && /^\d+x$/.test(duration)) {
-        baseDuration = duration.replace('x', 'n');
+      } else if (baseDuration.endsWith('x') && /^\d+x$/.test(baseDuration)) {
+        baseDuration = baseDuration.replace('x', 'n');
         tupletType = 'sextuplet';
       }
     }
@@ -4420,7 +4793,12 @@ export class NoteEditor {
       beats = beats * (ratio.normal / ratio.actual);
     }
 
-    return dotted ? beats * 1.5 : beats;
+    // Apply dotted multiplier - use dottedFromString OR dotted parameter
+    // but NOT both (avoid double-counting)
+    if (dottedFromString || dotted) {
+      beats *= 1.5;
+    }
+    return beats;
   }
 
   /**
@@ -4532,13 +4910,22 @@ export class NoteEditor {
       return;
     }
 
+    // IMPORTANT: Query the toolbar directly to ensure we have the current state
+    // This avoids sync issues between toolbar and noteEditor
+    const isRestFromToolbar = window.getCurrentNoteIsRest ? window.getCurrentNoteIsRest() : this.isRestMode;
+    const dottedFromToolbar = window.getCurrentNoteDotted ? window.getCurrentNoteDotted() : this.isDotted;
+    let durationFromToolbar = window.getCurrentNoteDuration ? window.getCurrentNoteDuration() : this.currentDuration;
+    // Duration from toolbar may have dotted suffix, strip it
+    durationFromToolbar = durationFromToolbar.replace('.', '');
+
     // Create ghost note data
     this.ghostNote = {
       pitch: staffPosition.pitch,
       staff: staffPosition.staff,
       measure: staffPosition.measure,
-      duration: this.currentDuration,
-      isRest: this.isRestMode,
+      duration: durationFromToolbar,
+      dotted: dottedFromToolbar,
+      isRest: isRestFromToolbar,
       mouseX: mouseX, // Store mouse X for accurate positioning
       mouseY: mouseY, // Store mouse Y for accurate positioning
     };
@@ -4546,7 +4933,7 @@ export class NoteEditor {
     // Get harmonic coloring based on the hovered measure's chord
     // staffPosition.measure is the measureBounds object, use .index to get measure number
     const measureIndex = staffPosition.measure?.index;
-    if (!this.isRestMode && measureIndex !== undefined) {
+    if (!isRestFromToolbar && measureIndex !== undefined) {
       // Get chord for the current measure being hovered
       const compositionState = window.getCompositionState?.();
       const chord = compositionState?.getChord?.(measureIndex) || this.chordContext;

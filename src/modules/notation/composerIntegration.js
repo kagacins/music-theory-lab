@@ -160,6 +160,10 @@ export class NotationComposer {
         },
         onTimeSignatureChange: (num, denom) => {
           if (this.compositionState) {
+            // Save state before time signature change for undo support
+            if (typeof window.saveStateBeforeChange === 'function') {
+              window.saveStateBeforeChange();
+            }
             this.compositionState.setTimeSignature(num, denom);
             this.render();
           }
