@@ -5,6 +5,7 @@
  * Provides export functionality for:
  * - PDF Lead Sheet export
  * - MIDI export
+ * - Audio export (WAV/MP3)
  * - Shareable progression links
  */
 
@@ -13,6 +14,15 @@ import { CHORD_DEFINITIONS, ALL_NOTES, DEFAULT_TIME_SIGNATURE } from '../../data
 import { spellNoteInKey } from '../utils/noteUtils.js';
 import { addSpecificChordToProgression } from '../features/chordBuilder.js';
 import { getCompositionState, getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
+import {
+    exportToAudio,
+    getEstimatedFileSize,
+    formatFileSize,
+    isAudioExportSupported,
+    isExportInProgress,
+    cancelExport,
+    downloadAudioFile
+} from './audioExporter.js';
 
 // =============================================================================
 // CONSTANTS
@@ -2448,6 +2458,268 @@ export function showMIDIExportDialog() {
 }
 
 // =============================================================================
+// AUDIO EXPORT DIALOG
+// =============================================================================
+
+/**
+ * Show the audio export dialog
+ * Allows exporting composition as WAV or MP3
+ */
+export function showAudioExportDialog() {
+    const progressionData = getProgressionData();
+
+    if (!progressionData || progressionData.length === 0) {
+        alert('No progression to export. Add some chords first.');
+        return;
+    }
+
+    // Check if audio export is supported
+    if (!isAudioExportSupported()) {
+        alert('Audio export is not supported in this browser. Please use a modern browser like Chrome, Firefox, or Edge.');
+        return;
+    }
+
+    // Get estimated file sizes
+    const estimates = getEstimatedFileSize({ format: 'wav' });
+
+    // Create modal
+    const modal = document.createElement('div');
+    modal.id = 'audio-export-modal';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+
+    modal.innerHTML = `
+        <div style="background: white; border-radius: 12px; padding: 24px; width: 480px; max-width: 90vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+            <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 600; color: #1f2937; display: flex; align-items: center; gap: 8px;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                    <path d="M9 18V5l12-2v13"></path>
+                    <circle cx="6" cy="18" r="3"></circle>
+                    <circle cx="18" cy="16" r="3"></circle>
+                </svg>
+                Export Audio
+            </h2>
+            <p style="margin: 0 0 12px 0; font-size: 14px; color: #6b7280;">
+                Export your composition as an audio file using the same high-quality piano samples you hear in the app.
+            </p>
+            <p style="margin: 0 0 20px 0; font-size: 12px; color: #9ca3af; background: #f9fafb; padding: 8px 12px; border-radius: 6px; border-left: 3px solid #d1d5db;">
+                <strong>Note:</strong> Export time equals your composition length (a ${estimates.durationFormatted} piece takes ~${estimates.durationFormatted} to export).
+            </p>
+
+            <!-- Composition Info -->
+            <div style="margin-bottom: 16px; padding: 12px; background: #f0f9ff; border-radius: 8px; border: 1px solid #bae6fd;">
+                <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                    <span style="color: #0369a1;">Duration:</span>
+                    <span style="color: #1e40af; font-weight: 500;">${estimates.durationFormatted}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-top: 4px;">
+                    <span style="color: #0369a1;">Chords:</span>
+                    <span style="color: #1e40af; font-weight: 500;">${progressionData.length}</span>
+                </div>
+            </div>
+
+            <!-- Title Input -->
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 4px;">Filename</label>
+                <input type="text" id="audio-filename" value="My Composition" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+            </div>
+
+            <!-- Format Selection -->
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 8px;">Format</label>
+                <div style="display: flex; gap: 12px;">
+                    <label style="flex: 1; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 12px; border: 2px solid #2563eb; border-radius: 8px; background: #eff6ff;" id="format-wav-label">
+                        <input type="radio" name="audio-format" value="wav" checked style="accent-color: #2563eb;">
+                        <div>
+                            <div style="font-size: 14px; font-weight: 500; color: #1e40af;">WAV</div>
+                            <div style="font-size: 11px; color: #6b7280;">~${formatFileSize(estimates.wav)}</div>
+                        </div>
+                    </label>
+                    <label style="flex: 1; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px;" id="format-mp3-label">
+                        <input type="radio" name="audio-format" value="mp3" style="accent-color: #2563eb;">
+                        <div>
+                            <div style="font-size: 14px; font-weight: 500; color: #374151;">MP3</div>
+                            <div style="font-size: 11px; color: #6b7280;">~${formatFileSize(estimates.mp3)}</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- MP3 Quality (hidden by default) -->
+            <div id="mp3-quality-section" style="margin-bottom: 16px; display: none;">
+                <label style="display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 4px;">MP3 Quality</label>
+                <select id="audio-quality" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+                    <option value="128">128 kbps (smaller file)</option>
+                    <option value="192" selected>192 kbps (recommended)</option>
+                    <option value="256">256 kbps (high quality)</option>
+                    <option value="320">320 kbps (maximum quality)</option>
+                </select>
+            </div>
+
+            <!-- Options -->
+            <div style="margin-bottom: 20px; padding: 12px; background: #f9fafb; border-radius: 8px;">
+                <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 8px;">Options</label>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: #374151;">
+                        <input type="checkbox" id="audio-normalize" checked style="width: 16px; height: 16px; accent-color: #2563eb;">
+                        Normalize audio levels
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: #374151;">
+                        <input type="checkbox" id="audio-fadeout" checked style="width: 16px; height: 16px; accent-color: #2563eb;">
+                        Fade out at end
+                    </label>
+                </div>
+            </div>
+
+            <!-- Progress Section (hidden initially) -->
+            <div id="audio-export-progress" style="display: none; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span id="progress-status" style="font-size: 13px; color: #374151;">Preparing...</span>
+                    <span id="progress-percent" style="font-size: 13px; color: #6b7280;">0%</span>
+                </div>
+                <div style="height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;">
+                    <div id="progress-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #2563eb, #7c3aed); transition: width 0.3s ease;"></div>
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div id="audio-export-buttons" style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button id="audio-cancel-btn" style="padding: 10px 20px; border: 1px solid #d1d5db; border-radius: 6px; background: white; color: #374151; font-size: 14px; font-weight: 500; cursor: pointer;">Cancel</button>
+                <button id="audio-export-btn" style="padding: 10px 20px; border: none; border-radius: 6px; background: linear-gradient(135deg, #2563eb, #7c3aed); color: white; font-size: 14px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7,10 12,15 17,10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Export Audio
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Focus filename input
+    document.getElementById('audio-filename').select();
+
+    // Update format selection styling and show/hide MP3 options
+    const updateFormatStyling = () => {
+        const format = document.querySelector('input[name="audio-format"]:checked')?.value || 'wav';
+        const wavLabel = document.getElementById('format-wav-label');
+        const mp3Label = document.getElementById('format-mp3-label');
+        const mp3Quality = document.getElementById('mp3-quality-section');
+
+        if (format === 'wav') {
+            wavLabel.style.border = '2px solid #2563eb';
+            wavLabel.style.background = '#eff6ff';
+            mp3Label.style.border = '1px solid #d1d5db';
+            mp3Label.style.background = 'white';
+            mp3Quality.style.display = 'none';
+        } else {
+            wavLabel.style.border = '1px solid #d1d5db';
+            wavLabel.style.background = 'white';
+            mp3Label.style.border = '2px solid #2563eb';
+            mp3Label.style.background = '#eff6ff';
+            mp3Quality.style.display = 'block';
+        }
+    };
+
+    // Add format change listeners
+    document.querySelectorAll('input[name="audio-format"]').forEach(radio => {
+        radio.addEventListener('change', updateFormatStyling);
+    });
+
+    // Handle cancel
+    document.getElementById('audio-cancel-btn').addEventListener('click', () => {
+        if (isExportInProgress()) {
+            cancelExport();
+        }
+        modal.remove();
+    });
+
+    // Handle export
+    document.getElementById('audio-export-btn').addEventListener('click', async () => {
+        const filename = document.getElementById('audio-filename').value || 'My Composition';
+        const format = document.querySelector('input[name="audio-format"]:checked')?.value || 'wav';
+        const quality = parseInt(document.getElementById('audio-quality').value);
+        const normalize = document.getElementById('audio-normalize').checked;
+        const fadeOut = document.getElementById('audio-fadeout').checked;
+
+        // Show progress section
+        document.getElementById('audio-export-progress').style.display = 'block';
+        document.getElementById('audio-export-buttons').style.display = 'none';
+
+        // Progress callback
+        const onProgress = (percent, message) => {
+            document.getElementById('progress-bar').style.width = `${percent}%`;
+            document.getElementById('progress-percent').textContent = `${percent}%`;
+            document.getElementById('progress-status').textContent = message;
+        };
+
+        try {
+            const blob = await exportToAudio({
+                format,
+                quality,
+                normalize,
+                fadeOut,
+                fadeOutDuration: 0.5,
+                instrument: 'piano'
+            }, onProgress);
+
+            // Download the file
+            downloadAudioFile(blob, filename, format);
+
+            // Show success message briefly then close
+            document.getElementById('progress-status').textContent = 'Export complete!';
+            document.getElementById('progress-bar').style.background = 'linear-gradient(90deg, #10b981, #059669)';
+
+            setTimeout(() => {
+                modal.remove();
+            }, 1000);
+
+        } catch (error) {
+            console.error('Audio export failed:', error);
+
+            // Show error
+            document.getElementById('progress-status').textContent = `Error: ${error.message}`;
+            document.getElementById('progress-status').style.color = '#dc2626';
+            document.getElementById('progress-bar').style.background = '#dc2626';
+
+            // Show buttons again
+            setTimeout(() => {
+                document.getElementById('audio-export-progress').style.display = 'none';
+                document.getElementById('audio-export-buttons').style.display = 'flex';
+            }, 2000);
+        }
+    });
+
+    // Handle click outside to close
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal && !isExportInProgress()) {
+            modal.remove();
+        }
+    });
+
+    // Handle Escape key
+    const handleEscape = (e) => {
+        if (e.key === 'Escape' && !isExportInProgress()) {
+            modal.remove();
+            document.removeEventListener('keydown', handleEscape);
+        }
+    };
+    document.addEventListener('keydown', handleEscape);
+}
+
+// =============================================================================
 // INITIALIZATION
 // =============================================================================
 
@@ -2478,5 +2750,6 @@ window.showMIDIImportDialog = showMIDIImportDialog;
 window.copyShareableLink = copyShareableLink;
 window.showPDFExportDialog = showPDFExportDialog;
 window.showMIDIExportDialog = showMIDIExportDialog;
+window.showAudioExportDialog = showAudioExportDialog;
 window.initExportService = initExportService;
 window.parseShareableLink = parseShareableLink;

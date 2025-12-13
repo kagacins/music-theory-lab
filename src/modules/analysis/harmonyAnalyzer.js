@@ -9,7 +9,7 @@
  * - Complexity scoring
  */
 
-import { ALL_NOTES } from '../../data/music-data.js';
+import { ALL_NOTES, ENHARMONIC_MAP } from '../../data/music-data.js';
 import { detectAllPatterns, PATTERN_CATEGORIES } from './patternDetection.js';
 
 /**
@@ -470,11 +470,43 @@ export class HarmonyAnalyzer {
         // Safety check for chord object
         if (!chord || !chord.root) return '?';
 
-        const degree = this.getScaleDegree(chord.root, key);
-        if (degree === null) return '?';
-
         const romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
         const minorRomanNumerals = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii'];
+
+        let degree = this.getScaleDegree(chord.root, key);
+        let chromaticPrefix = '';
+
+        // Handle chromatic (non-diatonic) chords
+        if (degree === null) {
+            // Calculate the semitone distance to find the chromatic degree
+            const keyIndex = ALL_NOTES.indexOf(key) !== -1
+                ? ALL_NOTES.indexOf(key)
+                : ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
+            const chordIndex = ALL_NOTES.indexOf(chord.root) !== -1
+                ? ALL_NOTES.indexOf(chord.root)
+                : ALL_NOTES.indexOf(ENHARMONIC_MAP[chord.root]);
+
+            if (keyIndex === -1 || chordIndex === -1) return '?';
+
+            const interval = (chordIndex - keyIndex + 12) % 12;
+
+            // Map chromatic intervals to nearest diatonic degree with appropriate prefix
+            const chromaticMapping = {
+                1: { degree: 2, prefix: '♭' },  // ♭II (e.g., Db in C)
+                3: { degree: 3, prefix: '♭' },  // ♭III (e.g., Eb in C)
+                6: { degree: 4, prefix: '♯' },  // ♯IV (e.g., F# in C)
+                8: { degree: 6, prefix: '♭' },  // ♭VI (e.g., Ab in C)
+                10: { degree: 7, prefix: '♭' }  // ♭VII (e.g., Bb in C)
+            };
+
+            const mapping = chromaticMapping[interval];
+            if (mapping) {
+                degree = mapping.degree;
+                chromaticPrefix = mapping.prefix;
+            } else {
+                return '?'; // Unknown chromatic interval
+            }
+        }
 
         const index = degree - 1;
         const isMinor = chord.type && (chord.type === 'Minor' || chord.type === 'Diminished');
@@ -488,7 +520,7 @@ export class HarmonyAnalyzer {
             if (chord.type.includes('7')) numeral += '7';
         }
 
-        return numeral;
+        return chromaticPrefix + numeral;
     }
 
     /**
@@ -498,8 +530,16 @@ export class HarmonyAnalyzer {
      * @returns {number|null} Scale degree (1-7)
      */
     getScaleDegree(chordRoot, key) {
-        const keyIndex = ALL_NOTES.indexOf(key);
-        const chordIndex = ALL_NOTES.indexOf(chordRoot);
+        // Handle enharmonic equivalents (e.g., Bb -> A#, Db -> C#)
+        let keyIndex = ALL_NOTES.indexOf(key);
+        if (keyIndex === -1 && ENHARMONIC_MAP[key]) {
+            keyIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
+        }
+
+        let chordIndex = ALL_NOTES.indexOf(chordRoot);
+        if (chordIndex === -1 && ENHARMONIC_MAP[chordRoot]) {
+            chordIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[chordRoot]);
+        }
 
         if (keyIndex === -1 || chordIndex === -1) return null;
 

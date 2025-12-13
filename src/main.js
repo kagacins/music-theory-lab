@@ -162,6 +162,7 @@ import {
     showPDFExportDialog,
     showMIDIExportDialog,
     showMIDIImportDialog,
+    showAudioExportDialog,
     copyShareableLink,
     parseShareableLink,
     importFromMIDI
@@ -2685,6 +2686,7 @@ window.onload = () => {
     const actionImportMidi = document.getElementById('action-import-midi');
     const actionExportMidi = document.getElementById('action-export-midi');
     const actionExportPDF = document.getElementById('action-export-pdf');
+    const actionExportAudio = document.getElementById('action-export-audio');
     const actionCopyLink = document.getElementById('action-copy-link');
     const actionSettingsBtn = document.getElementById('action-settings-btn');
     const actionSettingsPopover = document.getElementById('action-settings-popover');
@@ -2854,6 +2856,13 @@ window.onload = () => {
     if (actionExportPDF) {
         actionExportPDF.addEventListener('click', () => {
             showPDFExportDialog();
+        });
+    }
+
+    // Export Audio
+    if (actionExportAudio) {
+        actionExportAudio.addEventListener('click', () => {
+            showAudioExportDialog();
         });
     }
 

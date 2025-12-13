@@ -13564,13 +13564,16 @@ export function renderProgressionControls() {
     keySelect.innerHTML = '';
     const notes = getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
 
+    // Build array of all keys for random selection
+    const allKeys = [];
+
     // Add major keys
     notes.forEach((note, index) => {
         const option = document.createElement('option');
         option.value = note;
         option.textContent = `${note} Major`;
-        if (index === 0) option.selected = true;
         keySelect.appendChild(option);
+        allKeys.push(note);
     });
 
     // Add minor keys
@@ -13579,6 +13582,7 @@ export function renderProgressionControls() {
         option.value = `${note}m`;
         option.textContent = `${note} minor`;
         keySelect.appendChild(option);
+        allKeys.push(`${note}m`);
     });
 
     // Populate progression selector using analyzer's pattern definitions
@@ -13590,12 +13594,68 @@ export function renderProgressionControls() {
         option.value = pattern.pattern.join(',');
         option.textContent = pattern.name;
         option.setAttribute('data-pattern-id', progKey);
-        // Select first one by default (Pop Progression)
-        if (index === 0) {
-            option.selected = true;
-        }
         progressionSelect.appendChild(option);
     });
+
+    // Randomly select a key and progression on initial load
+    // Build valid keys from the actual dropdown options to ensure they match
+    // Filter to only VexFlow-compatible keys (avoid D#, G#, A# major which need double sharps)
+    const invalidMajorRoots = ['D#', 'G#', 'A#']; // These would require double sharps
+    const invalidMinorRoots = ['D#', 'G#', 'A#', 'E#', 'B#']; // These are problematic in minor too
+
+    const validMajorKeys = notes.filter(note => !invalidMajorRoots.includes(note));
+    const validMinorKeys = notes
+        .filter(note => !invalidMinorRoots.includes(note))
+        .map(note => `${note}m`);
+
+    // Categorize progressions by mode based on their first chord
+    // Lowercase roman numerals (i, ii, etc.) indicate minor mode
+    // Uppercase (I, II, etc.) indicate major mode
+    const majorModeProgs = [];
+    const minorModeProgs = [];
+
+    progressionKeys.forEach((progKey, index) => {
+        const pattern = COMMON_PROGRESSIONS[progKey];
+        const firstChord = pattern.pattern[0];
+        // Check if first chord is lowercase (minor mode) - look at first letter after any 'b' prefix
+        const chordWithoutFlat = firstChord.replace(/^b/, '');
+        const isMinorMode = chordWithoutFlat[0] === chordWithoutFlat[0].toLowerCase();
+
+        if (isMinorMode) {
+            minorModeProgs.push({ key: progKey, index });
+        } else {
+            majorModeProgs.push({ key: progKey, index });
+        }
+    });
+
+    // Randomly decide major or minor mode, then pick matching key and progression
+    const useMajorMode = Math.random() > 0.3; // Slight preference for major (70/30)
+
+    let selectedKey, selectedProgIndex, selectedProgName;
+
+    if (useMajorMode && majorModeProgs.length > 0) {
+        const randomKeyIndex = Math.floor(Math.random() * validMajorKeys.length);
+        const randomProgIndex = Math.floor(Math.random() * majorModeProgs.length);
+        selectedKey = validMajorKeys[randomKeyIndex];
+        selectedProgIndex = majorModeProgs[randomProgIndex].index;
+        selectedProgName = majorModeProgs[randomProgIndex].key;
+    } else if (minorModeProgs.length > 0) {
+        const randomKeyIndex = Math.floor(Math.random() * validMinorKeys.length);
+        const randomProgIndex = Math.floor(Math.random() * minorModeProgs.length);
+        selectedKey = validMinorKeys[randomKeyIndex];
+        selectedProgIndex = minorModeProgs[randomProgIndex].index;
+        selectedProgName = minorModeProgs[randomProgIndex].key;
+    } else {
+        // Fallback to major if no minor progressions available
+        const randomKeyIndex = Math.floor(Math.random() * validMajorKeys.length);
+        selectedKey = validMajorKeys[randomKeyIndex];
+        selectedProgIndex = 0;
+        selectedProgName = progressionKeys[0];
+    }
+
+    keySelect.value = selectedKey;
+    progressionSelect.selectedIndex = selectedProgIndex;
+    console.log(`Loaded random progression: ${selectedProgName} in ${selectedKey}`);
 
     // Add event listeners
     keySelect.onchange = () => loadProgression();
@@ -14159,7 +14219,10 @@ export function importChordList(mode = 'replace') {
         }
         
         // Calculate Roman numeral
-        const trainerKeyRootIndex = ALL_NOTES.indexOf(keyForCalculation);
+        let trainerKeyRootIndex = ALL_NOTES.indexOf(keyForCalculation);
+        if (trainerKeyRootIndex === -1) {
+            trainerKeyRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[keyForCalculation] || keyForCalculation);
+        }
         let addedChordRootIndex = ALL_NOTES.indexOf(root);
         if (addedChordRootIndex === -1) {
             addedChordRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[root] || root);
