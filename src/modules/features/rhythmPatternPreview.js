@@ -163,12 +163,32 @@ export function previewPattern({
 }
 
 export function stopPreview() {
+    // Stop any custom preview synths
     if (window.stopPreviewSynths) window.stopPreviewSynths();
+
+    // Release fallback synths
     if (fallbackBass && fallbackBass.triggerRelease) fallbackBass.triggerRelease();
     if (fallbackComp && fallbackComp.releaseAll) fallbackComp.releaseAll();
+
+    // CRITICAL: Release the main piano/guitar synths to stop scheduled notes
+    // Notes scheduled with triggerAttackRelease() use absolute times, not Transport,
+    // so we must explicitly release them
+    const piano = getPiano();
+    if (piano && piano.releaseAll) {
+        piano.releaseAll();
+    }
+
+    const guitar = getGuitar();
+    if (guitar && guitar.releaseAll) {
+        guitar.releaseAll();
+    }
+
+    // Stop Transport (for any Transport-scheduled events)
     if (typeof Tone !== 'undefined' && Tone.Transport) {
         Tone.Transport.stop();
+        Tone.Transport.cancel(); // Cancel any scheduled Transport events
     }
+
     previewState.isPlaying = false;
 }
 

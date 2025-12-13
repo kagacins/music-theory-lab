@@ -359,7 +359,8 @@ import {
     detectCurrentPattern,
     formatBeatsDisplay,
     getDefaultPatternForChordCount,
-    getRecommendedPatterns
+    getRecommendedPatterns,
+    getPatternTimeSignatureSuitability
 } from './rhythmicPatterns.js';
 import {
     getAllPatternsForCount,
@@ -14478,6 +14479,11 @@ export function showRhythmPatternModal() {
     modal.id = 'rhythm-pattern-modal';
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
 
+    // Get current time signature from compositionState
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    const timeSignature = compositionState?.metadata?.timeSignature || { num: 4, denom: 4 };
+    const timeSignatureDisplay = `${timeSignature.num}/${timeSignature.denom}`;
+
     modal.innerHTML = `
         <div class="bg-gray-900 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
             <!-- Header -->
@@ -14486,6 +14492,9 @@ export function showRhythmPatternModal() {
                     <div>
                         <h2 class="text-lg font-bold text-white">Rhythm Pattern Library</h2>
                         <p class="text-xs text-gray-400">Apply rhythm patterns to your progression</p>
+                    </div>
+                    <div class="px-2 py-1 bg-indigo-600 bg-opacity-30 border border-indigo-500 rounded text-indigo-300 text-xs font-mono">
+                        ${timeSignatureDisplay}
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -14640,10 +14649,32 @@ export function showRhythmPatternModal() {
             customCountInlineEl.textContent = customCount > 0 ? `${customCount} custom` : 'No custom patterns';
         }
         const currentPattern = getCurrentPattern();
-        patternSelectEl.innerHTML = patterns.map(pattern => {
+
+        // Sort patterns: ideal for time signature first, then compatible, then incompatible
+        const sortedPatterns = [...patterns].sort((a, b) => {
+            const suitA = getPatternTimeSignatureSuitability(a, timeSignature);
+            const suitB = getPatternTimeSignatureSuitability(b, timeSignature);
+            const order = { ideal: 0, compatible: 1, incompatible: 2 };
+            return (order[suitA] || 1) - (order[suitB] || 1);
+        });
+
+        patternSelectEl.innerHTML = sortedPatterns.map(pattern => {
             const beatsDisplay = formatBeatsDisplay(pattern.beats);
             const isCurrent = currentPattern && currentPattern.id === pattern.id;
-            const prefix = pattern.isCustom ? '★ ' : (pattern.isDefault ? '• ' : '');
+            const suitability = getPatternTimeSignatureSuitability(pattern, timeSignature);
+
+            // Build prefix: ★ custom, • default, ✓ ideal for time sig, ~ compatible
+            let prefix = '';
+            if (pattern.isCustom) {
+                prefix = '★ ';
+            } else if (suitability === 'ideal') {
+                prefix = '✓ ';
+            } else if (suitability === 'incompatible') {
+                prefix = '⚠ ';
+            } else if (pattern.isDefault) {
+                prefix = '• ';
+            }
+
             return `
                 <option value="${pattern.id}" ${isCurrent ? 'selected' : ''}>
                     ${prefix}${pattern.name} (${beatsDisplay})
@@ -14692,9 +14723,22 @@ export function showRhythmPatternModal() {
         const chords = getTargetChordsDynamic();
         if (pattern && previewEl) {
             const beatsDisplay = formatBeatsDisplay(pattern.beats);
+            const suitability = getPatternTimeSignatureSuitability(pattern, timeSignature);
+
+            // Build suitability badge
+            let suitabilityBadge = '';
+            if (suitability === 'ideal') {
+                suitabilityBadge = `<span class="px-2 py-0.5 bg-green-600 bg-opacity-30 text-green-300 rounded text-xs">✓ Ideal for ${timeSignatureDisplay}</span>`;
+            } else if (suitability === 'incompatible') {
+                suitabilityBadge = `<span class="px-2 py-0.5 bg-red-600 bg-opacity-30 text-red-300 rounded text-xs">⚠ May not fit ${timeSignatureDisplay}</span>`;
+            }
+
             previewEl.innerHTML = `
                 <div class="text-xs text-gray-500 mb-2">Pattern Preview:</div>
-                <div class="text-white font-semibold mb-1">${pattern.name}</div>
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="text-white font-semibold">${pattern.name}</span>
+                    ${suitabilityBadge}
+                </div>
                 <div class="text-sm text-gray-300 mb-2">${pattern.description || 'Custom pattern'}</div>
                 <div class="flex flex-wrap gap-1 mb-2">
                     ${pattern.beats.map((beat, i) => `

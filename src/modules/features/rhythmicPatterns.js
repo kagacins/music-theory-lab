@@ -92,7 +92,8 @@ export const RHYTHMIC_PATTERNS = {
         beats: [1, 1, 1],
         totalBeats: 3,
         description: 'Three quarter notes - perfect for 3/4 time',
-        category: PATTERN_CATEGORIES.BASIC
+        category: PATTERN_CATEGORIES.BASIC,
+        timeSignature: { num: 3, denom: 4 }
     },
     '3-jazz-turnaround': {
         id: '3-jazz-turnaround',
@@ -250,7 +251,8 @@ export const RHYTHMIC_PATTERNS = {
         beats: [1, 1, 1, 1, 1],
         totalBeats: 5,
         description: 'Five quarter notes - natural for 5/4 time',
-        category: PATTERN_CATEGORIES.JAZZ
+        category: PATTERN_CATEGORIES.JAZZ,
+        timeSignature: { num: 5, denom: 4 }
     },
     '5-progressive': {
         id: '5-progressive',
@@ -300,7 +302,8 @@ export const RHYTHMIC_PATTERNS = {
         beats: [1, 1, 1, 1, 1, 1],
         totalBeats: 6,
         description: 'Six quarter notes - two bars of 3/4',
-        category: PATTERN_CATEGORIES.BASIC
+        category: PATTERN_CATEGORIES.BASIC,
+        timeSignature: { num: 3, denom: 4 }
     },
 
     // ============================================================================
@@ -323,7 +326,8 @@ export const RHYTHMIC_PATTERNS = {
         beats: [1, 1, 1, 1, 1, 1, 1],
         totalBeats: 7,
         description: 'Seven quarter notes - natural for 7/4 time',
-        category: PATTERN_CATEGORIES.JAZZ
+        category: PATTERN_CATEGORIES.JAZZ,
+        timeSignature: { num: 7, denom: 4 }
     },
 
     // ============================================================================
@@ -611,4 +615,104 @@ export function getCategoryDisplayName(category) {
         [PATTERN_CATEGORIES.SYNCOPATED]: 'Syncopated'
     };
     return names[category] || category;
+}
+
+/**
+ * Check if a pattern is suitable for a given time signature
+ * @param {object} pattern - Pattern object with beats array
+ * @param {object} timeSignature - Time signature object { num, denom }
+ * @returns {string} Suitability: 'ideal', 'compatible', or 'incompatible'
+ */
+export function getPatternTimeSignatureSuitability(pattern, timeSignature) {
+    if (!pattern || !pattern.beats || !timeSignature) return 'compatible';
+
+    const { num, denom } = timeSignature;
+    const beatsPerMeasure = num * (4 / denom); // Convert to quarter-note beats
+    const totalPatternBeats = pattern.totalBeats || pattern.beats.reduce((a, b) => a + b, 0);
+
+    // Check if pattern has explicit time signature preference
+    if (pattern.timeSignature) {
+        if (pattern.timeSignature.num === num && pattern.timeSignature.denom === denom) {
+            return 'ideal';
+        }
+    }
+
+    // Special cases for common time signatures
+    if (num === 3 && denom === 4) {
+        // 3/4 time - patterns with beats divisible by 3 work well
+        if (totalPatternBeats % 3 === 0) {
+            // Check if individual beats fit within a 3/4 measure
+            const allFit = pattern.beats.every(b => b <= 3);
+            if (allFit) return 'ideal';
+        }
+        // Patterns with individual beats > 3 won't fit cleanly in 3/4
+        if (pattern.beats.some(b => b > 3)) return 'incompatible';
+    }
+
+    if (num === 6 && denom === 8) {
+        // 6/8 time (2 dotted quarter notes = 3 eighth notes each)
+        // Patterns with beats of 1.5 or multiples work well
+        const goodFor68 = pattern.beats.every(b => b <= 3 && (b % 1.5 === 0 || b % 1 === 0));
+        if (goodFor68 && totalPatternBeats % 3 === 0) return 'ideal';
+    }
+
+    if (num === 5 && denom === 4) {
+        // 5/4 time - patterns with totalBeats divisible by 5 work well
+        if (totalPatternBeats % 5 === 0) return 'ideal';
+        if (pattern.beats.some(b => b > 5)) return 'incompatible';
+    }
+
+    if (num === 7 && denom === 4) {
+        // 7/4 time - patterns with totalBeats divisible by 7 work well
+        if (totalPatternBeats % 7 === 0) return 'ideal';
+        if (pattern.beats.some(b => b > 7)) return 'incompatible';
+    }
+
+    // Standard 4/4 or 2/4 time
+    if ((num === 4 || num === 2) && denom === 4) {
+        // Most patterns work with 4/4, check if beats fit
+        if (totalPatternBeats % 4 === 0 || totalPatternBeats % 2 === 0) {
+            return 'ideal';
+        }
+    }
+
+    // Default: compatible if individual beats don't exceed measure length
+    if (pattern.beats.every(b => b <= beatsPerMeasure)) {
+        return 'compatible';
+    }
+
+    return 'incompatible';
+}
+
+/**
+ * Get patterns suitable for a specific time signature
+ * @param {number} chordCount - Number of chords
+ * @param {object} timeSignature - Time signature object { num, denom }
+ * @param {boolean} includeCompatible - Include compatible patterns (not just ideal)
+ * @returns {object} Object with ideal and compatible pattern arrays
+ */
+export function getPatternsForTimeSignature(chordCount, timeSignature, includeCompatible = true) {
+    const allPatterns = getPatternsForChordCount(chordCount);
+
+    const ideal = [];
+    const compatible = [];
+    const incompatible = [];
+
+    for (const pattern of allPatterns) {
+        const suitability = getPatternTimeSignatureSuitability(pattern, timeSignature);
+        if (suitability === 'ideal') {
+            ideal.push({ ...pattern, timeSignatureSuitability: 'ideal' });
+        } else if (suitability === 'compatible') {
+            compatible.push({ ...pattern, timeSignatureSuitability: 'compatible' });
+        } else {
+            incompatible.push({ ...pattern, timeSignatureSuitability: 'incompatible' });
+        }
+    }
+
+    return {
+        ideal,
+        compatible: includeCompatible ? compatible : [],
+        incompatible,
+        all: [...ideal, ...compatible, ...(includeCompatible ? [] : incompatible)]
+    };
 }
