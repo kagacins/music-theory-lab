@@ -604,7 +604,6 @@ export class NotationToolbar {
     this.container.querySelectorAll('.duration-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const duration = e.currentTarget.dataset.duration;
-        console.log('[NotationToolbar] Duration button clicked:', duration);
         if (duration) {
           this.setDuration(duration);
         }
@@ -630,7 +629,6 @@ export class NotationToolbar {
     this.container.querySelectorAll('.accidental-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const accidental = e.currentTarget.dataset.accidental;
-        console.log('[NotationToolbar] Accidental button clicked:', accidental);
         if (accidental) {
           this.setAccidental(accidental);
         }
@@ -641,7 +639,6 @@ export class NotationToolbar {
     this.container.querySelectorAll('.articulation-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const articulation = e.currentTarget.dataset.articulation;
-        console.log('[NotationToolbar] Articulation button clicked:', articulation);
         if (articulation) {
           this.setArticulation(articulation);
         }
@@ -652,7 +649,6 @@ export class NotationToolbar {
     this.container.querySelectorAll('.tuplet-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const tupletType = e.currentTarget.dataset.tuplet;
-        console.log('[NotationToolbar] Tuplet button clicked:', tupletType, 'selectedNotesCount:', this.selectedNotesCount);
 
         // If notes are selected and selection has tuplet, remove it
         if (this.selectedNotesCount > 0 && this.selectionTuplet === tupletType) {
@@ -890,7 +886,6 @@ export class NotationToolbar {
    * @param {string} duration - Duration ID
    */
   setDuration(duration) {
-    console.log('[NotationToolbar] setDuration called:', duration, '(was:', this.currentDuration, ')');
     this.currentDuration = duration;
     this.updateDurationButtons();
     this.onDurationChange(duration);
@@ -1110,8 +1105,6 @@ export class NotationToolbar {
    * @param {boolean} notifyNoteEditor - Whether to notify noteEditor of the change (default true)
    */
   setTupletInsertMode(tupletType, notifyNoteEditor = true) {
-    console.log('[NotationToolbar] setTupletInsertMode called with:', tupletType, 'notify:', notifyNoteEditor);
-
     // Only notify if mode actually changed and notification is requested
     const modeChanged = this.tupletInsertMode !== tupletType;
     this.tupletInsertMode = tupletType;
@@ -1128,10 +1121,8 @@ export class NotationToolbar {
    */
   updateTupletButtons() {
     if (!this.container) return;
-    console.log('[NotationToolbar] updateTupletButtons - tupletInsertMode:', this.tupletInsertMode);
     this.container.querySelectorAll('.tuplet-btn').forEach(btn => {
       const isActive = btn.dataset.tuplet === this.tupletInsertMode;
-      console.log(`[NotationToolbar] Button ${btn.dataset.tuplet}: active=${isActive}`);
       btn.classList.toggle('active', isActive);
     });
   }
@@ -1192,7 +1183,6 @@ export class NotationToolbar {
     this.voiceNumber = Math.max(1, Math.min(2, voiceNumber));
     this.updateVoiceSelector();
     this.onVoiceChange(this.voiceNumber);
-    console.log('[NotationToolbar] Voice set to:', this.voiceNumber);
   }
 
   /**
@@ -1203,7 +1193,6 @@ export class NotationToolbar {
   setVoiceDisplay(voiceNumber) {
     this.voiceNumber = Math.max(1, Math.min(2, voiceNumber));
     this.updateVoiceSelector();
-    console.log('[NotationToolbar] Voice display updated to:', this.voiceNumber);
   }
 
   /**
@@ -1329,17 +1318,6 @@ export class NotationToolbar {
     this.selectionAccidental = accidentals.size === 1 ? ([...accidentals][0] === 'none' ? null : [...accidentals][0]) : 'mixed';
     this.selectionTied = tiedStates.size === 1 ? [...tiedStates][0] : 'mixed';
     this.selectionTuplet = tupletTypes.size === 1 ? ([...tupletTypes][0] === 'none' ? null : [...tupletTypes][0]) : 'mixed';
-
-    console.log('[NotationToolbar] Selection state:', {
-      count: this.selectedNotesCount,
-      duration: this.selectionDuration,
-      articulation: this.selectionArticulation,
-      dotted: this.selectionDotted,
-      isRest: this.selectionIsRest,
-      accidental: this.selectionAccidental,
-      tied: this.selectionTied,
-      tuplet: this.selectionTuplet
-    });
 
     // CRITICAL FIX: Sync internal state to match what's being shown visually
     // This ensures that if the user adds a new note while something is selected,
@@ -1550,7 +1528,6 @@ export class NotationToolbar {
    */
   updateTupletButtonsForSelection() {
     if (!this.container) return;
-    console.log('[NotationToolbar] updateTupletButtonsForSelection - selectedNotesCount:', this.selectedNotesCount, 'tupletInsertMode:', this.tupletInsertMode);
 
     this.container.querySelectorAll('.tuplet-btn').forEach(btn => {
       const tupletType = btn.dataset.tuplet;

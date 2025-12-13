@@ -554,12 +554,8 @@ export class BuildingBlock {
     setDuration(newBeats) {
         const oldTotal = this.units.length;
         const newTotal = newBeats * UNITS_PER_BEAT;
-        const oldBeats = this.beats;
-
-        console.log(`[BuildingBlock.setDuration] Block ${this.id}: ${oldBeats} beats (${oldTotal} units) -> ${newBeats} beats (${newTotal} units)`);
 
         if (newTotal === oldTotal) {
-            console.log(`[BuildingBlock.setDuration] No change needed`);
             return; // No change needed
         }
 
@@ -581,11 +577,9 @@ export class BuildingBlock {
         } else {
             // Shortening - truncate from the end
             this.units.length = newTotal;
-            console.log(`[BuildingBlock.setDuration] Truncated units array to ${this.units.length} units`);
         }
 
         this.beats = newBeats;
-        console.log(`[BuildingBlock.setDuration] Final state: beats=${this.beats}, units.length=${this.units.length}`);
     }
 
     /**
@@ -596,7 +590,6 @@ export class BuildingBlock {
      * @param {Object} attributes - All musical attributes (see Unit class for options)
      */
     setNote(startUnit, durationUnits, pitches, attributes = {}) {
-        console.log('[BuildingBlock.setNote] startUnit:', startUnit, 'pitches:', JSON.stringify(pitches));
         const endUnit = Math.min(startUnit + durationUnits, this.units.length);
 
         // First unit is the note start - gets all attributes
@@ -672,8 +665,6 @@ export class BuildingBlock {
         const notes = [];
         let i = 0;
 
-        console.log(`[BuildingBlock.getNotes] Block ${this.id}: beats=${this.beats}, units.length=${this.units.length}`);
-
         while (i < this.units.length) {
             const unit = this.units[i];
 
@@ -691,7 +682,6 @@ export class BuildingBlock {
                         break;
                     }
                 }
-                console.log(`[BuildingBlock.getNotes]   Note at startUnit=${startUnit}, durationUnits=${durationUnits}, pitches=${JSON.stringify(unit.pitches)}`);
 
                 // Build note object with all attributes from the start unit
                 const note = {
@@ -928,9 +918,6 @@ export class BuildingBlockSequence {
         const unitsPerMeasure = this.getUnitsPerMeasure();
         const beatsPerMeasure = this.getBeatsPerMeasure();
 
-        console.log(`%c[renderToMeasures] === START ===`, 'color: #9900cc; font-weight: bold');
-        console.log(`[renderToMeasures] ${this.blocks.length} blocks, ${unitsPerMeasure} units/measure`);
-
         let currentMeasure = this._createEmptyMeasure(0);
         let measureUnitOffset = 0; // Current position within the measure
         let absoluteUnit = 0; // Position in the entire sequence
@@ -938,11 +925,9 @@ export class BuildingBlockSequence {
         for (let blockIdx = 0; blockIdx < this.blocks.length; blockIdx++) {
             const block = this.blocks[blockIdx];
             const notes = block.getNotes();
-            console.log(`[renderToMeasures] Block ${blockIdx}: ${block.beats} beats, ${notes.length} notes`);
 
             for (let noteIdx = 0; noteIdx < notes.length; noteIdx++) {
                 const note = notes[noteIdx];
-                console.log(`[renderToMeasures]   Note ${noteIdx}: ${note.durationUnits} units, isRest=${note.isRest}, pitches=${note.pitches?.length || 0}`);
                 let remainingUnits = note.durationUnits;
                 let isFirstPart = true;
 
@@ -1037,15 +1022,6 @@ export class BuildingBlockSequence {
         if (currentMeasure.bassNotes.length > 0) {
             measures.push(currentMeasure);
         }
-
-        console.log(`[renderToMeasures] Generated ${measures.length} measures:`);
-        measures.forEach((m, i) => {
-            const notesSummary = m.bassNotes.map(n =>
-                `${n.isRest ? 'REST' : n.pitches?.length + 'p'}@${n.beat?.toFixed(2)}(${n.duration})${n.isTied ? 'T' : ''}`
-            ).join(', ');
-            console.log(`[renderToMeasures]   Measure ${i}: ${m.bassNotes.length} notes - ${notesSummary}`);
-        });
-        console.log(`%c[renderToMeasures] === END ===`, 'color: #9900cc; font-weight: bold');
 
         return measures;
     }
