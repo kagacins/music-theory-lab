@@ -4,6 +4,7 @@ import { getPiano, getGuitar, initAudio, getAudioIsReady } from '../audio/audioE
  * Rhythm Pattern Preview Player
  * - Plays bass + comping lanes for a given pattern over a chord slice
  * - Supports swing %, humanize, kit selection, and loop length
+ * - Uses Transport scheduling for reliable stop functionality
  */
 
 let previewState = {
@@ -16,6 +17,7 @@ let previewState = {
 
 let fallbackBass = null;
 let fallbackComp = null;
+let scheduledEventIds = []; // Track scheduled Transport events for cancellation
 
 function ensureAudio() {
     if (!getAudioIsReady()) {
@@ -53,53 +55,44 @@ function getFallbackComp() {
     return fallbackComp;
 }
 
-function scheduleNote(synth, note, time, duration, velocity = 0.9) {
-    if (!synth || !synth.triggerAttackRelease) return;
-    synth.triggerAttackRelease(note, duration, time, velocity);
-}
-
-function getNow() {
-    return (typeof Tone !== 'undefined' && Tone.now) ? Tone.now() : 0;
-}
-
 /**
  * Apply swing: shift off-beats later by swing %
  */
-function applySwing(time, isOffbeat, swing) {
-    if (!swing || swing <= 0) return time;
-    if (!isOffbeat) return time;
+function applySwing(beatOffset, isOffbeat, swing) {
+    if (!swing || swing <= 0) return beatOffset;
+    if (!isOffbeat) return beatOffset;
     const swingFactor = swing / 100; // 0..1
-    return time + 0.25 * swingFactor; // quarter-beat shift
+    return beatOffset + 0.25 * swingFactor; // quarter-beat shift
 }
 
 /**
- * Apply humanize: randomize timing by ±humanize ms
+ * Apply humanize: randomize timing by ±humanize ms (converted to beats)
  */
-function applyHumanize(time, humanizeMs) {
-    if (!humanizeMs || humanizeMs <= 0) return time;
-    const jitter = (Math.random() * 2 - 1) * (humanizeMs / 1000);
-    return time + jitter;
+function applyHumanize(beatOffset, humanizeMs, bpm) {
+    if (!humanizeMs || humanizeMs <= 0) return beatOffset;
+    const jitterMs = (Math.random() * 2 - 1) * humanizeMs;
+    const jitterBeats = (jitterMs / 1000) * (bpm / 60);
+    return beatOffset + jitterBeats;
 }
 
 /**
- * Build events from beats for a lane
+ * Build events from beats for a lane (returns beat offsets, not absolute times)
  */
-function buildLaneEvents(beats, bpm, startTime, swing, humanizeMs, offsetBeats = 0) {
-    const beatDuration = 60 / bpm;
+function buildLaneEvents(beats, swing, humanizeMs, bpm, offsetBeats = 0) {
     let acc = offsetBeats;
     return beats.map((beat, i) => {
         const isOffbeat = (acc % 1) !== 0;
-        let t = startTime + acc * beatDuration;
-        t = applySwing(t, isOffbeat, swing);
-        t = applyHumanize(t, humanizeMs);
-        const dur = beat * beatDuration;
+        let beatOffset = acc;
+        beatOffset = applySwing(beatOffset, isOffbeat, swing);
+        beatOffset = applyHumanize(beatOffset, humanizeMs, bpm);
+        const durBeats = beat;
         acc += beat;
-        return { time: t, duration: dur };
+        return { beatOffset, durBeats };
     });
 }
 
 /**
- * Preview a pattern (bass + comp lanes)
+ * Preview a pattern (bass + comp lanes) using Transport scheduling
  * @param {Object} opts
  * @param {Array} chords - chord slice [{root,type,inversion,bassNote,voicingNotes}]
  * @param {Array<number>} bassBeats
@@ -117,77 +110,121 @@ export function previewPattern({
     humanizeMs = 0
 } = {}) {
     if (!chords.length) return;
+    if (typeof Tone === 'undefined') return;
+
+    // Stop any existing preview first
+    stopPreview();
+
     // Allow piano-only playback (empty bassBeats is OK if compBeats exists)
     const hasBass = bassBeats && bassBeats.length > 0;
     const hasComp = compBeats && compBeats.length > 0;
     if (!hasBass && !hasComp) return;
 
-    const now = getNow();
-    const startTime = now + 0.05;
+    ensureAudio();
+
     const bassSynth = hasBass ? getPreviewSynth('bass') : null;
     const compSynth = hasComp ? getPreviewSynth('comp') : null;
 
-    // Build events only for lanes that have beats
-    const bassEvents = hasBass ? buildLaneEvents(bassBeats, bpm, startTime, swing, humanizeMs) : [];
-    const compEvents = hasComp ? buildLaneEvents(compBeats, bpm, startTime, swing, humanizeMs) : [];
+    // Set Transport BPM
+    Tone.Transport.bpm.value = bpm;
 
-    // Map events to chords by index (simple mapping) - only if bass is enabled
+    // Build events (beat offsets, not absolute times)
+    const bassEvents = hasBass ? buildLaneEvents(bassBeats, swing, humanizeMs, bpm) : [];
+    const compEvents = hasComp ? buildLaneEvents(compBeats, swing, humanizeMs, bpm) : [];
+
+    // Clear previous scheduled events
+    scheduledEventIds = [];
+
+    // Schedule bass notes using Transport
     if (hasBass && bassSynth) {
         bassEvents.forEach((ev, i) => {
             const chord = chords[i % chords.length];
             const note = chord?.bassNote || chord?.root + '2';
-            scheduleNote(bassSynth, note, ev.time, ev.duration, 0.9);
+            const durationNotation = ev.durBeats + 'n'; // Convert to Tone.js notation
+
+            const eventId = Tone.Transport.schedule((time) => {
+                if (bassSynth && bassSynth.triggerAttackRelease) {
+                    bassSynth.triggerAttackRelease(note, durationNotation, time, 0.9);
+                }
+            }, `0:${ev.beatOffset}`);
+            scheduledEventIds.push(eventId);
         });
     }
 
-    // Piano/comp chords
+    // Schedule comp/piano chords using Transport
     if (hasComp && compSynth) {
         compEvents.forEach((ev, i) => {
             const chord = chords[i % chords.length];
             const notes = chord?.voicingNotes || (chord?.root ? [chord.root + '4'] : []);
-            if (notes && notes.length && compSynth.triggerAttackRelease) {
-                compSynth.triggerAttackRelease(notes, ev.duration, ev.time, 0.8);
+            const durationNotation = ev.durBeats + 'n';
+
+            if (notes && notes.length) {
+                const eventId = Tone.Transport.schedule((time) => {
+                    if (compSynth && compSynth.triggerAttackRelease) {
+                        compSynth.triggerAttackRelease(notes, durationNotation, time, 0.8);
+                    }
+                }, `0:${ev.beatOffset}`);
+                scheduledEventIds.push(eventId);
             }
         });
     }
 
-    // Calculate total duration based on whichever lane is active
+    // Calculate total duration
     const bassDuration = hasBass ? bassBeats.reduce((a, b) => a + b, 0) : 0;
     const compDuration = hasComp ? compBeats.reduce((a, b) => a + b, 0) : 0;
     const totalBeats = Math.max(bassDuration, compDuration);
 
+    // Schedule auto-stop at end
+    const stopEventId = Tone.Transport.schedule(() => {
+        stopPreview();
+    }, `0:${totalBeats + 0.1}`);
+    scheduledEventIds.push(stopEventId);
+
+    // Start Transport from beginning
+    Tone.Transport.position = 0;
+    Tone.Transport.start();
     previewState.isPlaying = true;
-    setTimeout(() => {
-        previewState.isPlaying = false;
-    }, Math.ceil((totalBeats * 60 / bpm) * 1000) + 200);
 }
 
 export function stopPreview() {
-    // Stop any custom preview synths
-    if (window.stopPreviewSynths) window.stopPreviewSynths();
+    if (typeof Tone === 'undefined') {
+        previewState.isPlaying = false;
+        return;
+    }
 
-    // Release fallback synths
-    if (fallbackBass && fallbackBass.triggerRelease) fallbackBass.triggerRelease();
-    if (fallbackComp && fallbackComp.releaseAll) fallbackComp.releaseAll();
+    // Stop Transport immediately
+    Tone.Transport.stop();
+    Tone.Transport.position = 0;
 
-    // CRITICAL: Release the main piano/guitar synths to stop scheduled notes
-    // Notes scheduled with triggerAttackRelease() use absolute times, not Transport,
-    // so we must explicitly release them
+    // Cancel all scheduled events
+    scheduledEventIds.forEach(id => {
+        Tone.Transport.clear(id);
+    });
+    scheduledEventIds = [];
+
+    // Also use Transport.cancel() for any other events
+    Tone.Transport.cancel(0);
+
+    // Release any currently playing notes
+    if (fallbackBass && fallbackBass.triggerRelease) {
+        try { fallbackBass.triggerRelease(); } catch (e) {}
+    }
+    if (fallbackComp && fallbackComp.releaseAll) {
+        try { fallbackComp.releaseAll(); } catch (e) {}
+    }
+
     const piano = getPiano();
     if (piano && piano.releaseAll) {
-        piano.releaseAll();
+        try { piano.releaseAll(); } catch (e) {}
     }
 
     const guitar = getGuitar();
     if (guitar && guitar.releaseAll) {
-        guitar.releaseAll();
+        try { guitar.releaseAll(); } catch (e) {}
     }
 
-    // Stop Transport (for any Transport-scheduled events)
-    if (typeof Tone !== 'undefined' && Tone.Transport) {
-        Tone.Transport.stop();
-        Tone.Transport.cancel(); // Cancel any scheduled Transport events
-    }
+    // Stop any custom preview synths
+    if (window.stopPreviewSynths) window.stopPreviewSynths();
 
     previewState.isPlaying = false;
 }
