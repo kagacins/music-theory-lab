@@ -692,11 +692,15 @@ export class NotationComposer {
           chordSymbol = chord.root + typeSuffix;
         }
 
+        // Get time signature from compositionState metadata (not hardcoded 4/4)
+        const ts = this.compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
+        const timeSignatureString = `${ts.num}/${ts.denom}`;
+
         const measureData = {
           trebleNotes: [],
           bassNotes: [],
           keySignature: currentKey,
-          timeSignature: '4/4',
+          timeSignature: timeSignatureString,
           chord: {
             root: chord.root,
             type: chord.type,
