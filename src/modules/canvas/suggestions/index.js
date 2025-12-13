@@ -81,9 +81,6 @@ export function initializeIntegratedSuggestions(options) {
     const chord = chordEngine || new ChordSuggestionEngine(config.chord);
     manager.setChordEngine(chord);
 
-    console.log('📋 Keyboard Shortcuts:');
-    console.log('  Space (hold)  - Preview suggestion');
-
     return manager;
 }
 

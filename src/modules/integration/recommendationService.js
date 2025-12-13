@@ -100,8 +100,6 @@ export class RecommendationService {
             // Initialize section generator
             this._sectionGenerator = getSectionGenerator();
             this._sectionGenerator.initialize();
-
-            console.log('[Phase 5] Cross-engine coordination initialized');
         } catch (error) {
             console.warn('[Phase 5] Failed to initialize coordination components:', error);
             this._phase5Enabled = false;

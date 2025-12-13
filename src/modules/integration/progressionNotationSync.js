@@ -34,8 +34,6 @@ export class ProgressionNotationSync {
      */
     setupBidirectionalSync() {
         // DISABLED - compositionState is single source of truth
-        console.log('[ProgressionNotationSync] Bidirectional sync DISABLED - compositionState is single source of truth');
-
         // Previously listened to:
         // - 'chordChanged' → updateProgressionFromNotation
         // - 'measureAdded' → syncMeasureToProgression

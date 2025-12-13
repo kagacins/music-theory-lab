@@ -134,19 +134,6 @@ function getOrCreateOverlayCanvas(baseCanvas) {
     });
     resizeObserver.observe(baseCanvas);
 
-    // DEBUG: Log canvas and parent info
-    console.log('Canvas position:', window.getComputedStyle(baseCanvas).position);
-    console.log('Canvas left:', window.getComputedStyle(baseCanvas).left);
-    console.log('Canvas top:', window.getComputedStyle(baseCanvas).top);
-    console.log('Parent position:', window.getComputedStyle(baseCanvas.parentElement).position);
-    console.log('Parent overflow:', window.getComputedStyle(baseCanvas.parentElement).overflow);
-    console.log('Parent overflowX:', window.getComputedStyle(baseCanvas.parentElement).overflowX);
-    console.log('Parent overflowY:', window.getComputedStyle(baseCanvas.parentElement).overflowY);
-    console.log('Parent width:', window.getComputedStyle(baseCanvas.parentElement).width);
-    console.log('Parent height:', window.getComputedStyle(baseCanvas.parentElement).height);
-    console.log('Overlay position:', window.getComputedStyle(overlay).position);
-    console.log('Overlay left:', window.getComputedStyle(overlay).left);
-    console.log('Overlay top:', window.getComputedStyle(overlay).top);
   }
 
   return overlay;

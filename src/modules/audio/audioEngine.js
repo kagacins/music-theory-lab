@@ -59,7 +59,6 @@ export function initAudio() {
             hideModal();
             audioIsReady = true;
             audioIsLoading = false;
-            console.log("Piano samples loaded.");
         },
         onerror: (e) => {
             console.error("Error loading piano samples:", e);
@@ -83,10 +82,7 @@ export function initAudio() {
 
     cameraShutter = new Tone.Player({
         url: "public/camera-shutter.mp3",
-        autostart: false,
-        onload: () => {
-            console.log("Camera shutter sound loaded.");
-        }
+        autostart: false
     }).toDestination();
 
     // Initialize guitar for fretboard mode

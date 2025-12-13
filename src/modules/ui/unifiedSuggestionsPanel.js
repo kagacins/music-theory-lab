@@ -26,8 +26,6 @@ export function initUnifiedSuggestionsPanel() {
 
     // Attach event listeners for modals
     attachEventListeners();
-    
-    console.log('Analysis modals initialized');
 }
 
 

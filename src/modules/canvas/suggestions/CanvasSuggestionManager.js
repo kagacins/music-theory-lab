@@ -77,11 +77,6 @@ export class CanvasSuggestionManager {
 
         // Listen to feature flag changes
         this.attachFeatureFlagListeners();
-
-        console.log('Canvas Suggestion Manager initialized', {
-            enabled: this.enabled,
-            config: this.config.getAll()
-        });
     }
 
     /**
