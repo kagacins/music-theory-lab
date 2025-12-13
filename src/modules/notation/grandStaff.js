@@ -3107,9 +3107,14 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
   function drawChordBracket(startBeat, endBeat, chordName, color, chordData = null, chordIndex = -1) {
     const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
+    // DEBUG: Log bracket positioning calculations
+    console.log(`[drawChordBracket] timeSignature=${timeSignature}, beatsPerMeasure=${beatsPerMeasure}, startBeat=${startBeat}, endBeat=${endBeat}, chordName=${chordName}`);
+
     // Convert global beat positions to global measure indices
     const globalStartMeasure = Math.floor(startBeat / beatsPerMeasure);
     const globalEndMeasure = Math.floor(endBeat / beatsPerMeasure);
+
+    console.log(`[drawChordBracket] globalStartMeasure=${globalStartMeasure}, globalEndMeasure=${globalEndMeasure}, measures.length=${measures.length}`);
 
     // Convert to local measure indices for this page
     const localStartMeasure = globalStartMeasure - globalMeasureOffset;

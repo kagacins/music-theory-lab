@@ -3392,6 +3392,10 @@ export class CompositionState {
         // but 1.33 measures in 3/4)
         this.buildChordSegments();
 
+        // DEBUG: Log chord segments after rebuild
+        console.log(`[setTimeSignature] Rebuilt chord segments for ${num}/${denom}:`,
+            this.chordSegments.map(s => `Chord ${s.chordIndex}: startBeat=${s.startBeat}, duration=${s.durationBeats}`));
+
         // Emit event for any listeners
         this.events.emit('timeSignatureChanged', { num, denom });
     }
