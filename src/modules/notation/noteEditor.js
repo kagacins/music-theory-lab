@@ -21,6 +21,7 @@ import {
   getTupletDuration,
 } from '../state/buildingBlock.js';
 import { getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
+import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
 
 // ============================================================================
 // CONSTANTS
@@ -1379,6 +1380,10 @@ export class NoteEditor {
       let maxBeats;
       let availableBeats;
 
+      // Get beats per measure from time signature (normalized to quarter-note beats)
+      const ts = compositionState.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
+      const beatsPerMeasure = ts.num * (4 / ts.denom); // e.g., 6/8 = 3, 4/4 = 4, 3/4 = 3
+
       if (staff === 'bass') {
         // BASS CLEF: Use building block (chord segment) boundaries, not measure boundaries
         const beatInMeasure = this.getCurrentBeat(targetMeasureIndex, staff);
@@ -1391,12 +1396,12 @@ export class NoteEditor {
           availableBeats = maxBeats - usedInBlock;
         } else {
           // Fallback to measure-based if no segment found
-          maxBeats = 4;
+          maxBeats = beatsPerMeasure;
           availableBeats = maxBeats - usedBeats;
         }
       } else {
         // TREBLE CLEF: Use measure boundaries
-        maxBeats = 4; // 4/4 time
+        maxBeats = beatsPerMeasure;
         availableBeats = maxBeats - usedBeats;
       }
 
@@ -1440,7 +1445,7 @@ export class NoteEditor {
                 insertBeat += beats;
               }
 
-              const maxBeats = 4; // 4/4 time
+              const maxBeats = beatsPerMeasure; // Use time signature
               const spaceAfterInsertPoint = maxBeats - insertBeat;
 
               if (spaceAfterInsertPoint <= 0) {
@@ -2202,9 +2207,12 @@ export class NoteEditor {
     const firstNoteId = Array.from(this.selectedNotes)[0];
     const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(firstNoteId);
 
+    // Get beats per measure from time signature
+    const compositionStateCheck = window.getCompositionState?.();
+    const ts = compositionStateCheck?.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
+    const beatsPerMeasure = ts.num * (4 / ts.denom); // e.g., 6/8 = 3, 4/4 = 4
 
     // Check if the selected note is a tied continuation
-    const compositionStateCheck = window.getCompositionState?.();
     if (compositionStateCheck) {
       const measureCheck = compositionStateCheck.measures[measureIndex];
       const voiceCheck = staff === 'treble' ? measureCheck?.notation?.treble?.voices?.[0] : measureCheck?.notation?.bass?.voices?.[0];
@@ -2251,7 +2259,7 @@ export class NoteEditor {
       usedBeats += beats;
     }
 
-    const maxBeats = 4; // 4/4 time
+    const maxBeats = beatsPerMeasure; // Use time signature
     // Calculate requested beats, accounting for tuplet insert mode
     let requestedBeats = this.durationToBeats(this.currentDuration, this.isDotted);
     if (this.tupletInsertMode && TUPLET_RATIOS[this.tupletInsertMode]) {
@@ -2283,7 +2291,7 @@ export class NoteEditor {
                 insertBeat += beats;
               }
 
-              const maxBeats = 4; // 4/4 time
+              const maxBeats = beatsPerMeasure; // Use time signature
               const spaceAfterInsertPoint = maxBeats - insertBeat;
 
               if (spaceAfterInsertPoint <= 0) {
@@ -2371,6 +2379,10 @@ export class NoteEditor {
       return;
     }
 
+    // Get beats per measure from time signature
+    const ts = compositionState.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
+    const beatsPerMeasure = ts.num * (4 / ts.denom); // e.g., 6/8 = 3, 4/4 = 4
+
     const measure = compositionState.measures[measureIndex];
     const voice = this.getVoice(measure, staff);
 
@@ -2394,7 +2406,7 @@ export class NoteEditor {
       usedBeats += beats;
     }
 
-    const maxBeats = 4; // 4/4 time
+    const maxBeats = beatsPerMeasure; // Use time signature
     // Calculate requested beats, accounting for tuplet insert mode
     let requestedBeats = this.durationToBeats(this.currentDuration, this.isDotted);
     if (this.tupletInsertMode && TUPLET_RATIOS[this.tupletInsertMode]) {
@@ -2438,7 +2450,7 @@ export class NoteEditor {
                 insertBeat += beats;
               }
 
-              const maxBeats = 4; // 4/4 time
+              const maxBeats = beatsPerMeasure; // Use time signature
               const spaceAfterInsertPoint = maxBeats - insertBeat;
 
               if (spaceAfterInsertPoint <= 0) {
@@ -2623,7 +2635,7 @@ export class NoteEditor {
     const overflows = [];
 
     // Get the actual time signature for proper beat calculation
-    const timeSignature = compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
+    const timeSignature = compositionState.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
     const maxBeats = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
     for (const noteId of this.selectedNotes) {
@@ -4477,6 +4489,16 @@ export class NoteEditor {
   }
 
   /**
+   * Get beats per measure from current time signature
+   * @returns {number} - Beats per measure (normalized to quarter-note beats)
+   */
+  getBeatsPerMeasure() {
+    const compositionState = window.getCompositionState?.();
+    const ts = compositionState?.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
+    return ts.num * (4 / ts.denom); // e.g., 6/8 = 3, 4/4 = 4, 3/4 = 3
+  }
+
+  /**
    * Check if a note can be added to a measure without exceeding beat limit
    * @param {number} measureIndex - Measure index
    * @param {string} staff - 'treble' or 'bass'
@@ -4485,9 +4507,8 @@ export class NoteEditor {
    * @returns {boolean} - True if note can be added
    */
   canAddNoteToBeat(measureIndex, staff, duration, isDotted) {
-    // Get time signature (hardcoded to 4/4 for now)
-    // TODO: Get from compositionState metadata
-    const maxBeats = 4;
+    // Get time signature from compositionState
+    const maxBeats = this.getBeatsPerMeasure();
 
     // Calculate current beats used
     const currentBeats = this.getMeasureBeatsUsed(measureIndex, staff);
@@ -4510,7 +4531,7 @@ export class NoteEditor {
    * @returns {number} - Remaining beats
    */
   getRemainingBeats(measureIndex, staff) {
-    const maxBeats = 4; // 4/4 time
+    const maxBeats = this.getBeatsPerMeasure();
     const usedBeats = this.getMeasureBeatsUsed(measureIndex, staff);
     return maxBeats - usedBeats;
   }
@@ -4519,10 +4540,10 @@ export class NoteEditor {
    * Get current beat position in a measure (where next note would be added)
    * @param {number} measureIndex - Measure index
    * @param {string} staff - 'treble' or 'bass'
-   * @returns {number} - Beat position (0-4 for 4/4 time)
+   * @returns {number} - Beat position (0 to beatsPerMeasure)
    */
   getCurrentBeat(measureIndex, staff) {
-    return 4 - this.getRemainingBeats(measureIndex, staff);
+    return this.getBeatsPerMeasure() - this.getRemainingBeats(measureIndex, staff);
   }
 
   /**

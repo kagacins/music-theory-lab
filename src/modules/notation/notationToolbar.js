@@ -6,6 +6,8 @@
  * including duration selection, rests, accidentals, and display options.
  */
 
+import { TIME_SIGNATURES, DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -263,13 +265,9 @@ export class NotationToolbar {
           <div class="toolbar-group-content">
             <div class="toolbar-section view-section">
               <select class="time-signature-select" title="Time Signature">
-                <option value="4/4" ${this.timeSignature === '4/4' ? 'selected' : ''}>4/4</option>
-                <option value="3/4" ${this.timeSignature === '3/4' ? 'selected' : ''}>3/4</option>
-                <option value="2/4" ${this.timeSignature === '2/4' ? 'selected' : ''}>2/4</option>
-                <option value="6/8" ${this.timeSignature === '6/8' ? 'selected' : ''}>6/8</option>
-                <option value="2/2" ${this.timeSignature === '2/2' ? 'selected' : ''}>2/2</option>
-                <option value="9/8" ${this.timeSignature === '9/8' ? 'selected' : ''}>9/8</option>
-                <option value="12/8" ${this.timeSignature === '12/8' ? 'selected' : ''}>12/8</option>
+                ${TIME_SIGNATURES.map(ts => `
+                  <option value="${ts.value}" ${this.timeSignature === ts.value ? 'selected' : ''}>${ts.value}</option>
+                `).join('')}
               </select>
               <select class="voice-select" title="Select voice for editing">
                 <option value="1" ${this.voiceNumber === 1 ? 'selected' : ''}>Voice 1</option>

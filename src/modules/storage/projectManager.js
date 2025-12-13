@@ -12,6 +12,8 @@
  * - Composition settings (auto-generate bass, voice leading, etc.)
  */
 
+import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
+
 // Project file format version - increment when format changes
 // 1.0.0 - Initial format
 // 1.1.0 - Added song sections (verse, chorus, etc.)
@@ -111,7 +113,7 @@ export function createProjectData(compositionState) {
             title: compositionState.metadata?.title || 'Untitled Project',
             composer: compositionState.metadata?.composer || '',
             tempo: compositionState.metadata?.tempo || 120,
-            timeSignature: compositionState.metadata?.timeSignature || { num: 4, denom: 4 },
+            timeSignature: compositionState.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE,
             key: compositionState.metadata?.key || 'C'
         },
 
@@ -335,8 +337,18 @@ export function applyProjectToState(projectData, compositionState, trainerState,
 
         // 4. Sync composition state with the new progression
         if (projectData.progressionData) {
+            // Normalize time signature to object format for consistency
+            let timeSignature = projectData.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
+            if (typeof timeSignature === 'string') {
+                const parts = timeSignature.split('/').map(Number);
+                timeSignature = { num: parts[0] || 4, denom: parts[1] || 4 };
+            }
+
             compositionState.syncWithProgressionData(projectData.progressionData, {
-                preserveMelody: false // We'll load melody from the project
+                preserveMelody: false, // We'll load melody from the project
+                key: projectData.metadata?.key,
+                tempo: projectData.metadata?.tempo,
+                timeSignature: timeSignature
             });
         }
 

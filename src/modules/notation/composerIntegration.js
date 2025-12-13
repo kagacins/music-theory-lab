@@ -32,6 +32,7 @@ import { PAGE_CONFIG, getMeasurePagePosition, applyPaginationPreset, getTotalPag
 import { PageLayoutManager } from './pageLayoutManager.js';
 import { PageNavigator } from './pageNavigator.js';
 import { initVoiceLeadingOverlay, getVoiceLeadingOverlay } from './voiceLeadingOverlay.js';
+import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
 
 // ============================================================================
 // NOTATION COMPOSER CLASS
@@ -160,12 +161,16 @@ export class NotationComposer {
         },
         onTimeSignatureChange: (num, denom) => {
           if (this.compositionState) {
-            // Save state before time signature change for undo support
-            if (typeof window.saveStateBeforeChange === 'function') {
-              window.saveStateBeforeChange();
+            // Check if scaling dialog is needed
+            const scalingInfo = this.compositionState.getTimeSignatureScalingInfo(num, denom);
+
+            if (scalingInfo.needsScaling) {
+              // Show dialog asking user about scaling
+              this.showTimeSignatureScalingDialog(num, denom, scalingInfo);
+            } else {
+              // No chords or same beats per measure - just change directly
+              this.applyTimeSignatureChange(num, denom, false);
             }
-            this.compositionState.setTimeSignature(num, denom);
-            this.render();
           }
         },
         onUndo: () => {
@@ -693,7 +698,7 @@ export class NotationComposer {
         }
 
         // Get time signature from compositionState metadata (not hardcoded 4/4)
-        const ts = this.compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
+        const ts = this.compositionState.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
         const timeSignatureString = `${ts.num}/${ts.denom}`;
 
         const measureData = {
@@ -2454,6 +2459,169 @@ export class NotationComposer {
     // Deprecated - compositionState handles serialization
     console.warn('[ComposerIntegration] fromJSON() is deprecated');
     this.render();
+  }
+
+  // ============================================================================
+  // TIME SIGNATURE CHANGE WITH SCALING OPTION
+  // ============================================================================
+
+  /**
+   * Show dialog asking user whether to scale chord durations when time signature changes
+   * @param {number} num - New numerator
+   * @param {number} denom - New denominator
+   * @param {Object} scalingInfo - Info from getTimeSignatureScalingInfo
+   */
+  showTimeSignatureScalingDialog(num, denom, scalingInfo) {
+    // Remove any existing dialog
+    const existingDialog = document.getElementById('time-signature-scaling-dialog');
+    if (existingDialog) {
+      existingDialog.remove();
+    }
+
+    // Generate example text based on what's changing
+    const noteValueExample = scalingInfo.denominatorChanged
+      ? `A whole note in ${scalingInfo.oldTimeSignature} becomes a half note in ${scalingInfo.newTimeSignature}`
+      : 'Note values stay the same';
+
+    const measureExample = scalingInfo.beatsPerMeasureChanged
+      ? `A 1-measure chord stays 1 measure`
+      : 'Measure count stays the same';
+
+    // Create dialog
+    const dialog = document.createElement('div');
+    dialog.id = 'time-signature-scaling-dialog';
+    dialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    dialog.innerHTML = `
+      <div class="bg-white rounded-lg shadow-xl p-6 max-w-lg mx-4">
+        <h3 class="text-lg font-bold text-gray-800 mb-4">Time Signature Change</h3>
+        <p class="text-gray-600 mb-4">
+          You're changing from <strong>${scalingInfo.oldTimeSignature}</strong> to <strong>${scalingInfo.newTimeSignature}</strong>
+          with <strong>${scalingInfo.chordCount} chord(s)</strong> in your progression.
+        </p>
+        <p class="text-gray-700 font-medium mb-4">How should chord durations be handled?</p>
+
+        <div class="space-y-3 mb-6">
+          <label class="flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition ${scalingInfo.denominatorChanged ? '' : 'opacity-50'}">
+            <input type="radio" name="scaling-option" value="noteValue" class="mt-1" ${scalingInfo.denominatorChanged ? 'checked' : ''}>
+            <div>
+              <div class="font-medium text-gray-800">Keep note values</div>
+              <div class="text-sm text-gray-500">${noteValueExample}</div>
+              <div class="text-xs text-blue-600 mt-1">Duration numbers adjust to match the new beat unit</div>
+            </div>
+          </label>
+
+          <label class="flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-green-50 hover:border-green-300 transition">
+            <input type="radio" name="scaling-option" value="measures" class="mt-1" ${!scalingInfo.denominatorChanged ? 'checked' : ''}>
+            <div>
+              <div class="font-medium text-gray-800">Keep measure count</div>
+              <div class="text-sm text-gray-500">${measureExample}</div>
+              <div class="text-xs text-green-600 mt-1">Chord spans the same number of measures</div>
+            </div>
+          </label>
+
+          <label class="flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-100 hover:border-gray-400 transition">
+            <input type="radio" name="scaling-option" value="none" class="mt-1">
+            <div>
+              <div class="font-medium text-gray-800">Keep internal values (no scaling)</div>
+              <div class="text-sm text-gray-500">Raw beat numbers stay exactly the same</div>
+              <div class="text-xs text-gray-500 mt-1">May result in chords spanning partial measures</div>
+            </div>
+          </label>
+        </div>
+
+        <div class="flex gap-3 justify-end">
+          <button class="cancel-btn px-4 py-2 text-gray-600 hover:text-gray-800 transition">Cancel</button>
+          <button class="apply-btn px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">Apply</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(dialog);
+
+    // Handle cancel
+    dialog.querySelector('.cancel-btn').addEventListener('click', () => {
+      dialog.remove();
+      // Reset the toolbar dropdown to the old value
+      if (this.toolbar) {
+        const oldTS = this.compositionState.getTimeSignature();
+        this.toolbar.setTimeSignature(oldTS.num, oldTS.denom);
+      }
+    });
+
+    // Handle apply
+    dialog.querySelector('.apply-btn').addEventListener('click', () => {
+      const scaleOption = dialog.querySelector('input[name="scaling-option"]:checked').value;
+      dialog.remove();
+
+      let scaleFactor = 1;
+      if (scaleOption === 'noteValue') {
+        // Keep note values: scale by oldDenom/newDenom
+        // 4/4 to 6/8: factor = 4/8 = 0.5 (whole note -> half note)
+        scaleFactor = scalingInfo.scaleFactorForNoteValues;
+      } else if (scaleOption === 'measures') {
+        // Keep measure count: scale by newBeatsPerMeasure/oldBeatsPerMeasure
+        // 4/4 to 6/8: factor = 3/4 = 0.75 (1 measure stays 1 measure)
+        scaleFactor = scalingInfo.scaleFactorForMeasures;
+      }
+      // 'none' keeps scaleFactor = 1
+
+      this.applyTimeSignatureChange(num, denom, scaleFactor !== 1, scaleFactor);
+    });
+
+    // Handle click outside to cancel
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) {
+        dialog.remove();
+        // Reset the toolbar dropdown
+        if (this.toolbar) {
+          const oldTS = this.compositionState.getTimeSignature();
+          this.toolbar.setTimeSignature(oldTS.num, oldTS.denom);
+        }
+      }
+    });
+  }
+
+  /**
+   * Apply time signature change with optional duration scaling
+   * @param {number} num - New numerator
+   * @param {number} denom - New denominator
+   * @param {boolean} shouldScale - Whether to scale chord durations
+   * @param {number} scaleFactor - Scale factor for durations (if shouldScale is true)
+   */
+  applyTimeSignatureChange(num, denom, shouldScale, scaleFactor = 1) {
+    // Save state before time signature change for undo support
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    let scaledProgressionData = null;
+
+    // Scale chord durations if requested (before changing time signature)
+    // This updates the building blocks with new durations
+    if (shouldScale && scaleFactor !== 1) {
+      scaledProgressionData = this.compositionState.scaleChordDurations(scaleFactor);
+    }
+
+    // Apply the time signature change
+    // This rebuilds measures for the new time signature
+    this.compositionState.setTimeSignature(num, denom);
+
+    // If we scaled durations, sync the scaled data with the NEW time signature
+    // This ensures the progression data reflects both the new durations AND new time signature
+    if (scaledProgressionData && scaledProgressionData.length > 0) {
+      this.compositionState.syncWithProgressionData(scaledProgressionData, {
+        key: this.compositionState.metadata?.key || 'C',
+        timeSignature: { num, denom }
+      });
+    }
+
+    this.render();
+
+    // Update progression displays to reflect new durations
+    if (window.renderProgressionDisplay) {
+      window.renderProgressionDisplay('melody-progression-visualization', true);
+      window.renderProgressionDisplay('melody-progression-visualization', false);
+    }
   }
 
   // ============================================================================

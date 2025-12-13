@@ -3750,6 +3750,24 @@ window.loadProject = async function() {
                     if (metadata.key && typeof window.updateKeySignatureDisplay === 'function') {
                         window.updateKeySignatureDisplay(metadata.key);
                     }
+                    // Update time signature display if exists
+                    if (metadata.timeSignature) {
+                        // Convert {num, denom} object to "num/denom" string for dropdown
+                        const ts = metadata.timeSignature;
+                        const tsString = typeof ts === 'string' ? ts : `${ts.num}/${ts.denom}`;
+
+                        // Update notation toolbar time signature select
+                        const timeSigSelect = document.querySelector('.time-signature-select');
+                        if (timeSigSelect) {
+                            timeSigSelect.value = tsString;
+                        }
+
+                        // Also update any other time signature displays
+                        const timeSigDisplay = document.getElementById('time-signature-display');
+                        if (timeSigDisplay) {
+                            timeSigDisplay.textContent = tsString;
+                        }
+                    }
                 }
             }
         );

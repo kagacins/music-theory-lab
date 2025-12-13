@@ -411,6 +411,10 @@ import {
 import { renderEnhancedTensionCurve, getTensionArcUI } from '../ui/TensionArcUI.js';
 import { getTensionArcPlanner } from '../analysis/TensionArcPlanner.js';
 
+// Voice Leading Optimization
+import { getVoiceLeadingOptimizedProgression } from './voiceLeadingOptimizer.js';
+import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
+
 // ============================================================================
 // Chord Function Helper (Phase 3.3: Enhanced with Color-Coding)
 // ============================================================================
@@ -12555,6 +12559,19 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
         getEnharmonicPreference()
     );
 
+    // Get default beats based on current time signature (one full measure)
+    // Beats are stored as quarter-note equivalents (normalized)
+    // e.g., 4/4 = 4 beats, 3/4 = 3 beats, 6/8 = 3 beats (6 eighth notes = 3 quarter notes)
+    let defaultBeats = 4;
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (compositionState && compositionState.metadata && compositionState.metadata.timeSignature) {
+        const ts = compositionState.metadata.timeSignature;
+        // Normalize to quarter-note beats: num * (4 / denom)
+        const num = ts.num || 4;
+        const denom = ts.denom || 4;
+        defaultBeats = num * (4 / denom);
+    }
+
     // Create complete chord data with all required properties
     const newChordData = {
         name: result.name,
@@ -12572,7 +12589,7 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
         lhNotes: lhNotes,
         lhOmittedNotes: [],
         roman: roman,
-        beats: 4 // Default: 4 beats (whole note in 4/4 time)
+        beats: defaultBeats // Default: one measure based on current time signature
     };
 
     // === Stable add path: reuse addToProgressionData (same as Chord Builder) ===
@@ -13412,6 +13429,21 @@ export function saveRecording() {
  */
 export function addToProgressionData(chordData, options = {}) {
     const trainerState = getTrainerState();
+
+    // If beats not provided, default to one full measure based on current time signature
+    if (chordData.beats === undefined) {
+        let defaultBeats = 4;
+        const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+        if (compositionState && compositionState.metadata && compositionState.metadata.timeSignature) {
+            const ts = compositionState.metadata.timeSignature;
+            // Normalize to quarter-note beats: num * (4 / denom)
+            // e.g., 4/4 = 4 beats, 3/4 = 3 beats, 6/8 = 3 beats (6 eighth notes = 3 quarter notes)
+            const num = ts.num || 4;
+            const denom = ts.denom || 4;
+            defaultBeats = num * (4 / denom);
+        }
+        chordData.beats = defaultBeats;
+    }
 
     // Save state before adding (only on first chord of batch to avoid multiple undo states)
     if (!options.skipRender) {
@@ -14296,13 +14328,18 @@ export function openTemplateBrowser() {
 /**
  * Load a selected template into the progression
  * @param {object} template - Template object from template browser
- * @param {string} action - 'load' (replace) or 'append' (add to end)
+ * @param {string} action - 'load' (replace), 'append' (add to end), 'load-suggestion' (load with voice leading), 'append-suggestion' (append with voice leading)
  * @param {string} rhythmPattern - Optional rhythm pattern ID to apply
  */
 function loadTemplateToProgression(template, action = 'load', rhythmPattern = null) {
 
     const keySelect = document.getElementById('trainer-key-select');
     const currentKey = keySelect ? keySelect.value : 'C';
+
+    // Determine if voice leading optimization should be applied
+    const applyVoiceLeading = action.includes('suggestion');
+    // Normalize action to base type ('load' or 'append')
+    const baseAction = action.replace('-suggestion', '');
 
     // Stop playback if currently playing
     const trainerState = getTrainerState();
@@ -14333,7 +14370,7 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
     let progressionRomans = [];
 
     // If appending, start with existing progression
-    if (action === 'append' && trainerState.progressionData && trainerState.progressionData.length > 0) {
+    if (baseAction === 'append' && trainerState.progressionData && trainerState.progressionData.length > 0) {
         progressionData = [...trainerState.progressionData];
         progressionRomans = [...trainerState.progressionRomans];
     }
@@ -14401,6 +14438,24 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
         }
     });
 
+    // Apply voice leading optimization if requested
+    if (applyVoiceLeading && progressionData.length > 0) {
+        // Get the index where new chords start (for append mode)
+        const newChordsStartIndex = baseAction === 'append' && trainerState.progressionData ?
+            trainerState.progressionData.length : 0;
+
+        // Only optimize the newly added chords
+        const chordsToOptimize = progressionData.slice(newChordsStartIndex);
+        const optimizedChords = getVoiceLeadingOptimizedProgression(chordsToOptimize);
+
+        // Replace the new chords with optimized versions
+        for (let i = 0; i < optimizedChords.length; i++) {
+            progressionData[newChordsStartIndex + i] = optimizedChords[i];
+        }
+
+        console.log(`[loadTemplateToProgression] Applied voice leading optimization to ${optimizedChords.length} chords`);
+    }
+
     // Update state
     setProgressionData(progressionData);
     setProgressionRomans(progressionRomans);
@@ -14408,7 +14463,7 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
     setIsReady(true);
 
     // Clear undo/redo history for fresh start (only on load, not append)
-    if (action === 'load') {
+    if (baseAction === 'load') {
         clearHistory();
     }
 
@@ -14420,9 +14475,10 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
     updateProgressionControlsUI();
 
     // Show success message with template info
-    const actionText = action === 'append' ? 'Appended' : 'Loaded';
+    const actionText = baseAction === 'append' ? 'Appended' : 'Loaded';
+    const voiceLeadingText = applyVoiceLeading ? ' (voice-leading optimized)' : '';
     const patternName = pattern ? ` with ${pattern.name} rhythm` : '';
-    const message = `${actionText} template: "${template.name}"${patternName}\n${progressionData.length} total chords in ${currentKey}`;
+    const message = `${actionText} template: "${template.name}"${voiceLeadingText}${patternName}\n${progressionData.length} total chords in ${currentKey}`;
     if (window.showModal) {
         setTimeout(() => {
             window.showModal(message, false);
@@ -14481,7 +14537,7 @@ export function showRhythmPatternModal() {
 
     // Get current time signature from compositionState
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-    const timeSignature = compositionState?.metadata?.timeSignature || { num: 4, denom: 4 };
+    const timeSignature = compositionState?.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
     const timeSignatureDisplay = `${timeSignature.num}/${timeSignature.denom}`;
 
     modal.innerHTML = `

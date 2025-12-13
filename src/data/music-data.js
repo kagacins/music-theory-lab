@@ -244,6 +244,27 @@ function generateDiatonicChords(rootNote, noteArray) {
     });
 }
 
+/**
+ * Supported time signatures
+ * Each entry has:
+ * - value: string format for UI dropdowns ("4/4")
+ * - num: numerator (beats per measure)
+ * - denom: denominator (note value that gets one beat)
+ * - label: display label (optional, defaults to value)
+ */
+const TIME_SIGNATURES = [
+    { value: '4/4', num: 4, denom: 4, label: '4/4 (Common)' },
+    { value: '3/4', num: 3, denom: 4, label: '3/4 (Waltz)' },
+    { value: '2/4', num: 2, denom: 4, label: '2/4 (March)' },
+    { value: '6/8', num: 6, denom: 8, label: '6/8 (Compound)' },
+    { value: '2/2', num: 2, denom: 2, label: '2/2 (Cut Time)' },
+    { value: '9/8', num: 9, denom: 8, label: '9/8 (Compound)' },
+    { value: '12/8', num: 12, denom: 8, label: '12/8 (Compound)' },
+];
+
+/** Default time signature */
+const DEFAULT_TIME_SIGNATURE = { num: 4, denom: 4 };
+
 // Export all constants for ES6 module usage
 export {
     ALL_NOTES,
@@ -263,5 +284,7 @@ export {
     KEY_SIGNATURE_IMAGES,
     RELATIVE_MINOR_MAP,
     DIATONIC_CHORD_GROUPS,
-    generateDiatonicChords
+    generateDiatonicChords,
+    TIME_SIGNATURES,
+    DEFAULT_TIME_SIGNATURE
 };

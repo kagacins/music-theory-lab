@@ -18,6 +18,8 @@
  * This 48-subdivision approach cleanly handles both standard and triplet rhythms.
  */
 
+import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
+
 // Constants
 export const UNITS_PER_BEAT = 48;
 export const DEFAULT_BEATS = 4;
@@ -1112,7 +1114,7 @@ export class BuildingBlockSequence {
      */
     static fromJSON(json) {
         const seq = new BuildingBlockSequence();
-        seq.timeSignature = json.timeSignature || { num: 4, denom: 4 };
+        seq.timeSignature = json.timeSignature || DEFAULT_TIME_SIGNATURE;
         seq.blocks = json.blocks.map(b => BuildingBlock.fromJSON(b));
         return seq;
     }

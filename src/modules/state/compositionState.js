@@ -17,6 +17,7 @@ import { EventEmitter } from '../utils/eventEmitter.js';
 import { generateBassVoicing, generateBuildingBlockBass, splitBlockBassIntoMeasures } from '../integration/bassAutoFill.js';
 import { getChordNotes } from '../utils/noteUtils.js';
 import { BuildingBlockSequence, BuildingBlock, durationToUnits, unitsToDuration, UNITS_PER_BEAT } from './buildingBlock.js';
+import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
 
 // ============================================================================
 // BASS NOTE STORE - Single Source of Truth for Bass Notes
@@ -192,20 +193,36 @@ class BassNoteStore {
 export const TS_PPQ = 480;
 
 /**
- * Calculate the effective beats per measure from a time signature object
+ * Calculate the effective beats per measure from a time signature
  * This correctly handles all time signatures including compound meters
+ * Accepts both object format { num, denom } and string format "3/4"
  *
- * @param {Object} timeSignature - { num: number, denom: number }
+ * @param {Object|string} timeSignature - { num: number, denom: number } or "num/denom" string
  * @returns {number} - Effective beats per measure
  *
  * @example
  * getBeatsPerMeasureFromTimeSignature({ num: 4, denom: 4 }) // Returns 4
+ * getBeatsPerMeasureFromTimeSignature('4/4') // Returns 4
  * getBeatsPerMeasureFromTimeSignature({ num: 6, denom: 8 }) // Returns 3 (compound)
+ * getBeatsPerMeasureFromTimeSignature('6/8') // Returns 3 (compound)
  * getBeatsPerMeasureFromTimeSignature({ num: 2, denom: 2 }) // Returns 4 (cut time)
+ * getBeatsPerMeasureFromTimeSignature({ num: 3, denom: 4 }) // Returns 3
+ * getBeatsPerMeasureFromTimeSignature('3/4') // Returns 3
  */
-export function getBeatsPerMeasureFromTimeSignature(timeSignature = { num: 4, denom: 4 }) {
-    const num = timeSignature?.num ?? 4;
-    const denom = timeSignature?.denom ?? 4;
+export function getBeatsPerMeasureFromTimeSignature(timeSignature = DEFAULT_TIME_SIGNATURE) {
+    let num, denom;
+
+    // Handle string format like "3/4" or "6/8"
+    if (typeof timeSignature === 'string') {
+        const parts = timeSignature.split('/').map(Number);
+        num = parts[0] || 4;
+        denom = parts[1] || 4;
+    } else {
+        // Handle object format { num, denom }
+        num = timeSignature?.num ?? 4;
+        denom = timeSignature?.denom ?? 4;
+    }
+
     // Formula: multiply by (4/denom) to normalize everything to quarter-note beats
     // 4/4: 4 * (4/4) = 4 beats
     // 6/8: 6 * (4/8) = 3 beats (compound duple)
@@ -219,7 +236,7 @@ export function getBeatsPerMeasureFromTimeSignature(timeSignature = { num: 4, de
  * @param {Object} timeSignature - { num: number, denom: number }
  * @returns {number} - Ticks per denominator note
  */
-export function getTicksPerDenominator(timeSignature = { num: 4, denom: 4 }) {
+export function getTicksPerDenominator(timeSignature = DEFAULT_TIME_SIGNATURE) {
     const denom = timeSignature?.denom ?? 4;
     // A quarter note = TS_PPQ ticks
     // An eighth note = TS_PPQ / 2 ticks
@@ -232,7 +249,7 @@ export function getTicksPerDenominator(timeSignature = { num: 4, denom: 4 }) {
  * @param {Object} timeSignature - { num: number, denom: number }
  * @returns {number} - Total ticks that fit in one measure
  */
-export function getMeasureCapacityTicks(timeSignature = { num: 4, denom: 4 }) {
+export function getMeasureCapacityTicks(timeSignature = DEFAULT_TIME_SIGNATURE) {
     const num = timeSignature?.num ?? 4;
     return num * getTicksPerDenominator(timeSignature);
 }
@@ -243,7 +260,7 @@ export function getMeasureCapacityTicks(timeSignature = { num: 4, denom: 4 }) {
  * @param {Object} timeSignature - Current time signature
  * @returns {number} - Duration in ticks
  */
-export function durationStringToTicks(durationStr, timeSignature = { num: 4, denom: 4 }) {
+export function durationStringToTicks(durationStr, timeSignature = DEFAULT_TIME_SIGNATURE) {
     if (!durationStr) return getTicksPerDenominator(timeSignature);
 
     const base = durationStr.replace('.', '');
@@ -271,7 +288,7 @@ export function durationStringToTicks(durationStr, timeSignature = { num: 4, den
  * @param {Object} timeSignature - Current time signature (unused but for API consistency)
  * @returns {number} - Equivalent ticks
  */
-export function beatsToTicks(beats, timeSignature = { num: 4, denom: 4 }) {
+export function beatsToTicks(beats, timeSignature = DEFAULT_TIME_SIGNATURE) {
     return beats * TS_PPQ;
 }
 
@@ -290,7 +307,7 @@ export function ticksToBeats(ticks) {
  * @param {Object} timeSignature - Current time signature
  * @returns {number} - Total ticks
  */
-export function sumNoteTicks(notes, timeSignature = { num: 4, denom: 4 }) {
+export function sumNoteTicks(notes, timeSignature = DEFAULT_TIME_SIGNATURE) {
     return notes.reduce((sum, note) => {
         return sum + durationStringToTicks(note.duration, timeSignature);
     }, 0);
@@ -302,7 +319,7 @@ export function sumNoteTicks(notes, timeSignature = { num: 4, denom: 4 }) {
  * @param {Object} timeSignature - Current time signature
  * @returns {string} - Closest duration string
  */
-export function ticksToDurationString(ticks, timeSignature = { num: 4, denom: 4 }) {
+export function ticksToDurationString(ticks, timeSignature = DEFAULT_TIME_SIGNATURE) {
     const durations = ['1n', '2n.', '2n', '4n.', '4n', '8n.', '8n', '16n.', '16n', '32n'];
     let closest = '4n';
     let closestDiff = Infinity;
@@ -324,7 +341,7 @@ export function ticksToDurationString(ticks, timeSignature = { num: 4, denom: 4 
  * @param {Object} timeSignature - Current time signature
  * @returns {number} - Overflow ticks (0 if within capacity)
  */
-export function getNotesOverflowTicks(notes, timeSignature = { num: 4, denom: 4 }) {
+export function getNotesOverflowTicks(notes, timeSignature = DEFAULT_TIME_SIGNATURE) {
     const totalTicks = sumNoteTicks(notes, timeSignature);
     const capacityTicks = getMeasureCapacityTicks(timeSignature);
     return Math.max(0, totalTicks - capacityTicks);
@@ -1176,7 +1193,7 @@ export class CompositionState {
             return bassNotes;
         }
 
-        const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
+        const timeSignature = this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE;
         const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
         // If the new duration fits in one measure, we may need to recombine
@@ -1320,7 +1337,7 @@ export class CompositionState {
      */
     initializeBassBlockSequence(progressionData) {
         // Set time signature on the sequence
-        const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
+        const timeSignature = this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE;
         this.bassBlockSequence.setTimeSignature(timeSignature.num, timeSignature.denom);
 
         // Clear existing blocks
@@ -1638,7 +1655,7 @@ export class CompositionState {
             return;
         }
 
-        const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
+        const timeSignature = this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE;
         const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
         // First, clear all bass notes from measures
@@ -1862,7 +1879,7 @@ export class CompositionState {
      * This rebuilds measure bass notes from segment data
      */
     applySegmentsToMeasures() {
-        const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
+        const timeSignature = this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE;
         const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
         // First, clear all bass notes
@@ -1953,7 +1970,7 @@ export class CompositionState {
      */
     initializeTrebleBlockSequence() {
         // Set time signature on the sequence
-        const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
+        const timeSignature = this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE;
         this.trebleBlockSequence.setTimeSignature(timeSignature.num, timeSignature.denom);
 
         // Clear existing blocks
@@ -2947,7 +2964,7 @@ export class CompositionState {
         }
 
         const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
-        const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
+        const timeSignature = this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE;
         let previousChord = null;
 
         // First, clear all bass notes from all measures
@@ -3040,7 +3057,7 @@ export class CompositionState {
 
         const { startBeat, durationBeats, chord } = segment;
         const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
-        const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
+        const timeSignature = this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE;
 
         // Get previous chord for voice leading
         const previousSegment = chordIndex > 0 ? this.getChordSegment(chordIndex - 1) : null;
@@ -3271,7 +3288,7 @@ export class CompositionState {
      * @param {number} denom - Denominator (e.g., 4 for 4/4)
      */
     setTimeSignature(num, denom) {
-        const oldTS = this.metadata.timeSignature || { num: 4, denom: 4 };
+        const oldTS = this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE;
 
         // Skip if no change
         if (oldTS.num === num && oldTS.denom === denom) {
@@ -3405,7 +3422,91 @@ export class CompositionState {
      * @returns {Object} - { num, denom }
      */
     getTimeSignature() {
-        return this.metadata.timeSignature || { num: 4, denom: 4 };
+        return this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE;
+    }
+
+    /**
+     * Get information about whether chord duration scaling is needed for a time signature change
+     * @param {number} newNum - New numerator
+     * @param {number} newDenom - New denominator
+     * @returns {Object} - { needsScaling, oldBeatsPerMeasure, newBeatsPerMeasure, scaleFactorForMeasures, scaleFactorForNoteValues, chordCount }
+     */
+    getTimeSignatureScalingInfo(newNum, newDenom) {
+        const oldTS = this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE;
+        const oldBeatsPerMeasure = oldTS.num * (4 / oldTS.denom);
+        const newBeatsPerMeasure = newNum * (4 / newDenom);
+
+        // Get chord count from progression
+        const progressionData = this.exportToProgressionData();
+        const chordCount = progressionData.length;
+
+        // Check if denominator changed (affects note value interpretation)
+        const denominatorChanged = oldTS.denom !== newDenom;
+
+        // Check if beats per measure changed (affects measure count)
+        const beatsPerMeasureChanged = Math.abs(oldBeatsPerMeasure - newBeatsPerMeasure) > 0.001;
+
+        // Dialog is needed if there are chords AND (denominator or beats-per-measure changed)
+        const needsScaling = chordCount > 0 && (denominatorChanged || beatsPerMeasureChanged);
+
+        // Scale factor to maintain same measure count
+        // Example: 4/4 (4 bpm) to 6/8 (3 bpm): factor = 3/4 = 0.75
+        const scaleFactorForMeasures = newBeatsPerMeasure / oldBeatsPerMeasure;
+
+        // Scale factor to maintain same note value (same number of denominator beats)
+        // Example: 4/4 to 6/8: factor = 4/8 = 0.5 (a "4-beat" chord becomes 2 quarter-note beats = 4 eighth notes)
+        const scaleFactorForNoteValues = oldTS.denom / newDenom;
+
+        return {
+            needsScaling,
+            oldBeatsPerMeasure,
+            newBeatsPerMeasure,
+            oldDenom: oldTS.denom,
+            newDenom: newDenom,
+            scaleFactorForMeasures,
+            scaleFactorForNoteValues,
+            denominatorChanged,
+            beatsPerMeasureChanged,
+            chordCount,
+            oldTimeSignature: `${oldTS.num}/${oldTS.denom}`,
+            newTimeSignature: `${newNum}/${newDenom}`
+        };
+    }
+
+    /**
+     * Scale all chord durations by a factor (used when time signature changes)
+     * This should be called BEFORE setTimeSignature so the scaled values
+     * are used when rebuilding measures for the new time signature.
+     * @param {number} scaleFactor - Factor to multiply chord beats by
+     * @returns {Array} - The modified progression data (for use by caller)
+     */
+    scaleChordDurations(scaleFactor) {
+        const progressionData = this.exportToProgressionData();
+
+        if (progressionData.length === 0) return progressionData;
+
+        // Scale each chord's beats
+        progressionData.forEach(chord => {
+            const oldBeats = chord.beats || 4;
+            // Scale and round to nearest 0.25 (sixteenth note)
+            const newBeats = Math.round(oldBeats * scaleFactor * 4) / 4;
+            // Ensure minimum of 0.25 beats
+            chord.beats = Math.max(0.25, newBeats);
+            console.log(`[scaleChordDurations] Chord ${chord.root} ${chord.type}: ${oldBeats} -> ${chord.beats} (factor: ${scaleFactor})`);
+        });
+
+        // Update the building blocks with new durations
+        // This is the key - building blocks are the source of truth for durations
+        progressionData.forEach((chord, index) => {
+            if (this.bassBlockSequence && this.bassBlockSequence.blocks[index]) {
+                this.bassBlockSequence.blocks[index].setDuration(chord.beats);
+            }
+        });
+
+        console.log(`[scaleChordDurations] Scaled ${progressionData.length} chord(s) by factor ${scaleFactor}`);
+
+        // Return the modified data so caller can use it after time signature change
+        return progressionData;
     }
 
     /**
@@ -3660,7 +3761,7 @@ export class CompositionState {
         if (options.timeSignature) this.metadata.timeSignature = options.timeSignature;
 
         // Get time signature to determine beats per measure
-        const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
+        const timeSignature = this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE;
         const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
         // Process each chord, potentially splitting across multiple measures
@@ -3737,7 +3838,7 @@ export class CompositionState {
             }));
 
         // Get time signature to determine beats per measure
-        const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
+        const timeSignature = this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE;
         const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
         // Calculate how many measures we need based on chord durations
@@ -4311,7 +4412,7 @@ export class CompositionState {
         // Rebuild measures from the updated progression
         this.syncWithProgressionData(progressionData, {
             key: this.metadata.key,
-            timeSignature: this.metadata.timeSignature || { num: 4, denom: 4 },
+            timeSignature: this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE,
         });
 
         this.events.emit('chordDurationChanged', chordIndex, newBeats);
@@ -4367,7 +4468,7 @@ export class CompositionState {
         // Rebuild measures from the reordered progression
         this.syncWithProgressionData(progressionData, {
             key: this.metadata.key,
-            timeSignature: this.metadata.timeSignature || { num: 4, denom: 4 },
+            timeSignature: this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE,
         });
 
         this.events.emit('chordReordered', fromIndex, toIndex);
@@ -4403,7 +4504,7 @@ export class CompositionState {
         // Rebuild measures from the updated progression
         this.syncWithProgressionData(progressionData, {
             key: this.metadata.key,
-            timeSignature: this.metadata.timeSignature || { num: 4, denom: 4 },
+            timeSignature: this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE,
         });
 
         this.events.emit('chordInserted', atIndex, chordData);
@@ -4438,7 +4539,7 @@ export class CompositionState {
         // Rebuild measures from the updated progression
         this.syncWithProgressionData(progressionData, {
             key: this.metadata.key,
-            timeSignature: this.metadata.timeSignature || { num: 4, denom: 4 },
+            timeSignature: this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE,
         });
 
         this.events.emit('chordRemoved', atIndex);

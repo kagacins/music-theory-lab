@@ -2518,9 +2518,10 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   }
 
   // Draw incomplete measure indicator if beats don't add up
-  // Parse time signature to get expected beats per measure
-  const [timeSigNum] = timeSignature.split('/').map(Number);
-  const beatsPerMeasure = timeSigNum || 4;
+  // Parse time signature to get expected beats per measure (normalized to quarter-note beats)
+  const [timeSigNum, timeSigDenom] = timeSignature.split('/').map(Number);
+  // Normalize to quarter-note beats: 4/4 = 4, 3/4 = 3, 6/8 = 3 (since 6 eighth notes = 3 quarter notes)
+  const beatsPerMeasure = (timeSigNum || 4) * (4 / (timeSigDenom || 4));
 
   // Calculate total beats for a set of notes
   const calcTotalBeats = (notes) => {

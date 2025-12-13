@@ -72,6 +72,8 @@
  * ============================================================================
  */
 
+import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
+
 // Trainer state object - UI state only
 let trainerState = {
     // progressionData REMOVED - now in compositionState
@@ -193,9 +195,11 @@ export function setProgressionData(value) {
         if (compositionState) {
             // DEBUGGING: Uncomment to trace when progression data is set
             // console.log('[setProgressionData] Setting progression with', value.length, 'chords:', value.map(c => `${c.root}${c.type}`));
+            // CRITICAL FIX: Use the CURRENT time signature from compositionState, not hardcoded 4/4
+            const currentTimeSignature = compositionState.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
             compositionState.syncWithProgressionData(value, {
                 key: trainerState.currentKey,
-                timeSignature: { num: 4, denom: 4 }
+                timeSignature: currentTimeSignature
             });
             // Invalidate cache when progression data is set
             // This ensures next getProgressionData() call returns fresh data

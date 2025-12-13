@@ -7,7 +7,7 @@ import { getProgressionData, getCurrentKey } from '../state/trainerState.js';
 import { getInstrument, getAudioIsReady, initAudio, getPiano, getPianoReverb } from './audioEngine.js';
 import { getEnharmonicPreference, getNotationPreference } from '../state/globalState.js';
 import { getNoteKeyId, noteToMidi, getLHNotes, getNotePitches, hasPitch, getPrimaryPitch } from '../utils/noteUtils.js';
-import { CHORD_DEFINITIONS, ALL_NOTES, MAJOR_SCALE_STEPS } from '../../data/music-data.js';
+import { CHORD_DEFINITIONS, ALL_NOTES, MAJOR_SCALE_STEPS, DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
 import { analyzeChordTone, CHORD_TONE_COLORS, NOTE_RELATIONSHIPS } from '../analysis/chordToneAnalyzer.js';
 import { getCompositionState, getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
 
@@ -4217,7 +4217,7 @@ export function playAllMelody() {
         // This ensures patterns like arpeggio, alberti, boogie etc. play correctly
         if (window.getCompositionState) {
             const compositionState = window.getCompositionState();
-            const timeSignature = compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
+            const timeSignature = compositionState.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
             const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
             const events = [];
@@ -4896,7 +4896,7 @@ function renderBassFromCompositionState(context, chordStaves, numMeasures, chord
 
             try {
                 // Create voice for bass notes
-                const timeSignature = measure.timeSignature || interactiveMelody.timeSignature || { num: 4, denom: 4 };
+                const timeSignature = measure.timeSignature || interactiveMelody.timeSignature || DEFAULT_TIME_SIGNATURE;
                 const voice = new Voice({
                     num_beats: timeSignature.num,
                     beat_value: timeSignature.denom

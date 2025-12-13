@@ -5,6 +5,7 @@
  */
 
 import { savePreset, getAllPresets } from '../storage/presetManager.js';
+import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
 
 /**
  * Template categories for organization
@@ -1593,7 +1594,7 @@ export function saveCustomTemplate(templateData) {
         metadata: {
             key: templateData.key || 'C',
             tempo: templateData.arrangement?.tempo || 120,
-            timeSignature: templateData.arrangement?.timeSignature || { num: 4, denom: 4 }
+            timeSignature: templateData.arrangement?.timeSignature || DEFAULT_TIME_SIGNATURE
         }
     });
 }

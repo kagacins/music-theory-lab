@@ -13,6 +13,7 @@ import { NoteEditor } from './noteEditor.js';
 import { getCurrentKey } from '../state/trainerState.js';
 import { generateBassVoicing } from '../integration/bassAutoFill.js';
 import { initializeIntegratedSuggestions, FeatureFlags } from '../canvas/suggestions/index.js';
+import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -280,8 +281,9 @@ export function initEnhancedNotation(options = {}) {
               let noteBeats = durationToBeats(data.note.duration || '4n');
               if (data.note.dotted) noteBeats *= 1.5;
 
-              // Check if adding would exceed 4 beats (4/4 time)
-              const maxBeats = 4;
+              // Get beats per measure from time signature
+              const ts = notationComposer.compositionState?.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
+              const maxBeats = ts.num * (4 / ts.denom); // e.g., 6/8 = 3, 4/4 = 4
               if (usedBeats + noteBeats > maxBeats + 0.01) {
                 console.warn(`[onNoteAdd] Cannot add note - would exceed ${maxBeats} beats (used: ${usedBeats}, adding: ${noteBeats})`);
                 return;

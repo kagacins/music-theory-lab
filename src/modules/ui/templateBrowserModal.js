@@ -22,10 +22,16 @@ import {
 } from '../features/rhythmicPatterns.js';
 
 import { getProgressionData } from '../state/trainerState.js';
+import { getVoiceLeadingOptimizedProgression, scoreProgressionVoiceLeading } from '../features/voiceLeadingOptimizer.js';
+import { previewPattern, stopPreview } from '../features/rhythmPatternPreview.js';
+import { getPiano, initAudio, getAudioIsReady } from '../audio/audioEngine.js';
+import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
 
 let currentCategory = 'All';
 let currentSearchQuery = '';
 let onTemplateSelectCallback = null;
+let currentlyPreviewingTemplateId = null;
+let previewTimeout = null;
 
 /**
  * Show the template browser modal
@@ -55,6 +61,9 @@ export function showTemplateBrowser(onSelect) {
  * Hide and remove the template browser modal
  */
 export function hideTemplateBrowser() {
+    // Stop any preview playback
+    stopTemplatePreview();
+
     const modal = document.getElementById('template-browser-modal');
     if (modal) {
         modal.remove();
@@ -279,6 +288,34 @@ function renderTemplateList(category) {
                 selectTemplate(template, 'append');
             });
         }
+
+        // Load Suggestion button (voice leading optimized)
+        const loadSuggestionBtn = container.querySelector(`button[data-template-id="${template.id}"][data-action="load-suggestion"]`);
+        if (loadSuggestionBtn) {
+            loadSuggestionBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectTemplate(template, 'load-suggestion');
+            });
+        }
+
+        // Append Suggestion button (voice leading optimized)
+        const appendSuggestionBtn = container.querySelector(`button[data-template-id="${template.id}"][data-action="append-suggestion"]`);
+        if (appendSuggestionBtn) {
+            appendSuggestionBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectTemplate(template, 'append-suggestion');
+            });
+        }
+
+        // Preview buttons
+        const previewBtns = container.querySelectorAll(`button[data-template-id="${template.id}"].template-preview-btn`);
+        previewBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const previewType = btn.dataset.previewType;
+                previewTemplate(template, previewType, btn);
+            });
+        });
     });
 }
 
@@ -395,13 +432,31 @@ function createTemplateCard(template) {
             ${createRhythmPatternSelector(template)}
 
             <!-- Action Buttons -->
-            <div class="flex gap-2 mt-3">
-                <button class="template-load-btn flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition text-xs font-semibold" data-template-id="${template.id}" data-action="load">
-                    Load
-                </button>
-                <button class="template-append-btn flex-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-md transition text-xs font-semibold" data-template-id="${template.id}" data-action="append">
-                    Append
-                </button>
+            <div class="flex flex-col gap-2 mt-3">
+                <!-- Original progression buttons -->
+                <div class="flex gap-2">
+                    <button class="template-preview-btn px-2 py-1.5 bg-gray-600 hover:bg-gray-500 text-white rounded-md transition text-xs" data-template-id="${template.id}" data-preview-type="original" title="Preview original progression">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    </button>
+                    <button class="template-load-btn flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition text-xs font-semibold" data-template-id="${template.id}" data-action="load">
+                        Load
+                    </button>
+                    <button class="template-append-btn flex-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-md transition text-xs font-semibold" data-template-id="${template.id}" data-action="append">
+                        Append
+                    </button>
+                </div>
+                <!-- Voice leading optimized buttons -->
+                <div class="flex gap-2">
+                    <button class="template-preview-btn px-2 py-1.5 bg-purple-700 hover:bg-purple-600 text-white rounded-md transition text-xs" data-template-id="${template.id}" data-preview-type="optimized" title="Preview voice-leading optimized">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    </button>
+                    <button class="template-load-suggestion-btn flex-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-md transition text-xs font-semibold" data-template-id="${template.id}" data-action="load-suggestion" title="Load with voice leading optimization">
+                        Load Suggestion
+                    </button>
+                    <button class="template-append-suggestion-btn flex-1 px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white rounded-md transition text-xs font-semibold" data-template-id="${template.id}" data-action="append-suggestion" title="Append with voice leading optimization">
+                        Append Suggestion
+                    </button>
+                </div>
             </div>
         </div>
     `;
@@ -468,7 +523,7 @@ function createRhythmPatternSelector(template) {
 /**
  * Handle template selection
  * @param {object} template - Selected template
- * @param {string} action - Action to perform ('load' or 'append')
+ * @param {string} action - Action to perform ('load', 'append', 'load-suggestion', 'append-suggestion')
  */
 function selectTemplate(template, action = 'load') {
     // Get the selected rhythm pattern from the dropdown
@@ -479,6 +534,216 @@ function selectTemplate(template, action = 'load') {
         onTemplateSelectCallback(template, action, rhythmPattern);
     }
     hideTemplateBrowser();
+}
+
+/**
+ * Stop any currently playing preview
+ */
+function stopTemplatePreview() {
+    if (previewTimeout) {
+        clearTimeout(previewTimeout);
+        previewTimeout = null;
+    }
+    stopPreview();
+    currentlyPreviewingTemplateId = null;
+
+    // Reset all preview button states
+    document.querySelectorAll('.template-preview-btn').forEach(btn => {
+        btn.classList.remove('bg-red-600', 'hover:bg-red-500');
+        btn.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+    });
+}
+
+/**
+ * Preview a template progression
+ * @param {object} template - Template to preview
+ * @param {string} previewType - 'original' or 'optimized'
+ * @param {HTMLElement} buttonEl - The preview button element
+ */
+function previewTemplate(template, previewType, buttonEl) {
+    // If already previewing this template, stop it
+    if (currentlyPreviewingTemplateId === `${template.id}-${previewType}`) {
+        stopTemplatePreview();
+        return;
+    }
+
+    // Stop any current preview
+    stopTemplatePreview();
+
+    // Ensure audio is initialized
+    if (!getAudioIsReady()) {
+        initAudio();
+    }
+
+    // Get key from UI or default to C
+    const keySelect = document.getElementById('trainer-key-select');
+    const currentKey = keySelect ? keySelect.value : 'C';
+
+    // Convert template to chord data for preview
+    const chordData = convertTemplateToChordData(template, currentKey);
+
+    if (!chordData || chordData.length === 0) {
+        console.warn('[TemplateBrowser] Could not convert template to chord data');
+        return;
+    }
+
+    // Apply voice leading optimization if requested
+    let previewChords = chordData;
+    if (previewType === 'optimized') {
+        previewChords = getVoiceLeadingOptimizedProgression(chordData);
+    }
+
+    // Update button to show stop state
+    currentlyPreviewingTemplateId = `${template.id}-${previewType}`;
+    buttonEl.classList.add('bg-red-600', 'hover:bg-red-500');
+    buttonEl.classList.remove('bg-gray-600', 'hover:bg-gray-500', 'bg-purple-700', 'hover:bg-purple-600');
+    buttonEl.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>';
+
+    // Play the preview using the rhythm pattern preview system
+    const tempo = template.arrangement?.tempo || 120;
+    const beatsPerChord = 2; // Default to 2 beats per chord for preview
+
+    // Build chord objects for preview
+    const previewChordObjects = previewChords.map(chord => ({
+        root: chord.root,
+        type: chord.type,
+        voicingNotes: chord.notes || [],
+        bassNote: chord.root + '2'
+    }));
+
+    // Calculate beats array
+    const compBeats = previewChordObjects.map(() => beatsPerChord);
+
+    // Play the preview
+    previewPattern({
+        chords: previewChordObjects,
+        bassBeats: [], // No bass for preview
+        compBeats: compBeats,
+        bpm: tempo,
+        swing: 0,
+        humanizeMs: 0
+    });
+
+    // Auto-stop after progression completes
+    const totalBeats = compBeats.reduce((a, b) => a + b, 0);
+    const durationMs = (totalBeats / tempo) * 60 * 1000 + 500;
+
+    previewTimeout = setTimeout(() => {
+        stopTemplatePreview();
+    }, durationMs);
+}
+
+/**
+ * Convert a template to chord data for preview
+ * @param {object} template - Template object
+ * @param {string} key - Musical key
+ * @returns {Array<Object>} Array of chord data objects
+ */
+function convertTemplateToChordData(template, key) {
+    const SHARP_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const MAJOR_SCALE_STEPS = [0, 2, 4, 5, 7, 9, 11];
+
+    const keyIndex = SHARP_NOTES.indexOf(key.replace('m', '').replace('#', '').charAt(0));
+    const adjustedKeyIndex = key.includes('#') ? (keyIndex + 1) % 12 : keyIndex;
+
+    // Roman numeral to scale degree mapping
+    const ROMAN_MAP = {
+        'I': { degree: 0, quality: 'Major' },
+        'i': { degree: 0, quality: 'Minor' },
+        'II': { degree: 1, quality: 'Major' },
+        'ii': { degree: 1, quality: 'Minor' },
+        'ii°': { degree: 1, quality: 'Diminished' },
+        'III': { degree: 2, quality: 'Major' },
+        'iii': { degree: 2, quality: 'Minor' },
+        'IV': { degree: 3, quality: 'Major' },
+        'iv': { degree: 3, quality: 'Minor' },
+        'V': { degree: 4, quality: 'Major' },
+        'v': { degree: 4, quality: 'Minor' },
+        'VI': { degree: 5, quality: 'Major' },
+        'vi': { degree: 5, quality: 'Minor' },
+        'VII': { degree: 6, quality: 'Major' },
+        'vii': { degree: 6, quality: 'Minor' },
+        'vii°': { degree: 6, quality: 'Diminished' },
+        'bII': { degree: 0, quality: 'Major', offset: 1 },
+        'bIII': { degree: 2, quality: 'Major', offset: -1 },
+        'bVI': { degree: 5, quality: 'Major', offset: -1 },
+        'bVII': { degree: 6, quality: 'Major', offset: -1 }
+    };
+
+    // Chord intervals for generating notes
+    const CHORD_INTERVALS = {
+        'Major': [0, 4, 7],
+        'Minor': [0, 3, 7],
+        'Diminished': [0, 3, 6],
+        'Major 7th': [0, 4, 7, 11],
+        'Minor 7th': [0, 3, 7, 10],
+        'Dominant 7th': [0, 4, 7, 10],
+        'Diminished 7th': [0, 3, 6, 9]
+    };
+
+    const chordData = [];
+
+    template.progressions.forEach(roman => {
+        // Parse roman numeral
+        let baseRoman = roman;
+        let chordQuality = null;
+
+        // Check for 7th chord suffixes
+        if (roman.includes('maj7')) {
+            baseRoman = roman.replace('maj7', '');
+            chordQuality = 'Major 7th';
+        } else if (roman.includes('°7')) {
+            baseRoman = roman.replace('°7', '°');
+            chordQuality = 'Diminished 7th';
+        } else if (roman.includes('7')) {
+            baseRoman = roman.replace('7', '');
+            if (baseRoman.toUpperCase() === baseRoman || baseRoman === 'V') {
+                chordQuality = 'Dominant 7th';
+            } else {
+                chordQuality = 'Minor 7th';
+            }
+        }
+
+        // Look up base roman numeral
+        const mapEntry = ROMAN_MAP[baseRoman];
+        if (!mapEntry) {
+            // Try without accidentals
+            const cleanRoman = baseRoman.replace('b', '').replace('#', '');
+            const cleanEntry = ROMAN_MAP[cleanRoman];
+            if (!cleanEntry) return;
+        }
+
+        const entry = ROMAN_MAP[baseRoman] || ROMAN_MAP[baseRoman.replace('b', '').replace('#', '')];
+        if (!entry) return;
+
+        // Calculate root note
+        const scaleStep = MAJOR_SCALE_STEPS[entry.degree];
+        const offset = entry.offset || 0;
+        const rootIndex = (adjustedKeyIndex + scaleStep + offset + 12) % 12;
+        const rootNote = SHARP_NOTES[rootIndex];
+
+        // Determine final quality
+        const finalQuality = chordQuality || entry.quality;
+
+        // Generate notes
+        const intervals = CHORD_INTERVALS[finalQuality] || CHORD_INTERVALS['Major'];
+        const baseOctave = 3;
+        const notes = intervals.map(interval => {
+            const noteIndex = (rootIndex + interval) % 12;
+            const noteOctave = baseOctave + Math.floor((rootIndex + interval) / 12);
+            return SHARP_NOTES[noteIndex] + noteOctave;
+        });
+
+        chordData.push({
+            root: rootNote,
+            type: finalQuality,
+            roman: roman,
+            notes: notes,
+            key: key
+        });
+    });
+
+    return chordData;
 }
 
 /**
@@ -571,7 +836,7 @@ function showSaveTemplateDialog() {
         tags: ['custom', 'user-created'],
         arrangement: {
             tempo: 120,
-            timeSignature: { num: 4, denom: 4 },
+            timeSignature: DEFAULT_TIME_SIGNATURE,
             measuresPerChord: 1,
             bassPattern: 'root-fifth',
             style: 'custom'

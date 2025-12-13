@@ -8,6 +8,7 @@
  */
 
 import { getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
+import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
 
 // Intervals for different chord types (in semitones from root)
 // Includes both canonical names (with spaces) and common aliases
@@ -234,7 +235,7 @@ export function generateBassVoicing(chord, previousChord = null, options = {}) {
     const {
         voiceLeadingStrict = true,
         bassPattern = 'root-fifth',
-        timeSignature = { num: 4, denom: 4 },
+        timeSignature = DEFAULT_TIME_SIGNATURE,
         style = 'classical',
         beatsInMeasure = 4, // New: how many beats this chord occupies in this measure
         isChordContinuation = false, // New: is this a tied continuation from previous measure?
@@ -960,7 +961,7 @@ export function generateBuildingBlockBass(chord, previousChord = null, totalBeat
     const {
         bassPattern = 'root-fifth',
         bassFollowsInversion = false,
-        timeSignature = { num: 4, denom: 4 },
+        timeSignature = DEFAULT_TIME_SIGNATURE,
         bassOctave = null,  // null means use pattern-specific default
     } = options;
 

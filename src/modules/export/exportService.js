@@ -9,7 +9,7 @@
  */
 
 import { getProgressionData, getCurrentKey, getTrainerState } from '../state/trainerState.js';
-import { CHORD_DEFINITIONS, ALL_NOTES } from '../../data/music-data.js';
+import { CHORD_DEFINITIONS, ALL_NOTES, DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
 import { spellNoteInKey } from '../utils/noteUtils.js';
 import { addSpecificChordToProgression } from '../features/chordBuilder.js';
 import { getCompositionState, getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
@@ -851,7 +851,7 @@ export function exportToMIDI(options = {}) {
         const tracks = [];
 
         // Get time signature
-        const timeSignature = compositionState?.metadata?.timeSignature || { num: 4, denom: 4 };
+        const timeSignature = compositionState?.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
         const beatsPerMeasure = timeSignature.num;
 
 
