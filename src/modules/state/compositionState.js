@@ -943,7 +943,6 @@ export class CompositionState {
      */
     buildChordSegments() {
         const progressionData = this.exportToProgressionData();
-        console.log('[buildChordSegments] Building from progressionData:', progressionData.map(c => `${c.root} ${c.type}`));
         this.chordSegments = [];
 
         let currentBeat = 0;
@@ -1371,7 +1370,6 @@ export class CompositionState {
 
         // Get rendered measures from the sequence
         const renderedMeasures = this.bassBlockSequence.renderToMeasures();
-        console.log('[renderBassBlocksToMeasures] Rendered from blocks:', renderedMeasures.map((m, i) => ({ measureIndex: i, pitches: m.bassNotes.map(n => n.pitches) })));
 
         // Ensure we have enough measures
         while (this.measures.length < renderedMeasures.length) {
@@ -2131,20 +2129,12 @@ export class CompositionState {
             });
         }
 
-        console.log(`[syncMeasuresToTrebleBlock] Found ${combinedNotes.length} combined notes to write:`,
-            combinedNotes.map(n => `v${(n.voiceIndex || 0) + 1}:${n.pitches?.join(',') || 'rest'} at unit ${n.startUnit} (${n.durationUnits} units)`));
-
         // Now write the combined notes to the block
         for (const note of combinedNotes) {
             if (note.startUnit >= 0 && note.startUnit < totalUnits) {
                 block.setNote(note.startUnit, note.durationUnits, note.isRest ? [] : note.pitches, note.attributes);
             }
         }
-
-        // Debug: verify notes after sync
-        const notesAfterSync = block.getNotes();
-        console.log(`[syncMeasuresToTrebleBlock] After sync, block has ${notesAfterSync.length} notes:`,
-            notesAfterSync.map(n => `${n.pitches?.join(',') || 'rest'} at unit ${n.startUnit} (${n.durationUnits} units)`));
     }
 
     /**
@@ -3716,12 +3706,6 @@ export class CompositionState {
 
         this._isSyncing = true;
 
-        // Log caller info to help debug unnecessary calls
-        const caller = new Error().stack?.split('\n')[2]?.trim() || 'unknown';
-        const chordCount = progressionData?.length || 0;
-        const existingCount = this.storedProgressionData?.length || 0;
-        console.log(`[syncWithProgressionData] Called with ${chordCount} chords (was ${existingCount}). Caller: ${caller}`);
-
         try {
             // Update metadata if provided
             if (options.key) this.metadata.key = options.key;
@@ -3910,8 +3894,6 @@ export class CompositionState {
             return block && block.chord && chord.root !== block.chord.root;
         });
         const needsReinitialize = this.bassBlockSequence.blocks.length === 0 || blockCountDiffers || rootsDiffer;
-
-        console.log(`[syncWithProgressionData] needsReinitialize=${needsReinitialize} (blockCount: ${this.bassBlockSequence.blocks.length}->${progressionData.length}, rootsDiffer=${rootsDiffer})`);
 
         if (needsReinitialize) {
             // Clear existing blocks and reinitialize from progression

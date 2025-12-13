@@ -3704,7 +3704,6 @@ function handleSectionChipClick(sectionId, isShiftClick, isCtrlClick = false) {
     const realSections = compositionState ? compositionState.getSections() : [];
     // Use combined list including pseudo-sections for proper range selection
     const allSections = buildSectionChipsWithUngrouped(realSections);
-    console.log('[SectionView] All sections (including pseudo):', allSections.length);
 
     if (isShiftClick) {
         // Shift+click: select range of adjacent sections
@@ -3877,7 +3876,6 @@ function updateNotationForSelectedSections() {
         notationComposer.renderFilteredMeasures(startMeasure, endMeasure);
     } else {
         // Fallback: just render normally (filter is set, render() will use it)
-        console.log('[SectionView] renderFilteredMeasures not found, falling back to render()');
         if (typeof notationComposer.render === 'function') {
             notationComposer.render();
         }
@@ -3892,13 +3890,6 @@ function updateNotationForSelectedSections() {
  * @param {Array} sections - Array of section objects
  */
 function renderSectionViewMode(container, progressionData, key, sections) {
-    console.log('[SectionView] renderSectionViewMode called:', {
-        containerId: container.id,
-        progressionLength: progressionData.length,
-        sectionsCount: sections.length,
-        key
-    });
-
     // Create section picker bar
     const pickerBar = createSectionPickerBar(sections);
     container.appendChild(pickerBar);
@@ -9365,14 +9356,6 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         // Create container for cards
         const gridContainer = document.createElement('div');
         gridContainer.id = `${containerId}-cards-grid`;
-
-        console.log('[SectionView] COMPOSITION STUDIO renderProgressionDisplay:', {
-            containerId,
-            progressionViewMode,
-            sectionsCount: sections.length,
-            selectedSectionIds: [...selectedSectionIds],
-            progressionLength: trainerState.progressionData.length
-        });
 
         // Branch based on view mode
         if (progressionViewMode === 'section' && sections.length > 0) {
