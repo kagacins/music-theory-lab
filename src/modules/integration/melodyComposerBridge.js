@@ -8,7 +8,7 @@
  * to use CompositionState directly.
  */
 
-import { getCompositionState, resetCompositionState } from '../state/compositionState.js';
+import { getCompositionState, resetCompositionState, getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
 import {
     getProgressionNotationSync,
     syncProgressionToComposition
@@ -318,7 +318,7 @@ export function addNoteIntelligently(pitch, duration, dotted, staff, isRest = fa
     // BASS CLEF: Use building block boundaries instead of measure boundaries
     if (staff === 'bass') {
         const beatInMeasure = getCurrentBeat(selectedMeasureIndex, staff);
-        const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
         const absoluteBeat = (selectedMeasureIndex * beatsPerMeasure) + beatInMeasure;
         const segment = compositionState.getChordSegmentForBeat(absoluteBeat);
 

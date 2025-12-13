@@ -182,6 +182,508 @@ class BassNoteStore {
 }
 
 // ============================================================================
+// TIME SIGNATURE HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Ticks per quarter note - the fundamental timing resolution
+ * 480 is a standard MIDI PPQ value that divides evenly by many common note values
+ */
+export const TS_PPQ = 480;
+
+/**
+ * Calculate the effective beats per measure from a time signature object
+ * This correctly handles all time signatures including compound meters
+ *
+ * @param {Object} timeSignature - { num: number, denom: number }
+ * @returns {number} - Effective beats per measure
+ *
+ * @example
+ * getBeatsPerMeasureFromTimeSignature({ num: 4, denom: 4 }) // Returns 4
+ * getBeatsPerMeasureFromTimeSignature({ num: 6, denom: 8 }) // Returns 3 (compound)
+ * getBeatsPerMeasureFromTimeSignature({ num: 2, denom: 2 }) // Returns 4 (cut time)
+ */
+export function getBeatsPerMeasureFromTimeSignature(timeSignature = { num: 4, denom: 4 }) {
+    const num = timeSignature?.num ?? 4;
+    const denom = timeSignature?.denom ?? 4;
+    // Formula: multiply by (4/denom) to normalize everything to quarter-note beats
+    // 4/4: 4 * (4/4) = 4 beats
+    // 6/8: 6 * (4/8) = 3 beats (compound duple)
+    // 2/2: 2 * (4/2) = 4 beats (cut time = 4 quarter note beats)
+    // 3/4: 3 * (4/4) = 3 beats
+    return num * (4 / denom);
+}
+
+/**
+ * Get ticks per denominator unit for a time signature
+ * @param {Object} timeSignature - { num: number, denom: number }
+ * @returns {number} - Ticks per denominator note
+ */
+export function getTicksPerDenominator(timeSignature = { num: 4, denom: 4 }) {
+    const denom = timeSignature?.denom ?? 4;
+    // A quarter note = TS_PPQ ticks
+    // An eighth note = TS_PPQ / 2 ticks
+    // A half note = TS_PPQ * 2 ticks
+    return TS_PPQ * (4 / denom);
+}
+
+/**
+ * Calculate total tick capacity for one measure
+ * @param {Object} timeSignature - { num: number, denom: number }
+ * @returns {number} - Total ticks that fit in one measure
+ */
+export function getMeasureCapacityTicks(timeSignature = { num: 4, denom: 4 }) {
+    const num = timeSignature?.num ?? 4;
+    return num * getTicksPerDenominator(timeSignature);
+}
+
+/**
+ * Convert a duration string (Tone.js format) to ticks
+ * @param {string} durationStr - Duration like '4n', '8n.', '2n'
+ * @param {Object} timeSignature - Current time signature
+ * @returns {number} - Duration in ticks
+ */
+export function durationStringToTicks(durationStr, timeSignature = { num: 4, denom: 4 }) {
+    if (!durationStr) return getTicksPerDenominator(timeSignature);
+
+    const base = durationStr.replace('.', '');
+    const isDotted = durationStr.includes('.');
+
+    let denomValue = 4; // Default to quarter note
+    if (base.endsWith('1n')) denomValue = 1;
+    else if (base.endsWith('2n')) denomValue = 2;
+    else if (base.endsWith('4n')) denomValue = 4;
+    else if (base.endsWith('8n')) denomValue = 8;
+    else if (base.endsWith('16n')) denomValue = 16;
+    else if (base.endsWith('32n')) denomValue = 32;
+    else if (base.endsWith('64n')) denomValue = 64;
+
+    // Calculate base ticks (relative to quarter note)
+    const ticks = TS_PPQ * (4 / denomValue);
+
+    // Dotted notes are 1.5x their base duration
+    return isDotted ? ticks * 1.5 : ticks;
+}
+
+/**
+ * Convert beats to ticks
+ * @param {number} beats - Number of beats
+ * @param {Object} timeSignature - Current time signature (unused but for API consistency)
+ * @returns {number} - Equivalent ticks
+ */
+export function beatsToTicks(beats, timeSignature = { num: 4, denom: 4 }) {
+    return beats * TS_PPQ;
+}
+
+/**
+ * Convert ticks to beats
+ * @param {number} ticks - Number of ticks
+ * @returns {number} - Equivalent beats
+ */
+export function ticksToBeats(ticks) {
+    return ticks / TS_PPQ;
+}
+
+/**
+ * Sum the total ticks for an array of notes
+ * @param {Array} notes - Array of note objects with duration property
+ * @param {Object} timeSignature - Current time signature
+ * @returns {number} - Total ticks
+ */
+export function sumNoteTicks(notes, timeSignature = { num: 4, denom: 4 }) {
+    return notes.reduce((sum, note) => {
+        return sum + durationStringToTicks(note.duration, timeSignature);
+    }, 0);
+}
+
+/**
+ * Convert ticks to the closest standard duration string
+ * @param {number} ticks - Number of ticks
+ * @param {Object} timeSignature - Current time signature
+ * @returns {string} - Closest duration string
+ */
+export function ticksToDurationString(ticks, timeSignature = { num: 4, denom: 4 }) {
+    const durations = ['1n', '2n.', '2n', '4n.', '4n', '8n.', '8n', '16n.', '16n', '32n'];
+    let closest = '4n';
+    let closestDiff = Infinity;
+
+    for (const dur of durations) {
+        const durTicks = durationStringToTicks(dur, timeSignature);
+        const diff = Math.abs(durTicks - ticks);
+        if (diff < closestDiff) {
+            closestDiff = diff;
+            closest = dur;
+        }
+    }
+    return closest;
+}
+
+/**
+ * Calculate overflow ticks beyond measure capacity
+ * @param {Array} notes - Array of note objects with duration property
+ * @param {Object} timeSignature - Current time signature
+ * @returns {number} - Overflow ticks (0 if within capacity)
+ */
+export function getNotesOverflowTicks(notes, timeSignature = { num: 4, denom: 4 }) {
+    const totalTicks = sumNoteTicks(notes, timeSignature);
+    const capacityTicks = getMeasureCapacityTicks(timeSignature);
+    return Math.max(0, totalTicks - capacityTicks);
+}
+
+// ============================================================================
+// MULTI-VOICE TIME SIGNATURE REDISTRIBUTION HELPERS
+// ============================================================================
+
+/**
+ * Convert beats to a duration string (Tone.js format)
+ * @param {number} beats - Number of beats
+ * @returns {string} - Duration string like '4n', '2n.', etc.
+ */
+function beatsToDurationString(beats) {
+    // Map of beats to duration strings
+    const beatMap = [
+        { beats: 4, duration: '1n' },
+        { beats: 3, duration: '2n.' },
+        { beats: 2, duration: '2n' },
+        { beats: 1.5, duration: '4n.' },
+        { beats: 1, duration: '4n' },
+        { beats: 0.75, duration: '8n.' },
+        { beats: 0.5, duration: '8n' },
+        { beats: 0.375, duration: '16n.' },
+        { beats: 0.25, duration: '16n' },
+    ];
+
+    // Find the closest match
+    let closest = beatMap[0];
+    let closestDiff = Math.abs(beats - closest.beats);
+
+    for (const entry of beatMap) {
+        const diff = Math.abs(beats - entry.beats);
+        if (diff < closestDiff) {
+            closestDiff = diff;
+            closest = entry;
+        }
+    }
+
+    return closest.duration;
+}
+
+/**
+ * Get the duration in beats from a duration string
+ * @param {string} duration - Duration string like '4n', '2n.', etc.
+ * @returns {number} - Duration in beats
+ */
+function durationToBeats(duration) {
+    const map = {
+        '1n': 4,
+        '2n.': 3,
+        '2n': 2,
+        '4n.': 1.5,
+        '4n': 1,
+        '8n.': 0.75,
+        '8n': 0.5,
+        '16n.': 0.375,
+        '16n': 0.25,
+        '32n': 0.125,
+    };
+    return map[duration] || 1;
+}
+
+/**
+ * Collect all notes from all voices in a staff with their absolute beat positions
+ * This is used for multi-voice time signature redistribution
+ *
+ * @param {Array} measures - The measures array from compositionState
+ * @param {string} staff - 'treble' or 'bass'
+ * @param {Object} timeSignature - Current time signature for calculating absolute positions
+ * @returns {Object} - { voice0: [...notes], voice1: [...notes] } with absoluteBeat on each note
+ */
+export function collectAllNotesWithAbsolutePositions(measures, staff, timeSignature) {
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
+    const result = { voice0: [], voice1: [] };
+
+    for (let measureIndex = 0; measureIndex < measures.length; measureIndex++) {
+        const measure = measures[measureIndex];
+        const voices = measure?.notation?.[staff]?.voices || [];
+        const measureStartBeat = measureIndex * beatsPerMeasure;
+
+        for (let voiceIndex = 0; voiceIndex < voices.length; voiceIndex++) {
+            const voiceNotes = voices[voiceIndex]?.notes || [];
+            const voiceKey = `voice${voiceIndex}`;
+
+            if (!result[voiceKey]) {
+                result[voiceKey] = [];
+            }
+
+            for (const note of voiceNotes) {
+                // Skip rests - they'll be regenerated during redistribution
+                if (note.isRest || note.type === 'rest') continue;
+
+                // Skip tied continuations - we only want the first part of tied notes
+                if (note.isTied) continue;
+
+                const noteBeat = note.beat || 0;
+                const absoluteBeat = measureStartBeat + noteBeat;
+                const noteDuration = durationToBeats(note.duration);
+
+                // If this note has tied=true, it ties to the next note
+                // We need to combine tied notes into a single logical note with full duration
+                let totalDuration = noteDuration;
+
+                if (note.tied) {
+                    // Look ahead for tied continuations
+                    totalDuration = collectTiedDuration(measures, staff, voiceIndex, measureIndex, noteBeat, noteDuration, beatsPerMeasure);
+                }
+
+                result[voiceKey].push({
+                    pitch: note.pitch,
+                    pitches: note.pitches ? [...note.pitches] : (note.pitch ? [note.pitch] : []),
+                    duration: beatsToDurationString(totalDuration),
+                    durationBeats: totalDuration,
+                    absoluteBeat,
+                    voiceIndex,
+                    // Preserve other properties
+                    originalDuration: note.duration,
+                    ...(note.velocity !== undefined && { velocity: note.velocity }),
+                });
+            }
+        }
+    }
+
+    // Sort notes by absolute beat position within each voice
+    result.voice0.sort((a, b) => a.absoluteBeat - b.absoluteBeat);
+    result.voice1.sort((a, b) => a.absoluteBeat - b.absoluteBeat);
+
+    return result;
+}
+
+/**
+ * Helper to collect the total duration of a tied note chain
+ */
+function collectTiedDuration(measures, staff, voiceIndex, startMeasureIndex, startBeat, startDuration, beatsPerMeasure) {
+    let totalDuration = startDuration;
+    let currentMeasure = startMeasureIndex;
+    let expectedBeat = startBeat + startDuration;
+
+    // Look for continuation notes (isTied=true) that follow
+    while (currentMeasure < measures.length) {
+        // Check if we've moved to the next measure
+        if (expectedBeat >= beatsPerMeasure) {
+            currentMeasure++;
+            expectedBeat -= beatsPerMeasure;
+            if (currentMeasure >= measures.length) break;
+        }
+
+        const measure = measures[currentMeasure];
+        const voiceNotes = measure?.notation?.[staff]?.voices?.[voiceIndex]?.notes || [];
+
+        // Find a tied continuation at the expected beat
+        const continuation = voiceNotes.find(n =>
+            n.isTied &&
+            Math.abs((n.beat || 0) - expectedBeat) < 0.001
+        );
+
+        if (continuation) {
+            const contDuration = durationToBeats(continuation.duration);
+            totalDuration += contDuration;
+            expectedBeat += contDuration;
+
+            // If this continuation also ties forward, keep going
+            if (!continuation.tied) {
+                break; // End of tie chain
+            }
+        } else {
+            break; // No continuation found
+        }
+    }
+
+    return totalDuration;
+}
+
+/**
+ * Redistribute collected notes to measures based on a new time signature
+ * Handles splitting notes at measure boundaries and creating ties
+ *
+ * @param {Object} compositionState - The composition state instance
+ * @param {string} staff - 'treble' or 'bass'
+ * @param {Object} collectedNotes - Result from collectAllNotesWithAbsolutePositions
+ * @param {Object} newTimeSignature - The new time signature to redistribute to
+ */
+export function redistributeNotesToNewMeasures(compositionState, staff, collectedNotes, newTimeSignature) {
+    const newBeatsPerMeasure = getBeatsPerMeasureFromTimeSignature(newTimeSignature);
+
+    console.log(`[redistributeNotesToNewMeasures] Redistributing ${staff} notes to ${newTimeSignature.num}/${newTimeSignature.denom} (${newBeatsPerMeasure} beats/measure)`);
+
+    // Clear existing notes in this staff for all measures (but keep measure structure)
+    for (const measure of compositionState.measures) {
+        if (measure.notation?.[staff]?.voices) {
+            for (const voice of measure.notation[staff].voices) {
+                if (voice) {
+                    voice.notes = [];
+                }
+            }
+        }
+    }
+
+    // Process each voice
+    for (const voiceKey of Object.keys(collectedNotes)) {
+        const voiceIndex = parseInt(voiceKey.replace('voice', ''), 10);
+        const notes = collectedNotes[voiceKey];
+
+        console.log(`[redistributeNotesToNewMeasures] Processing ${voiceKey} with ${notes.length} notes`);
+
+        for (const note of notes) {
+            const absoluteBeat = note.absoluteBeat;
+            const noteDurationBeats = note.durationBeats;
+
+            // Calculate which measure and beat position this note starts in
+            let measureIndex = Math.floor(absoluteBeat / newBeatsPerMeasure);
+            let beatInMeasure = absoluteBeat - (measureIndex * newBeatsPerMeasure);
+
+            // Ensure measure exists
+            while (compositionState.measures.length <= measureIndex) {
+                compositionState.addMeasure({});
+            }
+
+            // Ensure voice exists in the measure
+            compositionState.ensureVoiceExists(measureIndex, staff, voiceIndex);
+
+            // Check if note fits in current measure or needs to be split
+            const remainingInMeasure = newBeatsPerMeasure - beatInMeasure;
+
+            if (noteDurationBeats <= remainingInMeasure) {
+                // Note fits entirely in this measure
+                const newNote = {
+                    type: 'note',
+                    pitch: note.pitch || note.pitches?.[0],
+                    pitches: note.pitches,
+                    duration: beatsToDurationString(noteDurationBeats),
+                    beat: beatInMeasure,
+                    dotted: beatsToDurationString(noteDurationBeats).includes('.'),
+                    isRest: false,
+                    isTied: false,
+                    tied: false,
+                    voiceIndex: voiceIndex, // Track which voice this note belongs to
+                };
+
+                compositionState.measures[measureIndex].notation[staff].voices[voiceIndex].notes.push(newNote);
+            } else {
+                // Note needs to be split across measure boundaries
+                let remainingDuration = noteDurationBeats;
+                let currentMeasureIndex = measureIndex;
+                let currentBeat = beatInMeasure;
+                let isFirstPart = true;
+
+                while (remainingDuration > 0.001 && currentMeasureIndex < compositionState.measures.length + 10) {
+                    // Ensure measure exists
+                    while (compositionState.measures.length <= currentMeasureIndex) {
+                        compositionState.addMeasure({});
+                    }
+                    compositionState.ensureVoiceExists(currentMeasureIndex, staff, voiceIndex);
+
+                    const spaceInMeasure = newBeatsPerMeasure - currentBeat;
+                    const durationThisMeasure = Math.min(remainingDuration, spaceInMeasure);
+                    const isLastPart = (remainingDuration - durationThisMeasure) < 0.001;
+
+                    const partNote = {
+                        type: 'note',
+                        pitch: note.pitch || note.pitches?.[0],
+                        pitches: note.pitches,
+                        duration: beatsToDurationString(durationThisMeasure),
+                        beat: currentBeat,
+                        dotted: beatsToDurationString(durationThisMeasure).includes('.'),
+                        isRest: false,
+                        isTied: !isFirstPart, // Continuation from previous
+                        tied: !isLastPart,    // Ties to next
+                        voiceIndex: voiceIndex, // Track which voice this note belongs to
+                    };
+
+                    compositionState.measures[currentMeasureIndex].notation[staff].voices[voiceIndex].notes.push(partNote);
+
+                    remainingDuration -= durationThisMeasure;
+                    currentMeasureIndex++;
+                    currentBeat = 0; // Subsequent parts start at beat 0
+                    isFirstPart = false;
+                }
+            }
+        }
+    }
+
+    // Fill gaps with rests for each voice
+    fillGapsWithRests(compositionState, staff, newTimeSignature);
+}
+
+/**
+ * Fill gaps in measures with rests
+ * Called after redistribution to ensure measures have proper rest structure
+ */
+function fillGapsWithRests(compositionState, staff, timeSignature) {
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
+
+    for (let measureIndex = 0; measureIndex < compositionState.measures.length; measureIndex++) {
+        const voices = compositionState.measures[measureIndex]?.notation?.[staff]?.voices || [];
+
+        for (let voiceIndex = 0; voiceIndex < voices.length; voiceIndex++) {
+            const voice = voices[voiceIndex];
+            if (!voice) continue;
+
+            const notes = voice.notes || [];
+            if (notes.length === 0) {
+                // Empty voice - fill with a single rest
+                voice.notes = [{
+                    type: 'rest',
+                    duration: beatsToDurationString(beatsPerMeasure),
+                    beat: 0,
+                    isRest: true,
+                    voiceIndex: voiceIndex,
+                }];
+                continue;
+            }
+
+            // Sort notes by beat
+            notes.sort((a, b) => (a.beat || 0) - (b.beat || 0));
+
+            // Calculate gaps and fill with rests
+            const newNotes = [];
+            let currentBeat = 0;
+
+            for (const note of notes) {
+                const noteBeat = note.beat || 0;
+
+                // If there's a gap before this note, fill with rest
+                if (noteBeat > currentBeat + 0.001) {
+                    const gapDuration = noteBeat - currentBeat;
+                    newNotes.push({
+                        type: 'rest',
+                        duration: beatsToDurationString(gapDuration),
+                        beat: currentBeat,
+                        isRest: true,
+                        voiceIndex: voiceIndex,
+                    });
+                }
+
+                newNotes.push(note);
+                currentBeat = noteBeat + durationToBeats(note.duration);
+            }
+
+            // Fill remaining space with rest
+            if (currentBeat < beatsPerMeasure - 0.001) {
+                const remainingDuration = beatsPerMeasure - currentBeat;
+                newNotes.push({
+                    type: 'rest',
+                    duration: beatsToDurationString(remainingDuration),
+                    beat: currentBeat,
+                    isRest: true,
+                    voiceIndex: voiceIndex,
+                });
+            }
+
+            voice.notes = newNotes;
+        }
+    }
+}
+
+// ============================================================================
 // CHORD SEGMENT MODEL
 // ============================================================================
 
@@ -677,7 +1179,7 @@ export class CompositionState {
         }
 
         const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
-        const beatsPerMeasure = timeSignature.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
         // If the new duration fits in one measure, we may need to recombine
         if (newDurationBeats > beatsPerMeasure) {
@@ -970,7 +1472,7 @@ export class CompositionState {
             return;
         }
 
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
 
         // Calculate where each chord starts in absolute beats
         const chordStartBeats = [];
@@ -1142,7 +1644,7 @@ export class CompositionState {
         }
 
         const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
-        const beatsPerMeasure = timeSignature.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
         // First, clear all bass notes from measures
         this.measures.forEach(measure => {
@@ -1219,6 +1721,7 @@ export class CompositionState {
                         beat: beatInMeasure,
                         dotted: firstPartDuration.includes('.'),
                         isTied: false, // First part is NOT tied (it's the start of the tie)
+                        tied: !noteEntry.isRest, // First part ties TO the next part (for rendering)
                         isRest: noteEntry.isRest,
                         bassNoteId: noteEntry.id,
                         chordIndex: chordIndex,
@@ -1243,6 +1746,7 @@ export class CompositionState {
                         beat: 0,
                         dotted: secondPartDuration.includes('.'),
                         isTied: true, // Second part IS tied (continuation of the tie)
+                        tied: false, // Second part does NOT tie to anything after (it's the end)
                         isRest: noteEntry.isRest,
                         bassNoteId: noteEntry.id,
                         chordIndex: chordIndex,
@@ -1364,7 +1868,7 @@ export class CompositionState {
      */
     applySegmentsToMeasures() {
         const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
-        const beatsPerMeasure = timeSignature.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
         // First, clear all bass notes
         this.measures.forEach(measure => {
@@ -1461,7 +1965,7 @@ export class CompositionState {
         this.trebleBlockSequence.blocks = [];
 
         // Calculate total beats from all measures
-        const beatsPerMeasure = timeSignature.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
         const totalBeats = this.measures.length * beatsPerMeasure;
 
         if (totalBeats === 0) {
@@ -1511,7 +2015,7 @@ export class CompositionState {
         }
 
         const block = this.trebleBlockSequence.blocks[0]; // Single treble block
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
 
         console.log(`[syncMeasuresToTrebleBlock] Syncing ${this.measures.length} measures to treble block`);
 
@@ -1677,7 +2181,7 @@ export class CompositionState {
         }
 
         const block = this.trebleBlockSequence.blocks[0];
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
 
         // Calculate the absolute beat position of this note
         const measure = this.measures[measureIndex];
@@ -1726,7 +2230,7 @@ export class CompositionState {
 
         const block = this.trebleBlockSequence.blocks[0]; // Single treble block
         const notes = block.getNotes();
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
         const unitsPerMeasure = beatsPerMeasure * UNITS_PER_BEAT;
 
         // Determine which voices are present in the block data
@@ -1792,7 +2296,8 @@ export class CompositionState {
                     duration: duration,
                     beat: beat,
                     dotted: duration.includes('.'),
-                    isTied: !isFirstPart, // Tied if continuation from previous measure
+                    isTied: !isFirstPart, // True if this is a continuation FROM the previous note
+                    tied: !isLastPart && !note.isRest, // True if this note ties TO the next part (for rendering)
                     isRest: note.isRest,
                     voiceIndex: voiceIndex, // Include 0-based voice index for rendering
                     // Musical attributes - only on first part
@@ -1852,7 +2357,7 @@ export class CompositionState {
             block.setDuration(requiredBeats);
 
             // Also ensure we have enough measures
-            const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+            const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
             const requiredMeasures = Math.ceil(requiredBeats / beatsPerMeasure);
             while (this.measures.length < requiredMeasures) {
                 this.addMeasure({});
@@ -1921,7 +2426,7 @@ export class CompositionState {
             notesAfter.map(n => `${n.pitches.join(',')||'rest'} at unit ${n.startUnit} (${n.durationUnits} units)`));
 
         // Step 4: Ensure we have enough measures
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
         const requiredMeasures = Math.ceil(newTotalBeats / beatsPerMeasure);
         while (this.measures.length < requiredMeasures) {
             this.addMeasure({});
@@ -2018,7 +2523,7 @@ export class CompositionState {
      * @returns {Object|null} - { startUnit, durationUnits, note, isTiedContinuation } or null
      */
     getTrebleNoteUnit(measureIndex, noteIndex) {
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
         const measureStartUnit = measureIndex * beatsPerMeasure * UNITS_PER_BEAT;
 
         const measure = this.measures[measureIndex];
@@ -2115,7 +2620,7 @@ export class CompositionState {
      */
     addTrebleNote(measureIndex, beat, noteData, options = {}) {
         const { useBlockSequence = true, insertWithShift = false } = options;
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
 
         // Ensure measure exists
         while (this.measures.length <= measureIndex) {
@@ -2462,7 +2967,7 @@ export class CompositionState {
             this.buildChordSegments();
         }
 
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
         const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
         let previousChord = null;
 
@@ -2555,7 +3060,7 @@ export class CompositionState {
         }
 
         const { startBeat, durationBeats, chord } = segment;
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
         const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
 
         // Get previous chord for voice leading
@@ -2777,6 +3282,147 @@ export class CompositionState {
         const voiceIndex = Math.max(0, Math.min(1, voiceNumber - 1));
         this.cursor.bassVoice = voiceIndex;
         this.events.emit('activeBassVoiceChanged', voiceNumber);
+    }
+
+    /**
+     * Set the time signature for the composition
+     * Preserves notes by syncing to block before change and re-rendering after
+     * For multi-voice content, uses full redistribution to preserve all voices
+     * @param {number} num - Numerator (e.g., 4 for 4/4)
+     * @param {number} denom - Denominator (e.g., 4 for 4/4)
+     */
+    setTimeSignature(num, denom) {
+        const oldTS = this.metadata.timeSignature || { num: 4, denom: 4 };
+        console.log(`[CompositionState] setTimeSignature: ${oldTS.num}/${oldTS.denom} -> ${num}/${denom}`);
+
+        // Skip if no change
+        if (oldTS.num === num && oldTS.denom === denom) {
+            console.log(`[CompositionState] Time signature unchanged, skipping`);
+            return;
+        }
+
+        // Check for multi-voice content in treble
+        const hasTrebleMultiVoice = this.measures.some(m => {
+            const voices = m.notation?.treble?.voices || [];
+            return voices.length > 1 && voices[1]?.notes?.some(n => !n.isRest && n.type !== 'rest');
+        });
+
+        // Check for treble notes (any voice)
+        const hasTrebleNotes = this.measures.some(m => {
+            const voices = m.notation?.treble?.voices || [];
+            return voices.some(voice =>
+                voice?.notes?.some(n => !n.isRest && n.type !== 'rest')
+            );
+        });
+
+        // Check for multi-voice content in bass
+        const hasBassMultiVoice = this.measures.some(m => {
+            const voices = m.notation?.bass?.voices || [];
+            return voices.length > 1 && voices[1]?.notes?.some(n => !n.isRest && n.type !== 'rest');
+        });
+
+        // Check for bass notes (any voice)
+        const hasBassNotes = this.measures.some(m => {
+            const voices = m.notation?.bass?.voices || [];
+            return voices.some(voice =>
+                voice?.notes?.some(n => !n.isRest && n.type !== 'rest')
+            );
+        });
+
+        const hasTrebleBlock = this.trebleBlockSequence?.blocks?.length > 0;
+        const hasBassBlock = this.bassBlockSequence?.blocks?.length > 0;
+        const newTS = { num, denom };
+
+        // PHASE 5: Multi-voice redistribution
+        if (hasTrebleMultiVoice && hasTrebleNotes) {
+            console.log(`[CompositionState] MULTI-VOICE detected - using full redistribution for treble`);
+
+            // 1. Collect ALL notes from ALL voices with absolute positions (using OLD time signature)
+            const collectedTrebleNotes = collectAllNotesWithAbsolutePositions(this.measures, 'treble', oldTS);
+            console.log(`[CompositionState] Collected treble notes:`, {
+                voice0: collectedTrebleNotes.voice0.length,
+                voice1: collectedTrebleNotes.voice1.length
+            });
+
+            // 2. Update metadata to new time signature
+            this.metadata.timeSignature = newTS;
+
+            // 3. Update block sequences
+            if (this.bassBlockSequence) {
+                this.bassBlockSequence.setTimeSignature(num, denom);
+            }
+            if (this.trebleBlockSequence) {
+                this.trebleBlockSequence.setTimeSignature(num, denom);
+            }
+
+            // 4. Redistribute treble notes to new measure structure
+            redistributeNotesToNewMeasures(this, 'treble', collectedTrebleNotes, newTS);
+
+        } else if (hasTrebleBlock && hasTrebleNotes) {
+            // PHASE 4: Single-voice - use block-based sync/render (simpler and well-tested)
+            console.log(`[CompositionState] Single-voice treble - using block-based redistribution`);
+
+            // 1. Sync treble notes to block BEFORE updating metadata
+            this.syncMeasuresToTrebleBlock(); // Uses OLD time signature
+
+            // 2. Update metadata to new time signature
+            this.metadata.timeSignature = newTS;
+
+            // 3. Update block sequences
+            if (this.bassBlockSequence) {
+                this.bassBlockSequence.setTimeSignature(num, denom);
+            }
+            if (this.trebleBlockSequence) {
+                this.trebleBlockSequence.setTimeSignature(num, denom);
+            }
+
+            // 4. Re-render treble block to measures using NEW time signature
+            this.renderTrebleBlocksToMeasures();
+
+        } else {
+            // No treble notes - just update metadata
+            this.metadata.timeSignature = newTS;
+
+            if (this.bassBlockSequence) {
+                this.bassBlockSequence.setTimeSignature(num, denom);
+            }
+            if (this.trebleBlockSequence) {
+                this.trebleBlockSequence.setTimeSignature(num, denom);
+            }
+        }
+
+        // 5. Handle bass notes during time signature change
+        // PHASE 5: If bass has multi-voice, use full redistribution (like treble)
+        // Otherwise, re-render from block (simpler for single-voice)
+        if (hasBassMultiVoice && hasBassNotes) {
+            console.log(`[CompositionState] BASS MULTI-VOICE detected - using full redistribution`);
+
+            // Collect ALL bass notes from ALL voices with absolute positions (using OLD time signature)
+            const collectedBassNotes = collectAllNotesWithAbsolutePositions(this.measures, 'bass', oldTS);
+            console.log(`[CompositionState] Collected bass notes:`, {
+                voice0: collectedBassNotes.voice0.length,
+                voice1: collectedBassNotes.voice1.length
+            });
+
+            // Redistribute bass notes to new measure structure
+            redistributeNotesToNewMeasures(this, 'bass', collectedBassNotes, newTS);
+
+        } else if (hasBassBlock) {
+            // Single-voice bass - re-render from block (simpler and well-tested)
+            console.log(`[CompositionState] Re-rendering bass block to measures with NEW time signature`);
+            this.renderBassBlocksToMeasures(); // Uses NEW time signature
+        }
+
+        // Emit event for any listeners
+        this.events.emit('timeSignatureChanged', { num, denom });
+    }
+
+    /**
+     * Get the current time signature
+     * @returns {Object} - { num, denom }
+     */
+    getTimeSignature() {
+        return this.metadata.timeSignature || { num: 4, denom: 4 };
     }
 
     /**
@@ -3032,7 +3678,7 @@ export class CompositionState {
 
         // Get time signature to determine beats per measure
         const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
-        const beatsPerMeasure = timeSignature.num || timeSignature.numerator || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
         // Process each chord, potentially splitting across multiple measures
         progressionData.forEach((chordData, chordIndex) => {
@@ -3116,7 +3762,7 @@ export class CompositionState {
 
         // Get time signature to determine beats per measure
         const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
-        const beatsPerMeasure = timeSignature.num || timeSignature.numerator || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
         // Calculate how many measures we need based on chord durations
         let requiredMeasures = 0;
@@ -3870,8 +4516,7 @@ export class CompositionState {
             });
 
             // Advance by measure's total beats
-            const timeSignature = this.metadata.timeSignature || { num: 4, denom: 4 };
-            currentBeat += timeSignature.num || 4;
+            currentBeat += getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
         }
 
         return trebleNotes;
@@ -4168,7 +4813,7 @@ export class CompositionState {
             return;
         }
 
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
 
         // Get foundational chord pitches - exact pitches from chord card
         const bassPitches = this.getFoundationalBassPitches(chordData);
@@ -4890,7 +5535,7 @@ export class CompositionState {
         let trebleNotesToDuplicate = [];
         let sectionStartUnit = 0;
         let sectionEndUnit = 0;
-        const beatsPerMeasure = this.metadata.timeSignature?.num || 4;
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
 
         if (mode === 'both' && this.trebleBlockSequence?.blocks?.length > 0) {
             const trebleBlock = this.trebleBlockSequence.blocks[0];

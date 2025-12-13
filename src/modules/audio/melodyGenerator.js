@@ -9,7 +9,7 @@ import { getEnharmonicPreference, getNotationPreference } from '../state/globalS
 import { getNoteKeyId, noteToMidi, getLHNotes, getNotePitches, hasPitch, getPrimaryPitch } from '../utils/noteUtils.js';
 import { CHORD_DEFINITIONS, ALL_NOTES, MAJOR_SCALE_STEPS } from '../../data/music-data.js';
 import { analyzeChordTone, CHORD_TONE_COLORS, NOTE_RELATIONSHIPS } from '../analysis/chordToneAnalyzer.js';
-import { getCompositionState } from '../state/compositionState.js';
+import { getCompositionState, getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
 
 // Global state
 let currentMelody = null;
@@ -3007,6 +3007,10 @@ export function playFromSelectedMeasure() {
             console.log(`[playFromSelectedMeasure] Got ${notesFromStart.length} melody notes from compositionState (from measure ${startMeasure})`);
         }
         if (notesFromStart.length > 0) {
+            // Filter out tied continuation notes - they should not be played as new attacks
+            const playableNotes = notesFromStart.filter(note => !note.isTied);
+            console.log(`[playFromSelectedMeasure] After filtering ties: ${playableNotes.length} playable notes`);
+
             melodyPart = new Tone.Part((time, noteData) => {
                 // Handle polyphony - play all pitches
                 const pitches = noteData.pitches || (noteData.pitch ? [noteData.pitch] : []);
@@ -3025,7 +3029,7 @@ export function playFromSelectedMeasure() {
                         if (keyEl) keyEl.classList.remove('active-melody-playback');
                     }, time + 0.4);
                 });
-            }, notesFromStart.map(note => ({
+            }, playableNotes.map(note => ({
                 time: ((note.measure - startMeasure) * measureDuration) + (note.beat * beatDuration),
                 pitch: note.pitch, // Legacy single pitch
                 pitches: note.pitches, // Polyphonic format
@@ -3363,6 +3367,12 @@ export function playMeasure(measureIndex) {
                 return; // Skip rests
             }
 
+            // Skip tied notes - they are continuations from previous measures, not new attacks
+            if (note.isTied) {
+                console.log(`[playMeasure] Note ${index}: TIED CONTINUATION, skipping`);
+                return;
+            }
+
             const delay = note.beat * beatDuration; // Use actual beat position for timing
             // Use tuplet-aware duration calculation (pass tuplet attribute for correct rhythm)
             const noteDuration = note.duration ? getDurationInSeconds(note.duration, tempo, note.tuplet) : 0.5;
@@ -3546,14 +3556,15 @@ export function playInteractiveMelodyWithChords() {
     if (window.getCompositionState) {
         const compositionState = window.getCompositionState();
         melodyNotesToPlay = compositionState.getAllMelodyNotes()
-            .filter(note => note.type === 'note' && (note.pitch || note.pitches)) // Skip rests, include both formats
+            // Skip rests, skip tied continuations, include both formats
+            .filter(note => note.type === 'note' && (note.pitch || note.pitches) && !note.isTied)
             .map(note => ({
                 time: (note.measure * measureDuration) + (note.beat * beatDuration),
                 pitch: note.pitch, // Legacy single pitch
                 pitches: note.pitches, // Polyphonic format
                 duration: note.duration
             }));
-        console.log(`[playInteractiveMelodyWithChords] Got ${melodyNotesToPlay.length} melody notes from compositionState`);
+        console.log(`[playInteractiveMelodyWithChords] Got ${melodyNotesToPlay.length} melody notes from compositionState (after filtering ties)`);
     }
 
     // Schedule melody notes
@@ -3992,7 +4003,10 @@ export function playAllMelody() {
                     // New-style ties: this note is marked as a continuation or end
                     ((note.tie === 'continue' || note.tie === 'end') && prev && samePitches(note, prev)) ||
                     // Legacy ties: previous note has tied=true and same pitch
-                    (prev && prev.tied && samePitches(note, prev));
+                    (prev && prev.tied && samePitches(note, prev)) ||
+                    // isTied flag: this note is a continuation from a previous tied note
+                    // (used by time signature redistribution)
+                    (note.isTied && prev && samePitches(note, prev));
 
                 // Skip pure continuation notes – their duration will be merged into the start note
                 if (isContinuation) {
@@ -4021,7 +4035,10 @@ export function playAllMelody() {
                         // New-style ties: continue/end and same pitch
                         ((next.tie === 'continue' || next.tie === 'end') && samePitches(next, prevInChain)) ||
                         // Legacy ties: previous note in chain has tied=true and same pitch
-                        (prevInChain && prevInChain.tied && samePitches(next, prevInChain));
+                        (prevInChain && prevInChain.tied && samePitches(next, prevInChain)) ||
+                        // isTied flag: this note is a continuation from a previous tied note
+                        // (used by time signature redistribution)
+                        (next.isTied && samePitches(next, prevInChain));
 
                     if (!nextIsContinuation) {
                         break;
@@ -4232,7 +4249,7 @@ export function playAllMelody() {
         if (window.getCompositionState) {
             const compositionState = window.getCompositionState();
             const timeSignature = compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
-            const beatsPerMeasure = timeSignature.num || timeSignature.numerator || 4;
+            const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
             const events = [];
             const measureCount = compositionState.getMeasureCount();

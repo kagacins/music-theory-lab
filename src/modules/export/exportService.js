@@ -12,7 +12,7 @@ import { getProgressionData, getCurrentKey, getTrainerState } from '../state/tra
 import { CHORD_DEFINITIONS, ALL_NOTES } from '../../data/music-data.js';
 import { spellNoteInKey } from '../utils/noteUtils.js';
 import { addSpecificChordToProgression } from '../features/chordBuilder.js';
-import { getCompositionState } from '../state/compositionState.js';
+import { getCompositionState, getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
 
 // =============================================================================
 // CONSTANTS
@@ -767,7 +767,7 @@ function getNotesFromComposition(staff) {
     const notes = [];
     let currentTick = 0;
     const ticksPerBeat = 128; // Standard MIDI resolution
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
     const ticksPerMeasure = ticksPerBeat * beatsPerMeasure;
 
     compositionState.measures.forEach((measure, measureIndex) => {

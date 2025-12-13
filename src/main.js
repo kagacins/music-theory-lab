@@ -272,7 +272,8 @@ import {
 import {
     CompositionState,
     getCompositionState,
-    resetCompositionState
+    resetCompositionState,
+    getBeatsPerMeasureFromTimeSignature
 } from './modules/state/compositionState.js';
 import {
     BuildingBlock,
@@ -2072,7 +2073,7 @@ window.clearAllTrebleNotes = function() {
 
     // Get total duration in beats (all measures)
     const numMeasures = compositionState.measures?.length || 8;
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
     const totalBeats = numMeasures * beatsPerMeasure;
 
     // Clear all treble notes using the beat range method

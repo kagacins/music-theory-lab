@@ -43,7 +43,7 @@ import {
 } from './motifRecognition.js';
 
 import { generateMelodySuggestions, noteToMidi, midiToNote } from './melodySuggestion.js';
-import { getCompositionState } from '../state/compositionState.js';
+import { getCompositionState, getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
 import { getPiano, getAudioIsReady } from '../audio/audioEngine.js';
 import { getSectionProfile } from '../features/sectionProfiles.js';
 import { getChordContext, getChordSequenceForPhrase, buildChordTimeline } from './chordTimeline.js';
@@ -563,7 +563,7 @@ function buildChordSequenceForPhrase(measureIndex, noteIndex) {
     const timeline = buildChordTimeline();
     if (timeline.length === 0) return null;
 
-    const beatsPerMeasure = compositionState?.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState?.metadata?.timeSignature);
     const trebleNotes = compositionState?.getNotes(measureIndex, 'treble', 0) || [];
 
     // Calculate starting beat
@@ -1064,7 +1064,7 @@ function appendPhraseAtEnd(phrase) {
 function insertPhraseWithShift(phrase, selectedInfo) {
     const { measureIndex, noteIndex } = selectedInfo;
     const UNITS_PER_BEAT = 48;
-    const beatsPerMeasure = compositionState.metadata?.timeSignature?.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
 
     console.log(`[insertPhraseWithShift] Inserting ${phrase.notes.length} notes with rhythm:`, phrase.rhythm);
 

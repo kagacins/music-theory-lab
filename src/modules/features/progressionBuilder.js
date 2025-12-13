@@ -70,6 +70,9 @@ import {
     getNotationPreference
 } from '../state/globalState.js';
 
+// Import BuildingBlockSequence for undo/redo serialization
+import { BuildingBlockSequence } from '../state/buildingBlock.js';
+
 // Import guided mode event dispatcher for lesson integration
 import { dispatchBuilderEvent, isGuidedModeActive, validateProgressionChord } from '../ui/lessonGuidedMode.js';
 
@@ -13710,9 +13713,44 @@ function captureProgressionState() {
 
     // Capture notation state from CompositionState for full undo support
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-    if (compositionState && compositionState.measures) {
+    if (compositionState) {
         // Deep clone the measures array which contains all notation data
-        state.notationData = JSON.parse(JSON.stringify(compositionState.measures));
+        if (compositionState.measures) {
+            state.notationData = JSON.parse(JSON.stringify(compositionState.measures));
+        }
+
+        // Capture time signature from metadata
+        if (compositionState.metadata?.timeSignature) {
+            state.timeSignature = { ...compositionState.metadata.timeSignature };
+        }
+
+        // Capture block sequences for treble and bass clefs
+        // These contain detailed note-by-unit data that's essential for accurate restoration
+        if (compositionState.trebleBlockSequence) {
+            try {
+                state.trebleBlockSequence = compositionState.trebleBlockSequence.toJSON();
+            } catch (e) {
+                console.warn('[captureProgressionState] Failed to serialize trebleBlockSequence:', e);
+            }
+        }
+
+        if (compositionState.bassBlockSequence) {
+            try {
+                state.bassBlockSequence = compositionState.bassBlockSequence.toJSON();
+            } catch (e) {
+                console.warn('[captureProgressionState] Failed to serialize bassBlockSequence:', e);
+            }
+        }
+
+        // Capture chord segments for bass note tracking
+        if (compositionState.chordSegments) {
+            state.chordSegments = JSON.parse(JSON.stringify(compositionState.chordSegments));
+        }
+
+        // Capture other relevant metadata
+        if (compositionState.metadata) {
+            state.metadata = JSON.parse(JSON.stringify(compositionState.metadata));
+        }
     }
 
     return state;
@@ -13732,13 +13770,69 @@ function restoreProgressionState(state) {
     setCurrentKey(state.currentKey);
 
     // Restore notation state if it was captured
-    if (state.notationData) {
-        const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-        if (compositionState) {
-            // Deep clone and restore the measures array
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (compositionState) {
+        // Restore measures array
+        if (state.notationData) {
             compositionState.measures = JSON.parse(JSON.stringify(state.notationData));
-            // Emit event to notify listeners of the change
-            compositionState.events.emit('loaded', { measures: compositionState.measures });
+        }
+
+        // Restore time signature to metadata
+        if (state.timeSignature) {
+            compositionState.metadata.timeSignature = { ...state.timeSignature };
+        } else if (state.metadata?.timeSignature) {
+            compositionState.metadata.timeSignature = { ...state.metadata.timeSignature };
+        }
+
+        // Restore full metadata if captured
+        if (state.metadata) {
+            // Preserve timeSignature we just set, but restore other metadata
+            const preservedTS = compositionState.metadata.timeSignature;
+            Object.assign(compositionState.metadata, JSON.parse(JSON.stringify(state.metadata)));
+            compositionState.metadata.timeSignature = preservedTS;
+        }
+
+        // Restore treble block sequence
+        if (state.trebleBlockSequence) {
+            try {
+                compositionState.trebleBlockSequence = BuildingBlockSequence.fromJSON(state.trebleBlockSequence);
+            } catch (e) {
+                console.warn('[restoreProgressionState] Failed to restore trebleBlockSequence:', e);
+            }
+        }
+
+        // Restore bass block sequence
+        if (state.bassBlockSequence) {
+            try {
+                compositionState.bassBlockSequence = BuildingBlockSequence.fromJSON(state.bassBlockSequence);
+            } catch (e) {
+                console.warn('[restoreProgressionState] Failed to restore bassBlockSequence:', e);
+            }
+        }
+
+        // Restore chord segments for bass note tracking
+        if (state.chordSegments) {
+            compositionState.chordSegments = JSON.parse(JSON.stringify(state.chordSegments));
+        }
+
+        // Emit event to notify listeners of the change
+        compositionState.events.emit('loaded', { measures: compositionState.measures });
+
+        // Update time signature in toolbar and notation
+        const ts = compositionState.metadata.timeSignature;
+        if (ts) {
+            // Update toolbar's time signature select
+            if (window.getNotationComposer) {
+                const notationComposer = window.getNotationComposer();
+                if (notationComposer?.toolbar?.setTimeSignature) {
+                    notationComposer.toolbar.setTimeSignature(ts.num, ts.denom);
+                }
+            }
+
+            // Update time signature display in notation if function exists
+            if (window.updateTimeSignatureDisplay) {
+                window.updateTimeSignatureDisplay(ts.num, ts.denom);
+            }
         }
     }
 

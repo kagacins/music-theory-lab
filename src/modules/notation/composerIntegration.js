@@ -158,6 +158,16 @@ export class NotationComposer {
           this.layoutManager.setConfig({ measuresPerLine: mpl });
           this.render();
         },
+        onTimeSignatureChange: (num, denom) => {
+          if (this.compositionState) {
+            // Save state before time signature change for undo support
+            if (typeof window.saveStateBeforeChange === 'function') {
+              window.saveStateBeforeChange();
+            }
+            this.compositionState.setTimeSignature(num, denom);
+            this.render();
+          }
+        },
         onUndo: () => {
           if (typeof window.handleUndo === 'function') {
             window.handleUndo();
@@ -248,6 +258,10 @@ export class NotationComposer {
           cueRestsForSecondaryVoice: initialRestSettings.cueRestsForSecondaryVoice,
           hideCueRests: initialRestSettings.hideCueRests,
         });
+
+        // Sync toolbar's time signature to match compositionState
+        const ts = this.compositionState.getTimeSignature();
+        this.toolbar.setTimeSignature(ts.num, ts.denom);
       }
     }
 

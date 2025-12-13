@@ -7,6 +7,8 @@
  * Based on Phase 1.2 of progression-builder-integration.md
  */
 
+import { getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
+
 // Intervals for different chord types (in semitones from root)
 // Includes both canonical names (with spaces) and common aliases
 const CHORD_INTERVALS = {
@@ -973,7 +975,7 @@ export function generateBuildingBlockBass(chord, previousChord = null, totalBeat
     // Get the bass note based on inversion setting, using the effective octave
     const bassNote = getBassNoteForChord(chord, bassFollowsInversion, effectiveOctave);
     const fifth = findFifth(chord.root, chordNotes, effectiveOctave);
-    const beatsPerMeasure = timeSignature.num || 4;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
     // Generate the pattern based on type
     // Note: bassNote respects the bassFollowsInversion setting
