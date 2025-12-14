@@ -592,6 +592,13 @@ let selectedStructure = 'simple';
 let isPlaying = false;
 let playbackTimeoutIds = [];
 
+// Track swapped chords for swap-back functionality
+// Map of chord index -> original chord name
+let swappedChords = new Map();
+
+// Track the current working progression (may differ from mood default after swaps)
+let workingProgression = null;
+
 let customizations = {
     key: null,
     tempo: 100,
@@ -614,6 +621,55 @@ const ENHARMONIC_TO_SHARP = {
     'Db': 'C#', 'Eb': 'D#', 'Fb': 'E', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#', 'Cb': 'B',
     'E#': 'F', 'B#': 'C'
 };
+
+/**
+ * Get the current working progression (with any applied swaps)
+ * @returns {Object} Progression object with key, chords, roman
+ */
+function getCurrentProgression() {
+    if (workingProgression) {
+        return workingProgression;
+    }
+    const mood = MOOD_OPTIONS.find(m => m.id === selectedMood);
+    if (mood) {
+        // Initialize working progression from mood
+        workingProgression = {
+            key: mood.progression.key,
+            chords: [...mood.progression.chords],
+            roman: [...mood.progression.roman]
+        };
+        return workingProgression;
+    }
+    return { key: 'C', chords: ['C', 'G', 'Am', 'F'], roman: ['I', 'V', 'vi', 'IV'] };
+}
+
+/**
+ * Apply a chord swap to the working progression
+ * @param {number} index - Chord index to swap
+ * @param {string} newChord - New chord name
+ */
+function applyChordSwap(index, newChord) {
+    const progression = getCurrentProgression();
+    if (index >= 0 && index < progression.chords.length) {
+        // Store original for undo
+        if (!swappedChords.has(index)) {
+            swappedChords.set(index, progression.chords[index]);
+        }
+        progression.chords[index] = newChord;
+    }
+}
+
+/**
+ * Revert a chord swap
+ * @param {number} index - Chord index to revert
+ */
+function revertChordSwap(index) {
+    const progression = getCurrentProgression();
+    if (swappedChords.has(index)) {
+        progression.chords[index] = swappedChords.get(index);
+        swappedChords.delete(index);
+    }
+}
 
 /**
  * Get the pitch class index (0-11) for a note name
@@ -1286,20 +1342,46 @@ function renderStep5Preview() {
             <h3 class="font-bold text-blue-800 dark:text-blue-200 mb-3 flex items-center gap-2">
                 <span>🔄</span> Quick Swaps (Try These!)
             </h3>
-            <p class="text-sm text-blue-600 dark:text-blue-300 mb-3">Click any suggestion to preview how it sounds:</p>
-            <div class="flex flex-wrap gap-2">
-                ${getQuickSwapSuggestions(mood.progression.chords, selectedMood, selectedStyle).map(swap => `
-                    <button class="quick-swap-btn px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600 hover:bg-blue-100 dark:hover:bg-blue-800/50 transition-colors text-left"
-                            data-swap-from="${swap.from}" data-swap-to="${swap.to}" data-swap-index="${swap.index}">
-                        <div class="text-sm font-medium text-blue-900 dark:text-blue-100">
-                            ${swap.from} → ${swap.to}
+            <p class="text-sm text-blue-600 dark:text-blue-300 mb-3">Preview or apply chord substitutions:</p>
+            <div class="flex flex-wrap gap-3" id="quick-swap-container">
+                ${getQuickSwapSuggestions(getCurrentProgression().chords, selectedMood, selectedStyle).map(swap => {
+                    const isSwapped = swappedChords.has(swap.index);
+                    return `
+                    <div class="quick-swap-card flex flex-col gap-2 p-3 rounded-lg bg-white dark:bg-gray-800 border ${isSwapped ? 'border-green-400 dark:border-green-500 ring-2 ring-green-200 dark:ring-green-800' : 'border-blue-300 dark:border-blue-600'}">
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <div class="text-sm font-medium text-blue-900 dark:text-blue-100">
+                                    ${swap.from} → ${swap.to}
+                                </div>
+                                <div class="text-xs text-blue-600 dark:text-blue-400">${swap.reason}</div>
+                            </div>
                         </div>
-                        <div class="text-xs text-blue-600 dark:text-blue-400">${swap.reason}</div>
-                    </button>
-                `).join('')}
+                        <div class="flex gap-2">
+                            <button class="quick-swap-play-btn flex-1 px-2 py-1.5 text-xs font-medium rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors flex items-center justify-center gap-1"
+                                    data-chord="${swap.to}" title="Preview this chord">
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+                                Play
+                            </button>
+                            ${isSwapped ? `
+                                <button class="quick-swap-back-btn flex-1 px-2 py-1.5 text-xs font-medium rounded bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors flex items-center justify-center gap-1"
+                                        data-swap-index="${swap.index}" title="Revert to original">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.793 2.232a.75.75 0 01-.025 1.06L3.622 7.25h10.003a5.375 5.375 0 010 10.75H10.75a.75.75 0 010-1.5h2.875a3.875 3.875 0 000-7.75H3.622l4.146 3.957a.75.75 0 01-1.036 1.085l-5.5-5.25a.75.75 0 010-1.085l5.5-5.25a.75.75 0 011.06.025z" clip-rule="evenodd"/></svg>
+                                    Undo
+                                </button>
+                            ` : `
+                                <button class="quick-swap-apply-btn flex-1 px-2 py-1.5 text-xs font-medium rounded bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800 transition-colors flex items-center justify-center gap-1"
+                                        data-swap-from="${swap.from}" data-swap-to="${swap.to}" data-swap-index="${swap.index}" title="Apply this swap">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>
+                                    Swap
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                `;
+                }).join('')}
             </div>
             <p class="text-xs text-blue-500 dark:text-blue-400 mt-3">
-                These are just ideas - you can customize everything in the next step!
+                Applied swaps update the preview above. You can always undo!
             </p>
         </div>
     `;
@@ -1885,7 +1967,9 @@ function getCustomizedChords() {
     const mood = MOOD_OPTIONS.find(m => m.id === selectedMood);
     if (!mood) return [];
 
-    let chords = [...mood.progression.chords];
+    // Use working progression (which includes any applied swaps)
+    const progression = getCurrentProgression();
+    let chords = [...progression.chords];
 
     // Apply variations first
     if (customizations.variation === 'sevenths') {
@@ -1900,7 +1984,7 @@ function getCustomizedChords() {
     }
 
     // Transpose to user's selected key if different from mood's original key
-    const originalKey = mood.progression.key;
+    const originalKey = progression.key;
     const targetKey = customizations.key;
 
     if (targetKey && targetKey !== originalKey) {
@@ -2000,6 +2084,9 @@ function attachWizardListeners(container) {
     container.querySelectorAll('.mood-option').forEach(btn => {
         btn.addEventListener('click', () => {
             selectedMood = btn.dataset.mood;
+            // Reset working progression and swaps when mood changes
+            workingProgression = null;
+            swappedChords = new Map();
             const mood = MOOD_OPTIONS.find(m => m.id === selectedMood);
             if (mood) {
                 customizations.tempo = mood.suggestedTempo;
@@ -2080,33 +2167,59 @@ function attachWizardListeners(container) {
         });
     });
 
-    // Quick swap suggestions
-    container.querySelectorAll('.quick-swap-btn').forEach(btn => {
+    // Quick swap - Play button
+    container.querySelectorAll('.quick-swap-play-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const chord = btn.dataset.chord;
+            try {
+                const piano = getPiano();
+                if (!piano || !chord) return;
+                const notes = getChordNotes(chord, 4);
+                piano.triggerAttackRelease(notes, '2n');
+            } catch (e) {
+                console.warn('Failed to play chord:', e);
+            }
+        });
+    });
+
+    // Quick swap - Apply button
+    container.querySelectorAll('.quick-swap-apply-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             const swapTo = btn.dataset.swapTo;
             const swapIndex = parseInt(btn.dataset.swapIndex);
 
-            try {
-                const piano = getPiano();
-                if (!piano) return;
+            if (swapIndex >= 0 && swapTo) {
+                // Apply the swap
+                applyChordSwap(swapIndex, swapTo);
 
-                // Play the suggested chord
-                if (swapIndex >= 0) {
-                    const notes = getChordNotes(swapTo, 4);
-                    piano.triggerAttackRelease(notes, '2n');
-                } else {
-                    // For "all chords" suggestions, play a quick preview
-                    const mood = MOOD_OPTIONS.find(m => m.id === selectedMood);
-                    if (mood) {
-                        const chords = mood.progression.chords.slice(0, 2);
-                        for (let i = 0; i < chords.length; i++) {
-                            const notes = getChordNotes(chords[i] + '7', 4);
-                            piano.triggerAttackRelease(notes, '4n', `+${i * 0.5}`);
-                        }
+                // Play the new chord as feedback
+                try {
+                    const piano = getPiano();
+                    if (piano) {
+                        const notes = getChordNotes(swapTo, 4);
+                        piano.triggerAttackRelease(notes, '4n');
                     }
+                } catch (e) {
+                    // Silent fail
                 }
-            } catch (e) {
-                // Silent fail
+
+                // Re-render to update UI
+                renderSongwritingWizard(container);
+            }
+        });
+    });
+
+    // Quick swap - Undo/Revert button
+    container.querySelectorAll('.quick-swap-back-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const swapIndex = parseInt(btn.dataset.swapIndex);
+
+            if (!isNaN(swapIndex)) {
+                // Revert the swap
+                revertChordSwap(swapIndex);
+
+                // Re-render to update UI
+                renderSongwritingWizard(container);
             }
         });
     });
@@ -2263,7 +2376,15 @@ function attachWizardListeners(container) {
     // Key selection
     container.querySelectorAll('.key-option').forEach(btn => {
         btn.addEventListener('click', () => {
-            customizations.key = btn.dataset.key;
+            const newKey = btn.dataset.key;
+            const oldKey = customizations.key || getCurrentProgression().key;
+            customizations.key = newKey;
+
+            // Update working progression key if it exists
+            if (workingProgression) {
+                workingProgression.key = newKey;
+            }
+
             renderSongwritingWizard(container);
         });
     });
@@ -2579,6 +2700,8 @@ function resetWizard() {
     selectedMood = null;
     selectedStyle = null;
     selectedStructure = 'simple';
+    swappedChords = new Map();
+    workingProgression = null;
     customizations = {
         key: null,
         tempo: 100,
@@ -2647,9 +2770,21 @@ export function showSongBuilderModal() {
     modal.id = 'song-builder-modal';
     modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]';
 
-    const compositionState = getCompositionState();
-    const sections = compositionState.getSections();
-    const progression = compositionState.getProgression();
+    // Safely get composition state
+    let compositionState;
+    try {
+        compositionState = getCompositionState();
+    } catch (e) {
+        console.warn('[showSongBuilderModal] Could not get composition state:', e);
+    }
+
+    // Also try window.getCompositionState as fallback
+    if (!compositionState && typeof window.getCompositionState === 'function') {
+        compositionState = window.getCompositionState();
+    }
+
+    const sections = compositionState?.getSections?.() || [];
+    const progression = compositionState?.getProgression?.() || [];
     const hasContent = sections.length > 0 || progression.length > 0;
 
     modal.innerHTML = `

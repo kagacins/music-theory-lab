@@ -17,7 +17,7 @@ import { createPlaybackControls } from '../components/playbackControls.js';
 import { createAnswerButtons } from '../components/answerButtons.js';
 import { createFeedbackDisplay, createProgressBar, createStreakIndicator } from '../components/feedbackDisplay.js';
 import { generateChordExercise, playChord, playArpeggio } from '../earTrainingAudio.js';
-import { recordExerciseResult, getDifficultyLevel, EXERCISE_TYPES, getEarTrainingProgress } from '../earTrainingProgress.js';
+import { recordExerciseResult, getDifficultyLevel, setDifficultyLevel, EXERCISE_TYPES, getEarTrainingProgress } from '../earTrainingProgress.js';
 import { CHORD_DEFINITIONS } from '../../../../data/music-data.js';
 
 // ===========================================
@@ -76,15 +76,66 @@ function renderExercise(container, difficulty, questionsPerSession, onComplete) 
             Listen to a chord and identify its quality
         </p>
         <div class="flex items-center justify-center gap-4 mt-3">
-            <span class="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm font-medium">
-                Level ${difficulty}
-            </span>
+            <div class="relative inline-block">
+                <button id="chord-level-selector-btn" class="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm font-medium hover:bg-blue-200 dark:hover:bg-blue-800 transition cursor-pointer flex items-center gap-1">
+                    Level ${difficulty}
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+                <div id="chord-level-dropdown" class="hidden absolute top-full left-1/2 transform -translate-x-1/2 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 min-w-[180px]">
+                    <div class="py-1">
+                        ${[1, 2, 3, 4, 5].map(lvl => `
+                            <button class="chord-level-option w-full px-4 py-2 text-left text-sm ${lvl === difficulty ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 font-medium' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}" data-level="${lvl}">
+                                Level ${lvl} ${lvl === difficulty ? '✓' : ''}
+                            </button>
+                        `).join('')}
+                    </div>
+                    <div class="px-3 py-2 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
+                        <div class="font-medium mb-1">Level Guide:</div>
+                        <div>1: Major/Minor only</div>
+                        <div>2: + Dim/Augmented</div>
+                        <div>3: + 7th chords</div>
+                        <div>4: + Dim7, Half-Dim, Sus</div>
+                        <div>5: + 9th chords</div>
+                    </div>
+                </div>
+            </div>
             <span class="px-3 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded-full text-sm font-medium">
                 ${progress.totalXpEarned} XP
             </span>
         </div>
     `;
     container.appendChild(header);
+
+    // Level selector toggle
+    const levelBtn = header.querySelector('#chord-level-selector-btn');
+    const levelDropdown = header.querySelector('#chord-level-dropdown');
+
+    levelBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        levelDropdown.classList.toggle('hidden');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', () => {
+        levelDropdown?.classList.add('hidden');
+    }, { once: true });
+
+    // Level option selection
+    header.querySelectorAll('.chord-level-option').forEach(option => {
+        option.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const newLevel = parseInt(option.dataset.level, 10);
+            if (newLevel !== difficulty) {
+                setDifficultyLevel(EXERCISE_TYPES.CHORD, newLevel);
+                // Re-render with new difficulty
+                sessionStats = { total: 0, correct: 0 };
+                renderExercise(container, newLevel, questionsPerSession, onComplete);
+            }
+            levelDropdown.classList.add('hidden');
+        });
+    });
 
     // Progress bar
     const progressContainer = document.createElement('div');

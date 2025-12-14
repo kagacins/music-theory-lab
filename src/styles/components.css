@@ -319,12 +319,82 @@
 .chord-card-wrapper {
     position: relative;
     overflow: visible; /* prevent ring/outline clipping */
+    /* Add padding to prevent selection ring from being clipped by parent containers */
+    /* ring-4 = 4px ring, ring-offset-2 = 2px offset, so need 6px+ padding */
+    padding-top: 8px;
+    margin-top: -8px; /* Offset the padding to maintain original spacing */
 }
 
 /* Allow selection rings to render fully */
 .chord-card-wrapper .simplified-card,
 .chord-card-wrapper .detailed-card {
     overflow: visible;
+}
+
+/* Ensure flex containers don't clip selection rings at top */
+/* Note: Don't override overflow on scroll containers - just add padding */
+.section-cards-area,
+.ungrouped-cards-area {
+    overflow: visible;
+    padding-top: 8px; /* Allow ring-offset to show */
+}
+
+/* For grid containers that need to scroll horizontally, use padding instead of overflow:visible */
+[id$="-cards-grid"]:not(.scroll-view-container) {
+    padding-top: 8px; /* Allow ring-offset to show */
+}
+
+/* Section filtered cards wrapper needs horizontal scroll */
+.section-cards-wrapper {
+    padding-top: 8px; /* Allow ring-offset to show */
+}
+
+/* Main progression visualization containers - allow horizontal scroll, but don't clip top (for selection rings) */
+#progression-visualization,
+#melody-progression-visualization,
+#builder-progression-visualization {
+    overflow-x: auto;
+    overflow-y: visible;
+    padding-top: 8px;
+}
+
+/* Dynamically generated cards-grid containers - same treatment */
+[id$="-cards-grid"] {
+    overflow-x: auto;
+    overflow-y: visible;
+    padding-top: 8px;
+}
+
+/* Parent panels - allow horizontal scroll */
+#progression-visualization-panel {
+    overflow-x: auto;
+    overflow-y: visible;
+}
+
+/* Scroll container class */
+.progression-scroll-container {
+    overflow-x: auto;
+    overflow-y: visible;
+}
+
+/* Section filtered cards container */
+.section-filtered-cards {
+    overflow-x: auto;
+    overflow-y: visible;
+    padding-top: 8px;
+}
+
+/* Section cards area inside unified section containers */
+.section-cards-area {
+    overflow-x: auto;
+    overflow-y: visible;
+    padding-top: 8px;
+}
+
+/* Section unified container - allow internal scroll if needed */
+.section-unified-container {
+    overflow: visible;
+    max-width: 100%;
 }
 
 /* Chord tooltip must appear above everything */

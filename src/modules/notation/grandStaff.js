@@ -3108,14 +3108,9 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
   function drawChordBracket(startBeat, endBeat, chordName, color, chordData = null, chordIndex = -1) {
     const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
-    // DEBUG: Log bracket positioning calculations
-    console.log(`[drawChordBracket] timeSignature=${timeSignature}, beatsPerMeasure=${beatsPerMeasure}, startBeat=${startBeat}, endBeat=${endBeat}, chordName=${chordName}`);
-
     // Convert global beat positions to global measure indices
     const globalStartMeasure = Math.floor(startBeat / beatsPerMeasure);
     const globalEndMeasure = Math.floor(endBeat / beatsPerMeasure);
-
-    console.log(`[drawChordBracket] globalStartMeasure=${globalStartMeasure}, globalEndMeasure=${globalEndMeasure}, measures.length=${measures.length}`);
 
     // Convert to local measure indices for this page
     const localStartMeasure = globalStartMeasure - globalMeasureOffset;
@@ -3413,20 +3408,26 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
           );
 
           // Draw the bracket with chord name beneath bass clef
-          // Format chord name with inversion using helper function
-          let chordName = formatChordNameForDisplay(chord);
+          // Use displayNameOverride if user has manually set a chord name, otherwise format automatically
+          let chordName;
+          if (chord.displayNameOverride) {
+            chordName = chord.displayNameOverride;
+          } else {
+            // Format chord name with inversion using helper function
+            chordName = formatChordNameForDisplay(chord);
 
-          // Add inversion indicator only for non-root inversions
-          const inversion = chord.inversion || 0;
-          if (inversion === 1) {
-            chordName += ' (1st)';
-          } else if (inversion === 2) {
-            chordName += ' (2nd)';
-          } else if (inversion === 3) {
-            chordName += ' (3rd)';
+            // Add inversion indicator only for non-root inversions
+            const inversion = chord.inversion || 0;
+            if (inversion === 1) {
+              chordName += ' (1st)';
+            } else if (inversion === 2) {
+              chordName += ' (2nd)';
+            } else if (inversion === 3) {
+              chordName += ' (3rd)';
+            }
           }
 
-          // Add edited indicator
+          // Add edited indicator for bass notes
           if (segment.isEdited) {
             chordName += ' ✎';
           }
@@ -3459,17 +3460,23 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
             );
 
             // Draw the bracket with chord name beneath bass clef
-            // Format chord name using helper function
-            let chordName = formatChordNameForDisplay(chord);
+            // Use displayNameOverride if user has manually set a chord name, otherwise format automatically
+            let chordName;
+            if (chord.displayNameOverride) {
+              chordName = chord.displayNameOverride;
+            } else {
+              // Format chord name using helper function
+              chordName = formatChordNameForDisplay(chord);
 
-            // Add inversion indicator only for non-root inversions
-            const inversion = chord.inversion || 0;
-            if (inversion === 1) {
-              chordName += ' (1st)';
-            } else if (inversion === 2) {
-              chordName += ' (2nd)';
-            } else if (inversion === 3) {
-              chordName += ' (3rd)';
+              // Add inversion indicator only for non-root inversions
+              const inversion = chord.inversion || 0;
+              if (inversion === 1) {
+                chordName += ' (1st)';
+              } else if (inversion === 2) {
+                chordName += ' (2nd)';
+              } else if (inversion === 3) {
+                chordName += ' (3rd)';
+              }
             }
 
             drawChordBracket(

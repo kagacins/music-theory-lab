@@ -4194,117 +4194,41 @@ function renderSectionAwareCardsScroll(gridContainer, progressionData, key, opti
         gridContainer.appendChild(buttonContainer);
     }
 
-    // Track if we have any sections and ungrouped chords
-    const hasSections = sections.length > 0;
-    let ungroupedZone = null;
+    // Track which sections have already been rendered (to avoid duplicates)
+    const renderedSections = new Set();
 
-    // Check if there are any ungrouped chords (chords not in any section)
-    const hasUngroupedChords = progressionData.some((_, idx) => !chordToSection.has(idx));
-
-    // Create ungrouped zone only if there are sections AND ungrouped chords
-    if (hasSections && hasUngroupedChords) {
-        ungroupedZone = document.createElement('div');
-        ungroupedZone.className = 'ungrouped-drop-zone flex flex-col rounded-lg overflow-visible flex-shrink-0';
-        ungroupedZone.style.cssText = `
-            scroll-snap-align: start;
-            min-width: 80px;
-            min-height: 100px;
-            background: rgba(156, 163, 175, 0.1);
-            border: 2px dashed #9ca3af;
-            border-radius: 12px;
-            padding: 8px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            align-items: center;
-            justify-content: flex-start;
-        `;
-
-        // Label for ungrouped zone
-        const label = document.createElement('div');
-        label.style.cssText = `
-            font-size: 10px;
-            color: #6b7280;
-            text-align: center;
-            padding: 2px 6px;
-            background: rgba(156, 163, 175, 0.2);
-            border-radius: 4px;
-            white-space: nowrap;
-        `;
-        label.textContent = 'Ungrouped';
-        ungroupedZone.appendChild(label);
-
-        // Container for ungrouped cards
-        const ungroupedCards = document.createElement('div');
-        ungroupedCards.className = 'ungrouped-cards-area flex flex-wrap gap-2';
-        ungroupedCards.style.cssText = 'min-height: 60px; width: 100%;';
-        ungroupedZone.appendChild(ungroupedCards);
-
-        gridContainer.appendChild(ungroupedZone);
-    }
-
-    // Render cards in sequence with scroll snap
+    // Render cards in positional order - maintaining original chord sequence
+    // Ungrouped chords stay in their positions, sections are rendered when we hit their first chord
     let i = 0;
     while (i < progressionData.length) {
         const section = chordToSection.get(i);
 
-        if (section) {
-            // This card is in a section - render the entire section as a unified container
+        if (section && !renderedSections.has(section.id)) {
+            // This chord is in a section we haven't rendered yet - render entire section
             const sectionContainer = createUnifiedSectionContainer(section, progressionData, key);
             sectionContainer.style.scrollSnapAlign = 'start';
             sectionContainer.style.flexShrink = '0';
             gridContainer.appendChild(sectionContainer);
+            renderedSections.add(section.id);
 
-            // Skip all cards in this section
+            // Skip all cards in this section (by finding max index in section)
             const maxIndex = Math.max(...section.chordIndices);
             i = maxIndex + 1;
+        } else if (section && renderedSections.has(section.id)) {
+            // This chord is in a section we already rendered (non-contiguous indices)
+            // Skip it - it was already rendered with its section
+            i++;
         } else {
-            // Ungrouped card - render in ungrouped zone if it exists, otherwise directly in grid
+            // Ungrouped card - render directly in grid at its position
             const chord = progressionData[i];
             const wrapper = createChordCardWrapper(chord, i, key);
             wrapper.style.scrollSnapAlign = 'start';
             wrapper.style.flexShrink = '0';
-
-            if (ungroupedZone) {
-                const ungroupedCards = ungroupedZone.querySelector('.ungrouped-cards-area');
-                ungroupedCards.appendChild(wrapper);
-            } else {
-                gridContainer.appendChild(wrapper);
-            }
+            // Mark as ungrouped for drag/drop handling
+            wrapper.setAttribute('data-ungrouped', 'true');
+            gridContainer.appendChild(wrapper);
             i++;
         }
-    }
-
-    // Initialize sortable on ungrouped zone if it exists
-    if (ungroupedZone && typeof Sortable !== 'undefined') {
-        const ungroupedCards = ungroupedZone.querySelector('.ungrouped-cards-area');
-        ungroupedCards.sortableInstance = new Sortable(ungroupedCards, {
-            group: {
-                name: 'progression-cards',
-                pull: true,
-                put: function(to, from, dragEl) {
-                    // Accept chord cards from anywhere
-                    return dragEl.classList.contains('chord-card-wrapper') &&
-                           dragEl.hasAttribute('data-chord-index');
-                }
-            },
-            animation: 200,
-            ghostClass: 'sortable-ghost',
-            chosenClass: 'sortable-chosen',
-            dragClass: 'sortable-drag',
-            handle: '.drag-handle',
-            draggable: '.chord-card-wrapper[data-chord-index]',
-            swapThreshold: 0.65,
-            onAdd: function(evt) {
-                // Card was dropped here from a section - ungroup it
-                handleCardDragWithinSection(evt, evt.from.getAttribute('data-section-id'));
-            },
-            onEnd: function(evt) {
-                if (evt.from !== evt.to) return;
-                // Reorder within ungrouped
-                handleCardDragWithinSection(evt, null);
-            }
-        });
     }
 }
 
@@ -4432,109 +4356,37 @@ function renderSectionAwareCards(gridContainer, progressionData, key, options = 
         gridContainer.appendChild(buttonContainer);
     }
 
-    // Track if we have any sections and ungrouped chords
-    const hasSections = sections.length > 0;
-    let ungroupedZone = null;
+    // Track which sections have already been rendered (to avoid duplicates)
+    const renderedSections = new Set();
 
-    // Check if there are any ungrouped chords (chords not in any section)
-    const hasUngroupedChords = progressionData.some((_, idx) => !chordToSection.has(idx));
-
-    // Create ungrouped zone only if there are sections AND ungrouped chords
-    if (hasSections && hasUngroupedChords) {
-        ungroupedZone = document.createElement('div');
-        ungroupedZone.className = 'ungrouped-drop-zone flex flex-col rounded-lg overflow-visible';
-        ungroupedZone.style.cssText = `
-            min-width: 80px;
-            min-height: 100px;
-            background: rgba(156, 163, 175, 0.1);
-            border: 2px dashed #9ca3af;
-            border-radius: 12px;
-            padding: 8px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            align-items: center;
-            justify-content: flex-start;
-        `;
-
-        // Label for ungrouped zone
-        const label = document.createElement('div');
-        label.style.cssText = `
-            font-size: 10px;
-            color: #6b7280;
-            text-align: center;
-            padding: 2px 6px;
-            background: rgba(156, 163, 175, 0.2);
-            border-radius: 4px;
-            white-space: nowrap;
-        `;
-        label.textContent = 'Ungrouped';
-        ungroupedZone.appendChild(label);
-
-        // Container for ungrouped cards
-        const ungroupedCards = document.createElement('div');
-        ungroupedCards.className = 'ungrouped-cards-area flex flex-wrap gap-2';
-        ungroupedCards.style.cssText = 'min-height: 60px; width: 100%;';
-        ungroupedZone.appendChild(ungroupedCards);
-
-        gridContainer.appendChild(ungroupedZone);
-    }
-
-    // Render cards in sequence, grouping adjacent section cards into containers
+    // Render cards in positional order - maintaining original chord sequence
+    // Ungrouped chords stay in their positions, sections are rendered when we hit their first chord
     let i = 0;
     while (i < progressionData.length) {
         const section = chordToSection.get(i);
 
-        if (section) {
-            // This card is in a section - render the entire section as a unified container
+        if (section && !renderedSections.has(section.id)) {
+            // This chord is in a section we haven't rendered yet - render entire section
             const sectionContainer = createUnifiedSectionContainer(section, progressionData, key);
             gridContainer.appendChild(sectionContainer);
+            renderedSections.add(section.id);
 
-            // Skip all cards in this section
+            // Skip all cards in this section (by finding max index in section)
             const maxIndex = Math.max(...section.chordIndices);
             i = maxIndex + 1;
+        } else if (section && renderedSections.has(section.id)) {
+            // This chord is in a section we already rendered (non-contiguous indices)
+            // Skip it - it was already rendered with its section
+            i++;
         } else {
-            // Ungrouped card - render in ungrouped zone if it exists, otherwise directly in grid
+            // Ungrouped card - render directly in grid at its position
             const chord = progressionData[i];
             const wrapper = createChordCardWrapper(chord, i, key);
-
-            if (ungroupedZone) {
-                const ungroupedCards = ungroupedZone.querySelector('.ungrouped-cards-area');
-                ungroupedCards.appendChild(wrapper);
-            } else {
-                gridContainer.appendChild(wrapper);
-            }
+            // Mark as ungrouped for drag/drop handling
+            wrapper.setAttribute('data-ungrouped', 'true');
+            gridContainer.appendChild(wrapper);
             i++;
         }
-    }
-
-    // Initialize sortable on ungrouped zone if it exists
-    if (ungroupedZone && typeof Sortable !== 'undefined') {
-        const ungroupedCards = ungroupedZone.querySelector('.ungrouped-cards-area');
-        ungroupedCards.sortableInstance = new Sortable(ungroupedCards, {
-            group: {
-                name: 'progression-cards',
-                pull: true,
-                put: function(to, from, dragEl) {
-                    return dragEl.classList.contains('chord-card-wrapper') &&
-                           dragEl.hasAttribute('data-chord-index');
-                }
-            },
-            animation: 200,
-            ghostClass: 'sortable-ghost',
-            chosenClass: 'sortable-chosen',
-            dragClass: 'sortable-drag',
-            handle: '.drag-handle',
-            draggable: '.chord-card-wrapper[data-chord-index]',
-            swapThreshold: 0.65,
-            onAdd: function(evt) {
-                handleCardDragWithinSection(evt, evt.from.getAttribute('data-section-id'));
-            },
-            onEnd: function(evt) {
-                if (evt.from !== evt.to) return;
-                handleCardDragWithinSection(evt, null);
-            }
-        });
     }
 
     // Update shift classes
@@ -8084,17 +7936,21 @@ function handleCardDragWithinSection(evt, originalSectionId) {
     const isFilteredView = visibleChordOrder.length < totalChords;
 
     // Check if the card moved to a different section or out of a section
-    const toSectionId = toContainer.getAttribute('data-section-id');
-    const fromSectionId = fromContainer.getAttribute('data-section-id');
+    // In Section View (filtered), the container doesn't have data-section-id,
+    // but the cards have data-in-section attribute
+    let toSectionId = toContainer.getAttribute('data-section-id');
+    let fromSectionId = fromContainer.getAttribute('data-section-id');
 
-    console.log('[handleCardDragWithinSection]', {
-        oldChordIndex,
-        fromSectionId,
-        toSectionId,
-        isFilteredView,
-        visibleChordOrder,
-        totalChords
-    });
+    // If container doesn't have section ID, check the dragged item's section
+    if (!fromSectionId) {
+        fromSectionId = draggedItem.getAttribute('data-in-section');
+    }
+    // For destination, check if there's a section context from nearby cards
+    if (!toSectionId && isFilteredView) {
+        // In filtered view, all visible cards might be from the same section(s)
+        // Get the section from the dragged item itself
+        toSectionId = draggedItem.getAttribute('data-in-section');
+    }
 
     // Update section membership if changed
     if (fromSectionId !== toSectionId) {
@@ -8111,14 +7967,74 @@ function handleCardDragWithinSection(evt, originalSectionId) {
                 const positionInSection = Array.from(sectionCards).indexOf(draggedItem);
                 compositionState.addChordToSection(oldChordIndex, toSectionId, positionInSection);
             }
-        } else {
         }
     }
 
-    // In filtered view (Section View mode), DON'T do global reorder
-    // Just update section membership and re-render
+    // If dragging within the same section, reorder the actual chord data
+    if (fromSectionId && fromSectionId === toSectionId) {
+        const section = compositionState.getSection(toSectionId);
+
+        if (section) {
+            // Get the new order of chord indices within this section from the DOM
+            const sectionCards = toContainer.querySelectorAll('.chord-card-wrapper[data-chord-index]');
+            const newSectionOrder = Array.from(sectionCards).map(card =>
+                parseInt(card.getAttribute('data-chord-index'), 10)
+            );
+
+            // Check if order actually changed within the section
+            if (JSON.stringify(newSectionOrder) !== JSON.stringify(section.chordIndices)) {
+                saveStateBeforeChange();
+
+                const trainerState = getTrainerState();
+
+                // Get the sorted positions that this section occupies
+                const sectionPositions = [...section.chordIndices].sort((a, b) => a - b);
+
+                // Build full new order array: for each position in progression,
+                // determine which OLD index's data should go there
+                const fullNewOrder = [];
+                for (let i = 0; i < trainerState.progressionData.length; i++) {
+                    const posInSection = sectionPositions.indexOf(i);
+                    if (posInSection !== -1) {
+                        // This position is in the section - get data from reordered index
+                        fullNewOrder.push(newSectionOrder[posInSection]);
+                    } else {
+                        // Non-section position keeps its own data
+                        fullNewOrder.push(i);
+                    }
+                }
+
+                // Reorder the actual progression data
+                const newProgressionData = fullNewOrder.map(oldIdx => trainerState.progressionData[oldIdx]);
+                const newProgressionRomans = fullNewOrder.map(oldIdx => trainerState.progressionRomans[oldIdx]);
+
+                // Section indices stay the same - they still occupy the same positions,
+                // we just swapped the data at those positions
+                // No need to update section.chordIndices
+
+                // Update trainer state
+                setProgressionData(newProgressionData);
+                setProgressionRomans(newProgressionRomans);
+            }
+        }
+
+        // Re-render to update visuals
+        renderProgressionDisplay('melody-progression-visualization', true);
+        renderProgressionDisplay('melody-progression-visualization', false);
+
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
+        }
+        if (window.updateVoiceLeading) {
+            window.updateVoiceLeading();
+        }
+        return; // Exit early - don't do global reorder
+    }
+
+    // In filtered view (Section View mode), don't do global reorder
+    // Section reordering was already handled above
     if (isFilteredView) {
-        // Still re-render to update section visuals
+        // Re-render to update section visuals
         renderProgressionDisplay('melody-progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
 

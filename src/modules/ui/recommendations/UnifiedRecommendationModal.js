@@ -6140,6 +6140,7 @@ function renderExplorerView(container) {
         pageSize: 25,
         filterRoot: '',
         filterType: '',
+        filterTopNote: '',
         sortColumn: 'score',
         sortDirection: 'desc'
     };
@@ -6192,6 +6193,17 @@ function renderExplorerView(container) {
     typeFilterLabel.appendChild(typeFilter);
     filterRow.appendChild(typeFilterLabel);
 
+    // Top Note filter
+    const topNoteFilterLabel = document.createElement('label');
+    topNoteFilterLabel.style.cssText = 'font-size: 12px; color: #6b7280;';
+    topNoteFilterLabel.textContent = 'Top Note: ';
+    const topNoteFilter = document.createElement('select');
+    topNoteFilter.style.cssText = 'padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;';
+    topNoteFilter.innerHTML = '<option value="">All</option>' +
+        ALL_NOTES.map(n => `<option value="${n}">${n}</option>`).join('');
+    topNoteFilterLabel.appendChild(topNoteFilter);
+    filterRow.appendChild(topNoteFilterLabel);
+
     container.appendChild(filterRow);
 
     // Table container
@@ -6215,6 +6227,23 @@ function renderExplorerView(container) {
     `;
     container.appendChild(paginationRow);
 
+    // Helper to get the top note (highest pitch class) of a chord
+    function getChordTopNote(root, type, inversion = 0) {
+        try {
+            const key = getCurrentKey() || 'C';
+            const result = getInvertedChordNotes(root, type, inversion, key, 0);
+            if (result && result.specificNotes && result.specificNotes.length > 0) {
+                // Notes are like ["C4", "E4", "G4"] - get the last one (highest)
+                const topNoteWithOctave = result.specificNotes[result.specificNotes.length - 1];
+                // Extract pitch class (remove octave number)
+                return topNoteWithOctave.replace(/\d+$/, '');
+            }
+        } catch (e) {
+            // Fallback if chord notes can't be calculated
+        }
+        return null;
+    }
+
     function getFilteredData() {
         let filtered = allRecommendations;
         if (explorerState.filterRoot) {
@@ -6222,6 +6251,26 @@ function renderExplorerView(container) {
         }
         if (explorerState.filterType) {
             filtered = filtered.filter(r => r.type === explorerState.filterType);
+        }
+        if (explorerState.filterTopNote) {
+            filtered = filtered.filter(r => {
+                const topNote = getChordTopNote(r.root, r.type, r.inversion || 0);
+                // Normalize for comparison (handle enharmonics like C# vs Db)
+                if (!topNote) return false;
+                const normalizedTop = topNote.replace('#', '♯').replace('b', '♭');
+                const normalizedFilter = explorerState.filterTopNote.replace('#', '♯').replace('b', '♭');
+                // Also check enharmonic equivalents
+                const ENHARMONICS = {
+                    'C♯': 'D♭', 'D♭': 'C♯',
+                    'D♯': 'E♭', 'E♭': 'D♯',
+                    'F♯': 'G♭', 'G♭': 'F♯',
+                    'G♯': 'A♭', 'A♭': 'G♯',
+                    'A♯': 'B♭', 'B♭': 'A♯'
+                };
+                return normalizedTop === normalizedFilter ||
+                       topNote === explorerState.filterTopNote ||
+                       ENHARMONICS[normalizedTop] === normalizedFilter;
+            });
         }
         // Sort
         filtered.sort((a, b) => {
@@ -6532,6 +6581,12 @@ function renderExplorerView(container) {
 
     typeFilter.addEventListener('change', () => {
         explorerState.filterType = typeFilter.value;
+        explorerState.page = 0;
+        renderTable();
+    });
+
+    topNoteFilter.addEventListener('change', () => {
+        explorerState.filterTopNote = topNoteFilter.value;
         explorerState.page = 0;
         renderTable();
     });

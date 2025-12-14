@@ -307,6 +307,18 @@ export function getDifficultyLevel(exerciseType) {
 }
 
 /**
+ * Set difficulty level for an exercise type
+ * @param {string} exerciseType - The exercise type (from EXERCISE_TYPES)
+ * @param {number} level - The new level (1-5)
+ */
+export function setDifficultyLevel(exerciseType, level) {
+    // Clamp level between 1 and 5
+    const clampedLevel = Math.max(1, Math.min(5, level));
+    progressData.difficultyLevels[exerciseType] = clampedLevel;
+    saveEarTrainingProgress();
+}
+
+/**
  * Get stats for an exercise type
  */
 export function getExerciseStats(exerciseType) {
@@ -404,6 +416,7 @@ export default {
     resetSessionStats,
     getEarTrainingProgress,
     getDifficultyLevel,
+    setDifficultyLevel,
     getExerciseStats,
     getOverallStats,
     getEarnedBadges,

@@ -10,7 +10,7 @@
 
 import { NotationComposer } from './composerIntegration.js';
 import { NoteEditor } from './noteEditor.js';
-import { getCurrentKey } from '../state/trainerState.js';
+import { getCurrentKey, getSelectedChordIndex, invalidateProgressionDataCache } from '../state/trainerState.js';
 import { generateBassVoicing } from '../integration/bassAutoFill.js';
 import { initializeIntegratedSuggestions, FeatureFlags } from '../canvas/suggestions/index.js';
 import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
@@ -1098,29 +1098,74 @@ export function initEnhancedNotation(options = {}) {
 
     // Handle chord symbol application
     notationComposer.toolbar.onChordSymbolApply = (chordSymbol) => {
-
-      // Find measure containing selected notes, or first measure if no selection
+      // Find the target chord based on selection priority:
+      // 1. Selected notes -> use their measure's chord
+      // 2. Selected measure -> use that measure's chord
+      // 3. Highlighted chord card -> use that chord directly
+      // 4. Default to first chord
       let targetMeasureIndex = 0;
+      let chordIndex = undefined;
 
       if (noteEditor.selectedNotes.size > 0) {
         // Get first selected note's measure
         const firstNoteId = [...noteEditor.selectedNotes][0];
         const [measureIndex] = firstNoteId.split('-');
         targetMeasureIndex = parseInt(measureIndex);
+      } else if (notationComposer.selectedMeasure !== null && notationComposer.selectedMeasure !== undefined) {
+        // Use the currently selected measure (from clicking on a measure)
+        targetMeasureIndex = notationComposer.selectedMeasure;
+      } else {
+        // Use the currently selected chord card from trainerState
+        const selectedIndex = getSelectedChordIndex();
+        if (selectedIndex !== null && selectedIndex !== undefined && selectedIndex >= 0) {
+          chordIndex = selectedIndex;
+        }
       }
 
-      // Apply chord symbol to measure
+      // Apply chord symbol to the chord (not the measure) so it moves with the chord
       if (notationComposer.compositionState) {
-        const measure = notationComposer.compositionState.getMeasure(targetMeasureIndex);
-        if (measure) {
-          // Initialize metadata if needed
-          if (!measure.metadata) {
-            measure.metadata = {};
+        // If we don't have chordIndex yet, get it from the target measure
+        if (chordIndex === undefined) {
+          const measure = notationComposer.compositionState.getMeasure(targetMeasureIndex);
+          chordIndex = measure?.chord?.chordIndex;
+
+          // Fallback: find chord by beat position
+          if (chordIndex === undefined && notationComposer.compositionState.getChordSegmentForBeat) {
+            const timeSignature = notationComposer.compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
+            const beatsPerMeasure = timeSignature.num * (4 / timeSignature.denom);
+            const measureStartBeat = targetMeasureIndex * beatsPerMeasure;
+            const segment = notationComposer.compositionState.getChordSegmentForBeat(measureStartBeat);
+            if (segment) {
+              chordIndex = segment.chordIndex;
+            }
           }
-          measure.metadata.chordSymbol = chordSymbol;
+        }
 
+        if (chordIndex !== undefined) {
+          // Get the chord segment and update its displayNameOverride
+          const segment = notationComposer.compositionState.getChordSegment(chordIndex);
+          if (segment && segment.chord) {
+            segment.chord.displayNameOverride = chordSymbol;
+          }
 
-          // Re-render to show chord symbol (force render to ensure it appears)
+          // Also update storedProgressionData (source of truth for rebuilding segments)
+          const storedData = notationComposer.compositionState.storedProgressionData;
+          if (storedData && storedData[chordIndex]) {
+            storedData[chordIndex].displayNameOverride = chordSymbol;
+          }
+
+          // Update all measures that belong to this chord
+          const measures = notationComposer.compositionState.measures;
+          for (const m of measures) {
+            if (m.chord && m.chord.chordIndex === chordIndex) {
+              m.chord.displayNameOverride = chordSymbol;
+            }
+          }
+
+          // Invalidate the progression data cache so drag/drop operations see the updated data
+          invalidateProgressionDataCache();
+
+          // Re-render to show chord symbol
           notationComposer.render(true);
         }
       }
