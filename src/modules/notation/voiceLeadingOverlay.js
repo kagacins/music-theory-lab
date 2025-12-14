@@ -15,6 +15,7 @@ import {
     detectParallelMotion,
     detectVoiceCrossing
 } from '../features/enhancedVoiceLeading.js';
+import { getPiano, preWarmAudioContext } from '../audio/audioEngine.js';
 
 // ============================================================================
 // CONSTANTS
@@ -75,7 +76,14 @@ export class VoiceLeadingDiagram {
         this.showWarningsOnly = false;
         this.showNewDropped = true;
 
+        // Voice matching mode: 'smooth' (Hungarian algorithm) or 'voices' (register-based)
+        this.matchingMode = 'smooth';
+
         // Load saved preferences (no longer load isVisible - always visible now)
+        const savedMatchingMode = localStorage.getItem('voice-leading-matching-mode');
+        if (savedMatchingMode) {
+            this.matchingMode = savedMatchingMode;
+        }
         const savedExpanded = localStorage.getItem('voice-leading-panel-expanded');
         if (savedExpanded !== null) {
             this.isPanelExpanded = savedExpanded === 'true';
@@ -436,13 +444,33 @@ export class VoiceLeadingDiagram {
     }
 
     /**
-     * Toggle warnings-only filter
+     * Set matching mode explicitly
      */
-    toggleWarningsOnly() {
-        this.showWarningsOnly = !this.showWarningsOnly;
+    setMatchingMode(mode) {
+        if (this.matchingMode === mode) return; // Already in this mode
+        this.matchingMode = mode;
+        localStorage.setItem('voice-leading-matching-mode', this.matchingMode);
+        this.analyze(); // Re-analyze with new mode
+        this.render();
+        this.updateFilterButtons();
+    }
+
+    /**
+     * Set warnings filter explicitly
+     */
+    setWarningsFilter(warningsOnly) {
+        if (this.showWarningsOnly === warningsOnly) return; // Already in this state
+        this.showWarningsOnly = warningsOnly;
         localStorage.setItem('voice-leading-warnings-only', this.showWarningsOnly.toString());
         this.render();
         this.updateFilterButtons();
+    }
+
+    /**
+     * Toggle warnings-only filter (legacy, for backwards compatibility)
+     */
+    toggleWarningsOnly() {
+        this.setWarningsFilter(!this.showWarningsOnly);
     }
 
     /**
@@ -456,29 +484,75 @@ export class VoiceLeadingDiagram {
     }
 
     /**
-     * Update filter button states
+     * Update filter button states for segmented controls
      */
     updateFilterButtons() {
-        const warningsBtn = document.getElementById('vl-filter-warnings');
-        const newDroppedBtn = document.getElementById('vl-filter-new-dropped');
+        // Mode segmented control
+        const modeSmoothBtn = document.getElementById('vl-mode-smooth');
+        const modeVoicesBtn = document.getElementById('vl-mode-voices');
 
-        if (warningsBtn) {
-            if (this.showWarningsOnly) {
-                warningsBtn.classList.add('bg-red-100', 'text-red-700', 'border-red-300');
-                warningsBtn.classList.remove('bg-gray-100', 'text-gray-600', 'border-gray-200');
+        if (modeSmoothBtn && modeVoicesBtn) {
+            if (this.matchingMode === 'smooth') {
+                modeSmoothBtn.classList.add('bg-blue-500', 'text-white');
+                modeSmoothBtn.classList.remove('bg-white', 'text-gray-600', 'hover:bg-gray-50');
+                modeVoicesBtn.classList.remove('bg-purple-500', 'text-white');
+                modeVoicesBtn.classList.add('bg-white', 'text-gray-600', 'hover:bg-gray-50');
             } else {
-                warningsBtn.classList.remove('bg-red-100', 'text-red-700', 'border-red-300');
-                warningsBtn.classList.add('bg-gray-100', 'text-gray-600', 'border-gray-200');
+                modeSmoothBtn.classList.remove('bg-blue-500', 'text-white');
+                modeSmoothBtn.classList.add('bg-white', 'text-gray-600', 'hover:bg-gray-50');
+                modeVoicesBtn.classList.add('bg-purple-500', 'text-white');
+                modeVoicesBtn.classList.remove('bg-white', 'text-gray-600', 'hover:bg-gray-50');
             }
         }
 
+        // View segmented control
+        const viewAllBtn = document.getElementById('vl-view-all');
+        const viewWarningsBtn = document.getElementById('vl-view-warnings');
+
+        if (viewAllBtn && viewWarningsBtn) {
+            if (this.showWarningsOnly) {
+                viewAllBtn.classList.remove('bg-gray-700', 'text-white');
+                viewAllBtn.classList.add('bg-white', 'text-gray-600', 'hover:bg-gray-50');
+                viewWarningsBtn.classList.add('bg-red-500', 'text-white');
+                viewWarningsBtn.classList.remove('bg-white', 'text-gray-600', 'hover:bg-gray-50');
+            } else {
+                viewAllBtn.classList.add('bg-gray-700', 'text-white');
+                viewAllBtn.classList.remove('bg-white', 'text-gray-600', 'hover:bg-gray-50');
+                viewWarningsBtn.classList.remove('bg-red-500', 'text-white');
+                viewWarningsBtn.classList.add('bg-white', 'text-gray-600', 'hover:bg-gray-50');
+            }
+        }
+
+        // New/Dropped checkbox toggle
+        const newDroppedBtn = document.getElementById('vl-filter-new-dropped');
+        const newDroppedCheckbox = document.getElementById('vl-new-dropped-checkbox');
+        const newDroppedCheck = document.getElementById('vl-new-dropped-check');
+
         if (newDroppedBtn) {
             if (this.showNewDropped) {
-                newDroppedBtn.classList.add('bg-indigo-100', 'text-indigo-700', 'border-indigo-300');
-                newDroppedBtn.classList.remove('bg-gray-100', 'text-gray-600', 'border-gray-200');
+                newDroppedBtn.classList.add('bg-indigo-50', 'text-indigo-700', 'border-indigo-300');
+                newDroppedBtn.classList.remove('bg-white', 'text-gray-500', 'border-gray-300', 'hover:bg-gray-50');
             } else {
-                newDroppedBtn.classList.remove('bg-indigo-100', 'text-indigo-700', 'border-indigo-300');
-                newDroppedBtn.classList.add('bg-gray-100', 'text-gray-600', 'border-gray-200');
+                newDroppedBtn.classList.remove('bg-indigo-50', 'text-indigo-700', 'border-indigo-300');
+                newDroppedBtn.classList.add('bg-white', 'text-gray-500', 'border-gray-300', 'hover:bg-gray-50');
+            }
+        }
+
+        if (newDroppedCheckbox) {
+            if (this.showNewDropped) {
+                newDroppedCheckbox.classList.add('bg-indigo-500', 'border-indigo-500');
+                newDroppedCheckbox.classList.remove('bg-white', 'border-gray-400');
+            } else {
+                newDroppedCheckbox.classList.remove('bg-indigo-500', 'border-indigo-500');
+                newDroppedCheckbox.classList.add('bg-white', 'border-gray-400');
+            }
+        }
+
+        if (newDroppedCheck) {
+            if (this.showNewDropped) {
+                newDroppedCheck.classList.remove('hidden');
+            } else {
+                newDroppedCheck.classList.add('hidden');
             }
         }
     }
@@ -526,30 +600,88 @@ export class VoiceLeadingDiagram {
 
                 <!-- Filter Controls -->
                 <div class="flex items-center justify-between px-3 py-2 bg-white/50 border-b border-indigo-200">
-                    <div class="flex items-center gap-2">
-                        <button id="vl-filter-warnings"
-                                class="px-2 py-1 text-xs rounded border transition-all ${this.showWarningsOnly ? 'bg-red-100 text-red-700 border-red-300' : 'bg-gray-100 text-gray-600 border-gray-200'}"
-                                title="Show only transitions with warnings">
-                            <span class="flex items-center gap-1">
-                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <!-- Matching Mode: Segmented Control -->
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-xs text-gray-500">Mode:</span>
+                            <div class="inline-flex rounded-md overflow-hidden border border-gray-300">
+                                <button id="vl-mode-smooth"
+                                        class="px-2 py-1 text-xs font-medium transition-all border-r border-gray-300 ${this.matchingMode === 'smooth' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}"
+                                        title="Minimize total voice movement">
+                                    Smooth
+                                </button>
+                                <button id="vl-mode-voices"
+                                        class="px-2 py-1 text-xs font-medium transition-all ${this.matchingMode === 'voices' ? 'bg-purple-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}"
+                                        title="Track by register position">
+                                    Voice Parts
+                                </button>
+                            </div>
+                            <button id="vl-mode-info" class="p-0.5 text-gray-400 hover:text-gray-600 transition-colors" title="Learn about matching modes">
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
                                 </svg>
-                                Warnings Only
-                            </span>
-                        </button>
+                            </button>
+                        </div>
+
+                        <span class="text-gray-300">|</span>
+
+                        <!-- View Filter: Segmented Control -->
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-xs text-gray-500">Show:</span>
+                            <div class="inline-flex rounded-md overflow-hidden border border-gray-300">
+                                <button id="vl-view-all"
+                                        class="px-2 py-1 text-xs font-medium transition-all border-r border-gray-300 ${!this.showWarningsOnly ? 'bg-gray-700 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}">
+                                    All
+                                </button>
+                                <button id="vl-view-warnings"
+                                        class="px-2 py-1 text-xs font-medium transition-all flex items-center gap-1 ${this.showWarningsOnly ? 'bg-red-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    Warnings
+                                </button>
+                            </div>
+                        </div>
+
+                        <span class="text-gray-300">|</span>
+
+                        <!-- New/Dropped: Checkbox-style toggle -->
                         <button id="vl-filter-new-dropped"
-                                class="px-2 py-1 text-xs rounded border transition-all ${this.showNewDropped ? 'bg-indigo-100 text-indigo-700 border-indigo-300' : 'bg-gray-100 text-gray-600 border-gray-200'}"
-                                title="Show new and dropped voice arcs">
-                            <span class="flex items-center gap-1">
-                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"></path>
-                                </svg>
-                                New/Dropped
+                                class="flex items-center gap-1.5 px-2 py-1 text-xs rounded border transition-all ${this.showNewDropped ? 'bg-indigo-50 text-indigo-700 border-indigo-300' : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'}"
+                                title="Show gray arcs for voices that appear or disappear between chords (e.g., going from 3 notes to 4 notes)">
+                            <span id="vl-new-dropped-checkbox" class="w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${this.showNewDropped ? 'bg-indigo-500 border-indigo-500' : 'bg-white border-gray-400'}">
+                                <svg id="vl-new-dropped-check" class="w-2.5 h-2.5 text-white ${this.showNewDropped ? '' : 'hidden'}" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                             </span>
+                            <span>Added/Removed Voices</span>
                         </button>
                     </div>
                     <div id="vl-warning-summary" class="text-xs text-gray-500">
                         <!-- Warning summary will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- Mode Info Panel (hidden by default) -->
+                <div id="vl-mode-info-panel" class="hidden px-3 py-3 bg-blue-50 border-b border-blue-200 text-sm">
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="font-semibold text-blue-900">Voice Matching Modes</span>
+                        <button id="vl-mode-info-close" class="text-blue-400 hover:text-blue-600">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="space-y-3 text-xs text-blue-800">
+                        <div class="flex gap-2">
+                            <span class="px-2 py-0.5 bg-blue-200 text-blue-800 rounded font-medium shrink-0">Smooth</span>
+                            <p>Uses the <strong>Hungarian algorithm</strong> to minimize total semitone movement across all voices. Best for analyzing <em>efficiency</em> of voice leading. May connect notes across registers if it reduces overall movement.</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <span class="px-2 py-0.5 bg-purple-200 text-purple-800 rounded font-medium shrink-0">Voice Parts</span>
+                            <p>Connects notes by <strong>register position</strong>: top note → top note, middle → middle, bottom → bottom. Best for understanding how <em>individual voice parts</em> move. Shows soprano, alto, tenor, bass lines.</p>
+                        </div>
+                        <div class="mt-2 p-2 bg-white/50 rounded border border-blue-200">
+                            <p class="text-blue-700"><strong>Example:</strong> G→D chord with D4 on top. "Smooth" might connect D4→D3 (same pitch class). "Voice Parts" connects D4→A3 (both are top notes in their chords).</p>
+                        </div>
                     </div>
                 </div>
 
@@ -714,14 +846,45 @@ export class VoiceLeadingDiagram {
                 });
             }
 
-            const warningsBtn = document.getElementById('vl-filter-warnings');
-            if (warningsBtn) {
-                warningsBtn.addEventListener('click', () => this.toggleWarningsOnly());
-            }
-
             const newDroppedBtn = document.getElementById('vl-filter-new-dropped');
             if (newDroppedBtn) {
                 newDroppedBtn.addEventListener('click', () => this.toggleNewDropped());
+            }
+
+            // Matching mode segmented control
+            const modeSmoothBtn = document.getElementById('vl-mode-smooth');
+            const modeVoicesBtn = document.getElementById('vl-mode-voices');
+            if (modeSmoothBtn) {
+                modeSmoothBtn.addEventListener('click', () => this.setMatchingMode('smooth'));
+            }
+            if (modeVoicesBtn) {
+                modeVoicesBtn.addEventListener('click', () => this.setMatchingMode('voices'));
+            }
+
+            // View filter segmented control
+            const viewAllBtn = document.getElementById('vl-view-all');
+            const viewWarningsBtn = document.getElementById('vl-view-warnings');
+            if (viewAllBtn) {
+                viewAllBtn.addEventListener('click', () => this.setWarningsFilter(false));
+            }
+            if (viewWarningsBtn) {
+                viewWarningsBtn.addEventListener('click', () => this.setWarningsFilter(true));
+            }
+
+            // Mode info panel toggle
+            const modeInfoBtn = document.getElementById('vl-mode-info');
+            const modeInfoPanel = document.getElementById('vl-mode-info-panel');
+            const modeInfoClose = document.getElementById('vl-mode-info-close');
+
+            if (modeInfoBtn && modeInfoPanel) {
+                modeInfoBtn.addEventListener('click', () => {
+                    modeInfoPanel.classList.toggle('hidden');
+                });
+            }
+            if (modeInfoClose && modeInfoPanel) {
+                modeInfoClose.addEventListener('click', () => {
+                    modeInfoPanel.classList.add('hidden');
+                });
             }
 
             // Set up drag handle listeners (matching sectionDragDrop.js pattern)
@@ -967,6 +1130,7 @@ export class VoiceLeadingDiagram {
 
     /**
      * Analyze voice motions between chords
+     * Uses either Hungarian algorithm (smooth) or register-based matching (voices)
      */
     analyzeVoiceMotions(fromMidi, toMidi) {
         const motions = [];
@@ -976,6 +1140,12 @@ export class VoiceLeadingDiagram {
 
         if (fromLen === 0 || toLen === 0) return motions;
 
+        if (this.matchingMode === 'voices') {
+            // Voice Parts mode: match by register position (top→top, middle→middle, etc.)
+            return this.analyzeVoiceMotionsByRegister(fromMidi, toMidi);
+        }
+
+        // Smooth mode: use Hungarian algorithm for optimal matching
         // Build cost matrix
         const costs = [];
         for (let f = 0; f < fromLen; f++) {
@@ -1029,6 +1199,71 @@ export class VoiceLeadingDiagram {
                     type: 'new',
                 });
             }
+        }
+
+        // Sort by fromVoice for display
+        motions.sort((a, b) => {
+            if (a.fromVoice === -1) return 1;
+            if (b.fromVoice === -1) return -1;
+            return a.fromVoice - b.fromVoice;
+        });
+
+        return motions;
+    }
+
+    /**
+     * Analyze voice motions by register position
+     * Top note → top note, second from top → second from top, etc.
+     */
+    analyzeVoiceMotionsByRegister(fromMidi, toMidi) {
+        const motions = [];
+        const fromLen = fromMidi.length;
+        const toLen = toMidi.length;
+
+        // Notes are already sorted low to high, so highest index = soprano
+        // Match from the top down (soprano first, then alto, etc.)
+        const minLen = Math.min(fromLen, toLen);
+
+        for (let i = 0; i < minLen; i++) {
+            // Match from top: fromMidi[fromLen-1-i] → toMidi[toLen-1-i]
+            const fromIdx = fromLen - 1 - i;
+            const toIdx = toLen - 1 - i;
+            const interval = Math.abs(toMidi[toIdx] - fromMidi[fromIdx]);
+
+            motions.push({
+                fromVoice: fromIdx,
+                toVoice: toIdx,
+                fromMidi: fromMidi[fromIdx],
+                toMidi: toMidi[toIdx],
+                interval: interval,
+                type: this.getMotionType(interval),
+            });
+        }
+
+        // Mark dropped voices (from chord has more notes)
+        for (let i = minLen; i < fromLen; i++) {
+            const fromIdx = fromLen - 1 - i;
+            motions.push({
+                fromVoice: fromIdx,
+                toVoice: -1,
+                fromMidi: fromMidi[fromIdx],
+                toMidi: null,
+                interval: null,
+                type: 'dropped',
+            });
+        }
+
+        // Mark new voices (to chord has more notes)
+        for (let i = minLen; i < toLen; i++) {
+            const toIdx = toLen - 1 - i;
+            motions.push({
+                fromVoice: -1,
+                toVoice: toIdx,
+                fromMidi: null,
+                toMidi: toMidi[toIdx],
+                interval: null,
+                type: 'new',
+            });
         }
 
         // Sort by fromVoice for display
@@ -1188,7 +1423,19 @@ export class VoiceLeadingDiagram {
         const numChords = chords.length;
         const maxNotes = Math.max(...chords.map(c => c.midi.length), 3);
         const width = Math.max(400, numChords * DIAGRAM.chordSpacing + 40);
-        const height = Math.max(DIAGRAM.minHeight, DIAGRAM.topPadding + maxNotes * DIAGRAM.noteSpacing + DIAGRAM.bottomPadding + 20);
+
+        // Find global MIDI range for pitch-based Y positioning
+        const allMidi = chords.flatMap(c => c.midi);
+        const midiMin = Math.min(...allMidi);
+        const midiMax = Math.max(...allMidi);
+        const midiRange = Math.max(12, midiMax - midiMin); // At least one octave range
+
+        // Store for use in getNoteYByPitch
+        this._midiMin = midiMin;
+        this._midiMax = midiMax;
+        this._midiRange = midiRange;
+
+        const height = Math.max(DIAGRAM.minHeight, DIAGRAM.topPadding + 150 + DIAGRAM.bottomPadding);
 
         // Create SVG
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -1216,12 +1463,13 @@ export class VoiceLeadingDiagram {
                     return;
                 }
 
-                const fromY = motion.fromVoice >= 0
-                    ? this.getNoteY(motion.fromVoice, fromChord.midi.length, height)
-                    : this.getNoteY(motion.toVoice, toChord.midi.length, height);
-                const toY = motion.toVoice >= 0
-                    ? this.getNoteY(motion.toVoice, toChord.midi.length, height)
-                    : this.getNoteY(motion.fromVoice, fromChord.midi.length, height);
+                // Use pitch-based Y positioning for accurate visual representation
+                const fromY = motion.fromMidi !== null
+                    ? this.getNoteYByPitch(motion.fromMidi, height)
+                    : this.getNoteYByPitch(motion.toMidi, height);
+                const toY = motion.toMidi !== null
+                    ? this.getNoteYByPitch(motion.toMidi, height)
+                    : this.getNoteYByPitch(motion.fromMidi, height);
 
                 const path = this.createVoiceLine(
                     fromX + DIAGRAM.noteRadius,
@@ -1259,6 +1507,9 @@ export class VoiceLeadingDiagram {
         // Clear and append
         diagramArea.innerHTML = '';
         diagramArea.appendChild(svg);
+
+        // Render fix suggestions if there are warnings
+        this.renderFixSuggestions();
     }
 
     /**
@@ -1271,7 +1522,22 @@ export class VoiceLeadingDiagram {
     }
 
     /**
-     * Get Y position for a note in a chord
+     * Get Y position for a note based on its actual MIDI pitch
+     * Higher pitches = lower Y (higher on screen)
+     */
+    getNoteYByPitch(midiValue, height) {
+        const startY = DIAGRAM.topPadding + 30;
+        const availableHeight = height - startY - DIAGRAM.bottomPadding - 20;
+
+        // Map MIDI value to Y position (inverted: higher pitch = lower Y)
+        const normalized = (midiValue - this._midiMin) / this._midiRange;
+        const y = startY + availableHeight * (1 - normalized);
+
+        return y;
+    }
+
+    /**
+     * Get Y position for a note in a chord (legacy - by voice index)
      */
     getNoteY(voiceIndex, totalNotes, height) {
         const startY = DIAGRAM.topPadding + 20;
@@ -1310,9 +1576,9 @@ export class VoiceLeadingDiagram {
         label.textContent = labelText;
         group.appendChild(label);
 
-        // Note circles
+        // Note circles - positioned by actual pitch
         chord.midi.forEach((midi, i) => {
-            const y = this.getNoteY(i, chord.midi.length, height);
+            const y = this.getNoteYByPitch(midi, height);
 
             const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
             circle.setAttribute('cx', x);
@@ -1449,40 +1715,74 @@ export class VoiceLeadingDiagram {
             path.setAttribute('stroke-dasharray', '3,3');
         }
 
-        // Helper to add tooltip event listeners
-        const addTooltipEvents = (element, text) => {
-            if (!text) return;
+        // Helper to add tooltip and click-to-play event listeners
+        const addInteractiveEvents = (element, text, fromMidi, toMidi) => {
+            // Make clickable if we have both notes
+            const isClickable = fromMidi !== null && toMidi !== null;
+            element.style.cursor = isClickable ? 'pointer' : 'help';
 
-            element.style.cursor = 'help';
+            // Click to play voice motion
+            if (isClickable) {
+                element.addEventListener('click', (e) => {
+                    e.stopPropagation();
 
-            element.addEventListener('mouseenter', (e) => {
-                const tooltip = document.getElementById('vl-arc-tooltip');
-                if (tooltip) {
-                    tooltip.textContent = text;
-                    tooltip.classList.add('visible');
-                    // Position above the cursor
-                    const rect = element.getBoundingClientRect();
-                    const tooltipRect = tooltip.getBoundingClientRect();
-                    tooltip.style.left = `${e.clientX - tooltipRect.width / 2}px`;
-                    tooltip.style.top = `${e.clientY - tooltipRect.height - 15}px`;
-                }
-            });
+                    // Visual feedback - brief flash
+                    const originalOpacity = path.getAttribute('opacity') || '0.8';
+                    path.setAttribute('opacity', '1');
+                    path.setAttribute('stroke-width', String(parseFloat(path.getAttribute('stroke-width')) + 2));
 
-            element.addEventListener('mousemove', (e) => {
-                const tooltip = document.getElementById('vl-arc-tooltip');
-                if (tooltip && tooltip.classList.contains('visible')) {
-                    const tooltipRect = tooltip.getBoundingClientRect();
-                    tooltip.style.left = `${e.clientX - tooltipRect.width / 2}px`;
-                    tooltip.style.top = `${e.clientY - tooltipRect.height - 15}px`;
-                }
-            });
+                    setTimeout(() => {
+                        path.setAttribute('opacity', originalOpacity);
+                        path.setAttribute('stroke-width', String(parseFloat(path.getAttribute('stroke-width')) - 2));
+                    }, 300);
 
-            element.addEventListener('mouseleave', () => {
-                const tooltip = document.getElementById('vl-arc-tooltip');
-                if (tooltip) {
-                    tooltip.classList.remove('visible');
-                }
-            });
+                    // Play the voice motion
+                    this.playVoiceMotion(fromMidi, toMidi);
+
+                    // Update tooltip to show "Playing..."
+                    const tooltip = document.getElementById('vl-arc-tooltip');
+                    if (tooltip) {
+                        const originalText = tooltip.textContent;
+                        tooltip.innerHTML = '🔊 Playing...';
+                        setTimeout(() => {
+                            tooltip.textContent = originalText;
+                        }, 1400);
+                    }
+                });
+            }
+
+            // Tooltip on hover
+            if (text) {
+                const hoverText = isClickable ? text + '\n🔊 Click to hear' : text;
+
+                element.addEventListener('mouseenter', (e) => {
+                    const tooltip = document.getElementById('vl-arc-tooltip');
+                    if (tooltip) {
+                        tooltip.textContent = hoverText;
+                        tooltip.classList.add('visible');
+                        // Position above the cursor
+                        const tooltipRect = tooltip.getBoundingClientRect();
+                        tooltip.style.left = `${e.clientX - tooltipRect.width / 2}px`;
+                        tooltip.style.top = `${e.clientY - tooltipRect.height - 15}px`;
+                    }
+                });
+
+                element.addEventListener('mousemove', (e) => {
+                    const tooltip = document.getElementById('vl-arc-tooltip');
+                    if (tooltip && tooltip.classList.contains('visible')) {
+                        const tooltipRect = tooltip.getBoundingClientRect();
+                        tooltip.style.left = `${e.clientX - tooltipRect.width / 2}px`;
+                        tooltip.style.top = `${e.clientY - tooltipRect.height - 15}px`;
+                    }
+                });
+
+                element.addEventListener('mouseleave', () => {
+                    const tooltip = document.getElementById('vl-arc-tooltip');
+                    if (tooltip) {
+                        tooltip.classList.remove('visible');
+                    }
+                });
+            }
         };
 
         // Add glow effect for warnings
@@ -1513,23 +1813,17 @@ export class VoiceLeadingDiagram {
 
             group.appendChild(path);
 
-            // Add JavaScript-based tooltip
-            if (tooltipText) {
-                addTooltipEvents(group, tooltipText);
-            }
+            // Add interactive events (tooltip + click-to-play)
+            addInteractiveEvents(group, tooltipText, motion.fromMidi, motion.toMidi);
 
             return group;
         }
 
-        // Non-warning arcs: add tooltip if there's text
-        if (tooltipText) {
-            const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            group.appendChild(path);
-            addTooltipEvents(group, tooltipText);
-            return group;
-        }
-
-        return path;
+        // Non-warning arcs: add interactive events
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        group.appendChild(path);
+        addInteractiveEvents(group, tooltipText, motion.fromMidi, motion.toMidi);
+        return group;
     }
 
     /**
@@ -1625,6 +1919,233 @@ export class VoiceLeadingDiagram {
         }
         this.container = null;
         this.analysisData = null;
+    }
+
+    // ========================================================================
+    // FIX SUGGESTIONS
+    // ========================================================================
+
+    /**
+     * Generate fix suggestions for voice leading issues
+     * @param {Array} warnings - Array of warning objects from analysis
+     * @param {Array} transitions - Array of transition objects
+     * @returns {Array} Array of suggestion objects
+     */
+    generateFixSuggestions(warnings, transitions) {
+        const suggestions = [];
+
+        // Collect detailed warnings from transitions
+        const warningDetails = [];
+        transitions.forEach((t, idx) => {
+            t.motions.forEach(m => {
+                if (m.warnings && m.warnings.length > 0) {
+                    m.warnings.forEach(w => {
+                        warningDetails.push({
+                            type: w,
+                            transition: idx,
+                            fromChord: idx,
+                            toChord: idx + 1,
+                            motion: m
+                        });
+                    });
+                }
+            });
+        });
+
+        // Group by warning type and generate suggestions
+        const parallelFifths = warningDetails.filter(w => w.type === 'P5');
+        const parallelOctaves = warningDetails.filter(w => w.type === 'P8');
+        const voiceCrossings = warningDetails.filter(w => w.type === 'crossing');
+        const largeLeaps = warningDetails.filter(w => w.type === 'leap');
+
+        // Parallel Fifths suggestions
+        if (parallelFifths.length > 0) {
+            suggestions.push({
+                type: 'P5',
+                icon: '🔵',
+                title: 'Parallel 5ths Detected',
+                issue: `Found ${parallelFifths.length} parallel fifth${parallelFifths.length > 1 ? 's' : ''} between chords.`,
+                fixes: [
+                    'Move one voice by step while the other stays (common tone)',
+                    'Use contrary motion - one voice up, one voice down',
+                    'Try a different chord inversion to break the parallel movement',
+                    'Add a passing tone or suspension to one of the voices'
+                ]
+            });
+        }
+
+        // Parallel Octaves suggestions
+        if (parallelOctaves.length > 0) {
+            suggestions.push({
+                type: 'P8',
+                icon: '🟣',
+                title: 'Parallel Octaves Detected',
+                issue: `Found ${parallelOctaves.length} parallel octave${parallelOctaves.length > 1 ? 's' : ''} between chords.`,
+                fixes: [
+                    'Have one voice hold a common tone while the other moves',
+                    'Move voices in contrary or oblique motion',
+                    'Change the voicing of one chord to break the doubling',
+                    'Consider using a 10th (compound 3rd) instead of an octave'
+                ]
+            });
+        }
+
+        // Voice Crossing suggestions
+        if (voiceCrossings.length > 0) {
+            suggestions.push({
+                type: 'crossing',
+                icon: '🟡',
+                title: 'Voice Crossing Detected',
+                issue: `Found ${voiceCrossings.length} voice crossing${voiceCrossings.length > 1 ? 's' : ''}.`,
+                fixes: [
+                    'Rearrange chord voicings to keep voices in their registers',
+                    'Use a different inversion that maintains voice order',
+                    'Expand or contract the chord spacing to avoid overlap',
+                    'Consider if the melody line can take a different path'
+                ]
+            });
+        }
+
+        // Large Leap suggestions
+        if (largeLeaps.length > 0) {
+            const avgLeap = largeLeaps.reduce((sum, w) => sum + (w.motion.interval || 0), 0) / largeLeaps.length;
+            suggestions.push({
+                type: 'leap',
+                icon: '🩷',
+                title: 'Large Leaps Detected',
+                issue: `Found ${largeLeaps.length} leap${largeLeaps.length > 1 ? 's' : ''} of 8+ semitones (avg: ${Math.round(avgLeap)} semitones).`,
+                fixes: [
+                    'Follow the leap with stepwise motion in the opposite direction',
+                    'Insert a passing chord to break the large interval',
+                    'Use a different chord inversion closer to the previous voicing',
+                    'Consider if the leap serves a melodic purpose (if so, it may be intentional)'
+                ]
+            });
+        }
+
+        return suggestions;
+    }
+
+    /**
+     * Render fix suggestions UI
+     */
+    renderFixSuggestions() {
+        if (!this.analysisData) return;
+
+        const { transitions, warnings } = this.analysisData;
+        const suggestions = this.generateFixSuggestions(warnings, transitions);
+
+        // Find or create suggestions container
+        let suggestionsContainer = document.getElementById('vl-fix-suggestions');
+        if (!suggestionsContainer) {
+            const panel = document.getElementById('voice-leading-panel');
+            if (!panel) return;
+
+            suggestionsContainer = document.createElement('div');
+            suggestionsContainer.id = 'vl-fix-suggestions';
+            suggestionsContainer.className = 'border-t border-indigo-200';
+
+            // Insert before the legend
+            const legend = panel.querySelector('.px-3.py-2.bg-white\\/50.border-t');
+            if (legend) {
+                panel.insertBefore(suggestionsContainer, legend);
+            } else {
+                panel.appendChild(suggestionsContainer);
+            }
+        }
+
+        if (suggestions.length === 0) {
+            suggestionsContainer.innerHTML = '';
+            suggestionsContainer.style.display = 'none';
+            return;
+        }
+
+        suggestionsContainer.style.display = 'block';
+        suggestionsContainer.innerHTML = `
+            <div class="px-3 py-2 bg-amber-50">
+                <button id="vl-suggestions-toggle" class="w-full flex items-center justify-between text-left">
+                    <span class="flex items-center gap-2 text-sm font-medium text-amber-800">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                        </svg>
+                        Fix Suggestions (${suggestions.length})
+                    </span>
+                    <svg id="vl-suggestions-chevron" class="w-4 h-4 text-amber-600 transform transition-transform" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                    </svg>
+                </button>
+                <div id="vl-suggestions-content" class="hidden mt-2 space-y-3">
+                    ${suggestions.map(s => `
+                        <div class="bg-white rounded-lg p-3 shadow-sm border border-amber-200">
+                            <div class="flex items-start gap-2">
+                                <span class="text-lg">${s.icon}</span>
+                                <div class="flex-1">
+                                    <div class="font-medium text-gray-900 text-sm">${s.title}</div>
+                                    <div class="text-xs text-gray-600 mt-0.5">${s.issue}</div>
+                                    <div class="mt-2">
+                                        <div class="text-xs font-medium text-green-700 mb-1">How to fix:</div>
+                                        <ul class="text-xs text-gray-700 space-y-1">
+                                            ${s.fixes.map(fix => `
+                                                <li class="flex items-start gap-1.5">
+                                                    <span class="text-green-500 mt-0.5">•</span>
+                                                    <span>${fix}</span>
+                                                </li>
+                                            `).join('')}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+        // Add toggle behavior
+        const toggleBtn = document.getElementById('vl-suggestions-toggle');
+        const content = document.getElementById('vl-suggestions-content');
+        const chevron = document.getElementById('vl-suggestions-chevron');
+
+        if (toggleBtn && content && chevron) {
+            toggleBtn.addEventListener('click', () => {
+                content.classList.toggle('hidden');
+                chevron.classList.toggle('rotate-180');
+            });
+        }
+    }
+
+    // ========================================================================
+    // AUDIO PLAYBACK
+    // ========================================================================
+
+    /**
+     * Play a voice motion (two notes in sequence)
+     * @param {number} fromMidi - Starting MIDI note
+     * @param {number} toMidi - Ending MIDI note
+     */
+    async playVoiceMotion(fromMidi, toMidi) {
+        preWarmAudioContext();
+        const piano = getPiano();
+        if (!piano) {
+            console.warn('[VoiceLeading] Piano not initialized');
+            return;
+        }
+
+        try {
+            const fromNote = this.midiToNoteNameWithOctave(fromMidi);
+            const toNote = this.midiToNoteNameWithOctave(toMidi);
+
+            const now = Tone.now();
+
+            // Play first note
+            piano.triggerAttackRelease(fromNote, 0.6, now);
+
+            // Play second note after a short gap
+            piano.triggerAttackRelease(toNote, 0.6, now + 0.7);
+
+        } catch (err) {
+            console.error('[VoiceLeading] Error playing voice motion:', err);
+        }
     }
 
     // ========================================================================

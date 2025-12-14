@@ -119,14 +119,271 @@ const INTERVAL_GROUPS = [
 ];
 
 const SCALE_DEFINITIONS = {
-    'Major (Ionian)': { intervals: [0, 2, 4, 5, 7, 9, 11] }, 'Natural Minor (Aeolian)': { intervals: [0, 2, 3, 5, 7, 8, 10] },
-    'Harmonic Minor': { intervals: [0, 2, 3, 5, 7, 8, 11] }, 'Melodic Minor': { intervals: [0, 2, 3, 5, 7, 9, 11] },
-    'Major Pentatonic': { intervals: [0, 2, 4, 7, 9] }, 'Minor Pentatonic': { intervals: [0, 3, 5, 7, 10] },
-    'Blues': { intervals: [0, 3, 5, 6, 7, 10] }, 'Dorian (Mode 2)': { intervals: [0, 2, 3, 5, 7, 9, 10] },
-    'Phrygian (Mode 3)': { intervals: [0, 1, 3, 5, 7, 8, 10] }, 'Lydian (Mode 4)': { intervals: [0, 2, 4, 6, 7, 9, 11] },
-    'Mixolydian (Mode 5)': { intervals: [0, 2, 4, 5, 7, 9, 10] }, 'Locrian (Mode 7)': { intervals: [0, 1, 3, 5, 6, 8, 10] },
-    'Whole Tone': { intervals: [0, 2, 4, 6, 8, 10] }, 'Diminished (WH)': { intervals: [0, 1, 3, 4, 6, 7, 9, 10] },
-    'Chromatic': { intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] },
+    // ============ BASIC SCALES ============
+    'Major (Ionian)': {
+        intervals: [0, 2, 4, 5, 7, 9, 11],
+        category: 'basic',
+        difficulty: 'beginner',
+        description: 'The foundation of Western music. Bright, happy sound.',
+        commonUses: ['Pop', 'Classical', 'Folk', 'Most Western music'],
+        relatedChords: ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°']
+    },
+    'Natural Minor (Aeolian)': {
+        intervals: [0, 2, 3, 5, 7, 8, 10],
+        category: 'basic',
+        difficulty: 'beginner',
+        description: 'The relative minor of major. Sad, introspective quality.',
+        commonUses: ['Rock', 'Pop ballads', 'Classical', 'Folk'],
+        relatedChords: ['i', 'ii°', 'III', 'iv', 'v', 'VI', 'VII']
+    },
+    'Major Pentatonic': {
+        intervals: [0, 2, 4, 7, 9],
+        category: 'basic',
+        difficulty: 'beginner',
+        description: 'Five-note scale. Universally pleasant, impossible to sound bad.',
+        commonUses: ['Country', 'Rock solos', 'Folk', 'World music'],
+        relatedChords: ['I', 'IV', 'V']
+    },
+    'Minor Pentatonic': {
+        intervals: [0, 3, 5, 7, 10],
+        category: 'basic',
+        difficulty: 'beginner',
+        description: 'The go-to scale for rock and blues solos.',
+        commonUses: ['Rock', 'Blues', 'Metal', 'Pop solos'],
+        relatedChords: ['i', 'IV', 'v']
+    },
+    'Blues': {
+        intervals: [0, 3, 5, 6, 7, 10],
+        category: 'basic',
+        difficulty: 'beginner',
+        description: 'Minor pentatonic with added "blue note" (b5). Soulful, expressive.',
+        commonUses: ['Blues', 'Rock', 'Jazz', 'R&B'],
+        relatedChords: ['I7', 'IV7', 'V7']
+    },
+    'Major Blues': {
+        intervals: [0, 2, 3, 4, 7, 9],
+        category: 'basic',
+        difficulty: 'beginner',
+        description: 'Major pentatonic with added b3. Bright blues sound.',
+        commonUses: ['Happy blues', 'Country', 'Gospel', 'Jazz'],
+        relatedChords: ['I', 'IV', 'V']
+    },
+
+    // ============ MODES ============
+    'Dorian (Mode 2)': {
+        intervals: [0, 2, 3, 5, 7, 9, 10],
+        category: 'modes',
+        difficulty: 'intermediate',
+        description: 'Minor with raised 6th. Jazzy, sophisticated minor sound.',
+        commonUses: ['Jazz', 'Funk', 'Rock', 'Modal compositions'],
+        relatedChords: ['i', 'ii', 'III', 'IV', 'v', 'vi°', 'VII']
+    },
+    'Phrygian (Mode 3)': {
+        intervals: [0, 1, 3, 5, 7, 8, 10],
+        category: 'modes',
+        difficulty: 'intermediate',
+        description: 'Minor with b2. Spanish/Flamenco flavor, dark and exotic.',
+        commonUses: ['Flamenco', 'Metal', 'Film scores', 'World music'],
+        relatedChords: ['i', 'II', 'III', 'iv', 'v°', 'VI', 'vii']
+    },
+    'Lydian (Mode 4)': {
+        intervals: [0, 2, 4, 6, 7, 9, 11],
+        category: 'modes',
+        difficulty: 'intermediate',
+        description: 'Major with #4. Dreamy, floating, ethereal quality.',
+        commonUses: ['Film scores', 'Jazz', 'Progressive rock', 'New Age'],
+        relatedChords: ['I', 'II', 'iii', '#iv°', 'V', 'vi', 'vii']
+    },
+    'Mixolydian (Mode 5)': {
+        intervals: [0, 2, 4, 5, 7, 9, 10],
+        category: 'modes',
+        difficulty: 'intermediate',
+        description: 'Major with b7. Bluesy major sound, rock anthem feel.',
+        commonUses: ['Rock', 'Blues', 'Country', 'Funk'],
+        relatedChords: ['I', 'ii', 'iii°', 'IV', 'v', 'vi', 'VII']
+    },
+    'Locrian (Mode 7)': {
+        intervals: [0, 1, 3, 5, 6, 8, 10],
+        category: 'modes',
+        difficulty: 'advanced',
+        description: 'Diminished tonic. Unstable, rarely used alone.',
+        commonUses: ['Jazz', 'Metal', 'Avant-garde', 'Tension passages'],
+        relatedChords: ['i°', 'II', 'iii', 'iv', 'V', 'VI', 'vii']
+    },
+
+    // ============ MINOR VARIANTS ============
+    'Harmonic Minor': {
+        intervals: [0, 2, 3, 5, 7, 8, 11],
+        category: 'minor-variants',
+        difficulty: 'intermediate',
+        description: 'Natural minor with raised 7th. Creates strong V-i cadence.',
+        commonUses: ['Classical', 'Flamenco', 'Metal', 'Middle Eastern'],
+        relatedChords: ['i', 'ii°', 'III+', 'iv', 'V', 'VI', 'vii°']
+    },
+    'Melodic Minor': {
+        intervals: [0, 2, 3, 5, 7, 9, 11],
+        category: 'minor-variants',
+        difficulty: 'intermediate',
+        description: 'Minor with raised 6th and 7th. Smooth melodic motion.',
+        commonUses: ['Jazz', 'Classical melody', 'Film scores'],
+        relatedChords: ['i', 'ii', 'III+', 'IV', 'V', 'vi°', 'vii°'],
+        modes: ['Melodic Minor', 'Dorian b2', 'Lydian Augmented', 'Lydian Dominant', 'Mixolydian b6', 'Locrian #2', 'Altered']
+    },
+
+    // ============ SYMMETRIC SCALES ============
+    'Whole Tone': {
+        intervals: [0, 2, 4, 6, 8, 10],
+        category: 'symmetric',
+        difficulty: 'advanced',
+        description: 'All whole steps. Dreamy, floating, no clear resolution.',
+        commonUses: ['Impressionism (Debussy)', 'Dream sequences', 'Film transitions'],
+        relatedChords: ['aug', '7#5'],
+        note: 'Only 2 unique whole tone scales exist (C and Db)'
+    },
+    'Diminished (WH)': {
+        intervals: [0, 2, 3, 5, 6, 8, 9, 11],
+        category: 'symmetric',
+        difficulty: 'advanced',
+        description: 'Alternating W-H pattern. Tension, suspense, mystery.',
+        commonUses: ['Diminished chord improv', 'Film suspense', 'Jazz'],
+        relatedChords: ['dim7'],
+        note: 'Only 3 unique diminished scales exist'
+    },
+    'Diminished (HW)': {
+        intervals: [0, 1, 3, 4, 6, 7, 9, 10],
+        category: 'symmetric',
+        difficulty: 'advanced',
+        description: 'Alternating H-W pattern. Dominant function, jazz tension.',
+        commonUses: ['Over dominant 7th chords', 'Jazz improvisation', 'Fusion'],
+        relatedChords: ['7b9', '13b9']
+    },
+    'Chromatic': {
+        intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        category: 'symmetric',
+        difficulty: 'beginner',
+        description: 'All 12 notes. Used for chromatic passing tones.',
+        commonUses: ['Exercises', 'Chromatic runs', 'Atonal music'],
+        relatedChords: ['Any']
+    },
+
+    // ============ BEBOP SCALES ============
+    'Bebop Major': {
+        intervals: [0, 2, 4, 5, 7, 8, 9, 11],
+        category: 'bebop',
+        difficulty: 'advanced',
+        description: 'Major with added #5. Keeps chord tones on beats.',
+        commonUses: ['Jazz walking bass', 'Bebop improvisation', 'Swing'],
+        relatedChords: ['maj7', '6']
+    },
+    'Bebop Dominant': {
+        intervals: [0, 2, 4, 5, 7, 9, 10, 11],
+        category: 'bebop',
+        difficulty: 'advanced',
+        description: 'Mixolydian with added natural 7. The jazz standard.',
+        commonUses: ['Over dominant 7th chords', 'Jazz solos', 'Bebop lines'],
+        relatedChords: ['7', '9', '13']
+    },
+    'Bebop Minor': {
+        intervals: [0, 2, 3, 4, 5, 7, 9, 10],
+        category: 'bebop',
+        difficulty: 'advanced',
+        description: 'Dorian with added major 3rd. Smooth voice leading.',
+        commonUses: ['Over minor 7th chords', 'Jazz', 'Fusion'],
+        relatedChords: ['m7', 'm9']
+    },
+
+    // ============ EXOTIC/WORLD SCALES ============
+    'Phrygian Dominant': {
+        intervals: [0, 1, 4, 5, 7, 8, 10],
+        category: 'exotic',
+        difficulty: 'intermediate',
+        description: 'Flamenco/Middle Eastern flavor. Exotic tension.',
+        commonUses: ['Flamenco', 'Middle Eastern', 'Metal', 'Film scores'],
+        relatedChords: ['I', 'ii°', 'iii', 'iv', 'V', 'VI', 'vii°'],
+        aliases: ['Spanish Gypsy', 'Freygish', 'Ahava Rabbah']
+    },
+    'Hungarian Minor': {
+        intervals: [0, 2, 3, 6, 7, 8, 11],
+        category: 'exotic',
+        difficulty: 'advanced',
+        description: 'Double harmonic minor. Dramatic, exotic character.',
+        commonUses: ['Eastern European folk', 'Film scores', 'Metal'],
+        aliases: ['Gypsy Minor', 'Double Harmonic Minor']
+    },
+    'Double Harmonic Major': {
+        intervals: [0, 1, 4, 5, 7, 8, 11],
+        category: 'exotic',
+        difficulty: 'advanced',
+        description: 'Byzantine scale. Middle Eastern, mysterious.',
+        commonUses: ['Middle Eastern music', 'Byzantine chant', 'Film scores'],
+        aliases: ['Arabic', 'Byzantine', 'Gypsy Major']
+    },
+    'Hirajoshi': {
+        intervals: [0, 2, 3, 7, 8],
+        category: 'exotic',
+        difficulty: 'intermediate',
+        description: 'Japanese pentatonic. Serene, contemplative feel.',
+        commonUses: ['Japanese music', 'Meditation', 'Video game soundtracks', 'Ambient'],
+        relatedChords: ['m', 'sus2']
+    },
+    'In Sen': {
+        intervals: [0, 1, 5, 7, 10],
+        category: 'exotic',
+        difficulty: 'intermediate',
+        description: 'Japanese scale. Dark, mysterious Japanese flavor.',
+        commonUses: ['Japanese traditional', 'Film scores', 'Ambient'],
+        relatedChords: ['m7', 'sus4']
+    },
+
+    // ============ JAZZ EXTENSIONS ============
+    'Lydian Dominant': {
+        intervals: [0, 2, 4, 6, 7, 9, 10],
+        category: 'jazz',
+        difficulty: 'advanced',
+        description: 'Lydian with b7. Sophisticated jazz tension.',
+        commonUses: ['Over 7#11 chords', 'Jazz fusion', 'Tritone subs'],
+        relatedChords: ['7#11', '9#11'],
+        derivation: '4th mode of melodic minor'
+    },
+    'Altered': {
+        intervals: [0, 1, 3, 4, 6, 8, 10],
+        category: 'jazz',
+        difficulty: 'advanced',
+        description: 'Maximum tension. All alterations on dominant chord.',
+        commonUses: ['Over altered dominant chords', 'Jazz resolution', 'Fusion'],
+        relatedChords: ['7alt', '7b9#9', '7b5#5'],
+        derivation: '7th mode of melodic minor',
+        aliases: ['Super Locrian', 'Diminished Whole Tone']
+    },
+    'Lydian Augmented': {
+        intervals: [0, 2, 4, 6, 8, 9, 11],
+        category: 'jazz',
+        difficulty: 'advanced',
+        description: 'Lydian with #5. Dreamy augmented sound.',
+        commonUses: ['Over maj7#5 chords', 'Jazz', 'Fusion'],
+        relatedChords: ['maj7#5'],
+        derivation: '3rd mode of melodic minor'
+    },
+    'Locrian #2': {
+        intervals: [0, 2, 3, 5, 6, 8, 10],
+        category: 'jazz',
+        difficulty: 'advanced',
+        description: 'Locrian with natural 2. More usable half-diminished scale.',
+        commonUses: ['Over m7b5 chords', 'Jazz ii-V-i in minor'],
+        relatedChords: ['m7b5'],
+        derivation: '6th mode of melodic minor'
+    }
+};
+
+// Scale category metadata for UI filtering
+const SCALE_CATEGORIES = {
+    'basic': { name: 'Basic', icon: '🎵', description: 'Essential scales for beginners' },
+    'modes': { name: 'Modes', icon: '🎭', description: 'The 7 modes of the major scale' },
+    'minor-variants': { name: 'Minor Variants', icon: '🌙', description: 'Harmonic and melodic minor scales' },
+    'symmetric': { name: 'Symmetric', icon: '🔷', description: 'Scales with repeating interval patterns' },
+    'bebop': { name: 'Bebop', icon: '🎷', description: '8-note scales for jazz improvisation' },
+    'exotic': { name: 'World/Exotic', icon: '🌍', description: 'Scales from various musical traditions' },
+    'jazz': { name: 'Jazz Extensions', icon: '🎹', description: 'Advanced scales for jazz harmony' }
 };
 
 const ENHARMONIC_MAP = {
@@ -279,6 +536,7 @@ export {
     CHORD_GROUPS,
     INTERVAL_GROUPS,
     SCALE_DEFINITIONS,
+    SCALE_CATEGORIES,
     ENHARMONIC_MAP,
     KEY_SIGNATURE_TEXT,
     KEY_SIGNATURE_IMAGES,

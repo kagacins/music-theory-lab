@@ -12,6 +12,8 @@ import { learningPaths, getAllLessons, getLessonById, LESSON_STATUS } from '../.
 import { renderLessonViewer } from './lessonViewer.js';
 import { renderSongwritingWizard } from './songwritingWizard.js';
 import { getLessonStatus, getUserStats, getRecommendedLesson, loadProgress } from './learningProgress.js';
+import { showEarTrainingModal } from './earTraining/earTrainingModal.js';
+import { getOverallStats as getEarTrainingStats } from './earTraining/earTrainingProgress.js';
 
 // ===========================================
 // STATE
@@ -82,14 +84,15 @@ function renderLessonBrowser(container) {
                     </div>
                 `}
 
-                <button id="start-wizard-btn" class="flex items-center gap-4 p-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl shadow-lg transition-all hover:shadow-xl">
-                    <div class="w-14 h-14 bg-white/30 rounded-full flex items-center justify-center text-2xl">🎵</div>
+                <button id="start-ear-training-btn" class="flex items-center gap-4 p-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl shadow-lg transition-all hover:shadow-xl">
+                    <div class="w-14 h-14 bg-white/30 rounded-full flex items-center justify-center text-2xl">🎧</div>
                     <div class="text-left">
-                        <div class="text-sm text-purple-100">Write Your First Song</div>
-                        <div class="text-lg font-bold">Songwriting Wizard</div>
+                        <div class="text-sm text-indigo-100">Train Your Ears</div>
+                        <div class="text-lg font-bold">Ear Training</div>
                     </div>
-                    <svg class="w-6 h-6 ml-auto" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
+                    <svg class="w-6 h-6 ml-auto" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
                 </button>
+
             </div>
 
             <!-- Learning Paths -->
@@ -209,9 +212,9 @@ function attachBrowserListeners(container) {
         }
     });
 
-    // Start wizard button
-    container.querySelector('#start-wizard-btn')?.addEventListener('click', () => {
-        showWizard();
+    // Start ear training button
+    container.querySelector('#start-ear-training-btn')?.addEventListener('click', () => {
+        showEarTrainingModal();
     });
 
     // Lesson cards

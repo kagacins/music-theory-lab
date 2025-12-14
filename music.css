@@ -3115,6 +3115,49 @@ canvas {
 }
 
 /* ===========================
+   Ear Training Animations
+   =========================== */
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes bounce-once {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+.animate-fade-in {
+    animation: fade-in 0.3s ease-out;
+}
+
+.animate-bounce-once {
+    animation: bounce-once 0.5s ease-out;
+}
+
+/* Ear Training Modal Styles */
+#ear-training-modal .ear-training-container {
+    max-height: 90vh;
+}
+
+/* Scale transform utilities for buttons */
+.hover\:scale-102:hover {
+    transform: scale(1.02);
+}
+
+.active\:scale-98:active {
+    transform: scale(0.98);
+}
+
+/* ===========================
    Song Sections Styles
    =========================== */
 

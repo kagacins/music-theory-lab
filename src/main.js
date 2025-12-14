@@ -152,7 +152,9 @@ import {
     changeScaleOctave,
     updateScaleOctaveUI,
     changeScaleSpeed,
-    updateScaleSpeedUI
+    updateScaleSpeedUI,
+    filterScalesByCategory,
+    updateScaleInfoPanel
 } from './modules/features/scaleExplorer.js';
 import { initAudio, getPiano, getGuitar, getInstrument, getAudioIsReady, getCameraShutter, forceStopAllPlayback, initAudioContextKeepAlive } from './modules/audio/audioEngine.js';
 import { updateUndoRedoButtons } from './modules/utils/undoRedo.js';
@@ -1511,6 +1513,8 @@ window.changeScaleSpeed = changeScaleSpeed;
 window.changeScaleOctave = changeScaleOctave;
 window.selectScaleRootNote = selectScaleRootNote;
 window.selectScaleType = selectScaleType;
+window.filterScalesByCategory = filterScalesByCategory;
+window.updateScaleInfoPanel = updateScaleInfoPanel;
 
 // Expose state to window for modules that access it globally (temporary solution)
 window.g_NumOctaves = getNumOctaves();

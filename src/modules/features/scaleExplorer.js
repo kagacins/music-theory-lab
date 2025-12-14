@@ -52,6 +52,7 @@ import {
     FLAT_NOTES,
     ALL_NOTES,
     SCALE_DEFINITIONS,
+    SCALE_CATEGORIES,
     ENHARMONIC_MAP
 } from '../../data/music-data.js';
 
@@ -192,6 +193,7 @@ export function selectScaleType(type) {
         btn.classList.toggle('hover:bg-lime-100', !isSelected);
     });
     updateScaleDisplay();
+    updateScaleInfoPanel();
 }
 
 // ============================================================================
@@ -310,6 +312,156 @@ export function updateScaleOctaveUI() {
 // Rendering Functions
 // ============================================================================
 
+// Track current category filter
+let currentCategoryFilter = 'all';
+
+/**
+ * Get difficulty badge HTML
+ */
+function getDifficultyBadge(difficulty) {
+    const badges = {
+        'beginner': '<span class="text-[10px] px-1 py-0.5 bg-green-100 text-green-700 rounded">Beginner</span>',
+        'intermediate': '<span class="text-[10px] px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded">Intermediate</span>',
+        'advanced': '<span class="text-[10px] px-1 py-0.5 bg-red-100 text-red-700 rounded">Advanced</span>'
+    };
+    return badges[difficulty] || '';
+}
+
+/**
+ * Filter scales by category
+ */
+export function filterScalesByCategory(category) {
+    currentCategoryFilter = category;
+    renderScaleTypeButtons();
+
+    // Update category filter buttons
+    document.querySelectorAll('.scale-category-btn').forEach(btn => {
+        const isSelected = btn.dataset.category === category;
+        btn.classList.toggle('bg-lime-500', isSelected);
+        btn.classList.toggle('text-white', isSelected);
+        btn.classList.toggle('bg-gray-100', !isSelected);
+        btn.classList.toggle('text-gray-700', !isSelected);
+    });
+}
+
+/**
+ * Render scale type buttons based on current filter
+ */
+function renderScaleTypeButtons() {
+    const typeSelector = document.getElementById('scale-type-selector');
+    if (!typeSelector) return;
+
+    typeSelector.innerHTML = '';
+
+    Object.entries(SCALE_DEFINITIONS).forEach(([type, scale]) => {
+        // Filter by category if not 'all'
+        if (currentCategoryFilter !== 'all' && scale.category !== currentCategoryFilter) {
+            return;
+        }
+
+        const button = document.createElement('button');
+        button.dataset.scaleType = type;
+        button.onclick = () => selectScaleType(type);
+        button.className = 'key-button px-2 py-1.5 font-medium rounded-lg text-xs transition duration-150 transform hover:scale-105 bg-gray-200 text-gray-800 hover:bg-lime-100 text-left flex flex-col';
+
+        // Scale name
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'font-semibold';
+        nameSpan.textContent = type;
+        button.appendChild(nameSpan);
+
+        // Difficulty badge (optional - for less cluttered view)
+        if (scale.difficulty) {
+            const badgeContainer = document.createElement('span');
+            badgeContainer.innerHTML = getDifficultyBadge(scale.difficulty);
+            button.appendChild(badgeContainer);
+        }
+
+        typeSelector.appendChild(button);
+    });
+
+    // Re-select current scale type if it's visible
+    const currentType = getScaleType();
+    const currentScale = SCALE_DEFINITIONS[currentType];
+    if (currentCategoryFilter === 'all' || (currentScale && currentScale.category === currentCategoryFilter)) {
+        selectScaleType(currentType);
+    } else {
+        // Select first visible scale
+        const firstVisible = Object.entries(SCALE_DEFINITIONS).find(([, scale]) =>
+            currentCategoryFilter === 'all' || scale.category === currentCategoryFilter
+        );
+        if (firstVisible) {
+            selectScaleType(firstVisible[0]);
+        }
+    }
+}
+
+/**
+ * Render category filter buttons
+ */
+function renderCategoryFilters() {
+    const filterContainer = document.getElementById('scale-category-filter');
+    if (!filterContainer) return;
+
+    filterContainer.innerHTML = '';
+
+    // "All" button
+    const allBtn = document.createElement('button');
+    allBtn.className = 'scale-category-btn px-2 py-1 text-xs font-medium rounded-lg transition-all bg-lime-500 text-white';
+    allBtn.textContent = 'All';
+    allBtn.dataset.category = 'all';
+    allBtn.onclick = () => filterScalesByCategory('all');
+    filterContainer.appendChild(allBtn);
+
+    // Category buttons
+    Object.entries(SCALE_CATEGORIES).forEach(([id, cat]) => {
+        const btn = document.createElement('button');
+        btn.className = 'scale-category-btn px-2 py-1 text-xs font-medium rounded-lg transition-all bg-gray-100 text-gray-700 hover:bg-lime-100';
+        btn.innerHTML = `${cat.icon} ${cat.name}`;
+        btn.dataset.category = id;
+        btn.title = cat.description;
+        btn.onclick = () => filterScalesByCategory(id);
+        filterContainer.appendChild(btn);
+    });
+}
+
+/**
+ * Update scale info panel with current scale details
+ */
+export function updateScaleInfoPanel() {
+    const infoPanel = document.getElementById('scale-info-panel');
+    if (!infoPanel) return;
+
+    const currentType = getScaleType();
+    const scale = SCALE_DEFINITIONS[currentType];
+    if (!scale) return;
+
+    infoPanel.innerHTML = `
+        <div class="bg-lime-50 border border-lime-200 rounded-lg p-3 mt-2">
+            <div class="flex items-start justify-between mb-1">
+                <span class="font-bold text-lime-800">${currentType}</span>
+                ${getDifficultyBadge(scale.difficulty)}
+            </div>
+            <p class="text-sm text-gray-700 mb-2">${scale.description || ''}</p>
+            ${scale.commonUses ? `
+                <div class="text-xs text-gray-600">
+                    <span class="font-medium">Common uses:</span> ${scale.commonUses.join(', ')}
+                </div>
+            ` : ''}
+            ${scale.relatedChords ? `
+                <div class="text-xs text-gray-600 mt-1">
+                    <span class="font-medium">Related chords:</span> ${scale.relatedChords.join(' ')}
+                </div>
+            ` : ''}
+            ${scale.aliases ? `
+                <div class="text-xs text-gray-500 mt-1">
+                    <span class="font-medium">Also known as:</span> ${scale.aliases.join(', ')}
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
 /**
  * Render all scale explorer selectors (root and type)
  */
@@ -330,17 +482,13 @@ export function renderScaleSelectors() {
         rootSelector.appendChild(button);
     });
 
-    if (typeSelector.children.length === 0) {
-        Object.keys(SCALE_DEFINITIONS).forEach(type => {
-            const button = document.createElement('button');
-            button.textContent = type;
-            button.dataset.scaleType = type;
-            button.onclick = () => selectScaleType(type);
-            button.className = 'key-button px-2 py-1 font-medium rounded-lg text-xs transition duration-150 transform hover:scale-105 bg-gray-200 text-gray-800 hover:bg-lime-100';
-            typeSelector.appendChild(button);
-        });
-    }
+    // Render category filters
+    renderCategoryFilters();
+
+    // Render scale type buttons
+    renderScaleTypeButtons();
 
     selectScaleRootNote(getScaleRootIndex());
     selectScaleType(getScaleType());
+    updateScaleInfoPanel();
 }
