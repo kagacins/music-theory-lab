@@ -12,8 +12,10 @@ const ROMAN_MAP_BASE = {
     'iii': { index: 2, quality: 'Minor' }, 'IV': { index: 3, quality: 'Major' },
     'V': { index: 4, quality: 'Major' }, 'vi': { index: 5, quality: 'Minor' },
     'vii°': { index: 6, quality: 'Diminished' },
+    'vii': { index: 6, quality: 'Diminished' },  // For when ° is stripped by regex
     // Diatonic minor key chords
     'i': { index: 0, quality: 'Minor' }, 'iv': { index: 3, quality: 'Minor' },
+    'ii°': { index: 1, quality: 'Diminished' },  // Diminished ii in minor keys
     // Non-diatonic / Secondary dominant variants (major on normally minor degrees)
     'II': { index: 1, quality: 'Major' },   // V/V - secondary dominant
     'III': { index: 2, quality: 'Major' },  // V/vi - secondary dominant

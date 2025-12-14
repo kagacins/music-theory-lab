@@ -22,6 +22,7 @@ let guitar = null;
 let audioIsLoading = false;
 let audioIsReady = false;
 let cameraShutter = null;
+let pendingAudioCallbacks = [];
 
 // ============================================================================
 // Audio Initialization
@@ -59,6 +60,14 @@ export function initAudio() {
             hideModal();
             audioIsReady = true;
             audioIsLoading = false;
+            // Execute any pending callbacks
+            if (pendingAudioCallbacks.length > 0) {
+                const callbacks = [...pendingAudioCallbacks];
+                pendingAudioCallbacks = [];
+                callbacks.forEach(cb => {
+                    try { cb(); } catch (e) { console.error('Pending audio callback error:', e); }
+                });
+            }
         },
         onerror: (e) => {
             console.error("Error loading piano samples:", e);
@@ -268,6 +277,22 @@ export function getAudioIsLoading() {
  */
 export function getAudioIsReady() {
     return audioIsReady;
+}
+
+/**
+ * Execute a callback when audio is ready
+ * If audio is already ready, executes immediately
+ * Otherwise queues the callback for when audio finishes loading
+ * @param {Function} callback - Function to execute when audio is ready
+ */
+export function whenAudioReady(callback) {
+    if (audioIsReady) {
+        callback();
+    } else {
+        pendingAudioCallbacks.push(callback);
+        // Make sure audio initialization has started
+        initAudio();
+    }
 }
 
 /**

@@ -69,6 +69,10 @@ export function hideTemplateBrowser() {
         modal.remove();
     }
     onTemplateSelectCallback = null;
+
+    // Reset filters so next open starts fresh
+    currentSearchQuery = '';
+    currentCategory = 'All';
 }
 
 /**

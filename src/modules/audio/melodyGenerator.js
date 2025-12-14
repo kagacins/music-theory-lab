@@ -2638,6 +2638,11 @@ function stopMeasurePlayback(canvas) {
         window.stopNotationPlaybackHighlighting();
     }
 
+    // Clear chord card highlighting
+    if (window.unhighlightAllChordCards) {
+        window.unhighlightAllChordCards();
+    }
+
     // Re-render to clear highlighting and restore selection border
     requestAnimationFrame(() => {
         const isRecording = window.isInteractiveMode || false;
@@ -3244,6 +3249,19 @@ export function playMeasure(measureIndex) {
         window.setNotationActiveMeasure(measureIndex);
     }
 
+    // Highlight the corresponding chord card based on measure's chordIndex
+    if (window.getCompositionState) {
+        const compositionState = window.getCompositionState();
+        const measure = compositionState.getMeasure(measureIndex);
+        if (measure && measure.chord && measure.chord.chordIndex !== undefined) {
+            const chordIndex = measure.chord.chordIndex;
+            // Call highlightChordCard if available (from progressionBuilder)
+            if (window.highlightChordCard) {
+                window.highlightChordCard(chordIndex);
+            }
+        }
+    }
+
     // Play bass notes with proper timing whenever they exist in the rendered notation
     if (bassNoteData.length > 0) {
         const tempo = interactiveMelody.tempo || 120;
@@ -3672,6 +3690,10 @@ export function stopPlayAllMelody() {
         playAllParts.chordPart.stop().dispose();
         playAllParts.chordPart = null;
     }
+    if (playAllParts.measureHighlightPart) {
+        playAllParts.measureHighlightPart.stop().dispose();
+        playAllParts.measureHighlightPart = null;
+    }
     
     // Clear all keyboard highlights
     document.querySelectorAll('.active-melody-playback').forEach(key => {
@@ -3687,6 +3709,11 @@ export function stopPlayAllMelody() {
     // Stop new notation system highlighting
     if (window.stopNotationPlaybackHighlighting) {
         window.stopNotationPlaybackHighlighting();
+    }
+
+    // Clear chord card highlighting
+    if (window.unhighlightAllChordCards) {
+        window.unhighlightAllChordCards();
     }
 
     // Also stop any hold-to-play measures
@@ -3906,11 +3933,21 @@ export function playAllMelody() {
         updateCanvas();
 
         // Visual feedback on keyboard - add highlight when note starts
+        // Also highlight chord card based on measure's chordIndex
         Tone.Draw.schedule(() => {
             notesToPlay.forEach(pitch => {
                 const keyEl = document.getElementById(getNoteKeyId(pitch));
                 if (keyEl) keyEl.classList.add('active-melody-playback');
             });
+
+            // Highlight chord card for this measure
+            if (window.getCompositionState && window.highlightChordCard) {
+                const compositionState = window.getCompositionState();
+                const measure = compositionState.getMeasure(measureNum);
+                if (measure && measure.chord && measure.chord.chordIndex !== undefined) {
+                    window.highlightChordCard(measure.chord.chordIndex);
+                }
+            }
         }, time);
 
         // Calculate note duration and schedule removal
@@ -4108,11 +4145,16 @@ export function playAllMelody() {
         // Schedule bass notes from compositionState
         if (bassNoteData.length > 0) {
             // Set active measure for yellow highlighting when auto-generated bass plays
+            // Also highlight the corresponding chord card
             Tone.Draw.schedule(() => {
                 if (window.isNotationInitialized && window.isNotationInitialized()) {
                     if (window.setNotationActiveMeasure) {
                         window.setNotationActiveMeasure(measureIndex);
                     }
+                }
+                // Highlight chord card based on chordIndex
+                if (chordIndex !== undefined && window.highlightChordCard) {
+                    window.highlightChordCard(chordIndex);
                 }
             }, time);
 
@@ -4339,12 +4381,46 @@ export function playAllMelody() {
     // Clear any previously tracked chord notes
     currentlyPlayingChordNotes = [];
     
+    // Schedule chord card highlighting at measure boundaries (handles rests)
+    // This ensures chord cards are highlighted even when there are no notes playing
+    const measureHighlightPart = new Tone.Part((time, data) => {
+        Tone.Draw.schedule(() => {
+            if (window.highlightChordCard && data.chordIndex !== undefined) {
+                window.highlightChordCard(data.chordIndex);
+            }
+            if (window.setNotationActiveMeasure) {
+                window.setNotationActiveMeasure(data.measureIndex);
+            }
+        }, time);
+    }, (() => {
+        // Generate events for each measure start
+        const events = [];
+        if (window.getCompositionState) {
+            const compositionState = window.getCompositionState();
+            const measureCount = compositionState.getMeasureCount();
+            for (let i = 0; i < measureCount; i++) {
+                const measure = compositionState.getMeasure(i);
+                const chordIndex = measure?.chord?.chordIndex;
+                events.push({
+                    time: i * measureDuration,
+                    measureIndex: i,
+                    chordIndex: chordIndex
+                });
+            }
+        }
+        return events;
+    })());
+
+    // Store for cleanup
+    playAllParts.measureHighlightPart = measureHighlightPart;
+
     // Add parts to transport and start
     if (melodyPart) {
         melodyPart.start(0);
     }
     chordPart.start(0);
-    
+    measureHighlightPart.start(0);
+
     // Start transport
     Tone.Transport.start();
     

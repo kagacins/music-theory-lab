@@ -82,7 +82,8 @@ import {
     getInstrument,
     getAudioIsReady,
     getAudioIsLoading,
-    initAudio
+    initAudio,
+    whenAudioReady
 } from '../audio/audioEngine.js';
 
 // Import auto-save for dirty marking
@@ -10803,6 +10804,12 @@ export function loadProgression() {
             key: freshTrainerState.currentKey
         });
     }
+
+    // Update key display in melody tab header
+    const melodyCurrentKeyDisplay = document.getElementById('melody-current-key-display');
+    if (melodyCurrentKeyDisplay && freshTrainerState.currentKey) {
+        melodyCurrentKeyDisplay.textContent = freshTrainerState.currentKey;
+    }
 }
 
 /**
@@ -11792,15 +11799,15 @@ export function stopStepChord() {
  * @param {number} index - Index of chord in progression
  */
 export function startProgressionChord(index) {
-    initAudio();
-    
-    if (!getAudioIsReady()) {
-        if (!getAudioIsLoading() && window.showModal) {
-            window.showModal("Loading piano samples...", false);
-        }
-        return;
-    }
+    // Use whenAudioReady to ensure audio plays even if this is the first interaction
+    whenAudioReady(() => playProgressionChordNow(index));
+}
 
+/**
+ * Internal function to play a progression chord (called after audio is ready)
+ * @param {number} index - Index of chord in progression
+ */
+function playProgressionChordNow(index) {
     const trainerState = getTrainerState();
 
     if (trainerState.isPlaying) handleAutoPlayback();
@@ -14451,18 +14458,56 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
 
     romans.forEach((roman, index) => {
         // Parse roman numeral to extract base and quality
-        // Examples: "I", "ii", "V7", "Imaj7", "ii7", "vii°"
+        // Examples: "I", "ii", "V7", "Imaj7", "ii7", "vii°", "ii°7", "I9", "Imaj9", "#IVdim7"
         let baseRoman = roman;
         let chordQuality = null;
+        let isDiminished = false;
 
-        // Check for 7th chord suffixes
-        if (roman.includes('maj7')) {
+        // Check for diminished symbol (° or dim) - must check before chord suffix stripping
+        if (roman.includes('°') || roman.toLowerCase().includes('dim')) {
+            isDiminished = true;
+        }
+
+        // Check for chord suffixes (in order of specificity - longer patterns first)
+        if (roman.includes('maj13')) {
+            baseRoman = roman.replace('maj13', '');
+            chordQuality = 'Major 13th';
+        } else if (roman.includes('maj11')) {
+            baseRoman = roman.replace('maj11', '');
+            chordQuality = 'Major 11th';
+        } else if (roman.includes('maj9')) {
+            baseRoman = roman.replace('maj9', '');
+            chordQuality = 'Major 9th';
+        } else if (roman.includes('maj7')) {
             baseRoman = roman.replace('maj7', '');
             chordQuality = 'Major 7th';
+        } else if (roman.includes('dim7') || roman.includes('°7')) {
+            // Diminished 7th (e.g., vii°7, #IVdim7, ii°7)
+            baseRoman = roman.replace('dim7', '').replace('°7', '');
+            chordQuality = 'Diminished 7th';
+        } else if (roman.includes('13')) {
+            baseRoman = roman.replace('13', '');
+            chordQuality = 'Dominant 13th';
+        } else if (roman.includes('11')) {
+            baseRoman = roman.replace('11', '');
+            chordQuality = 'Dominant 11th';
+        } else if (roman.includes('9')) {
+            baseRoman = roman.replace('9', '');
+            // Determine chord type based on case and diminished flag
+            if (isDiminished) {
+                chordQuality = 'Diminished 9th';
+            } else if (baseRoman.toLowerCase().includes('i') && baseRoman.toLowerCase() === baseRoman) {
+                chordQuality = 'Minor 9th';
+            } else {
+                chordQuality = 'Dominant 9th';
+            }
         } else if (roman.includes('7')) {
             baseRoman = roman.replace('7', '');
-            // Determine if it's dominant 7th or minor 7th based on case
-            if (baseRoman === baseRoman.toUpperCase() || baseRoman === 'V' || baseRoman === 'VII') {
+            // Check if this is a diminished chord with 7th
+            if (isDiminished) {
+                // Half-diminished for ø7 or diminished with just "7"
+                chordQuality = 'Half-Diminished 7th';
+            } else if (baseRoman === baseRoman.toUpperCase() || baseRoman === 'V' || baseRoman === 'VII') {
                 chordQuality = 'Dominant 7th';
             } else {
                 chordQuality = 'Minor 7th';
@@ -14471,9 +14516,14 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
 
         // Look up the default quality from ROMAN_MAP_BASE
         const mapEntry = ROMAN_MAP_BASE[baseRoman];
-        const defaultQuality = mapEntry ? mapEntry.quality : 'Major'; // Default to Major if not found
+        let defaultQuality = mapEntry ? mapEntry.quality : 'Major'; // Default to Major if not found
 
-        // Determine final quality - use 7th chord quality if present, otherwise use default
+        // Override default quality if diminished symbol is present (for triads like vii° or ii°)
+        if (isDiminished && !chordQuality) {
+            defaultQuality = 'Diminished';
+        }
+
+        // Determine final quality - use chord quality if present, otherwise use default
         const finalQuality = chordQuality || defaultQuality;
 
         // Get chord info from base roman numeral with the correct quality

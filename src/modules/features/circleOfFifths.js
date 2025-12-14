@@ -426,6 +426,11 @@ function handleKeyClick(event) {
                     if (window.loadProgression) {
                         window.loadProgression();
                     }
+                    // Update key display in melody tab header immediately
+                    const melodyKeyDisplay = document.getElementById('melody-current-key-display');
+                    if (melodyKeyDisplay) melodyKeyDisplay.textContent = targetKey;
+                    const melodyKeyDisplayText = document.getElementById('melody-key-display-text');
+                    if (melodyKeyDisplayText) melodyKeyDisplayText.textContent = targetKey;
                     // Close the modal after key is set
                     closeCircleOfFifthsPanel();
                 } else {
@@ -447,6 +452,11 @@ function handleKeyClick(event) {
                         if (window.loadProgression) {
                             window.loadProgression();
                         }
+                        // Update key display in melody tab header
+                        const melodyKeyDisplay2 = document.getElementById('melody-current-key-display');
+                        if (melodyKeyDisplay2) melodyKeyDisplay2.textContent = targetKey;
+                        const melodyKeyDisplayText2 = document.getElementById('melody-key-display-text');
+                        if (melodyKeyDisplayText2) melodyKeyDisplayText2.textContent = targetKey;
                     }
                 }
             } else {
@@ -477,6 +487,11 @@ function handleKeyClick(event) {
         if (window.loadProgression) {
             window.loadProgression();
         }
+        // Update key display in melody tab header
+        const melodyKeyDisplay3 = document.getElementById('melody-current-key-display');
+        if (melodyKeyDisplay3) melodyKeyDisplay3.textContent = targetKey;
+        const melodyKeyDisplayText3 = document.getElementById('melody-key-display-text');
+        if (melodyKeyDisplayText3) melodyKeyDisplayText3.textContent = targetKey;
         // Close the modal after key is set
         closeCircleOfFifthsPanel();
     }

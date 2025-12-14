@@ -3,7 +3,7 @@
  * Provides context-aware chord suggestions with music theory explanations
  */
 
-import { CHORD_DEFINITIONS, ALL_NOTES } from '../../data/music-data.js';
+import { CHORD_DEFINITIONS, ALL_NOTES, ENHARMONIC_MAP } from '../../data/music-data.js';
 import { getHarmonyAnalyzer } from '../analysis/harmonyAnalyzer.js';
 
 /**
@@ -59,19 +59,38 @@ function getRomanNumeral(degree, isMinor = false) {
 }
 
 /**
+ * Normalize a note to sharp notation for consistent lookups
+ */
+function normalizeToSharp(note) {
+    if (!note) return null;
+    // Handle flats by converting to their sharp equivalents
+    const normalized = ENHARMONIC_MAP[note] || note;
+    // Make sure we return the sharp version
+    if (normalized.includes('b') && ENHARMONIC_MAP[normalized]) {
+        return ENHARMONIC_MAP[normalized];
+    }
+    return normalized;
+}
+
+/**
  * Get scale degree of a chord root in a key
+ * Returns an object with degree and whether it's chromatic
  */
 function getScaleDegree(chordRoot, key) {
-    const keyIndex = ALL_NOTES.indexOf(key);
-    const chordIndex = ALL_NOTES.indexOf(chordRoot);
+    // Normalize both to sharp notation
+    const normalizedKey = normalizeToSharp(key?.replace('m', '')); // Remove 'm' for minor keys
+    const normalizedRoot = normalizeToSharp(chordRoot);
+
+    const keyIndex = ALL_NOTES.indexOf(normalizedKey);
+    const chordIndex = ALL_NOTES.indexOf(normalizedRoot);
 
     if (keyIndex === -1 || chordIndex === -1) return null;
 
     // Calculate semitone distance
     let distance = (chordIndex - keyIndex + 12) % 12;
 
-    // Map to scale degree (major scale)
-    const degreeMap = {
+    // Map to scale degree (major scale diatonic)
+    const diatonicDegreeMap = {
         0: 1,  // Root (I)
         2: 2,  // 2nd (ii)
         4: 3,  // 3rd (iii)
@@ -81,7 +100,30 @@ function getScaleDegree(chordRoot, key) {
         11: 7  // 7th (vii°)
     };
 
-    return degreeMap[distance] || null;
+    // Map chromatic notes to their closest scale degree with alteration
+    const chromaticDegreeMap = {
+        1: 'b2',   // b2 / #1
+        3: 'b3',   // b3 / #2
+        6: 'b5',   // b5 / #4 (tritone)
+        8: 'b6',   // b6 / #5
+        10: 'b7'   // b7
+    };
+
+    // Return diatonic degree if found
+    if (diatonicDegreeMap[distance]) {
+        return diatonicDegreeMap[distance];
+    }
+
+    // Return chromatic degree if found (as a number for Roman numeral conversion)
+    // We need to return a number for getRomanNumeral to work
+    // For chromatic, we'll use a special encoding
+    if (chromaticDegreeMap[distance]) {
+        // Return the base degree with a flag indicating it's altered
+        // For display purposes, we handle this in the Roman numeral conversion
+        return { chromatic: chromaticDegreeMap[distance], distance };
+    }
+
+    return null;
 }
 
 /**
@@ -459,16 +501,33 @@ export function analyzeProgression(progression, key) {
 
     // Convert to Roman numerals
     const romanNumerals = progression.map(chord => {
+        if (!chord || !chord.root) return '?';
         const degree = getScaleDegree(chord.root, key);
         if (!degree) return '?';
+
+        // Handle chromatic degrees (returned as object with chromatic property)
+        if (typeof degree === 'object' && degree.chromatic) {
+            const isMinor = chord.type === 'Minor' || chord.type === 'Diminished';
+            // Format chromatic Roman numerals like bVII, bIII, etc.
+            const chromaticLabel = degree.chromatic; // e.g., 'b7', 'b3'
+            const baseNum = parseInt(chromaticLabel.replace(/[^0-9]/g, ''));
+            const alteration = chromaticLabel.replace(/[0-9]/g, ''); // 'b' or '#'
+            const roman = getRomanNumeral(baseNum, isMinor);
+            return alteration + roman;
+        }
+
         const isMinor = chord.type === 'Minor' || chord.type === 'Diminished';
         return getRomanNumeral(degree, isMinor);
     });
 
     // Get harmonic functions
     const functions = progression.map(chord => {
+        if (!chord || !chord.root) return null;
         const degree = getScaleDegree(chord.root, key);
-        return degree ? getHarmonicFunction(degree) : null;
+        if (!degree) return null;
+        // For chromatic degrees, use the base degree for function analysis
+        const baseDegree = typeof degree === 'object' ? parseInt(degree.chromatic.replace(/[^0-9]/g, '')) : degree;
+        return getHarmonicFunction(baseDegree);
     }).filter(f => f !== null);
 
     // Check for common progressions
