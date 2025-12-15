@@ -4021,7 +4021,9 @@ function renderSectionViewMode(container, progressionData, key, sections) {
         cardsArea.className = 'section-cards-area items-start gap-2 p-2 rounded-b-lg';
         cardsArea.style.display = 'flex';
         cardsArea.style.flexDirection = 'row';
-        cardsArea.style.flexWrap = 'wrap';
+        cardsArea.style.flexWrap = 'nowrap';
+        cardsArea.style.overflowX = 'auto';
+        cardsArea.style.overflowY = 'visible';
         cardsArea.style.backgroundColor = (sectionData.color || '#9ca3af') + '20';
         cardsArea.style.borderLeft = `3px solid ${sectionData.color || '#9ca3af'}`;
         cardsArea.style.borderRight = `3px solid ${sectionData.color || '#9ca3af'}`;
@@ -4436,7 +4438,9 @@ function createUnifiedSectionContainer(section, progressionData, key) {
     // Force horizontal layout with inline styles to avoid CSS specificity issues
     cardsArea.style.display = 'flex';
     cardsArea.style.flexDirection = 'row';
-    cardsArea.style.flexWrap = 'wrap';
+    cardsArea.style.flexWrap = 'nowrap';
+    cardsArea.style.overflowX = 'auto';
+    cardsArea.style.overflowY = 'visible';
     cardsArea.style.backgroundColor = section.color + '20'; // 20% opacity
     cardsArea.style.borderLeft = `3px solid ${section.color}`;
     cardsArea.style.borderRight = `3px solid ${section.color}`;

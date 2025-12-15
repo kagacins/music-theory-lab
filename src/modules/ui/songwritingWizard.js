@@ -827,11 +827,31 @@ async function playProgression(chordNames, duration = 0.8, loop = false) {
 }
 
 function parseChordName(name) {
+    if (!name || typeof name !== 'string') {
+        console.warn('[parseChordName] Invalid input:', name);
+        return { root: 'C', type: 'Major' };
+    }
+
+    // Order matters - more specific patterns first
     const patterns = [
+        // Extended chords
+        { regex: /^([A-G][#b]?)maj9$/i, type: 'Major 9th' },
+        { regex: /^([A-G][#b]?)m9$/i, type: 'Minor 9th' },
+        { regex: /^([A-G][#b]?)9$/i, type: 'Dominant 9th' },
+        { regex: /^([A-G][#b]?)add9$/i, type: 'Add9' },
+        // 7th chords
         { regex: /^([A-G][#b]?)maj7$/i, type: 'Major 7th' },
         { regex: /^([A-G][#b]?)m7$/i, type: 'Minor 7th' },
         { regex: /^([A-G][#b]?)7$/i, type: 'Dominant 7th' },
+        { regex: /^([A-G][#b]?)dim7$/i, type: 'Diminished 7th' },
+        // 6th chords
+        { regex: /^([A-G][#b]?)m6$/i, type: 'Minor 6th' },
+        { regex: /^([A-G][#b]?)6$/i, type: 'Major 6th' },
+        // Triads and other
         { regex: /^([A-G][#b]?)dim$/i, type: 'Diminished' },
+        { regex: /^([A-G][#b]?)aug$/i, type: 'Augmented' },
+        { regex: /^([A-G][#b]?)sus4$/i, type: 'Sus4' },
+        { regex: /^([A-G][#b]?)sus2$/i, type: 'Sus2' },
         { regex: /^([A-G][#b]?)m$/i, type: 'Minor' },
         { regex: /^([A-G][#b]?)$/i, type: 'Major' }
     ];
@@ -839,11 +859,30 @@ function parseChordName(name) {
     for (const { regex, type } of patterns) {
         const match = name.match(regex);
         if (match) {
-            return { root: match[1], type };
+            // Normalize root: uppercase letter, lowercase accidental
+            const root = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+            return { root, type };
         }
     }
 
-    return { root: name.replace(/[^A-G#b]/gi, ''), type: 'Major' };
+    // Fallback: try to extract root note more carefully
+    const rootMatch = name.match(/^([A-G][#b]?)/i);
+    if (rootMatch) {
+        // Normalize root: uppercase letter, lowercase accidental
+        const root = rootMatch[1].charAt(0).toUpperCase() + rootMatch[1].slice(1).toLowerCase();
+        // Try to determine type from suffix
+        const suffix = name.substring(rootMatch[0].length).toLowerCase();
+        if (suffix.includes('maj7')) return { root, type: 'Major 7th' };
+        if (suffix.includes('m7')) return { root, type: 'Minor 7th' };
+        if (suffix.includes('7')) return { root, type: 'Dominant 7th' };
+        if (suffix.includes('dim')) return { root, type: 'Diminished' };
+        if (suffix.includes('aug')) return { root, type: 'Augmented' };
+        if (suffix.includes('m') || suffix.includes('min')) return { root, type: 'Minor' };
+        return { root, type: 'Major' };
+    }
+
+    console.warn('[parseChordName] Could not parse chord:', name);
+    return { root: 'C', type: 'Major' };
 }
 
 // ===========================================
@@ -1300,12 +1339,12 @@ function renderStep5Preview() {
         <div class="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-xl p-6 mb-6 border border-gray-200 dark:border-gray-600">
             <h3 class="font-bold text-gray-900 dark:text-white mb-4 text-center">Your Chord Progression</h3>
             <div class="flex justify-center gap-2 md:gap-4 flex-wrap mb-6">
-                ${mood.progression.chords.map((chord, idx) => `
+                ${getCustomizedChords().map((chord, idx) => `
                     <div class="text-center">
                         <div class="w-14 h-14 md:w-16 md:h-16 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-lg md:text-xl font-bold text-blue-900 dark:text-blue-100 shadow-md">
                             ${chord}
                         </div>
-                        <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">${mood.progression.roman[idx]}</div>
+                        <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">${mood.progression.roman[idx] || ''}</div>
                     </div>
                 `).join(`
                     <div class="self-center text-gray-400 dark:text-gray-500 font-bold">→</div>
@@ -2174,8 +2213,13 @@ function attachWizardListeners(container) {
             try {
                 const piano = getPiano();
                 if (!piano || !chord) return;
-                const notes = getChordNotes(chord, 4);
-                piano.triggerAttackRelease(notes, '2n');
+                const { root, type } = parseChordName(chord);
+                const key = customizations.key || getCurrentProgression().key || 'C';
+                const notesResult = getChordNotes(root, type, key, 4);
+                const notes = notesResult?.specificNotes || notesResult?.baseNotes || [];
+                if (notes.length > 0) {
+                    piano.triggerAttackRelease(notes, '2n');
+                }
             } catch (e) {
                 console.warn('Failed to play chord:', e);
             }
@@ -2196,8 +2240,13 @@ function attachWizardListeners(container) {
                 try {
                     const piano = getPiano();
                     if (piano) {
-                        const notes = getChordNotes(swapTo, 4);
-                        piano.triggerAttackRelease(notes, '4n');
+                        const { root, type } = parseChordName(swapTo);
+                        const key = customizations.key || getCurrentProgression().key || 'C';
+                        const notesResult = getChordNotes(root, type, key, 4);
+                        const notes = notesResult?.specificNotes || notesResult?.baseNotes || [];
+                        if (notes.length > 0) {
+                            piano.triggerAttackRelease(notes, '4n');
+                        }
                     }
                 } catch (e) {
                     // Silent fail
@@ -2482,6 +2531,12 @@ function loadToComposition(targetTab) {
     const key = customizations.key || mood?.progression.key || 'C';
     const styleId = style?.id || 'pop';
 
+    console.log('[SongwritingWizard] loadToComposition called');
+    console.log('  baseChords:', baseChords);
+    console.log('  key:', key);
+    console.log('  mood:', mood?.id);
+    console.log('  customizations.key:', customizations.key);
+
     // Map structure section types to composition section types
     const sectionTypeMap = {
         'intro': 'intro',
@@ -2569,6 +2624,7 @@ function loadToComposition(targetTab) {
         // Fallback: simple 4-chord progression from mood
         expandedProgression = baseChords.map((chord, idx) => {
             const { root, type } = parseChordName(chord);
+            console.log(`  [parseChordName] "${chord}" => root: "${root}", type: "${type}"`);
             return {
                 root,
                 type,
@@ -2577,6 +2633,8 @@ function loadToComposition(targetTab) {
             };
         });
     }
+
+    console.log('[SongwritingWizard] expandedProgression:', expandedProgression);
 
     // Set key and progression
     setCurrentKey(customizations.key || mood?.progression.key || 'C');
