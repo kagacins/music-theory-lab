@@ -1590,6 +1590,7 @@ function createSectionIntentControls() {
     modeSelect.value = intent.mode;
     modeSelect.addEventListener('change', () => {
         setSectionIntent({ mode: modeSelect.value });
+        modalState.currentPhraseCandidates = []; // Clear cached phrases to force regeneration
         updateSubModeSelector();
         renderActiveTab(); // Re-render to update scoring
     });
@@ -1644,6 +1645,7 @@ function updateSubModeSelector() {
         subModeSelect.value = intent.subMode || CONTINUE_SUBMODES.BUILDING;
         subModeSelect.addEventListener('change', () => {
             setSectionIntent({ subMode: subModeSelect.value });
+            modalState.currentPhraseCandidates = []; // Clear cached phrases to force regeneration
             renderActiveTab(); // Re-render to update scoring
         });
         container.appendChild(subModeSelect);
@@ -1667,6 +1669,7 @@ function updateSubModeSelector() {
         typeSelect.value = intent.newSectionType || 'verse';
         typeSelect.addEventListener('change', () => {
             setSectionIntent({ newSectionType: typeSelect.value });
+            modalState.currentPhraseCandidates = []; // Clear cached phrases to force regeneration
             renderActiveTab(); // Re-render to update scoring
         });
         container.appendChild(typeSelect);
@@ -7980,7 +7983,9 @@ function renderMelodyPhrasesView(container, currentChord, key) {
             let totalBeats = 0;
             for (let i = startIdx; i <= endIdx; i++) {
                 if (progressionData[i]) {
-                    totalBeats += progressionData[i].duration || 4;
+                    // Support multiple duration property names (beats, duration, durationBeats)
+                    const chordDuration = progressionData[i].beats ?? progressionData[i].duration ?? progressionData[i].durationBeats ?? 4;
+                    totalBeats += chordDuration;
                 }
             }
             return totalBeats;
@@ -8126,7 +8131,9 @@ function renderMelodyPhrasesView(container, currentChord, key) {
         // Sum durations of all selected chords
         fixedDurationBeats = 0;
         for (let i = minChordIdx; i <= maxChordIdx && i < progressionData.length; i++) {
-            fixedDurationBeats += progressionData[i].duration || 4; // Default 4 beats per chord
+            // Support multiple duration property names (beats, duration, durationBeats)
+            const chordDuration = progressionData[i].beats ?? progressionData[i].duration ?? progressionData[i].durationBeats ?? 4;
+            fixedDurationBeats += chordDuration;
         }
         const numChords = maxChordIdx - minChordIdx + 1;
         if (numChords === 1) {
@@ -9018,13 +9025,17 @@ function applyPhrase(phrase) {
         // Calculate the beat position where the selected chord(s) start
         insertAtBeat = 0;
         for (let i = 0; i < minChordIdx; i++) {
-            insertAtBeat += progressionData[i].duration || 4;
+            // Support multiple duration property names (beats, duration, durationBeats)
+            const chordDuration = progressionData[i].beats ?? progressionData[i].duration ?? progressionData[i].durationBeats ?? 4;
+            insertAtBeat += chordDuration;
         }
 
         // Calculate max duration (sum of selected chords' durations)
         maxDuration = 0;
         for (let i = minChordIdx; i <= maxChordIdx && i < progressionData.length; i++) {
-            maxDuration += progressionData[i].duration || 4;
+            // Support multiple duration property names (beats, duration, durationBeats)
+            const chordDuration = progressionData[i].beats ?? progressionData[i].duration ?? progressionData[i].durationBeats ?? 4;
+            maxDuration += chordDuration;
         }
     }
 
@@ -9114,9 +9125,10 @@ function applyPhrase(phrase) {
                     compositionState.renderTrebleBlocksToMeasures();
                 }
 
-                // Trigger UI update
-                if (window.renderNotation) {
-                    window.renderNotation();
+                // Trigger notation UI update immediately
+                const notationComposer = window.getNotationComposer?.();
+                if (notationComposer) {
+                    notationComposer.render();
                 }
 
                 console.log(`Applied phrase: ${addedCount}/${notes.length} notes (${totalPhraseBeats.toFixed(1)} beats)`);

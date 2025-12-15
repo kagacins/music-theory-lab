@@ -1025,7 +1025,8 @@ export function generatePhrase({
         }
     }
 
-    // Final safety: if we're over, remove notes; if under, extend last note
+    // Final safety: ensure we hit the target beats exactly
+    // First, if we're over, pop notes until we're at or under target
     while (totalBeats > effectiveTargetBeats + 0.01 && rhythm.length > 1) {
         rhythm.pop();
         notes.pop();
@@ -1033,17 +1034,40 @@ export function generatePhrase({
         totalBeats = rhythm.reduce((sum, r) => sum + r, 0);
     }
 
+    // If under, extend the last note to exactly fill the target
     if (totalBeats < effectiveTargetBeats - 0.01 && rhythm.length > 0) {
         const deficit = effectiveTargetBeats - totalBeats;
         const lastIdx = rhythm.length - 1;
         const needed = rhythm[lastIdx] + deficit;
+
+        // First try to find an exact standard duration
+        let found = false;
         for (const std of standardDurations) {
-            if (std >= needed - 0.01 && std <= 4) {
+            if (Math.abs(std - needed) < 0.01 && std <= 4) {
                 rhythm[lastIdx] = std;
+                found = true;
                 break;
             }
         }
+
+        // If no exact match, use the exact needed value (even if non-standard)
+        // This ensures we hit the target beats precisely
+        if (!found && needed > 0 && needed <= 4) {
+            rhythm[lastIdx] = needed;
+        }
+
         totalBeats = rhythm.reduce((sum, r) => sum + r, 0);
+    }
+
+    // If still over (by a small amount), adjust last note down
+    if (totalBeats > effectiveTargetBeats + 0.01 && rhythm.length > 0) {
+        const excess = totalBeats - effectiveTargetBeats;
+        const lastIdx = rhythm.length - 1;
+        const adjusted = rhythm[lastIdx] - excess;
+        if (adjusted >= 0.25) {  // Don't go below 16th note
+            rhythm[lastIdx] = adjusted;
+            totalBeats = rhythm.reduce((sum, r) => sum + r, 0);
+        }
     }
 
     // Calculate overall phrase score

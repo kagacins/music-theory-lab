@@ -815,6 +815,114 @@ export function getCommonTones(chord1, chord2) {
 }
 
 // -----------------------------------------------------------------------------
+// Section Intent Modifiers
+// -----------------------------------------------------------------------------
+
+/**
+ * Apply section intent modifications to style rules
+ * This allows the melody suggestions to adapt based on whether the user is:
+ * - Continuing a section (building, concluding, or finishing)
+ * - Starting a new section (with a specific section type)
+ *
+ * @param {Object} baseRules - Base style rules to modify
+ * @param {Object} sectionIntent - Section intent state
+ * @param {string} currentContour - Current contour preference
+ * @returns {Object} Modified style rules
+ */
+function applySectionIntentModifiers(baseRules, sectionIntent, currentContour) {
+    const rules = { ...baseRules };
+
+    if (!sectionIntent) return rules;
+
+    const { mode, subMode, newSectionType } = sectionIntent;
+
+    // Continue Section modifiers
+    if (mode === 'continue') {
+        switch (subMode) {
+            case 'building':
+                // Building tension: favor ascending motion, more tension notes allowed
+                rules.tensionPenalty *= 0.7; // Reduce tension penalty - allow more color
+                rules.chordToneBoost *= 0.9; // Slightly less emphasis on chord tones
+                rules.stepwiseBoost *= 1.2; // More stepwise motion for smooth building
+                // Internally prefer ascending (will be applied via contour)
+                rules._preferAscending = true;
+                break;
+
+            case 'concluding':
+                // Working toward conclusion: start resolving, prefer stable tones
+                rules.chordToneBoost *= 1.15; // More chord tones
+                rules.tensionPenalty *= 1.2; // Less tension
+                rules.stepwiseBoost *= 1.1; // Smooth voice leading to resolution
+                rules._preferDescending = true;
+                break;
+
+            case 'final':
+                // Final phrase: strongly favor resolution and stability
+                rules.chordToneBoost *= 1.4; // Strongly prefer chord tones
+                rules.scaleToneBoost *= 1.1; // Scale tones are also good
+                rules.tensionPenalty *= 1.8; // Avoid tension notes
+                rules.approachToneBoost *= 0.7; // Less approach tones at the end
+                rules._preferResolution = true;
+                break;
+        }
+    }
+
+    // New Section modifiers
+    if (mode === 'new') {
+        // When starting a new section, adapt based on section type
+        switch (newSectionType) {
+            case 'intro':
+                // Intro: sparse, establishing, chord-tone focused
+                rules.chordToneBoost *= 1.3;
+                rules.tensionPenalty *= 1.3;
+                rules.stepwiseBoost *= 0.9;
+                break;
+
+            case 'verse':
+                // Verse: storytelling, moderate movement
+                rules.stepwiseBoost *= 1.1;
+                rules.chordToneBoost *= 1.0; // Balanced
+                break;
+
+            case 'prechorus':
+                // Pre-chorus: building anticipation
+                rules.tensionPenalty *= 0.8;
+                rules._preferAscending = true;
+                rules.stepwiseBoost *= 1.15;
+                break;
+
+            case 'chorus':
+                // Chorus: memorable, strong chord tones
+                rules.chordToneBoost *= 1.25;
+                rules.scaleToneBoost *= 1.1;
+                break;
+
+            case 'bridge':
+                // Bridge: contrast, more exploration
+                rules.tensionPenalty *= 0.6; // Allow more color
+                rules.approachToneBoost *= 1.2;
+                break;
+
+            case 'outro':
+                // Outro: resolving, winding down
+                rules.chordToneBoost *= 1.35;
+                rules.tensionPenalty *= 1.5;
+                rules._preferDescending = true;
+                break;
+
+            case 'solo':
+            case 'interlude':
+                // Solo/Interlude: more freedom
+                rules.tensionPenalty *= 0.5;
+                rules.approachToneBoost *= 1.3;
+                break;
+        }
+    }
+
+    return rules;
+}
+
+// -----------------------------------------------------------------------------
 // Main suggestion generation
 // -----------------------------------------------------------------------------
 
@@ -832,6 +940,7 @@ export function getCommonTones(chord1, chord2) {
  * @param {Array} options.recentNotes - Array of recent note names for recency penalty
  * @param {Object} options.nextChord - Next chord in progression (for anticipation)
  * @param {number} options.anticipationFactor - 0-1, proximity to chord change (1 = at boundary)
+ * @param {Object} options.sectionIntent - Section intent state for context-aware suggestions
  * @returns {Object} Suggestions and context
  */
 export function generateMelodySuggestions({
@@ -845,13 +954,14 @@ export function generateMelodySuggestions({
     range = 2,
     recentNotes = [],
     nextChord = null,
-    anticipationFactor = 0
+    anticipationFactor = 0,
+    sectionIntent = null
 } = {}) {
     const baseStyleRules = STYLE_RULES[styleId] || STYLE_RULES.any;
 
     // Get user's custom weights and apply them as multipliers
     const userWeights = getSavedMelodyWeights();
-    const styleRules = {
+    let styleRules = {
         chordToneBoost: baseStyleRules.chordToneBoost * userWeights.chordTone,
         scaleToneBoost: baseStyleRules.scaleToneBoost * userWeights.scaleTone,
         stepwiseBoost: baseStyleRules.stepwiseBoost * userWeights.voiceLeading,
@@ -861,6 +971,11 @@ export function generateMelodySuggestions({
         avoidIntervals: baseStyleRules.avoidIntervals,
         useBlueNotes: baseStyleRules.useBlueNotes
     };
+
+    // Apply section intent modifications to style rules
+    if (sectionIntent) {
+        styleRules = applySectionIntentModifiers(styleRules, sectionIntent, contourId);
+    }
 
     // Store recency penalty weight for later use
     const recencyPenaltyMultiplier = userWeights.recencyPenalty;
@@ -947,6 +1062,37 @@ export function generateMelodySuggestions({
             // Apply contour preference (use chord root as reference when no previousNote)
             const contourBonus = scoreContour(noteName, previousNote, contourId, chord.root, octave);
 
+            // Apply section intent direction preferences
+            let sectionIntentBonus = 0;
+            if (previousNote && (styleRules._preferAscending || styleRules._preferDescending)) {
+                const prevMIDI = getMIDINumber(previousNote);
+                const currentMIDI = getMIDINumber(noteName);
+                const direction = currentMIDI - prevMIDI;
+
+                if (styleRules._preferAscending && direction > 0) {
+                    sectionIntentBonus += 15; // Bonus for ascending motion when building
+                } else if (styleRules._preferAscending && direction < 0) {
+                    sectionIntentBonus -= 10; // Penalty for descending when building
+                }
+
+                if (styleRules._preferDescending && direction < 0) {
+                    sectionIntentBonus += 15; // Bonus for descending motion when concluding
+                } else if (styleRules._preferDescending && direction > 0) {
+                    sectionIntentBonus -= 10; // Penalty for ascending when concluding
+                }
+            }
+
+            // Prefer resolution to chord root for final phrases
+            if (styleRules._preferResolution) {
+                const chordTones = getChordTones(chord);
+                const notePitchClass = getPitchClass(noteName);
+                if (chordTones[0] === notePitchClass) {
+                    sectionIntentBonus += 20; // Strong preference for root at final
+                } else if (chordTones.includes(notePitchClass)) {
+                    sectionIntentBonus += 10; // Prefer other chord tones
+                }
+            }
+
             // Apply mood-based scoring
             const moodBonus = scoreMood(noteName, chord, previousNote, mood);
 
@@ -998,6 +1144,7 @@ export function generateMelodySuggestions({
             }
             harmonicScore += contourBonus;
             harmonicScore += moodBonus;
+            harmonicScore += sectionIntentBonus;
 
             // Apply recency/frequency penalty to harmonic score
             if (recentNotes && recentNotes.length > 0) {

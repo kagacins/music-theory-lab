@@ -2217,16 +2217,11 @@ export class CompositionState {
             return;
         }
 
-        // MULTI-VOICE CHECK: Skip render if Voice 2 has any notes in measures
-        // In multi-voice mode, measures are the source of truth, not the block
-        const hasMultipleVoices = this.measures.some(m => {
-            const voices = m.notation?.treble?.voices || [];
-            return voices.length > 1 && voices[1]?.notes?.length > 0;
-        });
-
-        if (hasMultipleVoices) {
-            return;
-        }
+        // NOTE: We removed the blanket "skip if Voice 2 exists" check.
+        // The code below already handles multiple voices properly by only
+        // clearing voices that exist in the block. The previous check was
+        // too aggressive and prevented phrase application from working
+        // when Voice 2 existed anywhere in the composition.
 
         const block = this.trebleBlockSequence.blocks[0]; // Single treble block
         const notes = block.getNotes();

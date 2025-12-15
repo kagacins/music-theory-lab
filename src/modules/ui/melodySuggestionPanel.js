@@ -334,13 +334,17 @@ export function updateSuggestions({
     octave = 4,
     recentNotes = [],
     nextChord = null,
-    anticipationFactor = 0
+    anticipationFactor = 0,
+    sectionIntent = null
 }) {
     showLoadingState();
 
     console.log('🎼 Generating melody suggestions with styleId:', styleId);
     if (nextChord && anticipationFactor > 0) {
         console.log(`🎯 Anticipation active: ${(anticipationFactor * 100).toFixed(0)}% toward ${nextChord.root} ${nextChord.type}`);
+    }
+    if (sectionIntent) {
+        console.log(`📍 Section intent: mode=${sectionIntent.mode}, subMode=${sectionIntent.subMode}, newSectionType=${sectionIntent.newSectionType}`);
     }
 
     // Generate suggestions
@@ -354,7 +358,8 @@ export function updateSuggestions({
         range: 2,
         recentNotes,
         nextChord,
-        anticipationFactor
+        anticipationFactor,
+        sectionIntent
     });
 
     // Update context display

@@ -9214,8 +9214,8 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             // Initialize sortable on the grid container
             initializeSimplifiedSortable(gridContainer);
         } else {
-            // Default: Use flexbox with wrapping; section-aware rendering controls its own layout
-            gridContainer.className = 'flex flex-wrap items-start gap-2';
+            // Default: Use flexbox with horizontal scroll (no wrapping)
+            gridContainer.className = 'flex flex-nowrap items-start gap-2 overflow-x-auto pb-2';
             if (hasSections) {
                 renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
                     showActionButtons: true
@@ -9299,8 +9299,8 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             // Initialize sortable on the grid container
             initializeSimplifiedSortable(gridContainer);
         } else {
-            // Default: Use flexbox with wrapping
-            gridContainer.className = 'flex flex-wrap items-start gap-2';
+            // Default: Use flexbox with horizontal scroll (no wrapping)
+            gridContainer.className = 'flex flex-nowrap items-start gap-2 overflow-x-auto pb-2';
             if (hasSections) {
                 renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
                     showActionButtons: true
@@ -14207,21 +14207,9 @@ export function importChordList(mode = 'replace') {
             romanNumeral = minorMap[romanNumeral] || romanNumeral;
         }
         
-        // Generate default LH notes (1 octave below RH)
-        const defaultLHType = 'rootOnly';
-        const defaultRHOctaveShift = 0; // New chords start at default octave
-        const defaultLHRelativeShift = 0; // No shift from LH base octave (octave 2)
-        const absoluteLHOctaveShift = defaultRHOctaveShift + defaultLHRelativeShift;
-        const defaultLHNotes = getLHNotes(
-            root,
-            defaultLHType,
-            0,  // lhInversion
-            key,
-            absoluteLHOctaveShift,
-            parsed.type,
-            getEnharmonicPreference()
-        );
-        
+        // No LH accompaniment by default for typed chords
+        const defaultLHType = 'none';
+
         // Create chord data object
         const chordData = {
             roman: romanNumeral,
@@ -14237,7 +14225,7 @@ export function importChordList(mode = 'replace') {
             lhType: defaultLHType,
             lhInversion: 0,
             lhOctaveShift: 0,
-            lhNotes: defaultLHNotes,
+            lhNotes: [],  // No LH notes
             lhOmittedNotes: [],
             rhythmPattern: 'block',
             isVoicingExpanded: true

@@ -20,6 +20,7 @@ import {
 import { getCompositionState } from '../state/compositionState.js';
 import { getPiano, getAudioIsReady } from '../audio/audioEngine.js';
 import { getChordContext } from './chordTimeline.js';
+import { getSectionIntent, INTENT_MODES, CONTINUE_SUBMODES } from '../state/sectionIntentState.js';
 
 // -----------------------------------------------------------------------------
 // Controller State
@@ -127,6 +128,11 @@ function setupEventListeners() {
 
     // Listen for progression imports
     compositionState.events.on('progressionImported', () => {
+        refreshSuggestions();
+    });
+
+    // Listen for section intent changes (Continue/New Section, Build/Resolve/Final, section type)
+    window.addEventListener('sectionIntentChanged', () => {
         refreshSuggestions();
     });
 
@@ -272,6 +278,9 @@ export function refreshSuggestions() {
         }
     }
 
+    // Get section intent for context-aware suggestions
+    const sectionIntent = getSectionIntent();
+
     // Generate and display suggestions
     // Use effectiveChord (where new note will land) instead of measure.chord (where selected note is)
     updateSuggestions({
@@ -284,7 +293,8 @@ export function refreshSuggestions() {
         recentNotes: recentNotes,
         selectedNoteInfo: selectedNoteInfo,  // Pass to panel for context display
         nextChord: nextChord,
-        anticipationFactor: anticipationFactor
+        anticipationFactor: anticipationFactor,
+        sectionIntent: sectionIntent  // Pass section intent for context-aware suggestions
     });
 }
 

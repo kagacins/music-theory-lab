@@ -27,7 +27,12 @@ const MOOD_OPTIONS = [
         title: 'Happy',
         subtitle: 'Uplifting & Bright',
         color: '#fef08a',
-        progression: { key: 'C', chords: ['C', 'G', 'Am', 'F'], roman: ['I', 'V', 'vi', 'IV'] },
+        progressions: [
+            { name: 'Classic Pop', key: 'C', chords: ['C', 'G', 'Am', 'F'], roman: ['I', 'V', 'vi', 'IV'], desc: 'The most popular progression ever' },
+            { name: 'Optimistic', key: 'G', chords: ['G', 'C', 'D', 'G'], roman: ['I', 'IV', 'V', 'I'], desc: 'Simple and bright' },
+            { name: 'Joyful', key: 'D', chords: ['D', 'A', 'G', 'A'], roman: ['I', 'V', 'IV', 'V'], desc: 'Energetic bounce' },
+            { name: '50s Happy', key: 'C', chords: ['C', 'Am', 'F', 'G'], roman: ['I', 'vi', 'IV', 'V'], desc: 'Classic doo-wop feel' }
+        ],
         suggestedTempo: 120,
         tips: [
             'Major key creates brightness',
@@ -41,12 +46,17 @@ const MOOD_OPTIONS = [
         title: 'Sad',
         subtitle: 'Melancholy & Touching',
         color: '#bfdbfe',
-        progression: { key: 'Am', chords: ['Am', 'F', 'C', 'G'], roman: ['i', 'VI', 'III', 'VII'] },
+        progressions: [
+            { name: 'Heartbreak', key: 'Am', chords: ['Am', 'F', 'C', 'G'], roman: ['i', 'VI', 'III', 'VII'], desc: 'Modern emotional ballad' },
+            { name: 'Longing', key: 'Em', chords: ['Em', 'C', 'G', 'D'], roman: ['i', 'VI', 'III', 'VII'], desc: 'Gentle sadness' },
+            { name: 'Teardrops', key: 'Am', chords: ['Am', 'Dm', 'E', 'Am'], roman: ['i', 'iv', 'V', 'i'], desc: 'Classic minor progression' },
+            { name: 'Bittersweet', key: 'C', chords: ['C', 'G', 'Am', 'Em'], roman: ['I', 'V', 'vi', 'iii'], desc: 'Major key sadness' }
+        ],
         suggestedTempo: 72,
         tips: [
             'Starting on minor creates immediate emotion',
-            'The F (VI) chord adds warmth to the sadness',
-            'Ending on G creates longing'
+            'The VI chord adds warmth to the sadness',
+            'Slower tempos enhance melancholy'
         ]
     },
     {
@@ -55,7 +65,12 @@ const MOOD_OPTIONS = [
         title: 'Energetic',
         subtitle: 'Powerful & Driving',
         color: '#fca5a5',
-        progression: { key: 'E', chords: ['E', 'A', 'B', 'E'], roman: ['I', 'IV', 'V', 'I'] },
+        progressions: [
+            { name: 'Rock Power', key: 'E', chords: ['E', 'A', 'B', 'E'], roman: ['I', 'IV', 'V', 'I'], desc: 'Classic rock foundation' },
+            { name: 'Punk Drive', key: 'G', chords: ['G', 'C', 'D', 'D'], roman: ['I', 'IV', 'V', 'V'], desc: 'Fast and aggressive' },
+            { name: 'Arena Rock', key: 'A', chords: ['A', 'D', 'E', 'D'], roman: ['I', 'IV', 'V', 'IV'], desc: 'Stadium anthem feel' },
+            { name: 'Power Pop', key: 'D', chords: ['D', 'Bm', 'G', 'A'], roman: ['I', 'vi', 'IV', 'V'], desc: 'Catchy and driving' }
+        ],
         suggestedTempo: 140,
         tips: [
             'The classic I-IV-V-I is rock\'s foundation',
@@ -69,7 +84,12 @@ const MOOD_OPTIONS = [
         title: 'Dreamy',
         subtitle: 'Ethereal & Floating',
         color: '#c4b5fd',
-        progression: { key: 'C', chords: ['Cmaj7', 'Fmaj7', 'Am7', 'Em7'], roman: ['Imaj7', 'IVmaj7', 'vi7', 'iii7'] },
+        progressions: [
+            { name: 'Floating', key: 'C', chords: ['Cmaj7', 'Fmaj7', 'Am7', 'Em7'], roman: ['Imaj7', 'IVmaj7', 'vi7', 'iii7'], desc: 'Lush 7th chords' },
+            { name: 'Ambient', key: 'G', chords: ['Gmaj7', 'Em7', 'Cmaj7', 'D'], roman: ['Imaj7', 'vi7', 'IVmaj7', 'V'], desc: 'Spacious and open' },
+            { name: 'Celestial', key: 'D', chords: ['Dmaj7', 'F#m7', 'Gmaj7', 'A'], roman: ['Imaj7', 'iii7', 'IVmaj7', 'V'], desc: 'Ascending feel' },
+            { name: 'Hazy', key: 'F', chords: ['Fmaj7', 'Am7', 'Dm7', 'Bbmaj7'], roman: ['Imaj7', 'iii7', 'vi7', 'IVmaj7'], desc: 'No dominant, unresolved' }
+        ],
         suggestedTempo: 85,
         tips: [
             'Major 7th chords create a floating quality',
@@ -83,11 +103,16 @@ const MOOD_OPTIONS = [
         title: 'Romantic',
         subtitle: 'Warm & Tender',
         color: '#fbcfe8',
-        progression: { key: 'G', chords: ['G', 'Em', 'C', 'D'], roman: ['I', 'vi', 'IV', 'V'] },
+        progressions: [
+            { name: 'Love Song', key: 'G', chords: ['G', 'Em', 'C', 'D'], roman: ['I', 'vi', 'IV', 'V'], desc: 'Classic ballad progression' },
+            { name: 'First Dance', key: 'C', chords: ['C', 'Am', 'F', 'G'], roman: ['I', 'vi', 'IV', 'V'], desc: 'Timeless romance' },
+            { name: 'Tender', key: 'F', chords: ['F', 'Dm', 'Bb', 'C'], roman: ['I', 'vi', 'IV', 'V'], desc: 'Soft and warm' },
+            { name: 'Serenade', key: 'D', chords: ['D', 'G', 'A', 'Bm'], roman: ['I', 'IV', 'V', 'vi'], desc: 'Building to emotion' }
+        ],
         suggestedTempo: 76,
         tips: [
             'Key of G is warm and accessible',
-            'The vi (Em) early creates vulnerability',
+            'The vi chord early creates vulnerability',
             'Building to V creates anticipation'
         ]
     },
@@ -97,7 +122,12 @@ const MOOD_OPTIONS = [
         title: 'Chill',
         subtitle: 'Relaxed & Smooth',
         color: '#a5f3fc',
-        progression: { key: 'D', chords: ['Dmaj7', 'A', 'Bm', 'G'], roman: ['Imaj7', 'V', 'vi', 'IV'] },
+        progressions: [
+            { name: 'Lo-Fi', key: 'D', chords: ['Dmaj7', 'A', 'Bm', 'G'], roman: ['Imaj7', 'V', 'vi', 'IV'], desc: 'Perfect for lo-fi beats' },
+            { name: 'Smooth', key: 'G', chords: ['Gmaj7', 'Am7', 'Bm7', 'Cmaj7'], roman: ['Imaj7', 'ii7', 'iii7', 'IVmaj7'], desc: 'Jazz-influenced chill' },
+            { name: 'Laid Back', key: 'C', chords: ['C', 'Em', 'F', 'G'], roman: ['I', 'iii', 'IV', 'V'], desc: 'Simple and relaxed' },
+            { name: 'Sunset', key: 'A', chords: ['Amaj7', 'D', 'E', 'F#m7'], roman: ['Imaj7', 'IV', 'V', 'vi7'], desc: 'Warm evening vibes' }
+        ],
         suggestedTempo: 90,
         tips: [
             'The maj7 on I creates a relaxed home base',
@@ -111,12 +141,17 @@ const MOOD_OPTIONS = [
         title: 'Mysterious',
         subtitle: 'Enigmatic & Dark',
         color: '#a78bfa',
-        progression: { key: 'Em', chords: ['Em', 'Am', 'B7', 'Em'], roman: ['i', 'iv', 'V7', 'i'] },
+        progressions: [
+            { name: 'Dark', key: 'Em', chords: ['Em', 'Am', 'B7', 'Em'], roman: ['i', 'iv', 'V7', 'i'], desc: 'Classic minor tension' },
+            { name: 'Suspense', key: 'Am', chords: ['Am', 'Dm', 'E7', 'Am'], roman: ['i', 'iv', 'V7', 'i'], desc: 'Building dread' },
+            { name: 'Enigma', key: 'Dm', chords: ['Dm', 'Bb', 'Gm', 'A7'], roman: ['i', 'VI', 'iv', 'V7'], desc: 'Unexpected turns' },
+            { name: 'Shadows', key: 'Em', chords: ['Em', 'C', 'Am', 'B7'], roman: ['i', 'VI', 'iv', 'V7'], desc: 'Haunting movement' }
+        ],
         suggestedTempo: 95,
         tips: [
             'Natural minor creates an ancient feel',
             'The iv chord adds depth without resolution',
-            'B7 creates tension that resolves to minor'
+            'V7 creates tension that resolves to minor'
         ]
     },
     {
@@ -125,12 +160,17 @@ const MOOD_OPTIONS = [
         title: 'Triumphant',
         subtitle: 'Epic & Victorious',
         color: '#fcd34d',
-        progression: { key: 'D', chords: ['D', 'A', 'Bm', 'G', 'D', 'A', 'G', 'D'], roman: ['I', 'V', 'vi', 'IV', 'I', 'V', 'IV', 'I'] },
+        progressions: [
+            { name: 'Victory', key: 'D', chords: ['D', 'A', 'Bm', 'G'], roman: ['I', 'V', 'vi', 'IV'], desc: 'Anthemic and powerful' },
+            { name: 'Epic', key: 'C', chords: ['C', 'G', 'Am', 'F'], roman: ['I', 'V', 'vi', 'IV'], desc: 'Stadium-ready' },
+            { name: 'Glory', key: 'G', chords: ['G', 'D', 'Em', 'C'], roman: ['I', 'V', 'vi', 'IV'], desc: 'Uplifting triumph' },
+            { name: 'Champion', key: 'E', chords: ['E', 'B', 'C#m', 'A'], roman: ['I', 'V', 'vi', 'IV'], desc: 'Rock anthem style' }
+        ],
         suggestedTempo: 130,
         tips: [
-            'Extended 8-chord progression builds momentum',
-            'The repeated D→A creates strength',
-            'Ending on I provides powerful resolution'
+            'Strong I-V movement creates power',
+            'The vi adds emotional depth',
+            'Ending on IV provides lift before resolution'
         ]
     },
     {
@@ -139,7 +179,12 @@ const MOOD_OPTIONS = [
         title: 'Nostalgic',
         subtitle: 'Bittersweet & Reflective',
         color: '#fed7aa',
-        progression: { key: 'F', chords: ['Fmaj7', 'Dm7', 'Bbmaj7', 'C'], roman: ['Imaj7', 'vi7', 'IVmaj7', 'V'] },
+        progressions: [
+            { name: 'Memories', key: 'F', chords: ['Fmaj7', 'Dm7', 'Bbmaj7', 'C'], roman: ['Imaj7', 'vi7', 'IVmaj7', 'V'], desc: 'Wistful 7ths' },
+            { name: 'Yesteryear', key: 'G', chords: ['G', 'Em', 'C', 'D'], roman: ['I', 'vi', 'IV', 'V'], desc: 'Simple nostalgia' },
+            { name: 'Flashback', key: 'C', chords: ['Cmaj7', 'Am7', 'Fmaj7', 'G7'], roman: ['Imaj7', 'vi7', 'IVmaj7', 'V7'], desc: 'Jazz-tinged memory' },
+            { name: 'Old Photo', key: 'D', chords: ['D', 'Bm', 'G', 'A'], roman: ['I', 'vi', 'IV', 'V'], desc: 'Warm remembrance' }
+        ],
         suggestedTempo: 82,
         tips: [
             '7th chords add wistfulness',
@@ -153,7 +198,12 @@ const MOOD_OPTIONS = [
         title: 'Playful',
         subtitle: 'Fun & Bouncy',
         color: '#86efac',
-        progression: { key: 'G', chords: ['G', 'C', 'D', 'G'], roman: ['I', 'IV', 'V', 'I'] },
+        progressions: [
+            { name: 'Bouncy', key: 'G', chords: ['G', 'C', 'D', 'G'], roman: ['I', 'IV', 'V', 'I'], desc: 'Simple and joyful' },
+            { name: 'Skippy', key: 'C', chords: ['C', 'F', 'G', 'C'], roman: ['I', 'IV', 'V', 'I'], desc: 'Light and fun' },
+            { name: 'Whimsical', key: 'D', chords: ['D', 'G', 'A', 'Bm'], roman: ['I', 'IV', 'V', 'vi'], desc: 'Playful with a twist' },
+            { name: 'Silly', key: 'A', chords: ['A', 'D', 'E', 'A'], roman: ['I', 'IV', 'V', 'I'], desc: 'Carefree and bright' }
+        ],
         suggestedTempo: 135,
         tips: [
             'Simple I-IV-V-I is inherently joyful',
@@ -589,6 +639,7 @@ let creationMode = null; // 'quick', 'full', or 'explore'
 let selectedMood = null;
 let selectedStyle = null;
 let selectedStructure = 'simple';
+let selectedProgressionIndex = 0; // Which progression option within the mood
 let isPlaying = false;
 let playbackTimeoutIds = [];
 
@@ -623,6 +674,20 @@ const ENHARMONIC_TO_SHARP = {
 };
 
 /**
+ * Get the selected progression option from the current mood
+ * @returns {Object} Progression object with key, chords, roman, name, desc
+ */
+function getSelectedMoodProgression() {
+    const mood = MOOD_OPTIONS.find(m => m.id === selectedMood);
+    if (mood && mood.progressions && mood.progressions.length > 0) {
+        const idx = Math.min(selectedProgressionIndex, mood.progressions.length - 1);
+        return mood.progressions[idx];
+    }
+    // Fallback
+    return { name: 'Default', key: 'C', chords: ['C', 'G', 'Am', 'F'], roman: ['I', 'V', 'vi', 'IV'], desc: '' };
+}
+
+/**
  * Get the current working progression (with any applied swaps)
  * @returns {Object} Progression object with key, chords, roman
  */
@@ -630,17 +695,15 @@ function getCurrentProgression() {
     if (workingProgression) {
         return workingProgression;
     }
-    const mood = MOOD_OPTIONS.find(m => m.id === selectedMood);
-    if (mood) {
-        // Initialize working progression from mood
-        workingProgression = {
-            key: mood.progression.key,
-            chords: [...mood.progression.chords],
-            roman: [...mood.progression.roman]
-        };
-        return workingProgression;
-    }
-    return { key: 'C', chords: ['C', 'G', 'Am', 'F'], roman: ['I', 'V', 'vi', 'IV'] };
+    const selectedProg = getSelectedMoodProgression();
+    // Initialize working progression from selected mood progression
+    workingProgression = {
+        key: selectedProg.key,
+        chords: [...selectedProg.chords],
+        roman: [...selectedProg.roman],
+        name: selectedProg.name
+    };
+    return workingProgression;
 }
 
 /**
@@ -789,13 +852,14 @@ async function playProgression(chordNames, duration = 0.8, loop = false) {
 
         const playOnce = async () => {
             const now = Tone.now();
+            const key = customizations.key || getCurrentProgression().key || 'C';
 
             for (let i = 0; i < chordNames.length; i++) {
                 if (!isPlaying) break;
 
                 const { root, type } = parseChordName(chordNames[i]);
-                const chordInfo = getChordNotes(root, type);
-                const notes = chordInfo?.specificNotes || [];
+                const chordInfo = getChordNotes(root, type, key, 3); // octave 3 for better sound
+                const notes = chordInfo?.specificNotes || chordInfo?.baseNotes || [];
 
                 if (notes.length > 0) {
                     piano.triggerAttackRelease(notes, duration * 0.9, now + (i * duration));
@@ -891,23 +955,20 @@ function parseChordName(name) {
 
 function renderStepIndicator() {
     return `
-        <div class="wizard-step-indicator flex justify-center gap-1 md:gap-2 mb-6 flex-wrap">
+        <div class="wizard-step-indicator flex justify-center gap-0.5 mb-3 overflow-x-auto">
             ${WIZARD_STEPS.map((step, idx) => `
-                <div class="flex items-center">
+                <div class="flex items-center flex-shrink-0">
                     <div class="flex flex-col items-center">
-                        <div class="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-sm md:text-lg transition-all ${
+                        <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all ${
                             idx < currentStep ? 'bg-green-500 text-white' :
-                            idx === currentStep ? 'bg-blue-600 text-white ring-4 ring-blue-200' :
+                            idx === currentStep ? 'bg-blue-600 text-white ring-2 ring-blue-200' :
                             'bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400'
                         }">
                             ${idx < currentStep ? '✓' : step.icon}
                         </div>
-                        <span class="text-[10px] md:text-xs mt-1 font-medium max-w-[60px] text-center ${
-                            idx === currentStep ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
-                        }">${step.title}</span>
                     </div>
                     ${idx < WIZARD_STEPS.length - 1 ? `
-                        <div class="w-4 md:w-8 h-0.5 mx-1 mt-[-16px] ${idx < currentStep ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}"></div>
+                        <div class="w-3 h-0.5 ${idx < currentStep ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}"></div>
                     ` : ''}
                 </div>
             `).join('')}
@@ -947,86 +1008,94 @@ function renderStep0Welcome() {
     ];
 
     return `
-        <div class="text-center mb-8">
-            <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-3">What would you like to create today?</h2>
-            <p class="text-gray-600 dark:text-gray-300">Choose how you want to approach your songwriting session</p>
+        <div class="text-center mb-4">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-1">What would you like to create?</h2>
+            <p class="text-gray-600 dark:text-gray-300 text-sm">Choose your songwriting approach</p>
         </div>
 
-        <div class="grid md:grid-cols-3 gap-4 mb-6">
+        <div class="grid md:grid-cols-3 gap-3">
             ${modes.map(mode => `
-                <button class="creation-mode-option group p-6 rounded-2xl border-2 transition-all hover:scale-[1.02] text-left ${
+                <button class="creation-mode-option group p-3 rounded-xl border-2 transition-all hover:scale-[1.01] text-left ${
                     creationMode === mode.id
-                        ? 'border-blue-500 shadow-xl ring-4 ring-blue-200 dark:ring-blue-800'
+                        ? 'border-blue-500 shadow-lg ring-2 ring-blue-200 dark:ring-blue-800'
                         : 'border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 bg-white dark:bg-gray-800'
                 }" data-mode="${mode.id}">
-                    <div class="bg-gradient-to-br ${mode.color} w-16 h-16 rounded-xl flex items-center justify-center text-3xl mb-4 shadow-lg">
-                        ${mode.emoji}
-                    </div>
-                    <div class="font-bold text-xl text-gray-900 dark:text-white mb-1">${mode.title}</div>
-                    <div class="text-sm text-blue-600 dark:text-blue-400 font-medium mb-2">${mode.subtitle}</div>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-3">${mode.description}</p>
-                    <div class="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
-                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
-                        </svg>
-                        ${mode.time}
+                    <div class="flex items-start gap-3">
+                        <div class="bg-gradient-to-br ${mode.color} w-10 h-10 rounded-lg flex items-center justify-center text-xl shadow flex-shrink-0">
+                            ${mode.emoji}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-bold text-gray-900 dark:text-white">${mode.title}</div>
+                            <div class="text-xs text-blue-600 dark:text-blue-400 font-medium">${mode.subtitle}</div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">${mode.description}</p>
+                        </div>
                     </div>
                 </button>
             `).join('')}
         </div>
-
-        ${creationMode ? `
-            <div class="bg-gradient-to-r ${modes.find(m => m.id === creationMode)?.color} rounded-xl p-4 text-white text-center">
-                <div class="flex items-center justify-center gap-3">
-                    <span class="text-2xl">${modes.find(m => m.id === creationMode)?.emoji}</span>
-                    <div>
-                        <span class="font-bold">${modes.find(m => m.id === creationMode)?.title}</span>
-                        <span class="opacity-80 ml-2">selected</span>
-                    </div>
-                </div>
-            </div>
-        ` : `
-            <div class="text-center text-gray-400 dark:text-gray-500 text-sm">
-                Select a mode to continue
-            </div>
-        `}
     `;
 }
 
 function renderStep1Mood() {
+    const currentMood = MOOD_OPTIONS.find(m => m.id === selectedMood);
+    const progressions = currentMood?.progressions || [];
+
     return `
-        <div class="text-center mb-6">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">What feeling do you want to capture?</h2>
-            <p class="text-gray-600 dark:text-gray-300">Choose a mood - this shapes the entire composition</p>
-            <p class="text-sm text-blue-500 dark:text-blue-400 mt-1 flex items-center justify-center gap-1">
-                <span>🔊</span> Hover over a mood to hear a preview
-            </p>
+        <div class="text-center mb-3">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-1">What feeling do you want?</h2>
+            <p class="text-gray-600 dark:text-gray-300 text-sm">Select a mood, then choose a progression</p>
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+        <div class="grid grid-cols-5 gap-2">
             ${MOOD_OPTIONS.map(mood => `
-                <button class="mood-option group p-3 rounded-xl border-2 transition-all hover:scale-[1.02] ${
+                <button class="mood-option group p-2 rounded-lg border-2 transition-all hover:scale-[1.02] ${
                     selectedMood === mood.id
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40 shadow-lg'
-                        : 'border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 bg-white dark:bg-gray-800'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40 shadow-md'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-blue-300 bg-white dark:bg-gray-800'
                 }" data-mood="${mood.id}" style="${selectedMood === mood.id ? `background: linear-gradient(135deg, ${mood.color}40, transparent);` : ''}">
-                    <div class="text-3xl mb-1">${mood.emoji}</div>
-                    <div class="font-bold text-gray-900 dark:text-white text-sm">${mood.title}</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400 leading-tight">${mood.subtitle}</div>
+                    <div class="text-2xl">${mood.emoji}</div>
+                    <div class="font-semibold text-gray-900 dark:text-white text-xs">${mood.title}</div>
                 </button>
             `).join('')}
         </div>
 
-        ${selectedMood ? `
-            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl p-4 border border-blue-200 dark:border-blue-700">
-                <div class="flex items-center gap-3 mb-2">
-                    <span class="text-2xl">${MOOD_OPTIONS.find(m => m.id === selectedMood)?.emoji}</span>
-                    <span class="font-bold text-gray-900 dark:text-white">${MOOD_OPTIONS.find(m => m.id === selectedMood)?.title}</span>
-                    <button id="preview-mood-btn" class="ml-auto px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm flex items-center gap-1">
-                        <span class="play-btn-icon">▶</span> Preview
-                    </button>
+        ${selectedMood && progressions.length > 0 ? `
+            <div class="mt-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-lg p-3 border border-blue-200 dark:border-blue-700">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xl">${currentMood?.emoji}</span>
+                    <span class="font-bold text-gray-900 dark:text-white text-sm">${currentMood?.title}</span>
+                    <span class="text-xs text-gray-500">${currentMood?.subtitle}</span>
                 </div>
-                <p class="text-sm text-gray-600 dark:text-gray-300">${MOOD_OPTIONS.find(m => m.id === selectedMood)?.tips[0]}</p>
+
+                <!-- Progression Options -->
+                <div class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Choose a progression:</div>
+                <div class="grid grid-cols-2 gap-2">
+                    ${progressions.map((prog, idx) => `
+                        <div class="progression-option flex items-center gap-2 p-2 rounded-lg border-2 cursor-pointer transition-all ${
+                            selectedProgressionIndex === idx
+                                ? 'border-blue-500 bg-blue-100 dark:bg-blue-900/50'
+                                : 'border-gray-200 dark:border-gray-600 hover:border-blue-300 bg-white dark:bg-gray-800'
+                        }" data-progression-index="${idx}">
+                            <button class="progression-play-btn flex-shrink-0 w-7 h-7 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center text-xs transition-colors" data-progression-index="${idx}" title="Play ${prog.name}">
+                                ▶
+                            </button>
+                            <div class="flex-1 min-w-0">
+                                <div class="font-semibold text-gray-900 dark:text-white text-xs">${prog.name}</div>
+                                <div class="text-[10px] text-gray-500 dark:text-gray-400 truncate">${prog.chords.join(' → ')}</div>
+                                <div class="text-[9px] text-gray-400 dark:text-gray-500">${prog.desc}</div>
+                            </div>
+                            ${selectedProgressionIndex === idx ? '<span class="text-blue-500 text-sm">✓</span>' : ''}
+                        </div>
+                    `).join('')}
+                </div>
+
+                <!-- Tips for selected progression -->
+                <div class="mt-2 pt-2 border-t border-blue-200 dark:border-blue-700">
+                    <div class="text-[10px] text-gray-600 dark:text-gray-400">
+                        <strong>Key:</strong> ${progressions[selectedProgressionIndex]?.key} ·
+                        <strong>Roman:</strong> ${progressions[selectedProgressionIndex]?.roman.join(' - ')}
+                    </div>
+                </div>
             </div>
         ` : ''}
     `;
@@ -1036,39 +1105,34 @@ function renderStep2Style() {
     const mood = MOOD_OPTIONS.find(m => m.id === selectedMood);
 
     return `
-        <div class="text-center mb-6">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">What style fits your vision?</h2>
-            <p class="text-gray-600 dark:text-gray-300">This affects chord complexity and recommended patterns</p>
+        <div class="text-center mb-3">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-1">What style fits your vision?</h2>
+            <p class="text-gray-600 dark:text-gray-300 text-sm">Affects chord complexity</p>
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div class="grid grid-cols-4 gap-2 pt-2 overflow-visible">
             ${STYLE_OPTIONS.map(style => {
                 const isRecommended = mood && style.suggestedMoods.includes(mood.id);
                 return `
-                    <button class="style-option group p-4 rounded-xl border-2 transition-all hover:scale-[1.02] relative ${
+                    <button class="style-option group p-2 rounded-lg border-2 transition-all hover:scale-[1.02] relative overflow-visible ${
                         selectedStyle === style.id
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40 shadow-lg'
-                            : 'border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 bg-white dark:bg-gray-800'
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40 shadow-md'
+                            : 'border-gray-200 dark:border-gray-600 hover:border-blue-300 bg-white dark:bg-gray-800'
                     }" data-style="${style.id}">
-                        ${isRecommended ? '<span class="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">Recommended</span>' : ''}
-                        <div class="text-3xl mb-2">${style.emoji}</div>
-                        <div class="font-bold text-gray-900 dark:text-white">${style.title}</div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">${style.description}</div>
+                        ${isRecommended ? '<span class="absolute -top-2 -right-2 bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-sm z-10">★</span>' : ''}
+                        <div class="text-2xl">${style.emoji}</div>
+                        <div class="font-semibold text-gray-900 dark:text-white text-xs">${style.title}</div>
                     </button>
                 `;
             }).join('')}
         </div>
 
         ${selectedStyle ? `
-            <div class="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 rounded-xl p-4 border border-purple-200 dark:border-purple-700">
-                <div class="flex items-center gap-3">
-                    <span class="text-2xl">${STYLE_OPTIONS.find(s => s.id === selectedStyle)?.emoji}</span>
-                    <div>
-                        <span class="font-bold text-gray-900 dark:text-white">${STYLE_OPTIONS.find(s => s.id === selectedStyle)?.title}</span>
-                        <p class="text-sm text-gray-600 dark:text-gray-300">
-                            Chord complexity: <span class="font-medium">${STYLE_OPTIONS.find(s => s.id === selectedStyle)?.chordComplexity}</span>
-                        </p>
-                    </div>
+            <div class="mt-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 rounded-lg p-2 border border-purple-200 dark:border-purple-700">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">${STYLE_OPTIONS.find(s => s.id === selectedStyle)?.emoji}</span>
+                    <span class="font-bold text-gray-900 dark:text-white text-sm">${STYLE_OPTIONS.find(s => s.id === selectedStyle)?.title}</span>
+                    <span class="text-xs text-gray-500">Complexity: ${STYLE_OPTIONS.find(s => s.id === selectedStyle)?.chordComplexity}</span>
                 </div>
             </div>
         ` : ''}
@@ -1076,43 +1140,69 @@ function renderStep2Style() {
 }
 
 function renderStep3Structure() {
+    const style = STYLE_OPTIONS.find(s => s.id === selectedStyle);
+
+    // Determine recommended structures based on style
+    const getRecommendedStructures = () => {
+        if (!style) return ['verse-chorus', 'simple']; // Default recommendations
+        switch (style.id) {
+            case 'jazz': return ['aaba', 'simple'];
+            case 'blues': return ['blues', 'simple'];
+            case 'rock': return ['verse-chorus', 'verse-prechorus-chorus'];
+            case 'pop': return ['verse-chorus', 'verse-prechorus-chorus'];
+            case 'electronic': return ['simple', 'verse-chorus'];
+            case 'folk': return ['verse-chorus', 'simple'];
+            case 'rnb': return ['verse-prechorus-chorus', 'verse-chorus'];
+            case 'classical': return ['aaba', 'verse-prechorus-chorus'];
+            default: return ['verse-chorus', 'simple'];
+        }
+    };
+
+    const recommendedIds = getRecommendedStructures();
+
     return `
-        <div class="text-center mb-6">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Choose your song structure</h2>
-            <p class="text-gray-600 dark:text-gray-300">This defines the overall form of your composition</p>
+        <div class="text-center mb-3">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-1">Choose your song structure</h2>
+            <p class="text-gray-600 dark:text-gray-300 text-sm">Defines the overall form</p>
         </div>
 
-        <div class="space-y-3 mb-6">
-            ${STRUCTURE_OPTIONS.map(structure => `
-                <button class="structure-option w-full p-4 rounded-xl border-2 transition-all hover:scale-[1.01] text-left ${
+        <div class="space-y-2">
+            ${STRUCTURE_OPTIONS.map(structure => {
+                const isRecommended = recommendedIds.includes(structure.id);
+                return `
+                <button class="structure-option w-full p-2 rounded-lg border-2 transition-all text-left ${
                     selectedStructure === structure.id
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40 shadow-lg'
-                        : 'border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 bg-white dark:bg-gray-800'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40 shadow-md'
+                        : isRecommended
+                            ? 'border-green-300 dark:border-green-600 hover:border-green-400 bg-green-50/50 dark:bg-green-900/20'
+                            : 'border-gray-200 dark:border-gray-600 hover:border-blue-300 bg-white dark:bg-gray-800'
                 }" data-structure="${structure.id}">
-                    <div class="flex items-center gap-4">
-                        <div class="text-3xl">${structure.icon}</div>
+                    <div class="flex items-center gap-3">
+                        <div class="text-xl">${structure.icon}</div>
                         <div class="flex-1">
-                            <div class="font-bold text-gray-900 dark:text-white">${structure.title}</div>
-                            <div class="text-sm text-gray-500 dark:text-gray-400">${structure.description}</div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-semibold text-gray-900 dark:text-white text-sm">${structure.title}</span>
+                                ${isRecommended ? `<span class="px-1.5 py-0.5 bg-green-500 text-white text-[10px] font-medium rounded flex-shrink-0">★ Recommended</span>` : ''}
+                            </div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">${structure.description}</div>
                         </div>
                         <div class="text-right">
-                            <div class="text-lg font-bold text-blue-600 dark:text-blue-400">${structure.totalMeasures}</div>
-                            <div class="text-xs text-gray-500">measures</div>
+                            <div class="text-sm font-bold text-blue-600 dark:text-blue-400">${structure.totalMeasures}m</div>
                         </div>
                     </div>
                     ${selectedStructure === structure.id ? `
-                        <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
-                            <div class="flex flex-wrap gap-2">
+                        <div class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                            <div class="flex flex-wrap gap-1">
                                 ${structure.sections.map(s => `
-                                    <span class="px-2 py-1 rounded-full text-xs font-medium ${getSectionColor(s.type)}">
-                                        ${s.type}${s.repeat ? ` ×${s.repeat}` : ''} (${s.measures}m)
+                                    <span class="px-1.5 py-0.5 rounded text-[10px] font-medium ${getSectionColor(s.type)}">
+                                        ${s.type}${s.repeat ? `×${s.repeat}` : ''}
                                     </span>
                                 `).join('')}
                             </div>
                         </div>
                     ` : ''}
                 </button>
-            `).join('')}
+            `;}).join('')}
         </div>
     `;
 }
@@ -1142,156 +1232,85 @@ function renderStep4Tempo() {
     const currentFeel = customizations.feel || 'straight';
     const currentTimeSig = customizations.timeSignature || '4/4';
 
-    // Get tempo description
     const getTempoLabel = (bpm) => {
-        if (bpm < 60) return 'Very Slow (Largo)';
-        if (bpm < 80) return 'Slow (Adagio)';
-        if (bpm < 100) return 'Moderate (Andante)';
-        if (bpm < 120) return 'Walking (Moderato)';
-        if (bpm < 140) return 'Fast (Allegro)';
-        if (bpm < 170) return 'Very Fast (Vivace)';
-        return 'Extremely Fast (Presto)';
+        if (bpm < 80) return 'Slow';
+        if (bpm < 120) return 'Medium';
+        if (bpm < 150) return 'Fast';
+        return 'Very Fast';
     };
 
-    // Style-suggested feel
     const suggestedFeel = style?.id === 'jazz' ? 'swing' :
                           style?.id === 'blues' ? 'shuffle' : 'straight';
 
     return `
-        <div class="text-center mb-6">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Set the pace & feel</h2>
-            <p class="text-gray-600 dark:text-gray-300">Configure tempo, rhythmic feel, and time signature</p>
+        <div class="text-center mb-3">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-1">Set the pace & feel</h2>
         </div>
 
-        <!-- Tempo Section -->
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-600 mb-4">
-            <div class="text-center mb-4">
-                <span id="tempo-display" class="text-5xl font-bold text-blue-600 dark:text-blue-400">${currentTempo}</span>
-                <span class="text-xl text-gray-500 ml-2">BPM</span>
-                <div id="tempo-label" class="text-sm text-gray-500 mt-1">${getTempoLabel(currentTempo)}</div>
-            </div>
-
-            <input type="range" id="tempo-slider" min="40" max="200" value="${currentTempo}"
-                class="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600">
-
-            <div class="flex justify-between text-xs text-gray-500 mt-2 mb-4">
-                <span>Ballad (60)</span>
-                <span>Pop (100)</span>
-                <span>Dance (140)</span>
-                <span>Punk (180)</span>
-            </div>
-
-            <!-- Tap Tempo -->
-            <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+        <div class="grid md:grid-cols-2 gap-3">
+            <!-- Tempo -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
                 <div class="flex items-center justify-between mb-2">
+                    <span class="font-medium text-gray-900 dark:text-white text-sm">Tempo</span>
                     <div>
-                        <div class="font-medium text-gray-900 dark:text-white text-sm">Tap to set tempo</div>
-                        <div class="text-xs text-gray-500">Press <kbd class="px-1 py-0.5 bg-gray-200 dark:bg-gray-600 rounded text-[10px]">Space</kbd> rhythmically</div>
+                        <span id="tempo-display" class="text-2xl font-bold text-blue-600 dark:text-blue-400">${currentTempo}</span>
+                        <span class="text-sm text-gray-500 dark:text-gray-400">BPM</span>
                     </div>
-                    <button id="tap-tempo-btn" class="relative px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-all active:scale-90 shadow-md">
-                        <span id="tap-btn-text">TAP</span>
-                        <span id="tap-pulse" class="absolute inset-0 rounded-lg bg-white opacity-0 pointer-events-none"></span>
+                </div>
+                <input type="range" id="tempo-slider" min="40" max="200" value="${currentTempo}"
+                    class="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                <div class="flex justify-between text-[10px] text-gray-500 dark:text-white mt-1">
+                    <span>60</span><span>100</span><span>140</span><span>180</span>
+                </div>
+                <div class="flex items-center justify-between mt-2">
+                    <button id="tap-tempo-btn" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium">
+                        TAP
                     </button>
-                </div>
-                <div id="tap-feedback" class="flex items-center justify-center gap-3 h-5">
-                    <div id="tap-dots" class="flex gap-1">
-                        <span class="tap-dot w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600"></span>
-                        <span class="tap-dot w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600"></span>
-                        <span class="tap-dot w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600"></span>
-                        <span class="tap-dot w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600"></span>
-                    </div>
-                    <span id="tap-message" class="text-sm text-gray-500"></span>
-                </div>
-            </div>
-
-            ${mood ? `
-                <div class="mt-3 flex items-center justify-center gap-2">
-                    <span class="text-sm text-gray-500">Suggested for ${mood.title}:</span>
-                    <button id="use-suggested-tempo" class="px-3 py-1 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-full text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors">
-                        ${suggestedTempo} BPM
-                    </button>
-                </div>
-            ` : ''}
-        </div>
-
-        <!-- Feel & Time Signature Section -->
-        <div class="grid md:grid-cols-2 gap-4 mb-4">
-            <!-- Feel Selection -->
-            <div class="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
-                <div class="flex items-center justify-between mb-3">
-                    <div class="font-medium text-gray-900 dark:text-white">Feel</div>
-                    ${style && suggestedFeel !== 'straight' ? `
-                        <span class="text-xs text-green-600 dark:text-green-400">${style.title} often uses ${suggestedFeel}</span>
+                    ${mood ? `
+                        <button id="use-suggested-tempo" class="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded text-xs">
+                            Use ${suggestedTempo}
+                        </button>
                     ` : ''}
                 </div>
-                <div class="grid grid-cols-3 gap-2">
-                    <button class="feel-option p-3 rounded-lg border-2 transition-all text-center ${
-                        currentFeel === 'straight'
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40'
-                            : 'border-gray-200 dark:border-gray-600 hover:border-blue-300'
-                    }" data-feel="straight">
-                        <div class="text-2xl mb-1">➡️</div>
-                        <div class="text-xs font-medium text-gray-900 dark:text-white">Straight</div>
-                        <div class="text-[10px] text-gray-500">Even 8ths</div>
-                    </button>
-                    <button class="feel-option p-3 rounded-lg border-2 transition-all text-center ${
-                        currentFeel === 'swing'
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40'
-                            : 'border-gray-200 dark:border-gray-600 hover:border-blue-300'
-                    }" data-feel="swing">
-                        <div class="text-2xl mb-1">🎷</div>
-                        <div class="text-xs font-medium text-gray-900 dark:text-white">Swing</div>
-                        <div class="text-[10px] text-gray-500">Jazz triplet</div>
-                    </button>
-                    <button class="feel-option p-3 rounded-lg border-2 transition-all text-center ${
-                        currentFeel === 'shuffle'
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40'
-                            : 'border-gray-200 dark:border-gray-600 hover:border-blue-300'
-                    }" data-feel="shuffle">
-                        <div class="text-2xl mb-1">🎸</div>
-                        <div class="text-xs font-medium text-gray-900 dark:text-white">Shuffle</div>
-                        <div class="text-[10px] text-gray-500">Blues groove</div>
-                    </button>
-                </div>
             </div>
 
-            <!-- Time Signature Selection -->
-            <div class="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
-                <div class="font-medium text-gray-900 dark:text-white mb-3">Time Signature</div>
-                <div class="grid grid-cols-3 gap-2">
-                    <button class="timesig-option p-3 rounded-lg border-2 transition-all text-center ${
-                        currentTimeSig === '4/4'
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40'
-                            : 'border-gray-200 dark:border-gray-600 hover:border-blue-300'
-                    }" data-timesig="4/4">
-                        <div class="text-xl font-bold text-gray-900 dark:text-white">4/4</div>
-                        <div class="text-[10px] text-gray-500">Common time</div>
-                    </button>
-                    <button class="timesig-option p-3 rounded-lg border-2 transition-all text-center ${
-                        currentTimeSig === '3/4'
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40'
-                            : 'border-gray-200 dark:border-gray-600 hover:border-blue-300'
-                    }" data-timesig="3/4">
-                        <div class="text-xl font-bold text-gray-900 dark:text-white">3/4</div>
-                        <div class="text-[10px] text-gray-500">Waltz</div>
-                    </button>
-                    <button class="timesig-option p-3 rounded-lg border-2 transition-all text-center ${
-                        currentTimeSig === '6/8'
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40'
-                            : 'border-gray-200 dark:border-gray-600 hover:border-blue-300'
-                    }" data-timesig="6/8">
-                        <div class="text-xl font-bold text-gray-900 dark:text-white">6/8</div>
-                        <div class="text-[10px] text-gray-500">Compound</div>
-                    </button>
+            <!-- Feel & Time -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                <div class="mb-2">
+                    <span class="font-medium text-gray-900 dark:text-white text-sm" title="How the rhythm is subdivided - straight (even), swing (triplet feel), or shuffle (blues groove)">Feel <span class="text-gray-400 text-xs">ⓘ</span></span>
+                    <div class="grid grid-cols-3 gap-1 mt-1">
+                        ${[
+                            { id: 'straight', tip: 'Even eighth notes - standard pop/rock feel' },
+                            { id: 'swing', tip: 'Triplet-based rhythm - jazzy, bouncy feel' },
+                            { id: 'shuffle', tip: 'Blues groove - laid-back, syncopated feel' }
+                        ].map(feel => `
+                            <button class="feel-option p-1.5 rounded border transition-all text-center ${
+                                currentFeel === feel.id
+                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100'
+                                    : 'border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300'
+                            }" data-feel="${feel.id}" title="${feel.tip}">
+                                <div class="text-xs font-medium capitalize">${feel.id}</div>
+                            </button>
+                        `).join('')}
+                    </div>
                 </div>
-            </div>
-        </div>
-
-        <div class="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-3 border border-amber-200 dark:border-amber-700/50">
-            <div class="flex items-start gap-2">
-                <span class="text-lg">💡</span>
-                <div class="text-sm text-amber-800 dark:text-amber-200">
-                    <strong>Current settings:</strong> ${currentTempo} BPM, ${currentFeel} feel, ${currentTimeSig} time
+                <div>
+                    <span class="font-medium text-gray-900 dark:text-white text-sm" title="Beats per measure - 4/4 is most common, 3/4 for waltz, 6/8 for compound feel">Time <span class="text-gray-400 text-xs">ⓘ</span></span>
+                    <div class="grid grid-cols-3 gap-1 mt-1">
+                        ${[
+                            { sig: '4/4', tip: 'Common time - 4 beats per measure (most music)' },
+                            { sig: '3/4', tip: 'Waltz time - 3 beats per measure' },
+                            { sig: '6/8', tip: 'Compound time - 6 eighth notes, feels like 2 groups of 3' }
+                        ].map(item => `
+                            <button class="timesig-option p-1.5 rounded border transition-all text-center ${
+                                currentTimeSig === item.sig
+                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100'
+                                    : 'border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300'
+                            }" data-timesig="${item.sig}" title="${item.tip}">
+                                <div class="text-sm font-bold">${item.sig}</div>
+                            </button>
+                        `).join('')}
+                    </div>
                 </div>
             </div>
         </div>
@@ -1301,178 +1320,136 @@ function renderStep4Tempo() {
 function renderStep5Preview() {
     const mood = MOOD_OPTIONS.find(m => m.id === selectedMood);
     const style = STYLE_OPTIONS.find(s => s.id === selectedStyle);
-    const structure = STRUCTURE_OPTIONS.find(s => s.id === selectedStructure);
 
     if (!mood) return '<p class="text-center text-gray-500">Please select a mood first</p>';
 
     return `
-        <div class="text-center mb-6">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Preview Your Composition</h2>
-            <p class="text-gray-600 dark:text-gray-300">Here's what we've created based on your choices</p>
+        <div class="text-center mb-2">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white">Preview Your Composition</h2>
         </div>
 
-        <!-- Summary Cards -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-600 text-center">
-                <div class="text-2xl mb-1">${mood.emoji}</div>
-                <div class="text-xs text-gray-500">Mood</div>
-                <div class="font-bold text-gray-900 dark:text-white">${mood.title}</div>
-            </div>
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-600 text-center">
-                <div class="text-2xl mb-1">${style?.emoji || '🎵'}</div>
-                <div class="text-xs text-gray-500">Style</div>
-                <div class="font-bold text-gray-900 dark:text-white">${style?.title || 'Any'}</div>
-            </div>
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-600 text-center">
-                <div class="text-2xl mb-1">🎹</div>
-                <div class="text-xs text-gray-500">Key</div>
-                <div class="font-bold text-gray-900 dark:text-white">${customizations.key || mood.progression.key}</div>
-            </div>
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-600 text-center">
-                <div class="text-2xl mb-1">⏱️</div>
-                <div class="text-xs text-gray-500">Tempo</div>
-                <div class="font-bold text-gray-900 dark:text-white">${customizations.tempo} BPM</div>
-            </div>
+        <!-- Summary row -->
+        <div class="flex justify-center gap-4 mb-3 text-sm text-gray-700 dark:text-gray-200">
+            <span>${mood.emoji} ${mood.title}</span>
+            <span>${style?.emoji || '🎵'} ${style?.title || 'Any'}</span>
+            <span>🎹 ${customizations.key || getSelectedMoodProgression().key}</span>
+            <span>⏱️ ${customizations.tempo} BPM</span>
         </div>
 
         <!-- Chord Progression -->
-        <div class="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-xl p-6 mb-6 border border-gray-200 dark:border-gray-600">
-            <h3 class="font-bold text-gray-900 dark:text-white mb-4 text-center">Your Chord Progression</h3>
-            <div class="flex justify-center gap-2 md:gap-4 flex-wrap mb-6">
+        <div class="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-lg p-3 mb-3 border border-gray-200 dark:border-gray-600">
+            <div class="flex justify-center items-center gap-2 flex-wrap mb-3" id="wizard-progression-display">
                 ${getCustomizedChords().map((chord, idx) => `
-                    <div class="text-center">
-                        <div class="w-14 h-14 md:w-16 md:h-16 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-lg md:text-xl font-bold text-blue-900 dark:text-blue-100 shadow-md">
-                            ${chord}
-                        </div>
-                        <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">${mood.progression.roman[idx] || ''}</div>
+                    <div class="wizard-chord-chip w-12 h-12 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-sm font-bold text-blue-900 dark:text-blue-100 shadow cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all" data-chord="${chord}" title="Click and hold to play ${chord}">
+                        ${chord}
                     </div>
-                `).join(`
-                    <div class="self-center text-gray-400 dark:text-gray-500 font-bold">→</div>
-                `)}
+                `).join(`<span class="text-gray-400 dark:text-gray-500">→</span>`)}
             </div>
-
-            <div class="flex justify-center gap-3">
-                <button id="play-progression-btn" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-2 transition-colors font-medium shadow-md">
-                    <span class="play-btn-icon">▶</span> Play Once
+            <div class="flex justify-center gap-2">
+                <button id="play-progression-btn" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-sm flex items-center gap-1">
+                    <span class="play-btn-icon">▶</span> Play
                 </button>
-                <button id="play-loop-btn" class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center gap-2 transition-colors font-medium shadow-md">
-                    <span>🔁</span> Loop
+                <button id="play-loop-btn" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm flex items-center gap-1">
+                    🔁 Loop
                 </button>
             </div>
         </div>
 
-        <!-- Why This Works -->
-        <div class="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-5 border border-yellow-200 dark:border-yellow-700/50 mb-6">
-            <h3 class="font-bold text-yellow-800 dark:text-yellow-200 mb-3 flex items-center gap-2">
-                <span>💡</span> Why This Works for "${mood.title}"
-            </h3>
-            <ul class="space-y-2">
-                ${mood.tips.map(tip => `
-                    <li class="flex items-start gap-2 text-sm text-yellow-700 dark:text-yellow-300">
-                        <span class="mt-0.5">•</span>
-                        <span>${tip}</span>
-                    </li>
-                `).join('')}
-            </ul>
-        </div>
+        <!-- Quick Swaps -->
+        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-700/50">
+            <div class="font-semibold text-blue-800 dark:text-blue-200 mb-2 text-sm flex items-center gap-1">
+                <span>🔄</span> Quick Swaps
+            </div>
+            <div class="flex flex-wrap gap-2" id="quick-swap-container">
+                ${(() => {
+                    // Get current customized chords (with key transposition)
+                    const currentChords = getCustomizedChords();
+                    // Get suggestions based on current displayed chords
+                    const suggestions = getQuickSwapSuggestions(currentChords, selectedMood, selectedStyle);
+                    // Also show undo cards for any active swaps not covered by suggestions
+                    const result = [];
 
-        <!-- Quick Swap Suggestions -->
-        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-5 border border-blue-200 dark:border-blue-700/50">
-            <h3 class="font-bold text-blue-800 dark:text-blue-200 mb-3 flex items-center gap-2">
-                <span>🔄</span> Quick Swaps (Try These!)
-            </h3>
-            <p class="text-sm text-blue-600 dark:text-blue-300 mb-3">Preview or apply chord substitutions:</p>
-            <div class="flex flex-wrap gap-3" id="quick-swap-container">
-                ${getQuickSwapSuggestions(getCurrentProgression().chords, selectedMood, selectedStyle).map(swap => {
-                    const isSwapped = swappedChords.has(swap.index);
-                    return `
-                    <div class="quick-swap-card flex flex-col gap-2 p-3 rounded-lg bg-white dark:bg-gray-800 border ${isSwapped ? 'border-green-400 dark:border-green-500 ring-2 ring-green-200 dark:ring-green-800' : 'border-blue-300 dark:border-blue-600'}">
-                        <div class="flex items-center justify-between gap-3">
-                            <div>
-                                <div class="text-sm font-medium text-blue-900 dark:text-blue-100">
-                                    ${swap.from} → ${swap.to}
+                    // First, show undo cards for active swaps
+                    for (const [index, originalChord] of swappedChords.entries()) {
+                        const currentChord = currentChords[index] || '';
+                        if (currentChord !== originalChord) {
+                            result.push(`
+                                <div class="quick-swap-card flex items-center gap-2 p-2 rounded bg-white dark:bg-gray-800 border border-green-400">
+                                    <span class="text-xs font-medium text-gray-800 dark:text-gray-200">${currentChord}→${originalChord}</span>
+                                    <button class="quick-swap-play-btn p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 rounded" data-chord="${originalChord}" title="Play original chord">▶</button>
+                                    <button class="quick-swap-back-btn p-1 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900 rounded" data-swap-index="${index}" title="Undo swap">↩</button>
                                 </div>
-                                <div class="text-xs text-blue-600 dark:text-blue-400">${swap.reason}</div>
-                            </div>
-                        </div>
-                        <div class="flex gap-2">
-                            <button class="quick-swap-play-btn flex-1 px-2 py-1.5 text-xs font-medium rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors flex items-center justify-center gap-1"
-                                    data-chord="${swap.to}" title="Preview this chord">
-                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
-                                Play
-                            </button>
-                            ${isSwapped ? `
-                                <button class="quick-swap-back-btn flex-1 px-2 py-1.5 text-xs font-medium rounded bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors flex items-center justify-center gap-1"
-                                        data-swap-index="${swap.index}" title="Revert to original">
-                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.793 2.232a.75.75 0 01-.025 1.06L3.622 7.25h10.003a5.375 5.375 0 010 10.75H10.75a.75.75 0 010-1.5h2.875a3.875 3.875 0 000-7.75H3.622l4.146 3.957a.75.75 0 01-1.036 1.085l-5.5-5.25a.75.75 0 010-1.085l5.5-5.25a.75.75 0 011.06.025z" clip-rule="evenodd"/></svg>
-                                    Undo
-                                </button>
-                            ` : `
-                                <button class="quick-swap-apply-btn flex-1 px-2 py-1.5 text-xs font-medium rounded bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800 transition-colors flex items-center justify-center gap-1"
-                                        data-swap-from="${swap.from}" data-swap-to="${swap.to}" data-swap-index="${swap.index}" title="Apply this swap">
-                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>
-                                    Swap
-                                </button>
-                            `}
-                        </div>
-                    </div>
-                `;
-                }).join('')}
+                            `);
+                        }
+                    }
+
+                    // Then show new suggestions (excluding already swapped indices)
+                    for (const swap of suggestions) {
+                        if (!swappedChords.has(swap.index)) {
+                            result.push(`
+                                <div class="quick-swap-card flex items-center gap-2 p-2 rounded bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600">
+                                    <span class="text-xs font-medium text-gray-800 dark:text-gray-200">${swap.from}→${swap.to}</span>
+                                    <button class="quick-swap-play-btn p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 rounded" data-chord="${swap.to}" title="Play this chord">▶</button>
+                                    <button class="quick-swap-apply-btn p-1 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900 rounded" data-swap-from="${swap.from}" data-swap-to="${swap.to}" data-swap-index="${swap.index}" title="Apply swap">✓</button>
+                                </div>
+                            `);
+                        }
+                    }
+
+                    return result.join('');
+                })()}
             </div>
-            <p class="text-xs text-blue-500 dark:text-blue-400 mt-3">
-                Applied swaps update the preview above. You can always undo!
-            </p>
         </div>
     `;
 }
 
 /**
  * Generate quick swap suggestions based on the progression
+ * Works with any key by using chord type-based substitutions
  */
 function getQuickSwapSuggestions(chords, moodId, styleId) {
     const suggestions = [];
 
-    // Common substitutions
-    const substitutionMap = {
-        'Am': [
-            { to: 'Em', reason: 'Brighter, more open' },
-            { to: 'Am7', reason: 'Jazzier, smoother' }
+    // Type-based substitutions (work in any key)
+    // Format: { type: chordType, subs: [{ suffix: newSuffix, reason: string }] }
+    const typeSubstitutions = {
+        'Minor': [
+            { suffix: 'm7', reason: 'Jazzier, smoother' },
         ],
-        'F': [
-            { to: 'Dm', reason: 'More tension' },
-            { to: 'Fmaj7', reason: 'Dreamy feel' }
+        'Major': [
+            { suffix: 'maj7', reason: 'Softer, more sophisticated' },
+            { suffix: '7', reason: 'More drive to resolve' },
         ],
-        'C': [
-            { to: 'Cmaj7', reason: 'Softer, more sophisticated' },
-            { to: 'C/E', reason: 'Smooth bass movement' }
+        'Minor 7th': [
+            { suffix: 'm', reason: 'Simpler, cleaner' },
         ],
-        'G': [
-            { to: 'G7', reason: 'More drive to resolve' },
-            { to: 'Em', reason: 'Darker substitute' }
+        'Major 7th': [
+            { suffix: '', reason: 'Simpler, cleaner' },
         ],
-        'Dm': [
-            { to: 'F', reason: 'Brighter alternative' },
-            { to: 'Dm7', reason: 'Smooth jazz feel' }
-        ],
-        'Em': [
-            { to: 'Am', reason: 'More grounded' },
-            { to: 'Em7', reason: 'Airy, open sound' }
+        'Dominant 7th': [
+            { suffix: '', reason: 'Simpler, cleaner' },
         ]
     };
 
     chords.forEach((chord, idx) => {
-        const { root } = parseChordName(chord);
-        const baseChord = chord.replace('maj7', '').replace('m7', 'm').replace('7', '');
+        const { root, type } = parseChordName(chord);
 
-        if (substitutionMap[baseChord]) {
-            // Add first relevant substitution for this chord
-            const sub = substitutionMap[baseChord][0];
-            suggestions.push({
-                index: idx,
-                from: chord,
-                to: sub.to,
-                reason: sub.reason
-            });
+        // Skip if chord already has a suggestion at this index
+        if (suggestions.some(s => s.index === idx)) return;
+
+        if (typeSubstitutions[type]) {
+            const sub = typeSubstitutions[type][0];
+            const newChord = root + sub.suffix;
+
+            // Don't suggest the same chord
+            if (newChord !== chord) {
+                suggestions.push({
+                    index: idx,
+                    from: chord,
+                    to: newChord,
+                    reason: sub.reason
+                });
+            }
         }
     });
 
@@ -1504,11 +1481,12 @@ function renderStep6Customize() {
     const style = STYLE_OPTIONS.find(s => s.id === selectedStyle);
     if (!mood) return '<p class="text-center text-gray-500">Please select a mood first</p>';
 
+    const selectedProg = getSelectedMoodProgression();
     const keys = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
-    const currentKey = customizations.key || mood.progression.key;
+    const currentKey = customizations.key || selectedProg.key;
 
     // Check if progression already has 7ths
-    const alreadyHas7ths = mood.progression.chords.some(c => c.includes('7') || c.includes('maj7'));
+    const alreadyHas7ths = selectedProg.chords.some(c => c.includes('7') || c.includes('maj7'));
 
     // Style-specific variations
     const getVariations = () => {
@@ -1532,11 +1510,11 @@ function renderStep6Customize() {
         }
 
         // Rotated start
-        if (mood.progression.chords.length > 2) {
+        if (selectedProg.chords.length > 2) {
             variations.push({
                 id: 'rotated',
                 title: 'Start on Different Chord',
-                desc: `Begin on ${mood.progression.chords[1]} instead of ${mood.progression.chords[0]}`,
+                desc: `Begin on ${selectedProg.chords[1]} instead of ${selectedProg.chords[0]}`,
                 available: true
             });
         }
@@ -1557,54 +1535,43 @@ function renderStep6Customize() {
     const variations = getVariations();
 
     return `
-        <div class="text-center mb-6">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Fine-tune Your Creation</h2>
-            <p class="text-gray-600 dark:text-gray-300">Optional adjustments - skip if you're happy with the preview</p>
+        <div class="text-center mb-3">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-1">Fine-tune Your Creation</h2>
         </div>
 
-        <div class="grid md:grid-cols-2 gap-6 mb-6">
+        <div class="grid md:grid-cols-2 gap-3 mb-3">
             <!-- Key Selection -->
-            <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-600">
-                <h3 class="font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                <div class="font-semibold text-gray-900 dark:text-white mb-2 text-sm flex items-center gap-1">
                     <span>🎹</span> Key
-                </h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                    Change key to match your vocal range or band
-                </p>
-                <div class="flex flex-wrap gap-2">
+                </div>
+                <div class="flex flex-wrap gap-1">
                     ${keys.map(key => `
-                        <button class="key-option px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                        <button class="key-option px-2 py-1 rounded text-xs font-semibold transition-all ${
                             key === currentKey
-                                ? 'bg-blue-600 text-white shadow-md'
-                                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
                         }" data-key="${key}">
                             ${key}
                         </button>
                     `).join('')}
                 </div>
-                <div class="mt-3 text-xs text-gray-500">
-                    Current: <strong>${currentKey}</strong> ${currentKey !== mood.progression.key ? `(originally ${mood.progression.key})` : ''}
-                </div>
             </div>
 
             <!-- Variation Selection -->
-            <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-600">
-                <h3 class="font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                <div class="font-semibold text-gray-900 dark:text-white mb-2 text-sm flex items-center gap-1">
                     <span>✨</span> Variation
-                </h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                    ${alreadyHas7ths ? 'This progression already uses 7th chords' : 'Try a different flavor'}
-                </p>
-                <div class="space-y-2">
+                </div>
+                <div class="space-y-1">
                     ${variations.map(v => `
-                        <button class="variation-option w-full text-left px-4 py-3 rounded-lg transition-colors ${
+                        <button class="variation-option w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
                             customizations.variation === v.id
-                                ? 'bg-blue-100 dark:bg-blue-900/50 border-2 border-blue-500'
-                                : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
-                        } ${!v.available ? 'opacity-50 cursor-not-allowed' : ''}"
-                        data-variation="${v.id}" ${!v.available ? 'disabled' : ''}>
-                            <div class="font-semibold text-gray-900 dark:text-white">${v.title}</div>
-                            <div class="text-xs text-gray-500 dark:text-gray-400">${v.desc}</div>
+                                ? 'bg-blue-100 dark:bg-blue-900/50 border border-blue-500 text-blue-900 dark:text-blue-100'
+                                : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100'
+                        }" data-variation="${v.id}">
+                            <span class="font-semibold">${v.title}</span>
+                            <span class="text-gray-500 dark:text-gray-400 ml-1">${v.desc}</span>
                         </button>
                     `).join('')}
                 </div>
@@ -1612,13 +1579,13 @@ function renderStep6Customize() {
         </div>
 
         <!-- Preview current customization -->
-        <div class="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 mb-4">
+        <div class="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
             <div class="flex items-center justify-between">
                 <div>
-                    <div class="font-medium text-gray-900 dark:text-white">Current progression:</div>
-                    <div class="text-sm text-gray-500">${getCustomizedChords().join(' → ')}</div>
+                    <div class="text-sm font-medium text-gray-900 dark:text-white">Progression:</div>
+                    <div class="text-xs text-gray-500" id="customize-progression-display">${getCustomizedChords().join(' → ')}</div>
                 </div>
-                <button id="preview-custom-btn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-2 transition-colors font-medium">
+                <button id="preview-custom-btn" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-sm flex items-center gap-1">
                     <span class="play-btn-icon">▶</span> Preview
                 </button>
             </div>
@@ -1635,39 +1602,56 @@ function renderStep7MelodyBass() {
 
     // Generate melody tips based on mood/style
     const getMelodyTips = () => {
-        const tips = [];
         const moodTips = {
-            'happy': ['Use ascending phrases for uplifting energy', 'Emphasize major 3rds and 5ths', 'Try rhythmic syncopation for bounce'],
-            'sad': ['Use descending melodic lines', 'Linger on minor 3rds', 'Leave space between phrases'],
-            'energetic': ['Use repeated rhythmic patterns', 'Strong accents on downbeats', 'Jump between chord tones'],
-            'dreamy': ['Use stepwise motion', 'Let notes sustain and overlap', 'Avoid strong rhythmic accents'],
-            'romantic': ['Create gentle, flowing phrases', 'Use passing tones between chord tones', 'Build to emotional climaxes'],
-            'chill': ['Keep it simple and sparse', 'Use longer note values', 'Explore the upper register'],
-            'mysterious': ['Use chromatic passing tones', 'Unexpected rhythmic placement', 'Minor 2nds create tension'],
-            'triumphant': ['End phrases on high notes', 'Use dotted rhythms for power', 'Bold leaps between chord tones'],
-            'nostalgic': ['Echo earlier phrases', 'Use familiar melodic shapes', 'Gentle ornaments and grace notes'],
-            'playful': ['Short, bouncy phrases', 'Unexpected rests', 'Repeat and vary motifs']
+            'happy': ['Ascending phrases = energy', 'Emphasize 3rds & 5ths', 'Syncopation adds bounce'],
+            'sad': ['Descending lines = emotion', 'Linger on minor 3rds', 'Leave space between phrases'],
+            'energetic': ['Repeated rhythms = drive', 'Strong downbeats', 'Leap between chord tones'],
+            'dreamy': ['Stepwise = smooth', 'Let notes sustain', 'Avoid strong accents'],
+            'romantic': ['Gentle flowing phrases', 'Passing tones add warmth', 'Build to climaxes'],
+            'chill': ['Keep it sparse', 'Longer note values', 'Explore upper register'],
+            'mysterious': ['Chromatic passing tones', 'Unexpected rhythms', 'Minor 2nds = tension'],
+            'triumphant': ['End phrases high', 'Dotted rhythms = power', 'Bold leaps'],
+            'nostalgic': ['Echo earlier phrases', 'Familiar melodic shapes', 'Gentle ornaments'],
+            'playful': ['Short bouncy phrases', 'Unexpected rests', 'Vary your motifs']
         };
-        tips.push(...(moodTips[selectedMood] || ['Start on chord tones', 'Use stepwise motion', 'End phrases on stable notes']));
-        return tips;
+        return moodTips[selectedMood] || ['Start on chord tones', 'Use stepwise motion', 'End on stable notes'];
     };
 
-    // Generate a simple starter motif based on the first chord
-    const getStarterMotif = () => {
-        if (!chords.length) return null;
-        const firstChord = chords[0];
-        const { root } = parseChordName(firstChord);
-        // Create a simple motif suggestion
-        const patterns = [
-            { name: 'Stepwise Rise', notes: `${root} → step up → step up → step down` },
-            { name: 'Chord Arpeggio', notes: `${root} → 3rd → 5th → 3rd` },
-            { name: 'Question-Answer', notes: `${root} → 5th (question) / 3rd → ${root} (answer)` }
+    // Voice leading & technique tips
+    const getVoiceLeadingTips = () => {
+        return [
+            { label: 'Chord Tones', tip: 'Root, 3rd, 5th are safest on strong beats' },
+            { label: 'Passing Tones', tip: 'Connect chord tones on weak beats' },
+            { label: 'Voice Leading', tip: 'Move by step when chords change' },
+            { label: 'Repetition', tip: 'Repeat motifs with small variations' }
         ];
-        return patterns;
     };
 
-    const melodyTips = getMelodyTips();
-    const starterMotifs = getStarterMotif();
+    // Rhythm suggestions based on style
+    const getRhythmTips = () => {
+        const styleTips = {
+            'pop': { pattern: '♩ ♩ ♩ ♩', desc: 'Steady quarters with syncopated accents' },
+            'rock': { pattern: '♩ ♪♪ ♩ ♪♪', desc: 'Driving eighth notes, accent 2 & 4' },
+            'jazz': { pattern: '♪.♪ ♪.♪', desc: 'Swing feel, behind the beat' },
+            'folk': { pattern: '♩ ♩ ♩ ♩', desc: 'Simple and singable' },
+            'electronic': { pattern: '♪♪♪♪ ♪♪♪♪', desc: 'Consistent 8ths or 16ths' },
+            'rnb': { pattern: '♩. ♪ ♩ ♪♪', desc: 'Syncopated, laid-back groove' },
+            'classical': { pattern: '♩ ♪♪ ♩ ♪♪', desc: 'Balanced phrases, clear structure' },
+            'blues': { pattern: '♪.♪ ♪.♪', desc: 'Shuffle feel, expressive bends' }
+        };
+        return styleTips[style?.id] || { pattern: '♩ ♩ ♩ ♩', desc: 'Quarter notes for stability' };
+    };
+
+    // Get starter motifs
+    const getStarterMotifs = () => {
+        if (!chords.length) return [];
+        const { root } = parseChordName(chords[0]);
+        return [
+            { name: 'Rise', notes: `${root}→2→3→2` },
+            { name: 'Arpeggio', notes: `${root}→3→5→3` },
+            { name: 'Question', notes: `${root}→5 / 3→${root}` }
+        ];
+    };
 
     // Get suggested bass patterns based on style
     const getSuggestedPatterns = () => {
@@ -1684,6 +1668,10 @@ function renderStep7MelodyBass() {
         return suggestions[style?.id] || ['root-fifth', 'half-time', 'arpeggio'];
     };
 
+    const melodyTips = getMelodyTips();
+    const voiceLeadingTips = getVoiceLeadingTips();
+    const rhythmTip = getRhythmTips();
+    const starterMotifs = getStarterMotifs();
     const suggestedPatterns = getSuggestedPatterns();
 
     // Find a pattern by ID from any category
@@ -1696,123 +1684,124 @@ function renderStep7MelodyBass() {
     };
 
     return `
-        <div class="text-center mb-6">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Melody & Bass Guidance</h2>
-            <p class="text-gray-600 dark:text-gray-300">Tips for your melody and bass pattern selection</p>
+        <div class="text-center mb-2">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white">Melody & Bass Guidance</h2>
         </div>
 
-        <!-- Melody Guidance Section -->
-        <div class="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-5 mb-6 border border-purple-200 dark:border-purple-700/50">
-            <div class="flex items-center gap-2 mb-4">
-                <span class="text-2xl">🎵</span>
-                <h3 class="font-bold text-lg text-purple-900 dark:text-purple-100">Melody Tips for ${mood?.title || 'Your Song'}</h3>
-            </div>
+        <!-- Two-column layout for compact view -->
+        <div class="grid md:grid-cols-2 gap-2">
+            <!-- Melody Section -->
+            <div class="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg p-2 border border-purple-200 dark:border-purple-700/50">
+                <div class="flex items-center gap-1 mb-1">
+                    <span class="text-sm">🎵</span>
+                    <span class="font-bold text-xs text-purple-900 dark:text-purple-100">Melody for ${mood?.title || 'Your Song'}</span>
+                </div>
 
-            <div class="grid md:grid-cols-3 gap-3 mb-4">
-                ${melodyTips.map(tip => `
-                    <div class="bg-white/70 dark:bg-gray-800/50 rounded-lg p-3 text-sm text-purple-800 dark:text-purple-200 flex items-start gap-2">
-                        <span class="text-purple-500 mt-0.5">•</span>
-                        <span>${tip}</span>
-                    </div>
-                `).join('')}
-            </div>
+                <!-- Mood-specific tips -->
+                <div class="space-y-0.5 mb-2">
+                    ${melodyTips.map(tip => `
+                        <div class="text-[10px] text-purple-800 dark:text-purple-200 leading-tight">
+                            <span class="text-purple-500">•</span> ${tip}
+                        </div>
+                    `).join('')}
+                </div>
 
-            ${starterMotifs ? `
-                <div class="mt-4 pt-4 border-t border-purple-200 dark:border-purple-700">
-                    <div class="flex items-center gap-2 mb-3">
-                        <span>💡</span>
-                        <span class="font-medium text-purple-800 dark:text-purple-200">Starter Motif Ideas (Key of ${key})</span>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        ${starterMotifs.map(motif => `
-                            <div class="bg-white dark:bg-gray-800 rounded-lg px-3 py-2 border border-purple-300 dark:border-purple-600">
-                                <div class="font-medium text-sm text-gray-900 dark:text-white">${motif.name}</div>
-                                <div class="text-xs text-purple-600 dark:text-purple-400">${motif.notes}</div>
+                <!-- Voice Leading Quick Reference -->
+                <div class="bg-white/50 dark:bg-gray-800/50 rounded p-1.5 mb-2">
+                    <div class="text-[10px] font-semibold text-purple-900 dark:text-purple-100 mb-1">📝 Quick Reference</div>
+                    <div class="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                        ${voiceLeadingTips.map(item => `
+                            <div class="text-[9px] text-purple-700 dark:text-purple-300">
+                                <strong>${item.label}:</strong> ${item.tip}
                             </div>
                         `).join('')}
                     </div>
-                    <p class="text-xs text-purple-600 dark:text-purple-400 mt-3">
-                        Press <kbd class="px-1.5 py-0.5 bg-purple-200 dark:bg-purple-700 rounded">Tab</kbd> in the Melody Composer for AI melody suggestions!
-                    </p>
                 </div>
-            ` : ''}
-        </div>
 
-        <!-- Bass Pattern Section -->
-        <div class="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 mb-4">
-            <div class="flex items-center gap-2 mb-4">
-                <span class="text-2xl">🎸</span>
-                <h3 class="font-bold text-lg text-gray-900 dark:text-white">Bass Pattern</h3>
+                <!-- Rhythm suggestion -->
+                <div class="bg-white/50 dark:bg-gray-800/50 rounded p-1.5 mb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-semibold text-purple-900 dark:text-purple-100">🥁 Rhythm:</span>
+                        <span class="font-mono text-xs text-purple-700 dark:text-purple-300">${rhythmTip.pattern}</span>
+                    </div>
+                    <div class="text-[9px] text-purple-600 dark:text-purple-400">${rhythmTip.desc}</div>
+                </div>
+
+                <!-- Starter Motifs -->
+                <div class="flex flex-wrap gap-1 mb-1">
+                    ${starterMotifs.map(m => `
+                        <span class="bg-white dark:bg-gray-800 rounded px-1.5 py-0.5 text-[10px] border border-purple-300 dark:border-purple-600">
+                            <strong class="text-purple-900 dark:text-white">${m.name}:</strong>
+                            <span class="text-purple-600 dark:text-purple-400">${m.notes}</span>
+                        </span>
+                    `).join('')}
+                </div>
+
+                <div class="text-[9px] text-purple-600 dark:text-purple-400">
+                    <kbd class="px-1 py-0.5 bg-purple-200 dark:bg-purple-700 rounded">Tab</kbd> in Composer = AI suggestions
+                </div>
             </div>
 
-        <!-- Suggested Patterns -->
-        ${style ? `
-        <div class="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 mb-6 border border-green-200 dark:border-green-700/50">
-            <div class="flex items-center gap-2 mb-3">
-                <span class="text-lg">✨</span>
-                <span class="font-medium text-green-800 dark:text-green-200">Recommended for ${style.title}</span>
-            </div>
-            <div class="flex flex-wrap gap-2">
-                ${suggestedPatterns.map(patternId => {
-                    const pattern = findPattern(patternId);
-                    if (!pattern) return '';
-                    return `
-                        <button class="bass-pattern-option px-4 py-2 rounded-lg transition-all ${
-                            currentPattern === patternId
-                                ? 'bg-green-600 text-white shadow-md'
-                                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-green-100 dark:hover:bg-green-800/30 border border-green-300 dark:border-green-600'
-                        }" data-pattern="${patternId}">
-                            <div class="font-medium">${pattern.name}</div>
-                            <div class="text-xs opacity-75">${pattern.desc}</div>
-                        </button>
-                    `;
-                }).join('')}
-            </div>
-        </div>
-        ` : ''}
+            <!-- Bass Section -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-2 border border-gray-200 dark:border-gray-700">
+                <div class="flex items-center gap-1 mb-1">
+                    <span class="text-sm">🎸</span>
+                    <span class="font-bold text-xs text-gray-900 dark:text-white">Bass Pattern</span>
+                    <span class="text-[9px] text-gray-500 dark:text-gray-400 ml-auto">${findPattern(currentPattern)?.name || 'Root-Fifth'}</span>
+                </div>
 
-        <!-- All Pattern Categories -->
-        <div class="space-y-4 mb-6">
-            ${Object.entries(BASS_PATTERN_CATEGORIES).map(([catId, category]) => `
-                <div class="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
-                    <div class="flex items-center justify-between mb-3">
+                ${style ? `
+                <div class="mb-1.5">
+                    <div class="text-[9px] text-green-700 dark:text-green-300 mb-0.5">★ Recommended for ${style.title}:</div>
+                    <div class="flex flex-wrap gap-0.5">
+                        ${suggestedPatterns.map(patternId => {
+                            const pattern = findPattern(patternId);
+                            if (!pattern) return '';
+                            return `
+                                <button class="bass-pattern-option px-1.5 py-0.5 rounded text-[9px] transition-all ${
+                                    currentPattern === patternId
+                                        ? 'bg-green-600 text-white'
+                                        : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800/50'
+                                }" data-pattern="${patternId}">
+                                    ${pattern.name}${currentPattern === patternId ? ' ✓' : ''}
+                                </button>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+                ` : ''}
+
+                <!-- All Bass Pattern Categories -->
+                <div class="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
+                    ${Object.entries(BASS_PATTERN_CATEGORIES).map(([catId, category]) => `
                         <div>
-                            <div class="font-medium text-gray-900 dark:text-white">${category.title}</div>
-                            <div class="text-xs text-gray-500">${category.description}</div>
+                            <div class="text-[9px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">${category.title}</div>
+                            <div class="flex flex-wrap gap-0.5">
+                                ${category.patterns.map(pattern => `
+                                    <button class="bass-pattern-option px-1 py-0.5 rounded text-[9px] transition-all ${
+                                        currentPattern === pattern.id
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-blue-900/30'
+                                    }" data-pattern="${pattern.id}" title="${pattern.desc}">
+                                        ${pattern.name}${currentPattern === pattern.id ? ' ✓' : ''}
+                                    </button>
+                                `).join('')}
+                            </div>
                         </div>
-                    </div>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-                        ${category.patterns.map(pattern => `
-                            <button class="bass-pattern-option p-3 rounded-lg border-2 transition-all text-left ${
-                                currentPattern === pattern.id
-                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40'
-                                    : 'border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500'
-                            }" data-pattern="${pattern.id}">
-                                <div class="font-medium text-sm text-gray-900 dark:text-white">${pattern.name}</div>
-                                <div class="text-xs text-gray-500">${pattern.desc}</div>
-                            </button>
-                        `).join('')}
-                    </div>
+                    `).join('')}
                 </div>
-            `).join('')}
-        </div>
 
-        <!-- Current Selection -->
-        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-700/50">
-            <div class="flex items-center justify-between">
-                <div>
-                    <div class="text-sm text-blue-800 dark:text-blue-200">
-                        <strong>Selected:</strong> ${findPattern(currentPattern)?.name || 'Root-Fifth'}
+                <!-- Bass Tips (collapsed) -->
+                <details class="mt-1.5">
+                    <summary class="text-[9px] text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">📝 Bass Tips</summary>
+                    <div class="mt-1 space-y-0.5 text-[9px] text-gray-600 dark:text-gray-300 pl-2">
+                        <div>• <strong>Root</strong> on beat 1 anchors the chord</div>
+                        <div>• <strong>5th</strong> on beat 3 adds movement</div>
+                        <div>• <strong>Walking</strong> = stepwise between roots</div>
+                        <div>• <strong>Approach</strong> = half-step into next root</div>
                     </div>
-                    <div class="text-xs text-blue-600 dark:text-blue-300 mt-1">
-                        ${findPattern(currentPattern)?.desc || ''}
-                    </div>
-                </div>
-                <div class="text-xs text-blue-600 dark:text-blue-400">
-                    You can change this anytime in the Melody Composer
-                </div>
+                </details>
             </div>
-        </div>
         </div>
     `;
 }
@@ -1824,6 +1813,7 @@ function renderStep8Launch() {
 
     if (!mood) return '<p class="text-center text-gray-500">Please select a mood first</p>';
 
+    const selectedProg = getSelectedMoodProgression();
     const chords = getCustomizedChords();
 
     // Calculate what will actually be generated
@@ -1867,7 +1857,7 @@ function renderStep8Launch() {
             <div class="p-4 grid grid-cols-5 gap-3 text-center text-sm">
                 <div>
                     <div class="text-gray-500 dark:text-gray-400">Key</div>
-                    <div class="font-bold text-gray-900 dark:text-white">${customizations.key || mood.progression.key}</div>
+                    <div class="font-bold text-gray-900 dark:text-white">${customizations.key || selectedProg.key}</div>
                 </div>
                 <div>
                     <div class="text-gray-500 dark:text-gray-400">Tempo</div>
@@ -1954,7 +1944,7 @@ function renderStep8Launch() {
                 <ol class="mt-2 space-y-1 list-decimal list-inside text-blue-700 dark:text-blue-300">
                     <li>Your ${chords.length}-chord progression is expanded to ${expandedInfo.totalMeasures} measures</li>
                     ${expandedInfo.sections.length > 0 ? `<li>${expandedInfo.sections.length} labeled sections are created automatically</li>` : ''}
-                    <li>Key set to <strong>${customizations.key || mood.progression.key}</strong>, tempo to <strong>${customizations.tempo} BPM</strong></li>
+                    <li>Key set to <strong>${customizations.key || selectedProg.key}</strong>, tempo to <strong>${customizations.tempo} BPM</strong></li>
                     <li>Ready to add melody! Press <kbd class="px-1.5 py-0.5 bg-blue-200 dark:bg-blue-700 rounded text-xs">Tab</kbd> for AI suggestions</li>
                 </ol>
             </div>
@@ -2066,32 +2056,33 @@ export function renderSongwritingWizard(container) {
     else if (currentStep === 1) canProceed = !!selectedMood;
 
     const html = `
-        <div class="songwriting-wizard bg-white dark:bg-gray-900 max-w-4xl mx-auto p-4 md:p-6 rounded-xl">
-            <div class="mb-6 text-center">
-                <h1 class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2 flex items-center justify-center gap-3">
-                    <span class="text-3xl md:text-4xl">✨</span> Songwriting Wizard
-                </h1>
-                <p class="text-gray-500 dark:text-gray-400 text-sm">Step ${currentStep + 1} of ${WIZARD_STEPS.length}</p>
+        <div class="songwriting-wizard bg-white dark:bg-gray-900 max-w-4xl mx-auto p-3 md:p-4 rounded-xl">
+            <!-- Header with title and nav buttons on same row -->
+            <div class="flex items-center justify-between mb-3">
+                ${currentStep > 0 ? `
+                    <button id="wizard-back-btn" class="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors flex items-center gap-1 text-sm">
+                        <span>←</span> Back
+                    </button>
+                ` : '<div class="w-20"></div>'}
+
+                <div class="text-center flex-1">
+                    <h1 class="text-lg md:text-xl font-bold text-gray-900 dark:text-white flex items-center justify-center gap-2">
+                        <span class="text-xl md:text-2xl">✨</span> Songwriting Wizard
+                    </h1>
+                    <p class="text-gray-500 dark:text-gray-400 text-xs">Step ${currentStep + 1} of ${WIZARD_STEPS.length}</p>
+                </div>
+
+                ${currentStep < WIZARD_STEPS.length - 1 ? `
+                    <button id="wizard-next-btn" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-1 shadow-md text-sm ${!canProceed ? 'opacity-50 cursor-not-allowed' : ''}">
+                        Next <span>→</span>
+                    </button>
+                ` : '<div class="w-20"></div>'}
             </div>
 
             ${renderStepIndicator()}
 
-            <div id="wizard-step-content" class="mb-6 min-h-[300px]">
+            <div id="wizard-step-content" class="wizard-step-content">
                 ${stepContent}
-            </div>
-
-            <div class="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-700">
-                ${currentStep > 0 ? `
-                    <button id="wizard-back-btn" class="px-5 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors flex items-center gap-2">
-                        <span>←</span> Back
-                    </button>
-                ` : '<div></div>'}
-
-                ${currentStep < WIZARD_STEPS.length - 1 ? `
-                    <button id="wizard-next-btn" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 shadow-md ${!canProceed ? 'opacity-50 cursor-not-allowed' : ''}">
-                        Next <span>→</span>
-                    </button>
-                ` : ''}
             </div>
         </div>
     `;
@@ -2123,45 +2114,79 @@ function attachWizardListeners(container) {
     container.querySelectorAll('.mood-option').forEach(btn => {
         btn.addEventListener('click', () => {
             selectedMood = btn.dataset.mood;
-            // Reset working progression and swaps when mood changes
+            // Reset working progression, swaps, and progression index when mood changes
             workingProgression = null;
             swappedChords = new Map();
+            selectedProgressionIndex = 0; // Reset to first progression option
             const mood = MOOD_OPTIONS.find(m => m.id === selectedMood);
             if (mood) {
                 customizations.tempo = mood.suggestedTempo;
             }
             renderSongwritingWizard(container);
         });
+    });
 
-        // Hover preview for mood options
-        let hoverTimeout = null;
-        btn.addEventListener('mouseenter', () => {
-            const moodId = btn.dataset.mood;
-            const mood = MOOD_OPTIONS.find(m => m.id === moodId);
-            if (mood && !isPlaying) {
-                // Small delay before playing to avoid accidental triggers
-                hoverTimeout = setTimeout(async () => {
-                    try {
-                        const piano = getPiano();
-                        if (!piano) return;
+    // Progression option selection (clicking to select)
+    container.querySelectorAll('.progression-option').forEach(option => {
+        option.addEventListener('click', (e) => {
+            // Don't select if clicking the play button
+            if (e.target.closest('.progression-play-btn')) return;
 
-                        // Play first two chords of the progression quickly
-                        const chords = mood.progression.chords.slice(0, 2);
-                        for (let i = 0; i < chords.length; i++) {
-                            const notes = getChordNotes(chords[i], 4);
-                            piano.triggerAttackRelease(notes, '4n', `+${i * 0.5}`);
-                        }
-                    } catch (e) {
-                        // Silently fail - hover preview is optional
-                    }
-                }, 300);
+            const idx = parseInt(option.dataset.progressionIndex, 10);
+            if (!isNaN(idx)) {
+                selectedProgressionIndex = idx;
+                // Reset working progression when selecting a different progression
+                workingProgression = null;
+                swappedChords = new Map();
+                renderSongwritingWizard(container);
             }
         });
+    });
 
-        btn.addEventListener('mouseleave', () => {
-            if (hoverTimeout) {
-                clearTimeout(hoverTimeout);
-                hoverTimeout = null;
+    // Progression play buttons
+    container.querySelectorAll('.progression-play-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation(); // Don't trigger the parent selection
+            const idx = parseInt(btn.dataset.progressionIndex, 10);
+            const mood = MOOD_OPTIONS.find(m => m.id === selectedMood);
+            if (!mood || !mood.progressions || isNaN(idx)) return;
+
+            const prog = mood.progressions[idx];
+            if (!prog) return;
+
+            try {
+                const piano = getPiano();
+                if (!piano) return;
+
+                // Visual feedback
+                btn.textContent = '■';
+                btn.classList.add('bg-red-500');
+                btn.classList.remove('bg-green-500');
+
+                // Play all chords in the progression
+                const key = prog.key || 'C';
+                const duration = 0.5; // seconds per chord
+                for (let i = 0; i < prog.chords.length; i++) {
+                    const { root, type } = parseChordName(prog.chords[i]);
+                    const chordInfo = getChordNotes(root, type, key, 3);
+                    const notes = chordInfo?.specificNotes || chordInfo?.baseNotes || [];
+                    if (notes.length > 0) {
+                        piano.triggerAttackRelease(notes, duration * 0.9, `+${i * duration}`);
+                    }
+                }
+
+                // Reset button after playback
+                setTimeout(() => {
+                    btn.textContent = '▶';
+                    btn.classList.remove('bg-red-500');
+                    btn.classList.add('bg-green-500');
+                }, prog.chords.length * duration * 1000 + 200);
+
+            } catch (e) {
+                console.warn('[Wizard] Progression play failed:', e);
+                btn.textContent = '▶';
+                btn.classList.remove('bg-red-500');
+                btn.classList.add('bg-green-500');
             }
         });
     });
@@ -2206,6 +2231,64 @@ function attachWizardListeners(container) {
         });
     });
 
+    // Chord chip click-and-hold to play
+    container.querySelectorAll('.wizard-chord-chip').forEach(chip => {
+        let isHolding = false;
+        let holdInterval = null;
+
+        const startPlaying = async () => {
+            const chord = chip.dataset.chord;
+            if (!chord) return;
+
+            try {
+                const piano = getPiano();
+                if (!piano) return;
+
+                const { root, type } = parseChordName(chord);
+                const key = customizations.key || getCurrentProgression().key || 'C';
+                const notesResult = getChordNotes(root, type, key, 3);
+                const notes = notesResult?.specificNotes || notesResult?.baseNotes || [];
+
+                if (notes.length > 0) {
+                    isHolding = true;
+                    chip.classList.add('ring-2', 'ring-blue-500', 'scale-95');
+
+                    // Play the chord
+                    piano.triggerAttack(notes);
+
+                    // Store notes for release
+                    chip._playingNotes = notes;
+                }
+            } catch (e) {
+                console.warn('Failed to play chord chip:', e);
+            }
+        };
+
+        const stopPlaying = () => {
+            if (isHolding) {
+                isHolding = false;
+                chip.classList.remove('ring-2', 'ring-blue-500', 'scale-95');
+
+                try {
+                    const piano = getPiano();
+                    if (piano && chip._playingNotes) {
+                        piano.triggerRelease(chip._playingNotes);
+                        chip._playingNotes = null;
+                    }
+                } catch (e) {
+                    // Silent fail
+                }
+            }
+        };
+
+        chip.addEventListener('mousedown', startPlaying);
+        chip.addEventListener('mouseup', stopPlaying);
+        chip.addEventListener('mouseleave', stopPlaying);
+        chip.addEventListener('touchstart', (e) => { e.preventDefault(); startPlaying(); });
+        chip.addEventListener('touchend', stopPlaying);
+        chip.addEventListener('touchcancel', stopPlaying);
+    });
+
     // Quick swap - Play button
     container.querySelectorAll('.quick-swap-play-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
@@ -2215,7 +2298,7 @@ function attachWizardListeners(container) {
                 if (!piano || !chord) return;
                 const { root, type } = parseChordName(chord);
                 const key = customizations.key || getCurrentProgression().key || 'C';
-                const notesResult = getChordNotes(root, type, key, 4);
+                const notesResult = getChordNotes(root, type, key, 3); // octave 3 to match progression
                 const notes = notesResult?.specificNotes || notesResult?.baseNotes || [];
                 if (notes.length > 0) {
                     piano.triggerAttackRelease(notes, '2n');
@@ -2233,16 +2316,31 @@ function attachWizardListeners(container) {
             const swapIndex = parseInt(btn.dataset.swapIndex);
 
             if (swapIndex >= 0 && swapTo) {
-                // Apply the swap
-                applyChordSwap(swapIndex, swapTo);
+                // The swap suggestion is based on DISPLAYED (transposed) chords
+                // We need to UNTRANSPOSE the new chord back to the base key
+                const progression = getCurrentProgression();
+                const originalKey = progression.key;
+                const targetKey = customizations.key;
 
-                // Play the new chord as feedback
+                let chordToStore = swapTo;
+                if (targetKey && targetKey !== originalKey) {
+                    // Untranspose: from displayed key back to original key
+                    const semitones = getSemitonesBetweenKeys(targetKey, originalKey);
+                    if (semitones !== 0) {
+                        chordToStore = transposeChord(swapTo, semitones);
+                    }
+                }
+
+                // Apply the swap with the untransposed chord
+                applyChordSwap(swapIndex, chordToStore);
+
+                // Play the new chord as feedback (use displayed key for audio)
                 try {
                     const piano = getPiano();
                     if (piano) {
                         const { root, type } = parseChordName(swapTo);
-                        const key = customizations.key || getCurrentProgression().key || 'C';
-                        const notesResult = getChordNotes(root, type, key, 4);
+                        const key = customizations.key || originalKey || 'C';
+                        const notesResult = getChordNotes(root, type, key, 3); // octave 3 to match progression
                         const notes = notesResult?.specificNotes || notesResult?.baseNotes || [];
                         if (notes.length > 0) {
                             piano.triggerAttackRelease(notes, '4n');
@@ -2400,9 +2498,9 @@ function attachWizardListeners(container) {
 
     // Preview mood
     container.querySelector('#preview-mood-btn')?.addEventListener('click', async () => {
-        const mood = MOOD_OPTIONS.find(m => m.id === selectedMood);
-        if (mood) {
-            await playProgression(mood.progression.chords, 0.7);
+        const selectedProg = getSelectedMoodProgression();
+        if (selectedProg && selectedProg.chords) {
+            await playProgression(selectedProg.chords, 0.7);
         }
     });
 
@@ -2426,14 +2524,9 @@ function attachWizardListeners(container) {
     container.querySelectorAll('.key-option').forEach(btn => {
         btn.addEventListener('click', () => {
             const newKey = btn.dataset.key;
-            const oldKey = customizations.key || getCurrentProgression().key;
             customizations.key = newKey;
-
-            // Update working progression key if it exists
-            if (workingProgression) {
-                workingProgression.key = newKey;
-            }
-
+            // NOTE: Do NOT update workingProgression.key - it should stay as the original key
+            // getCustomizedChords() transposes from originalKey to customizations.key
             renderSongwritingWizard(container);
         });
     });
@@ -2465,10 +2558,11 @@ function attachWizardListeners(container) {
     // Open Song Builder (for Full Composition mode)
     container.querySelector('#open-song-builder-btn')?.addEventListener('click', () => {
         loadToComposition('melody');
-        // After loading, show the Song Builder modal
+        // After loading, show the Song Builder modal - need longer delay for sections to be created
+        // Pass true to force showing builder even if state sync is delayed
         setTimeout(() => {
-            showSongBuilderModal();
-        }, 200);
+            showSongBuilderModal(true);
+        }, 500);
     });
 
     // AI feature toggles
@@ -2523,19 +2617,114 @@ function attachWizardListeners(container) {
     container._cleanupKeydown = () => document.removeEventListener('keydown', handleKeydown);
 }
 
+/**
+ * Generate a section-appropriate variation of the user's progression
+ * This creates harmonic coherence - the whole song sounds unified
+ * @param {string} sectionType - Type of section (verse, chorus, bridge, etc.)
+ * @param {Array} baseChords - User's selected progression (chord names)
+ * @param {number} measuresNeeded - Number of measures to fill
+ * @param {Array} romanNumerals - Roman numerals for the progression
+ * @returns {Array} Array of chord objects for the section
+ */
+function generateCoherentSectionChords(sectionType, baseChords, measuresNeeded, romanNumerals) {
+    const chords = [];
+
+    // Different sections use the user's progression in different ways
+    switch (sectionType) {
+        case 'verse':
+        case 'loop':
+        case 'A':
+            // Verse: Use progression as-is, looped
+            for (let i = 0; i < measuresNeeded; i++) {
+                const idx = i % baseChords.length;
+                const { root, type } = parseChordName(baseChords[idx]);
+                chords.push({ root, type, roman: romanNumerals[idx] || '', duration: 1 });
+            }
+            break;
+
+        case 'chorus':
+            // Chorus: Same progression but can start on a different chord (rotation)
+            // Often choruses start on the IV or on the same chord for anthem effect
+            const chorusRotation = 0; // Start on same chord for anthemic feel
+            for (let i = 0; i < measuresNeeded; i++) {
+                const idx = (i + chorusRotation) % baseChords.length;
+                const { root, type } = parseChordName(baseChords[idx]);
+                chords.push({ root, type, roman: romanNumerals[idx] || '', duration: 1 });
+            }
+            break;
+
+        case 'prechorus':
+            // Pre-chorus: Use last 2 chords to build tension, or ii-V pattern
+            const tensionChords = baseChords.length >= 2
+                ? baseChords.slice(-2)
+                : baseChords;
+            for (let i = 0; i < measuresNeeded; i++) {
+                const idx = i % tensionChords.length;
+                const { root, type } = parseChordName(tensionChords[idx]);
+                const romanIdx = baseChords.length - tensionChords.length + idx;
+                chords.push({ root, type, roman: romanNumerals[romanIdx] || '', duration: 1 });
+            }
+            break;
+
+        case 'bridge':
+        case 'B':
+            // Bridge: Start on a different chord for contrast (often vi or IV)
+            // Rotate progression to start on chord index 2 or 3 (typically vi or IV)
+            const bridgeStart = Math.min(2, baseChords.length - 1);
+            for (let i = 0; i < measuresNeeded; i++) {
+                const idx = (i + bridgeStart) % baseChords.length;
+                const { root, type } = parseChordName(baseChords[idx]);
+                chords.push({ root, type, roman: romanNumerals[idx] || '', duration: 1 });
+            }
+            break;
+
+        case 'intro':
+            // Intro: Use first 1-2 chords, simpler
+            const introChords = baseChords.slice(0, Math.min(2, baseChords.length));
+            for (let i = 0; i < measuresNeeded; i++) {
+                const idx = i % introChords.length;
+                const { root, type } = parseChordName(introChords[idx]);
+                chords.push({ root, type, roman: romanNumerals[idx] || '', duration: 1 });
+            }
+            break;
+
+        case 'outro':
+            // Outro: Use last 2 chords or full progression for resolution
+            const outroChords = baseChords.length >= 2
+                ? [baseChords[baseChords.length - 2], baseChords[0]] // IV-I or V-I cadence feel
+                : baseChords;
+            for (let i = 0; i < measuresNeeded; i++) {
+                const idx = i % outroChords.length;
+                const { root, type } = parseChordName(outroChords[idx]);
+                chords.push({ root, type, roman: '', duration: 1 });
+            }
+            break;
+
+        default:
+            // Fallback: loop the progression
+            for (let i = 0; i < measuresNeeded; i++) {
+                const idx = i % baseChords.length;
+                const { root, type } = parseChordName(baseChords[idx]);
+                chords.push({ root, type, roman: romanNumerals[idx] || '', duration: 1 });
+            }
+    }
+
+    return chords;
+}
+
 function loadToComposition(targetTab) {
     const baseChords = getCustomizedChords();
     const mood = MOOD_OPTIONS.find(m => m.id === selectedMood);
     const style = STYLE_OPTIONS.find(s => s.id === selectedStyle);
     const structure = STRUCTURE_OPTIONS.find(s => s.id === selectedStructure);
-    const key = customizations.key || mood?.progression.key || 'C';
-    const styleId = style?.id || 'pop';
+    const selectedProg = getSelectedMoodProgression();
+    const key = customizations.key || selectedProg.key || 'C';
+    const romanNumerals = selectedProg.roman || [];
 
     console.log('[SongwritingWizard] loadToComposition called');
     console.log('  baseChords:', baseChords);
     console.log('  key:', key);
-    console.log('  mood:', mood?.id);
-    console.log('  customizations.key:', customizations.key);
+    console.log('  selectedProgression:', selectedProg.name);
 
     // Map structure section types to composition section types
     const sectionTypeMap = {
@@ -2552,8 +2741,9 @@ function loadToComposition(targetTab) {
     };
 
     // Generate expanded progression based on structure
+    // KEY CHANGE: Now uses the user's progression coherently throughout!
     let expandedProgression = [];
-    let sectionDefinitions = []; // Track which chord indices belong to which section
+    let sectionDefinitions = [];
     let currentChordIndex = 0;
 
     if (structure && structure.sections) {
@@ -2564,45 +2754,20 @@ function loadToComposition(targetTab) {
                 const sectionStartIndex = currentChordIndex;
                 const measuresNeeded = sectionDef.measures;
 
-                // Generate section-specific progression
                 let chordsForSection = [];
 
                 if (sectionDef.type === 'blues') {
-                    // 12-bar blues has a specific pattern
+                    // 12-bar blues has a specific pattern (keeps traditional blues feel)
                     const bluesPattern = generateBluesProgression(baseChords[0]);
                     chordsForSection = bluesPattern;
-                } else if (sectionDef.type === 'loop') {
-                    // Simple loop: just use the base progression
-                    for (let i = 0; i < measuresNeeded; i++) {
-                        const chordIndex = i % baseChords.length;
-                        const chord = baseChords[chordIndex];
-                        const { root, type } = parseChordName(chord);
-                        chordsForSection.push({
-                            root,
-                            type,
-                            roman: mood?.progression.roman[chordIndex] || '',
-                            duration: 1
-                        });
-                    }
                 } else {
-                    // Generate section-specific progression with variety!
-                    const sectionChordNames = generateSectionProgression(
+                    // USE USER'S PROGRESSION COHERENTLY
+                    chordsForSection = generateCoherentSectionChords(
                         sectionDef.type,
-                        key,
+                        baseChords,
                         measuresNeeded,
-                        styleId
+                        romanNumerals
                     );
-
-                    // Convert chord names to progression data objects
-                    chordsForSection = sectionChordNames.map(chordName => {
-                        const { root, type } = parseChordName(chordName);
-                        return {
-                            root,
-                            type,
-                            roman: '', // Could calculate Roman numerals but keep it simple
-                            duration: 1
-                        };
-                    });
                 }
 
                 expandedProgression = expandedProgression.concat(chordsForSection);
@@ -2621,14 +2786,13 @@ function loadToComposition(targetTab) {
             }
         }
     } else {
-        // Fallback: simple 4-chord progression from mood
+        // Fallback: simple 4-chord progression from user's selection
         expandedProgression = baseChords.map((chord, idx) => {
             const { root, type } = parseChordName(chord);
-            console.log(`  [parseChordName] "${chord}" => root: "${root}", type: "${type}"`);
             return {
                 root,
                 type,
-                roman: mood?.progression.roman[idx % mood.progression.roman.length] || '',
+                roman: romanNumerals[idx % romanNumerals.length] || '',
                 duration: 1
             };
         });
@@ -2637,7 +2801,7 @@ function loadToComposition(targetTab) {
     console.log('[SongwritingWizard] expandedProgression:', expandedProgression);
 
     // Set key and progression
-    setCurrentKey(customizations.key || mood?.progression.key || 'C');
+    setCurrentKey(key);
     setProgressionData(expandedProgression);
 
     // Set tempo via global if available
@@ -2818,8 +2982,9 @@ export function openWizardInModal() {
 /**
  * Show the Song Builder in a modal overlay
  * Used after loading composition from wizard in "Full Composition" mode
+ * @param {boolean} forceShowBuilder - If true, always show builder even if no content detected
  */
-export function showSongBuilderModal() {
+export function showSongBuilderModal(forceShowBuilder = false) {
     // Remove existing modal if present
     const existingModal = document.getElementById('song-builder-modal');
     if (existingModal) existingModal.remove();
@@ -2843,7 +3008,8 @@ export function showSongBuilderModal() {
 
     const sections = compositionState?.getSections?.() || [];
     const progression = compositionState?.getProgression?.() || [];
-    const hasContent = sections.length > 0 || progression.length > 0;
+    // When called from wizard, we force showing the builder
+    const hasContent = forceShowBuilder || sections.length > 0 || progression.length > 0;
 
     modal.innerHTML = `
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto m-4 relative">
@@ -2867,14 +3033,42 @@ export function showSongBuilderModal() {
 
     const content = modal.querySelector('#song-builder-modal-content');
 
-    // Only render the builder if we have content, otherwise show the empty state
+    // Render the builder if we have content or forced
     if (hasContent) {
-        createSongBuilder(content, {
-            showHeader: false,
-            onStructureChange: () => {
-                createSongBuilder(content, { showHeader: false });
-            }
-        });
+        try {
+            createSongBuilder(content, {
+                showHeader: false,
+                onStructureChange: () => {
+                    try {
+                        createSongBuilder(content, { showHeader: false });
+                    } catch (e) {
+                        console.error('[showSongBuilderModal] Error refreshing builder:', e);
+                    }
+                }
+            });
+        } catch (e) {
+            console.error('[showSongBuilderModal] Error creating builder:', e);
+            // Show fallback message if builder fails
+            content.innerHTML = `
+                <div class="text-center py-8">
+                    <div class="text-4xl mb-4">⚠️</div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Loading Song Structure...</h3>
+                    <p class="text-gray-600 dark:text-gray-400 mb-4">
+                        The composition is still being set up. Please wait a moment or try again.
+                    </p>
+                    <button id="retry-builder-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+                        Retry
+                    </button>
+                </div>
+            `;
+            content.querySelector('#retry-builder-btn')?.addEventListener('click', () => {
+                try {
+                    createSongBuilder(content, { showHeader: false });
+                } catch (retryError) {
+                    console.error('[showSongBuilderModal] Retry failed:', retryError);
+                }
+            });
+        }
     } else {
         // Wire up empty state buttons
         content.querySelector('#start-wizard-from-builder')?.addEventListener('click', () => {
@@ -2887,10 +3081,13 @@ export function showSongBuilderModal() {
         });
     }
 
-    // Close button handler
-    modal.querySelector('.close-modal-btn').addEventListener('click', () => {
-        modal.remove();
-    });
+    // Close button handler - use optional chaining to be safe
+    const closeBtn = modal.querySelector('.close-modal-btn');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            modal.remove();
+        });
+    }
 
     // Click outside to close
     modal.addEventListener('click', (e) => {
