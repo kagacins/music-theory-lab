@@ -2054,8 +2054,8 @@ export const firstProgressionTutorial = defineTutorial({
                 // Step 2: Show the Progression Setup panel
                 {
                     instruction: 'This is the Progression Setup panel. Here you can set the key for your progression and access other tools.',
-                    spotlight: '#progression-controls-panel',
-                    targetElement: '#progression-controls-panel',
+                    spotlight: '#melody-progression-setup-panel',
+                    targetElement: '#melody-progression-setup-panel',
                     callout: 'We\'ll be working in the key of C Major - the most common key for learning progressions. No sharps or flats to worry about!',
                     validation: null,
                     successMessage: null
@@ -2063,8 +2063,8 @@ export const firstProgressionTutorial = defineTutorial({
                 // Step 3: Show the Progression Visualization panel
                 {
                     instruction: 'This is where your progression will appear as you build it. Right now it\'s empty - let\'s add some chords!',
-                    spotlight: '#progression-visualization-panel',
-                    targetElement: '#progression-visualization-panel',
+                    spotlight: '#chord-progression-card-panel',
+                    targetElement: '#chord-progression-card-panel',
                     callout: 'Each chord you add will appear as a "card" here. You can click on cards to select them, drag to reorder, and more!',
                     validation: null,
                     successMessage: null
@@ -2072,17 +2072,17 @@ export const firstProgressionTutorial = defineTutorial({
                 // Step 4: Show Quick Add Chord form
                 {
                     instruction: 'Look at the Quick Add Chord form above. This is the fastest way to add chords to your progression. Let\'s use it to add our first chord.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'You can select a root note, chord type, and inversion, then click "Add" to add the chord to your progression.',
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
                         // Open the Quick Add form if it's hidden
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-form-melody');
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-form-melody');
                             }
                         }
                     }
@@ -2090,8 +2090,8 @@ export const firstProgressionTutorial = defineTutorial({
                 // Step 5: Add C Major (the I chord)
                 {
                     instruction: 'Now add a C Major chord - this is the "I" chord (the home chord). Select "C" as the root and "Major" as the type, then click "Add".',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'C Major is the "home base" of the key of C. Every I-IV-V-I progression starts and ends here.',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'The I chord is added! You can see it appear in the progression area.'
@@ -2099,8 +2099,8 @@ export const firstProgressionTutorial = defineTutorial({
                 // Step 6: Add F Major (the IV chord)
                 {
                     instruction: 'Now add an F Major chord - this is the "IV" chord (the traveling chord). Select "F" as the root and "Major" as the type.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'F is the 4th note in the C Major scale, so F Major is the IV chord. It gives a feeling of "going somewhere."',
                     validation: { type: 'progression_chord_added', value: 'F Major' },
                     successMessage: 'The IV chord is added! The journey begins.'
@@ -2108,8 +2108,8 @@ export const firstProgressionTutorial = defineTutorial({
                 // Step 7: Add G Major (the V chord)
                 {
                     instruction: 'Add a G Major chord - this is the "V" chord (the tension chord). Select "G" as the root and "Major" as the type.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'G is the 5th note in C Major, so G Major is the V chord. It creates tension that wants to resolve back to home (C).',
                     validation: { type: 'progression_chord_added', value: 'G Major' },
                     successMessage: 'The V chord is added! Feel that tension building!'
@@ -2117,8 +2117,8 @@ export const firstProgressionTutorial = defineTutorial({
                 // Step 8: Add C Major again (return to I)
                 {
                     instruction: 'Finally, add another C Major chord to complete the progression. This brings us back "home" and creates a satisfying resolution.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Ending on the I chord gives a sense of completion. Without this final C, the progression would feel unfinished!',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'Perfect! You\'ve built a complete I-IV-V-I progression: C-F-G-C!'
@@ -2126,17 +2126,17 @@ export const firstProgressionTutorial = defineTutorial({
                 // Step 9: Look at the progression
                 {
                     instruction: 'Look at your progression! You\'ve built C - F - G - C. Notice how the Roman numerals show I - IV - V - I below each chord.',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     callout: 'Roman numerals are universal - they work in ANY key. The I-IV-V-I pattern sounds the same whether in C, G, D, or any other key!',
                     validation: null,
                     successMessage: null
                 },
                 // Step 10: Play the progression
                 {
-                    instruction: 'Now for the best part - play your progression! Click the "Auto Play" button in the floating controls on the right side of the screen.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    instruction: 'Now for the best part - play your progression! Click the Play button in the action bar at the top of the screen.',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'Listen to the journey: Home (C) → Traveling (F) → Tension (G) → Home again (C). This is the foundation of Western music!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'You did it! That satisfying resolution at the end is why this progression is in thousands of songs!'
@@ -2195,16 +2195,16 @@ export const popularProgressionTutorial = defineTutorial({
                 // Step 2: Show Quick Add form
                 {
                     instruction: 'We\'ll use the Quick Add form. For Part 1, keep all inversions at "Root" - we\'ll add inversions later.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Part 1: Build with root position chords to hear the basic progression.',
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-form-melody');
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-form-melody');
                             }
                         }
                     }
@@ -2212,8 +2212,8 @@ export const popularProgressionTutorial = defineTutorial({
                 // Step 3: Add C Major
                 {
                     instruction: 'Add C Major (the I chord) - root position. This is "home."',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'C Major is the tonic - the home base that everything revolves around.',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'C added!'
@@ -2221,8 +2221,8 @@ export const popularProgressionTutorial = defineTutorial({
                 // Step 4: Add G Major
                 {
                     instruction: 'Add G Major (the V chord) - keep it in root position.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'G is the dominant - it creates lift and energy.',
                     validation: { type: 'progression_chord_added', value: 'G Major' },
                     successMessage: 'G added!'
@@ -2230,8 +2230,8 @@ export const popularProgressionTutorial = defineTutorial({
                 // Step 5: Add Am
                 {
                     instruction: 'Add A Minor (the vi chord) - this is the emotional heart!',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Am is the relative minor - it adds vulnerability and depth to the progression.',
                     validation: { type: 'progression_chord_added', value: 'A Minor' },
                     successMessage: 'Am added - feel that emotion!'
@@ -2239,8 +2239,8 @@ export const popularProgressionTutorial = defineTutorial({
                 // Step 6: Add F Major
                 {
                     instruction: 'Add F Major (the IV chord) to complete the progression.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'F is the subdominant - it brings warmth and sets up the loop back to C.',
                     validation: { type: 'progression_chord_added', value: 'F Major' },
                     successMessage: 'F added! You\'ve built I-V-vi-IV!'
@@ -2248,8 +2248,8 @@ export const popularProgressionTutorial = defineTutorial({
                 // Step 7: Play Part 1
                 {
                     instruction: 'Play your progression! Listen to the basic sound - it works, but notice how the bass jumps around (C→G→A→F).',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'This sounds good, but the bass line has big jumps. After hearing this, we\'ll apply voice leading to smooth it out!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'Sounds familiar right? Now let\'s make it SMOOTH with voice leading!'
@@ -2265,8 +2265,8 @@ export const popularProgressionTutorial = defineTutorial({
                 // Step 9: Expand G chord
                 {
                     instruction: 'Click on the G chord (2nd card) to select it, then click the expand button (↓) to see more options.',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     callout: 'We\'ll change G to 1st inversion (G/B) so the bass goes C→B instead of C→G.',
                     validation: null,
                     successMessage: null,
@@ -2291,8 +2291,8 @@ export const popularProgressionTutorial = defineTutorial({
                 // Step 11: Expand Am chord
                 {
                     instruction: 'Now click on the Am chord (3rd card) and expand it.',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     callout: 'We\'ll use Am in 2nd inversion (Am/E) or keep root and adjust octave for smooth bass from B.',
                     validation: null,
                     successMessage: null,
@@ -2317,8 +2317,8 @@ export const popularProgressionTutorial = defineTutorial({
                 // Step 13: Expand F chord
                 {
                     instruction: 'Finally, click on the F chord (4th card) and expand it.',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     callout: 'F will complete our smooth bass line.',
                     validation: null,
                     successMessage: null,
@@ -2343,8 +2343,8 @@ export const popularProgressionTutorial = defineTutorial({
                 // Step 15: Play the voice-led version
                 {
                     instruction: 'Now play your voice-led progression! Compare the smoothness to Part 1 - the bass flows instead of jumping!',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'Listen to that smooth bass line! This is how professional recordings sound.',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'Hear the difference? That\'s professional voice leading!'
@@ -2402,16 +2402,16 @@ export const voiceLeadingTutorial = defineTutorial({
                 // Step 2: Show the Quick Add form
                 {
                     instruction: 'We\'ll use the Quick Add form, paying attention to the INVERSION selector. Then we\'ll fine-tune with octave adjustments in the chord cards.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'The inversion dropdown shows: Root (default), 1st (middle note in bass), 2nd (top note in bass). Each creates different voice leading.',
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-form-melody');
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-form-melody');
                             }
                         }
                     }
@@ -2419,8 +2419,8 @@ export const voiceLeadingTutorial = defineTutorial({
                 // Step 3: Add C Major (root position - our starting point)
                 {
                     instruction: 'Start with C Major in ROOT position. Select C, Major, keep inversion at "Root", then click Add.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'C in root position (C-E-G) puts C in the bass. Our goal: keep the bass line moving by small steps!',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'C Major added! Now for the F chord...'
@@ -2428,8 +2428,8 @@ export const voiceLeadingTutorial = defineTutorial({
                 // Step 4: Add F Major with 2nd inversion
                 {
                     instruction: 'Add F Major with 2ND INVERSION. Select F, Major, change inversion to "2nd", then Add.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'F in 2nd inversion (C-F-A) keeps C in the bass - a "common tone" with the previous chord!',
                     validation: { type: 'progression_chord_added', value: 'F Major' },
                     successMessage: 'F Major added! Bass stayed on C - perfect voice leading so far.'
@@ -2437,8 +2437,8 @@ export const voiceLeadingTutorial = defineTutorial({
                 // Step 5: Add G Major with 1st inversion
                 {
                     instruction: 'Add G Major with 1ST INVERSION. Select G, Major, change inversion to "1st", then Add.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'G in 1st inversion puts B in the bass. B is just one half-step below C - perfect for stepping back home!',
                     validation: { type: 'progression_chord_added', value: 'G Major' },
                     successMessage: 'G Major added! But wait - we need to adjust the octave for truly smooth voice leading...'
@@ -2446,8 +2446,8 @@ export const voiceLeadingTutorial = defineTutorial({
                 // Step 6: Add C Major to complete
                 {
                     instruction: 'Complete with C Major in root position. Then we\'ll hear what it sounds like!',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Almost there! After adding this C, let\'s hear the progression BEFORE making octave adjustments.',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'Progression complete! Now let\'s hear how it sounds with just inversions (no octave tweaks yet).'
@@ -2455,8 +2455,8 @@ export const voiceLeadingTutorial = defineTutorial({
                 // Step 7: Play WITHOUT octave adjustments to hear the "jumpy" bass
                 {
                     instruction: 'Press Auto Play to hear your progression. Listen to the bass line - notice how it jumps around a bit? The inversions help, but we can do better!',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'The bass goes: C (low) → C (high!) → B (high) → C (low). That\'s still a bit jumpy. Let\'s fix it with octave adjustments!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'Hear those jumps? The F and G bass notes are too high. Let\'s drop them an octave for smoother motion.'
@@ -2464,8 +2464,8 @@ export const voiceLeadingTutorial = defineTutorial({
                 // Step 8: Look at the progression and explain octave issue
                 {
                     instruction: 'The inversions are set, but the octave positions need adjustment. We need both F and G dropped an octave for truly smooth voice leading.',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     spotlightExtraHeight: 200,
                     callout: 'The fix: Drop F and G by one octave so the bass walks smoothly: C→C(same)→B(step down)→C(step up).',
                     validation: null,
@@ -2474,8 +2474,8 @@ export const voiceLeadingTutorial = defineTutorial({
                 // Step 9: Expand and adjust the F chord
                 {
                     instruction: 'Let\'s adjust the F chord first. Click the 2nd chord card (F Major) to select it, then find the expand button (↓).',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     spotlightExtraHeight: 200,
                     callout: 'Each chord card can be expanded to reveal octave controls. We\'ll drop F by one octave so its bass C matches the first chord\'s C.',
                     validation: null,
@@ -2490,8 +2490,8 @@ export const voiceLeadingTutorial = defineTutorial({
                 // Step 10: Set F's octave shift
                 {
                     instruction: 'In the expanded F card, find "Octave Shift" and set it to "-1 octave (-12)". This drops F so its bass C matches the first chord.',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     spotlightExtraHeight: 200,
                     callout: 'Now F\'s bass note (C) will be at the SAME pitch as the first C chord. That\'s a perfect common tone - no movement at all!',
                     validation: null,
@@ -2506,8 +2506,8 @@ export const voiceLeadingTutorial = defineTutorial({
                 // Step 11: Expand and adjust the G chord
                 {
                     instruction: 'Now let\'s adjust the G chord. Click the 3rd chord card (G Major) and expand it.',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     spotlightExtraHeight: 200,
                     callout: 'We\'ll also drop G by one octave so its bass B is BELOW the C, not above it.',
                     validation: null,
@@ -2522,8 +2522,8 @@ export const voiceLeadingTutorial = defineTutorial({
                 // Step 12: Set G's octave shift
                 {
                     instruction: 'In the expanded G card, set "Octave Shift" to "-1 octave (-12)". This puts B BELOW the previous C for smooth stepwise motion.',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     spotlightExtraHeight: 200,
                     callout: 'Now the bass line will be: C → C (same!) → B (half-step down) → C (half-step up). That\'s professional voice leading!',
                     validation: null,
@@ -2538,8 +2538,8 @@ export const voiceLeadingTutorial = defineTutorial({
                 // Step 13: Play and listen to the SMOOTH version
                 {
                     instruction: 'Now play your progression again with Auto Play! Compare it to before - listen to how the bass line NOW smoothly walks: C→C(same)→B(step down)→C(step up).',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'With both F and G dropped an octave, the bass stays in a tight range. Compare this to the jumpy version you heard earlier!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'Hear that smooth bass line? Much better than the jumpy version! That\'s the magic of voice leading with proper octave placement!'
@@ -2597,16 +2597,16 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 2: Show the Quick Add form
                 {
                     instruction: 'We\'ll use the Quick Add form to build progressions that showcase each minor chord\'s unique character.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'First, we\'ll build the "thoughtful" progression using the ii chord (Dm). The ii-V-I pattern is incredibly smooth!',
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-form-melody');
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-form-melody');
                             }
                         }
                     }
@@ -2614,8 +2614,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 3: Add C Major (the I chord - home base)
                 {
                     instruction: 'Start with C Major - our home chord. Select "C" as the root and "Major" as the type, then click "Add".',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Every emotional journey starts from home. C Major gives us a stable foundation.',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'Home base established! Now let\'s add the thoughtful ii chord.'
@@ -2623,8 +2623,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 4: Add D minor (the ii chord)
                 {
                     instruction: 'Now add D minor - the "ii" chord. Select "D" as the root and "Minor" as the type.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Dm is the "pre-tension" chord. It creates a thoughtful, preparing feeling - like taking a deep breath before the big moment.',
                     validation: { type: 'progression_chord_added', value: 'D Minor' },
                     successMessage: 'The ii chord is in! Feel that thoughtful, contemplative mood.'
@@ -2632,8 +2632,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 5: Add G Major (the V chord)
                 {
                     instruction: 'Add G Major - the V chord that the ii naturally leads to. Select "G" as the root and "Major" as the type.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'The ii-V movement is jazz\'s most important pattern! Dm → G creates smooth, sophisticated tension.',
                     validation: { type: 'progression_chord_added', value: 'G Major' },
                     successMessage: 'Perfect ii-V! Now resolve back home.'
@@ -2641,8 +2641,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 6: Add C Major (resolve)
                 {
                     instruction: 'Complete with C Major to resolve the progression. This gives us C - Dm - G - C.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'The complete ii-V-I pattern: thoughtful preparation (Dm) → tension (G) → resolution (C). Very smooth!',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'The "thoughtful" progression is complete!'
@@ -2650,8 +2650,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 7: Play the thoughtful progression
                 {
                     instruction: 'Play your progression! Listen to how the Dm creates a moment of contemplation before G\'s tension resolves to C.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'The ii chord (Dm) doesn\'t feel "sad" - it feels thoughtful, like you\'re about to say something important.',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'Hear that smooth, jazz-influenced sound? That\'s the power of ii-V-I!'
@@ -2659,8 +2659,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 8: Clear for next progression
                 {
                     instruction: 'Now let\'s explore the emotional vi chord! Click "Clear All" to start fresh.',
-                    spotlight: '#clear-progression-btn',
-                    targetElement: '#clear-progression-btn',
+                    spotlight: '#action-clear-progression',
+                    targetElement: '#action-clear-progression',
                     callout: 'The vi chord (Am) carries the most emotional weight in any major key. It\'s the "relative minor" of C.',
                     validation: { type: 'progression_cleared' },
                     successMessage: 'Ready for the emotional journey!'
@@ -2668,8 +2668,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 9: Build emotional progression - C
                 {
                     instruction: 'Let\'s build the deeper emotional progression: C - Am - Dm - G - C. Start with C Major.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'This progression uses BOTH vi (Am) and ii (Dm) for maximum emotional impact!',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'Starting point set!'
@@ -2677,8 +2677,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 10: Add A minor (the vi chord)
                 {
                     instruction: 'Add A minor - the powerful "vi" chord. Select "A" as the root and "Minor" as the type.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Am is the emotional heart of C major. It\'s the "Can\'t Help Falling in Love" chord - pure vulnerability.',
                     validation: { type: 'progression_chord_added', value: 'A Minor' },
                     successMessage: 'Feel that emotional shift! The vi chord changes everything.'
@@ -2686,8 +2686,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 11: Add D minor
                 {
                     instruction: 'Add D minor to deepen the journey. Two minor chords in a row creates a powerful emotional arc.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Going from vi (Am) to ii (Dm) - we\'re stacking emotions! This creates a really moving progression.',
                     validation: { type: 'progression_chord_added', value: 'D Minor' },
                     successMessage: 'Double minor! The emotional weight is building.'
@@ -2695,8 +2695,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 12: Add G Major
                 {
                     instruction: 'Add G Major for tension before the final resolution.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'After two minor chords, the V chord (G) lifts us up and prepares for the satisfying return home.',
                     validation: { type: 'progression_chord_added', value: 'G Major' },
                     successMessage: 'The tension is set!'
@@ -2704,8 +2704,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 13: Add final C Major
                 {
                     instruction: 'Complete with C Major for the full emotional arc: C - Am - Dm - G - C.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Five chords, complete emotional journey: home → vulnerability → contemplation → tension → resolution.',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'The emotional progression is complete!'
@@ -2713,8 +2713,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 14: Play the emotional progression (BEFORE voice leading)
                 {
                     instruction: 'Play this progression first WITHOUT voice leading. Listen to the bass - it jumps around quite a bit!',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'The emotion is there, but the bass line is jumpy: C → A → D → G → C. Let\'s make it smoother with voice leading!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'Hear those jumps? Now let\'s apply voice leading to make it even more beautiful.'
@@ -2722,8 +2722,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 15: Introduce voice leading
                 {
                     instruction: 'Now let\'s combine your minor chord knowledge with voice leading! We\'ll use inversions and octave adjustments to create a smooth bass line.',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     spotlightExtraHeight: 200,
                     callout: 'Good voice leading + emotional minor chords = professional-sounding progressions. Let\'s optimize each chord!',
                     validation: null,
@@ -2732,8 +2732,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 16: Expand Am chord card
                 {
                     instruction: 'Click on the Am chord card (2nd chord) to select it, then expand it to see the inversion and octave controls.',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     spotlightExtraHeight: 200,
                     callout: 'We\'ll put Am in 1st inversion so its bass note (E) is closer to C. Then we\'ll adjust the octave.',
                     validation: null,
@@ -2747,8 +2747,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 17: Set Am inversion and octave
                 {
                     instruction: 'In the expanded Am card, set the inversion to "1st" (E in bass). This puts E closer to C for smoother motion.',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     spotlightExtraHeight: 200,
                     callout: 'Am in 1st inversion: E-A-C. The bass moves C → E (just a third) instead of C → A (a bigger jump).',
                     validation: null,
@@ -2762,8 +2762,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 18: Expand Dm chord card
                 {
                     instruction: 'Now expand the Dm chord card (3rd chord). We\'ll use 1st inversion here too.',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     spotlightExtraHeight: 200,
                     callout: 'Dm in 1st inversion puts F in the bass. E → F is just a half step - perfect voice leading!',
                     validation: null,
@@ -2777,8 +2777,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 19: Set Dm inversion
                 {
                     instruction: 'Set Dm to "1st" inversion (F in bass). Also set its octave shift to "-1" to keep the bass in a smooth range.',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     spotlightExtraHeight: 200,
                     callout: 'Dm/F with octave shift -1: The bass walks E → F (half step down when we drop the octave). Silky smooth!',
                     validation: null,
@@ -2792,8 +2792,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 20: Expand G chord card
                 {
                     instruction: 'Expand the G chord card (4th chord). We\'ll adjust this one too.',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     spotlightExtraHeight: 200,
                     callout: 'G in 2nd inversion puts D in the bass. F → D is a smooth step down.',
                     validation: null,
@@ -2807,8 +2807,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 21: Set G inversion and octave
                 {
                     instruction: 'Set G to "2nd" inversion (D in bass) and octave shift to "-1" to keep the bass line walking downward.',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     spotlightExtraHeight: 200,
                     callout: 'The bass line is now: C → E → F → D → C. Much smoother than jumping around!',
                     validation: null,
@@ -2822,8 +2822,8 @@ export const addingEmotionTutorial = defineTutorial({
                 // Step 22: Play the voice-led version
                 {
                     instruction: 'Now play your voice-led emotional progression! Compare it to the jumpy version you heard before.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'Same chords, same emotion, but now with a smooth walking bass: C → E → F → D → C. This is professional-level arranging!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'Hear the difference? The emotion is still there, but now it flows beautifully!'
@@ -2977,16 +2977,16 @@ export const seventhChordsTutorial = defineTutorial({
                 // Step 1: Clear and start fresh
                 {
                     instruction: 'Let\'s build the most important jazz progression: ii-V-I. Use the Quick Add form.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'ii-V-I in C: Dm7 (preparation) → G7 (tension) → Cmaj7 (resolution). Pure jazz magic!',
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-form-melody');
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-form-melody');
                             }
                         }
                     }
@@ -2994,8 +2994,8 @@ export const seventhChordsTutorial = defineTutorial({
                 // Step 2: Add Dm7
                 {
                     instruction: 'Add D Minor 7 - the "ii" chord. Select "D" as root and "Minor 7" as type.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Dm7 is the preparation chord. It creates a smooth, contemplative feeling before the tension.',
                     validation: { type: 'progression_chord_added', value: 'D Minor 7' },
                     successMessage: 'The ii chord is in! Smooth preparation.'
@@ -3003,8 +3003,8 @@ export const seventhChordsTutorial = defineTutorial({
                 // Step 3: Add G7
                 {
                     instruction: 'Add G Dominant 7 - the "V" chord. Select "G" as root and "Dominant 7" as type.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'G7 contains the tritone (B-F) that creates maximum tension, pulling strongly to C.',
                     validation: { type: 'progression_chord_added', value: 'G Dominant 7' },
                     successMessage: 'The V7 chord adds the tension! Feel that pull toward C.'
@@ -3012,8 +3012,8 @@ export const seventhChordsTutorial = defineTutorial({
                 // Step 4: Add Cmaj7
                 {
                     instruction: 'Complete with C Major 7 - the "I" chord. Select "C" as root and "Major 7" as type.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Cmaj7 is the destination. The tritone resolves (B→C, F→E), creating deep satisfaction.',
                     validation: { type: 'progression_chord_added', value: 'C Major 7' },
                     successMessage: 'The I chord completes the journey!'
@@ -3021,8 +3021,8 @@ export const seventhChordsTutorial = defineTutorial({
                 // Step 5: Play the ii-V-I
                 {
                     instruction: 'Play your ii-V-I progression! This is the sound of jazz.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'Dm7 → G7 → Cmaj7. Preparation → Tension → Resolution. Learn this in all 12 keys!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'You just played the foundation of jazz harmony!'
@@ -3068,16 +3068,16 @@ export const secondaryDominantsTutorial = defineTutorial({
                 // Step 2: Show Quick Add form
                 {
                     instruction: 'We\'ll use the Quick Add form to build progressions that showcase secondary dominants.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'First, we\'ll build C → D7 → G → C to hear V/V (D7 leading to G).',
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-form-melody');
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-form-melody');
                             }
                         }
                     }
@@ -3085,16 +3085,16 @@ export const secondaryDominantsTutorial = defineTutorial({
                 // Step 3: Add C Major
                 {
                     instruction: 'Start with C Major - our home base.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'Home established!'
                 },
                 // Step 4: Add D7 (V/V)
                 {
                     instruction: 'Now add D Dominant 7 - this is V/V! Select "D" as root and "Dominant 7" as type.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'D7 is the V chord OF G. It contains the tritone F#-C that resolves to G. D7 is not in C major, but it works because it leads to G!',
                     validation: { type: 'progression_chord_added', value: 'D Dominant 7' },
                     successMessage: 'V/V is in! Notice the F# - that\'s not in C major, but it adds color!'
@@ -3102,8 +3102,8 @@ export const secondaryDominantsTutorial = defineTutorial({
                 // Step 5: Add G Major
                 {
                     instruction: 'Add G Major - the target of our secondary dominant.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'D7 → G gives G a dramatic arrival. Without D7, C → G is nice. With D7, it\'s dramatic!',
                     validation: { type: 'progression_chord_added', value: 'G Major' },
                     successMessage: 'G arrives with fanfare thanks to D7!'
@@ -3111,16 +3111,16 @@ export const secondaryDominantsTutorial = defineTutorial({
                 // Step 6: Add final C
                 {
                     instruction: 'Complete with C Major for the full journey.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'Progression complete!'
                 },
                 // Step 7: Play V/V progression
                 {
                     instruction: 'Play the progression! Listen to how D7 creates extra drama before G.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'C → D7 → G → C. That D7 gives G a "royal entrance." This is V/V in action!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'Hear how D7 makes G\'s arrival more dramatic!'
@@ -3128,8 +3128,8 @@ export const secondaryDominantsTutorial = defineTutorial({
                 // Step 8: Clear for next example
                 {
                     instruction: 'Now let\'s try V/vi - creating drama before the emotional Am chord. Click "Clear All".',
-                    spotlight: '#clear-progression-btn',
-                    targetElement: '#clear-progression-btn',
+                    spotlight: '#action-clear-progression',
+                    targetElement: '#action-clear-progression',
                     callout: 'V/vi in C major is E7. E7 → Am gives the vi chord a powerful introduction!',
                     validation: { type: 'progression_cleared' },
                     successMessage: 'Ready for V/vi!'
@@ -3137,16 +3137,16 @@ export const secondaryDominantsTutorial = defineTutorial({
                 // Step 9: Build V/vi progression
                 {
                     instruction: 'Add C Major to start.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'Home base!'
                 },
                 // Step 10: Add E7
                 {
                     instruction: 'Add E Dominant 7 - this is V/vi! Select "E" as root and "Dominant 7" as type.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'E7 contains G# - not in C major! But this "borrowed" note creates a powerful pull to Am.',
                     validation: { type: 'progression_chord_added', value: 'E Dominant 7' },
                     successMessage: 'V/vi is in! That G# adds spice.'
@@ -3154,8 +3154,8 @@ export const secondaryDominantsTutorial = defineTutorial({
                 // Step 11: Add Am
                 {
                     instruction: 'Add A Minor - the emotional target of our secondary dominant.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'E7 → Am is incredibly powerful. The G# resolves up to A, creating an emotional punch!',
                     validation: { type: 'progression_chord_added', value: 'A Minor' },
                     successMessage: 'Am arrives with emotional weight!'
@@ -3163,24 +3163,24 @@ export const secondaryDominantsTutorial = defineTutorial({
                 // Step 12: Add G and C
                 {
                     instruction: 'Add G Major and then C Major to complete.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'G Major' },
                     successMessage: 'Almost there!'
                 },
                 // Step 13: Add final C
                 {
                     instruction: 'Complete with C Major.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'Complete!'
                 },
                 // Step 14: Play V/vi progression
                 {
                     instruction: 'Play this progression! E7 → Am is one of the most emotional moments in music.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'C → E7 → Am → G → C. That E7 creates a moment of drama before the emotional Am.',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'The E7 intensifies the emotional Am!'
@@ -3226,16 +3226,16 @@ export const borrowedChordsTutorial = defineTutorial({
                 // Step 2: Show Quick Add form
                 {
                     instruction: 'Let\'s build a rock progression using the ♭VII chord (Bb).',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'C → Bb → F → C. The Bb is borrowed from C minor - it adds that epic rock quality!',
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-form-melody');
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-form-melody');
                             }
                         }
                     }
@@ -3243,16 +3243,16 @@ export const borrowedChordsTutorial = defineTutorial({
                 // Step 3: Add C Major
                 {
                     instruction: 'Start with C Major - our home in the major key.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'Home established in C major!'
                 },
                 // Step 4: Add Bb Major (♭VII)
                 {
                     instruction: 'Add Bb Major - the ♭VII borrowed chord! Select "Bb" as root and "Major" as type.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Bb is NOT in C major (C major has B natural). We\'re borrowing it from C minor for that rock/epic quality!',
                     validation: { type: 'progression_chord_added', value: 'Bb Major' },
                     successMessage: '♭VII is in! This is the rock anthem sound.'
@@ -3260,8 +3260,8 @@ export const borrowedChordsTutorial = defineTutorial({
                 // Step 5: Add F Major
                 {
                     instruction: 'Add F Major - the IV chord.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Bb → F is a very smooth motion. The ♭VII often moves to IV or I.',
                     validation: { type: 'progression_chord_added', value: 'F Major' },
                     successMessage: 'The IV chord completes the rock sound!'
@@ -3269,16 +3269,16 @@ export const borrowedChordsTutorial = defineTutorial({
                 // Step 6: Add final C
                 {
                     instruction: 'Complete with C Major.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'Rock progression complete!'
                 },
                 // Step 7: Play ♭VII progression
                 {
                     instruction: 'Play the progression! Listen to that epic, powerful ♭VII sound.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'C → Bb → F → C. This is the sound of rock anthems and movie climaxes!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'That epic quality comes from the borrowed Bb!'
@@ -3286,8 +3286,8 @@ export const borrowedChordsTutorial = defineTutorial({
                 // Step 8: Clear for iv example
                 {
                     instruction: 'Now let\'s try the most emotional borrowed chord: iv (Fm). Click "Clear All".',
-                    spotlight: '#clear-progression-btn',
-                    targetElement: '#clear-progression-btn',
+                    spotlight: '#action-clear-progression',
+                    targetElement: '#action-clear-progression',
                     callout: 'The iv chord (Fm instead of F) contains Ab, which adds devastating emotion. Think "Creep" by Radiohead!',
                     validation: { type: 'progression_cleared' },
                     successMessage: 'Ready for the emotional iv chord!'
@@ -3295,16 +3295,16 @@ export const borrowedChordsTutorial = defineTutorial({
                 // Step 9: Build iv progression
                 {
                     instruction: 'Add C Major to start.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'Home!'
                 },
                 // Step 10: Add F Major first
                 {
                     instruction: 'Add F Major - the normal IV chord.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'We\'ll play F Major, then F minor to hear the dramatic difference.',
                     validation: { type: 'progression_chord_added', value: 'F Major' },
                     successMessage: 'Normal IV in place.'
@@ -3312,8 +3312,8 @@ export const borrowedChordsTutorial = defineTutorial({
                 // Step 11: Add F minor (iv)
                 {
                     instruction: 'Now add F Minor - the borrowed iv chord! Select "F" as root and "Minor" as type.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Fm contains Ab - the "♭6" from C minor. This is one of the most emotional sounds in music!',
                     validation: { type: 'progression_chord_added', value: 'F Minor' },
                     successMessage: 'The emotional iv is in!'
@@ -3321,16 +3321,16 @@ export const borrowedChordsTutorial = defineTutorial({
                 // Step 12: Add final C
                 {
                     instruction: 'Complete with C Major.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'Complete!'
                 },
                 // Step 13: Play iv progression
                 {
                     instruction: 'Play it! Listen to how Fm hits differently than F.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'C → F → Fm → C. That moment when F becomes Fm is pure emotion. The Ab is devastating!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'Feel that emotional weight when F becomes Fm!'
@@ -3338,24 +3338,24 @@ export const borrowedChordsTutorial = defineTutorial({
                 // Step 14: Clear for ♭VI example
                 {
                     instruction: 'One more: ♭VI (Ab) adds wonder and surprise. Click "Clear All".',
-                    spotlight: '#clear-progression-btn',
-                    targetElement: '#clear-progression-btn',
+                    spotlight: '#action-clear-progression',
+                    targetElement: '#action-clear-progression',
                     validation: { type: 'progression_cleared' },
                     successMessage: 'Ready for ♭VI!'
                 },
                 // Step 15: Build ♭VI-♭VII-I
                 {
                     instruction: 'Let\'s build the cinematic ♭VI-♭VII-I: Ab → Bb → C. Start with C Major.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'Starting point!'
                 },
                 // Step 16: Add Ab (♭VI)
                 {
                     instruction: 'Add Ab Major - the ♭VI chord. Select "Ab" as root and "Major" as type.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Ab is the ♭VI - it creates a feeling of wonder or bittersweetness. Very cinematic!',
                     validation: { type: 'progression_chord_added', value: 'Ab Major' },
                     successMessage: '♭VI adds that sense of wonder!'
@@ -3363,8 +3363,8 @@ export const borrowedChordsTutorial = defineTutorial({
                 // Step 17: Add Bb (♭VII)
                 {
                     instruction: 'Add Bb Major - the ♭VII chord.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: '♭VI → ♭VII together creates a powerful sweeping motion toward home.',
                     validation: { type: 'progression_chord_added', value: 'Bb Major' },
                     successMessage: '♭VII building momentum!'
@@ -3372,16 +3372,16 @@ export const borrowedChordsTutorial = defineTutorial({
                 // Step 18: Add final C
                 {
                     instruction: 'Complete with C Major for the triumphant resolution.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'Epic finish!'
                 },
                 // Step 19: Play cinematic progression
                 {
                     instruction: 'Play it! This is pure film score material.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'C → Ab → Bb → C. Both ♭VI and ♭VII borrowed together. This is the sound of movie climaxes!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'That sweeping, cinematic sound comes from chaining borrowed chords!'
@@ -3427,16 +3427,16 @@ export const tensionReleaseTutorial = defineTutorial({
                 // Step 2: Basic V-I resolution first
                 {
                     instruction: 'First, let\'s hear the basic V-I resolution - the most fundamental tension/release in music.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'G7 → C is pure tension → resolution. The tritone in G7 (B-F) resolves to the stability of C.',
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-form-melody');
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-form-melody');
                             }
                         }
                     }
@@ -3444,24 +3444,24 @@ export const tensionReleaseTutorial = defineTutorial({
                 // Step 3: Add G7
                 {
                     instruction: 'Add G Dominant 7 - the tension chord.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'G Dominant 7' },
                     successMessage: 'G7 - maximum tension!'
                 },
                 // Step 4: Add C
                 {
                     instruction: 'Add C Major - the release.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'The resolution!'
                 },
                 // Step 5: Play V-I
                 {
                     instruction: 'Play this fundamental cadence. Feel the tension melt into release.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'G7 → C. The B wants to go up to C, the F wants to go down to E. Maximum satisfaction!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'That "ahhh" feeling is tension releasing!'
@@ -3469,8 +3469,8 @@ export const tensionReleaseTutorial = defineTutorial({
                 // Step 6: Now delay the resolution
                 {
                     instruction: 'Now let\'s DELAY the resolution for more impact. Click "Clear All".',
-                    spotlight: '#clear-progression-btn',
-                    targetElement: '#clear-progression-btn',
+                    spotlight: '#action-clear-progression',
+                    targetElement: '#action-clear-progression',
                     callout: 'Great music doesn\'t always resolve immediately. Delaying resolution builds anticipation!',
                     validation: { type: 'progression_cleared' },
                     successMessage: 'Ready to build delayed tension!'
@@ -3478,32 +3478,32 @@ export const tensionReleaseTutorial = defineTutorial({
                 // Step 7: Build delayed resolution
                 {
                     instruction: 'Start with C Major.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'Home first!'
                 },
                 // Step 8: Add Am
                 {
                     instruction: 'Add A Minor - building momentum.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'A Minor' },
                     successMessage: 'Emotional motion!'
                 },
                 // Step 9: Add G7
                 {
                     instruction: 'Add G7 - creating tension.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'G Dominant 7' },
                     successMessage: 'Tension builds!'
                 },
                 // Step 10: Add F (delay!)
                 {
                     instruction: 'Now instead of going to C, add F Major! This DELAYS the resolution.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'F after G7 is surprising! The ear expects C but gets F. This builds even more anticipation.',
                     validation: { type: 'progression_chord_added', value: 'F Major' },
                     successMessage: 'Delayed! The tension extends.'
@@ -3511,16 +3511,16 @@ export const tensionReleaseTutorial = defineTutorial({
                 // Step 11: Add final C
                 {
                     instruction: 'Now resolve to C Major. After the delay, the resolution is even sweeter!',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'Finally home!'
                 },
                 // Step 12: Play delayed resolution
                 {
                     instruction: 'Play it! The F after G7 delays the expected resolution, making C\'s arrival more powerful.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'C → Am → G7 → F → C. That G7 → F is a "fake out" that makes the final C even more satisfying!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'Delayed gratification makes the resolution sweeter!'
@@ -3528,8 +3528,8 @@ export const tensionReleaseTutorial = defineTutorial({
                 // Step 13: Clear for deceptive cadence
                 {
                     instruction: 'Now let\'s try the "deceptive cadence" - V7 going to vi instead of I. Click "Clear All".',
-                    spotlight: '#clear-progression-btn',
-                    targetElement: '#clear-progression-btn',
+                    spotlight: '#action-clear-progression',
+                    targetElement: '#action-clear-progression',
                     callout: 'G7 → Am instead of G7 → C is a plot twist! The ear expects one thing and gets another.',
                     validation: { type: 'progression_cleared' },
                     successMessage: 'Ready for the deceptive cadence!'
@@ -3537,8 +3537,8 @@ export const tensionReleaseTutorial = defineTutorial({
                 // Step 14: Build deceptive cadence
                 {
                     instruction: 'Build C → F → G7 → Am → G7 → C.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'First G7 → Am is deceptive. Second G7 → C resolves for real!',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'Starting the journey!'
@@ -3546,45 +3546,45 @@ export const tensionReleaseTutorial = defineTutorial({
                 // Step 15-19: Complete the progression
                 {
                     instruction: 'Add F Major.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'F Major' },
                     successMessage: 'Building!'
                 },
                 {
                     instruction: 'Add G7 - here comes the tension!',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'G Dominant 7' },
                     successMessage: 'Tension set!'
                 },
                 {
                     instruction: 'Now the twist: Add A Minor instead of C! This is the deceptive cadence.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'G7 → Am is surprising and emotional. Am shares notes with C, so it\'s not jarring, just unexpected!',
                     validation: { type: 'progression_chord_added', value: 'A Minor' },
                     successMessage: 'The deception! Expected C, got Am.'
                 },
                 {
                     instruction: 'Add G7 again for another try at resolution.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'G Dominant 7' },
                     successMessage: 'Tension returns!'
                 },
                 {
                     instruction: 'Finally resolve properly to C Major.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'True resolution at last!'
                 },
                 // Step 20: Play deceptive cadence
                 {
                     instruction: 'Play it! Listen to how the first G7 → Am surprises you, making the real resolution more satisfying.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'The deceptive cadence is used in countless emotional songs - it\'s a harmonic "plot twist"!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'You felt the deception and the eventual resolution!'
@@ -3710,16 +3710,16 @@ export const melodyChordTutorial = defineTutorial({
                 // Step 1: Introduction to guide tones in progression
                 {
                     instruction: 'We\'ll build ii-V-I (Dm7-G7-Cmaj7) and trace the guide tones: 3rd and 7th of each chord.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Dm7: 3rd=F, 7th=C. G7: 3rd=B, 7th=F. Cmaj7: 3rd=E, 7th=B. Watch how close these notes are!',
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-form-melody');
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-form-melody');
                             }
                         }
                     }
@@ -3727,8 +3727,8 @@ export const melodyChordTutorial = defineTutorial({
                 // Step 2: Add Dm7
                 {
                     instruction: 'Add D Minor 7.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Dm7 guide tones: F (3rd) and C (7th). These define the chord\'s character.',
                     validation: { type: 'progression_chord_added', value: 'D Minor 7' },
                     successMessage: 'Dm7: F and C are the guide tones!'
@@ -3736,8 +3736,8 @@ export const melodyChordTutorial = defineTutorial({
                 // Step 3: Add G7
                 {
                     instruction: 'Add G Dominant 7.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'G7 guide tones: B (3rd) and F (7th). Notice: F stays! C moves down to B.',
                     validation: { type: 'progression_chord_added', value: 'G Dominant 7' },
                     successMessage: 'G7: B and F are the guide tones!'
@@ -3745,8 +3745,8 @@ export const melodyChordTutorial = defineTutorial({
                 // Step 4: Add Cmaj7
                 {
                     instruction: 'Add C Major 7.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Cmaj7 guide tones: E (3rd) and B (7th). F resolves to E! B stays!',
                     validation: { type: 'progression_chord_added', value: 'C Major 7' },
                     successMessage: 'Cmaj7: E and B are the guide tones!'
@@ -3754,8 +3754,8 @@ export const melodyChordTutorial = defineTutorial({
                 // Step 5: Play and trace guide tones
                 {
                     instruction: 'Play the progression! The guide tones move: (F,C) → (B,F) → (E,B). Notice the smooth half-step motions!',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'C→B (half step down), F stays, then B stays, F→E (half step down). This is beautiful voice leading!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'Guide tones create the smoothest melodic motion!'
@@ -4043,16 +4043,16 @@ export const modesIntroTutorial = defineTutorial({
                 // Step 2: Start with Dorian
                 {
                     instruction: 'First, let\'s explore Dorian - the "jazz" mode. It\'s minor but with a brighter 6th. Let\'s build a Dorian vamp.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'D Dorian uses C major\'s notes but treats D as home. The key feature: major IV chord (G) instead of minor!',
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-form-melody');
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-form-melody');
                             }
                         }
                     }
@@ -4060,8 +4060,8 @@ export const modesIntroTutorial = defineTutorial({
                 // Step 3: Add Dm7
                 {
                     instruction: 'Add D Minor 7 - our Dorian home chord.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'In Dorian, the i chord (Dm7) is home. We stay here - no resolving to C major!',
                     validation: { type: 'progression_chord_added', value: 'D Minor 7' },
                     successMessage: 'Dorian home established!'
@@ -4069,8 +4069,8 @@ export const modesIntroTutorial = defineTutorial({
                 // Step 4: Add G7 (the IV chord)
                 {
                     instruction: 'Add G7 - this is the IV7 in D Dorian. The major IV is Dorian\'s signature!',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'G7 contains B natural (not Bb). In natural minor, this would be Gm. The major IV is what makes it Dorian!',
                     validation: { type: 'progression_chord_added', value: 'G Dominant 7' },
                     successMessage: 'The IV7 - Dorian\'s signature chord!'
@@ -4078,24 +4078,24 @@ export const modesIntroTutorial = defineTutorial({
                 // Step 5: Repeat the vamp
                 {
                     instruction: 'Add Dm7 again to complete the vamp.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'D Minor 7' },
                     successMessage: 'Vamp complete!'
                 },
                 // Step 6: Add one more G7
                 {
                     instruction: 'Add G7 again for a full two-bar vamp.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'G Dominant 7' },
                     successMessage: 'The classic jazz Dorian vamp!'
                 },
                 // Step 7: Play Dorian vamp
                 {
                     instruction: 'Play the Dorian vamp! This is "So What" territory - pure modal jazz.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'Notice: we DON\'T resolve to C! D is home. The B natural in G7 is what makes it Dorian, not natural minor.',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'That\'s the Dorian sound - jazzy, sophisticated, but still minor!'
@@ -4103,8 +4103,8 @@ export const modesIntroTutorial = defineTutorial({
                 // Step 8: Clear for Mixolydian
                 {
                     instruction: 'Now let\'s try Mixolydian - the rock/blues mode. Click "Clear All".',
-                    spotlight: '#clear-progression-btn',
-                    targetElement: '#clear-progression-btn',
+                    spotlight: '#action-clear-progression',
+                    targetElement: '#action-clear-progression',
                     callout: 'Mixolydian is major but with a ♭7. The ♭VII chord is its signature - pure rock sound!',
                     validation: { type: 'progression_cleared' },
                     successMessage: 'Ready for Mixolydian!'
@@ -4112,8 +4112,8 @@ export const modesIntroTutorial = defineTutorial({
                 // Step 9: Build Mixolydian progression
                 {
                     instruction: 'Add G Major - our Mixolydian home.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'G Mixolydian is major but has F natural (♭7) instead of F#. This gives it that bluesy rock quality.',
                     validation: { type: 'progression_chord_added', value: 'G Major' },
                     successMessage: 'Mixolydian home!'
@@ -4121,8 +4121,8 @@ export const modesIntroTutorial = defineTutorial({
                 // Step 10: Add F (♭VII)
                 {
                     instruction: 'Add F Major - the ♭VII chord! This is Mixolydian\'s signature.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'F is the ♭VII of G. In G major, this chord would be F#dim. The major ♭VII is pure Mixolydian rock!',
                     validation: { type: 'progression_chord_added', value: 'F Major' },
                     successMessage: 'The ♭VII - rock\'s favorite chord!'
@@ -4130,24 +4130,24 @@ export const modesIntroTutorial = defineTutorial({
                 // Step 11: Add C
                 {
                     instruction: 'Add C Major - the IV chord.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'The IV chord!'
                 },
                 // Step 12: Return to G
                 {
                     instruction: 'Return to G Major.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'G Major' },
                     successMessage: 'Back home!'
                 },
                 // Step 13: Play Mixolydian
                 {
                     instruction: 'Play the Mixolydian progression! This is the sound of classic rock.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'G - F - C - G. The F (♭VII) is what makes it Mixolydian, not G major. "Sweet Home Alabama" territory!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'That\'s Mixolydian - major but with rock swagger!'
@@ -4155,8 +4155,8 @@ export const modesIntroTutorial = defineTutorial({
                 // Step 14: Clear for Phrygian
                 {
                     instruction: 'Now Phrygian - the dark, Spanish mode. Click "Clear All".',
-                    spotlight: '#clear-progression-btn',
-                    targetElement: '#clear-progression-btn',
+                    spotlight: '#action-clear-progression',
+                    targetElement: '#action-clear-progression',
                     callout: 'Phrygian has a ♭2 - the half-step from ♭II to i creates instant drama and darkness.',
                     validation: { type: 'progression_cleared' },
                     successMessage: 'Ready for Phrygian!'
@@ -4164,8 +4164,8 @@ export const modesIntroTutorial = defineTutorial({
                 // Step 15: Build Phrygian
                 {
                     instruction: 'Add E Minor - our Phrygian home.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'E Phrygian uses C major\'s notes but treats E as home. The F chord (♭II) defines it.',
                     validation: { type: 'progression_chord_added', value: 'E Minor' },
                     successMessage: 'Phrygian home!'
@@ -4173,8 +4173,8 @@ export const modesIntroTutorial = defineTutorial({
                 // Step 16: Add F (♭II)
                 {
                     instruction: 'Add F Major - the ♭II chord! This half-step motion creates the Spanish/flamenco sound.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'F is a half-step above E. This ♭II - i motion is the most distinctive sound in Phrygian!',
                     validation: { type: 'progression_chord_added', value: 'F Major' },
                     successMessage: 'The ♭II - instant flamenco!'
@@ -4182,24 +4182,24 @@ export const modesIntroTutorial = defineTutorial({
                 // Step 17: Add more Em
                 {
                     instruction: 'Add E Minor again.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'E Minor' },
                     successMessage: 'Back to Phrygian home!'
                 },
                 // Step 18: One more F
                 {
                     instruction: 'Add F Major again for a repeating vamp.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'F Major' },
                     successMessage: 'Phrygian vamp complete!'
                 },
                 // Step 19: Play Phrygian
                 {
                     instruction: 'Play the Phrygian vamp! Hear that dark, Spanish intensity.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'Em - F - Em - F. That F→E half-step motion is pure drama. Flamenco, metal, and mysterious music use this!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'That\'s Phrygian - dark, dramatic, Spanish!'
@@ -4245,16 +4245,16 @@ export const modalHarmonyTutorial = defineTutorial({
                 // Step 2: Wrong way first
                 {
                     instruction: 'First, let\'s see what NOT to do. We\'ll build what seems like D Dorian but falls into C major.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'If we play Dm - G - C, our ear hears "ii - V - I in C major" and D Dorian is lost!',
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-form-melody');
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-form-melody');
                             }
                         }
                     }
@@ -4262,24 +4262,24 @@ export const modalHarmonyTutorial = defineTutorial({
                 // Step 3: Build "wrong" progression
                 {
                     instruction: 'Add D Minor - supposedly our Dorian home.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'D Minor' },
                     successMessage: 'D Minor added.'
                 },
                 // Step 4: Add G
                 {
                     instruction: 'Add G Major.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'G Major' },
                     successMessage: 'G added.'
                 },
                 // Step 5: Add C
                 {
                     instruction: 'Add C Major - and watch Dorian disappear!',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'The moment G resolves to C, your ear says "we\'re in C major!" Dm becomes just the ii chord.',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'C added - but we\'ve lost Dorian!'
@@ -4287,8 +4287,8 @@ export const modalHarmonyTutorial = defineTutorial({
                 // Step 6: Play the "wrong" way
                 {
                     instruction: 'Play it and notice how it sounds like C major, not D Dorian.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'G → C is the V - I cadence that destroys modal feeling. Your ear hears C as home!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'Hear it? That\'s C major with a ii chord, not D Dorian!'
@@ -4296,8 +4296,8 @@ export const modalHarmonyTutorial = defineTutorial({
                 // Step 7: Clear for correct way
                 {
                     instruction: 'Now let\'s do it RIGHT. Click "Clear All".',
-                    spotlight: '#clear-progression-btn',
-                    targetElement: '#clear-progression-btn',
+                    spotlight: '#action-clear-progression',
+                    targetElement: '#action-clear-progression',
                     callout: 'We\'ll avoid G → C and keep D as our center using Dorian\'s characteristic chord.',
                     validation: { type: 'progression_cleared' },
                     successMessage: 'Ready for true Dorian!'
@@ -4305,8 +4305,8 @@ export const modalHarmonyTutorial = defineTutorial({
                 // Step 8: Build true Dorian
                 {
                     instruction: 'Add D Minor 7 - our true modal home.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'This time, D stays home. No resolving to C!',
                     validation: { type: 'progression_chord_added', value: 'D Minor 7' },
                     successMessage: 'Dorian home!'
@@ -4314,8 +4314,8 @@ export const modalHarmonyTutorial = defineTutorial({
                 // Step 9: Add G (but not going to C!)
                 {
                     instruction: 'Add G7 - the characteristic IV7 chord.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'G7 contains B natural - the raised 6th that defines Dorian. And we won\'t resolve it to C!',
                     validation: { type: 'progression_chord_added', value: 'G Dominant 7' },
                     successMessage: 'The IV7 - Dorian\'s signature!'
@@ -4323,8 +4323,8 @@ export const modalHarmonyTutorial = defineTutorial({
                 // Step 10: Add C (as ♭VII, not as I!)
                 {
                     instruction: 'Add C Major - but this time it\'s the ♭VII, not the destination!',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'C is now the ♭VII of D, not a tonic. We\'re going BACK to D!',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'C as ♭VII, passing through!'
@@ -4332,8 +4332,8 @@ export const modalHarmonyTutorial = defineTutorial({
                 // Step 11: Return to Dm
                 {
                     instruction: 'Return to D Minor 7 - reaffirming D as home.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'D is home! The C → D motion (♭VII → i) keeps the modal color.',
                     validation: { type: 'progression_chord_added', value: 'D Minor 7' },
                     successMessage: 'Home is D, not C!'
@@ -4341,8 +4341,8 @@ export const modalHarmonyTutorial = defineTutorial({
                 // Step 12: Play true Dorian
                 {
                     instruction: 'Play it! D is clearly home - this is true Dorian.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'Dm7 - G7 - C - Dm7. We used G and C, but D is home. The B natural in G7 keeps it Dorian!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'THAT\'S Dorian! D is home, and the raised 6th (B) defines the mode.'
@@ -4350,8 +4350,8 @@ export const modalHarmonyTutorial = defineTutorial({
                 // Step 13: Clear for Mixolydian example
                 {
                     instruction: 'Let\'s apply the same principle to Mixolydian. Click "Clear All".',
-                    spotlight: '#clear-progression-btn',
-                    targetElement: '#clear-progression-btn',
+                    spotlight: '#action-clear-progression',
+                    targetElement: '#action-clear-progression',
                     callout: 'In Mixolydian, we avoid the V chord resolving to I (D → G in G Mixolydian). We use ♭VII instead!',
                     validation: { type: 'progression_cleared' },
                     successMessage: 'Ready for Mixolydian!'
@@ -4359,16 +4359,16 @@ export const modalHarmonyTutorial = defineTutorial({
                 // Step 14: Build Mixolydian
                 {
                     instruction: 'Add G Major - our Mixolydian home.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'G Major' },
                     successMessage: 'Mixolydian home!'
                 },
                 // Step 15: Add ♭VII
                 {
                     instruction: 'Add F Major - the ♭VII! This is Mixolydian\'s signature.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'F is the ♭VII of G. This chord contains the ♭7 (F instead of F#) that defines Mixolydian!',
                     validation: { type: 'progression_chord_added', value: 'F Major' },
                     successMessage: '♭VII - the rock chord!'
@@ -4376,16 +4376,16 @@ export const modalHarmonyTutorial = defineTutorial({
                 // Step 16: Add IV
                 {
                     instruction: 'Add C Major - the IV chord.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'IV chord!'
                 },
                 // Step 17: Back to G
                 {
                     instruction: 'Return to G Major. Notice: no D → G (V - I) anywhere!',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'We avoided D (the V) entirely. ♭VII → I (F → G) replaces V → I.',
                     validation: { type: 'progression_chord_added', value: 'G Major' },
                     successMessage: 'G is home!'
@@ -4393,8 +4393,8 @@ export const modalHarmonyTutorial = defineTutorial({
                 // Step 18: Play Mixolydian
                 {
                     instruction: 'Play the Mixolydian progression! Classic rock sound.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'G - F - C - G. No D chord means no V-I. The F (♭VII) keeps it unmistakably Mixolydian!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'That\'s modal harmony - the mode is preserved because we avoided V-I!'
@@ -4440,16 +4440,16 @@ export const advancedVoiceLeadingTutorial = defineTutorial({
                 // Step 2: Build ii-V-I to trace guide tones
                 {
                     instruction: 'Let\'s build ii-V-I with 7th chords and trace the guide tone movement.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Dm7: 3rd = F, 7th = C. G7: 3rd = B, 7th = F. Cmaj7: 3rd = E, 7th = B. Watch the smooth connections!',
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-form-melody');
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-form-melody');
                             }
                         }
                     }
@@ -4457,8 +4457,8 @@ export const advancedVoiceLeadingTutorial = defineTutorial({
                 // Step 3: Add Dm7
                 {
                     instruction: 'Add D Minor 7. Guide tones: F (3rd) and C (7th).',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Dm7 = D-F-A-C. The F and C are the "soul" of this chord.',
                     validation: { type: 'progression_chord_added', value: 'D Minor 7' },
                     successMessage: 'Dm7: Guide tones F and C!'
@@ -4466,8 +4466,8 @@ export const advancedVoiceLeadingTutorial = defineTutorial({
                 // Step 4: Add G7
                 {
                     instruction: 'Add G Dominant 7. Guide tones: B (3rd) and F (7th).',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'G7 = G-B-D-F. Notice: C dropped to B (half step), F stayed! That\'s smooth voice leading.',
                     validation: { type: 'progression_chord_added', value: 'G Dominant 7' },
                     successMessage: 'G7: C→B (half step), F stays!'
@@ -4475,8 +4475,8 @@ export const advancedVoiceLeadingTutorial = defineTutorial({
                 // Step 5: Add Cmaj7
                 {
                     instruction: 'Add C Major 7. Guide tones: E (3rd) and B (7th).',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Cmaj7 = C-E-G-B. F dropped to E (half step), B stayed! Perfect guide tone resolution.',
                     validation: { type: 'progression_chord_added', value: 'C Major 7' },
                     successMessage: 'Cmaj7: F→E (half step), B stays!'
@@ -4484,8 +4484,8 @@ export const advancedVoiceLeadingTutorial = defineTutorial({
                 // Step 6: Play and analyze
                 {
                     instruction: 'Play it and listen for the smooth guide tone movement.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'Full guide tone motion: F stays → F → E, and C → B stays → B. All half-steps or common tones!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'That smoothness comes from guide tones moving by step!'
@@ -4493,8 +4493,8 @@ export const advancedVoiceLeadingTutorial = defineTutorial({
                 // Step 7: Now with voice leading in the progression
                 {
                     instruction: 'Now let\'s apply inversions to create an even smoother bass line. We\'ll expand the chord cards.',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     spotlightExtraHeight: 200,
                     callout: 'With inversions, we can make EVERY voice move smoothly, not just the guide tones.',
                     validation: null,
@@ -4503,8 +4503,8 @@ export const advancedVoiceLeadingTutorial = defineTutorial({
                 // Step 8: Expand Dm7 card
                 {
                     instruction: 'Click on the Dm7 chord to select it, then expand it to see inversion controls.',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     spotlightExtraHeight: 200,
                     callout: 'Dm7 in root position: D in bass. Let\'s keep it there as our starting point.',
                     validation: null,
@@ -4518,8 +4518,8 @@ export const advancedVoiceLeadingTutorial = defineTutorial({
                 // Step 9: Set G7 inversion
                 {
                     instruction: 'Now expand the G7 card. Set it to 2nd inversion (D in bass) - the bass stays on D!',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     spotlightExtraHeight: 200,
                     callout: 'G7/D means D stays in bass: D → D. One voice doesn\'t move at all! This is called a pedal tone.',
                     validation: null,
@@ -4533,8 +4533,8 @@ export const advancedVoiceLeadingTutorial = defineTutorial({
                 // Step 10: Set Cmaj7 inversion
                 {
                     instruction: 'Expand Cmaj7. Try 1st inversion (E in bass) - the bass walks D → D → E (just a step up!).',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     spotlightExtraHeight: 200,
                     callout: 'Bass line: D → D → E. Minimal movement! This is contrary motion - bass up while inner voices move down.',
                     validation: null,
@@ -4548,8 +4548,8 @@ export const advancedVoiceLeadingTutorial = defineTutorial({
                 // Step 11: Play voice-led version
                 {
                     instruction: 'Play the voice-led version! Compare to the root position version.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'Bass: D → D → E. Much smoother than D → G → C! Every voice now moves minimally.',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'Hear how much smoother that is? That\'s advanced voice leading!'
@@ -4557,8 +4557,8 @@ export const advancedVoiceLeadingTutorial = defineTutorial({
                 // Step 12: Clear for walking bass example
                 {
                     instruction: 'Let\'s try another technique: creating a walking bass line. Click "Clear All".',
-                    spotlight: '#clear-progression-btn',
-                    targetElement: '#clear-progression-btn',
+                    spotlight: '#action-clear-progression',
+                    targetElement: '#action-clear-progression',
                     callout: 'A walking bass moves by step, creating a melody in the bass voice. Very common in jazz!',
                     validation: { type: 'progression_cleared' },
                     successMessage: 'Ready for walking bass!'
@@ -4566,38 +4566,38 @@ export const advancedVoiceLeadingTutorial = defineTutorial({
                 // Step 13: Build progression for walking bass
                 {
                     instruction: 'Build C - Am - Dm - G. We\'ll add inversions for a walking bass.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'C Major' },
                     successMessage: 'C added!'
                 },
                 // Step 14-16: Complete progression
                 {
                     instruction: 'Add A Minor.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'A Minor' },
                     successMessage: 'Am added!'
                 },
                 {
                     instruction: 'Add D Minor.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'D Minor' },
                     successMessage: 'Dm added!'
                 },
                 {
                     instruction: 'Add G Major.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     validation: { type: 'progression_chord_added', value: 'G Major' },
                     successMessage: 'G added!'
                 },
                 // Step 17: Apply inversions for walking bass
                 {
                     instruction: 'Now apply inversions: Am in 1st inv (C bass), Dm root (D bass), G in 1st inv (B bass). Bass walks: C → C → D → B!',
-                    spotlight: '#progression-visualization',
-                    targetElement: '#progression-visualization',
+                    spotlight: '#melody-progression-visualization',
+                    targetElement: '#melody-progression-visualization',
                     spotlightExtraHeight: 200,
                     callout: 'Expand each card and set inversions. The bass becomes a melody: C - C - D - B (or try C - B - D - G for different motion).',
                     validation: null,
@@ -4771,16 +4771,16 @@ export const extendedChordsTutorial = defineTutorial({
                 // Step 1: Introduction
                 {
                     instruction: 'The extended ii-V-I is the sound of jazz. Let\'s build Dm9 - G13 - Cmaj9.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Extensions add color without changing function. ii is still ii, just richer!',
                     validation: null,
                     successMessage: null,
                     onEnter: () => {
-                        const form = document.getElementById('quick-add-chord-form');
+                        const form = document.getElementById('quick-add-chord-form-melody');
                         if (form && form.classList.contains('hidden')) {
                             if (window.toggleQuickAddChordForm) {
-                                window.toggleQuickAddChordForm('quick-add-chord-form');
+                                window.toggleQuickAddChordForm('quick-add-chord-form-melody');
                             }
                         }
                     }
@@ -4788,8 +4788,8 @@ export const extendedChordsTutorial = defineTutorial({
                 // Step 2: Add Dm9
                 {
                     instruction: 'Add D Minor 9.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Dm9 = D-F-A-C-E. The 9th (E) adds sweetness to the ii chord.',
                     validation: { type: 'progression_chord_added', value: 'D Minor 9' },
                     successMessage: 'Dm9 - smooth preparation!'
@@ -4797,8 +4797,8 @@ export const extendedChordsTutorial = defineTutorial({
                 // Step 3: Add G13
                 {
                     instruction: 'Add G Dominant 13.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'G13 = G-B-D-F-A-E. The 13th (E) adds warmth to the dominant tension.',
                     validation: { type: 'progression_chord_added', value: 'G Dominant 13' },
                     successMessage: 'G13 - rich dominant!'
@@ -4806,8 +4806,8 @@ export const extendedChordsTutorial = defineTutorial({
                 // Step 4: Add Cmaj9
                 {
                     instruction: 'Resolve to C Major 9.',
-                    spotlight: '#quick-add-chord-form',
-                    targetElement: '#quick-add-chord-form',
+                    spotlight: '#quick-add-chord-form-melody',
+                    targetElement: '#quick-add-chord-form-melody',
                     callout: 'Cmaj9 = C-E-G-B-D. The 9th (D) floats over the resolution. Sophisticated!',
                     validation: { type: 'progression_chord_added', value: 'C Major 9' },
                     successMessage: 'Cmaj9 - dreamy resolution!'
@@ -4815,8 +4815,8 @@ export const extendedChordsTutorial = defineTutorial({
                 // Step 5: Play extended ii-V-I
                 {
                     instruction: 'Play your extended ii-V-I! This is professional jazz harmony.',
-                    spotlight: '#play-progression-btn',
-                    targetElement: '#play-progression-btn',
+                    spotlight: '#action-play-btn',
+                    targetElement: '#action-play-btn',
                     callout: 'Compare this to basic Dm - G - C. The extensions add so much richness and sophistication!',
                     validation: { type: 'progression_play_complete' },
                     successMessage: 'That\'s the jazz sound! Extensions transform everything.'

@@ -840,20 +840,20 @@ const CHORD_LAB_PANELS = {
  * Maps panel IDs to their chevron IDs and default states for tutorial
  */
 const PROGRESSION_WORKSHOP_PANELS = {
-    'progression-controls-panel': {
-        chevronId: 'progression-controls-chevron',
+    'melody-progression-setup-panel': {
+        chevronId: 'melody-progression-setup-chevron',
         tutorialState: 'expanded' // Need this for key selector and Quick Add
     },
-    'progression-visualization-panel': {
-        chevronId: 'progression-visualization-chevron',
+    'chord-progression-card-panel': {
+        chevronId: 'chord-progression-card-chevron',
         tutorialState: 'expanded' // Need this to see the progression being built
     },
     'style-mood-insights-panel': {
         chevronId: 'style-mood-insights-chevron',
         tutorialState: 'collapsed' // Collapse to reduce confusion
     },
-    'chord-progression-card-panel': {
-        chevronId: 'chord-progression-card-chevron',
+    'staff-notation-card-panel': {
+        chevronId: 'staff-notation-card-chevron',
         tutorialState: 'collapsed' // Collapse to reduce confusion
     }
 };
@@ -907,14 +907,14 @@ function saveTabState(targetTab) {
             }
         });
 
-        // Save scroll position of the main content area
-        const tabContent = document.getElementById('tab-trainer');
+        // Save scroll position of the main content area (trainer redirects to melody)
+        const tabContent = document.getElementById('tab-melody');
         if (tabContent) {
-            savedTabState.scrollPositions['tab-trainer'] = tabContent.scrollTop;
+            savedTabState.scrollPositions['tab-melody'] = tabContent.scrollTop;
         }
 
-        // Save scroll position of scrollable containers within Progression Workshop
-        const scrollableContainers = document.querySelectorAll('#tab-trainer [class*="overflow-auto"], #tab-trainer [class*="overflow-y-auto"]');
+        // Save scroll position of scrollable containers within Composition Studio
+        const scrollableContainers = document.querySelectorAll('#tab-melody [class*="overflow-auto"], #tab-melody [class*="overflow-y-auto"]');
         scrollableContainers.forEach((container, idx) => {
             savedTabState.scrollPositions[`container-${idx}`] = {
                 element: container,
@@ -1015,19 +1015,19 @@ function forceTutorialState(targetTab) {
         if (tensionCurveContainer) tensionCurveContainer.remove();
 
         // Show the Quick Add Chord form so users can easily add chords
-        const quickAddForm = document.getElementById('quick-add-chord-form');
+        const quickAddForm = document.getElementById('quick-add-chord-form-melody');
         if (quickAddForm && quickAddForm.classList.contains('hidden')) {
             quickAddForm.classList.remove('hidden');
         }
 
-        // Scroll the tab content to the top
-        const tabContent = document.getElementById('tab-trainer');
+        // Scroll the tab content to the top (trainer redirects to melody)
+        const tabContent = document.getElementById('tab-melody');
         if (tabContent) {
             tabContent.scrollTop = 0;
         }
 
         // Reset scroll on all scrollable containers
-        const scrollableContainers = document.querySelectorAll('#tab-trainer [class*="overflow-auto"], #tab-trainer [class*="overflow-y-auto"]');
+        const scrollableContainers = document.querySelectorAll('#tab-melody [class*="overflow-auto"], #tab-melody [class*="overflow-y-auto"]');
         scrollableContainers.forEach(container => {
             container.scrollTop = 0;
             container.scrollLeft = 0;
@@ -1103,8 +1103,8 @@ function restoreTabState() {
 
         // Restore scroll positions
         Object.entries(savedTabState.scrollPositions).forEach(([key, value]) => {
-            if (key === 'tab-trainer') {
-                const tabContent = document.getElementById('tab-trainer');
+            if (key === 'tab-melody') {
+                const tabContent = document.getElementById('tab-melody');
                 if (tabContent) tabContent.scrollTop = value;
             } else if (typeof value === 'object' && value.element) {
                 value.element.scrollTop = value.scrollTop;

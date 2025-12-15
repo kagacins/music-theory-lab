@@ -3416,6 +3416,54 @@ function renderFlatCards(gridContainer, progressionData, key, options = {}) {
 }
 
 // ============================================================================
+// ACTION BUTTONS TOOLBAR
+// ============================================================================
+
+/**
+ * Create action buttons toolbar (Add, Section, Clear) as a horizontal strip
+ * This stays visible above the scrolling chord cards
+ * @param {string} containerId - Container ID for context
+ * @returns {HTMLElement} Toolbar element
+ */
+function createActionButtonsToolbar(containerId) {
+    const isMelodyComposer = containerId?.includes('melody');
+    const toggleFunction = isMelodyComposer ? 'toggleQuickAddChordMelody' : 'toggleQuickAddChord';
+
+    const toolbar = document.createElement('div');
+    toolbar.className = 'action-buttons-toolbar flex items-center gap-2 px-2 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg mb-2';
+    toolbar.id = `${containerId}-action-toolbar`;
+
+    toolbar.innerHTML = `
+        <button onclick="window.${toggleFunction} && window.${toggleFunction}()"
+                class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow transition flex items-center gap-1.5"
+                title="Add chord to progression">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Add
+        </button>
+        <button onclick="window.showAddSectionMenu && window.showAddSectionMenu(event, '${containerId}')"
+                class="px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center gap-1.5"
+                title="Select adjacent chords, then add to a section">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+            </svg>
+            Section
+        </button>
+        <button onclick="window.clearProgression && window.clearProgression()"
+                class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center gap-1.5"
+                title="Clear all chords">
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"></path>
+            </svg>
+            Clear
+        </button>
+    `;
+
+    return toolbar;
+}
+
+// ============================================================================
 // VIEW MODE UI COMPONENTS
 // ============================================================================
 
@@ -9282,11 +9330,15 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             }
         }
 
+        // Add action buttons toolbar above the scrolling cards (always visible)
+        const actionToolbar = createActionButtonsToolbar(containerId);
+        container.appendChild(actionToolbar);
+
         // Create container for cards
         const gridContainer = document.createElement('div');
         gridContainer.id = `${containerId}-cards-grid`;
 
-        // Branch based on view mode
+        // Branch based on view mode - pass showActionButtons: false since toolbar is above
         if (progressionViewMode === 'section' && sections.length > 0) {
             // Section View Mode: show section picker and filtered cards
             gridContainer.className = 'flex flex-col gap-2';
@@ -9294,7 +9346,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         } else if (progressionViewMode === 'scroll') {
             // Scroll View Mode: horizontal scrolling
             renderScrollViewMode(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
-                showActionButtons: true
+                showActionButtons: false
             });
             // Initialize sortable on the grid container
             initializeSimplifiedSortable(gridContainer);
@@ -9303,11 +9355,11 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             gridContainer.className = 'flex flex-nowrap items-start gap-2 overflow-x-auto pb-2';
             if (hasSections) {
                 renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
-                    showActionButtons: true
+                    showActionButtons: false
                 });
             } else {
                 renderFlatCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
-                    showActionButtons: true
+                    showActionButtons: false
                 });
             }
             // Initialize sortable on the grid container
