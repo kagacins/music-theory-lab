@@ -3007,7 +3007,7 @@ export function showSongBuilderModal(forceShowBuilder = false) {
     }
 
     const sections = compositionState?.getSections?.() || [];
-    const progression = compositionState?.getProgression?.() || [];
+    const progression = compositionState?.getChords?.() || [];  // Use getChords() not getProgression()
     // When called from wizard, we force showing the builder
     const hasContent = forceShowBuilder || sections.length > 0 || progression.length > 0;
 
