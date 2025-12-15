@@ -95,13 +95,12 @@ export function initChordFunctionLegend() {
     window.showChordFunctionLegend = showLegend;
     window.hideChordFunctionLegend = hideLegend;
 
-    // Show the legend on first load if not dismissed
-    if (isLegendVisible && !hasBeenDismissed) {
-        // Delay slightly to let page load
-        setTimeout(() => {
-            showLegend(false); // Start in compact mode
-        }, 500);
-    }
+    // Auto-show on first load disabled - users can access via keyboard shortcut or menu
+    // if (isLegendVisible && !hasBeenDismissed) {
+    //     setTimeout(() => {
+    //         showLegend(false); // Start in compact mode
+    //     }, 500);
+    // }
 }
 
 // ===========================================

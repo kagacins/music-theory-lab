@@ -87,6 +87,12 @@
                 </div>
             </nav>
 
+            <!-- Start Here Guide Link -->
+            <a href="start-here.html" onclick="window.toggleSidebar && window.toggleSidebar();" class="w-full mt-4 flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/30 text-amber-300 hover:text-amber-200 rounded-lg font-medium transition-all">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                <span>Start Here Guide</span>
+            </a>
+
             <!-- Start New Song Button (Sidebar) -->
             <button onclick="window.openSongwritingWizard && window.openSongwritingWizard(); window.toggleSidebar && window.toggleSidebar();" class="w-full mt-4 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
@@ -257,75 +263,314 @@
                         <svg class="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                     </button>
                 </div>
+
+                <!-- About & Support Button -->
+                <div class="mt-3">
+                    <button id="about-btn" onclick="window.showAboutModal && window.showAboutModal()" class="w-full py-2 px-3 bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white text-sm font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between group">
+                        <span class="flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+                            <span>About & Support</span>
+                        </span>
+                        <svg class="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                </div>
             </div>
         </div>
     </div><!-- close flex-1 overflow-y-auto -->
     </div><!-- close sidebar -->
     <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden" onclick="window.toggleSidebar && window.toggleSidebar()"></div>
 
+    <!-- Landing Page -->
+    <div id="landing-page" class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white relative overflow-hidden">
+        <!-- Animated background elements -->
+        <div class="absolute inset-0 overflow-hidden pointer-events-none">
+            <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
+            <div class="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse" style="animation-delay: 1s;"></div>
+            <div class="absolute top-1/2 right-1/3 w-64 h-64 bg-rose-500/15 rounded-full blur-3xl animate-pulse" style="animation-delay: 2s;"></div>
+            <!-- Musical note decorations -->
+            <svg class="absolute top-20 left-10 w-16 h-16 text-white/10 animate-bounce" style="animation-duration: 3s;" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
+            <svg class="absolute bottom-32 right-20 w-12 h-12 text-white/10 animate-bounce" style="animation-duration: 4s; animation-delay: 0.5s;" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
+        </div>
+
+        <div class="relative z-10 max-w-6xl mx-auto px-4 py-8 sm:py-12">
+            <!-- Hero Section -->
+            <header class="text-center mb-12 sm:mb-16">
+                <h1 class="text-4xl sm:text-5xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-white via-purple-200 to-white bg-clip-text text-transparent">
+                    Interactive Music Theory Lab
+                </h1>
+                <p class="text-lg sm:text-xl text-purple-200 mb-8 max-w-2xl mx-auto">
+                    Learn music theory through hands-on creation. Build chords, craft progressions, compose melodies, and understand <em>why</em> music sounds good.
+                </p>
+
+                <!-- Primary CTAs -->
+                <div class="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6">
+                    <a href="start-here.html" class="group px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white text-lg font-bold rounded-xl shadow-lg hover:shadow-xl hover:shadow-orange-500/25 transition-all transform hover:scale-105 flex items-center gap-3">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                        Start Here
+                    </a>
+                    <button onclick="window.enterApp && window.enterApp()" class="px-8 py-4 bg-white/10 hover:bg-white/20 backdrop-blur text-white text-lg font-semibold rounded-xl border border-white/30 hover:border-white/50 transition-all flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
+                        Enter App
+                    </button>
+                </div>
+
+                <!-- About & Support Button -->
+                <button onclick="window.showAboutModal && window.showAboutModal()" class="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-rose-500/80 to-orange-500/80 hover:from-rose-500 hover:to-orange-500 text-white font-medium rounded-lg transition-all">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"></path></svg>
+                    About & Support
+                </button>
+            </header>
+
+            <!-- Features Grid -->
+            <div class="grid md:grid-cols-2 gap-6 mb-12">
+                <!-- Chord Lab -->
+                <div class="group bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:border-amber-500/50 hover:bg-white/10 transition-all cursor-pointer" onclick="window.enterAppToTab && window.enterAppToTab('builder')">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="p-3 bg-amber-500/20 rounded-xl group-hover:bg-amber-500/30 transition-colors">
+                            <svg class="w-8 h-8 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-white mb-1">Chord Lab</h3>
+                            <p class="text-amber-300 text-sm font-medium">Build & Explore Chords</p>
+                        </div>
+                    </div>
+                    <ul class="space-y-2 text-purple-100 text-sm">
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Interactive chord builder with real-time audio playback</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Extensive chord library: triads, 7ths, extended, altered, and more</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Visual piano keyboard and staff notation</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Chord voicings and inversions explorer</span>
+                        </li>
+                    </ul>
+                    <div class="mt-4 text-amber-400 text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
+                        Open Chord Lab <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </div>
+                </div>
+
+                <!-- Composition Studio -->
+                <div class="group bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:border-teal-500/50 hover:bg-white/10 transition-all cursor-pointer" onclick="window.enterAppToTab && window.enterAppToTab('melody')">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="p-3 bg-teal-500/20 rounded-xl group-hover:bg-teal-500/30 transition-colors">
+                            <svg class="w-8 h-8 text-teal-400" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0v12h8V4H6zm2 2h4v2H8V6zm0 4h4v2H8v-2z"></path></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-white mb-1">Composition Studio</h3>
+                            <p class="text-teal-300 text-sm font-medium">Create Full Songs</p>
+                        </div>
+                    </div>
+                    <ul class="space-y-2 text-purple-100 text-sm">
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-teal-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Build chord progressions with drag-and-drop</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-teal-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>AI-powered melody, chord & song structure generation</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-teal-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Song sections (Verse, Chorus, Bridge) with Song Builder</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-teal-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Audio file chord detection - upload MP3/WAV files</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-teal-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Export to MIDI, PDF, and more</span>
+                        </li>
+                    </ul>
+                    <div class="mt-4 text-teal-400 text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
+                        Open Composition Studio <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </div>
+                </div>
+
+                <!-- Scale Explorer -->
+                <div class="group bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:border-lime-500/50 hover:bg-white/10 transition-all cursor-pointer" onclick="window.enterAppToTab && window.enterAppToTab('scales')">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="p-3 bg-lime-500/20 rounded-xl group-hover:bg-lime-500/30 transition-colors">
+                            <svg class="w-8 h-8 text-lime-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11 4a1 1 0 10-2 0v4a1 1 0 102 0V7zm-3 1a1 1 0 10-2 0v3a1 1 0 102 0V8zM8 9a1 1 0 00-2 0v2a1 1 0 102 0V9z" clip-rule="evenodd"></path></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-white mb-1">Scale Explorer</h3>
+                            <p class="text-lime-300 text-sm font-medium">Discover Scales & Modes</p>
+                        </div>
+                    </div>
+                    <ul class="space-y-2 text-purple-100 text-sm">
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-lime-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>100+ scales: major, minor, modes, jazz, world music</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-lime-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Visual scale patterns on piano and fretboard</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-lime-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Diatonic chords for each scale</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-lime-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Compare scales and find related modes</span>
+                        </li>
+                    </ul>
+                    <div class="mt-4 text-lime-400 text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
+                        Open Scale Explorer <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </div>
+                </div>
+
+                <!-- Theory Academy -->
+                <div class="group bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:border-indigo-500/50 hover:bg-white/10 transition-all cursor-pointer" onclick="window.enterAppToTab && window.enterAppToTab('learn')">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="p-3 bg-indigo-500/20 rounded-xl group-hover:bg-indigo-500/30 transition-colors">
+                            <svg class="w-8 h-8 text-indigo-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0z"></path></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-white mb-1">Theory Academy</h3>
+                            <p class="text-indigo-300 text-sm font-medium">Learn By Doing</p>
+                        </div>
+                    </div>
+                    <ul class="space-y-2 text-purple-100 text-sm">
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-indigo-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Interactive lessons with hands-on exercises</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-indigo-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Guided tutorials that integrate with the app</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-indigo-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Topics: intervals, chord construction, progressions, voice leading</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <svg class="w-4 h-4 text-indigo-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                            <span>Progress from beginner to advanced</span>
+                        </li>
+                    </ul>
+                    <div class="mt-4 text-indigo-400 text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
+                        Open Theory Academy <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Features -->
+            <div class="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 mb-12">
+                <h3 class="text-lg font-bold mb-4 text-center" style="color: #ffffff; -webkit-text-fill-color: #ffffff; background: none;">Plus More Features</h3>
+                <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm" style="color: #ffffff;">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-purple-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path></svg>
+                        <span style="color: #ffffff;">AI-powered chord, melody & harmonization recommendations</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-purple-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"></path></svg>
+                        <span style="color: #ffffff;">Progression preset library</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-purple-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                        <span style="color: #ffffff;">MIDI & PDF export</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-purple-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd"></path></svg>
+                        <span style="color: #ffffff;">Audio chord detection</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer class="text-center text-purple-300 text-sm">
+                <p class="mb-2">Built for musicians who want to understand the "why" behind the music.</p>
+                <p class="text-purple-400 text-xs">Free to use. No account required.</p>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Main App Container (hidden when landing page is shown) -->
+    <div id="main-app" class="hidden">
     <div class="max-w-7xl mx-auto">
         <!-- Main Header -->
         <div id="main-header" class="grid items-center bg-white/95 backdrop-blur-md px-2 rounded-lg shadow-md mb-1 sticky top-1 z-20 border border-gray-200 transition-all duration-300 h-14 overflow-hidden" style="grid-template-columns: auto 1fr auto;">
-            <!-- Left side: Sidebar Toggle and Title -->
+            <!-- Left side: Sidebar Toggle -->
             <div class="flex items-center gap-1.5 justify-start h-full">
                 <button id="sidebar-toggle" onclick="window.toggleSidebar && window.toggleSidebar()" class="p-1 rounded hover:bg-gray-200 transition flex-shrink-0" title="Open Menu & Settings">
                     <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                 </button>
-                <div class="flex flex-col">
+            </div>
+
+            <!-- Center: Title + About Button -->
+            <div class="flex justify-start items-center gap-3 h-full pl-2">
+                <div class="flex flex-col text-left">
                     <h1 id="main-title" class="text-sm sm:text-base font-bold text-gray-800 tracking-tight leading-none">Interactive Music Theory Lab</h1>
                     <span id="tab-subtitle" class="text-[11px] text-amber-600 font-semibold leading-tight">Chord Lab</span>
                 </div>
-            </div>
-            
-            <!-- Center: Displays (collapsible) -->
-            <div class="hidden lg:flex justify-center items-center gap-1 h-full overflow-hidden">
-                <!-- Collapse/Expand Toggle -->
-                <button id="header-displays-toggle" onclick="window.toggleHeaderDisplays && window.toggleHeaderDisplays()" class="p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors flex-shrink-0" title="Toggle Info Displays">
-                    <svg id="header-displays-chevron" class="w-3.5 h-3.5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                <!-- About & Support Button -->
+                <button onclick="window.showAboutModal && window.showAboutModal()" class="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white text-xs font-medium rounded-lg shadow hover:shadow-md transition-all" title="About & Support">
+                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"></path></svg>
+                    <span class="hidden sm:flex flex-col leading-none text-left"><span class="font-semibold">About &</span><span class="text-[9px] opacity-90">Support</span></span>
                 </button>
-                <!-- Collapsible Display Panels -->
-                <div id="header-display-panels" class="header-displays-container flex items-center gap-1.5 overflow-hidden transition-all duration-300">
-                    <!-- Key Signature Display -->
-                    <div id="shared-key-signature-display" class="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded px-2 py-0.5 h-10">
-                        <div class="relative flex-shrink-0">
-                            <img id="treble-clef-img" src="key_signatures/treble_0.svg" alt="Key Signature" class="h-8">
-                            <span id="enharmonic-key-label" class="absolute -bottom-0.5 -right-0.5 text-[7px] leading-none font-bold bg-gray-800 text-white px-0.5 rounded hidden"></span>
-                        </div>
-                        <div class="flex flex-col border-l border-gray-200 pl-1.5">
-                            <span id="key-signature-text" class="text-[11px] font-semibold text-gray-800 leading-tight">C Major</span>
-                            <span class="text-[9px] text-gray-500 leading-tight"><span class="text-gray-400">rel:</span> <span id="relative-minor-display" class="font-medium">Am</span></span>
-                        </div>
-                    </div>
-                    <!-- Active Context Display (chord/scale/progression) -->
-                    <div id="shared-chord-display" class="min-w-[120px] h-10">
-                        <div id="builder-info-display" class="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded px-1.5 h-full">
-                            <div class="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"></div>
-                            <div class="flex flex-col min-w-0">
-                                <p id="builder-chord-name" class="text-[11px] font-bold text-gray-800 truncate leading-tight">C Major</p>
-                                <p id="builder-chord-notes" class="text-[9px] text-amber-600 font-medium truncate leading-tight">C4 - E4 - G4</p>
+            </div>
+
+            <!-- Right side: Displays + Header Tabs -->
+            <div class="flex justify-end items-center gap-1.5 h-full">
+                <!-- Displays (collapsible) - only on larger screens -->
+                <div class="hidden xl:flex items-center gap-1 h-full overflow-hidden">
+                    <!-- Collapse/Expand Toggle -->
+                    <button id="header-displays-toggle" onclick="window.toggleHeaderDisplays && window.toggleHeaderDisplays()" class="p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors flex-shrink-0" title="Toggle Info Displays">
+                        <svg id="header-displays-chevron" class="w-3.5 h-3.5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    </button>
+                    <!-- Collapsible Display Panels -->
+                    <div id="header-display-panels" class="header-displays-container flex items-center gap-1.5 overflow-hidden transition-all duration-300">
+                        <!-- Key Signature Display -->
+                        <div id="shared-key-signature-display" class="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded px-2 py-0.5 h-10">
+                            <div class="relative flex-shrink-0">
+                                <img id="treble-clef-img" src="key_signatures/treble_0.svg" alt="Key Signature" class="h-8">
+                                <span id="enharmonic-key-label" class="absolute -bottom-0.5 -right-0.5 text-[7px] leading-none font-bold bg-gray-800 text-white px-0.5 rounded hidden"></span>
+                            </div>
+                            <div class="flex flex-col border-l border-gray-200 pl-1.5">
+                                <span id="key-signature-text" class="text-[11px] font-semibold text-gray-800 leading-tight">C Major</span>
+                                <span class="text-[9px] text-gray-500 leading-tight"><span class="text-gray-400">rel:</span> <span id="relative-minor-display" class="font-medium">Am</span></span>
                             </div>
                         </div>
-                        <div id="progression-chord-display" class="hidden items-center gap-1 bg-teal-50 border border-teal-200 rounded px-1.5 h-full">
-                            <div class="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0"></div>
-                            <div class="flex flex-col min-w-0">
-                                <p class="text-[11px] font-bold text-gray-800 truncate leading-tight">Progression</p>
-                                <p id="progression-chord-notes-display" class="text-[9px] text-teal-600 font-medium truncate leading-tight">Ready</p>
+                        <!-- Active Context Display (chord/scale/progression) -->
+                        <div id="shared-chord-display" class="min-w-[120px] h-10">
+                            <div id="builder-info-display" class="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded px-1.5 h-full">
+                                <div class="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"></div>
+                                <div class="flex flex-col min-w-0">
+                                    <p id="builder-chord-name" class="text-[11px] font-bold text-gray-800 truncate leading-tight">C Major</p>
+                                    <p id="builder-chord-notes" class="text-[9px] text-amber-600 font-medium truncate leading-tight">C4 - E4 - G4</p>
+                                </div>
                             </div>
-                        </div>
-                        <div id="scale-info-display" class="hidden items-center gap-1 bg-lime-50 border border-lime-200 rounded px-1.5 h-full">
-                            <div class="w-1.5 h-1.5 rounded-full bg-lime-500 flex-shrink-0"></div>
-                            <div class="flex flex-col min-w-0">
-                                <p id="scale-name" class="text-[11px] font-bold text-gray-800 truncate leading-tight">C Major Scale</p>
-                                <p id="scale-notes-display" class="text-[9px] text-lime-600 font-medium truncate leading-tight">C-D-E-F-G-A-B</p>
+                            <div id="progression-chord-display" class="hidden items-center gap-1 bg-teal-50 border border-teal-200 rounded px-1.5 h-full">
+                                <div class="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0"></div>
+                                <div class="flex flex-col min-w-0">
+                                    <p class="text-[11px] font-bold text-gray-800 truncate leading-tight">Progression</p>
+                                    <p id="progression-chord-notes-display" class="text-[9px] text-teal-600 font-medium truncate leading-tight">Ready</p>
+                                </div>
+                            </div>
+                            <div id="scale-info-display" class="hidden items-center gap-1 bg-lime-50 border border-lime-200 rounded px-1.5 h-full">
+                                <div class="w-1.5 h-1.5 rounded-full bg-lime-500 flex-shrink-0"></div>
+                                <div class="flex flex-col min-w-0">
+                                    <p id="scale-name" class="text-[11px] font-bold text-gray-800 truncate leading-tight">C Major Scale</p>
+                                    <p id="scale-notes-display" class="text-[9px] text-lime-600 font-medium truncate leading-tight">C-D-E-F-G-A-B</p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
+                <!-- Separator -->
+                <div class="hidden xl:block w-px h-8 bg-gray-200"></div>
 
-            <!-- Right side: Header Tabs -->
-            <div class="flex justify-end items-center gap-1.5 h-full">
                 <!-- Expand/Collapse All Hover Button (tab-specific) -->
                 <div id="header-expand-collapse-group" class="relative hidden">
                     <div class="group relative">
@@ -373,7 +618,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Visual Piano Keyboard (Shared) -->
         <section id="keyboard-section" class="mb-2 sticky z-10" style="top: calc(var(--header-height, 76px) + 0.5rem);">
             <div id="piano-keyboard" class="keyboard rounded-md shadow-inner bg-gray-200">
@@ -610,10 +855,28 @@
                         </div>
                     </div>
 
-                    <button id="action-help-btn" class="flex items-center gap-1.5 px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg shadow transition-colors" title="Keyboard shortcuts & help">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <span class="hidden sm:inline">?</span>
-                    </button>
+                    <div class="relative" id="help-menu-container">
+                        <button id="action-help-btn" class="flex items-center gap-1.5 px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg shadow transition-colors" title="Help & Resources">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <span class="hidden sm:inline">?</span>
+                        </button>
+                        <div id="help-dropdown" class="hidden absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50">
+                            <a href="start-here.html" class="flex items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                                <div>
+                                    <div class="font-medium">Start Here Guide</div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">Learn how to use the app</div>
+                                </div>
+                            </a>
+                            <button onclick="window.showNotationShortcuts && window.showNotationShortcuts(); document.getElementById('help-dropdown').classList.add('hidden');" class="flex items-center gap-3 px-4 py-2.5 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors w-full text-left">
+                                <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                                <div>
+                                    <div class="font-medium">Keyboard Shortcuts</div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">Press ? anywhere for quick access</div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -2810,6 +3073,101 @@
                     <strong>Note:</strong> Detection works best on clear recordings. Complex mixes may have lower accuracy.
                     Bass notes are detected separately for inversion hints.
                 </p>
+            </div>
+        </div>
+    </div>
+    </div><!-- End main-app -->
+
+    <!-- About Modal -->
+    <div id="about-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50 overflow-y-auto">
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-4xl w-full my-8 max-h-[90vh] overflow-y-auto relative">
+            <!-- Close button in top right -->
+            <button onclick="window.hideAboutModal && window.hideAboutModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition p-1" title="Close">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+
+            <!-- Header with Support Box -->
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">About Interactive Music Theory Lab</h2>
+                <p class="text-gray-500 text-sm mb-3">Why Does This Website Exist?</p>
+                <!-- Compact Support Box -->
+                <div class="p-3 bg-gradient-to-r from-rose-50 to-orange-50 rounded-lg border border-rose-200 flex flex-col sm:flex-row items-center gap-3 max-w-2xl mx-auto">
+                    <div class="flex-1 text-center sm:text-left whitespace-nowrap">
+                        <p class="text-sm text-gray-700"><strong class="text-rose-600">50% of your contribution</strong> goes to musical charities like the <a href="https://www.detroityouthchoir.org/support" target="_blank" rel="noopener noreferrer" class="text-rose-600 hover:text-rose-700 underline">Detroit Youth Choir</a>.</p>
+                    </div>
+                    <div class="flex gap-2 flex-shrink-0">
+                        <!-- PayPal button hidden for now
+                        <a href="#" id="paypal-btn-top" class="inline-flex items-center gap-1 px-3 py-1.5 bg-[#0070ba] hover:bg-[#005ea6] text-white text-xs font-medium rounded-lg shadow transition-all">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 0 0-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 0 1 .923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z"/></svg>
+                            PayPal
+                        </a>
+                        -->
+                        <a href="https://ko-fi.com/Ken_IMTL" target="_blank" rel="noopener noreferrer" id="kofi-btn-top" class="inline-flex items-center gap-1 px-3 py-1.5 bg-[#FF5E5B] hover:bg-[#e54542] text-white text-xs font-medium rounded-lg shadow transition-all">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z"/></svg>
+                            Ko-fi
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <div class="prose prose-sm max-w-none text-gray-700 space-y-4">
+                <p>I'm musical-ish. I can read, learn, and decently play complicated piano songs. I can sight-read pretty well. I have rhythm. I played a decent saxophone through high school and could probably make it sound ok even today. But for some reason, I have absolutely never been able to memorize songs, write songs, or understand why what I'm playing sounds good. My childhood piano teacher, Mrs. Lorio, would have us to her house once a month on Saturday mornings specifically for something like a music theory workshop, but she didn't stand a chance to convince a 10-year-old boy that music theory was important. There were also cookies. In college I was interested enough that I took a music theory class at the University of Michigan which was awesome, but it didn't have anything to do with the practical application of music theory - it just wasn't possible in that environment for non-music majors.</p>
+
+                <p>I believe that through interactive music theory exercises directly integrated with songwriting - whether it be a few measures or a complete song - I can begin to close some of my own gaps, and that's why I started to develop this site. At first I just wanted my own interactive chord library, then I wanted to sort, organize, and re-order chords so I could listen to my library. Then, I wanted to use these organized chords to try to write a melody.</p>
+
+                <p>Then, I realized I didn't know enough about how to pick, sort, and organize chords or apply a melody - let alone create an entire song - so this project continued to grow. But I only knew how to code in a perfunctory manner, and AI helped me to fill that gap (in my experience AI does seem great for making websites, but is also pretty infuriating. Let me know if you want to talk about it).</p>
+
+                <p>And that brings us to where we are now. I think this is one of, if not the most, comprehensive practical and interactive music theory + songwriting things out there. There are many great applications and tools that do a better job at pieces of what I'm trying to provide to you and you should check them out, but I don't think they even try to bring it all together in this way. It's not why they were created. This application is meant to be for the aspiring musician and songwriter who doesn't have "it", but it can also be for those who do. This application isn't meant to be Suno - give Suno a vibe and some lyrics and have it write a whole song for you.</p>
+
+                <p>This is meant for the person who wants to get their hands a little dirtier and learn and understand what's going on. Why do these things sound good together and in sequence. And you get to pick how you want it go. If you get stuck with creating music, there are some tunable algorithms (i.e. you can pick whether you want to emphasize voice leading, harmonic function, style/mood, etc.) that are meant to provide guidance and suggestions for chord progressions, melody, texture/harmony, and more, but I think of these - based on your use case - as being somewhere between fun toys for exploration and valuable suggestions for the musician with writer's block or just looking for the spark of an idea. This isn't meant to write the song for you. It's specifically meant for not that.</p>
+
+                <p>As far as other features, there are interactive theory and writing lessons that integrate with the rest of the site. You can start from a significant library of progressions and edit them to your desired sound. You can even upload your own .wav or .mp3 files and we can detect with decent accuracy the base chords and duration of each chord and get those chords down in musical notation. You can do this with your songwriting samples you've recorded and you're trying to streamline getting them down on paper or your favorite band's song (unfortunately I can't point to YouTube links directly for legal reasons. It's gotta be your own files).</p>
+
+                <!-- Support Section -->
+                <div class="mt-8 p-6 bg-gradient-to-br from-rose-50 to-orange-50 rounded-xl border border-rose-200">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-rose-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"></path></svg>
+                        Support This Project
+                    </h3>
+                    <p class="text-gray-700 mb-4">If you'd like to contribute to help support active ongoing development, please use one of the buttons below. <strong>50% of your contribution goes to a musical charity or non-profit.</strong> Currently I'm thinking the <a href="https://www.detroityouthchoir.org/support" target="_blank" rel="noopener noreferrer" class="text-rose-600 hover:text-rose-700 underline">Detroit Youth Choir</a>. I'll provide monthly updates related to this if anyone contributes anything.</p>
+
+                    <div class="flex flex-wrap gap-3 justify-center">
+                        <!-- PayPal Button - hidden for now
+                        <a href="#" id="paypal-contribute-btn" class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0070ba] hover:bg-[#005ea6] text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all">
+                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 0 0-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 0 1 .923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z"/>
+                            </svg>
+                            Contribute via PayPal
+                        </a>
+                        -->
+
+                        <!-- Ko-fi Button -->
+                        <a href="https://ko-fi.com/Ken_IMTL" target="_blank" rel="noopener noreferrer" id="kofi-contribute-btn" class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#FF5E5B] hover:bg-[#e54542] text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all">
+                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z"/>
+                            </svg>
+                            Support on Ko-fi
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Bugs Notice -->
+                <div class="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                    <p class="text-amber-800 text-sm"><strong>There are bugs!</strong> Sorry. A lot has been created in a short time. I'm going to come up with a way you can let me know about them.</p>
+                </div>
+
+                <!-- Human-written notice -->
+                <p class="text-center text-xs text-gray-400 mt-6 italic">None of the above text was written by AI!</p>
+            </div>
+
+            <!-- Close Button -->
+            <div class="text-center mt-6">
+                <button onclick="window.hideAboutModal && window.hideAboutModal()" class="bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white px-6 py-2 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all">
+                    Close
+                </button>
             </div>
         </div>
     </div>

@@ -38,7 +38,7 @@ export function initAudio() {
 
     audioIsLoading = true;
     Tone.context.resume();
-    showModal("Loading piano samples...", !audioIsReady);
+    // Loading modal removed - landing page provides time for samples to load
 
     piano = new Tone.Sampler({
         urls: {

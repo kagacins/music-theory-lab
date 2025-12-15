@@ -20,7 +20,7 @@ import { switchTab, refreshAllTabs, initTabHistory } from './modules/ui/tabs.js'
 import { initAllSectionDragDrop } from './modules/ui/sectionDragDrop.js';
 import { initAllSectionSidebars, triggerSectionSidebarUpdate } from './modules/ui/sectionSidebar.js';
 // REMOVED: import { initFloatingSuggestionsPanel } from './modules/ui/floatingSuggestionsPanel.js';
-import { showModal, hideModal } from './modules/ui/modals.js';
+import { showModal, hideModal, showModalHTML, showAboutModal, hideAboutModal } from './modules/ui/modals.js';
 import { renderKeyboard, updateKeyboardLabels, updateKeyNames, clearHighlights, g_KeyboardKeys } from './modules/ui/keyboard.js';
 import { updateKeySignatureDisplay, setupResponsiveTitle } from './modules/ui/header.js';
 import { toggleSidebar, toggleSettingsGroup, restoreSettingsGroupStates, toggleHeaderDisplays, restoreHeaderDisplaysState } from './modules/ui/sidebar.js';
@@ -1063,11 +1063,127 @@ function saveMelody() {
     exportMelodyToMIDI();
 }
 
+// ============================================================================
+// Landing Page Functions
+// ============================================================================
+
+/**
+ * Enter the main app from the landing page
+ */
+function enterApp() {
+    const landingPage = document.getElementById('landing-page');
+    const mainApp = document.getElementById('main-app');
+
+    if (landingPage && mainApp) {
+        // Fade out landing page
+        landingPage.style.transition = 'opacity 0.3s ease-out';
+        landingPage.style.opacity = '0';
+
+        setTimeout(() => {
+            landingPage.classList.add('hidden');
+            mainApp.classList.remove('hidden');
+
+            // Fade in main app
+            mainApp.style.opacity = '0';
+            mainApp.style.transition = 'opacity 0.3s ease-in';
+            setTimeout(() => {
+                mainApp.style.opacity = '1';
+            }, 50);
+        }, 300);
+    }
+}
+
+/**
+ * Enter the main app and switch to a specific tab
+ * @param {string} tabName - The tab to switch to after entering
+ */
+function enterAppToTab(tabName) {
+    const landingPage = document.getElementById('landing-page');
+    const mainApp = document.getElementById('main-app');
+
+    if (landingPage && mainApp) {
+        // Fade out landing page
+        landingPage.style.transition = 'opacity 0.3s ease-out';
+        landingPage.style.opacity = '0';
+
+        setTimeout(() => {
+            landingPage.classList.add('hidden');
+            mainApp.classList.remove('hidden');
+
+            // Fade in main app
+            mainApp.style.opacity = '0';
+            mainApp.style.transition = 'opacity 0.3s ease-in';
+            setTimeout(() => {
+                mainApp.style.opacity = '1';
+                // Switch to the requested tab after app is visible
+                if (window.switchTab) {
+                    window.switchTab(tabName);
+                }
+            }, 50);
+        }, 300);
+    }
+}
+
+/**
+ * Show the Start Here modal (placeholder for guided onboarding)
+ */
+function showStartHereModal() {
+    // For now, show a placeholder modal explaining the Start Here feature is coming
+    const content = `
+        <div class="text-center">
+            <div class="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800 mb-3">Start Here - Coming Soon!</h3>
+            <p class="text-gray-600 mb-4">
+                A guided onboarding experience is in development that will help you discover all the features of the Interactive Music Theory Lab.
+            </p>
+            <p class="text-gray-600 mb-4">
+                <strong>In the meantime, here are some quick tips:</strong>
+            </p>
+            <ul class="text-left text-gray-600 space-y-2 mb-4 max-w-md mx-auto">
+                <li class="flex items-start gap-2">
+                    <span class="text-indigo-500 font-bold">1.</span>
+                    <span><strong>Chord Lab</strong> - Build and explore chords on the interactive keyboard</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span class="text-purple-500 font-bold">2.</span>
+                    <span><strong>Composition Studio</strong> - Create progressions and generate melodies</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span class="text-emerald-500 font-bold">3.</span>
+                    <span><strong>Scale Explorer</strong> - Learn scales and modes with fingering guides</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span class="text-rose-500 font-bold">4.</span>
+                    <span><strong>Theory Academy</strong> - Interactive lessons from basics to advanced</span>
+                </li>
+            </ul>
+            <p class="text-sm text-gray-500">
+                Press <kbd class="px-2 py-1 bg-gray-100 rounded text-xs font-mono">?</kbd> anywhere in the app to see keyboard shortcuts!
+            </p>
+        </div>
+    `;
+
+    if (window.showModalHTML) {
+        window.showModalHTML(content, true);
+    } else if (window.showModal) {
+        window.showModal('Start Here feature coming soon! Explore the tabs to discover all features.');
+    }
+}
+
+// Landing page now always shows on root site visit - no skip behavior
+
 // Expose functions to global scope for HTML event handlers
 window.switchTab = switchTab;
 window.refreshAllTabs = refreshAllTabs;
 window.showModal = showModal;
 window.hideModal = hideModal;
+window.showModalHTML = showModalHTML;
+window.showAboutModal = showAboutModal;
+window.hideAboutModal = hideAboutModal;
 window.toggleSidebar = toggleSidebar;
 window.toggleSettingsGroup = toggleSettingsGroup;
 window.toggleHeaderDisplays = toggleHeaderDisplays;
@@ -1090,6 +1206,11 @@ window.toggleDisplayPanel = toggleDisplayPanel;
 window.handleOctaveRangeChange = handleOctaveRangeChange;
 window.updateRecommendations = updateUnifiedSuggestions;
 window.updateUnifiedSuggestions = updateUnifiedSuggestions;
+
+// Landing page functions
+window.enterApp = enterApp;
+window.enterAppToTab = enterAppToTab;
+window.showStartHereModal = showStartHereModal;
 
 // Phase 1.3 & Phase 2: Interactive Learning Tools
 window.showChordComparisonModal = showChordComparisonModal;
@@ -2546,6 +2667,9 @@ window.onSelectNoteToEdit = function() {
 
 // Initialize application when DOM is ready
 window.onload = () => {
+    // Clear any old landing page skip preference (we now always show landing page)
+    localStorage.removeItem('skipLandingPage');
+
     // Calculate and set keyboard sticky position based on header height
     const header = document.getElementById('main-header');
     if (header) {
@@ -2871,27 +2995,21 @@ window.onload = () => {
     }
 
     if (actionHelpBtn) {
-        actionHelpBtn.addEventListener('click', () => {
-            // Show keyboard shortcuts help
-            const helpContent = `
-Keyboard Shortcuts:
-━━━━━━━━━━━━━━━━━━━
-Tab         → Open Suggestions Modal
-Space       → Play/Stop Progression
-1-7         → Add scale degree chord
-Shift+1-7   → Add minor variant
-Ctrl+Z      → Undo last action
-Ctrl+S      → Save progression
-←/→         → Navigate chords
-Delete      → Remove selected chord
+        actionHelpBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const dropdown = document.getElementById('help-dropdown');
+            if (dropdown) {
+                dropdown.classList.toggle('hidden');
+            }
+        });
 
-In Suggestions Modal:
-━━━━━━━━━━━━━━━━━━━
-↑/↓         → Navigate suggestions
-Enter       → Apply suggestion
-Esc         → Close modal
-            `.trim();
-            alert(helpContent);
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('help-dropdown');
+            const container = document.getElementById('help-menu-container');
+            if (dropdown && container && !container.contains(e.target)) {
+                dropdown.classList.add('hidden');
+            }
         });
     }
 
@@ -4396,6 +4514,23 @@ document.addEventListener('keydown', function(e) {
         }
         // Chords mode handled by Recommendations Modal
         return;
+    }
+});
+
+// Global ? key handler for keyboard shortcuts help
+document.addEventListener('keydown', function(e) {
+    // Don't trigger in input fields
+    const tagName = e.target.tagName.toLowerCase();
+    if (tagName === 'input' || tagName === 'textarea' || tagName === 'select' || e.target.isContentEditable) {
+        return;
+    }
+
+    // ? key (with or without shift) - show keyboard shortcuts
+    if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+        e.preventDefault();
+        if (window.showNotationShortcuts) {
+            window.showNotationShortcuts();
+        }
     }
 });
 

@@ -1614,6 +1614,20 @@ export function destroyEnhancedNotation() {
  * When adding new shortcuts, add them here to keep the modal in sync
  */
 export const KEYBOARD_SHORTCUTS = {
+  global: {
+    title: 'Global Shortcuts',
+    icon: '🌐',
+    color: 'blue',
+    shortcuts: [
+      { key: '?', action: 'Show this help', detail: 'Opens this keyboard shortcuts reference guide. Works anywhere in the app.' },
+      { key: 'Tab', action: 'Recommendations modal', detail: 'Opens the AI recommendations modal with chord suggestions. Press again to close.' },
+      { key: 'Shift + Tab', action: 'Melody suggestions', detail: 'Opens the recommendations modal directly to the melody suggestions tab.' },
+      { key: 'R', action: 'Recommendations modal', detail: 'Alternative shortcut to open the recommendations modal.' },
+      { key: 'Ctrl/⌘ + Z', action: 'Undo', detail: 'Undoes the last action (chord addition, note edit, etc.).' },
+      { key: 'Ctrl/⌘ + Shift + Z', action: 'Redo', detail: 'Redoes the last undone action.' },
+      { key: 'Escape', action: 'Close modal/panel', detail: 'Closes any open modal, panel, or dropdown menu.' },
+    ]
+  },
   mouse: {
     title: 'Mouse Controls',
     icon: '🖱️',
@@ -1846,6 +1860,12 @@ export function showNotationShortcuts() {
           <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p class="text-sm text-blue-900">
               <strong>🖥️ Platform Note:</strong> On Mac, use <kbd class="px-1 py-0.5 bg-blue-100 border border-blue-300 rounded text-xs">⌘ Command</kbd> instead of <kbd class="px-1 py-0.5 bg-blue-100 border border-blue-300 rounded text-xs">Ctrl</kbd> for all shortcuts.
+            </p>
+          </div>
+
+          <div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p class="text-sm text-amber-900">
+              <strong>⚠️ Browser Note:</strong> Some common shortcuts (<kbd class="px-1 py-0.5 bg-amber-100 border border-amber-300 rounded text-xs">Ctrl+S</kbd>, <kbd class="px-1 py-0.5 bg-amber-100 border border-amber-300 rounded text-xs">Ctrl+Tab</kbd>, <kbd class="px-1 py-0.5 bg-amber-100 border border-amber-300 rounded text-xs">Space</kbd>) are reserved by browsers. Use <kbd class="px-1 py-0.5 bg-amber-100 border border-amber-300 rounded text-xs">Tab</kbd> or <kbd class="px-1 py-0.5 bg-amber-100 border border-amber-300 rounded text-xs">R</kbd> for recommendations, and click play buttons for playback.
             </p>
           </div>
         </div>

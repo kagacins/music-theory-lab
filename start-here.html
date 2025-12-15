@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Start Here Guide - Interactive Music Theory Lab</title>
+    <!-- Load Tailwind CSS via CDN -->
+    <script>
+      // Suppress Tailwind CDN warning
+      const originalWarn = console.warn;
+      console.warn = function(...args) {
+          if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) {
+              return;
+          }
+          originalWarn.apply(console, args);
+      };
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the guide */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        .guide-section {
+            scroll-margin-top: 80px;
+        }
+
+        .nav-link.active {
+            background-color: rgb(99 102 241 / 0.1);
+            color: rgb(79 70 229);
+            border-left-color: rgb(79 70 229);
+        }
+
+        .callout {
+            position: relative;
+            padding-left: 1rem;
+            border-left: 4px solid;
+        }
+
+        .callout-tip {
+            background-color: rgb(236 253 245);
+            border-left-color: rgb(16 185 129);
+        }
+
+        .callout-info {
+            background-color: rgb(239 246 255);
+            border-left-color: rgb(59 130 246);
+        }
+
+        .callout-warning {
+            background-color: rgb(255 251 235);
+            border-left-color: rgb(245 158 11);
+        }
+
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            border-radius: 50%;
+            font-weight: 600;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .feature-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.1);
+        }
+
+        /* Sticky sidebar */
+        @media (min-width: 1024px) {
+            .sidebar-nav {
+                position: sticky;
+                top: 80px;
+                max-height: calc(100vh - 100px);
+                overflow-y: auto;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+    <!-- Header -->
+    <header class="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-4">
+                    <a href="index.html" class="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                        <span class="hidden sm:inline">Back to App</span>
+                    </a>
+                    <div class="h-6 w-px bg-gray-300"></div>
+                    <h1 class="text-lg font-bold text-gray-900">Start Here Guide</h1>
+                </div>
+                <a href="index.html" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+                    Launch App
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <div class="pt-16 flex">
+        <!-- Sidebar Navigation -->
+        <aside class="hidden lg:block w-64 flex-shrink-0 border-r border-gray-200 bg-white">
+            <nav class="sidebar-nav p-4 space-y-1">
+                <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-3">Getting Started</div>
+                <a href="#welcome" class="nav-link flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg border-l-4 border-transparent transition-colors">
+                    <span>Welcome</span>
+                </a>
+                <a href="#overview" class="nav-link flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg border-l-4 border-transparent transition-colors">
+                    <span>App Overview</span>
+                </a>
+
+                <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 mt-6 px-3">Core Features</div>
+                <a href="#chord-lab" class="nav-link flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg border-l-4 border-transparent transition-colors">
+                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                    <span>Chord Lab</span>
+                </a>
+                <a href="#composition-studio" class="nav-link flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg border-l-4 border-transparent transition-colors">
+                    <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                    <span>Composition Studio</span>
+                </a>
+                <a href="#ai-recommendations" class="nav-link flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg border-l-4 border-transparent transition-colors">
+                    <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                    <span>AI Recommendations</span>
+                </a>
+                <a href="#scale-explorer" class="nav-link flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg border-l-4 border-transparent transition-colors">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>Scale Explorer</span>
+                </a>
+                <a href="#theory-academy" class="nav-link flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg border-l-4 border-transparent transition-colors">
+                    <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                    <span>Theory Academy</span>
+                </a>
+
+                <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 mt-6 px-3">Reference</div>
+                <a href="#keyboard-shortcuts" class="nav-link flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg border-l-4 border-transparent transition-colors">
+                    <span>Keyboard Shortcuts</span>
+                </a>
+                <a href="#tips" class="nav-link flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg border-l-4 border-transparent transition-colors">
+                    <span>Tips & Tricks</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 min-w-0">
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+
+                <!-- Welcome Section -->
+                <section id="welcome" class="guide-section mb-16">
+                    <div class="text-center mb-12">
+                        <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl mb-6">
+                            <svg class="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                        </div>
+                        <h1 class="text-4xl font-bold text-gray-900 mb-4">Welcome to Interactive Music Theory Lab</h1>
+                        <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+                            Your comprehensive tool for learning music theory, building chords, creating progressions, and composing melodies.
+                        </p>
+                    </div>
+
+                    <div class="callout callout-tip p-4 rounded-lg mb-8">
+                        <div class="flex gap-3">
+                            <svg class="w-6 h-6 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                            <div>
+                                <div class="font-semibold text-emerald-800">New to music theory?</div>
+                                <p class="text-emerald-700 text-sm mt-1">Start with the <a href="#theory-academy" class="underline font-medium">Theory Academy</a> tab for structured lessons that will teach you from the basics.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2 class="text-2xl font-bold text-gray-900 mb-6">What can you do here?</h2>
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div class="feature-card bg-white rounded-xl p-5 border border-gray-200">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-amber-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                                </div>
+                                <h3 class="font-semibold text-gray-900">Build Chords</h3>
+                            </div>
+                            <p class="text-sm text-gray-600">Explore 50+ chord types with inversions, voicings, and hear how they sound on the interactive piano.</p>
+                        </div>
+                        <div class="feature-card bg-white rounded-xl p-5 border border-gray-200">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                </div>
+                                <h3 class="font-semibold text-gray-900">Create Progressions</h3>
+                            </div>
+                            <p class="text-sm text-gray-600">Build chord progressions, organize them into sections, and see them rendered as professional notation.</p>
+                        </div>
+                        <div class="feature-card bg-white rounded-xl p-5 border border-gray-200">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                                </div>
+                                <h3 class="font-semibold text-gray-900">Get AI Suggestions</h3>
+                            </div>
+                            <p class="text-sm text-gray-600">Press Tab to open the AI-powered recommendations modal for chord, melody, and harmonization ideas.</p>
+                        </div>
+                        <div class="feature-card bg-white rounded-xl p-5 border border-gray-200">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-10 h-10 rounded-lg bg-rose-100 flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                                </div>
+                                <h3 class="font-semibold text-gray-900">Learn Music Theory</h3>
+                            </div>
+                            <p class="text-sm text-gray-600">Interactive lessons from basics to advanced concepts, with quizzes and hands-on exercises.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- App Overview Section -->
+                <section id="overview" class="guide-section mb-16">
+                    <h2 class="text-3xl font-bold text-gray-900 mb-6">App Overview</h2>
+                    <p class="text-gray-600 mb-8">The app is organized into four main tabs, each serving a specific purpose. You can switch between tabs using the navigation at the top of the screen.</p>
+
+                    <div class="space-y-4">
+                        <div class="bg-white rounded-xl p-6 border border-gray-200">
+                            <div class="flex items-start gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-900 mb-1">Chord Lab</h3>
+                                    <p class="text-gray-600 text-sm mb-3">Your workspace for building and exploring individual chords. Select a root note and chord type, adjust inversions and voicings, and hear how it sounds.</p>
+                                    <div class="flex flex-wrap gap-2">
+                                        <span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded">50+ chord types</span>
+                                        <span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded">Inversions</span>
+                                        <span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded">Voice controls</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl p-6 border border-gray-200">
+                            <div class="flex items-start gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-900 mb-1">Composition Studio</h3>
+                                    <p class="text-gray-600 text-sm mb-3">Build chord progressions, arrange them into song sections, add melodies, and see everything rendered as professional sheet music notation.</p>
+                                    <div class="flex flex-wrap gap-2">
+                                        <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">Progressions</span>
+                                        <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">Sections</span>
+                                        <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">Notation</span>
+                                        <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">Playback</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl p-6 border border-gray-200">
+                            <div class="flex items-start gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-900 mb-1">Scale Explorer</h3>
+                                    <p class="text-gray-600 text-sm mb-3">Explore major, minor, and modal scales. See fingering patterns on the keyboard and understand which chords belong to each scale.</p>
+                                    <div class="flex flex-wrap gap-2">
+                                        <span class="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded">All modes</span>
+                                        <span class="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded">Fingerings</span>
+                                        <span class="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded">Related chords</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl p-6 border border-gray-200">
+                            <div class="flex items-start gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-900 mb-1">Theory Academy</h3>
+                                    <p class="text-gray-600 text-sm mb-3">Structured lessons from foundational concepts to advanced theory. Interactive exercises, quizzes, and a songwriting wizard to apply what you learn.</p>
+                                    <div class="flex flex-wrap gap-2">
+                                        <span class="px-2 py-1 bg-rose-100 text-rose-700 text-xs font-medium rounded">20+ lessons</span>
+                                        <span class="px-2 py-1 bg-rose-100 text-rose-700 text-xs font-medium rounded">Quizzes</span>
+                                        <span class="px-2 py-1 bg-rose-100 text-rose-700 text-xs font-medium rounded">Songwriting wizard</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Chord Lab Section -->
+                <section id="chord-lab" class="guide-section mb-16">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                        </div>
+                        <h2 class="text-3xl font-bold text-gray-900">Chord Lab</h2>
+                    </div>
+
+                    <p class="text-gray-600 mb-8">The Chord Lab is where you build and explore individual chords. Think of it as your chord workbench - select a root note, choose a chord type, and hear how it sounds.</p>
+
+                    <!-- Building Your First Chord -->
+                    <div class="mb-10">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Building Your First Chord</h3>
+
+                        <div class="space-y-4">
+                            <div class="flex gap-4 items-start">
+                                <span class="step-number">1</span>
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900 mb-1">Select a Root Note</h4>
+                                    <p class="text-gray-600 text-sm">Use the <strong>Root Note</strong> dropdown to choose the base note of your chord (C, D, E, etc.). This is the note the chord is built upon and named after.</p>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-4 items-start">
+                                <span class="step-number">2</span>
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900 mb-1">Choose a Chord Type</h4>
+                                    <p class="text-gray-600 text-sm">Select from 50+ chord types in the <strong>Chord Type</strong> dropdown. Start with basics like Major and Minor, then explore 7ths, suspended, and extended chords.</p>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-4 items-start">
+                                <span class="step-number">3</span>
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900 mb-1">Hear Your Chord</h4>
+                                    <p class="text-gray-600 text-sm">Click the <strong>Play</strong> button or click directly on the highlighted keys on the piano keyboard to hear how your chord sounds.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chord Controls -->
+                    <div class="mb-10">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Chord Controls</h3>
+
+                        <div class="bg-white rounded-xl border border-gray-200 divide-y divide-gray-200">
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Inversion</h4>
+                                <p class="text-gray-600 text-sm">Changes which note is in the bass (lowest position). Root position has the root note in the bass. First inversion puts the 3rd in the bass, second inversion puts the 5th in the bass.</p>
+                            </div>
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Octave</h4>
+                                <p class="text-gray-600 text-sm">Shifts the entire chord up or down in pitch. Lower octaves sound deeper and fuller, higher octaves sound brighter.</p>
+                            </div>
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Left Hand (Bass)</h4>
+                                <p class="text-gray-600 text-sm">Controls what the left hand plays: Off (nothing), Root (single bass note), Fifth (root + fifth), Octave (root in two octaves), or Chord (full chord voicing).</p>
+                            </div>
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Omit Notes</h4>
+                                <p class="text-gray-600 text-sm">Remove specific notes from the chord. Useful for creating open voicings or avoiding note clashes when combining with other instruments.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Adding to Progression -->
+                    <div class="mb-10">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Adding Chords to Your Progression</h3>
+
+                        <div class="callout callout-info p-4 rounded-lg mb-4">
+                            <p class="text-blue-800 text-sm">Once you've built a chord you like, you can add it to your progression to start composing.</p>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div class="flex gap-4 items-start">
+                                <span class="step-number">1</span>
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900 mb-1">Click "Add to Progression"</h4>
+                                    <p class="text-gray-600 text-sm">Find the <strong>Add to Progression</strong> button below the chord controls. This adds your current chord to the end of your progression.</p>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-4 items-start">
+                                <span class="step-number">2</span>
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900 mb-1">View in Progression Strip</h4>
+                                    <p class="text-gray-600 text-sm">Your chord appears in the progression strip at the bottom of the screen. You can see all added chords as cards showing their names.</p>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-4 items-start">
+                                <span class="step-number">3</span>
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900 mb-1">Continue Building</h4>
+                                    <p class="text-gray-600 text-sm">Add more chords to create a complete progression. A typical pop song uses 4-8 chords. Switch to the Composition Studio tab to work with your progression in detail.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- The Piano Keyboard -->
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">The Piano Keyboard</h3>
+                        <p class="text-gray-600 mb-4">The interactive piano keyboard shows you which notes are in your current chord (highlighted keys) and lets you play notes by clicking on them.</p>
+
+                        <div class="bg-gray-100 rounded-xl p-4">
+                            <ul class="space-y-2 text-sm text-gray-700">
+                                <li class="flex items-start gap-2">
+                                    <svg class="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                    <span><strong>Highlighted keys</strong> show the notes in your current chord</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <svg class="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                    <span><strong>Click any key</strong> to hear that individual note</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <svg class="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                    <span><strong>Note names</strong> appear on the keys to help you learn</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <svg class="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                    <span><strong>Colors indicate</strong> chord function when in a progression context</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Composition Studio Section -->
+                <section id="composition-studio" class="guide-section mb-16">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+                        </div>
+                        <h2 class="text-3xl font-bold text-gray-900">Composition Studio</h2>
+                    </div>
+
+                    <p class="text-gray-600 mb-8">The Composition Studio is where your chord progression comes to life. Here you can arrange chords, organize them into sections, add melodies, and see your music rendered as professional notation.</p>
+
+                    <!-- Working with Your Progression -->
+                    <div class="mb-10">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Working with Your Progression</h3>
+
+                        <p class="text-gray-600 mb-4">Your progression appears as a series of chord cards. Each card shows the chord name and can be clicked to select it.</p>
+
+                        <div class="bg-white rounded-xl border border-gray-200 divide-y divide-gray-200">
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Selecting Chords</h4>
+                                <p class="text-gray-600 text-sm">Click on a chord card to select it. Selected chords are highlighted. Hold Shift and click to select multiple adjacent chords.</p>
+                            </div>
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Playing Your Progression</h4>
+                                <p class="text-gray-600 text-sm">Use the <strong>Play</strong> button in the toolbar to hear your entire progression. The currently playing chord will be highlighted.</p>
+                            </div>
+                            <div class="p-4">
+                                <h4 class="font-medium text-gray-900 mb-1">Editing a Chord</h4>
+                                <p class="text-gray-600 text-sm">Double-click a chord card to open the edit panel. Here you can change the chord type, inversion, duration (beats), and other properties.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rearranging Chords -->
+                    <div class="mb-10">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Rearranging Chords</h3>
+
+                        <div class="space-y-4">
+                            <div class="flex gap-4 items-start">
+                                <span class="step-number">1</span>
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900 mb-1">Drag and Drop</h4>
+                                    <p class="text-gray-600 text-sm">Click and hold on a chord card, then drag it to a new position. Release to drop it in place. Other chords will shift to make room.</p>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-4 items-start">
+                                <span class="step-number">2</span>
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900 mb-1">Delete Chords</h4>
+                                    <p class="text-gray-600 text-sm">Select a chord and press <kbd class="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">Delete</kbd> or <kbd class="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">Backspace</kbd>, or use the delete button that appears on hover.</p>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-4 items-start">
+                                <span class="step-number">3</span>
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900 mb-1">Duplicate Chords</h4>
+                                    <p class="text-gray-600 text-sm">Right-click a chord to access the context menu with options to duplicate, copy, or paste chords.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Toolbar Actions -->
+                    <div class="mb-10">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Toolbar Actions</h3>
+
+                        <div class="grid sm:grid-cols-2 gap-3">
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <div class="w-6 h-6 rounded bg-indigo-100 flex items-center justify-center">
+                                        <span class="text-indigo-600 text-xs font-bold">+</span>
+                                    </div>
+                                    <span class="font-medium text-gray-900 text-sm">+Add Chord</span>
+                                </div>
+                                <p class="text-gray-600 text-xs">Opens the chord selector to add a new chord to your progression.</p>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <div class="w-6 h-6 rounded bg-purple-100 flex items-center justify-center">
+                                        <span class="text-purple-600 text-xs font-bold">+</span>
+                                    </div>
+                                    <span class="font-medium text-gray-900 text-sm">+Add Section</span>
+                                </div>
+                                <p class="text-gray-600 text-xs">Groups selected chords into a section (Verse, Chorus, Bridge, etc.).</p>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <div class="w-6 h-6 rounded bg-blue-100 flex items-center justify-center">
+                                        <svg class="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6z"/></svg>
+                                    </div>
+                                    <span class="font-medium text-gray-900 text-sm">Song Builder</span>
+                                </div>
+                                <p class="text-gray-600 text-xs">Opens the song structure builder to arrange sections into a full song.</p>
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <div class="w-6 h-6 rounded bg-red-100 flex items-center justify-center">
+                                        <svg class="w-3 h-3 text-red-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9z" clip-rule="evenodd"/></svg>
+                                    </div>
+                                    <span class="font-medium text-gray-900 text-sm">Clear</span>
+                                </div>
+                                <p class="text-gray-600 text-xs">Removes all chords from your progression. Use with caution!</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Musical Notation -->
+                    <div class="mb-10">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Musical Notation</h3>
+
+                        <p class="text-gray-600 mb-4">Your progression is automatically rendered as professional sheet music notation. The notation shows:</p>
+
+                        <ul class="space-y-2 text-gray-600 mb-4">
+                            <li class="flex items-start gap-2">
+                                <svg class="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                <span><strong>Grand staff</strong> with treble and bass clefs</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <svg class="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                <span><strong>Chord symbols</strong> above the staff (C, Am7, F, etc.)</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <svg class="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                <span><strong>Melody notes</strong> in the treble clef (if added)</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <svg class="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                <span><strong>Bass notes</strong> in the bass clef</span>
+                            </li>
+                        </ul>
+
+                        <div class="callout callout-tip p-4 rounded-lg">
+                            <div class="flex gap-3">
+                                <svg class="w-6 h-6 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                                <div>
+                                    <div class="font-semibold text-emerald-800">Export your notation</div>
+                                    <p class="text-emerald-700 text-sm mt-1">Use the Export button to save your composition as a PDF lead sheet, MIDI file, or shareable link.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- AI Recommendations Section -->
+                <section id="ai-recommendations" class="guide-section mb-16">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                        </div>
+                        <h2 class="text-3xl font-bold text-gray-900">AI Recommendations</h2>
+                    </div>
+
+                    <p class="text-gray-600 mb-8">The AI-powered Recommendations Modal is your creative assistant. It analyzes your current progression and suggests chords, melodies, and harmonizations that will sound great.</p>
+
+                    <div class="callout callout-info p-4 rounded-lg mb-8">
+                        <div class="flex gap-3">
+                            <svg class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <div>
+                                <div class="font-semibold text-blue-800">Quick Access</div>
+                                <p class="text-blue-700 text-sm mt-1">Press <kbd class="px-1.5 py-0.5 bg-blue-100 border border-blue-300 rounded text-xs font-mono">Tab</kbd> anywhere in the app to open the Recommendations Modal. Press <kbd class="px-1.5 py-0.5 bg-blue-100 border border-blue-300 rounded text-xs font-mono">R</kbd> as an alternative.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Opening the Modal -->
+                    <div class="mb-10">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Opening the Modal</h3>
+
+                        <div class="space-y-3">
+                            <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                                <kbd class="px-2 py-1 bg-white border border-gray-300 rounded text-sm font-mono shadow-sm">Tab</kbd>
+                                <span class="text-gray-700">Opens the modal with chord suggestions</span>
+                            </div>
+                            <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                                <kbd class="px-2 py-1 bg-white border border-gray-300 rounded text-sm font-mono shadow-sm">R</kbd>
+                                <span class="text-gray-700">Alternative shortcut to open recommendations</span>
+                            </div>
+                            <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                                <kbd class="px-2 py-1 bg-white border border-gray-300 rounded text-sm font-mono shadow-sm">Shift + Tab</kbd>
+                                <span class="text-gray-700">Opens directly to Melody suggestions tab</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recommendation Types -->
+                    <div class="mb-10">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">What You Can Get</h3>
+
+                        <div class="space-y-4">
+                            <div class="bg-white rounded-xl p-5 border border-gray-200">
+                                <h4 class="font-semibold text-gray-900 mb-2">Chord Suggestions</h4>
+                                <p class="text-gray-600 text-sm mb-3">Get intelligent suggestions for what chord should come next in your progression. Each suggestion includes:</p>
+                                <ul class="space-y-1 text-sm text-gray-600">
+                                    <li>- The suggested chord with Roman numeral analysis</li>
+                                    <li>- A score indicating how well it fits</li>
+                                    <li>- An explanation of why it works</li>
+                                    <li>- Preview playback before adding</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-white rounded-xl p-5 border border-gray-200">
+                                <h4 class="font-semibold text-gray-900 mb-2">Melody Ideas</h4>
+                                <p class="text-gray-600 text-sm mb-3">Get suggestions for melody notes and phrases that fit over your chord progression:</p>
+                                <ul class="space-y-1 text-sm text-gray-600">
+                                    <li>- Individual note suggestions with chord tone analysis</li>
+                                    <li>- Melodic phrases and patterns</li>
+                                    <li>- Style-aware suggestions (pop, jazz, classical, etc.)</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-white rounded-xl p-5 border border-gray-200">
+                                <h4 class="font-semibold text-gray-900 mb-2">Auto-Harmonize</h4>
+                                <p class="text-gray-600 text-sm mb-3">Have the AI generate harmonies for your existing melody:</p>
+                                <ul class="space-y-1 text-sm text-gray-600">
+                                    <li>- Parallel harmonies (thirds, sixths)</li>
+                                    <li>- Countermelody suggestions</li>
+                                    <li>- Voice leading optimization</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Using Suggestions -->
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Using Suggestions</h3>
+
+                        <div class="space-y-4">
+                            <div class="flex gap-4 items-start">
+                                <span class="step-number">1</span>
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900 mb-1">Preview</h4>
+                                    <p class="text-gray-600 text-sm">Hover over or click a suggestion to preview how it sounds with your existing progression.</p>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-4 items-start">
+                                <span class="step-number">2</span>
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900 mb-1">Apply</h4>
+                                    <p class="text-gray-600 text-sm">Click the Apply button (or double-click) to add the suggestion to your composition.</p>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-4 items-start">
+                                <span class="step-number">3</span>
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-gray-900 mb-1">Undo if Needed</h4>
+                                    <p class="text-gray-600 text-sm">Press <kbd class="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">Ctrl+Z</kbd> to undo any changes you don't like.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Scale Explorer Section -->
+                <section id="scale-explorer" class="guide-section mb-16">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                        </div>
+                        <h2 class="text-3xl font-bold text-gray-900">Scale Explorer</h2>
+                    </div>
+
+                    <p class="text-gray-600 mb-6">The Scale Explorer helps you understand scales and modes - the foundation of melody writing. See which notes belong to each scale and how they map to the keyboard.</p>
+
+                    <div class="bg-white rounded-xl border border-gray-200 divide-y divide-gray-200">
+                        <div class="p-4">
+                            <h4 class="font-medium text-gray-900 mb-1">Select a Scale</h4>
+                            <p class="text-gray-600 text-sm">Choose from major, natural minor, harmonic minor, melodic minor, and all seven modes (Dorian, Phrygian, Lydian, etc.).</p>
+                        </div>
+                        <div class="p-4">
+                            <h4 class="font-medium text-gray-900 mb-1">Choose a Root</h4>
+                            <p class="text-gray-600 text-sm">Select the starting note (root) for your scale. The keyboard will highlight all notes in that scale.</p>
+                        </div>
+                        <div class="p-4">
+                            <h4 class="font-medium text-gray-900 mb-1">View Fingerings</h4>
+                            <p class="text-gray-600 text-sm">See suggested fingering patterns for playing the scale on piano.</p>
+                        </div>
+                        <div class="p-4">
+                            <h4 class="font-medium text-gray-900 mb-1">Related Chords</h4>
+                            <p class="text-gray-600 text-sm">Discover which chords naturally belong to each scale - essential for writing progressions that sound cohesive.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Theory Academy Section -->
+                <section id="theory-academy" class="guide-section mb-16">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                        </div>
+                        <h2 class="text-3xl font-bold text-gray-900">Theory Academy</h2>
+                    </div>
+
+                    <p class="text-gray-600 mb-8">The Theory Academy is your structured learning path through music theory. Whether you're a complete beginner or looking to deepen your knowledge, there's a lesson path for you.</p>
+
+                    <div class="callout callout-tip p-4 rounded-lg mb-8">
+                        <div class="flex gap-3">
+                            <svg class="w-6 h-6 text-emerald-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                            <div>
+                                <div class="font-semibold text-emerald-800">Recommended for Beginners</div>
+                                <p class="text-emerald-700 text-sm mt-1">If you're new to music theory, start here! The Foundational lessons will teach you notes, scales, and intervals before moving on to chords.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Learning Paths -->
+                    <div class="mb-10">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Learning Paths</h3>
+
+                        <div class="space-y-4">
+                            <div class="bg-white rounded-xl p-5 border border-gray-200">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded">Foundational</span>
+                                    <span class="text-gray-400 text-sm">Lessons 1-5</span>
+                                </div>
+                                <h4 class="font-semibold text-gray-900 mb-1">The Basics</h4>
+                                <p class="text-gray-600 text-sm">What is a note? Sharps and flats. Octaves. Introduction to scales. Understanding intervals.</p>
+                            </div>
+
+                            <div class="bg-white rounded-xl p-5 border border-gray-200">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">Beginner</span>
+                                    <span class="text-gray-400 text-sm">Lessons 6-11</span>
+                                </div>
+                                <h4 class="font-semibold text-gray-900 mb-1">Chords & Progressions</h4>
+                                <p class="text-gray-600 text-sm">What is a chord? Major vs minor. Your first progression. Why chords "want" to move. The most popular progression.</p>
+                            </div>
+
+                            <div class="bg-white rounded-xl p-5 border border-gray-200">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded">Intermediate</span>
+                                    <span class="text-gray-400 text-sm">Lessons 12-17</span>
+                                </div>
+                                <h4 class="font-semibold text-gray-900 mb-1">Advanced Harmony</h4>
+                                <p class="text-gray-600 text-sm">7th chords. Borrowed chords. Secondary dominants. Voice leading principles.</p>
+                            </div>
+
+                            <div class="bg-white rounded-xl p-5 border border-gray-200">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded">Advanced</span>
+                                    <span class="text-gray-400 text-sm">Lessons 18-21</span>
+                                </div>
+                                <h4 class="font-semibold text-gray-900 mb-1">Professional Techniques</h4>
+                                <p class="text-gray-600 text-sm">Modal interchange. Tritone substitution. Complex chord voicings. Jazz harmony.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Songwriting Wizard -->
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-4">Songwriting Wizard</h3>
+                        <p class="text-gray-600 mb-4">Don't know where to start? The Songwriting Wizard guides you through creating your first song step by step:</p>
+
+                        <ol class="space-y-2 text-gray-600">
+                            <li class="flex items-start gap-2">
+                                <span class="font-medium text-gray-900">1.</span>
+                                <span>Choose a mood (Happy, Sad, Energetic, Dreamy, etc.)</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="font-medium text-gray-900">2.</span>
+                                <span>Preview the suggested progression</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="font-medium text-gray-900">3.</span>
+                                <span>Customize the key and variations</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="font-medium text-gray-900">4.</span>
+                                <span>Get melody writing tips</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="font-medium text-gray-900">5.</span>
+                                <span>Export to the Composition Studio and start creating!</span>
+                            </li>
+                        </ol>
+                    </div>
+                </section>
+
+                <!-- Keyboard Shortcuts Section -->
+                <section id="keyboard-shortcuts" class="guide-section mb-16">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-600 to-gray-700 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                        </div>
+                        <h2 class="text-3xl font-bold text-gray-900">Keyboard Shortcuts</h2>
+                    </div>
+
+                    <p class="text-gray-600 mb-6">Speed up your workflow with these keyboard shortcuts. Press <kbd class="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">?</kbd> anywhere in the app to see the full list.</p>
+
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div class="bg-white rounded-xl p-4 border border-gray-200">
+                            <h4 class="font-medium text-gray-900 mb-3">Global</h4>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Open recommendations</span>
+                                    <kbd class="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">Tab</kbd>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Keyboard shortcuts</span>
+                                    <kbd class="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">?</kbd>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Undo</span>
+                                    <kbd class="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">Ctrl+Z</kbd>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Redo</span>
+                                    <kbd class="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">Ctrl+Shift+Z</kbd>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Close modal</span>
+                                    <kbd class="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">Esc</kbd>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl p-4 border border-gray-200">
+                            <h4 class="font-medium text-gray-900 mb-3">Recommendations</h4>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Alternative open</span>
+                                    <kbd class="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">R</kbd>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Melody suggestions</span>
+                                    <kbd class="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-mono">Shift+Tab</kbd>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Tips Section -->
+                <section id="tips" class="guide-section mb-16">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                        </div>
+                        <h2 class="text-3xl font-bold text-gray-900">Tips & Tricks</h2>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="callout callout-tip p-4 rounded-lg">
+                            <h4 class="font-semibold text-emerald-800 mb-1">Start Simple</h4>
+                            <p class="text-emerald-700 text-sm">Begin with just 4 chords. Many hit songs use only C, G, Am, and F. Master the basics before exploring complex chords.</p>
+                        </div>
+
+                        <div class="callout callout-tip p-4 rounded-lg">
+                            <h4 class="font-semibold text-emerald-800 mb-1">Use the AI</h4>
+                            <p class="text-emerald-700 text-sm">Don't know what chord comes next? Press Tab to get AI suggestions. The explanations help you learn why certain chords work together.</p>
+                        </div>
+
+                        <div class="callout callout-tip p-4 rounded-lg">
+                            <h4 class="font-semibold text-emerald-800 mb-1">Listen, Don't Just Look</h4>
+                            <p class="text-emerald-700 text-sm">Always play your progressions! Your ears are the best judge. If something sounds wrong, trust that instinct.</p>
+                        </div>
+
+                        <div class="callout callout-tip p-4 rounded-lg">
+                            <h4 class="font-semibold text-emerald-800 mb-1">Learn by Doing</h4>
+                            <p class="text-emerald-700 text-sm">The Theory Academy lessons include interactive exercises. Actually building chords and progressions helps concepts stick better than just reading about them.</p>
+                        </div>
+
+                        <div class="callout callout-warning p-4 rounded-lg">
+                            <h4 class="font-semibold text-amber-800 mb-1">Save Your Work</h4>
+                            <p class="text-amber-700 text-sm">Use the Export feature to save your compositions. You can export as PDF, MIDI, or a shareable link.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Ready to Start -->
+                <section class="text-center py-12 border-t border-gray-200">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">Ready to Start Creating?</h2>
+                    <p class="text-gray-600 mb-6">You now have everything you need to begin your music theory journey.</p>
+                    <a href="index.html" class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition-colors">
+                        <span>Launch the App</span>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </a>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Active nav highlighting script -->
+    <script>
+        // Highlight active nav item based on scroll position
+        const sections = document.querySelectorAll('.guide-section');
+        const navLinks = document.querySelectorAll('.nav-link');
+
+        function updateActiveNav() {
+            let currentSection = '';
+
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop - 100;
+                if (window.scrollY >= sectionTop) {
+                    currentSection = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + currentSection) {
+                    link.classList.add('active');
+                }
+            });
+        }
+
+        window.addEventListener('scroll', updateActiveNav);
+        updateActiveNav();
+    </script>
+</body>
+</html>

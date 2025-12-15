@@ -210,3 +210,38 @@ export function showModalHTML(htmlContent, showButton = true) {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 }
+
+/**
+ * Show the About modal
+ */
+export function showAboutModal() {
+    const modal = document.getElementById('about-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+
+        // Close sidebar if open and reset header opacity
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        const header = document.getElementById('main-header');
+        if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
+            sidebar.classList.add('-translate-x-full');
+            if (overlay) overlay.classList.add('hidden');
+        }
+        // Always reset header opacity when opening About modal
+        if (header) {
+            header.style.opacity = '1';
+        }
+    }
+}
+
+/**
+ * Hide the About modal
+ */
+export function hideAboutModal() {
+    const modal = document.getElementById('about-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
