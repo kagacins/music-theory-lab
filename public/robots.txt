@@ -3,6 +3,7 @@
 
 User-agent: *
 Allow: /
+Allow: /sitemap.xml
 
 # Sitemap location
 Sitemap: https://imtl.net/sitemap.xml
