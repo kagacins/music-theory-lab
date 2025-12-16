@@ -188,10 +188,13 @@ export function switchTab(tabId, options = {}) {
     const headerExpandCollapse = document.getElementById('header-expand-collapse-group');
     if (headerExpandCollapse) {
         // Show controls for tabs that have collapsible sections
+        // Use invisible instead of hidden to maintain layout consistency
         if (tabId === 'builder' || tabId === 'melody') {
-            headerExpandCollapse.classList.remove('hidden');
+            headerExpandCollapse.classList.remove('invisible');
+            headerExpandCollapse.classList.add('visible');
         } else {
-            headerExpandCollapse.classList.add('hidden');
+            headerExpandCollapse.classList.remove('visible');
+            headerExpandCollapse.classList.add('invisible');
         }
     }
 

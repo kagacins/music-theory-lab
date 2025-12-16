@@ -568,7 +568,7 @@
     <div id="main-app" class="hidden">
     <div class="max-w-7xl mx-auto">
         <!-- Main Header -->
-        <div id="main-header" class="grid items-center bg-white/95 backdrop-blur-md px-2 rounded-lg shadow-md mb-1 sticky top-1 z-20 border border-gray-200 transition-all duration-300 h-14 overflow-hidden" style="grid-template-columns: auto 1fr auto;">
+        <div id="main-header" class="grid items-center bg-white/95 backdrop-blur-md px-2 rounded-lg shadow-md mb-1 border border-gray-200 transition-all duration-300 h-14 overflow-hidden" style="grid-template-columns: auto 1fr auto;">
             <!-- Left side: Sidebar Toggle -->
             <div class="flex items-center gap-1.5 justify-start h-full">
                 <button id="sidebar-toggle" onclick="window.toggleSidebar && window.toggleSidebar()" class="p-1 rounded hover:bg-gray-200 transition flex-shrink-0" title="Open Menu & Settings">
@@ -641,7 +641,7 @@
                 <div class="hidden xl:block w-px h-8 bg-gray-200"></div>
 
                 <!-- Expand/Collapse All Hover Button (tab-specific) -->
-                <div id="header-expand-collapse-group" class="relative hidden">
+                <div id="header-expand-collapse-group" class="relative">
                     <div class="group relative">
                         <!-- Chevron Icon (always visible) -->
                         <button class="p-1 text-gray-500 hover:text-gray-700 transition-colors rounded-lg hover:bg-gray-100" title="Expand/Collapse All Sections">
@@ -689,7 +689,7 @@
         </div>
 
         <!-- Visual Piano Keyboard (Shared) -->
-        <section id="keyboard-section" class="mb-2 sticky z-10" style="top: calc(var(--header-height, 76px) + 0.5rem);">
+        <section id="keyboard-section" class="mb-2">
             <div id="piano-keyboard" class="keyboard rounded-md shadow-inner bg-gray-200">
                 <!-- Keys injected here by JS -->
             </div>
@@ -701,7 +701,7 @@
         </section>
 
         <!-- Sticky Action Bar - Shown on Chord Lab and Composition Studio -->
-        <section id="action-bar" class="hidden sticky z-10 mb-2 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-md px-3 py-2" style="top: calc(var(--header-height, 76px) + var(--keyboard-height, 120px) + 1rem);">
+        <section id="action-bar" class="hidden mb-2 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-lg shadow-md px-3 py-2">
             <div class="flex items-center justify-between gap-3 flex-wrap">
                 <!-- Left: Playback Controls with Dropdown -->
                 <div class="flex items-center gap-2">

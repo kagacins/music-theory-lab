@@ -42,7 +42,7 @@
 
     /* Layout dimensions */
     --header-height: 60px;
-    --keyboard-height: 120px;
+    --keyboard-height: 180px;
 
     /* Card styling */
     --card-bg: #ffffff;
@@ -117,12 +117,7 @@ body[data-active-tab="learn"] .builder-only {
     display: none !important;
 }
 
-/* Force keyboard section to be sticky on ALL tabs */
-#keyboard-section {
-    position: -webkit-sticky !important;
-    position: sticky !important;
-    /* Keep z-index at 10 (from HTML class) so action-bar can appear below it properly */
-}
+/* Keyboard positioning is handled by the fixed positioning rules below */
 
 /* Section header + panel visual connection */
 /* Remove rounded bottom corners from header buttons when panel is open */
@@ -220,6 +215,89 @@ body[data-active-tab="learn"] .builder-only {
 body {
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     min-height: 100vh;
+}
+
+/* ============================================================================
+   Fixed header + keyboard stack (Chord Lab behavior, consistent on all tabs)
+   ----------------------------------------------------------------------------
+   Goal: tab content scrolls "under" the title bar + keyboard, without the
+   sticky elements ever being pushed off-screen near the bottom on short tabs.
+   This keeps window scrolling (no nested scroll container), so existing
+   scrollTo/scrollIntoView logic continues to work.
+   ============================================================================ */
+:root {
+    /* Matches body padding: p-4 (1rem) / sm:p-8 (2rem) in index.html */
+    --app-edge-pad: 1rem;
+    /* Tailwind max-w-7xl = 80rem */
+    --app-max-width: 80rem;
+}
+
+@media (min-width: 640px) {
+    :root {
+        --app-edge-pad: 2rem;
+    }
+}
+
+/* =============================================================================
+   FIXED POSITIONING FOR HEADER, KEYBOARD, AND ACTION BAR
+
+   Layout (top to bottom):
+   - Header: 0.5rem from top of viewport
+   - Keyboard: 0.5rem gap below header
+   - Action bar: 0.25rem gap below keyboard (only on builder/melody)
+   - Content: 0.5rem gap below action bar (or keyboard on scales/learn)
+   ============================================================================= */
+
+/* Header - fixed at top */
+#main-header {
+    position: fixed !important;
+    top: 0.5rem !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: calc(100vw - (2 * var(--app-edge-pad))) !important;
+    max-width: var(--app-max-width) !important;
+    z-index: 20 !important;
+}
+
+/* Keyboard - fixed below header with tiny gap */
+/* Header is h-14 (56px) + 0.5rem from top + 4px gap = 68px from top */
+#keyboard-section {
+    position: fixed !important;
+    top: 68px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: calc(100vw - (2 * var(--app-edge-pad))) !important;
+    max-width: var(--app-max-width) !important;
+    z-index: 15 !important;
+}
+
+/* Action bar - fixed below keyboard with tiny gap */
+/* Keyboard at 68px + keyboard height 180px + 4px gap = 252px */
+#action-bar {
+    position: fixed !important;
+    top: 252px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: calc(100vw - (2 * var(--app-edge-pad))) !important;
+    max-width: var(--app-max-width) !important;
+    z-index: 14 !important;
+}
+
+#action-bar:not(.hidden) {
+    display: flex !important;
+}
+
+/* Content padding - Chord Lab and Composition Studio (has action bar) */
+/* Action bar at 252px + action bar height ~40px + 0px gap = 292px */
+#main-app > .max-w-7xl.mx-auto {
+    padding-top: 280px;
+}
+
+/* Content padding - Scale Explorer and Theory Academy (no action bar) */
+/* Keyboard at 68px + keyboard height 180px + 2px gap = 250px */
+body[data-active-tab="scales"] #main-app > .max-w-7xl.mx-auto,
+body[data-active-tab="learn"] #main-app > .max-w-7xl.mx-auto {
+    padding-top: 230px !important;
 }
 
 /* Sidebar - Modern Glass Effect */

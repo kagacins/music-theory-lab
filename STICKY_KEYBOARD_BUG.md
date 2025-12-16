@@ -1,5 +1,14 @@
 # Sticky Keyboard Bug - Problem Definition
 
+## UPDATE: New Findings
+
+When keyboard uses `position: fixed` - it works on ALL tabs (stays in place)
+When keyboard uses `position: sticky` - it works on Chord Lab and Composition Studio, but BREAKS on Scale Explorer and Theory Academy
+
+The keyboard's sticky `top` value references the header position. On Scale Explorer and Theory Academy, "the keyboard does not know where to stop" - it scrolls past where it should stick.
+
+**Key question to answer:** What is different about Scale Explorer and Theory Academy that prevents the keyboard from "knowing" where to stop when using `position: sticky`?
+
 ## The Problem
 
 The title bar (`#main-header`) and keyboard (`#keyboard-section`) should be "sticky" - they scroll up slightly, then lock in place while the rest of the page content scrolls behind them.
@@ -75,17 +84,40 @@ The title bar (`#main-header`) and keyboard (`#keyboard-section`) should be "sti
 - `music.css` - Main styles
 - `src/modules/ui/tabs.js` - Tab switching logic
 
-## CSS Applied to Sticky Elements
+## CSS Applied to Sticky Elements (Current State after ChatGPT changes)
 
 ```css
-/* From index.html inline */
-#main-header: class="sticky top-1 z-20"
-#keyboard-section: class="mb-2 sticky z-10" style="top: calc(var(--header-height, 76px) + 0.5rem);"
+/* From music.css - ChatGPT's changes to fix sticky on all tabs */
+:root {
+    --app-edge-pad: 1rem;  /* 2rem on screens >= 640px */
+    --app-max-width: 80rem;
+}
 
-/* From music.css */
+/* Space reserved for fixed header */
+#main-app > .max-w-7xl.mx-auto {
+    padding-top: calc(
+        var(--app-edge-pad) +
+        var(--header-height, 76px) +
+        0.5rem
+    );
+}
+
+/* Header is FIXED (not sticky) */
+#main-header {
+    position: fixed !important;
+    top: var(--app-edge-pad) !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: calc(100vw - (2 * var(--app-edge-pad))) !important;
+    max-width: var(--app-max-width) !important;
+}
+
+/* Keyboard is STICKY - this works on builder/melody but NOT scales/learn */
 #keyboard-section {
     position: -webkit-sticky !important;
     position: sticky !important;
+    top: calc(var(--app-edge-pad) + var(--header-height, 76px) + 0.5rem) !important;
+    z-index: 15 !important;
 }
 ```
 
