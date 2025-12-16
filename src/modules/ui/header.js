@@ -50,9 +50,14 @@ export function updateKeySignatureDisplay(key) {
     }
 
     if (imageInfo && trebleImg) {
-        // Use BASE_URL for correct path in production (GitHub Pages with base path)
-        const basePath = import.meta.env?.BASE_URL || '/';
-        trebleImg.src = `${basePath}key_signatures/${imageInfo.treble}`;
+        // Use absolute path for consistent loading across environments
+        const newSrc = `/key_signatures/${imageInfo.treble}`;
+
+        // Only update if the src is actually different to avoid unnecessary reloads
+        if (trebleImg.src !== newSrc && !trebleImg.src.endsWith(imageInfo.treble)) {
+            trebleImg.style.opacity = '1'; // Reset opacity in case of previous error
+            trebleImg.src = newSrc;
+        }
     }
 
     // Show the enharmonic label if an equivalent key was used for the image
