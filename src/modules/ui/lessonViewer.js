@@ -84,6 +84,8 @@ async function playChord(root, chordType, duration = 1.2) {
             'major7': 'Major 7th',
             'minor7': 'Minor 7th',
             'diminished': 'Diminished',
+            'diminished7': 'Diminished 7th',
+            'halfDiminished7': 'Half-Diminished 7th',
             'augmented': 'Augmented'
         };
 
