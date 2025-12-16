@@ -5361,9 +5361,6 @@ function showAdvancedExplanationModal(item) {
     const chordSymbol = CHORD_DEFINITIONS[chordType]?.symbol || '';
     const chordName = `${chordRoot}${chordSymbol}`;
 
-    // All available keys for the selector
-    const allKeys = ['C', 'C#', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-
     // Generate content based on type
     let title = '';
     let headerGradient = '';
@@ -5424,11 +5421,6 @@ function showAdvancedExplanationModal(item) {
         return recommendationHTML + explanationHTML;
     };
 
-    // Build key selector dropdown options
-    const keyOptions = allKeys.map(k =>
-        `<option value="${k}" ${k === key ? 'selected' : ''}>${k}</option>`
-    ).join('');
-
     const modalHTML = `
         <div id="advanced-explanation-modal" class="fixed inset-0 flex items-center justify-center p-4" style="background: rgba(0,0,0,0.6); z-index: 100001;">
             <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col">
@@ -5436,13 +5428,7 @@ function showAdvancedExplanationModal(item) {
                 <div class="bg-gradient-to-r ${headerGradient} px-6 py-4 flex items-center justify-between">
                     <div>
                         <h2 class="text-lg font-bold text-white">${title}</h2>
-                        <div class="flex items-center gap-2 mt-1">
-                            <span class="text-white/80 text-sm">Key of</span>
-                            <select id="advanced-modal-key-selector" class="bg-white text-gray-900 text-sm rounded px-2 py-0.5 border border-white/30 cursor-pointer hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50">
-                                ${keyOptions}
-                            </select>
-                            <span class="text-white/80 text-sm">major</span>
-                        </div>
+                        <p class="text-white/80 text-sm mt-1">Key of ${key} major</p>
                     </div>
                     <button id="close-advanced-modal" class="text-white/80 hover:text-white transition-colors">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5457,8 +5443,7 @@ function showAdvancedExplanationModal(item) {
                 </div>
 
                 <!-- Footer -->
-                <div class="px-6 py-4 bg-gray-50 border-t flex items-center justify-between">
-                    <span class="text-xs text-gray-500">Change the key to see examples in different keys</span>
+                <div class="px-6 py-4 bg-gray-50 border-t flex justify-end">
                     <button id="dismiss-advanced-modal" class="px-4 py-2 bg-gradient-to-r ${headerGradient} text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium">
                         Got it!
                     </button>
@@ -5473,8 +5458,6 @@ function showAdvancedExplanationModal(item) {
     const modal = document.getElementById('advanced-explanation-modal');
     const closeBtn = document.getElementById('close-advanced-modal');
     const dismissBtn = document.getElementById('dismiss-advanced-modal');
-    const keySelector = document.getElementById('advanced-modal-key-selector');
-    const contentEl = document.getElementById('advanced-modal-content');
 
     const closeModal = () => modal.remove();
 
@@ -5482,12 +5465,6 @@ function showAdvancedExplanationModal(item) {
     dismissBtn.addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => {
         if (e.target === modal) closeModal();
-    });
-
-    // Key selector change handler - update content in real-time
-    keySelector.addEventListener('change', (e) => {
-        const selectedKey = e.target.value;
-        contentEl.innerHTML = generateContent(selectedKey);
     });
 
     const handleEscape = (e) => {

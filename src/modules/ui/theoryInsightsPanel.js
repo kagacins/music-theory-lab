@@ -246,6 +246,41 @@ const CONCEPT_EXPLANATIONS = {
 **Common uses:** Classical, jazz, adding intensity before a cadence.
 
 **In {{KEY}} major:** {{ii}}dim → {{V}} → {{I}} intensifies the standard ii - V - I progression.`
+    },
+    // Sequence Patterns
+    'DESCENDING_FIFTHS': {
+        title: 'Descending Fifths (Circle of Fifths)',
+        summary: 'Root motion descending by perfect fifths',
+        explanation: `Descending fifths motion follows the circle of fifths backwards, creating one of the strongest harmonic progressions in Western music.
+
+**Why it works:**
+• Each chord's root is a perfect 5th below the previous
+• Creates natural voice leading as each chord resolves to the next
+• The pattern has been used for centuries because it sounds so natural
+
+**Common sequences:**
+• vi → ii → V → I (the most common)
+• iii → vi → ii → V → I (full diatonic circle)
+• I → IV → vii° → iii → vi → ii → V → I
+
+**In {{KEY}} major:** Try {{vi}}m → {{ii}}m → {{V}} → {{I}} for a classic descending fifths sound.`
+    },
+    'II_V_CHAIN': {
+        title: 'ii-V Chain',
+        summary: 'Sequential ii-V patterns moving through keys',
+        explanation: `A ii-V chain is a series of ii-V progressions that move through different key centers, common in jazz and sophisticated pop.
+
+**Why it works:**
+• Each ii-V creates expectation for a resolution
+• The chain creates harmonic momentum
+• Can target diatonic or chromatic destinations
+
+**Common patterns:**
+• ii-V/V → ii-V/IV → ii-V/I (secondary dominants chain)
+• Descending by whole steps or half steps
+• "Coltrane Changes" use rapid ii-V chains
+
+**In {{KEY}} major:** A basic chain might be: {{iii}}m7 → {{VI}}7 → {{ii}}m7 → {{V}}7 → {{I}}, where {{iii}}m7-{{VI}}7 is a ii-V targeting {{ii}}.`
     }
 };
 
