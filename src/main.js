@@ -1,19 +1,19 @@
 /**
  * Main Entry Point
  * Initializes the application and exposes necessary functions to the global scope for HTML event handlers
- * 
+ *
  * GOOGLE CUSTOM SEARCH API CONFIGURATION:
- * Internet search for "Search Song Chords" feature is enabled.
- * 
- * SECURITY WARNING: API keys in client-side code are visible to anyone.
- * Consider using a backend proxy for production deployments.
- * 
+ * - Production (Netlify): Uses serverless function with env vars (API key hidden)
+ * - Local dev: Uses VITE_GOOGLE_SEARCH_API_KEY from .env.local
+ *
  * See GOOGLE_SEARCH_API_SETUP.md for detailed setup instructions.
  */
 
 // Google Custom Search API Configuration
-window.GOOGLE_SEARCH_API_KEY = 'AIzaSyCKMAccLd1yCc9tuTWmCBItpnB7QxtZiWo';
-window.GOOGLE_SEARCH_ENGINE_ID = '6233b4a886ca64ede';
+// In production, these will be undefined and the Netlify function will be used instead
+// In local dev, these come from .env.local (gitignored)
+window.GOOGLE_SEARCH_API_KEY = import.meta.env.VITE_GOOGLE_SEARCH_API_KEY || '';
+window.GOOGLE_SEARCH_ENGINE_ID = import.meta.env.VITE_GOOGLE_SEARCH_ENGINE_ID || '';
 
 // Import all necessary modules
 import { switchTab, refreshAllTabs, initTabHistory } from './modules/ui/tabs.js';
