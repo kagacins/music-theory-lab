@@ -1,0 +1,11 @@
+# Robots.txt for Interactive Music Theory Lab
+# https://imtl.net/
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://imtl.net/sitemap.xml
+
+# Disallow admin or private paths (none currently)
+# Disallow: /admin/

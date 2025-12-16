@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4F46E5;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="48" fill="url(#grad)"/>
+  <!-- Music note -->
+  <g fill="white">
+    <!-- Note head 1 -->
+    <ellipse cx="35" cy="65" rx="10" ry="8" transform="rotate(-20, 35, 65)"/>
+    <!-- Note head 2 -->
+    <ellipse cx="65" cy="55" rx="10" ry="8" transform="rotate(-20, 65, 55)"/>
+    <!-- Stems -->
+    <rect x="43" y="25" width="4" height="42"/>
+    <rect x="73" y="15" width="4" height="42"/>
+    <!-- Beam -->
+    <polygon points="43,25 77,15 77,22 43,32"/>
+  </g>
+</svg>
