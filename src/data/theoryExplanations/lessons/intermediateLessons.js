@@ -1437,6 +1437,268 @@ The same principles that make chord progressions smooth apply to melody:
       ],
       passingScore: 3
     }
+  },
+
+  // =====================================================
+  // Rhythm & Meter Concepts
+  // =====================================================
+  {
+    id: 'lesson-rhythm-meter',
+    path: 'intermediate',
+    title: 'Rhythm & Meter Concepts',
+    subtitle: 'Understanding time signatures, beats, and groove',
+    estimatedTime: '14 min',
+    icon: '🥁',
+
+    learn: {
+      introduction: `We've focused a lot on harmony - chords, scales, progressions. But rhythm is equally important! Let's explore the fundamental concepts that organize music in time.
+
+**What is Meter?**
+
+Meter is the organization of beats into regular groups. When you tap your foot to music, you're feeling the meter.
+
+**Time Signatures Explained:**
+
+A time signature like **4/4** tells you two things:
+- **Top number (4):** How many beats per measure
+- **Bottom number (4):** What note value gets one beat (4 = quarter note)
+
+So 4/4 means: four quarter-note beats per measure.
+
+**Simple vs Compound Meter:**
+
+**Simple Meters** divide beats into 2:
+- 2/4: Two beats per measure (March: LEFT-right, LEFT-right)
+- 3/4: Three beats per measure (Waltz: ONE-two-three, ONE-two-three)
+- 4/4: Four beats per measure (Most pop/rock/hip-hop)
+
+**Compound Meters** divide beats into 3:
+- 6/8: Two main beats, each divided into 3 eighth notes (da-da-DA, da-da-DA)
+- 9/8: Three main beats, each divided into 3
+- 12/8: Four main beats, each divided into 3 (Blues, slow rock ballads)
+
+**The Difference Feels Huge:**
+- 3/4 = ONE-two-three (waltz feel, three equal beats)
+- 6/8 = ONE-two-three-FOUR-five-six (two big beats, each triplet-subdivided)
+
+**Strong and Weak Beats:**
+
+In 4/4:
+- Beat 1: Strongest (downbeat)
+- Beat 3: Second strongest
+- Beats 2 & 4: Weak beats (but snare drums often hit here - backbeat!)
+
+This hierarchy creates the "groove" feel of different styles.
+
+**Syncopation: The Spice of Rhythm**
+
+Syncopation means emphasizing beats (or parts of beats) that are normally weak.
+
+Examples:
+- Playing on the "and" of beat 2 instead of beat 3
+- Accenting beat 2 and 4 heavily (backbeat)
+- Anticipating the downbeat by playing just before beat 1
+
+Syncopation creates excitement, tension, and groove. It's essential in:
+- Jazz (heavily syncopated melodies)
+- Funk (guitar/keyboard syncopation)
+- Reggae (offbeat emphasis)
+- Latin music (complex syncopation patterns)
+
+**Swing Feel vs Straight:**
+
+**Straight feel:** Each beat divides evenly into two equal parts (ta-ta, ta-ta)
+
+**Swing feel:** Each beat divides into a long-short pattern (taa-ta, taa-ta)
+- Often written as eighth notes but played with a triplet feel
+- The "skip" in jazz, blues, and classic rock
+- Makes music feel bouncy and alive
+
+**Pickup Measures (Anacrusis):**
+
+Many songs don't start on beat 1. The notes before the first downbeat are called the **pickup** or **anacrusis**.
+
+Example: "Happy Birthday" starts before the downbeat - "Hap-py" are pickup notes, "BIRTH-day" lands on beat 1.
+
+**Hemiola:**
+
+Hemiola is a rhythmic device where you temporarily feel the music in a different grouping.
+
+Example: In 6/8 (normally felt as 2 groups of 3), hemiola makes you hear 3 groups of 2 instead.
+- Normal: da-da-DA da-da-DA (two big beats)
+- Hemiola: da-DA da-DA da-DA (three medium beats)
+
+Creates tension and interest, common in classical music and jazz.
+
+**Polyrhythm:**
+
+Polyrhythm means two (or more) different rhythmic patterns happening simultaneously.
+
+Common example: 3 against 2
+- One hand plays 3 evenly spaced notes
+- Other hand plays 2 evenly spaced notes
+- They align at the beginning and end of the cycle
+
+Polyrhythms are fundamental to African music and appear throughout jazz, funk, and modern pop.`,
+
+      keyPoints: [
+        {
+          title: 'Simple vs Compound Changes Everything',
+          explanation: 'Simple meters (2/4, 3/4, 4/4) divide beats into 2; compound meters (6/8, 9/8, 12/8) divide beats into 3. A song in 3/4 (waltz) feels completely different from 6/8 (compound duple), even though both have "six eighth notes" per measure. The grouping changes the feel.',
+          analogy: 'Like organizing 6 eggs: two cartons of 3 vs three cartons of 2 - same eggs, different feel.'
+        },
+        {
+          title: 'Syncopation Creates Groove',
+          explanation: 'By emphasizing normally weak beats or off-beats, syncopation adds energy and forward motion. Every genre uses it differently - funk syncopates heavily, classical music uses it sparingly. Without syncopation, music feels square and mechanical.',
+          analogy: 'Like adding spice to food - the right amount of "wrongness" makes it more interesting.'
+        },
+        {
+          title: 'Swing Transforms the Feel',
+          explanation: 'The same written notes played straight vs. swung sound like different songs. Swing gives music a bouncy, lilting quality that defines jazz and blues. The long-short pattern is usually about 2:1 but varies by tempo and style.',
+          analogy: 'Like the difference between walking and skipping - same distance, completely different feel.'
+        },
+        {
+          title: 'The Backbeat is Everywhere',
+          explanation: 'In 4/4, putting emphasis on beats 2 and 4 (instead of 1 and 3) is called the backbeat. It\'s the foundation of rock, pop, R&B, and most modern music. The snare drum usually plays the backbeat while the kick drum anchors beat 1.',
+          analogy: 'The backbeat is like the "off" color in a design - by emphasizing what\'s normally background, you create energy.'
+        }
+      ],
+
+      summary: 'Meter organizes music into regular beat patterns. Simple meters (4/4, 3/4) divide beats into 2; compound meters (6/8, 12/8) divide into 3. Syncopation emphasizes weak beats for groove and energy. Swing creates a long-short feel instead of even divisions. The backbeat (emphasis on 2 and 4) defines modern popular music. Understanding rhythm and meter helps you feel and create more compelling music.'
+    },
+
+    hearIt: {
+      title: 'Hear different meters and rhythmic concepts',
+      examples: [
+        {
+          label: '4/4 Common Time (120 BPM)',
+          description: 'The backbone of rock and pop: ONE-two-THREE-four. Listen for the steady quarter-note pulse.',
+          playAction: { type: 'rhythmic_demo', meter: '4/4', tempo: 120, chords: ['C', 'Am', 'F', 'G'], withClick: true }
+        },
+        {
+          label: '3/4 Waltz Time (100 BPM)',
+          description: 'ONE-two-three, ONE-two-three. The elegant 3-beat dance feel - notice how different it feels!',
+          playAction: { type: 'rhythmic_demo', meter: '3/4', tempo: 100, chords: ['C', 'G', 'Am', 'F'], withClick: true }
+        },
+        {
+          label: '6/8 Compound Meter (160 BPM)',
+          description: 'TWO groups of THREE: ONE-two-three-FOUR-five-six. Common in ballads and Irish music.',
+          playAction: { type: 'rhythmic_demo', meter: '6/8', tempo: 160, chords: ['C', 'F', 'G', 'C'], withClick: true }
+        },
+        {
+          label: '4/4 with Swing Feel',
+          description: 'Same 4/4 meter but with swing - the off-beats are slightly delayed for that jazzy bounce.',
+          playAction: { type: 'rhythmic_demo', meter: '4/4', tempo: 110, chords: ['Cmaj7', 'Am7', 'Dm7', 'G7'], withClick: true, feel: 'swing' }
+        },
+        {
+          label: '5/4 Odd Meter (Take Five style)',
+          description: 'ONE-two-three-FOUR-five. An unusual 5-beat pattern - feels "off" until you lock in!',
+          playAction: { type: 'rhythmic_demo', meter: '5/4', tempo: 140, chords: ['Dm7', 'Gm7', 'Dm7', 'Am7'], withClick: true }
+        }
+      ],
+      famousSongs: [
+        '"Blue Danube" (Strauss) - Classic 3/4 waltz',
+        '"We Will Rock You" (Queen) - Powerful 4/4 stomp',
+        '"House of the Rising Sun" - 6/8 compound meter feel',
+        '"Take Five" (Dave Brubeck) - Famous 5/4 jazz',
+        '"Money" (Pink Floyd) - Unusual 7/4 meter',
+        '"Africa" (Toto) - Complex polyrhythms',
+        '"Superstition" (Stevie Wonder) - Heavy syncopation and groove',
+        '"Billie Jean" (Michael Jackson) - Perfect backbeat'
+      ]
+    },
+
+    tryIt: null,
+
+    experiment: {
+      title: 'Explore rhythmic concepts',
+      prompt: 'Play these progressions and focus on how rhythm changes the feel:',
+      challenges: [
+        {
+          label: 'Count in 4/4: C - F - G - C',
+          hint: 'Feel: ONE-two-THREE-four for each chord',
+          solution: { progression: ['C', 'F', 'G', 'C'] }
+        },
+        {
+          label: 'Same chords, 3/4 feel: C - F - G - C',
+          hint: 'Now feel: ONE-two-three for each chord (waltz)',
+          solution: { progression: ['C', 'F', 'G', 'C'] }
+        },
+        {
+          label: 'Blues in 12/8: C7 - F7 - C7 - G7',
+          hint: 'Feel triplet subdivisions: da-da-DA for each beat',
+          solution: { progression: ['C7', 'F7', 'C7', 'G7'] }
+        },
+        {
+          label: 'Syncopated anticipation: G - C (play C early)',
+          hint: 'Instead of playing C on beat 1, play it on the "and" of beat 4',
+          solution: { progression: ['G', 'C'] }
+        }
+      ],
+      freePlay: {
+        prompt: 'Build a 4-chord progression and experiment with playing it in different meters. Try counting in 4/4, then 3/4, then as if it were in 12/8. How does the feel change?',
+        openBuilder: true
+      }
+    },
+
+    quiz: {
+      title: 'Rhythm & Meter Quiz',
+      questions: [
+        {
+          id: 'q1',
+          type: 'multiple_choice',
+          question: 'What does the top number in a time signature tell you?',
+          options: [
+            'How fast to play',
+            'How many beats per measure',
+            'What note gets one beat',
+            'How many measures in the song'
+          ],
+          correctIndex: 1,
+          explanation: 'The top number tells you how many beats per measure. In 4/4, there are 4 beats per measure. In 3/4, there are 3 beats per measure.'
+        },
+        {
+          id: 'q2',
+          type: 'multiple_choice',
+          question: 'What is the main difference between simple and compound meters?',
+          options: [
+            'Compound meters are faster',
+            'Simple meters are for classical music only',
+            'Simple divides beats into 2; compound divides beats into 3',
+            'Compound meters have more measures'
+          ],
+          correctIndex: 2,
+          explanation: 'Simple meters (2/4, 3/4, 4/4) naturally divide each beat into 2 equal parts. Compound meters (6/8, 9/8, 12/8) divide each beat into 3 parts (triplet feel).'
+        },
+        {
+          id: 'q3',
+          type: 'multiple_choice',
+          question: 'What is syncopation?',
+          options: [
+            'Playing in time',
+            'Emphasizing normally weak beats or off-beats',
+            'Playing faster',
+            'Using compound meter'
+          ],
+          correctIndex: 1,
+          explanation: 'Syncopation is the emphasis of normally weak beats or off-beats. It creates groove, energy, and forward motion - essential in jazz, funk, reggae, and most popular music.'
+        },
+        {
+          id: 'q4',
+          type: 'multiple_choice',
+          question: 'What is the "backbeat" in 4/4 time?',
+          options: [
+            'The beat at the back of the measure',
+            'Playing softer on beats 2 and 4',
+            'Emphasis on beats 2 and 4 instead of 1 and 3',
+            'The last beat of a song'
+          ],
+          correctIndex: 2,
+          explanation: 'The backbeat is the emphasis on beats 2 and 4 in 4/4 time. It\'s the foundation of rock, pop, R&B, and most modern music - typically played by the snare drum.'
+        }
+      ],
+      passingScore: 3
+    }
   }
 ];
 

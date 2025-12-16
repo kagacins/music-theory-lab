@@ -357,7 +357,18 @@ When you move notes to different octaves while keeping the same three pitches, y
 All three are C Major - same notes, just rearranged! But each has a different character:
 - Root position sounds **stable and grounded**
 - First inversion sounds **lighter and flowing**
-- Second inversion sounds **suspended and wanting to resolve**`,
+- Second inversion sounds **suspended and wanting to resolve**
+
+**Slash Chord Notation:**
+
+You'll often see inversions written as "slash chords" like **C/E** or **G/B**. This means:
+- The letter before the slash is the chord (C major)
+- The letter after the slash is the bass note (E)
+
+So **C/E** = "C major with E in the bass" = first inversion!
+And **C/G** = "C major with G in the bass" = second inversion!
+
+This notation is used everywhere in lead sheets, chord charts, and tabs.`,
 
       keyPoints: [
         {
@@ -379,6 +390,11 @@ All three are C Major - same notes, just rearranged! But each has a different ch
           title: 'Second inversion creates tension',
           explanation: 'Second inversion (fifth in bass) often sounds unstable and wants to resolve. It\'s commonly used right before a final chord.',
           analogy: 'Like leaning forward before taking a step - there\'s built-in momentum.'
+        },
+        {
+          title: 'Slash notation tells you the bass note',
+          explanation: 'When you see C/E, read it as "C over E" - a C chord with E in the bass. The note after the slash is always the bass note. G/B means G chord with B in the bass (first inversion of G).',
+          analogy: 'Think of the slash as a dividing line: chord name on top, bass note on the bottom - just like in the actual music!'
         }
       ],
 
@@ -650,7 +666,6 @@ This progression is used in thousands of songs because it tells a complete music
     subtitle: 'Understanding tension and resolution',
     estimatedTime: '7 min',
     icon: '➡️',
-    // No tutorial for this lesson yet
 
     learn: {
       introduction: `You've felt it - some chords feel "finished" and some feel like they need to go somewhere. But why?

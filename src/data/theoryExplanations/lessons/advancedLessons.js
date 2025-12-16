@@ -973,6 +973,835 @@ The higher you stack, the more "jazz" you get!`,
       ],
       passingScore: 3
     }
+  },
+
+  // =====================================================
+  // Counterpoint Fundamentals
+  // =====================================================
+  {
+    id: 'lesson-counterpoint',
+    path: 'advanced',
+    title: 'Counterpoint Fundamentals',
+    subtitle: 'The art of combining independent melodic lines',
+    estimatedTime: '18 min',
+    icon: '🎼',
+
+    learn: {
+      introduction: `Counterpoint is one of the oldest and most sophisticated techniques in music - the art of combining multiple independent melodies that work together harmonically. Bach was the master, but these principles appear everywhere from fugues to rock guitar harmonies.
+
+**What is Counterpoint?**
+
+Counterpoint (from Latin "punctus contra punctum" - point against point, or note against note) is the technique of combining two or more independent melodic lines. Unlike homophonic music (melody + accompaniment), in counterpoint, EVERY voice is a melody.
+
+**Why Study Counterpoint?**
+
+Even if you never write a fugue, counterpoint skills will:
+- Make your bass lines more interesting (they become melodies!)
+- Create better inner voice movement in your arrangements
+- Help you understand why certain progressions sound "good" or "wrong"
+- Improve your ear for voice independence
+
+**The Species of Counterpoint:**
+
+Historically, counterpoint was taught in five "species" of increasing complexity:
+
+**First Species (1:1)** - Note against note
+- One note in the counterpoint for each note in the cantus firmus (fixed melody)
+- Only consonances on strong beats
+- No parallel 5ths or octaves
+- Movement should be mostly stepwise with occasional leaps
+
+**Second Species (2:1)** - Two notes against one
+- Two notes in counterpoint for each note in cantus firmus
+- Allows passing dissonances on weak beats
+- Dissonances must resolve by step
+
+**Third Species (4:1)** - Four notes against one
+- More freedom for passing tones and neighbor tones
+- Creates flowing, decorative lines
+
+**Fourth Species** - Suspensions
+- The counterpoint is offset, creating suspensions
+- Dissonance on strong beat resolves to consonance
+- The "sigh" of 4-3 and 7-6 suspensions
+
+**Fifth Species (Florid)** - Free counterpoint
+- Combines all previous species
+- Maximum melodic freedom
+
+**The Fundamental Rules:**
+
+1. **Avoid Parallel 5ths and Octaves**
+   - Two voices moving to a 5th from a 5th (G-D to A-E)
+   - Two voices moving to an octave from an octave
+   - These intervals are so pure they destroy independence
+
+2. **Use Contrary Motion**
+   - When one voice goes up, the other goes down
+   - Creates the strongest independence
+
+3. **Balance Steps and Leaps**
+   - Melodic lines should be mostly stepwise
+   - If you leap, follow with a step in the opposite direction
+   - Avoid consecutive leaps in the same direction
+
+4. **Resolve Dissonances**
+   - Dissonances (2nds, 7ths, tritone) must resolve by step
+   - Usually resolve down to a consonance
+
+5. **Avoid Voice Crossing**
+   - Keep soprano above alto, alto above tenor, etc.
+   - Crossing destroys the sense of independent lines
+
+**Consonant vs Dissonant Intervals:**
+
+**Perfect Consonances** (strong, stable):
+- Unison, Perfect 5th, Octave
+- Use on strong beats
+
+**Imperfect Consonances** (warm, preferred):
+- Major/Minor 3rds, Major/Minor 6ths
+- The workhorses of counterpoint
+
+**Dissonances** (tension, need resolution):
+- 2nds, 7ths, Tritone
+- Only on weak beats (in early species)
+- Must resolve by step`,
+
+      keyPoints: [
+        {
+          title: 'Each Voice Must Be a Melody',
+          explanation: 'In true counterpoint, if you isolated any single voice, it would make sense as a melody on its own. The bass isn\'t just roots, the tenor isn\'t just filler - each line has direction, shape, and musical meaning. This is what makes Bach\'s music so rich.',
+          analogy: 'Like a conversation where everyone has something interesting to say, not just one person talking while others nod.'
+        },
+        {
+          title: 'Parallel 5ths and Octaves Destroy Independence',
+          explanation: 'These "perfect" intervals are so acoustically pure that when two voices move in parallel 5ths or octaves, they merge into one sound. The voices lose their independence. This is why the rule exists - not arbitrarily, but to preserve the texture.',
+          analogy: 'Like two people saying the exact same thing at the same time - you only hear one voice, not two independent thoughts.'
+        },
+        {
+          title: 'Contrary Motion is King',
+          explanation: 'When one voice moves up while another moves down, they maintain maximum independence. Good counterpoint features more contrary motion than parallel or similar motion. It\'s the most effective way to keep voices distinct.',
+          analogy: 'Like two dancers moving past each other in opposite directions - you clearly see two separate paths.'
+        },
+        {
+          title: 'Dissonance Creates and Releases Tension',
+          explanation: 'Dissonances (2nds, 7ths, tritones) are essential for creating interest, but they must be handled carefully. In strict counterpoint, they appear on weak beats and resolve by step to consonances. Suspensions delay the expected consonance, creating delicious tension.',
+          analogy: 'Dissonance is like salt in cooking - essential for flavor, but too much ruins the dish. And it must be balanced with resolution.'
+        }
+      ],
+
+      summary: 'Counterpoint is the art of combining independent melodic lines. The fundamental rules - avoid parallel 5ths/octaves, use contrary motion, balance steps and leaps, resolve dissonances - serve to maintain voice independence. Even if you never write a fugue, counterpoint skills improve bass lines, arrangements, and harmonic understanding. Bach\'s works are the gold standard, but these principles appear throughout music history.'
+    },
+
+    hearIt: {
+      title: 'Hear counterpoint principles',
+      examples: [
+        {
+          label: 'Contrary motion with inversions',
+          description: 'Bass descends C-B-A (LH in blue) while upper voices stay stable (RH in orange). Inversions create independent voice movement.',
+          playAction: {
+            type: 'two_hand_progression',
+            chords: [
+              { name: 'C', lh: ['C3'], rh: ['E4', 'G4'] },
+              { name: 'G/B', lh: ['B2'], rh: ['D4', 'G4'] },
+              { name: 'Am', lh: ['A2'], rh: ['C4', 'E4'] }
+            ]
+          }
+        },
+        {
+          label: 'Ascending bass line',
+          description: 'Bass ascends stepwise: F-G-A-B-C (LH). The inversions create a smooth melodic bass.',
+          playAction: {
+            type: 'two_hand_progression',
+            chords: [
+              { name: 'F', lh: ['F2'], rh: ['A4', 'C5'] },
+              { name: 'G', lh: ['G2'], rh: ['B4', 'D5'] },
+              { name: 'Am', lh: ['A2'], rh: ['C4', 'E4'] },
+              { name: 'G/B', lh: ['B2'], rh: ['D4', 'G4'] },
+              { name: 'C', lh: ['C3'], rh: ['E4', 'G4'] }
+            ]
+          }
+        },
+        {
+          label: 'Parallel 3rds (good)',
+          description: 'All voices move together in 3rds - C-E to D-F to E-G. Parallel but maintains independence.',
+          playAction: {
+            type: 'two_hand_progression',
+            chords: [
+              { name: 'C', lh: ['C3'], rh: ['E4', 'G4'] },
+              { name: 'Dm', lh: ['D3'], rh: ['F4', 'A4'] },
+              { name: 'Em', lh: ['E3'], rh: ['G4', 'B4'] }
+            ]
+          }
+        },
+        {
+          label: '4-3 Suspension',
+          description: 'The 4th (F over C) holds over, then resolves to the 3rd (E). Classic counterpoint.',
+          playAction: {
+            type: 'two_hand_progression',
+            chords: [
+              { name: 'Csus4', lh: ['C3'], rh: ['F4', 'G4'] },
+              { name: 'C', lh: ['C3'], rh: ['E4', 'G4'] }
+            ]
+          }
+        },
+        {
+          label: '7-6 Suspension',
+          description: 'The 7th (B) holds and resolves down to 6th (A). Expressive and beautiful.',
+          playAction: {
+            type: 'two_hand_progression',
+            chords: [
+              { name: 'Cmaj7', lh: ['C3'], rh: ['E4', 'G4', 'B4'] },
+              { name: 'C6', lh: ['C3'], rh: ['E4', 'G4', 'A4'] }
+            ]
+          }
+        },
+        {
+          label: 'Bach-style walking bass',
+          description: 'Bass walks stepwise: C-B-A-G#-A (LH). Contrary to upper voices (RH) - a melody in its own right!',
+          playAction: {
+            type: 'two_hand_progression',
+            chords: [
+              { name: 'C', lh: ['C3'], rh: ['E4', 'G4'] },
+              { name: 'G/B', lh: ['B2'], rh: ['D4', 'G4'] },
+              { name: 'Am', lh: ['A2'], rh: ['C4', 'E4'] },
+              { name: 'E/G#', lh: ['G#2'], rh: ['B4', 'E4'] },
+              { name: 'Am', lh: ['A2'], rh: ['C4', 'E4'] }
+            ]
+          }
+        }
+      ],
+      famousSongs: [
+        'Bach\'s Two-Part Inventions - The best introduction to counterpoint',
+        'Bach\'s Cello Suites - Solo counterpoint implying multiple voices',
+        'Handel\'s "Hallelujah Chorus" - Choral counterpoint at its finest',
+        'Pachelbel\'s Canon - Strict canon (round) over a ground bass',
+        '"Eleanor Rigby" (Beatles) - String counterpoint in pop music',
+        'Iron Maiden guitar harmonies - Rock counterpoint in parallel 3rds'
+      ]
+    },
+
+    tryIt: null,
+
+    experiment: {
+      title: 'Practice counterpoint thinking',
+      prompt: 'Use the Progression Workshop to create bass lines that work contrapuntally with melodies:',
+      challenges: [
+        {
+          label: 'Walking bass: C - Am - Dm - G with C-B-A-G bass',
+          hint: 'Use inversions to create a descending bass line against static melody',
+          solution: { progression: ['C', 'Am/C', 'Dm/A', 'G'] }
+        },
+        {
+          label: 'Contrary motion: C - F/A - G/B - C',
+          hint: 'Bass moves up (C-A-B-C) while you imagine melody moving down',
+          solution: { progression: ['C', 'F/A', 'G/B', 'C'] }
+        },
+        {
+          label: 'Suspension chain: Gsus4 - G - Csus4 - C',
+          hint: 'Each suspension resolves before the next one begins',
+          solution: { progression: ['Gsus4', 'G', 'Csus4', 'C'] }
+        }
+      ],
+      freePlay: {
+        prompt: 'Build a 4-chord progression where the bass line is interesting enough to hum on its own. Use inversions to create stepwise motion!',
+        openBuilder: true
+      }
+    },
+
+    quiz: {
+      title: 'Counterpoint Quiz',
+      questions: [
+        {
+          id: 'q1',
+          type: 'multiple_choice',
+          question: 'Why are parallel 5ths and octaves avoided in counterpoint?',
+          options: [
+            'They sound bad',
+            'They are too loud',
+            'They make voices lose independence by merging them acoustically',
+            'They are too difficult to play'
+          ],
+          correctIndex: 2,
+          explanation: 'Perfect intervals (5ths, octaves) are so acoustically pure that parallel motion in these intervals causes voices to fuse together, destroying the sense of independent melodic lines.'
+        },
+        {
+          id: 'q2',
+          type: 'multiple_choice',
+          question: 'What type of voice motion creates the strongest independence?',
+          options: [
+            'Parallel motion',
+            'Similar motion',
+            'Contrary motion',
+            'Oblique motion'
+          ],
+          correctIndex: 2,
+          explanation: 'Contrary motion (one voice up, the other down) creates the strongest sense of independence. It\'s the hallmark of good counterpoint.'
+        },
+        {
+          id: 'q3',
+          type: 'multiple_choice',
+          question: 'What is a 4-3 suspension?',
+          options: [
+            'A chord with the 4th raised to 5th',
+            'A dissonant 4th held over and resolving down to the 3rd',
+            'Playing 4 notes then 3 notes',
+            'A time signature change'
+          ],
+          correctIndex: 1,
+          explanation: 'A 4-3 suspension holds the 4th (from the previous chord) over a new bass note, creating a dissonance that resolves down by step to the 3rd. It\'s one of the most expressive counterpoint devices.'
+        },
+        {
+          id: 'q4',
+          type: 'multiple_choice',
+          question: 'In strict counterpoint, when can dissonances occur?',
+          options: [
+            'Only on strong beats',
+            'Only on weak beats, and must resolve by step',
+            'Anywhere, without restriction',
+            'Never - only consonances allowed'
+          ],
+          correctIndex: 1,
+          explanation: 'In early species counterpoint, dissonances are allowed only on weak beats and must resolve by step to a consonance. Later species introduce suspensions, where dissonances on strong beats resolve down by step.'
+        }
+      ],
+      passingScore: 3
+    }
+  },
+
+  // =====================================================
+  // Modulation Techniques
+  // =====================================================
+  {
+    id: 'lesson-modulation',
+    path: 'advanced',
+    title: 'Modulation Techniques',
+    subtitle: 'How to change keys smoothly (or dramatically)',
+    estimatedTime: '16 min',
+    icon: '🔄',
+
+    learn: {
+      introduction: `Modulation - changing from one key to another - is one of the most powerful tools in a composer's arsenal. It can refresh a song, add drama, create surprise, or lift the energy. Let's explore the different ways to move between keys.
+
+**What is Modulation?**
+
+Modulation is a deliberate change of tonal center - moving from one key to another within a piece of music. Unlike just playing a chromatic chord (which is borrowed or secondary), modulation establishes a NEW home key.
+
+**Types of Modulation:**
+
+**1. Pivot Chord Modulation (Common Chord)**
+The smoothest type. A chord that exists in BOTH keys acts as a "pivot" - you hear it in the old key, but it leads to the new key.
+
+Example: C major to G major
+- Am is vi in C major AND ii in G major
+- Progression: C - F - Am - D7 - G
+- Am is the pivot (vi in C becomes ii in G)
+- The D7 (V7/G) confirms the new key
+
+**2. Common Tone Modulation**
+A single note is held while the harmony changes to a new key. The held note provides continuity.
+
+Example: C major to Ab major
+- Hold the note C (or G, which is in both C and Ab chords)
+- C chord (C-E-G) → Ab chord (Ab-C-Eb)
+- The common tone C bridges the distant keys
+
+**3. Direct Modulation (Phrase Modulation)**
+The most abrupt - simply start the new key without preparation. Often used at the start of a new section.
+
+Example: End a verse in C, start the chorus in Eb
+- No pivot, no preparation
+- Works because the phrase boundary creates a "reset"
+- Very common in pop music (the "truck driver's modulation" up a half-step)
+
+**4. Sequential Modulation**
+A melodic or harmonic pattern repeats at a new pitch level, carrying you to a new key.
+
+Example: ii-V-I in C, then ii-V-I in Db
+- Dm7 - G7 - Cmaj7 | Ebm7 - Ab7 - Dbmaj7
+- The pattern itself creates the logic for the key change
+
+**5. Chromatic Modulation**
+Uses chromatic voice leading (half-step movement) to slip into the new key.
+
+Example: C to E major
+- C - C+ (C-E-G#) - E
+- The G# (a chromatic alteration) becomes the 3rd of E major
+
+**Closely Related vs Distant Keys:**
+
+**Closely related keys** (easy to modulate):
+- Share many common chords
+- Differ by one sharp or flat
+- From C: G, F, Am, Dm, Em
+
+**Distant keys** (need more setup):
+- Few common chords
+- Differ by many sharps/flats
+- From C: Db, Ab, E, B
+
+**The "Truck Driver's Modulation":**
+A famous (infamous?) technique in pop music: modulate up a half-step for the final chorus. Direct, unsubtle, but incredibly effective for adding energy. Think "My Heart Will Go On" or "Livin' on a Prayer."
+
+**Establishing the New Key:**
+
+A modulation isn't complete until the new key is confirmed. Typically:
+- Play the V7 of the new key (creates expectation)
+- Resolve to the new I chord
+- Cadence (V7-I or ii-V-I) solidifies it`,
+
+      keyPoints: [
+        {
+          title: 'Pivot Chords Are Your Smoothest Tool',
+          explanation: 'A pivot chord belongs to both keys - your ear hears it in the context of the old key, then it\'s reinterpreted in the new key. The smoother the reinterpretation (like vi becoming ii), the more seamless the modulation. Find chords that overlap between your two keys.',
+          analogy: 'Like a word with two meanings - the same sound carries you from one context to another.'
+        },
+        {
+          title: 'Direct Modulation Works at Phrase Boundaries',
+          explanation: 'At the start of a new section (verse to chorus, for example), you can simply start in a new key without preparation. The phrase boundary creates a natural "reset" that allows the ear to accept the new key. This is why pop songs can modulate without theory - the form does the work.',
+          analogy: 'Like starting a new chapter in a book - you accept a change of scene because you know you\'re starting fresh.'
+        },
+        {
+          title: 'The V7 Confirms the New Key',
+          explanation: 'A modulation isn\'t "done" until you establish the new key. The most powerful confirmation is playing the V7 of the new key resolving to I. This dominant-tonic motion tells the ear definitively: "This is home now."',
+          analogy: 'V7-I is like signing a contract - it makes the new key official.'
+        },
+        {
+          title: 'Distant Keys Need More Steps',
+          explanation: 'Modulating from C to Db (distant keys with no common chords) requires more effort than C to G (closely related). You might chain through intermediate keys (C→Am→F→Db) or use chromatic common tones. The further you travel, the more bridges you need.',
+          analogy: 'Distant keys are like distant cities - you might need connecting flights instead of a direct route.'
+        }
+      ],
+
+      summary: 'Modulation is changing from one key to another. The main techniques are: pivot chord (a chord common to both keys), common tone (one note bridges the keys), direct modulation (simply start the new key at a phrase boundary), sequential (pattern repeats at new pitch level), and chromatic (half-step voice leading). Closely related keys are easier to modulate between. The V7-I cadence in the new key confirms the modulation.'
+    },
+
+    hearIt: {
+      title: 'Hear different modulation techniques',
+      examples: [
+        {
+          label: 'Pivot chord: C major to G major',
+          description: 'C - Am - D7 - G. Am is vi in C, reinterpreted as ii in G.',
+          playAction: { type: 'progression', chords: ['C', 'Am', 'D7', 'G'] }
+        },
+        {
+          label: 'Pivot chord: C major to A minor (relative minor)',
+          description: 'C - G - Am - E7 - Am. G is V in C, becomes VII in Am. E7 confirms Am.',
+          playAction: { type: 'progression', chords: ['C', 'G', 'Am', 'E7', 'Am'] }
+        },
+        {
+          label: 'Direct modulation up a half-step',
+          description: 'G - D - G, then Ab - Eb - Ab. The classic "truck driver\'s modulation."',
+          playAction: { type: 'progression', chords: ['G', 'D', 'G', 'Ab', 'Eb', 'Ab'] }
+        },
+        {
+          label: 'Sequential modulation: ii-V-I moving up',
+          description: 'Dm7 - G7 - Cmaj7, then Ebm7 - Ab7 - Dbmaj7. Same pattern, new key.',
+          playAction: { type: 'progression', chords: ['Dm7', 'G7', 'Cmaj7', 'Ebm7', 'Ab7', 'Dbmaj7'] }
+        },
+        {
+          label: 'Chromatic modulation: C to E',
+          description: 'C - C+ - E. The augmented chord (C-E-G#) provides the chromatic link.',
+          playAction: { type: 'progression', chords: ['C', 'Caug', 'E'] }
+        },
+        {
+          label: 'Common tone modulation: C to Ab',
+          description: 'C - Ab. The note C is in both chords, bridging very distant keys.',
+          playAction: { type: 'progression', chords: ['C', 'Ab', 'Bb', 'Ab'] }
+        }
+      ],
+      famousSongs: [
+        '"My Heart Will Go On" (Celine Dion) - Famous direct modulation up a half-step',
+        '"Livin\' on a Prayer" (Bon Jovi) - Another "truck driver" half-step modulation',
+        '"Penny Lane" (Beatles) - Multiple key changes using pivot chords',
+        '"I Will Always Love You" (Whitney Houston) - Dramatic key lift',
+        '"Bohemian Rhapsody" (Queen) - Multiple modulations throughout',
+        'Classical sonatas - Typically modulate to V (or relative major) in exposition'
+      ]
+    },
+
+    tryIt: null,
+
+    experiment: {
+      title: 'Practice modulation techniques',
+      prompt: 'Build progressions that change keys:',
+      challenges: [
+        {
+          label: 'Pivot from C to G: C - F - Am - D7 - G',
+          hint: 'Am is vi in C and ii in G - the perfect pivot',
+          solution: { progression: ['C', 'F', 'Am', 'D7', 'G'] }
+        },
+        {
+          label: 'Direct up a half-step: C - G - C, Db - Ab - Db',
+          hint: 'Just start the new key! The pause between makes it work.',
+          solution: { progression: ['C', 'G', 'C', 'Db', 'Ab', 'Db'] }
+        },
+        {
+          label: 'To relative minor: C - Em - Am - E7 - Am',
+          hint: 'E7 (V7 of Am) confirms the modulation to A minor',
+          solution: { progression: ['C', 'Em', 'Am', 'E7', 'Am'] }
+        },
+        {
+          label: 'Circle of fifths chain: C - G - D - A',
+          hint: 'Each chord is V of the next - modulatory but smooth',
+          solution: { progression: ['C', 'G7', 'G', 'D7', 'D', 'A7', 'A'] }
+        }
+      ],
+      freePlay: {
+        prompt: 'Try modulating from C major to a distant key like Ab or E. What pivot chords can you find? What chromatic alterations help bridge the gap?',
+        openBuilder: true
+      }
+    },
+
+    quiz: {
+      title: 'Modulation Quiz',
+      questions: [
+        {
+          id: 'q1',
+          type: 'multiple_choice',
+          question: 'What is a pivot chord modulation?',
+          options: [
+            'Playing two chords at once',
+            'Using a chord that exists in both the old and new keys',
+            'Always using the V chord',
+            'Modulating only to relative minor'
+          ],
+          correctIndex: 1,
+          explanation: 'A pivot chord belongs to both keys. It\'s heard in the context of the old key, then reinterpreted as part of the new key, creating a smooth bridge between them.'
+        },
+        {
+          id: 'q2',
+          type: 'multiple_choice',
+          question: 'What is the "truck driver\'s modulation"?',
+          options: [
+            'Modulating to the relative minor',
+            'Using a pivot chord to modulate down',
+            'A direct modulation up a half-step, often for a final chorus',
+            'Modulating around the circle of fifths'
+          ],
+          correctIndex: 2,
+          explanation: 'The "truck driver\'s modulation" is a direct key change up a half-step, typically for the last chorus. It\'s called that because it\'s straightforward and unsophisticated, but it adds undeniable energy.'
+        },
+        {
+          id: 'q3',
+          type: 'multiple_choice',
+          question: 'How do you confirm a modulation to a new key?',
+          options: [
+            'Play the new key\'s I chord once',
+            'Play the new key\'s V7 resolving to I (cadence)',
+            'Just announce the new key verbally',
+            'There\'s no way to confirm it'
+          ],
+          correctIndex: 1,
+          explanation: 'A modulation is confirmed by cadencing in the new key - typically V7 to I. This dominant-tonic motion tells the ear definitively that a new tonal center has been established.'
+        },
+        {
+          id: 'q4',
+          type: 'multiple_choice',
+          question: 'Which keys are closely related to C major?',
+          options: [
+            'Db, Eb, Ab',
+            'G, F, Am, Dm, Em',
+            'B, F#, C#',
+            'Only A minor'
+          ],
+          correctIndex: 1,
+          explanation: 'Closely related keys share most of their chords. From C major: G and F (differ by one sharp/flat) and their relative minors (Em, Dm, Am) are closely related.'
+        }
+      ],
+      passingScore: 3
+    }
+  },
+
+  // =====================================================
+  // Exotic & Specialized Scales
+  // =====================================================
+  {
+    id: 'lesson-exotic-scales',
+    path: 'advanced',
+    title: 'Exotic & Specialized Scales',
+    subtitle: 'Bebop, Phrygian Dominant, Hungarian Minor, and more',
+    estimatedTime: '17 min',
+    icon: '🌍',
+
+    learn: {
+      introduction: `Beyond major, minor, and the seven modes, there's a world of exotic scales that give music unique colors. These scales are essential for specific genres and can add incredible flavor to your playing.
+
+**Bebop Scales:**
+
+Jazz musicians in the 1940s discovered a brilliant trick: add one chromatic passing tone to make a 7-note scale into an 8-note scale. Why? Because 8 notes fit evenly into a 4-beat measure, keeping chord tones on strong beats!
+
+**Bebop Dominant Scale:**
+Major scale with a passing tone between b7 and root
+- Formula: 1 - 2 - 3 - 4 - 5 - 6 - b7 - 7 - 1
+- C Bebop Dominant: C-D-E-F-G-A-Bb-B-C
+- Use over: Dominant 7th chords (G7, C7)
+- The added major 7th (B) lets you run up and down and always land chord tones on downbeats
+
+**Bebop Major Scale:**
+Major scale with a passing tone between 5 and 6
+- Formula: 1 - 2 - 3 - 4 - 5 - #5 - 6 - 7
+- C Bebop Major: C-D-E-F-G-G#-A-B-C
+- Use over: Major 7th chords
+
+**Bebop Dorian (Minor) Scale:**
+Dorian with a passing tone between 3 and 4
+- Formula: 1 - 2 - b3 - 3 - 4 - 5 - 6 - b7
+- C Bebop Minor: C-D-Eb-E-F-G-A-Bb-C
+- Use over: Minor 7th chords
+- The major 3rd (E) passing tone adds chromaticism
+
+**Phrygian Dominant Scale (Spanish Gypsy):**
+
+This is the 5th mode of harmonic minor - one of the most dramatic scales in music!
+
+- Formula: 1 - b2 - 3 - 4 - 5 - b6 - b7
+- E Phrygian Dominant: E-F-G#-A-B-C-D-E
+- Derived from: A harmonic minor starting on E
+
+**Why it's special:**
+- Has both b2 (dark, Phrygian) AND major 3rd (bright)
+- Creates instant flamenco/Spanish/Middle Eastern sound
+- The interval between b2 and 3 (augmented 2nd) is exotic and dramatic
+- Use over: Dominant 7th chords, especially in minor key contexts
+
+**Where you hear it:**
+- Flamenco guitar
+- Metal (Yngwie Malmsteen, Marty Friedman)
+- Middle Eastern music
+- Film scores (any "desert" or "exotic" scene)
+
+**Hungarian Minor Scale:**
+
+A dramatic scale with TWO augmented 2nds - creating an almost "gypsy" or "Eastern European" flavor.
+
+- Formula: 1 - 2 - b3 - #4 - 5 - b6 - 7
+- C Hungarian Minor: C-D-Eb-F#-G-Ab-B-C
+- Also called: Double Harmonic Minor, Gypsy Minor
+
+**Why it's special:**
+- The #4 combined with b3 and b6 creates incredible tension
+- Two augmented 2nd intervals (b3 to #4, b6 to 7)
+- Very "exotic" and dramatic
+- Common in Hungarian and Eastern European folk music
+
+**Lydian Dominant Scale:**
+
+The 4th mode of melodic minor - essential for jazz!
+
+- Formula: 1 - 2 - 3 - #4 - 5 - 6 - b7
+- C Lydian Dominant: C-D-E-F#-G-A-Bb-C
+- Combines: Lydian's #4 with Mixolydian's b7
+
+**Why it's special:**
+- Use over: Dominant 7th chords (especially #11 chords)
+- Creates sophisticated, "floating" dominant sound
+- The #4 eliminates the typical dominant "darkness"
+- Think: Joe Henderson, Wayne Shorter, modern jazz
+
+**Whole Tone Scale:**
+
+Only 6 notes, all whole steps apart - completely symmetrical!
+
+- Formula: 1 - 2 - 3 - #4 - #5 - b7
+- C Whole Tone: C-D-E-F#-G#-A#-C
+- Only TWO whole tone scales exist (C and Db patterns)
+
+**Why it's special:**
+- No leading tone, no dominant function - pure ambiguity
+- "Dreamy," "floating," "otherworldly" quality
+- Use over: Augmented chords, dominant 7#5
+- Think: Debussy, dream sequences in film
+
+**Diminished Scales:**
+
+Also called "Octatonic" - 8 notes alternating between whole and half steps.
+
+**Half-Whole Diminished:**
+- Formula: H-W-H-W-H-W-H-W (starting with half step)
+- C Half-Whole Dim: C-Db-Eb-E-F#-G-A-Bb-C
+- Use over: Diminished 7th chords, dominant 7b9 chords
+
+**Whole-Half Diminished:**
+- Formula: W-H-W-H-W-H-W-H (starting with whole step)
+- C Whole-Half Dim: C-D-Eb-F-Gb-Ab-A-B-C
+- Use over: Dominant 7th chords (when you want tension)
+
+**Why they're special:**
+- Only THREE diminished scales exist (C, Db, D patterns repeat)
+- Highly symmetrical - transpose by minor 3rd and you get the same notes
+- Creates tension and chromaticism
+- Essential for jazz improvisers`,
+
+      keyPoints: [
+        {
+          title: 'Bebop Scales Keep Chord Tones on Strong Beats',
+          explanation: 'By adding one chromatic passing tone, bebop scales have 8 notes - fitting perfectly into 4 beats. When you run up or down the scale starting on a chord tone, you always land on chord tones on beats 1, 2, 3, and 4. This is the secret to bebop\'s swinging, coherent sound.',
+          analogy: 'Like adding an extra step to a staircase so you always land on the right foot.'
+        },
+        {
+          title: 'Phrygian Dominant is the "Spanish" Sound',
+          explanation: 'The combination of b2 (dark Phrygian flavor) and major 3rd (bright resolution) creates instant drama. The augmented 2nd between b2 and 3 (E-F-G# in E Phrygian Dominant) is the interval that defines flamenco and Middle Eastern music.',
+          analogy: 'It\'s like seeing a sunset and sunrise at the same time - dark and bright in one scale.'
+        },
+        {
+          title: 'Lydian Dominant is Jazz\'s Secret Weapon',
+          explanation: 'Combining the dreamy #4 of Lydian with the bluesy b7 of dominant creates a sophisticated, "outside" sound. Jazz players use it over dominant 7th chords when they want to sound modern and sophisticated without going fully "outside."',
+          analogy: 'It\'s like wearing sneakers with a suit - unexpected combination that works perfectly.'
+        },
+        {
+          title: 'Symmetrical Scales Have Limited Transpositions',
+          explanation: 'The whole tone scale only has 2 versions; the diminished scales only have 3. Because they\'re built on repeating patterns, transposing them eventually gets you back to the same notes. This makes them easier to learn but also gives them a distinctive, "rootless" quality.',
+          analogy: 'Like a hall of mirrors - wherever you start, you see the same pattern.'
+        }
+      ],
+
+      summary: 'Exotic scales add distinctive colors beyond standard modes. Bebop scales add a chromatic passing tone to keep chord tones on strong beats. Phrygian Dominant (5th mode of harmonic minor) creates instant Spanish/Middle Eastern drama. Lydian Dominant (4th mode of melodic minor) gives sophisticated jazz tension. Hungarian Minor has two augmented 2nds for gypsy flavor. Whole tone and diminished scales are symmetrical with limited transpositions. Each scale has specific uses and characteristic sounds.'
+    },
+
+    hearIt: {
+      title: 'Hear exotic scale colors',
+      examples: [
+        {
+          label: 'Phrygian Dominant - Spanish drama',
+          description: 'E-F-G#-A-B-C-D-E. That augmented 2nd (F to G#) is instant flamenco.',
+          playAction: { type: 'scale', root: 'E', scaleType: 'phrygian dominant' }
+        },
+        {
+          label: 'Lydian Dominant - Jazz sophistication',
+          description: 'C-D-E-F#-G-A-Bb-C. The #4 and b7 together: dreamy yet bluesy.',
+          playAction: { type: 'scale', root: 'C', scaleType: 'lydian dominant' }
+        },
+        {
+          label: 'Hungarian Minor - Gypsy fire',
+          description: 'C-D-Eb-F#-G-Ab-B-C. Two augmented 2nds create dramatic tension.',
+          playAction: { type: 'scale', root: 'C', scaleType: 'hungarian minor' }
+        },
+        {
+          label: 'Whole Tone - Dreamlike ambiguity',
+          description: 'C-D-E-F#-G#-A#-C. No half steps, pure floating quality.',
+          playAction: { type: 'scale', root: 'C', scaleType: 'whole tone' }
+        },
+        {
+          label: 'Diminished (Half-Whole) - Tense chromaticism',
+          description: 'C-Db-Eb-E-F#-G-A-Bb-C. Alternating half and whole steps.',
+          playAction: { type: 'scale', root: 'C', scaleType: 'diminished' }
+        },
+        {
+          label: 'Bebop Dominant - Swing lines',
+          description: 'C-D-E-F-G-A-Bb-B-C. The added B keeps chord tones on downbeats.',
+          playAction: { type: 'scale', root: 'C', scaleType: 'bebop dominant' }
+        },
+        {
+          label: 'Harmonic Minor - Dark and classical',
+          description: 'A-B-C-D-E-F-G#-A. The raised 7th creates that "dramatic" sound.',
+          playAction: { type: 'scale', root: 'A', scaleType: 'harmonic minor' }
+        },
+        {
+          label: 'Melodic Minor - Jazzy minor',
+          description: 'A-B-C-D-E-F#-G#-A (ascending). Minor 3rd with major 6th and 7th.',
+          playAction: { type: 'scale', root: 'A', scaleType: 'melodic minor' }
+        }
+      ],
+      famousSongs: [
+        '"Misirlou" (Dick Dale) - Phrygian Dominant throughout',
+        '"Black Star" (Yngwie Malmsteen) - Harmonic minor and Phrygian Dominant',
+        '"Take the A Train" - Lydian Dominant over the opening chord',
+        '"Clair de Lune" (Debussy) - Whole tone scale passages',
+        '"Giant Steps" (Coltrane) - Uses symmetric scales',
+        '"Spain" (Chick Corea) - Phrygian Dominant in the intro',
+        '"Dark Eyes" - Traditional song using Hungarian Minor',
+        '"Confirmation" (Charlie Parker) - Bebop scales throughout'
+      ]
+    },
+
+    tryIt: null,
+
+    experiment: {
+      title: 'Explore exotic scale colors',
+      prompt: 'Use the Scale Explorer to hear these distinctive sounds:',
+      challenges: [
+        {
+          label: 'Flamenco: E Phrygian Dominant over E7',
+          hint: 'Select E as root, Phrygian Dominant as scale type',
+          solution: { progression: ['E7', 'F', 'E7', 'F'] }
+        },
+        {
+          label: 'Jazz: C Lydian Dominant over C7#11',
+          hint: 'The #4 (F#) defines the Lydian sound',
+          solution: { progression: ['C7', 'F', 'C7'] }
+        },
+        {
+          label: 'Dreamy: Whole tone over Caug',
+          hint: 'No leading tone - the scale just floats',
+          solution: { progression: ['Caug', 'Eaug', 'Caug'] }
+        },
+        {
+          label: 'Dark drama: A Harmonic Minor',
+          hint: 'That G# to A gives classical minor its character',
+          solution: { progression: ['Am', 'E7', 'Am'] }
+        }
+      ],
+      freePlay: {
+        prompt: 'Go to the Scale Explorer and compare Harmonic Minor, Melodic Minor, and Phrygian Dominant starting on the same root. Notice how the augmented 2nd appears in different places and changes the character!',
+        openBuilder: true
+      }
+    },
+
+    quiz: {
+      title: 'Exotic Scales Quiz',
+      questions: [
+        {
+          id: 'q1',
+          type: 'multiple_choice',
+          question: 'Why do bebop scales have 8 notes instead of 7?',
+          options: [
+            'To make them harder to play',
+            'So chord tones land on strong beats when played as eighth notes',
+            'Because jazz musicians prefer even numbers',
+            'To add more dissonance'
+          ],
+          correctIndex: 1,
+          explanation: 'Bebop scales add a chromatic passing tone so that 8 notes fit evenly into a 4-beat measure. This ensures chord tones (1, 3, 5, 7) land on strong beats when you run up or down the scale.'
+        },
+        {
+          id: 'q2',
+          type: 'multiple_choice',
+          question: 'What makes Phrygian Dominant sound "Spanish"?',
+          options: [
+            'It has a major 7th',
+            'It has a flat 2nd and major 3rd, creating an augmented 2nd',
+            'It\'s played on Spanish guitars only',
+            'It uses only white keys'
+          ],
+          correctIndex: 1,
+          explanation: 'Phrygian Dominant has a b2 (dark) and major 3rd (bright) - the interval between them (augmented 2nd) is the "Spanish" or "Middle Eastern" sound. It\'s like E-F-G# in E Phrygian Dominant.'
+        },
+        {
+          id: 'q3',
+          type: 'multiple_choice',
+          question: 'How many whole tone scales exist?',
+          options: ['1', '2', '6', '12'],
+          correctIndex: 1,
+          explanation: 'Only 2 whole tone scales exist because the scale is completely symmetrical. C whole tone uses C-D-E-F#-G#-A#. Db whole tone uses Db-Eb-F-G-A-B. Any other starting note just gives you one of these two.'
+        },
+        {
+          id: 'q4',
+          type: 'multiple_choice',
+          question: 'What is Lydian Dominant a mode of?',
+          options: [
+            'Major scale',
+            'Harmonic minor',
+            'Melodic minor',
+            'Whole tone scale'
+          ],
+          correctIndex: 2,
+          explanation: 'Lydian Dominant is the 4th mode of melodic minor. If you play G melodic minor starting on C, you get C Lydian Dominant (C-D-E-F#-G-A-Bb). It combines Lydian\'s #4 with the dominant\'s b7.'
+        }
+      ],
+      passingScore: 3
+    }
   }
 ];
 

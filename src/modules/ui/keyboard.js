@@ -30,7 +30,7 @@ export let lastTouchTime = 0;
  */
 export function clearHighlights() {
     document.querySelectorAll('.key').forEach(key => {
-        key.classList.remove('active-scale', 'active-progression', 'active-builder', 'active-scale-explorer', 'active-scale-playback', 'active-builder-playback', 'active-melody-playback', 'active-lesson-playback');
+        key.classList.remove('active-scale', 'active-progression', 'active-builder', 'active-scale-explorer', 'active-scale-playback', 'active-builder-playback', 'active-melody-playback', 'active-lesson-playback', 'active-lesson-lh', 'active-lesson-rh');
     });
 }
 
@@ -56,11 +56,11 @@ export function highlightLessonNotes(notes) {
 }
 
 /**
- * Clear only lesson playback highlights
+ * Clear only lesson playback highlights (including LH/RH highlights)
  */
 export function clearLessonHighlights() {
-    document.querySelectorAll('.active-lesson-playback').forEach(el => {
-        el.classList.remove('active-lesson-playback');
+    document.querySelectorAll('.active-lesson-playback, .active-lesson-lh, .active-lesson-rh').forEach(el => {
+        el.classList.remove('active-lesson-playback', 'active-lesson-lh', 'active-lesson-rh');
     });
 }
 

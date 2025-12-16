@@ -18,6 +18,36 @@ import { renderLessonViewer } from './lessonViewer.js';
 import { getProgressionData, setProgressionData, getCurrentKey, setCurrentKey } from '../state/trainerState.js';
 import { renderProgressionDisplay, loadProgression } from '../features/progressionBuilder.js';
 
+// Enharmonic equivalents for chord validation
+const ENHARMONIC_MAP = {
+    'A#': 'Bb', 'Bb': 'A#',
+    'C#': 'Db', 'Db': 'C#',
+    'D#': 'Eb', 'Eb': 'D#',
+    'F#': 'Gb', 'Gb': 'F#',
+    'G#': 'Ab', 'Ab': 'G#'
+};
+
+/**
+ * Check if two chord names are enharmonically equivalent
+ * e.g., "A# Major" and "Bb Major" should match
+ */
+function areEnharmonicallyEquivalent(chord1, chord2) {
+    if (chord1 === chord2) return true;
+    if (!chord1 || !chord2) return false;
+
+    // Extract root and type from each chord
+    const [root1, ...type1Parts] = chord1.split(' ');
+    const [root2, ...type2Parts] = chord2.split(' ');
+    const type1 = type1Parts.join(' ');
+    const type2 = type2Parts.join(' ');
+
+    // Types must match exactly
+    if (type1 !== type2) return false;
+
+    // Check if roots are enharmonic equivalents
+    return ENHARMONIC_MAP[root1] === root2 || ENHARMONIC_MAP[root2] === root1;
+}
+
 // ===========================================
 // CONFIRMATION MODAL
 // ===========================================
@@ -1360,18 +1390,24 @@ function updateStepIndicatorPosition(targetEl) {
     const viewportHeight = window.innerHeight;
     const viewportWidth = window.innerWidth;
 
-    // Default position: above the element
+    // Get keyboard position to know where content starts
+    const keyboardSection = document.getElementById('keyboard-section');
+    const keyboardBottom = keyboardSection ? keyboardSection.getBoundingClientRect().bottom : 250;
+
+    // Default position: above the element, centered horizontally
     let top = rect.top - 50;
     let left = rect.left + rect.width / 2;
     let transformX = '-50%';
 
-    // If element is near the top of the viewport, position indicator below instead
-    if (rect.top < 80) {
+    // If element is near the top of the viewport (under or close to keyboard), position indicator below instead
+    if (rect.top < keyboardBottom + 60) {
         top = rect.bottom + 10;
     }
 
-    // If element is near the right edge (floating buttons), position to the left
-    if (rect.right > viewportWidth - 100) {
+    // Only apply right-edge positioning for NARROW elements (like buttons)
+    // Wide panels should keep centered positioning
+    const isNarrowElement = rect.width < 200;
+    if (isNarrowElement && rect.right > viewportWidth - 100) {
         left = rect.left - 10;
         transformX = '-100%';
         top = rect.top + rect.height / 2;
@@ -1488,7 +1524,7 @@ function validateAction(action, validation) {
 
         case 'progression_chord_added':
             return action.type === 'progressionChordAdded' &&
-                   (!value || action.detail?.chord === value);
+                   (!value || action.detail?.chord === value || areEnharmonicallyEquivalent(action.detail?.chord, value));
 
         case 'progression_key_changed':
             return action.type === 'progressionKeyChanged' &&
@@ -1557,8 +1593,8 @@ export function validateProgressionChord(chord) {
         return { valid: true, message: null };
     }
 
-    // Check if the chord matches what's expected
-    if (chord === expectedChord) {
+    // Check if the chord matches what's expected (including enharmonic equivalents)
+    if (chord === expectedChord || areEnharmonicallyEquivalent(chord, expectedChord)) {
         return { valid: true, message: null };
     }
 

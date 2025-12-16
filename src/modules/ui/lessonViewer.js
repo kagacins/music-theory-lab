@@ -12,7 +12,7 @@ import { getPiano } from '../audio/audioEngine.js';
 import { highlightLessonNotes, clearLessonHighlights } from './keyboard.js';
 import { getLearningProgress, markLessonComplete, markExerciseComplete, updateQuizScore, setCurrentLesson } from './learningProgress.js';
 import { switchTab, setCurrentLessonForHistory } from './tabs.js';
-import { startTutorial, whatIsANoteTutorial, sharpsFlatsTutorial, octavesTutorial, scalesTutorial, intervalsTutorial, whatIsAChordTutorial, majorVsMinorTutorial, chordInversionsTutorial, firstProgressionTutorial, voiceLeadingTutorial, popularProgressionTutorial, addingEmotionTutorial, seventhChordsTutorial, secondaryDominantsTutorial, borrowedChordsTutorial, tensionReleaseTutorial, melodyChordTutorial, scaleTypesTutorial, modesIntroTutorial, modalHarmonyTutorial, advancedVoiceLeadingTutorial, extendedChordsTutorial, createMiniKeyboard } from './interactiveTutorial.js';
+import { startTutorial, whatIsANoteTutorial, sharpsFlatsTutorial, octavesTutorial, scalesTutorial, intervalsTutorial, whatIsAChordTutorial, majorVsMinorTutorial, chordInversionsTutorial, whyChordMoveTutorial, firstProgressionTutorial, voiceLeadingTutorial, popularProgressionTutorial, addingEmotionTutorial, seventhChordsTutorial, secondaryDominantsTutorial, borrowedChordsTutorial, tensionReleaseTutorial, melodyChordTutorial, scaleTypesTutorial, modesIntroTutorial, modalHarmonyTutorial, advancedVoiceLeadingTutorial, extendedChordsTutorial, createMiniKeyboard } from './interactiveTutorial.js';
 import { startGuidedMode, startGuidedModeWithConfirmation } from './lessonGuidedMode.js';
 
 // ===========================================
@@ -40,6 +40,7 @@ const lessonTutorials = {
     'lesson-what-is-chord': whatIsAChordTutorial,
     'lesson-major-vs-minor': majorVsMinorTutorial,
     'lesson-inversions': chordInversionsTutorial,
+    'lesson-why-chords-move': whyChordMoveTutorial,
     'lesson-first-progression': firstProgressionTutorial,
     'lesson-voice-leading': voiceLeadingTutorial,
     'lesson-popular-progression': popularProgressionTutorial,
@@ -63,9 +64,13 @@ const lessonTutorials = {
 // ===========================================
 
 /**
- * Play a single chord
+ * Play a single chord with optional inversion
+ * @param {string} root - Root note name (e.g., 'C')
+ * @param {string} chordType - Chord type (e.g., 'major', 'minor7')
+ * @param {number} duration - Duration in seconds
+ * @param {number} inversion - Inversion (0 = root, 1 = first, 2 = second, etc.)
  */
-async function playChord(root, chordType, duration = 1.2) {
+async function playChord(root, chordType, duration = 1.2, inversion = 0) {
     if (isPlaying) return;
     isPlaying = true;
 
@@ -105,7 +110,12 @@ async function playChord(root, chordType, duration = 1.2) {
 
         const mappedType = typeMap[chordType] || chordType;
         const chordInfo = getChordNotes(root, mappedType);
-        const notes = chordInfo?.specificNotes || [];
+        let notes = chordInfo?.specificNotes || [];
+
+        // Apply inversion if specified
+        if (notes.length > 0 && inversion > 0) {
+            notes = applyChordInversion(notes, inversion);
+        }
 
         if (notes.length > 0) {
             // Highlight notes on keyboard
@@ -122,6 +132,41 @@ async function playChord(root, chordType, duration = 1.2) {
         clearLessonHighlights();
         isPlaying = false;
     }
+}
+
+/**
+ * Apply inversion to a chord by rotating notes and adjusting octaves
+ * @param {Array<string>} notes - Array of notes with octaves (e.g., ['C3', 'E3', 'G3'])
+ * @param {number} inversion - Inversion number (1 = first, 2 = second, etc.)
+ * @returns {Array<string>} - Inverted chord notes
+ */
+function applyChordInversion(notes, inversion) {
+    if (!notes || notes.length === 0 || inversion <= 0) return notes;
+
+    // Parse notes into letter and octave
+    const parsedNotes = notes.map(note => {
+        const letter = note.replace(/[0-9]/g, '');
+        const octave = parseInt(note.replace(/[^0-9]/g, ''), 10) || 3;
+        return { letter, octave, midi: noteNameToMidiApprox(note) };
+    });
+
+    // Sort by pitch to ensure consistent ordering
+    parsedNotes.sort((a, b) => a.midi - b.midi);
+
+    // Apply inversion: rotate notes and move the rotated ones up an octave
+    const effectiveInversion = inversion % parsedNotes.length;
+    const invertedNotes = [];
+
+    for (let i = 0; i < parsedNotes.length; i++) {
+        const noteIndex = (i + effectiveInversion) % parsedNotes.length;
+        const note = parsedNotes[noteIndex];
+
+        // Notes that were rotated from the bottom need to go up an octave
+        const octaveAdjustment = (noteIndex < effectiveInversion) ? 1 : 0;
+        invertedNotes.push(`${note.letter}${note.octave + octaveAdjustment}`);
+    }
+
+    return invertedNotes;
 }
 
 /**
@@ -157,6 +202,166 @@ async function playNote(note, duration = 1.0) {
 }
 
 /**
+ * Apply bass note inversion to a chord's notes
+ * For slash chords like G/B, this puts B in the bass (lowest octave)
+ * Uses voice leading to pick the octave closest to the previous bass note
+ * @param {Array<string>} notes - Original chord notes with octaves (e.g., ['G3', 'B3', 'D4'])
+ * @param {string} bassNote - The bass note letter (e.g., 'B', 'G#')
+ * @param {number|null} previousBassMidi - The MIDI number of the previous chord's bass note (for voice leading)
+ * @returns {Array<string>} - Revoiced notes with bass note in lowest position
+ */
+function applyBassNoteInversion(notes, bassNote, previousBassMidi = null) {
+    if (!notes || notes.length === 0 || !bassNote) return notes;
+
+    // Normalize bass note (remove any octave if present)
+    const bassLetter = bassNote.replace(/[0-9]/g, '');
+
+    // Determine bass octave based on voice leading (closest to previous bass)
+    let bassOctave;
+    if (previousBassMidi !== null) {
+        // Find the octave that puts this bass note closest to the previous bass
+        bassOctave = findClosestOctave(bassLetter, previousBassMidi);
+    } else {
+        // Find the lowest octave in the current chord and go one below
+        let lowestOctave = 9;
+        notes.forEach(note => {
+            const octave = parseInt(note.replace(/[^0-9]/g, ''), 10);
+            if (!isNaN(octave) && octave < lowestOctave) {
+                lowestOctave = octave;
+            }
+        });
+        bassOctave = Math.max(2, lowestOctave - 1);
+    }
+
+    // Check if the bass note is already in the chord
+    const bassNoteWithOctave = `${bassLetter}${bassOctave}`;
+    const bassNoteInChord = notes.find(note =>
+        note.replace(/[0-9]/g, '').toUpperCase() === bassLetter.toUpperCase()
+    );
+
+    if (bassNoteInChord) {
+        // Move the existing bass note to the target octave
+        const revoicedNotes = notes.map(note => {
+            const noteLetter = note.replace(/[0-9]/g, '');
+            if (noteLetter.toUpperCase() === bassLetter.toUpperCase()) {
+                return `${noteLetter}${bassOctave}`;
+            }
+            return note;
+        });
+
+        // Sort by pitch (put bass note first)
+        return revoicedNotes.sort((a, b) => {
+            const aMidi = noteNameToMidiApprox(a);
+            const bMidi = noteNameToMidiApprox(b);
+            return aMidi - bMidi;
+        });
+    } else {
+        // Bass note isn't in the chord - add it
+        return [bassNoteWithOctave, ...notes].sort((a, b) => {
+            const aMidi = noteNameToMidiApprox(a);
+            const bMidi = noteNameToMidiApprox(b);
+            return aMidi - bMidi;
+        });
+    }
+}
+
+/**
+ * Find the octave that places a note closest to a target MIDI number
+ * @param {string} noteLetter - Note letter (e.g., 'B', 'G#')
+ * @param {number} targetMidi - Target MIDI number to be close to
+ * @returns {number} - Best octave (2-5 range)
+ */
+function findClosestOctave(noteLetter, targetMidi) {
+    let bestOctave = 2;
+    let bestDistance = Infinity;
+
+    // Check octaves 1-5 for bass range
+    for (let oct = 1; oct <= 5; oct++) {
+        const midi = noteNameToMidiApprox(`${noteLetter}${oct}`);
+        const distance = Math.abs(midi - targetMidi);
+        if (distance < bestDistance) {
+            bestDistance = distance;
+            bestOctave = oct;
+        }
+    }
+
+    return Math.max(2, bestOctave); // Don't go below octave 2
+}
+
+/**
+ * Adjust an entire chord's position to maintain voice leading continuity
+ * Shifts ALL notes by the same amount to keep the bass close to the previous chord
+ * @param {Array<string>} notes - Original chord notes with octaves
+ * @param {number} previousBassMidi - The MIDI number of the previous chord's bass note
+ * @returns {Array<string>} - Notes with entire chord shifted for voice leading
+ */
+function adjustBassForVoiceLeading(notes, previousBassMidi) {
+    if (!notes || notes.length === 0 || previousBassMidi === null) return notes;
+
+    // Sort notes by pitch first
+    const sortedNotes = [...notes].sort((a, b) => {
+        const aMidi = noteNameToMidiApprox(a);
+        const bMidi = noteNameToMidiApprox(b);
+        return aMidi - bMidi;
+    });
+
+    // Get the current bass note
+    const currentBass = sortedNotes[0];
+    const currentBassMidi = noteNameToMidiApprox(currentBass);
+
+    // Calculate how far the bass needs to move to be close to the previous bass
+    // We want the bass to move by the smallest interval (prefer motion within a fourth)
+    let octaveShift = 0;
+    const bassDifference = currentBassMidi - previousBassMidi;
+
+    // If bass is more than 5 semitones away (a fourth), consider shifting the chord
+    if (Math.abs(bassDifference) > 5) {
+        // Calculate octave shift needed to get bass close to previous
+        if (bassDifference > 0) {
+            // Current bass is higher - shift down
+            octaveShift = -Math.round(bassDifference / 12);
+        } else {
+            // Current bass is lower - shift up
+            octaveShift = Math.round(Math.abs(bassDifference) / 12);
+        }
+    }
+
+    // If no shift needed, return as-is
+    if (octaveShift === 0) {
+        return sortedNotes;
+    }
+
+    // Shift ALL notes by the same octave amount to preserve chord voicing
+    const shiftedNotes = sortedNotes.map(note => {
+        const letter = note.replace(/[0-9]/g, '');
+        const octave = parseInt(note.replace(/[^0-9]/g, ''), 10) || 3;
+        const newOctave = Math.max(2, Math.min(6, octave + octaveShift)); // Keep in playable range
+        return `${letter}${newOctave}`;
+    });
+
+    return shiftedNotes;
+}
+
+/**
+ * Convert a note name to approximate MIDI number for sorting
+ * @param {string} noteName - Note name with octave (e.g., 'C3', 'F#4')
+ * @returns {number} - Approximate MIDI number
+ */
+function noteNameToMidiApprox(noteName) {
+    const noteMap = { 'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11 };
+    const letter = noteName.charAt(0).toUpperCase();
+    const hasSharp = noteName.includes('#');
+    const hasFlat = noteName.includes('b');
+    const octave = parseInt(noteName.replace(/[^0-9]/g, ''), 10) || 3;
+
+    let midi = noteMap[letter] || 0;
+    if (hasSharp) midi += 1;
+    if (hasFlat) midi -= 1;
+
+    return (octave + 1) * 12 + midi;
+}
+
+/**
  * Play a progression of chords with keyboard highlighting
  * @param {Array<string>} chordNames - Array of chord names (e.g., ['Dm7', 'G7', 'Cmaj7'])
  * @param {number} chordDuration - Duration of each chord in seconds
@@ -178,12 +383,34 @@ async function playProgression(chordNames, chordDuration = 0.8, onChordChange = 
         }
 
         // Pre-parse all chords to get notes for highlighting
-        const parsedChords = chordNames.map(chordName => {
-            const { root, type } = parseChordName(chordName);
+        // Track previous bass note MIDI for voice-leading continuity
+        let previousBassMidi = null;
+
+        const parsedChords = chordNames.map((chordName, index) => {
+            const { root, type, bassNote } = parseChordName(chordName);
             const chordInfo = getChordNotes(root, type);
+            let notes = chordInfo?.specificNotes || [];
+
+            // Handle slash chords (inversions) - put the bass note in closest octave to previous
+            if (bassNote && notes.length > 0) {
+                notes = applyBassNoteInversion(notes, bassNote, previousBassMidi);
+            } else if (previousBassMidi !== null && notes.length > 0) {
+                // For non-slash chords, adjust bass to maintain voice leading continuity
+                notes = adjustBassForVoiceLeading(notes, previousBassMidi);
+            }
+
+            // Track the bass MIDI for the next chord
+            if (notes.length > 0) {
+                // Sort to find actual bass note
+                const sortedNotes = [...notes].sort((a, b) =>
+                    noteNameToMidiApprox(a) - noteNameToMidiApprox(b)
+                );
+                previousBassMidi = noteNameToMidiApprox(sortedNotes[0]);
+            }
+
             return {
                 name: chordName,
-                notes: chordInfo?.specificNotes || []
+                notes: notes
             };
         });
 
@@ -216,6 +443,123 @@ async function playProgression(chordNames, chordDuration = 0.8, onChordChange = 
         clearLessonHighlights();
         isPlaying = false;
     }
+}
+
+/**
+ * Play a two-hand progression with separate LH (bass) and RH (upper voices)
+ * This is used for counterpoint and voice-leading demonstrations
+ * @param {Array<Object>} chords - Array of chord objects with lh and rh arrays
+ *   Example: [{ name: 'C', lh: ['C2'], rh: ['E4', 'G4'] }, ...]
+ * @param {number} chordDuration - Duration of each chord in seconds
+ * @param {Function} onChordChange - Optional callback when chord changes
+ */
+async function playTwoHandProgression(chords, chordDuration = 1.0, onChordChange = null) {
+    if (isPlaying) return;
+    isPlaying = true;
+
+    try {
+        const piano = getPiano ? getPiano() : (window.getPiano ? window.getPiano() : null);
+        if (!piano || typeof Tone === 'undefined') {
+            isPlaying = false;
+            return;
+        }
+
+        if (Tone.context.state !== 'running') {
+            await Tone.start();
+        }
+
+        const now = Tone.now();
+
+        // Schedule audio playback - play LH and RH together
+        for (let i = 0; i < chords.length; i++) {
+            const chord = chords[i];
+            const allNotes = [...(chord.lh || []), ...(chord.rh || [])];
+            if (allNotes.length > 0) {
+                piano.triggerAttackRelease(allNotes, chordDuration * 0.9, now + (i * chordDuration));
+            }
+        }
+
+        // Schedule keyboard highlights to sync with audio
+        for (let i = 0; i < chords.length; i++) {
+            const chord = chords[i];
+            setTimeout(() => {
+                // Highlight LH and RH with different colors
+                highlightTwoHandNotes(chord.lh || [], chord.rh || []);
+                if (onChordChange) {
+                    onChordChange(i, chord.name, chord);
+                }
+            }, i * chordDuration * 1000);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, chords.length * chordDuration * 1000 + 200));
+    } catch (err) {
+        console.error('[LessonViewer] Error playing two-hand progression:', err);
+    } finally {
+        clearLessonHighlights();
+        isPlaying = false;
+    }
+}
+
+/**
+ * Play a single chord from a two-hand progression (for step-through mode)
+ * @param {Object} chord - Chord object with lh and rh arrays
+ */
+async function playTwoHandChordStep(chord) {
+    if (isPlaying) return;
+    isPlaying = true;
+
+    try {
+        const piano = getPiano ? getPiano() : (window.getPiano ? window.getPiano() : null);
+        if (!piano || typeof Tone === 'undefined') {
+            isPlaying = false;
+            return;
+        }
+
+        if (Tone.context.state !== 'running') {
+            await Tone.start();
+        }
+
+        const allNotes = [...(chord.lh || []), ...(chord.rh || [])];
+        if (allNotes.length > 0) {
+            highlightTwoHandNotes(chord.lh || [], chord.rh || []);
+            piano.triggerAttackRelease(allNotes, 1.0);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 1100));
+    } catch (err) {
+        console.error('[LessonViewer] Error playing two-hand chord step:', err);
+    } finally {
+        clearLessonHighlights();
+        isPlaying = false;
+    }
+}
+
+/**
+ * Highlight notes on keyboard with different colors for LH and RH
+ * @param {Array<string>} lhNotes - Left hand notes (bass)
+ * @param {Array<string>} rhNotes - Right hand notes (upper voices)
+ */
+function highlightTwoHandNotes(lhNotes, rhNotes) {
+    // Clear previous highlights
+    clearLessonHighlights();
+
+    // Highlight LH notes in blue/indigo
+    lhNotes.forEach(note => {
+        const keyId = getNoteKeyId(note);
+        const keyElement = document.getElementById(keyId);
+        if (keyElement) {
+            keyElement.classList.add('active-lesson-lh');
+        }
+    });
+
+    // Highlight RH notes in orange/amber
+    rhNotes.forEach(note => {
+        const keyId = getNoteKeyId(note);
+        const keyElement = document.getElementById(keyId);
+        if (keyElement) {
+            keyElement.classList.add('active-lesson-rh');
+        }
+    });
 }
 
 /**
@@ -368,6 +712,156 @@ async function playVoicedProgression(voicings, chordDuration = 0.9) {
 }
 
 /**
+ * Play a rhythmic demonstration with metronome clicks and proper meter feel
+ * @param {Object} config - Rhythmic demo configuration
+ * @param {string} config.meter - Time signature ('4/4', '3/4', '6/8', '2/4', '5/4')
+ * @param {number} config.tempo - Tempo in BPM (default 100)
+ * @param {Array<string>} config.chords - Chords to play (one per measure)
+ * @param {boolean} config.withClick - Whether to play metronome click (default true)
+ * @param {string} config.feel - Optional: 'straight', 'swing', 'shuffle'
+ */
+async function playRhythmicDemo(config) {
+    if (isPlaying) return;
+    isPlaying = true;
+
+    try {
+        const piano = getPiano ? getPiano() : (window.getPiano ? window.getPiano() : null);
+        if (!piano || typeof Tone === 'undefined') {
+            isPlaying = false;
+            return;
+        }
+
+        if (Tone.context.state !== 'running') {
+            await Tone.start();
+        }
+
+        const {
+            meter = '4/4',
+            tempo = 100,
+            chords = ['C'],
+            withClick = true,
+            feel = 'straight'
+        } = config;
+
+        // Parse meter (e.g., '3/4' -> { beats: 3, subdivision: 4 })
+        const [beatsPerMeasure, beatUnit] = meter.split('/').map(Number);
+
+        // Calculate timing
+        const beatDuration = 60 / tempo; // Duration of one beat in seconds
+        const measureDuration = beatDuration * beatsPerMeasure;
+
+        // For compound meters (6/8, 9/8, 12/8), beats are grouped differently
+        const isCompound = [6, 9, 12].includes(beatsPerMeasure) && beatUnit === 8;
+        const mainBeats = isCompound ? beatsPerMeasure / 3 : beatsPerMeasure;
+
+        // Create a simple click synth for metronome
+        const clickSynth = new Tone.MembraneSynth({
+            pitchDecay: 0.008,
+            octaves: 2,
+            envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 }
+        }).toDestination();
+        clickSynth.volume.value = -12; // Quieter than piano
+
+        // Create a hi-hat like sound for subdivisions
+        const hihatSynth = new Tone.MetalSynth({
+            frequency: 400,
+            envelope: { attack: 0.001, decay: 0.05, release: 0.01 },
+            harmonicity: 5.1,
+            modulationIndex: 32,
+            resonance: 4000,
+            octaves: 1.5
+        }).toDestination();
+        hihatSynth.volume.value = -20;
+
+        // Pre-parse chords
+        const parsedChords = chords.map(chordName => {
+            const { root, type } = parseChordName(chordName);
+            const chordInfo = getChordNotes(root, type);
+            return {
+                name: chordName,
+                notes: chordInfo?.specificNotes || []
+            };
+        });
+
+        const now = Tone.now();
+        let timeOffset = 0;
+
+        // Schedule clicks and chords for each measure
+        for (let measureIndex = 0; measureIndex < parsedChords.length; measureIndex++) {
+            const chord = parsedChords[measureIndex];
+            const measureStart = now + timeOffset;
+
+            // Schedule chord on beat 1 of each measure
+            if (chord.notes.length > 0) {
+                // For compound meters, chord sustains longer
+                const chordDuration = isCompound ? measureDuration * 0.9 : measureDuration * 0.85;
+                piano.triggerAttackRelease(chord.notes, chordDuration, measureStart);
+            }
+
+            // Schedule metronome clicks
+            if (withClick) {
+                if (isCompound) {
+                    // Compound meter: accent on 1, 4, 7, etc. (grouped in 3s)
+                    for (let beat = 0; beat < beatsPerMeasure; beat++) {
+                        const beatTime = measureStart + (beat * beatDuration);
+                        const isMainBeat = beat % 3 === 0;
+
+                        if (isMainBeat) {
+                            // Main beat - stronger click
+                            const pitch = beat === 0 ? 'G4' : 'C4';
+                            clickSynth.triggerAttackRelease(pitch, '16n', beatTime);
+                        } else {
+                            // Subdivision - softer
+                            hihatSynth.triggerAttackRelease('16n', beatTime);
+                        }
+                    }
+                } else {
+                    // Simple meter: accent on beat 1, lighter on others
+                    for (let beat = 0; beat < beatsPerMeasure; beat++) {
+                        const beatTime = measureStart + (beat * beatDuration);
+
+                        // Apply swing if requested (delay off-beats)
+                        let adjustedTime = beatTime;
+                        if (feel === 'swing' && beat % 2 === 1) {
+                            adjustedTime += beatDuration * 0.15; // Slight delay for swing
+                        }
+
+                        // Beat 1 is strongest, beat 3 (in 4/4) is medium, others are light
+                        if (beat === 0) {
+                            clickSynth.triggerAttackRelease('G4', '16n', adjustedTime);
+                        } else if (beat === 2 && beatsPerMeasure === 4) {
+                            clickSynth.triggerAttackRelease('E4', '16n', adjustedTime);
+                        } else {
+                            clickSynth.triggerAttackRelease('C4', '16n', adjustedTime);
+                        }
+                    }
+                }
+            }
+
+            // Schedule keyboard highlight
+            setTimeout(() => {
+                highlightLessonNotes(chord.notes);
+            }, timeOffset * 1000);
+
+            timeOffset += measureDuration;
+        }
+
+        // Wait for playback to complete
+        await new Promise(resolve => setTimeout(resolve, timeOffset * 1000 + 300));
+
+        // Cleanup synths
+        clickSynth.dispose();
+        hihatSynth.dispose();
+
+    } catch (err) {
+        console.error('[LessonViewer] Error playing rhythmic demo:', err);
+    } finally {
+        clearLessonHighlights();
+        isPlaying = false;
+    }
+}
+
+/**
  * Parse chord name into root, type, and optional bass note (for slash chords)
  * Examples: "C", "Am", "G7", "F/C" (F with C in bass), "G/B" (G with B in bass)
  */
@@ -382,11 +876,37 @@ function parseChordName(name) {
         bassNote = parts[1]; // Store the bass note for potential future use
     }
 
-    // Handle various chord notations
+    // Handle various chord notations - ORDER MATTERS (more specific patterns first)
     const patterns = [
+        // Extended chords (most specific first)
+        { regex: /^([A-G][#b]?)maj7#11$/i, type: 'Major 7th #11' },
+        { regex: /^([A-G][#b]?)m13$/i, type: 'Minor 13th' },
+        { regex: /^([A-G][#b]?)13$/i, type: 'Dominant 13th' },
+        { regex: /^([A-G][#b]?)m11$/i, type: 'Minor 11th' },
+        { regex: /^([A-G][#b]?)11$/i, type: 'Dominant 11th' },
+        { regex: /^([A-G][#b]?)maj9$/i, type: 'Major 9th' },
+        { regex: /^([A-G][#b]?)m9$/i, type: 'Minor 9th' },
+        { regex: /^([A-G][#b]?)9$/i, type: 'Dominant 9th' },
+        { regex: /^([A-G][#b]?)add9$/i, type: 'Add9' },
+        // Altered dominants
+        { regex: /^([A-G][#b]?)7#9$/i, type: '7#9' },
+        { regex: /^([A-G][#b]?)7b9$/i, type: '7b9' },
+        { regex: /^([A-G][#b]?)7#5$/i, type: '7#5' },
+        { regex: /^([A-G][#b]?)7b5$/i, type: '7b5' },
+        // 6th chords
+        { regex: /^([A-G][#b]?)m6$/i, type: 'Minor 6th' },
+        { regex: /^([A-G][#b]?)6$/i, type: 'Major 6th' },
+        // 7th chords
         { regex: /^([A-G][#b]?)maj7$/i, type: 'Major 7th' },
+        { regex: /^([A-G][#b]?)m7b5$/i, type: 'Half-Diminished 7th' },
         { regex: /^([A-G][#b]?)m7$/i, type: 'Minor 7th' },
+        { regex: /^([A-G][#b]?)dim7$/i, type: 'Diminished 7th' },
         { regex: /^([A-G][#b]?)7$/i, type: 'Dominant 7th' },
+        // Suspended chords
+        { regex: /^([A-G][#b]?)sus4$/i, type: 'Sus4' },
+        { regex: /^([A-G][#b]?)sus2$/i, type: 'Sus2' },
+        { regex: /^([A-G][#b]?)sus$/i, type: 'Sus4' }, // "sus" alone typically means sus4
+        // Basic triads (must come last)
         { regex: /^([A-G][#b]?)dim$/i, type: 'Diminished' },
         { regex: /^([A-G][#b]?)aug$/i, type: 'Augmented' },
         { regex: /^([A-G][#b]?)m$/i, type: 'Minor' },
@@ -416,6 +936,11 @@ function isSteppablePlayAction(playAction) {
         return true;
     }
 
+    // Two-hand progressions with 2+ chords (for counterpoint lessons)
+    if (playAction.type === 'two_hand_progression' && Array.isArray(playAction.chords) && playAction.chords.length >= 2) {
+        return true;
+    }
+
     // Sequences with 2+ notes
     if (playAction.type === 'sequence' && Array.isArray(playAction.notes) && playAction.notes.length >= 2) {
         return true;
@@ -442,6 +967,7 @@ function getSteppableItems(playAction) {
     if (!playAction) return [];
 
     if (playAction.type === 'progression') return playAction.chords || [];
+    if (playAction.type === 'two_hand_progression') return playAction.chords || [];
     if (playAction.type === 'sequence') return playAction.notes || [];
     if (playAction.type === 'interval') return playAction.notes || [];
     if (playAction.type === 'comparison') {
@@ -459,10 +985,63 @@ function getStepperState(lessonId, exampleIndex) {
     if (!progressionStepperState[key]) {
         progressionStepperState[key] = {
             currentIndex: 0,
-            isPlaying: false
+            isPlaying: false,
+            cachedVoicings: null // Will be populated for progressions
         };
     }
     return progressionStepperState[key];
+}
+
+/**
+ * Pre-compute chord voicings for a progression with proper voice leading
+ * This ensures Play All and step-through use the same voicings
+ * @param {Array<string>} chordNames - Array of chord names (e.g., ['G7', 'C'])
+ * @returns {Array<Object>} - Array of {name, notes} objects with computed voicings
+ */
+function computeProgressionVoicings(chordNames) {
+    if (!chordNames || chordNames.length === 0) return [];
+
+    let previousBassMidi = null;
+
+    return chordNames.map((chordName) => {
+        const { root, type, bassNote } = parseChordName(chordName);
+        const chordInfo = getChordNotes(root, type);
+        let notes = chordInfo?.specificNotes || [];
+
+        // Handle slash chords (inversions) - put the bass note in closest octave to previous
+        if (bassNote && notes.length > 0) {
+            notes = applyBassNoteInversion(notes, bassNote, previousBassMidi);
+        } else if (previousBassMidi !== null && notes.length > 0) {
+            // For non-slash chords, adjust bass to maintain voice leading continuity
+            notes = adjustBassForVoiceLeading(notes, previousBassMidi);
+        }
+
+        // Track the bass MIDI for the next chord
+        if (notes.length > 0) {
+            const sortedNotes = [...notes].sort((a, b) =>
+                noteNameToMidiApprox(a) - noteNameToMidiApprox(b)
+            );
+            previousBassMidi = noteNameToMidiApprox(sortedNotes[0]);
+        }
+
+        return {
+            name: chordName,
+            notes: notes
+        };
+    });
+}
+
+/**
+ * Initialize cached voicings for a progression stepper
+ */
+function initializeStepperVoicings(lessonId, exampleIndex, playAction) {
+    const state = getStepperState(lessonId, exampleIndex);
+
+    if (playAction?.type === 'progression' && playAction.chords && !state.cachedVoicings) {
+        state.cachedVoicings = computeProgressionVoicings(playAction.chords);
+    }
+
+    return state;
 }
 
 /**
@@ -579,8 +1158,9 @@ async function playSequenceStep(note) {
 
 /**
  * Play a single chord from a progression and highlight on keyboard
+ * @param {string|Object} chordNameOrVoicing - Either a chord name string OR a pre-computed {name, notes} object
  */
-async function playProgressionStep(chordName) {
+async function playProgressionStep(chordNameOrVoicing) {
     if (isPlaying) return;
     isPlaying = true;
 
@@ -595,9 +1175,24 @@ async function playProgressionStep(chordName) {
             await Tone.start();
         }
 
-        const { root, type } = parseChordName(chordName);
-        const chordInfo = getChordNotes(root, type);
-        const notes = chordInfo?.specificNotes || [];
+        let notes;
+
+        // Check if we received pre-computed voicing or just a chord name
+        if (typeof chordNameOrVoicing === 'object' && chordNameOrVoicing.notes) {
+            // Use pre-computed voicing for consistency with Play All
+            notes = chordNameOrVoicing.notes;
+        } else {
+            // Fallback: compute notes on the fly (no voice leading context)
+            const chordName = chordNameOrVoicing;
+            const { root, type, bassNote } = parseChordName(chordName);
+            const chordInfo = getChordNotes(root, type);
+            notes = chordInfo?.specificNotes || [];
+
+            // Handle slash chords (inversions) - put the bass note in the lowest octave
+            if (bassNote && notes.length > 0) {
+                notes = applyBassNoteInversion(notes, bassNote);
+            }
+        }
 
         if (notes.length > 0) {
             highlightLessonNotes(notes);
@@ -624,7 +1219,7 @@ async function executePlayAction(action, onItemChange = null) {
             await playNote(action.note);
             break;
         case 'chord':
-            await playChord(action.root, action.chordType);
+            await playChord(action.root, action.chordType, 1.2, action.inversion || 0);
             break;
         case 'progression':
             await playProgression(action.chords, 0.8, onItemChange);
@@ -675,6 +1270,16 @@ async function executePlayAction(action, onItemChange = null) {
             // Play a progression with explicit note voicings for proper voice leading
             // Each chord is an array of specific notes like ['C4', 'E4', 'G4']
             await playVoicedProgression(action.voicings, action.duration || 0.9);
+            break;
+        case 'two_hand_progression':
+            // Play a two-hand progression with LH and RH notes specified separately
+            // Each chord has { name: 'C', lh: ['C2'], rh: ['E4', 'G4'] }
+            await playTwoHandProgression(action.chords, action.duration || 1.0, onItemChange);
+            break;
+        case 'rhythmic_demo':
+            // Play a rhythmic demonstration with metronome and proper meter feel
+            // Config: { meter: '3/4', tempo: 100, chords: ['C', 'G'], withClick: true, feel: 'swing' }
+            await playRhythmicDemo(action);
             break;
     }
 }
@@ -773,19 +1378,88 @@ function renderProgressionStepper(lesson, example, exampleIndex) {
     const state = getStepperState(lesson.id, exampleIndex);
     const currentIdx = state.currentIndex;
     const isChordType = example.playAction.type === 'progression';
+    const isTwoHand = example.playAction.type === 'two_hand_progression';
 
     // Build inline sequence display
-    const sequenceHTML = items.map((item, i) => {
-        let classes = 'step-chord px-2 py-1 rounded transition-all duration-200';
-        if (i === currentIdx) {
-            classes += ' step-current font-bold text-indigo-700 bg-indigo-100';
-        } else if (i < currentIdx) {
-            classes += ' text-gray-400';
-        } else {
-            classes += ' text-gray-500';
-        }
-        return `<span class="${classes}" data-chord-index="${i}">${item}</span>`;
-    }).join('<span class="text-gray-300 mx-1">→</span>');
+    let sequenceHTML;
+
+    if (isTwoHand) {
+        // Two-hand progression: show a grid with RH row, chord name row, and LH row
+        // Each column is a chord, making voice leading visible
+
+        // Build the three rows: RH notes, chord names, LH notes
+        const rhRow = items.map((item, i) => {
+            const rhNotes = item.rh ? item.rh.join(' ') : '-';
+            let classes = 'two-hand-cell rh-cell px-2 py-1 text-xs font-mono rounded';
+            if (i === currentIdx) {
+                classes += ' text-amber-700 font-bold bg-amber-50';
+            } else {
+                classes += ' text-amber-600/60';
+            }
+            return `<div class="${classes}" data-chord-index="${i}" data-hand="rh">${rhNotes}</div>`;
+        }).join('');
+
+        const chordNameRow = items.map((item, i) => {
+            const chordName = typeof item === 'object' ? item.name : item;
+            let classes = 'step-chord px-3 py-1 rounded transition-all duration-200 text-sm';
+            if (i === currentIdx) {
+                classes += ' step-current font-bold text-indigo-700 bg-indigo-100';
+            } else if (i < currentIdx) {
+                classes += ' text-gray-400';
+            } else {
+                classes += ' text-gray-500';
+            }
+            return `<div class="${classes}" data-chord-index="${i}">${chordName}</div>`;
+        }).join('');
+
+        const lhRow = items.map((item, i) => {
+            const lhNotes = item.lh ? item.lh.join(' ') : '-';
+            let classes = 'two-hand-cell lh-cell px-2 py-1 text-xs font-mono rounded';
+            if (i === currentIdx) {
+                classes += ' text-blue-700 font-bold bg-blue-50';
+            } else {
+                classes += ' text-blue-600/60';
+            }
+            return `<div class="${classes}" data-chord-index="${i}" data-hand="lh">${lhNotes}</div>`;
+        }).join('');
+
+        sequenceHTML = `
+            <div class="two-hand-grid">
+                <!-- RH row with label -->
+                <div class="flex items-center justify-center gap-1">
+                    <span class="w-8 text-right text-xs text-amber-600 font-semibold flex items-center justify-end gap-1">
+                        <span class="inline-block w-2 h-2 rounded-full bg-amber-500"></span>RH
+                    </span>
+                    <div class="flex items-center justify-center gap-2">${rhRow}</div>
+                </div>
+                <!-- Chord names row -->
+                <div class="flex items-center justify-center gap-1 my-1">
+                    <span class="w-8"></span>
+                    <div class="flex items-center justify-center gap-2">${chordNameRow}</div>
+                </div>
+                <!-- LH row with label -->
+                <div class="flex items-center justify-center gap-1">
+                    <span class="w-8 text-right text-xs text-blue-600 font-semibold flex items-center justify-end gap-1">
+                        <span class="inline-block w-2 h-2 rounded-full bg-blue-500"></span>LH
+                    </span>
+                    <div class="flex items-center justify-center gap-2">${lhRow}</div>
+                </div>
+            </div>
+        `;
+    } else {
+        // Regular progression/sequence: simple inline display
+        sequenceHTML = items.map((item, i) => {
+            let classes = 'step-chord px-2 py-1 rounded transition-all duration-200';
+            if (i === currentIdx) {
+                classes += ' step-current font-bold text-indigo-700 bg-indigo-100';
+            } else if (i < currentIdx) {
+                classes += ' text-gray-400';
+            } else {
+                classes += ' text-gray-500';
+            }
+            return `<span class="${classes}" data-chord-index="${i}">${item}</span>`;
+        }).join('<span class="text-gray-300 mx-1">→</span>');
+    }
 
     // Determine play button label based on type
     const playLabel = isChordType ? 'Play' : 'Play';
@@ -1352,6 +2026,7 @@ function updateStepperUI(container, lesson, exampleIndex) {
     const items = getSteppableItems(example.playAction);
     const state = getStepperState(lesson.id, exampleIndex);
     const currentIdx = state.currentIndex;
+    const isTwoHand = example.playAction.type === 'two_hand_progression';
 
     // Find the stepper element
     const stepper = container.querySelector(`.progression-stepper[data-example-index="${exampleIndex}"]`);
@@ -1369,6 +2044,34 @@ function updateStepperUI(container, lesson, exampleIndex) {
             el.classList.add('text-gray-500');
         }
     });
+
+    // Update LH/RH cell highlighting for two-hand progressions
+    if (isTwoHand) {
+        const cells = stepper.querySelectorAll('.two-hand-grid .two-hand-cell');
+        cells.forEach((el) => {
+            const hand = el.dataset.hand;
+            const chordIndex = parseInt(el.dataset.chordIndex);
+
+            // Remove all state classes
+            el.classList.remove('text-amber-700', 'text-amber-600/60', 'text-blue-700', 'text-blue-600/60', 'font-bold', 'bg-amber-50', 'bg-blue-50');
+
+            if (hand === 'rh') {
+                // RH cell (amber/orange)
+                if (chordIndex === currentIdx) {
+                    el.classList.add('text-amber-700', 'font-bold', 'bg-amber-50');
+                } else {
+                    el.classList.add('text-amber-600/60');
+                }
+            } else {
+                // LH cell (blue)
+                if (chordIndex === currentIdx) {
+                    el.classList.add('text-blue-700', 'font-bold', 'bg-blue-50');
+                } else {
+                    el.classList.add('text-blue-600/60');
+                }
+            }
+        });
+    }
 
     // Update counter
     const counter = stepper.querySelector('.step-counter');
@@ -1543,7 +2246,7 @@ function attachLessonEventListeners(container, lesson) {
         btn.addEventListener('click', async () => {
             const idx = parseInt(btn.dataset.exampleIndex);
             const example = lesson.hearIt?.examples?.[idx];
-            const state = getStepperState(lesson.id, idx);
+            const state = initializeStepperVoicings(lesson.id, idx, example?.playAction);
             const items = getSteppableItems(example?.playAction);
             const playType = example?.playAction?.type;
 
@@ -1555,10 +2258,15 @@ function attachLessonEventListeners(container, lesson) {
                 const currentItem = items[state.currentIndex];
                 if (currentItem) {
                     btn.disabled = true;
-                    showPlaybackCallout(container, idx, `Playing: ${currentItem}`);
+                    const displayName = typeof currentItem === 'object' ? currentItem.name : currentItem;
+                    showPlaybackCallout(container, idx, `Playing: ${displayName}`);
 
-                    if (playType === 'progression') {
-                        await playProgressionStep(currentItem);
+                    if (playType === 'two_hand_progression') {
+                        await playTwoHandChordStep(currentItem);
+                    } else if (playType === 'progression') {
+                        // Use cached voicing for consistent playback
+                        const voicing = state.cachedVoicings?.[state.currentIndex];
+                        await playProgressionStep(voicing || currentItem);
                     } else {
                         await playSequenceStep(currentItem);
                     }
@@ -1575,7 +2283,7 @@ function attachLessonEventListeners(container, lesson) {
         btn.addEventListener('click', async () => {
             const idx = parseInt(btn.dataset.exampleIndex);
             const example = lesson.hearIt?.examples?.[idx];
-            const state = getStepperState(lesson.id, idx);
+            const state = initializeStepperVoicings(lesson.id, idx, example?.playAction);
             const items = getSteppableItems(example?.playAction);
             const maxIndex = items.length - 1;
             const playType = example?.playAction?.type;
@@ -1588,10 +2296,15 @@ function attachLessonEventListeners(container, lesson) {
                 const currentItem = items[state.currentIndex];
                 if (currentItem) {
                     btn.disabled = true;
-                    showPlaybackCallout(container, idx, `Playing: ${currentItem}`);
+                    const displayName = typeof currentItem === 'object' ? currentItem.name : currentItem;
+                    showPlaybackCallout(container, idx, `Playing: ${displayName}`);
 
-                    if (playType === 'progression') {
-                        await playProgressionStep(currentItem);
+                    if (playType === 'two_hand_progression') {
+                        await playTwoHandChordStep(currentItem);
+                    } else if (playType === 'progression') {
+                        // Use cached voicing for consistent playback
+                        const voicing = state.cachedVoicings?.[state.currentIndex];
+                        await playProgressionStep(voicing || currentItem);
                     } else {
                         await playSequenceStep(currentItem);
                     }
@@ -1608,7 +2321,7 @@ function attachLessonEventListeners(container, lesson) {
         btn.addEventListener('click', async () => {
             const idx = parseInt(btn.dataset.exampleIndex);
             const example = lesson.hearIt?.examples?.[idx];
-            const state = getStepperState(lesson.id, idx);
+            const state = initializeStepperVoicings(lesson.id, idx, example?.playAction);
             const items = getSteppableItems(example?.playAction);
             const currentItem = items[state.currentIndex];
             const playType = example?.playAction?.type;
@@ -1618,11 +2331,16 @@ function attachLessonEventListeners(container, lesson) {
                 const originalText = btn.innerHTML;
                 btn.innerHTML = '...';
 
-                showPlaybackCallout(container, idx, `Playing: ${currentItem}`);
+                const displayName = typeof currentItem === 'object' ? currentItem.name : currentItem;
+                showPlaybackCallout(container, idx, `Playing: ${displayName}`);
 
                 // Play based on type: chord for progressions, note for sequences/intervals
-                if (playType === 'progression') {
-                    await playProgressionStep(currentItem);
+                if (playType === 'two_hand_progression') {
+                    await playTwoHandChordStep(currentItem);
+                } else if (playType === 'progression') {
+                    // Use cached voicing for consistent playback
+                    const voicing = state.cachedVoicings?.[state.currentIndex];
+                    await playProgressionStep(voicing || currentItem);
                 } else {
                     await playSequenceStep(currentItem);
                 }

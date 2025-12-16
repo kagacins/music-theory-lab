@@ -1188,6 +1188,60 @@ button:active:not(:disabled),
     transform: none !important;
 }
 
+/* Two-hand lesson highlighting - Left Hand (bass) - Blue/Indigo */
+.white-key.active-lesson-lh,
+.modern-keyboard .white-key.active-lesson-lh {
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%) !important;
+    box-shadow:
+        0 0 20px rgba(59, 130, 246, 0.6),
+        0 4px 12px rgba(59, 130, 246, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3),
+        inset 0 -2px 0 rgba(37, 99, 235, 0.6) !important;
+    border-color: rgba(59, 130, 246, 0.5) !important;
+    animation: none !important;
+    transform: none !important;
+}
+
+.black-key.active-lesson-lh,
+.modern-keyboard .black-key.active-lesson-lh {
+    background: linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%) !important;
+    box-shadow:
+        0 0 20px rgba(59, 130, 246, 0.7),
+        0 4px 12px rgba(59, 130, 246, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2),
+        inset 0 -2px 0 rgba(30, 64, 175, 0.8) !important;
+    border-color: rgba(29, 78, 216, 0.7) !important;
+    animation: none !important;
+    transform: none !important;
+}
+
+/* Two-hand lesson highlighting - Right Hand (upper voices) - Amber/Orange */
+.white-key.active-lesson-rh,
+.modern-keyboard .white-key.active-lesson-rh {
+    background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%) !important;
+    box-shadow:
+        0 0 20px rgba(245, 158, 11, 0.6),
+        0 4px 12px rgba(245, 158, 11, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3),
+        inset 0 -2px 0 rgba(217, 119, 6, 0.6) !important;
+    border-color: rgba(245, 158, 11, 0.5) !important;
+    animation: none !important;
+    transform: none !important;
+}
+
+.black-key.active-lesson-rh,
+.modern-keyboard .black-key.active-lesson-rh {
+    background: linear-gradient(180deg, #b45309 0%, #92400e 100%) !important;
+    box-shadow:
+        0 0 20px rgba(245, 158, 11, 0.7),
+        0 4px 12px rgba(245, 158, 11, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2),
+        inset 0 -2px 0 rgba(146, 64, 14, 0.8) !important;
+    border-color: rgba(180, 83, 9, 0.7) !important;
+    animation: none !important;
+    transform: none !important;
+}
+
 /* Lesson playback callout styles */
 .lesson-playback-callout {
     background: linear-gradient(135deg, #4f46e5, #6366f1);
