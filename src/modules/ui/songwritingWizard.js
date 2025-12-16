@@ -917,42 +917,45 @@ function renderStepIndicator() {
 
 function renderStep0Welcome() {
     const modes = [
-        {
-            id: 'quick',
-            emoji: '⚡',
-            title: 'Quick Song',
-            subtitle: '4 chords, get started fast',
-            description: 'Perfect for beginners or quick ideas. Creates a simple loop you can expand later.',
-            time: '~2 minutes',
-            color: 'from-blue-500 to-cyan-500'
-        },
-        {
-            id: 'full',
-            emoji: '🎼',
-            title: 'Full Composition',
-            subtitle: 'Verse, chorus, bridge & more',
-            description: 'Build a complete song structure with multiple sections, transitions, and professional arrangement.',
-            time: '~5 minutes',
-            color: 'from-purple-500 to-pink-500'
-        },
-        {
-            id: 'explore',
-            emoji: '🧪',
-            title: 'Explore & Learn',
-            subtitle: 'Sandbox mode',
-            description: 'No structure constraints. Experiment freely with chords, learn as you go, and discover what sounds good.',
-            time: 'Open-ended',
-            color: 'from-green-500 to-emerald-500'
-        }
-    ];
+    {
+        id: 'quick',
+        emoji: '⚡',
+        title: 'Quick Start',
+        subtitle: '4 chords in 30 seconds',
+        description: 'Perfect for beginners. Get a complete chord progression instantly, then customize it.',
+        features: ['Instant chord progression', 'Auto-generated melody', 'Easy customization'],
+        color: 'from-blue-500 to-cyan-500',
+        bgColor: 'bg-blue-50 dark:bg-blue-900/20'
+    },
+    {
+        id: 'guided',
+        emoji: '🎯',
+        title: 'Guided Creation',
+        subtitle: 'Step-by-step with learning',
+        description: 'Learn songwriting fundamentals while building. Perfect for improving your skills.',
+        features: ['Interactive lessons', 'Smart suggestions', 'Theory explanations'],
+        color: 'from-purple-500 to-pink-500',
+        bgColor: 'bg-purple-50 dark:bg-purple-900/20'
+    },
+    {
+        id: 'expert',
+        emoji: '🎼',
+        title: 'Expert Mode',
+        subtitle: 'Full control, advanced options',
+        description: 'Complete creative freedom with professional tools and advanced composition features.',
+        features: ['Custom structures', 'Advanced harmony', 'Professional export'],
+        color: 'from-green-500 to-emerald-500',
+        bgColor: 'bg-green-50 dark:bg-green-900/20'
+    }
+];
 
     return `
         <div class="text-center mb-8">
-            <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-3">What would you like to create today?</h2>
-            <p class="text-gray-600 dark:text-gray-300">Choose how you want to approach your songwriting session</p>
+            <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-3">Create Your Song</h2>
+            <p class="text-gray-600 dark:text-gray-300">Choose how you'd like to approach songwriting. Each path is designed for different experience levels and goals.</p>
         </div>
 
-        <div class="grid md:grid-cols-3 gap-4 mb-6">
+        <div class="grid md:grid-cols-3 gap-6 mb-6">
             ${modes.map(mode => `
                 <button class="creation-mode-option group p-6 rounded-2xl border-2 transition-all hover:scale-[1.02] text-left ${
                     creationMode === mode.id
@@ -3055,3 +3058,6 @@ export default {
     openWizardInModal,
     showSongBuilderModal
 };
+
+
+
