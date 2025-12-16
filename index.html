@@ -2663,7 +2663,7 @@
     <div class="fixed bottom-6 right-4 z-20 flex flex-col items-end gap-1" style="pointer-events: none;">
 
         <!-- Builder Floating Controls -->
-        <div id="floating-builder-controls" class="flex flex-col items-stretch gap-2 p-3 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border w-max" style="pointer-events: auto;" title="Chord Lab Controls">
+        <div id="floating-builder-controls" class="hidden flex flex-col items-stretch gap-2 p-3 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border w-max" style="pointer-events: auto;" title="Chord Lab Controls">
             <div class="flex flex-col gap-2">
                 <button onmousedown="if(window.startBuilderChord) startBuilderChord()" onmouseup="if(window.stopBuilderChord) stopBuilderChord()" onmouseleave="if(window.stopBuilderChord) stopBuilderChord()" ontouchstart="event.preventDefault(); if(window.startBuilderChord) startBuilderChord();" ontouchend="event.preventDefault(); if(window.stopBuilderChord) stopBuilderChord();" ontouchcancel="event.preventDefault(); if(window.stopBuilderChord) stopBuilderChord();" class="px-2 py-1 bg-amber-500 text-white font-bold rounded-xl shadow-lg hover:bg-amber-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-1 whitespace-nowrap text-sm" title="Play Chord">
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg> 
@@ -2774,7 +2774,7 @@
     </div>
 
     <!-- NEW: Expand Floating Controls Button (hidden on Chord Lab since controls are in action bar) -->
-    <button id="expand-controls-btn" onclick="window.toggleFloatingControls && window.toggleFloatingControls()" class="trainer-melody-only fixed bottom-6 right-4 z-10 p-2 bg-gray-700 text-white rounded-full shadow-lg hover:bg-gray-600 transition" title="Show/Hide Floating Controls">
+    <button id="expand-controls-btn" onclick="window.toggleFloatingControls && window.toggleFloatingControls()" class="hidden trainer-melody-only fixed bottom-6 right-4 z-10 p-2 bg-gray-700 text-white rounded-full shadow-lg hover:bg-gray-600 transition" title="Show/Hide Floating Controls">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
         </svg>

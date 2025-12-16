@@ -1,8 +1,10 @@
 # Netlify Configuration File
 
 [build]
-  # No build command needed for static site
-  publish = "."
+  # Build command to bundle the application
+  command = "npm run build"
+  # Publish the built output directory
+  publish = "dist"
 
 [functions]
   # Node.js version for serverless functions

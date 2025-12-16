@@ -20,7 +20,8 @@ export default defineConfig(({ mode }) => ({
     // Ensure all assets are bundled
     rollupOptions: {
       input: {
-        main: './index.html'
+        main: './index.html',
+        startHere: './start-here.html'
       }
     }
   },
