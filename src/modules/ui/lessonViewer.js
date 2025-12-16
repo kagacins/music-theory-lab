@@ -86,7 +86,17 @@ async function playChord(root, chordType, duration = 1.2) {
             'diminished': 'Diminished',
             'diminished7': 'Diminished 7th',
             'halfDiminished7': 'Half-Diminished 7th',
-            'augmented': 'Augmented'
+            'augmented': 'Augmented',
+            // Extended chords
+            'dominant9': 'Dominant 9th',
+            'major9': 'Major 9th',
+            'minor9': 'Minor 9th',
+            'dominant11': 'Dominant 11th',
+            'minor11': 'Minor 11th',
+            'dominant13': 'Dominant 13th',
+            // Altered chords
+            'dominant7sharp9': '7#9',
+            'major7sharp11': 'Major 7th #11'
         };
 
         const mappedType = typeMap[chordType] || chordType;

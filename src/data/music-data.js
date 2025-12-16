@@ -74,6 +74,7 @@ const CHORD_DEFINITIONS = {
     '7#5': { intervals: [0, 4, 8, 10], symbol: '7#5', description: 'A dominant 7th chord with a sharped 5th (R, M3, #5, m7). Raises the 5th by a half step from a regular dominant 7th. An altered dominant chord creating strong tension.' },
     '7b9': { intervals: [0, 4, 7, 10, 13], symbol: '7b9', description: 'A dominant 7th chord with a flatted 9th (R, M3, P5, m7, b9). Lowers the 9th by a half step. A very common and tense altered dominant chord in jazz.' },
     '7#9': { intervals: [0, 4, 7, 10, 15], symbol: '7#9', description: 'A dominant 7th chord with a sharped 9th (R, M3, P5, m7, #9). Raises the 9th by a half step. Also known as the "Hendrix chord".' },
+    'Major 7th #11': { intervals: [0, 4, 7, 11, 18], symbol: 'maj7#11', description: 'A major 7th chord with a raised 11th (R, M3, P5, M7, #11). The #11 creates a Lydian flavor - dreamy and floating. Common in jazz and film scores.' },
     'Power Chord': { intervals: [0, 7], symbol: '5', description: 'Contains only the root and the 5th (R, P5). The 3rd is omitted, making it neither major nor minor. Common in rock music.' },
 
     // Aliases for backwards compatibility (non-hyphenated and long form names)
