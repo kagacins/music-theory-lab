@@ -248,7 +248,7 @@ const CONCEPT_EXPLANATIONS = {
 **In {{KEY}} major:** {{ii}}dim → {{V}} → {{I}} intensifies the standard ii - V - I progression.`
     },
     // Sequence Patterns
-    'DESCENDING_FIFTHS': {
+    'DESC_5TH': {
         title: 'Descending Fifths (Circle of Fifths)',
         summary: 'Root motion descending by perfect fifths',
         explanation: `Descending fifths motion follows the circle of fifths backwards, creating one of the strongest harmonic progressions in Western music.
@@ -281,6 +281,53 @@ const CONCEPT_EXPLANATIONS = {
 • "Coltrane Changes" use rapid ii-V chains
 
 **In {{KEY}} major:** A basic chain might be: {{iii}}m7 → {{VI}}7 → {{ii}}m7 → {{V}}7 → {{I}}, where {{iii}}m7-{{VI}}7 is a ii-V targeting {{ii}}.`
+    },
+    'STEPWISE': {
+        title: 'Stepwise Bass Motion',
+        summary: 'Root motion moving by step (up or down)',
+        explanation: `Stepwise bass motion creates smooth, connected harmonic progressions where each chord root moves by a whole or half step.
+
+**Why it works:**
+• Creates smooth voice leading in all parts
+• Generates strong sense of direction
+• Common in classical and pop music
+
+**Common patterns:**
+• I → ii → iii (ascending stepwise)
+• I → viio/ii → ii → V → I (line cliché)
+• vi → V → IV → I (descending)
+
+**In {{KEY}} major:** Try {{I}} → {{ii}}m → {{iii}}m for an ascending stepwise bass line.`
+    },
+    // Additional Cadences
+    'PHC': {
+        title: 'Phrygian Half Cadence',
+        summary: 'Minor iv resolving to V',
+        explanation: `The Phrygian Half Cadence moves from minor iv to V, featuring a distinctive half-step descent in the bass (♭6 to 5).
+
+**Why it works:**
+• The half-step motion in the bass creates strong pull to V
+• Borrows the minor iv from parallel minor
+• Creates a darker, more dramatic approach to the dominant
+
+**Common uses:** Baroque music, minor key compositions, dramatic moments.
+
+**In {{KEY}} major:** {{iv}}m → {{V}} creates that dark Phrygian approach. Often used in minor keys as iv6 → V.`
+    },
+    // Additional Borrowed Chords
+    'borrowed-bII': {
+        title: 'Neapolitan Chord (♭II)',
+        summary: 'The dramatic ♭II major chord',
+        explanation: `The Neapolitan chord is a major triad built on the lowered 2nd scale degree. It's one of the most dramatic borrowed chords.
+
+**Why it works:**
+• Creates chromatic voice leading to V
+• The ♭II → V motion has a half-step bass descent
+• Adds intense drama and color
+
+**Common uses:** Classical music, dramatic film scores, emotional climaxes.
+
+**In {{KEY}} major:** {{bII}} → {{V}} → {{I}} creates a powerful cadential approach. Often used in first inversion (♭II6).`
     }
 };
 
@@ -290,6 +337,7 @@ CONCEPT_EXPLANATIONS['bVII'] = CONCEPT_EXPLANATIONS['borrowed-bVII'];
 CONCEPT_EXPLANATIONS['iv'] = CONCEPT_EXPLANATIONS['borrowed-iv'];
 CONCEPT_EXPLANATIONS['bIII'] = CONCEPT_EXPLANATIONS['borrowed-bIII'];
 CONCEPT_EXPLANATIONS['ii°'] = CONCEPT_EXPLANATIONS['borrowed-ii°'];
+CONCEPT_EXPLANATIONS['bII'] = CONCEPT_EXPLANATIONS['borrowed-bII'];
 
 // ============================================================================
 // THEORY INSIGHTS PANEL CLASS
