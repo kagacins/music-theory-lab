@@ -117,6 +117,13 @@ body[data-active-tab="learn"] .builder-only {
     display: none !important;
 }
 
+/* Force keyboard section to be sticky on ALL tabs */
+#keyboard-section {
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    /* Keep z-index at 10 (from HTML class) so action-bar can appear below it properly */
+}
+
 /* Section header + panel visual connection */
 /* Remove rounded bottom corners from header buttons when panel is open */
 .section-header-connected {
@@ -954,7 +961,7 @@ button:active:not(:disabled),
     border-right: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-.modern-keyboard .white-key:hover:not(.active-scale):not(.active-progression):not(.active-builder):not(.active-builder-playback):not(.active-scale-explorer):not(.active-scale-playback):not(.active-melody-playback) {
+.modern-keyboard .white-key:hover:not(.active-scale):not(.active-progression):not(.active-builder):not(.active-builder-playback):not(.active-scale-explorer):not(.active-scale-playback):not(.active-melody-playback):not(.active-lesson-playback) {
     background: linear-gradient(180deg, #ffffff 0%, #f8f9fa 50%, #e9ecef 100%);
     box-shadow: 
         inset 0 1px 0 rgba(255, 255, 255, 0.9),
@@ -964,7 +971,7 @@ button:active:not(:disabled),
     transform: translateY(-1px);
 }
 
-.modern-keyboard .white-key:active:not(.active-scale):not(.active-progression):not(.active-builder):not(.active-builder-playback):not(.active-scale-explorer):not(.active-scale-playback):not(.active-melody-playback) {
+.modern-keyboard .white-key:active:not(.active-scale):not(.active-progression):not(.active-builder):not(.active-builder-playback):not(.active-scale-explorer):not(.active-scale-playback):not(.active-melody-playback):not(.active-lesson-playback) {
     background: linear-gradient(180deg, #f1f3f5 0%, #e9ecef 50%, #dee2e6 100%);
     box-shadow: 
         inset 0 2px 4px rgba(0, 0, 0, 0.1),
@@ -977,6 +984,7 @@ button:active:not(:disabled),
 .modern-keyboard .white-key.active-builder-playback,
 .modern-keyboard .white-key.active-scale-playback,
 .modern-keyboard .white-key.active-melody-playback,
+.modern-keyboard .white-key.active-lesson-playback,
 .modern-keyboard .white-key.active-progression,
 .modern-keyboard .white-key.active-builder,
 .modern-keyboard .white-key.active-scale,
@@ -988,6 +996,7 @@ button:active:not(:disabled),
 .modern-keyboard .black-key.active-builder-playback,
 .modern-keyboard .black-key.active-scale-playback,
 .modern-keyboard .black-key.active-melody-playback,
+.modern-keyboard .black-key.active-lesson-playback,
 .modern-keyboard .black-key.active-progression,
 .modern-keyboard .black-key.active-builder,
 .modern-keyboard .black-key.active-scale,
@@ -1068,6 +1077,165 @@ button:active:not(:disabled),
     border-color: rgba(77, 124, 15, 0.7) !important;
     animation: none !important;
     transform: none !important;
+}
+
+/* ============================================
+   Theory Academy Lesson Playback Highlighting
+   ============================================ */
+
+/* Lesson playback - purple/indigo theme for Theory Academy */
+.white-key.active-lesson-playback,
+.modern-keyboard .white-key.active-lesson-playback {
+    background: linear-gradient(180deg, #8b5cf6 0%, #6366f1 100%) !important;
+    box-shadow:
+        0 0 20px rgba(139, 92, 246, 0.6),
+        0 4px 12px rgba(139, 92, 246, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3),
+        inset 0 -2px 0 rgba(99, 102, 241, 0.6) !important;
+    border-color: rgba(139, 92, 246, 0.5) !important;
+    animation: none !important;
+    transform: none !important;
+}
+
+.black-key.active-lesson-playback,
+.modern-keyboard .black-key.active-lesson-playback {
+    background: linear-gradient(180deg, #6d28d9 0%, #4c1d95 100%) !important;
+    box-shadow:
+        0 0 20px rgba(139, 92, 246, 0.7),
+        0 4px 12px rgba(139, 92, 246, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2),
+        inset 0 -2px 0 rgba(76, 29, 149, 0.8) !important;
+    border-color: rgba(109, 40, 217, 0.7) !important;
+    animation: none !important;
+    transform: none !important;
+}
+
+/* Lesson playback callout styles */
+.lesson-playback-callout {
+    background: linear-gradient(135deg, #4f46e5, #6366f1);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    text-align: center;
+    margin-bottom: 12px;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.2s ease;
+    display: none;
+}
+
+.lesson-playback-callout.visible {
+    opacity: 1;
+    transform: translateY(0);
+    display: block;
+}
+
+/* Progression stepper styles */
+.progression-stepper {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 12px;
+}
+
+.progression-stepper .step-sequence {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 16px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.progression-stepper .step-chord {
+    padding: 4px 12px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.progression-stepper .step-chord.step-prev,
+.progression-stepper .step-chord.step-next {
+    color: #94a3b8;
+    background: transparent;
+}
+
+.progression-stepper .step-chord.step-current {
+    color: #4f46e5;
+    background: #e0e7ff;
+    font-weight: 700;
+}
+
+.progression-stepper .step-chord.step-played {
+    color: #64748b;
+    background: #f1f5f9;
+}
+
+.progression-stepper .step-arrow {
+    color: #cbd5e1;
+    font-size: 14px;
+}
+
+.progression-stepper .step-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+.progression-stepper .step-btn {
+    padding: 6px 12px;
+    background: #e2e8f0;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.progression-stepper .step-btn:hover:not(:disabled) {
+    background: #cbd5e1;
+}
+
+.progression-stepper .step-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.progression-stepper .step-counter {
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 500;
+    min-width: 50px;
+    text-align: center;
+}
+
+.progression-stepper .play-all-btn {
+    padding: 6px 16px;
+    background: linear-gradient(135deg, #4f46e5, #6366f1);
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: white;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.progression-stepper .play-all-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #4338ca, #4f46e5);
+    transform: translateY(-1px);
+}
+
+.progression-stepper .play-all-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
 }
 
 .modern-keyboard .black-key {

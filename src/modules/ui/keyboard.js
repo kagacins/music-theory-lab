@@ -30,7 +30,37 @@ export let lastTouchTime = 0;
  */
 export function clearHighlights() {
     document.querySelectorAll('.key').forEach(key => {
-        key.classList.remove('active-scale', 'active-progression', 'active-builder', 'active-scale-explorer', 'active-scale-playback', 'active-builder-playback', 'active-melody-playback');
+        key.classList.remove('active-scale', 'active-progression', 'active-builder', 'active-scale-explorer', 'active-scale-playback', 'active-builder-playback', 'active-melody-playback', 'active-lesson-playback');
+    });
+}
+
+/**
+ * Highlight notes for lesson playback (Theory Academy)
+ * @param {Array<string>} notes - Array of note names to highlight (e.g., ['C4', 'E4', 'G4'])
+ */
+export function highlightLessonNotes(notes) {
+    // Clear previous lesson highlights only (don't clear other highlights)
+    document.querySelectorAll('.active-lesson-playback').forEach(el => {
+        el.classList.remove('active-lesson-playback');
+    });
+
+    if (!notes || notes.length === 0) return;
+
+    notes.forEach(note => {
+        const keyId = getNoteKeyId(note);
+        const keyElement = document.getElementById(keyId);
+        if (keyElement) {
+            keyElement.classList.add('active-lesson-playback');
+        }
+    });
+}
+
+/**
+ * Clear only lesson playback highlights
+ */
+export function clearLessonHighlights() {
+    document.querySelectorAll('.active-lesson-playback').forEach(el => {
+        el.classList.remove('active-lesson-playback');
     });
 }
 

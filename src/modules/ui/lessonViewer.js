@@ -9,6 +9,7 @@
 import { getLessonById, getNextLesson, getPreviousLesson, QUIZ_TYPES } from '../../data/theoryExplanations/lessons/index.js';
 import { getChordNotes } from '../utils/noteUtils.js';
 import { getPiano } from '../audio/audioEngine.js';
+import { highlightLessonNotes, clearLessonHighlights } from './keyboard.js';
 import { getLearningProgress, markLessonComplete, markExerciseComplete, updateQuizScore, setCurrentLesson } from './learningProgress.js';
 import { switchTab, setCurrentLessonForHistory } from './tabs.js';
 import { startTutorial, whatIsANoteTutorial, sharpsFlatsTutorial, octavesTutorial, scalesTutorial, intervalsTutorial, whatIsAChordTutorial, majorVsMinorTutorial, chordInversionsTutorial, firstProgressionTutorial, voiceLeadingTutorial, popularProgressionTutorial, addingEmotionTutorial, seventhChordsTutorial, secondaryDominantsTutorial, borrowedChordsTutorial, tensionReleaseTutorial, melodyChordTutorial, scaleTypesTutorial, modesIntroTutorial, modalHarmonyTutorial, advancedVoiceLeadingTutorial, extendedChordsTutorial, createMiniKeyboard } from './interactiveTutorial.js';
@@ -24,6 +25,9 @@ let exerciseProgress = {}; // Tracks completed exercises
 let quizAnswers = {}; // Tracks quiz answers
 let isPlaying = false;
 let activeTutorial = null;
+
+// Step-through state for progressions (per example index)
+const progressionStepperState = {};
 
 // Map lesson IDs to their interactive tutorials (using semantic IDs)
 const lessonTutorials = {
@@ -104,6 +108,9 @@ async function playChord(root, chordType, duration = 1.2) {
         const notes = chordInfo?.specificNotes || [];
 
         if (notes.length > 0) {
+            // Highlight notes on keyboard
+            highlightLessonNotes(notes);
+
             piano.triggerAttackRelease(notes, duration);
         }
 
@@ -111,6 +118,8 @@ async function playChord(root, chordType, duration = 1.2) {
     } catch (err) {
         console.error('[LessonViewer] Error playing chord:', err);
     } finally {
+        // Clear highlights after playback
+        clearLessonHighlights();
         isPlaying = false;
     }
 }
@@ -133,19 +142,27 @@ async function playNote(note, duration = 1.0) {
             await Tone.start();
         }
 
+        // Highlight note on keyboard
+        highlightLessonNotes([note]);
+
         piano.triggerAttackRelease(note, duration);
         await new Promise(resolve => setTimeout(resolve, duration * 1000 + 100));
     } catch (err) {
         console.error('[LessonViewer] Error playing note:', err);
     } finally {
+        // Clear highlights after playback
+        clearLessonHighlights();
         isPlaying = false;
     }
 }
 
 /**
- * Play a progression of chords
+ * Play a progression of chords with keyboard highlighting
+ * @param {Array<string>} chordNames - Array of chord names (e.g., ['Dm7', 'G7', 'Cmaj7'])
+ * @param {number} chordDuration - Duration of each chord in seconds
+ * @param {Function} onChordChange - Optional callback when chord changes (for step-through UI)
  */
-async function playProgression(chordNames, chordDuration = 0.8) {
+async function playProgression(chordNames, chordDuration = 0.8, onChordChange = null) {
     if (isPlaying) return;
     isPlaying = true;
 
@@ -160,24 +177,43 @@ async function playProgression(chordNames, chordDuration = 0.8) {
             await Tone.start();
         }
 
-        const now = Tone.now();
-
-        for (let i = 0; i < chordNames.length; i++) {
-            const chordName = chordNames[i];
-            // Parse chord name (e.g., "C", "Am", "G7", "Cmaj7")
+        // Pre-parse all chords to get notes for highlighting
+        const parsedChords = chordNames.map(chordName => {
             const { root, type } = parseChordName(chordName);
             const chordInfo = getChordNotes(root, type);
-            const notes = chordInfo?.specificNotes || [];
+            return {
+                name: chordName,
+                notes: chordInfo?.specificNotes || []
+            };
+        });
 
+        const now = Tone.now();
+
+        // Schedule audio playback
+        for (let i = 0; i < parsedChords.length; i++) {
+            const { notes } = parsedChords[i];
             if (notes.length > 0) {
                 piano.triggerAttackRelease(notes, chordDuration * 0.9, now + (i * chordDuration));
             }
+        }
+
+        // Schedule keyboard highlights to sync with audio
+        for (let i = 0; i < parsedChords.length; i++) {
+            const { name, notes } = parsedChords[i];
+            setTimeout(() => {
+                highlightLessonNotes(notes);
+                if (onChordChange) {
+                    onChordChange(i, name, notes);
+                }
+            }, i * chordDuration * 1000);
         }
 
         await new Promise(resolve => setTimeout(resolve, chordNames.length * chordDuration * 1000 + 200));
     } catch (err) {
         console.error('[LessonViewer] Error playing progression:', err);
     } finally {
+        // Clear highlights after playback
+        clearLessonHighlights();
         isPlaying = false;
     }
 }
@@ -261,14 +297,25 @@ async function playScaleSequence(root, scaleType = 'major') {
         const noteDuration = 0.35;
         const now = Tone.now();
 
+        // Schedule audio playback
         for (let i = 0; i < scaleNotes.length; i++) {
             piano.triggerAttackRelease(scaleNotes[i], noteDuration * 0.9, now + (i * noteDuration));
+        }
+
+        // Schedule keyboard highlights to sync with audio
+        for (let i = 0; i < scaleNotes.length; i++) {
+            const note = scaleNotes[i];
+            setTimeout(() => {
+                highlightLessonNotes([note]);
+            }, i * noteDuration * 1000);
         }
 
         await new Promise(resolve => setTimeout(resolve, scaleNotes.length * noteDuration * 1000 + 200));
     } catch (err) {
         console.error('[LessonViewer] Error playing scale:', err);
     } finally {
+        // Clear highlights after playback
+        clearLessonHighlights();
         isPlaying = false;
     }
 }
@@ -294,6 +341,7 @@ async function playVoicedProgression(voicings, chordDuration = 0.9) {
 
         const now = Tone.now();
 
+        // Schedule audio playback
         for (let i = 0; i < voicings.length; i++) {
             const notes = voicings[i];
             if (notes && notes.length > 0) {
@@ -301,10 +349,20 @@ async function playVoicedProgression(voicings, chordDuration = 0.9) {
             }
         }
 
+        // Schedule keyboard highlights to sync with audio
+        for (let i = 0; i < voicings.length; i++) {
+            const notes = voicings[i];
+            setTimeout(() => {
+                highlightLessonNotes(notes);
+            }, i * chordDuration * 1000);
+        }
+
         await new Promise(resolve => setTimeout(resolve, voicings.length * chordDuration * 1000 + 200));
     } catch (err) {
         console.error('[LessonViewer] Error playing voiced progression:', err);
     } finally {
+        // Clear highlights after playback
+        clearLessonHighlights();
         isPlaying = false;
     }
 }
@@ -347,9 +405,218 @@ function parseChordName(name) {
 }
 
 /**
+ * Check if a playAction is steppable (has multiple items that can be stepped through)
+ * This includes progressions, sequences, intervals with 2+ items
+ */
+function isSteppablePlayAction(playAction) {
+    if (!playAction) return false;
+
+    // Progressions with 2+ chords
+    if (playAction.type === 'progression' && Array.isArray(playAction.chords) && playAction.chords.length >= 2) {
+        return true;
+    }
+
+    // Sequences with 2+ notes
+    if (playAction.type === 'sequence' && Array.isArray(playAction.notes) && playAction.notes.length >= 2) {
+        return true;
+    }
+
+    // Intervals (always 2 notes)
+    if (playAction.type === 'interval' && Array.isArray(playAction.notes) && playAction.notes.length >= 2) {
+        return true;
+    }
+
+    // Comparison with 2+ items
+    if (playAction.type === 'comparison') {
+        if (Array.isArray(playAction.notes) && playAction.notes.length >= 2) return true;
+        if (Array.isArray(playAction.chords) && playAction.chords.length >= 2) return true;
+    }
+
+    return false;
+}
+
+/**
+ * Get the items array from a steppable playAction
+ */
+function getSteppableItems(playAction) {
+    if (!playAction) return [];
+
+    if (playAction.type === 'progression') return playAction.chords || [];
+    if (playAction.type === 'sequence') return playAction.notes || [];
+    if (playAction.type === 'interval') return playAction.notes || [];
+    if (playAction.type === 'comparison') {
+        return playAction.notes || playAction.chords || [];
+    }
+
+    return [];
+}
+
+/**
+ * Get or initialize stepper state for an example
+ */
+function getStepperState(lessonId, exampleIndex) {
+    const key = `${lessonId}-${exampleIndex}`;
+    if (!progressionStepperState[key]) {
+        progressionStepperState[key] = {
+            currentIndex: 0,
+            isPlaying: false
+        };
+    }
+    return progressionStepperState[key];
+}
+
+/**
+ * Play a sequence of individual notes with keyboard highlighting
+ * @param {Array<string>} notes - Array of notes (e.g., ['C4', 'D4', 'E4'])
+ * @param {number} tempo - Tempo in BPM (higher = faster)
+ * @param {Function} onNoteChange - Optional callback when note changes
+ */
+async function playNoteSequence(notes, tempo = 100, onNoteChange = null) {
+    if (isPlaying) return;
+    isPlaying = true;
+
+    try {
+        const piano = getPiano ? getPiano() : (window.getPiano ? window.getPiano() : null);
+        if (!piano || typeof Tone === 'undefined') {
+            isPlaying = false;
+            return;
+        }
+
+        if (Tone.context.state !== 'running') {
+            await Tone.start();
+        }
+
+        // Calculate note duration from tempo (beats per minute)
+        const noteDuration = 60 / tempo;
+        const now = Tone.now();
+
+        // Schedule audio playback
+        for (let i = 0; i < notes.length; i++) {
+            piano.triggerAttackRelease(notes[i], noteDuration * 0.8, now + (i * noteDuration));
+        }
+
+        // Schedule keyboard highlights to sync with audio
+        for (let i = 0; i < notes.length; i++) {
+            setTimeout(() => {
+                highlightLessonNotes([notes[i]]);
+                if (onNoteChange) {
+                    onNoteChange(i, notes[i], [notes[i]]);
+                }
+            }, i * noteDuration * 1000);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, notes.length * noteDuration * 1000 + 200));
+    } catch (err) {
+        console.error('[LessonViewer] Error playing note sequence:', err);
+    } finally {
+        clearLessonHighlights();
+        isPlaying = false;
+    }
+}
+
+/**
+ * Play a custom chord (array of specific notes played together)
+ * @param {Array<string>} notes - Array of notes to play simultaneously (e.g., ['C4', 'C5'])
+ */
+async function playCustomChord(notes, duration = 1.2) {
+    if (isPlaying) return;
+    isPlaying = true;
+
+    try {
+        const piano = getPiano ? getPiano() : (window.getPiano ? window.getPiano() : null);
+        if (!piano || typeof Tone === 'undefined') {
+            isPlaying = false;
+            return;
+        }
+
+        if (Tone.context.state !== 'running') {
+            await Tone.start();
+        }
+
+        if (notes && notes.length > 0) {
+            highlightLessonNotes(notes);
+            piano.triggerAttackRelease(notes, duration);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, duration * 1000 + 100));
+    } catch (err) {
+        console.error('[LessonViewer] Error playing custom chord:', err);
+    } finally {
+        clearLessonHighlights();
+        isPlaying = false;
+    }
+}
+
+/**
+ * Play a single note from a sequence and highlight on keyboard
+ */
+async function playSequenceStep(note) {
+    if (isPlaying) return;
+    isPlaying = true;
+
+    try {
+        const piano = getPiano ? getPiano() : (window.getPiano ? window.getPiano() : null);
+        if (!piano || typeof Tone === 'undefined') {
+            isPlaying = false;
+            return;
+        }
+
+        if (Tone.context.state !== 'running') {
+            await Tone.start();
+        }
+
+        highlightLessonNotes([note]);
+        piano.triggerAttackRelease(note, 0.8);
+
+        await new Promise(resolve => setTimeout(resolve, 900));
+    } catch (err) {
+        console.error('[LessonViewer] Error playing sequence step:', err);
+    } finally {
+        clearLessonHighlights();
+        isPlaying = false;
+    }
+}
+
+/**
+ * Play a single chord from a progression and highlight on keyboard
+ */
+async function playProgressionStep(chordName) {
+    if (isPlaying) return;
+    isPlaying = true;
+
+    try {
+        const piano = getPiano ? getPiano() : (window.getPiano ? window.getPiano() : null);
+        if (!piano || typeof Tone === 'undefined') {
+            isPlaying = false;
+            return;
+        }
+
+        if (Tone.context.state !== 'running') {
+            await Tone.start();
+        }
+
+        const { root, type } = parseChordName(chordName);
+        const chordInfo = getChordNotes(root, type);
+        const notes = chordInfo?.specificNotes || [];
+
+        if (notes.length > 0) {
+            highlightLessonNotes(notes);
+            piano.triggerAttackRelease(notes, 1.0);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 1100));
+    } catch (err) {
+        console.error('[LessonViewer] Error playing progression step:', err);
+    } finally {
+        clearLessonHighlights();
+        isPlaying = false;
+    }
+}
+
+/**
  * Execute a play action from lesson content
  */
-async function executePlayAction(action) {
+async function executePlayAction(action, onItemChange = null) {
     if (!action) return;
 
     switch (action.type) {
@@ -360,23 +627,47 @@ async function executePlayAction(action) {
             await playChord(action.root, action.chordType);
             break;
         case 'progression':
-            await playProgression(action.chords);
+            await playProgression(action.chords, 0.8, onItemChange);
             break;
         case 'scale':
             await playScaleSequence(action.root, action.scaleType);
             break;
+        case 'sequence':
+            // Play a sequence of notes (like E4, F4, G4)
+            await playNoteSequence(action.notes, action.tempo || 100, onItemChange);
+            break;
+        case 'interval':
+            // Play two notes as an interval (melodic - one after another)
+            await playNoteSequence(action.notes, 60, onItemChange);
+            break;
+        case 'chord_custom':
+            // Play a custom chord (array of specific notes played together)
+            await playCustomChord(action.notes);
+            break;
         case 'comparison':
             // Play two items back to back with a pause
             if (action.notes) {
-                for (const note of action.notes) {
-                    await playNote(note, 0.8);
+                for (let i = 0; i < action.notes.length; i++) {
+                    if (onItemChange) onItemChange(i, action.notes[i], [action.notes[i]]);
+                    await playNote(action.notes[i], 0.8);
                     await new Promise(r => setTimeout(r, 300));
                 }
             } else if (action.chords) {
-                for (const chord of action.chords) {
+                for (let i = 0; i < action.chords.length; i++) {
+                    const chord = action.chords[i];
                     const { root, type } = parseChordName(chord);
+                    if (onItemChange) onItemChange(i, chord, []);
                     await playChord(root, type, 1.0);
                     await new Promise(r => setTimeout(r, 500));
+                }
+            }
+            break;
+        case 'comparison_sequences':
+            // Play multiple sequences with pauses between them
+            if (action.sequences) {
+                for (let i = 0; i < action.sequences.length; i++) {
+                    await playNoteSequence(action.sequences[i], action.tempo || 100);
+                    await new Promise(r => setTimeout(r, 600));
                 }
             }
             break;
@@ -475,29 +766,116 @@ function renderLearnSection(lesson) {
 }
 
 /**
+ * Render a stepper UI for step-through control (works with sequences, progressions, intervals)
+ */
+function renderProgressionStepper(lesson, example, exampleIndex) {
+    const items = getSteppableItems(example.playAction);
+    const state = getStepperState(lesson.id, exampleIndex);
+    const currentIdx = state.currentIndex;
+    const isChordType = example.playAction.type === 'progression';
+
+    // Build inline sequence display
+    const sequenceHTML = items.map((item, i) => {
+        let classes = 'step-chord px-2 py-1 rounded transition-all duration-200';
+        if (i === currentIdx) {
+            classes += ' step-current font-bold text-indigo-700 bg-indigo-100';
+        } else if (i < currentIdx) {
+            classes += ' text-gray-400';
+        } else {
+            classes += ' text-gray-500';
+        }
+        return `<span class="${classes}" data-chord-index="${i}">${item}</span>`;
+    }).join('<span class="text-gray-300 mx-1">→</span>');
+
+    // Determine play button label based on type
+    const playLabel = isChordType ? 'Play' : 'Play';
+    const playTitle = isChordType ? 'Play current chord' : 'Play current note';
+
+    return `
+        <div style="background-color: #fff;" class="progression-stepper dark:bg-gray-800 rounded-xl p-5 mb-3 border border-gray-200 dark:border-gray-600" data-example-index="${exampleIndex}" data-play-type="${example.playAction.type}">
+            <!-- Header with label, inline callout, and description -->
+            <div class="mb-4">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <h4 style="color: #000;" class="font-semibold dark:text-white text-lg">${example.label}</h4>
+                    <!-- Playback callout (inline with title) -->
+                    <span class="playback-callout hidden bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-semibold whitespace-nowrap" data-example-index="${exampleIndex}">
+                        <span class="callout-text"></span>
+                    </span>
+                </div>
+                <p style="color: #666;" class="dark:text-gray-300 text-sm mt-1">${example.description}</p>
+            </div>
+
+            <!-- Inline sequence display -->
+            <div class="chord-sequence flex items-center justify-center flex-wrap gap-1 text-base mb-4 py-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                ${sequenceHTML}
+            </div>
+
+            <!-- Controls -->
+            <div class="flex items-center justify-center gap-3 flex-wrap">
+                <button class="step-prev-btn px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed" data-example-index="${exampleIndex}" ${currentIdx === 0 ? 'disabled' : ''}>
+                    ◀ Prev
+                </button>
+                <button class="step-play-btn px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium" data-example-index="${exampleIndex}" title="${playTitle}">
+                    ▶ ${playLabel}
+                </button>
+                <button class="step-next-btn px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed" data-example-index="${exampleIndex}" ${currentIdx >= items.length - 1 ? 'disabled' : ''}>
+                    Next ▶
+                </button>
+                <span class="step-counter text-sm text-gray-500 dark:text-gray-400 font-medium mx-2">${currentIdx + 1} / ${items.length}</span>
+                <button class="play-all-btn px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-bold shadow-md" data-example-index="${exampleIndex}">
+                    ▶▶ Play All
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Render a simple play button for non-steppable examples
+ */
+function renderSimplePlayButton(lesson, example, exampleIndex) {
+    return `
+        <div style="background-color: #fff;" class="dark:bg-gray-800 rounded-lg p-4 mb-3 border border-gray-200 dark:border-gray-600" data-example-index="${exampleIndex}">
+            <div class="flex items-start gap-4">
+                <button
+                    class="play-example-btn flex-shrink-0 w-12 h-12 rounded-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center transition-colors"
+                    data-example-index="${exampleIndex}"
+                    title="Play"
+                >
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                    </svg>
+                </button>
+                <div class="flex-1">
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <h4 style="color: #000;" class="font-semibold dark:text-white">${example.label}</h4>
+                        <!-- Playback callout (inline with title) -->
+                        <span class="simple-playback-callout hidden bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1 rounded-full text-sm font-semibold whitespace-nowrap" data-example-index="${exampleIndex}">
+                            <span class="callout-text"></span>
+                        </span>
+                    </div>
+                    <p style="color: #000;" class="dark:text-white text-sm mt-1">${example.description}</p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
  * Render the HEAR IT section
  */
 function renderHearItSection(lesson) {
     const hearIt = lesson.hearIt;
     if (!hearIt || !hearIt.examples?.length) return '';
 
-    const examplesHTML = hearIt.examples.map((ex, idx) => `
-        <div style="background-color: #fff;" class="dark:bg-gray-800 rounded-lg p-4 mb-3 flex items-start gap-4 border border-gray-200 dark:border-gray-600">
-            <button
-                class="play-example-btn flex-shrink-0 w-12 h-12 rounded-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center transition-colors"
-                data-example-index="${idx}"
-                title="Play"
-            >
-                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z"/>
-                </svg>
-            </button>
-            <div class="flex-1">
-                <h4 style="color: #000;" class="font-semibold dark:text-white">${ex.label}</h4>
-                <p style="color: #000;" class=" dark:text-white text-sm">${ex.description}</p>
-            </div>
-        </div>
-    `).join('');
+    const examplesHTML = hearIt.examples.map((ex, idx) => {
+        // Use step-through UI for progressions with 3+ chords
+        if (isSteppablePlayAction(ex.playAction)) {
+            return renderProgressionStepper(lesson, ex, idx);
+        }
+        // Use simple play button for other types
+        return renderSimplePlayButton(lesson, ex, idx);
+    }).join('');
 
     const songsHTML = hearIt.famousSongs?.length ? `
         <div class="mt-4 p-4 bg-violet-50 dark:bg-violet-900/50 rounded-lg border-2 border-violet-300 dark:border-violet-600">
@@ -965,6 +1343,101 @@ export function renderLessonViewer(lessonId, container, pushHistory = true) {
 }
 
 /**
+ * Update the progression stepper UI after stepping
+ */
+function updateStepperUI(container, lesson, exampleIndex) {
+    const example = lesson.hearIt?.examples?.[exampleIndex];
+    if (!example || !isSteppablePlayAction(example.playAction)) return;
+
+    const items = getSteppableItems(example.playAction);
+    const state = getStepperState(lesson.id, exampleIndex);
+    const currentIdx = state.currentIndex;
+
+    // Find the stepper element
+    const stepper = container.querySelector(`.progression-stepper[data-example-index="${exampleIndex}"]`);
+    if (!stepper) return;
+
+    // Update chord sequence highlighting
+    const chordElements = stepper.querySelectorAll('.step-chord');
+    chordElements.forEach((el, i) => {
+        el.classList.remove('step-current', 'font-bold', 'text-indigo-700', 'bg-indigo-100', 'text-gray-400', 'text-gray-500');
+        if (i === currentIdx) {
+            el.classList.add('step-current', 'font-bold', 'text-indigo-700', 'bg-indigo-100');
+        } else if (i < currentIdx) {
+            el.classList.add('text-gray-400');
+        } else {
+            el.classList.add('text-gray-500');
+        }
+    });
+
+    // Update counter
+    const counter = stepper.querySelector('.step-counter');
+    if (counter) {
+        counter.textContent = `${currentIdx + 1} / ${items.length}`;
+    }
+
+    // Update button states
+    const prevBtn = stepper.querySelector('.step-prev-btn');
+    const nextBtn = stepper.querySelector('.step-next-btn');
+    if (prevBtn) prevBtn.disabled = currentIdx === 0;
+    if (nextBtn) nextBtn.disabled = currentIdx >= items.length - 1;
+}
+
+/**
+ * Show playback callout with chord name
+ */
+function showPlaybackCallout(container, exampleIndex, text, isSimple = false) {
+    const selector = isSimple
+        ? `.simple-playback-callout[data-example-index="${exampleIndex}"]`
+        : `.playback-callout[data-example-index="${exampleIndex}"]`;
+    const callout = container.querySelector(selector);
+    if (callout) {
+        const textEl = callout.querySelector('.callout-text');
+        if (textEl) textEl.textContent = text;
+        callout.classList.remove('hidden');
+    }
+}
+
+/**
+ * Hide playback callout
+ */
+function hidePlaybackCallout(container, exampleIndex, isSimple = false) {
+    const selector = isSimple
+        ? `.simple-playback-callout[data-example-index="${exampleIndex}"]`
+        : `.playback-callout[data-example-index="${exampleIndex}"]`;
+    const callout = container.querySelector(selector);
+    if (callout) {
+        callout.classList.add('hidden');
+    }
+}
+
+/**
+ * Get a human-readable label for a play action
+ */
+function getPlayActionLabel(playAction) {
+    if (!playAction) return 'Playing...';
+
+    switch (playAction.type) {
+        case 'single_note':
+            return `Playing: ${playAction.note}`;
+        case 'chord':
+            return `Playing: ${playAction.root} ${playAction.chordType}`;
+        case 'progression':
+            return `Playing: ${playAction.chords.join(' → ')}`;
+        case 'scale':
+            return `Playing: ${playAction.root} ${playAction.scaleType} scale`;
+        case 'comparison':
+            if (playAction.notes) return `Comparing: ${playAction.notes.join(' vs ')}`;
+            if (playAction.chords) return `Comparing: ${playAction.chords.join(' vs ')}`;
+            return 'Comparing...';
+        case 'voiced_progression':
+            return 'Playing voiced progression...';
+        default:
+            return 'Playing...';
+    }
+}
+
+/**
  * Update section visibility
  */
 function updateSectionVisibility(container) {
@@ -1043,7 +1516,7 @@ function attachLessonEventListeners(container, lesson) {
         });
     });
 
-    // Play example buttons
+    // Play example buttons (simple play buttons for non-steppable examples)
     container.querySelectorAll('.play-example-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             const idx = parseInt(btn.dataset.exampleIndex);
@@ -1051,9 +1524,142 @@ function attachLessonEventListeners(container, lesson) {
             if (example?.playAction) {
                 btn.disabled = true;
                 btn.innerHTML = '<span class="animate-pulse">...</span>';
+
+                // Show callout for simple playback
+                const calloutText = getPlayActionLabel(example.playAction);
+                showPlaybackCallout(container, idx, calloutText, true);
+
                 await executePlayAction(example.playAction);
+
+                hidePlaybackCallout(container, idx, true);
                 btn.disabled = false;
                 btn.innerHTML = '<svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+            }
+        });
+    });
+
+    // Progression stepper: Step Previous button (navigates AND plays)
+    container.querySelectorAll('.step-prev-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const idx = parseInt(btn.dataset.exampleIndex);
+            const example = lesson.hearIt?.examples?.[idx];
+            const state = getStepperState(lesson.id, idx);
+            const items = getSteppableItems(example?.playAction);
+            const playType = example?.playAction?.type;
+
+            if (state.currentIndex > 0) {
+                state.currentIndex--;
+                updateStepperUI(container, lesson, idx);
+
+                // Auto-play the new current item
+                const currentItem = items[state.currentIndex];
+                if (currentItem) {
+                    btn.disabled = true;
+                    showPlaybackCallout(container, idx, `Playing: ${currentItem}`);
+
+                    if (playType === 'progression') {
+                        await playProgressionStep(currentItem);
+                    } else {
+                        await playSequenceStep(currentItem);
+                    }
+
+                    hidePlaybackCallout(container, idx);
+                    btn.disabled = false;
+                }
+            }
+        });
+    });
+
+    // Progression stepper: Step Next button (navigates AND plays)
+    container.querySelectorAll('.step-next-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const idx = parseInt(btn.dataset.exampleIndex);
+            const example = lesson.hearIt?.examples?.[idx];
+            const state = getStepperState(lesson.id, idx);
+            const items = getSteppableItems(example?.playAction);
+            const maxIndex = items.length - 1;
+            const playType = example?.playAction?.type;
+
+            if (state.currentIndex < maxIndex) {
+                state.currentIndex++;
+                updateStepperUI(container, lesson, idx);
+
+                // Auto-play the new current item
+                const currentItem = items[state.currentIndex];
+                if (currentItem) {
+                    btn.disabled = true;
+                    showPlaybackCallout(container, idx, `Playing: ${currentItem}`);
+
+                    if (playType === 'progression') {
+                        await playProgressionStep(currentItem);
+                    } else {
+                        await playSequenceStep(currentItem);
+                    }
+
+                    hidePlaybackCallout(container, idx);
+                    btn.disabled = false;
+                }
+            }
+        });
+    });
+
+    // Progression stepper: Play current item button (works for notes and chords)
+    container.querySelectorAll('.step-play-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const idx = parseInt(btn.dataset.exampleIndex);
+            const example = lesson.hearIt?.examples?.[idx];
+            const state = getStepperState(lesson.id, idx);
+            const items = getSteppableItems(example?.playAction);
+            const currentItem = items[state.currentIndex];
+            const playType = example?.playAction?.type;
+
+            if (currentItem) {
+                btn.disabled = true;
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '...';
+
+                showPlaybackCallout(container, idx, `Playing: ${currentItem}`);
+
+                // Play based on type: chord for progressions, note for sequences/intervals
+                if (playType === 'progression') {
+                    await playProgressionStep(currentItem);
+                } else {
+                    await playSequenceStep(currentItem);
+                }
+
+                hidePlaybackCallout(container, idx);
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        });
+    });
+
+    // Progression stepper: Play All button
+    container.querySelectorAll('.play-all-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const idx = parseInt(btn.dataset.exampleIndex);
+            const example = lesson.hearIt?.examples?.[idx];
+            const state = getStepperState(lesson.id, idx);
+
+            if (example?.playAction && isSteppablePlayAction(example.playAction)) {
+                btn.disabled = true;
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '...';
+
+                // Reset to start
+                state.currentIndex = 0;
+                updateStepperUI(container, lesson, idx);
+
+                // Play with callout updates using the onItemChange callback
+                await executePlayAction(example.playAction, (itemIndex, itemName) => {
+                    state.currentIndex = itemIndex;
+                    updateStepperUI(container, lesson, idx);
+                    showPlaybackCallout(container, idx, `Playing: ${itemName}`);
+                });
+
+                hidePlaybackCallout(container, idx);
+                btn.disabled = false;
+                btn.innerHTML = originalText;
             }
         });
     });
@@ -1467,6 +2073,8 @@ function resetLessonState() {
     currentSection = 'learn';
     exerciseProgress = {};
     quizAnswers = {};
+    // Clear progression stepper state
+    Object.keys(progressionStepperState).forEach(key => delete progressionStepperState[key]);
 }
 
 // ===========================================
