@@ -1,11 +1,9 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig(({ mode }) => ({
-  // Base path: use repo name for production (GitHub Pages), '/' for dev
-  // Set VITE_BASE_PATH env var or it defaults to '/Music-Theory-Lab/'
-  base: mode === 'production'
-    ? (process.env.VITE_BASE_PATH || '/music-theory-lab/')
-    : '/',
+  // Base path: '/' for most deployments (Netlify, custom domain)
+  // Set VITE_BASE_PATH env var to override (e.g., '/Music-Theory-Lab/' for GitHub Pages)
+  base: process.env.VITE_BASE_PATH || '/',
 
   // Use index.html in root as entry point
   root: '.',
