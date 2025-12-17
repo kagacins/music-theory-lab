@@ -409,9 +409,13 @@ function createButtonTooltip(button, tooltipText, chordType = null, chordRoot = 
     tooltip.appendChild(closeBtn);
     
     document.body.appendChild(tooltip);
-    
+
     // Smart positioning function that prefers above but falls back to below
     const positionTooltip = () => {
+        // Check if tooltips are disabled for this type
+        if (chordType && window.chordTooltipsEnabled === false) return;
+        if (!chordType && window.intervalTooltipsEnabled === false) return;
+
         const rect = button.getBoundingClientRect();
         const estimatedHeight = chordType ? 250 : 100; // Estimate with extra padding
         const spaceAbove = rect.top;

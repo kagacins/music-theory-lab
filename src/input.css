@@ -9,6 +9,8 @@
         opacity: 1 !important;
     }
 
+    /* FAB action button tooltips are styled inline for reliable rotation */
+
     /* FAB submenu animation */
     .fab-submenu {
         animation: fab-slide-in 0.15s ease-out;
@@ -56,5 +58,24 @@
 
     .touch-device .touch-device-only {
         display: block;
+    }
+
+    /* Hide info icons when parent container has tooltips-hidden class */
+    .tooltips-hidden .chord-info-icon {
+        display: none !important;
+    }
+
+    /* Hide chord tooltips when body has chord-tooltips-disabled class */
+    body.chord-tooltips-disabled .chord-button-tooltip[data-chord-type] {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+    }
+
+    /* Hide interval tooltips when body has interval-tooltips-disabled class */
+    body.interval-tooltips-disabled .chord-button-tooltip:not([data-chord-type]) {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
     }
 }

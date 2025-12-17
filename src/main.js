@@ -431,14 +431,13 @@ function handleMobileTooltips() {
         document.body.classList.add('touch-device');
     }
 
-    // Only show mobile FAB on actual mobile devices (not touch-enabled desktops)
-    if (isMobileDevice) {
-        const mobileFab = document.getElementById('mobile-fab');
-        if (mobileFab) {
-            mobileFab.classList.remove('hidden');
-        }
-        initMobileFab();
+    // Show mobile FAB (currently enabled for testing on all devices)
+    // TODO: Restore mobile-only check after FAB is refined: if (isMobileDevice) { ... }
+    const mobileFab = document.getElementById('mobile-fab');
+    if (mobileFab) {
+        mobileFab.classList.remove('hidden');
     }
+    initMobileFab();
 }
 
 /**
@@ -448,14 +447,18 @@ function handleMobileTooltips() {
 function initMobileFab() {
     const fabMain = document.getElementById('mobile-fab-main');
     const fabMenu = document.getElementById('mobile-fab-menu');
-    const fabSuggestions = document.getElementById('mobile-fab-suggestions');
-    const fabSettings = document.getElementById('mobile-fab-settings');
     const fabCategories = document.querySelectorAll('.fab-category');
 
     if (!fabMain || !fabMenu) return;
 
     let isOpen = false;
     let activeSubmenu = null;
+    let isHandlingAction = false; // Flag to prevent closing during action handling
+
+    // Quick Play Chord button (above FAB, visible when FAB collapsed in Chord Lab)
+    const fabPlayChordQuick = document.getElementById('fab-play-chord-quick');
+    // Quick buttons for Composition Studio (above FAB, visible when FAB collapsed)
+    const fabMelodyQuickButtons = document.getElementById('fab-melody-quick-buttons');
 
     // Toggle main FAB menu (first tier)
     fabMain.addEventListener('click', (e) => {
@@ -463,6 +466,14 @@ function initMobileFab() {
         isOpen = !isOpen;
         fabMenu.classList.toggle('hidden', !isOpen);
         fabMain.querySelector('.fab-icon').style.transform = isOpen ? 'rotate(45deg)' : 'rotate(0deg)';
+
+        // Hide/show quick buttons based on FAB state and current tab
+        if (fabPlayChordQuick && window.currentTab === 'builder') {
+            fabPlayChordQuick.classList.toggle('hidden', isOpen);
+        }
+        if (fabMelodyQuickButtons && window.currentTab === 'melody') {
+            fabMelodyQuickButtons.classList.toggle('hidden', isOpen);
+        }
 
         // Close any open submenu when closing main menu
         if (!isOpen) {
@@ -472,77 +483,158 @@ function initMobileFab() {
         // Show labels on hover
         if (isOpen) {
             showCategoryLabels();
+
+            // Update context-aware labels based on current tab
+            const currentTab = window.currentTab || 'builder';
+            const suggestionsCategory = document.querySelector('[data-category="suggestions"]');
+            if (suggestionsCategory) {
+                const label = suggestionsCategory.querySelector('.fab-label');
+                const btn = suggestionsCategory.querySelector('.fab-category-btn');
+                if (currentTab === 'builder') {
+                    if (label) label.textContent = 'Add';
+                    // Change icon to plus
+                    if (btn) btn.innerHTML = '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>';
+                } else {
+                    if (label) label.textContent = 'Suggestions';
+                    // Change icon to lightning bolt
+                    if (btn) btn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>';
+                }
+            }
         }
     });
 
     // Category buttons toggle submenus (second tier)
     fabCategories.forEach(category => {
         const categoryBtn = category.querySelector('.fab-category-btn');
-        const submenu = category.querySelector('.fab-submenu');
+        const categoryType = category.dataset.category;
 
         categoryBtn.addEventListener('click', (e) => {
             e.stopPropagation();
 
-            // Close other submenus
+            // Close other categories' submenus
             fabCategories.forEach(other => {
                 if (other !== category) {
-                    const otherSubmenu = other.querySelector('.fab-submenu');
-                    if (otherSubmenu) otherSubmenu.classList.add('hidden');
+                    other.querySelectorAll('.fab-submenu').forEach(sub => sub.classList.add('hidden'));
                 }
             });
 
-            // Toggle this submenu
-            if (submenu) {
-                const isSubmenuOpen = !submenu.classList.contains('hidden');
-                submenu.classList.toggle('hidden', isSubmenuOpen);
-                activeSubmenu = isSubmenuOpen ? null : submenu;
+            // For playback category, show the correct submenu based on current tab
+            if (categoryType === 'playback') {
+                const currentTab = window.currentTab || 'builder';
+                const builderSubmenu = document.getElementById('fab-playback-builder');
+                const melodySubmenu = document.getElementById('fab-playback-melody');
+                const defaultSubmenu = document.getElementById('fab-playback-default');
+
+                // Determine target submenu
+                let targetSubmenu;
+                if (currentTab === 'builder') {
+                    targetSubmenu = builderSubmenu;
+                } else if (currentTab === 'melody') {
+                    targetSubmenu = melodySubmenu;
+                } else {
+                    targetSubmenu = defaultSubmenu;
+                }
+
+                // Check if currently open BEFORE hiding
+                const isCurrentlyOpen = targetSubmenu && !targetSubmenu.classList.contains('hidden');
+
+                // Hide all playback submenus
+                [builderSubmenu, melodySubmenu, defaultSubmenu].forEach(sub => {
+                    if (sub) sub.classList.add('hidden');
+                });
+
+                // Toggle: if was open, leave closed; if was closed, show it
+                if (targetSubmenu && !isCurrentlyOpen) {
+                    targetSubmenu.classList.remove('hidden');
+                    activeSubmenu = targetSubmenu;
+                } else {
+                    activeSubmenu = null;
+                }
+            } else if (categoryType === 'suggestions') {
+                // For suggestions category, show Add (builder) or Suggestions (melody)
+                const currentTab = window.currentTab || 'builder';
+                const addSubmenu = document.getElementById('fab-add-builder');
+                const suggestionsSubmenu = document.getElementById('fab-suggestions-melody');
+
+                // Determine target submenu
+                let targetSubmenu;
+                if (currentTab === 'builder') {
+                    targetSubmenu = addSubmenu;
+                } else if (currentTab === 'melody') {
+                    targetSubmenu = suggestionsSubmenu;
+                }
+
+                // Check if currently open BEFORE hiding
+                const isCurrentlyOpen = targetSubmenu && !targetSubmenu.classList.contains('hidden');
+
+                // Hide both submenus
+                [addSubmenu, suggestionsSubmenu].forEach(sub => {
+                    if (sub) sub.classList.add('hidden');
+                });
+
+                // Toggle: if was open, leave closed; if was closed, show it
+                if (targetSubmenu && !isCurrentlyOpen) {
+                    targetSubmenu.classList.remove('hidden');
+                    activeSubmenu = targetSubmenu;
+                } else {
+                    activeSubmenu = null;
+                }
+            } else {
+                // For other categories, toggle their single submenu
+                const submenu = category.querySelector('.fab-submenu');
+                if (submenu) {
+                    const isSubmenuOpen = !submenu.classList.contains('hidden');
+                    submenu.classList.toggle('hidden', isSubmenuOpen);
+                    activeSubmenu = isSubmenuOpen ? null : submenu;
+                }
             }
         });
 
-        // Handle submenu action buttons
-        const actionBtns = category.querySelectorAll('.fab-action');
+        // Handle submenu action buttons (both circular .fab-action buttons and dropdown menu buttons)
+        const actionBtns = category.querySelectorAll('.fab-action, .fab-submenu button[data-action]');
         actionBtns.forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const action = btn.dataset.action;
+                // Set flag to prevent document click handler from closing FAB
+                isHandlingAction = true;
                 handleFabAction(action);
-                closeFab();
+
+                // Keep dropdown open - only close when clicking category button or outside FAB
+                // (removed auto-close behavior per user request)
+
+                // Reset flag after a short delay to allow any triggered clicks to complete
+                setTimeout(() => {
+                    isHandlingAction = false;
+                }, 100);
             });
         });
     });
 
-    // Suggestions button (direct action, no submenu)
-    if (fabSuggestions) {
-        fabSuggestions.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const actionSuggestionsBtn = document.getElementById('action-tab-suggestions');
-            if (actionSuggestionsBtn) actionSuggestionsBtn.click();
-            closeFab();
-        });
-    }
+    // Wire up FAB settings panel controls
+    initFabSettingsPanel();
 
-    // Settings button (direct action, no submenu)
-    if (fabSettings) {
-        fabSettings.addEventListener('click', (e) => {
-            e.stopPropagation();
-            // Open sidebar which contains settings
-            const sidebarToggle = document.getElementById('sidebar-toggle');
-            if (sidebarToggle) sidebarToggle.click();
-            closeFab();
-        });
-    }
-
-    // Close FAB when clicking outside
+    // Close FAB when clicking outside (but not when clicking on FAB elements or during action handling)
     document.addEventListener('click', (e) => {
-        if (isOpen && !e.target.closest('#mobile-fab')) {
+        // Check both local flag and global flag (for settings panel controls)
+        if (isOpen && !isHandlingAction && !window._fabIsHandlingAction && !e.target.closest('#mobile-fab')) {
             closeFab();
         }
     });
 
     function closeAllSubmenus() {
+        // Close ALL submenus in ALL categories (some categories have multiple submenus)
         fabCategories.forEach(category => {
-            const submenu = category.querySelector('.fab-submenu');
-            if (submenu) submenu.classList.add('hidden');
+            category.querySelectorAll('.fab-submenu').forEach(submenu => {
+                submenu.classList.add('hidden');
+            });
+        });
+        // Also close any standalone submenus by ID
+        ['fab-playback-builder', 'fab-playback-melody', 'fab-playback-default',
+         'fab-add-builder', 'fab-suggestions-melody', 'fab-file-dropdown',
+         'fab-edit-dropdown', 'fab-help-dropdown'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('hidden');
         });
         activeSubmenu = null;
     }
@@ -563,6 +655,70 @@ function initMobileFab() {
         fabMenu.classList.add('hidden');
         fabMain.querySelector('.fab-icon').style.transform = 'rotate(0deg)';
         closeAllSubmenus();
+        // Show quick buttons when closing FAB based on current tab
+        if (fabPlayChordQuick && window.currentTab === 'builder') {
+            fabPlayChordQuick.classList.remove('hidden');
+        }
+        if (fabMelodyQuickButtons && window.currentTab === 'melody') {
+            fabMelodyQuickButtons.classList.remove('hidden');
+        }
+    }
+
+    // Expose closeFab globally so it can be called on tab change
+    window.closeFab = closeFab;
+
+    // Quick Play Chord button - press-and-hold pattern for Chord Lab
+    if (fabPlayChordQuick) {
+        // Mouse events
+        fabPlayChordQuick.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            if (window.startBuilderChord) window.startBuilderChord();
+        });
+        fabPlayChordQuick.addEventListener('mouseup', () => {
+            if (window.stopBuilderChord) window.stopBuilderChord();
+        });
+        fabPlayChordQuick.addEventListener('mouseleave', () => {
+            if (window.stopBuilderChord) window.stopBuilderChord();
+        });
+
+        // Touch events
+        fabPlayChordQuick.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (window.startBuilderChord) window.startBuilderChord();
+        });
+        fabPlayChordQuick.addEventListener('touchend', () => {
+            if (window.stopBuilderChord) window.stopBuilderChord();
+        });
+        fabPlayChordQuick.addEventListener('touchcancel', () => {
+            if (window.stopBuilderChord) window.stopBuilderChord();
+        });
+    }
+
+    // Melody quick buttons - Play All, Stop, Suggestions
+    const fabPlayAllQuick = document.getElementById('fab-play-all-quick');
+    const fabStopQuick = document.getElementById('fab-stop-quick');
+    const fabSuggestionsQuick = document.getElementById('fab-suggestions-quick');
+
+    if (fabPlayAllQuick) {
+        fabPlayAllQuick.addEventListener('click', () => {
+            const playAllBtn = document.getElementById('action-play-all');
+            if (playAllBtn) playAllBtn.click();
+        });
+    }
+
+    if (fabStopQuick) {
+        fabStopQuick.addEventListener('click', () => {
+            const stopBtn = document.getElementById('action-stop-btn');
+            if (stopBtn) stopBtn.click();
+        });
+    }
+
+    if (fabSuggestionsQuick) {
+        fabSuggestionsQuick.addEventListener('click', () => {
+            if (window.showUnifiedRecommendationModal) {
+                window.showUnifiedRecommendationModal({ initialTab: 'chord' });
+            }
+        });
     }
 
     function handleFabAction(action) {
@@ -583,6 +739,75 @@ function initMobileFab() {
                 }
                 break;
 
+            // Chord Lab (builder) playback actions
+            case 'play-current-chord':
+                // Directly call playBuilderChordWithDuration instead of clicking hidden dropdown button
+                if (window.playBuilderChordWithDuration) {
+                    window.playBuilderChordWithDuration();
+                }
+                break;
+            case 'play-builder-progression':
+                // Directly call handleAutoPlayback instead of clicking hidden dropdown button
+                if (window.handleAutoPlayback) {
+                    window.handleAutoPlayback();
+                }
+                break;
+
+            // Composition Studio (melody) playback actions
+            case 'play-all-melody':
+                const playAllBtn = document.getElementById('action-play-all');
+                if (playAllBtn) playAllBtn.click();
+                break;
+            case 'play-progression-only':
+                const playProgOnlyBtn = document.getElementById('action-play-progression');
+                if (playProgOnlyBtn) playProgOnlyBtn.click();
+                break;
+            case 'play-from-cursor':
+                const playFromCursorBtn = document.getElementById('action-play-from-cursor');
+                if (playFromCursorBtn) playFromCursorBtn.click();
+                break;
+            case 'play-measure-melody':
+                const playMeasureBtn = document.getElementById('action-play-measure');
+                if (playMeasureBtn) playMeasureBtn.click();
+                break;
+
+            // Chord Lab (builder) add actions
+            case 'add-chord':
+                const addChordBtn = document.getElementById('action-add-chord');
+                if (addChordBtn) addChordBtn.click();
+                break;
+            case 'add-go':
+                const addGoBtn = document.getElementById('action-add-go');
+                if (addGoBtn) addGoBtn.click();
+                break;
+
+            // Composition Studio (melody) suggestions actions
+            case 'suggest-chords':
+                if (window.showUnifiedRecommendationModal) {
+                    window.showUnifiedRecommendationModal({ initialTab: 'chord' });
+                }
+                break;
+            case 'suggest-melody':
+                if (window.showUnifiedRecommendationModal) {
+                    window.showUnifiedRecommendationModal({ initialTab: 'melody' });
+                }
+                break;
+            case 'suggest-section':
+                if (window.showUnifiedRecommendationModal) {
+                    window.showUnifiedRecommendationModal({ initialTab: 'section' });
+                }
+                break;
+            case 'suggest-harmonize':
+                if (window.showUnifiedRecommendationModal) {
+                    window.showUnifiedRecommendationModal({ initialTab: 'harmonize' });
+                }
+                break;
+            case 'suggest-texture':
+                if (window.showUnifiedRecommendationModal) {
+                    window.showUnifiedRecommendationModal({ initialTab: 'polyphony' });
+                }
+                break;
+
             // Edit actions
             case 'undo':
                 const undoBtn = document.getElementById('action-undo');
@@ -592,11 +817,13 @@ function initMobileFab() {
                 const redoBtn = document.getElementById('action-redo');
                 if (redoBtn) redoBtn.click();
                 break;
-            case 'delete':
-                // Trigger delete on selected notes via keyboard event
-                if (window.noteEditor && window.noteEditor.deleteSelectedNotes) {
-                    window.noteEditor.deleteSelectedNotes();
-                }
+            case 'clear-treble':
+                const clearTrebleBtn = document.getElementById('action-clear-treble');
+                if (clearTrebleBtn) clearTrebleBtn.click();
+                break;
+            case 'clear-progression':
+                const clearProgBtn = document.getElementById('action-clear-progression');
+                if (clearProgBtn) clearProgBtn.click();
                 break;
 
             // File actions
@@ -620,10 +847,228 @@ function initMobileFab() {
                 const shareBtn = document.getElementById('action-copy-link');
                 if (shareBtn) shareBtn.click();
                 break;
+            case 'new-song':
+                if (window.openSongwritingWizard) {
+                    window.openSongwritingWizard();
+                }
+                break;
+            case 'version-history':
+                if (window.showVersionHistory) {
+                    window.showVersionHistory();
+                }
+                break;
+            case 'create-checkpoint':
+                if (window.createCheckpoint) {
+                    window.createCheckpoint();
+                }
+                break;
+            case 'import-midi':
+                const importMidiBtn = document.getElementById('action-import-midi');
+                if (importMidiBtn) importMidiBtn.click();
+                break;
+            case 'export-audio':
+                const exportAudioBtn = document.getElementById('action-export-audio');
+                if (exportAudioBtn) exportAudioBtn.click();
+                break;
+
+            // Help actions
+            case 'start-here':
+                window.location.href = 'start-here.html';
+                break;
+            case 'keyboard-shortcuts':
+                if (window.showNotationShortcuts) {
+                    window.showNotationShortcuts();
+                }
+                break;
 
             default:
                 console.warn('Unknown FAB action:', action);
         }
+    }
+}
+
+/**
+ * Initialize FAB Settings Panel controls
+ * Syncs with the main settings controls in the action bar
+ */
+function initFabSettingsPanel() {
+    // BPM Slider
+    const fabBpmSlider = document.getElementById('fab-bpm-slider');
+    const fabBpmValue = document.getElementById('fab-bpm-value');
+    const actionBpmSlider = document.getElementById('action-bpm-slider');
+    const actionBpmValue = document.getElementById('action-bpm-value');
+
+    if (fabBpmSlider && fabBpmValue) {
+        // Sync initial value from action bar
+        if (actionBpmSlider) {
+            fabBpmSlider.value = actionBpmSlider.value;
+            fabBpmValue.textContent = actionBpmSlider.value;
+        }
+
+        fabBpmSlider.addEventListener('input', (e) => {
+            const bpm = e.target.value;
+            fabBpmValue.textContent = bpm;
+            // Sync to action bar
+            if (actionBpmSlider) actionBpmSlider.value = bpm;
+            if (actionBpmValue) actionBpmValue.textContent = bpm;
+            // Apply BPM change
+            if (window.setPlaybackBPM) window.setPlaybackBPM(parseInt(bpm));
+        });
+    }
+
+    // Arpeggio Speed
+    const fabArpSlower = document.getElementById('fab-arp-slower');
+    const fabArpFaster = document.getElementById('fab-arp-faster');
+    const fabArpSpeed = document.getElementById('fab-arp-speed');
+    const actionArpSpeed = document.getElementById('action-arp-speed');
+
+    const arpSpeeds = ['Slow', 'Medium', 'Fast'];
+    let currentArpIndex = 1; // Default to Medium
+
+    // Sync initial value
+    if (actionArpSpeed && fabArpSpeed) {
+        fabArpSpeed.textContent = actionArpSpeed.textContent;
+        currentArpIndex = arpSpeeds.indexOf(actionArpSpeed.textContent);
+        if (currentArpIndex === -1) currentArpIndex = 1;
+    }
+
+    // Reference to isHandlingAction flag from outer scope
+    const getIsHandlingAction = () => window._fabIsHandlingAction;
+    const setIsHandlingAction = (val) => { window._fabIsHandlingAction = val; };
+
+    if (fabArpSlower) {
+        fabArpSlower.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setIsHandlingAction(true);
+            if (currentArpIndex > 0) {
+                currentArpIndex--;
+                const speed = arpSpeeds[currentArpIndex];
+                if (fabArpSpeed) fabArpSpeed.textContent = speed;
+                if (actionArpSpeed) actionArpSpeed.textContent = speed;
+                // Call arpeggio speed function directly (works without action bar)
+                if (window.changeArpeggioSpeed) {
+                    window.changeArpeggioSpeed('slower');
+                }
+            }
+            setTimeout(() => setIsHandlingAction(false), 100);
+        });
+    }
+
+    if (fabArpFaster) {
+        fabArpFaster.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setIsHandlingAction(true);
+            if (currentArpIndex < arpSpeeds.length - 1) {
+                currentArpIndex++;
+                const speed = arpSpeeds[currentArpIndex];
+                if (fabArpSpeed) fabArpSpeed.textContent = speed;
+                if (actionArpSpeed) actionArpSpeed.textContent = speed;
+                // Call arpeggio speed function directly (works without action bar)
+                if (window.changeArpeggioSpeed) {
+                    window.changeArpeggioSpeed('faster');
+                }
+            }
+            setTimeout(() => setIsHandlingAction(false), 100);
+        });
+    }
+
+    // RH Octave controls (Chord Lab only)
+    const fabRhOctaveDown = document.getElementById('fab-rh-octave-down');
+    const fabRhOctaveUp = document.getElementById('fab-rh-octave-up');
+    const fabRhOctave = document.getElementById('fab-rh-octave');
+    const builderOctaveDisplay = document.getElementById('builder-octave-display');
+
+    // Sync initial value from builder display
+    if (fabRhOctave && builderOctaveDisplay) {
+        // Extract just the number from "Oct: 0" format
+        const match = builderOctaveDisplay.textContent.match(/-?\d+/);
+        if (match) {
+            fabRhOctave.textContent = match[0];
+        }
+    }
+
+    if (fabRhOctaveDown) {
+        fabRhOctaveDown.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setIsHandlingAction(true);
+            if (window.changeBuilderOctave) {
+                window.changeBuilderOctave(-1);
+                // Stop the chord after a brief preview (500ms)
+                setTimeout(() => {
+                    if (window.stopBuilderChord) window.stopBuilderChord();
+                }, 500);
+                // Sync display
+                setTimeout(() => {
+                    if (fabRhOctave && builderOctaveDisplay) {
+                        const match = builderOctaveDisplay.textContent.match(/-?\d+/);
+                        if (match) fabRhOctave.textContent = match[0];
+                    }
+                }, 50);
+            }
+            setTimeout(() => setIsHandlingAction(false), 100);
+        });
+    }
+
+    if (fabRhOctaveUp) {
+        fabRhOctaveUp.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setIsHandlingAction(true);
+            if (window.changeBuilderOctave) {
+                window.changeBuilderOctave(1);
+                // Stop the chord after a brief preview (500ms)
+                setTimeout(() => {
+                    if (window.stopBuilderChord) window.stopBuilderChord();
+                }, 500);
+                // Sync display
+                setTimeout(() => {
+                    if (fabRhOctave && builderOctaveDisplay) {
+                        const match = builderOctaveDisplay.textContent.match(/-?\d+/);
+                        if (match) fabRhOctave.textContent = match[0];
+                    }
+                }, 50);
+            }
+            setTimeout(() => setIsHandlingAction(false), 100);
+        });
+    }
+
+    // Loop Toggle
+    const fabLoopToggle = document.getElementById('fab-loop-toggle');
+    const actionLoopToggle = document.getElementById('action-loop-toggle');
+
+    if (fabLoopToggle) {
+        // Sync initial value
+        if (actionLoopToggle) {
+            fabLoopToggle.checked = actionLoopToggle.checked;
+        }
+
+        fabLoopToggle.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const isLooping = e.target.checked;
+            if (actionLoopToggle) actionLoopToggle.checked = isLooping;
+            if (window.setLoopPlayback) window.setLoopPlayback(isLooping);
+        });
+    }
+
+    // Highlight Notes Toggle
+    const fabHighlightToggle = document.getElementById('fab-highlight-toggle');
+    const actionHighlightToggle = document.getElementById('action-highlight-toggle');
+
+    if (fabHighlightToggle) {
+        // Sync initial value
+        if (actionHighlightToggle) {
+            fabHighlightToggle.checked = actionHighlightToggle.checked;
+        }
+
+        fabHighlightToggle.addEventListener('change', (e) => {
+            e.stopPropagation();
+            const highlight = e.target.checked;
+            if (actionHighlightToggle) actionHighlightToggle.checked = highlight;
+            if (window.setHighlightNotes) window.setHighlightNotes(highlight);
+        });
     }
 }
 
@@ -1535,6 +1980,69 @@ window.toggleChordSetupPanel = toggleChordSetupPanel;
 window.toggleChordLibraryPanel = toggleChordLibraryPanel;
 window.toggleChordLibraryMode = toggleChordLibraryMode;
 window.toggleChordIntervalsPanel = toggleChordIntervalsPanel;
+
+// Chord and Interval tooltips toggles
+// These use CSS classes to show/hide the custom tooltip elements
+window.chordTooltipsEnabled = true;
+window.intervalTooltipsEnabled = true;
+
+window.toggleChordTooltips = function(enabled) {
+    window.chordTooltipsEnabled = enabled;
+    const chordSelector = document.getElementById('builder-chord-type-selector');
+    const chordLibraryPanel = document.getElementById('chord-library-panel');
+    const statusText = document.getElementById('chord-details-status');
+
+    // Add class to containers to hide info icons
+    if (chordSelector) {
+        chordSelector.classList.toggle('tooltips-hidden', !enabled);
+    }
+    if (chordLibraryPanel) {
+        chordLibraryPanel.classList.toggle('tooltips-hidden', !enabled);
+    }
+    if (statusText) {
+        statusText.textContent = enabled ? 'On' : 'Off';
+    }
+
+    // Add class to body to control tooltip visibility (tooltips are appended to body)
+    document.body.classList.toggle('chord-tooltips-disabled', !enabled);
+
+    // Also hide any currently visible tooltips
+    if (!enabled) {
+        document.querySelectorAll('.chord-button-tooltip[data-chord-type]').forEach(t => {
+            t.style.opacity = '0';
+            t.style.visibility = 'hidden';
+        });
+    }
+};
+
+window.toggleIntervalTooltips = function(enabled) {
+    window.intervalTooltipsEnabled = enabled;
+    const intervalSelector = document.getElementById('builder-interval-selector');
+    const intervalsPanel = document.getElementById('chord-intervals-panel');
+    const statusText = document.getElementById('interval-details-status');
+
+    // Add class to containers to hide info icons
+    if (intervalSelector) {
+        intervalSelector.classList.toggle('tooltips-hidden', !enabled);
+    }
+    if (intervalsPanel) {
+        intervalsPanel.classList.toggle('tooltips-hidden', !enabled);
+    }
+    if (statusText) {
+        statusText.textContent = enabled ? 'On' : 'Off';
+    }
+
+    // Add class to body to control tooltip visibility (tooltips are appended to body)
+    document.body.classList.toggle('interval-tooltips-disabled', !enabled);
+
+    // Also hide any currently visible tooltips (interval tooltips don't have data-chord-type)
+    if (!enabled) {
+        document.querySelectorAll('.chord-button-tooltip:not([data-chord-type])').forEach(t => {
+            t.style.opacity = '0';
+            t.style.visibility = 'hidden';
+        });
+    }
+};
 window.toggleBuilderProgressionPanel = toggleBuilderProgressionPanel;
 window.toggleBuilderCardView = toggleBuilderCardView;
 window.renderBuilderProgressionCards = renderBuilderProgressionCards;
@@ -2704,28 +3212,6 @@ window.toggleMelodyHighlight = function(enabled) {
 };
 
 /**
- * Toggle floating panel collapse/expand state
- */
-window.toggleFloatingPanelCollapse = function() {
-    const content = document.getElementById('floating-panel-content');
-    const toggleBtn = document.getElementById('toggle-floating-panel-btn');
-    if (!content || !toggleBtn) return;
-
-    const isCollapsed = content.classList.contains('hidden');
-    content.classList.toggle('hidden', !isCollapsed);
-
-    // Rotate the chevron icon
-    const svg = toggleBtn.querySelector('svg');
-    if (svg) {
-        if (isCollapsed) {
-            svg.style.transform = 'rotate(0deg)';
-        } else {
-            svg.style.transform = 'rotate(180deg)';
-        }
-    }
-};
-
-/**
  * Toggle melody recording on/off
  * @param {boolean} isRecording - true to start recording (Record), false to stop (Stop)
  */
@@ -3451,10 +3937,10 @@ window.onload = () => {
         }
     }
 
-    // Show action bar if starting on builder, trainer or melody tab
+    // Show action bar only for melody tab (Chord Lab uses FAB instead)
     const actionBar = document.getElementById('action-bar');
     const currentTab = getCurrentTab();
-    if (actionBar && (currentTab === 'builder' || currentTab === 'trainer' || currentTab === 'melody')) {
+    if (actionBar && currentTab === 'melody') {
         actionBar.classList.remove('hidden');
     }
 

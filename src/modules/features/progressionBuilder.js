@@ -4183,6 +4183,10 @@ function initializeSectionCardsAreaSortables(container) {
             handle: '.drag-handle',
             draggable: '.chord-card-wrapper[data-chord-index]',
             swapThreshold: 0.65,
+            // Touch-specific options
+            delay: 150,
+            delayOnTouchOnly: true,
+            touchStartThreshold: 5,
             onEnd: function(evt) {
                 // Handle card reordering within section or moving between sections
                 handleCardDragWithinSection(evt, sectionId);
@@ -4597,6 +4601,10 @@ function createUnifiedSectionContainer(section, progressionData, key) {
             handle: '.drag-handle',
             draggable: '.chord-card-wrapper[data-chord-index]',
             swapThreshold: 0.65,
+            // Touch-specific options
+            delay: 150,
+            delayOnTouchOnly: true,
+            touchStartThreshold: 5,
             // Handle cards added FROM outside (ungrouped or another section) INTO this section
             onAdd: function(evt) {
                 handleCardDragWithinSection(evt, evt.from.getAttribute('data-section-id'));
@@ -4857,6 +4865,10 @@ function initializeSectionSortables(container) {
                 // Exclude label and buttons from triggering drag (allow double-click rename)
                 filter: '.section-label, .section-menu-btn, .section-collapse-btn',
                 preventOnFilter: false, // Don't prevent events on filtered elements
+                // Touch-specific options
+                delay: 150,
+                delayOnTouchOnly: true,
+                touchStartThreshold: 5,
                 onEnd: function(evt) {
                     handleSectionReorder(evt.oldIndex - 1, evt.newIndex - 1); // -1 to account for toolbar
                 }
@@ -4887,6 +4899,11 @@ function initializeSectionSortables(container) {
             dragClass: 'sortable-drag',
             handle: '.drag-handle',
             filter: '.section-empty-indicator, .chord-card-wrapper:not([data-chord-index])',
+            // Touch-specific options
+            delay: 150,
+            delayOnTouchOnly: true,
+            touchStartThreshold: 5,
+            swapThreshold: 0.65,
             onStart: function(evt) {
                 // Handle multi-select drag
                 const selectedCount = getSelectionCount();
@@ -7917,6 +7934,10 @@ function initializeSimplifiedSortable(container) {
         // Allow dragging direct children that are cards or sections
         draggable: '.chord-card-wrapper[data-chord-index], .section-unified-container',
         swapThreshold: 0.65,
+        // Touch-specific options
+        delay: 150,
+        delayOnTouchOnly: true,
+        touchStartThreshold: 5,
         onStart: function(evt) {
         },
         // Handle cards added FROM sections TO the main container (ungrouped)
@@ -10556,7 +10577,12 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             fallbackOnBody: true,
             scrollSensitivity: 40,
             scrollSpeed: 10,
-            filter: 'button, .progression-chord-item button, [data-chord-index], select, input, label, .no-drag, [role="button"]',
+            // Touch-specific options
+            delay: 150, // Delay before drag starts (helps distinguish tap from drag on touch)
+            delayOnTouchOnly: true, // Only apply delay on touch devices
+            touchStartThreshold: 5, // Pixels of movement needed before drag starts
+            swapThreshold: 0.65, // More forgiving drop zone threshold
+            filter: 'button, .progression-chord-item button, select, input, label, .no-drag, [role="button"]',
             preventOnFilter: false, // Don't prevent default on filtered elements - let buttons work normally
             // Prevent text selection during drag
             onStart: function(evt) {
@@ -11403,14 +11429,26 @@ export function handleAutoPlayback() {
     }
     Tone.Transport.cancel();
 
-    const speedValue = parseFloat(document.getElementById('trainer-speed-select').value);
+    // Get BPM from various sources in order of preference:
+    // 1. FAB BPM slider (mobile)
+    // 2. Action bar BPM slider (desktop)
+    // 3. Fall back to trainer-speed-select formula for Composition Studio
+    const fabBpmSlider = document.getElementById('fab-bpm-slider');
+    const actionBpmSlider = document.getElementById('action-bpm-slider');
+    let bpm;
 
-    // Set Transport BPM based on speed to ensure correct timing
-    // Convert measure duration to BPM: 1 measure = 4 beats at 120 BPM = 2 seconds
-    // For speedValue of 1.5m, 1m, 0.6m, we want the measure to take that many seconds
-    // At 120 BPM, 1 measure = 2 seconds. So for 1.5 seconds, we need 4 beats / 1.5s * 60 = 160 BPM
-    // Formula: BPM = (4 beats / speedValue seconds) * 60
-    const bpm = (4 / speedValue) * 60;
+    if (fabBpmSlider && fabBpmSlider.value) {
+        bpm = parseInt(fabBpmSlider.value, 10);
+    } else if (actionBpmSlider && actionBpmSlider.value) {
+        bpm = parseInt(actionBpmSlider.value, 10);
+    } else {
+        // Fall back to trainer-speed-select formula for Composition Studio
+        const speedSelect = document.getElementById('trainer-speed-select');
+        const speedValue = speedSelect ? parseFloat(speedSelect.value) : 1.0;
+        // Convert measure duration to BPM: BPM = (4 beats / speedValue seconds) * 60
+        bpm = (4 / speedValue) * 60;
+    }
+
     Tone.Transport.bpm.value = bpm;
 
     let allEvents = [];
@@ -13557,6 +13595,9 @@ export function addToProgressionData(chordData, options = {}) {
         trainerState.progressionRomans.push(chordData.roman);
     }
     setProgressionData(trainerState.progressionData);
+
+    // Mark progression as ready when chords are added (fixes Chord Lab playback)
+    setIsReady(true);
 
     // Dispatch event for guided lesson mode
     if (isGuidedModeActive()) {

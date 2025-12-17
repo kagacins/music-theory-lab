@@ -309,9 +309,11 @@ export class NoteEditor {
     }
 
     // Check interaction mode from toolbar
-    // In 'noteEntry' mode with Alt held, skip note selection and go directly to note addition
+    // In 'noteEntry' mode with Alt held (or on touch devices), skip note selection and go directly to note addition
     const interactionMode = this.composerIntegration?.toolbar?.getInteractionMode?.() || 'select';
-    const isNoteEntryMode = interactionMode === 'noteEntry' && e.altKey;
+    // Touch devices: allow tap-to-add in noteEntry mode without requiring Alt key
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isNoteEntryMode = interactionMode === 'noteEntry' && (e.altKey || isTouchDevice);
 
     // Check if clicking on an existing note FIRST (before checking Alt key)
     // Skip this check in noteEntry mode when Alt is held - prioritize adding notes
@@ -365,13 +367,14 @@ export class NoteEditor {
       return;
     }
 
-    // Not clicking on a note - check if we're in note addition mode (Alt held)
-    if (!e.altKey) {
-      // No Alt key, not clicking on note = let event bubble to measure selection/playback
+    // Not clicking on a note - check if we're in note addition mode (Alt held or touch + noteEntry)
+    const canAddNote = e.altKey || (isTouchDevice && interactionMode === 'noteEntry');
+    if (!canAddNote) {
+      // Not in note addition mode = let event bubble to measure selection/playback
       return;
     }
 
-    // Alt is held and not clicking on a note - this is note addition mode
+    // In note addition mode (Alt held, or touch device in noteEntry mode)
     // Only proceed if clicking on a valid staff position
     if (!staffPosition || !staffPosition.staff) {
       return;

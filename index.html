@@ -112,7 +112,7 @@
     <!-- Composition Studio Card-Based Dashboard -->
     <link rel="stylesheet" href="src/styles/composition-studio.css">
 </head>
-<body class="bg-gray-50 min-h-screen p-4 sm:p-8 font-sans antialiased">
+<body class="bg-gray-50 min-h-screen p-4 sm:p-8 font-sans antialiased overscroll-y-none">
     <!-- NEW: Sidebar Navigation -->
     <div id="sidebar" class="fixed top-0 left-0 h-full bg-gray-800 text-white w-72 transform -translate-x-full transition-transform duration-300 ease-in-out z-30 shadow-2xl flex flex-col">
         <div class="p-4 flex-shrink-0">
@@ -955,6 +955,27 @@
             </div>
         </section>
 
+        <!-- Quick Play Chord button (above FAB, visible when FAB collapsed in Chord Lab) -->
+        <button id="fab-play-chord-quick" class="fixed bottom-36 right-4 z-50 hidden w-14 h-14 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95" aria-label="Play Chord">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+        </button>
+
+        <!-- Quick buttons for Composition Studio (above FAB, visible when FAB collapsed) -->
+        <div id="fab-melody-quick-buttons" class="fixed bottom-36 right-4 z-50 hidden flex flex-col gap-2">
+            <!-- Suggestions button -->
+            <button id="fab-suggestions-quick" class="w-14 h-14 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95" aria-label="Suggestions" title="Chord Suggestions">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/></svg>
+            </button>
+            <!-- Stop button -->
+            <button id="fab-stop-quick" class="w-14 h-14 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95" aria-label="Stop" title="Stop">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><rect x="6" y="6" width="8" height="8"/></svg>
+            </button>
+            <!-- Play All button -->
+            <button id="fab-play-all-quick" class="w-14 h-14 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95" aria-label="Play All" title="Play All">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+            </button>
+        </div>
+
         <!-- Mobile Floating Action Button (FAB) - 2-tier Speed Dial for touch devices -->
         <div id="mobile-fab" class="fixed bottom-20 right-4 z-50 hidden touch-device-only">
             <!-- Main FAB button -->
@@ -970,36 +991,93 @@
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
                     </button>
                     <span class="fab-label absolute right-14 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 transition-opacity pointer-events-none">Playback</span>
-                    <!-- Playback submenu (second tier) -->
-                    <div class="fab-submenu hidden absolute right-14 top-0 flex flex-row-reverse gap-2 items-center">
-                        <button class="fab-action w-10 h-10 bg-green-500 hover:bg-green-600 text-white rounded-full shadow flex items-center justify-center transition-all active:scale-95" data-action="play-all" title="Play All">
-                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+
+                    <!-- Playback submenu - Builder/Chord Lab context -->
+                    <div id="fab-playback-builder" class="fab-submenu hidden absolute bottom-0 right-14 w-44 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+                        <button class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-green-50 flex items-center gap-2 active:bg-green-100"
+                            onmousedown="if(window.startBuilderChord) startBuilderChord()"
+                            onmouseup="if(window.stopBuilderChord) stopBuilderChord()"
+                            onmouseleave="if(window.stopBuilderChord) stopBuilderChord()"
+                            ontouchstart="event.preventDefault(); if(window.startBuilderChord) startBuilderChord();"
+                            ontouchend="event.preventDefault(); if(window.stopBuilderChord) stopBuilderChord();"
+                            ontouchcancel="event.preventDefault(); if(window.stopBuilderChord) stopBuilderChord();">
+                            <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-2c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg>
+                            <span class="text-green-700 font-medium">Play Chord (Hold)</span>
                         </button>
-                        <button class="fab-action w-10 h-10 bg-red-500 hover:bg-red-600 text-white rounded-full shadow flex items-center justify-center transition-all active:scale-95" data-action="stop" title="Stop">
-                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><rect x="6" y="6" width="8" height="8"/></svg>
+                        <button data-action="play-builder-progression" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-2 active:bg-blue-100">
+                            <svg class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+                            <span class="text-blue-700">Play Progression</span>
                         </button>
-                        <button class="fab-action w-10 h-10 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow flex items-center justify-center transition-all active:scale-95" data-action="play-measure" title="Play Measure">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg>
+                        <div class="border-t border-gray-100"></div>
+                        <button data-action="stop" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-red-50 flex items-center gap-2 active:bg-red-100">
+                            <svg class="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20"><rect x="6" y="6" width="8" height="8"/></svg>
+                            <span class="text-red-700 font-medium">Stop</span>
+                        </button>
+                    </div>
+
+                    <!-- Playback submenu - Melody/Composition Studio context -->
+                    <div id="fab-playback-melody" class="fab-submenu hidden absolute bottom-0 right-14 w-44 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+                        <button data-action="play-all-melody" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-green-50 flex items-center gap-2 active:bg-green-100">
+                            <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+                            <span class="text-green-700 font-medium">Play All</span>
+                        </button>
+                        <button data-action="play-progression-only" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-2 active:bg-blue-100">
+                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                            <span class="text-blue-700">Chords Only</span>
+                        </button>
+                        <button data-action="play-from-cursor" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-purple-50 flex items-center gap-2 active:bg-purple-100">
+                            <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+                            <span class="text-purple-700">From Selected</span>
+                        </button>
+                        <button data-action="play-measure-melody" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-amber-50 flex items-center gap-2 active:bg-amber-100">
+                            <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-2c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg>
+                            <span class="text-amber-700">Play Measure</span>
+                        </button>
+                        <div class="border-t border-gray-100"></div>
+                        <button data-action="stop" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-red-50 flex items-center gap-2 active:bg-red-100">
+                            <svg class="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20"><rect x="6" y="6" width="8" height="8"/></svg>
+                            <span class="text-red-700 font-medium">Stop</span>
+                        </button>
+                    </div>
+
+                    <!-- Playback submenu - Default/Other tabs -->
+                    <div id="fab-playback-default" class="fab-submenu hidden absolute bottom-0 right-14 w-36 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+                        <button data-action="play-all" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-green-50 flex items-center gap-2 active:bg-green-100">
+                            <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+                            <span class="text-green-700 font-medium">Play</span>
+                        </button>
+                        <div class="border-t border-gray-100"></div>
+                        <button data-action="stop" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-red-50 flex items-center gap-2 active:bg-red-100">
+                            <svg class="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20"><rect x="6" y="6" width="8" height="8"/></svg>
+                            <span class="text-red-700 font-medium">Stop</span>
                         </button>
                     </div>
                 </div>
 
-                <!-- Edit category -->
-                <div class="fab-category relative" data-category="edit">
+                <!-- Edit category (Composition Studio only) -->
+                <div class="fab-category melody-only relative" data-category="edit">
                     <button class="fab-category-btn w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md flex items-center justify-center transition-all active:scale-95" aria-label="Edit">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     </button>
                     <span class="fab-label absolute right-14 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 transition-opacity pointer-events-none">Edit</span>
                     <!-- Edit submenu -->
-                    <div class="fab-submenu hidden absolute right-14 top-0 flex flex-row-reverse gap-2 items-center">
-                        <button class="fab-action w-10 h-10 bg-gray-500 hover:bg-gray-600 text-white rounded-full shadow flex items-center justify-center transition-all active:scale-95" data-action="undo" title="Undo">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a4 4 0 014 4v1m0 0l-4-4m4 4l4-4"/></svg>
+                    <div id="fab-edit-dropdown" class="fab-submenu hidden absolute bottom-0 right-14 w-44 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+                        <button data-action="undo" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h7c4.418 0 8 3.582 8 8M3 10l4-4m-4 4l4 4"/></svg>
+                            Undo
                         </button>
-                        <button class="fab-action w-10 h-10 bg-gray-500 hover:bg-gray-600 text-white rounded-full shadow flex items-center justify-center transition-all active:scale-95" data-action="redo" title="Redo">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10h-10a4 4 0 00-4 4v1m0 0l4-4m-4 4l-4-4"/></svg>
+                        <button data-action="redo" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10h-7c-4.418 0-8 3.582-8 8M21 10l-4-4m4 4l-4 4"/></svg>
+                            Redo
                         </button>
-                        <button class="fab-action w-10 h-10 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow flex items-center justify-center transition-all active:scale-95" data-action="delete" title="Delete Selected">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        <div class="border-t border-gray-100"></div>
+                        <button data-action="clear-treble" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-rose-50 flex items-center gap-2 active:bg-rose-100">
+                            <svg class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-2c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM6 6L18 18M6 18L18 6"/></svg>
+                            <span class="text-rose-700">Clear Melody</span>
+                        </button>
+                        <button data-action="clear-progression" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-rose-50 flex items-center gap-2 active:bg-rose-100">
+                            <svg class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            <span class="text-rose-700">Clear Chords</span>
                         </button>
                     </div>
                 </div>
@@ -1010,40 +1088,176 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
                     </button>
                     <span class="fab-label absolute right-14 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 transition-opacity pointer-events-none">File</span>
-                    <!-- File submenu -->
-                    <div class="fab-submenu hidden absolute right-14 top-0 flex flex-row-reverse gap-2 items-center">
-                        <button class="fab-action w-10 h-10 bg-green-500 hover:bg-green-600 text-white rounded-full shadow flex items-center justify-center transition-all active:scale-95" data-action="save" title="Save">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                    <!-- File dropdown panel -->
+                    <div id="fab-file-dropdown" class="fab-submenu hidden absolute bottom-0 right-14 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+                        <button data-action="new-song" class="melody-only w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-green-50 flex items-center gap-2 active:bg-green-100">
+                            <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            <span class="text-green-700 font-medium">New Song</span>
                         </button>
-                        <button class="fab-action w-10 h-10 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow flex items-center justify-center transition-all active:scale-95" data-action="load" title="Load">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                        <div class="border-t border-gray-100"></div>
+                        <button data-action="save" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                            Save
                         </button>
-                        <button class="fab-action w-10 h-10 bg-purple-500 hover:bg-purple-600 text-white rounded-full shadow flex items-center justify-center transition-all active:scale-95" data-action="export-midi" title="Export MIDI">
-                            <span class="text-xs font-bold">MID</span>
+                        <button data-action="load" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                            Load
                         </button>
-                        <button class="fab-action w-10 h-10 bg-red-500 hover:bg-red-600 text-white rounded-full shadow flex items-center justify-center transition-all active:scale-95" data-action="export-pdf" title="Export PDF">
-                            <span class="text-xs font-bold">PDF</span>
+                        <button data-action="version-history" class="melody-only w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Version History
                         </button>
-                        <button class="fab-action w-10 h-10 bg-indigo-500 hover:bg-indigo-600 text-white rounded-full shadow flex items-center justify-center transition-all active:scale-95" data-action="share-link" title="Share Link">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                        <button data-action="create-checkpoint" class="melody-only w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-purple-50 flex items-center gap-2 active:bg-purple-100">
+                            <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                            <span class="text-purple-700">Create Checkpoint</span>
+                        </button>
+                        <div class="melody-only border-t border-gray-100"></div>
+                        <button data-action="import-midi" class="melody-only w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                            Import MIDI
+                        </button>
+                        <button data-action="export-midi" class="melody-only w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+                            Export MIDI
+                        </button>
+                        <button data-action="share-link" class="melody-only w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                            Copy Link
+                        </button>
+                        <button data-action="export-pdf" class="melody-only w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                            Export PDF
+                        </button>
+                        <button data-action="export-audio" class="melody-only w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 active:bg-gray-200">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg>
+                            Export Audio
                         </button>
                     </div>
                 </div>
 
-                <!-- Suggestions -->
-                <button id="mobile-fab-suggestions" class="w-12 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-md flex items-center justify-center transition-all active:scale-95" aria-label="Suggestions">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                </button>
+                <!-- Add/Suggestions category (context-aware) -->
+                <div class="fab-category relative" data-category="suggestions">
+                    <!-- Category button - icon changes based on context -->
+                    <button class="fab-category-btn w-12 h-12 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-md flex items-center justify-center transition-all active:scale-95" aria-label="Add/Suggestions">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"/></svg>
+                    </button>
+                    <span class="fab-label absolute right-14 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 transition-opacity pointer-events-none">Suggestions</span>
 
-                <!-- Settings -->
-                <button id="mobile-fab-settings" class="w-12 h-12 bg-gray-600 hover:bg-gray-700 text-white rounded-full shadow-md flex items-center justify-center transition-all active:scale-95" aria-label="Settings">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                </button>
+                    <!-- Add submenu - Chord Lab context -->
+                    <div id="fab-add-builder" class="fab-submenu hidden absolute bottom-0 right-14 w-40 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+                        <button data-action="add-chord" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-indigo-50 flex items-center gap-2 active:bg-indigo-100">
+                            <svg class="w-4 h-4 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
+                            <span class="text-indigo-700 font-medium">Add Chord</span>
+                        </button>
+                        <button data-action="add-go" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-teal-50 flex items-center gap-2 active:bg-teal-100">
+                            <svg class="w-4 h-4 text-teal-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"/></svg>
+                            <span class="text-teal-700">Add & Go</span>
+                        </button>
+                    </div>
+
+                    <!-- Suggestions submenu - Composition Studio context -->
+                    <div id="fab-suggestions-melody" class="fab-submenu hidden absolute bottom-0 right-14 w-44 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+                        <button data-action="suggest-chords" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-2 active:bg-blue-100">
+                            <svg class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"></path><path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z"></path></svg>
+                            <span class="text-blue-700 font-medium">Chord Ideas</span>
+                        </button>
+                        <button data-action="suggest-melody" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-pink-50 flex items-center gap-2 active:bg-pink-100">
+                            <svg class="w-4 h-4 text-pink-600" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
+                            <span class="text-pink-700">Melody Ideas</span>
+                        </button>
+                        <button data-action="suggest-section" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-amber-50 flex items-center gap-2 active:bg-amber-100">
+                            <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            <span class="text-amber-700">Add Section</span>
+                        </button>
+                        <div class="border-t border-gray-100"></div>
+                        <button data-action="suggest-harmonize" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-purple-50 flex items-center gap-2 active:bg-purple-100">
+                            <svg class="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"></path></svg>
+                            <span class="text-purple-700">Harmonize</span>
+                        </button>
+                        <button data-action="suggest-texture" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-indigo-50 flex items-center gap-2 active:bg-indigo-100">
+                            <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                            <span class="text-indigo-700">Add Texture</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Settings category -->
+                <div class="fab-category relative" data-category="settings">
+                    <button class="fab-category-btn w-12 h-12 bg-gray-600 hover:bg-gray-700 text-white rounded-full shadow-md flex items-center justify-center transition-all active:scale-95" aria-label="Settings">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </button>
+                    <span class="fab-label absolute right-14 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 transition-opacity pointer-events-none">Settings</span>
+                    <!-- Settings panel (different from other submenus - it's a panel) -->
+                    <div class="fab-submenu fab-settings-panel hidden absolute right-14 bottom-0 w-56 bg-white rounded-lg shadow-xl border border-gray-200 p-3 z-20">
+                        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Playback Settings</div>
+                        <!-- BPM -->
+                        <div class="flex items-center justify-between mb-3">
+                            <label class="text-sm text-gray-700">BPM</label>
+                            <div class="flex items-center gap-2">
+                                <input type="range" id="fab-bpm-slider" min="40" max="200" value="120" class="w-16 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                <span id="fab-bpm-value" class="text-sm font-semibold text-gray-700 w-8">120</span>
+                            </div>
+                        </div>
+                        <!-- Arpeggio Speed (Chord Lab only) -->
+                        <div class="builder-only flex items-center justify-between mb-3">
+                            <label class="text-sm text-gray-700">Arpeggio</label>
+                            <div class="flex items-center gap-1">
+                                <button id="fab-arp-slower" class="px-2 py-0.5 text-sm font-bold bg-gray-200 rounded hover:bg-gray-300 active:scale-95">-</button>
+                                <span id="fab-arp-speed" class="text-xs font-semibold text-gray-700 w-12 text-center">Medium</span>
+                                <button id="fab-arp-faster" class="px-2 py-0.5 text-sm font-bold bg-gray-200 rounded hover:bg-gray-300 active:scale-95">+</button>
+                            </div>
+                        </div>
+                        <!-- RH Octave (Chord Lab only) -->
+                        <div class="builder-only flex items-center justify-between mb-3">
+                            <label class="text-sm text-gray-700">RH Octave</label>
+                            <div class="flex items-center gap-1">
+                                <button id="fab-rh-octave-down" class="px-2 py-0.5 text-sm font-bold bg-gray-200 rounded hover:bg-gray-300 active:scale-95">-</button>
+                                <span id="fab-rh-octave" class="text-xs font-semibold text-gray-700 w-6 text-center">4</span>
+                                <button id="fab-rh-octave-up" class="px-2 py-0.5 text-sm font-bold bg-gray-200 rounded hover:bg-gray-300 active:scale-95">+</button>
+                            </div>
+                        </div>
+                        <!-- Loop Toggle (Composition Studio only) -->
+                        <div class="melody-only flex items-center justify-between mb-3">
+                            <label class="text-sm text-gray-700">Loop</label>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="fab-loop-toggle" class="sr-only peer">
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                            </label>
+                        </div>
+                        <!-- Highlight Notes Toggle (Composition Studio only) -->
+                        <div class="melody-only flex items-center justify-between">
+                            <label class="text-sm text-gray-700">Highlight</label>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="fab-highlight-toggle" class="sr-only peer" checked>
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Help button -->
+                <div class="fab-category relative" data-category="help">
+                    <button class="fab-category-btn w-12 h-12 bg-gray-500 hover:bg-gray-600 text-white rounded-full shadow-md flex items-center justify-center transition-all active:scale-95" aria-label="Help">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </button>
+                    <span class="fab-label absolute right-14 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 transition-opacity pointer-events-none">Help</span>
+                    <!-- Help submenu -->
+                    <div id="fab-help-dropdown" class="fab-submenu hidden absolute bottom-0 right-14 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+                        <button data-action="start-here" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-green-50 flex items-center gap-2 active:bg-green-100">
+                            <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                            <span class="text-green-700 font-medium">Start Here Guide</span>
+                        </button>
+                        <button data-action="keyboard-shortcuts" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-2 active:bg-blue-100">
+                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                            <span class="text-blue-700">Keyboard Shortcuts</span>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- TAB CONTENT: CHORD BUILDER -->
-        <div id="tab-builder" class="tab-content">
+        <div id="tab-builder" class="tab-content -mt-12">
             <div class="bg-white p-4 rounded-xl shadow-2xl border border-amber-100 mb-4 max-w-7xl mx-auto">
                 <div id="builder-sections-container" class="space-y-3">
                 <div class="mb-3 builder-section-item">
@@ -1058,15 +1272,15 @@
                         <svg id="chord-setup-chevron" class="w-5 h-5 transform rotate-180 transition-transform" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                     </button>
 
-                    <div id="chord-setup-panel" class="grid grid-cols-1 lg:grid-cols-3 gap-2 bg-gradient-to-br from-amber-500/5 to-orange-500/5 rounded-b-lg p-2 items-start">
-                        <div class="bg-white p-2 rounded-lg border border-amber-100 shadow-sm h-fit">
+                    <div id="chord-setup-panel" class="grid grid-cols-1 lg:grid-cols-3 gap-2 bg-gradient-to-br from-amber-500/5 to-orange-500/5 rounded-b-lg p-2 items-start lg:items-stretch">
+                        <div class="bg-white p-2 rounded-lg border border-amber-100 shadow-sm h-fit lg:h-full">
                             <h3 class="text-xs font-semibold text-amber-800">1. Select Root Note</h3>
                             <div id="builder-note-selector" class="mt-1.5 grid grid-cols-6 gap-1.5">
                                 <!-- Buttons will be generated by JS -->
                             </div>
                     </div>
 
-                        <div class="bg-white px-1.5 pt-1.5 pb-1 rounded-lg border border-amber-100 shadow-sm h-fit">
+                        <div class="bg-white px-1.5 pt-1.5 pb-1 rounded-lg border border-amber-100 shadow-sm h-fit lg:h-full">
                             <h3 class="text-xs font-semibold text-amber-800">2. Chord Voicing</h3>
                             <h4 class="text-[10px] font-medium text-gray-500 mt-1 mb-0.5">Inversion</h4>
                             <div id="builder-inversion-selector" class="flex flex-wrap gap-1">
@@ -1084,7 +1298,7 @@
                             </div>
                         </div>
 
-                        <div class="bg-white p-2 rounded-lg border border-amber-100 shadow-sm h-fit">
+                        <div class="bg-white p-2 rounded-lg border border-amber-100 shadow-sm h-fit lg:h-full">
                             <h3 class="text-xs font-semibold text-amber-800">3. Left Hand</h3>
                              <div class="mt-1.5 flex flex-col gap-1.5">
                                 <div class="flex gap-1.5 w-full">
@@ -1139,13 +1353,22 @@
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
                             Chord Library
                             <!-- Chromatic/Diatonic Toggle -->
-                            <div class="flex items-center gap-1.5 ml-1" onclick="event.stopPropagation()" title="Toggle: Chromatic (all chords) ↔ Diatonic (scale chords)">
-                                <span class="text-[10px] font-bold text-white/70">♮♯♭</span>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" id="chord-library-mode-toggle" class="sr-only" onchange="window.toggleChordLibraryMode && window.toggleChordLibraryMode(this.checked)">
-                                    <div class="toggle-bg w-9 h-5 bg-white/30 rounded-full border border-white/50"></div>
+                            <div class="flex items-center gap-1 ml-3 px-2 py-0.5 bg-white/20 rounded-full" onclick="event.stopPropagation()" title="Toggle: Chromatic (all chords) ↔ Diatonic (scale chords)">
+                                <span class="text-[9px] font-semibold text-white/80">Chromatic</span>
+                                <label class="relative inline-flex items-center cursor-pointer mx-1">
+                                    <input type="checkbox" id="chord-library-mode-toggle" class="sr-only peer" onchange="window.toggleChordLibraryMode && window.toggleChordLibraryMode(this.checked)">
+                                    <div class="w-8 h-4 bg-gray-400 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-teal-500"></div>
                                 </label>
-                                <span class="text-[10px] font-bold text-white/70">Scale</span>
+                                <span class="text-[9px] font-semibold text-white/80">Diatonic</span>
+                            </div>
+                            <!-- Chord Details Toggle -->
+                            <div class="flex items-center gap-1 ml-2 px-2 py-0.5 bg-white/20 rounded-full" onclick="event.stopPropagation()" title="Show/hide chord details, inversions, and info icons">
+                                <span class="text-[9px] font-semibold text-white/80">Details</span>
+                                <label class="relative inline-flex items-center cursor-pointer mx-1">
+                                    <input type="checkbox" id="chord-tooltips-toggle" class="sr-only peer" checked onchange="window.toggleChordTooltips && window.toggleChordTooltips(this.checked)">
+                                    <div class="w-8 h-4 bg-gray-400 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-green-500"></div>
+                                </label>
+                                <span class="text-[9px] font-semibold text-white/80" id="chord-details-status">On</span>
                             </div>
                         </span>
                         <svg id="chord-library-chevron" class="w-5 h-5 transform rotate-180 transition-transform" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
@@ -1168,6 +1391,15 @@
                             </svg>
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="7" cy="19" r="2"/><path d="M7 17V5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M7 5L11 7L7 9L11 11L7 13" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             Intervals
+                            <!-- Interval Details Toggle -->
+                            <div class="flex items-center gap-1 ml-3 px-2 py-0.5 bg-white/20 rounded-full" onclick="event.stopPropagation()" title="Show/hide interval details and info icons">
+                                <span class="text-[9px] font-semibold text-white/80">Details</span>
+                                <label class="relative inline-flex items-center cursor-pointer mx-1">
+                                    <input type="checkbox" id="interval-tooltips-toggle" class="sr-only peer" checked onchange="window.toggleIntervalTooltips && window.toggleIntervalTooltips(this.checked)">
+                                    <div class="w-8 h-4 bg-gray-400 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-green-500"></div>
+                                </label>
+                                <span class="text-[9px] font-semibold text-white/80" id="interval-details-status">On</span>
+                            </div>
                         </span>
                         <svg id="chord-intervals-chevron" class="w-5 h-5 transform rotate-180 transition-transform" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                     </button>
@@ -1811,7 +2043,7 @@
         </div>
 
         <!-- TAB CONTENT: MELODY COMPOSER -->
-        <div id="tab-melody" class="tab-content hidden">
+        <div id="tab-melody" class="tab-content hidden -mt-12">
             <!-- Card-Based Dashboard Layout -->
             <div class="bg-white p-4 rounded-xl shadow-2xl border border-violet-100 mb-4 max-w-7xl mx-auto">
                 <div id="melody-dashboard-sections-container" class="space-y-3">
@@ -2863,40 +3095,6 @@
                     <span id="builder-octave-display" class="text-sm font-semibold text-gray-700 w-12 text-center" title="Current Octave Shift">Oct: 0</span>
                     <button id="builder-octave-up" onmousedown="if(window.changeBuilderOctave) changeBuilderOctave(1)" onmouseup="if(window.stopBuilderChord) stopBuilderChord()" onmouseleave="if(window.stopBuilderChord) stopBuilderChord()" ontouchstart="event.preventDefault(); if(window.changeBuilderOctave) changeBuilderOctave(1);" ontouchend="event.preventDefault(); if(window.stopBuilderChord) stopBuilderChord();" ontouchcancel="event.preventDefault(); if(window.stopBuilderChord) stopBuilderChord();" class="px-1 font-bold text-base bg-gray-200 rounded-md shadow-sm hover:bg-gray-300 active:scale-95 disabled:opacity-50" title="Increase Octave">+</button>
                 </div>
-            </div>
-        </div>
-
-        <!-- Floating Melody Controls - AI Suggestions Toolbar -->
-        <div id="floating-melody-controls" class="hidden flex-col items-stretch gap-2 p-3 bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border w-max" style="pointer-events: auto;" title="AI Suggestions">
-            <!-- Header with toggle -->
-            <div class="flex items-center justify-between gap-2 pb-1 border-b border-gray-200">
-                <span class="text-xs font-semibold text-gray-600">AI Assist</span>
-                <button id="toggle-floating-panel-btn" onclick="window.toggleFloatingPanelCollapse && window.toggleFloatingPanelCollapse()" class="p-0.5 text-gray-400 hover:text-gray-600 transition" title="Collapse panel">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                </button>
-            </div>
-            <!-- Collapsible content -->
-            <div id="floating-panel-content" class="flex flex-col gap-2 w-full">
-                <!-- Harmonize - suggest chords for melody -->
-                <button id="auto-harmonize-btn" onclick="window.showUnifiedRecommendationModal && window.showUnifiedRecommendationModal({ initialTab: 'harmonize' })" class="w-full px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 text-sm flex items-center justify-center gap-1" title="Suggest chords for your melody">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"></path></svg>
-                    Harmonize
-                </button>
-                <!-- Optimize - voice leading optimization -->
-                <button onclick="window.showUnifiedRecommendationModal && window.showUnifiedRecommendationModal({ initialTab: 'chord', initialIntent: 'optimize' })" class="w-full px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 text-sm flex items-center justify-center gap-1" title="Optimize voice leading and inversions">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                    Optimize
-                </button>
-                <!-- Chords - chord suggestions -->
-                <button onclick="window.showUnifiedRecommendationModal && window.showUnifiedRecommendationModal({ initialTab: 'chord' })" class="w-full px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 text-sm flex items-center justify-center gap-1" title="Get chord suggestions">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"></path><path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z"></path></svg>
-                    Chords
-                </button>
-                <!-- Melody - melody suggestions -->
-                <button onclick="window.showUnifiedRecommendationModal && window.showUnifiedRecommendationModal({ initialTab: 'melody' })" class="w-full px-2 py-1 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-xl shadow-lg transition duration-150 transform active:scale-95 text-sm flex items-center justify-center gap-1" title="Get melody suggestions">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
-                    Melody
-                </button>
             </div>
         </div>
 

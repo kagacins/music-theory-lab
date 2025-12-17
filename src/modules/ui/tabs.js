@@ -109,11 +109,39 @@ export function switchTab(tabId, options = {}) {
     // Set data attribute on body for CSS tab-aware theming (action bar, etc.)
     document.body.setAttribute('data-active-tab', tabId);
 
-    // Show/hide sticky action bar based on tab (builder and melody tabs)
+    // Close FAB when switching tabs
+    if (window.closeFab) {
+        window.closeFab();
+    }
+
+    // Hide sticky action bar for all tabs - FAB is now the primary control interface
     const actionBar = document.getElementById('action-bar');
     if (actionBar) {
-        const showActionBar = tabId === 'builder' || tabId === 'melody';
-        actionBar.classList.toggle('hidden', !showActionBar);
+        actionBar.classList.add('hidden');
+    }
+
+    // Show/hide FAB based on tab (always visible for builder and melody)
+    const mobileFab = document.getElementById('mobile-fab');
+    if (mobileFab) {
+        if (tabId === 'builder' || tabId === 'melody') {
+            // Always show FAB in Chord Lab and Composition Studio
+            mobileFab.classList.remove('hidden', 'touch-device-only');
+        } else {
+            // Hide FAB on other tabs
+            mobileFab.classList.add('hidden');
+        }
+    }
+
+    // Show/hide Play Chord quick button (above FAB, visible when FAB is collapsed in Chord Lab)
+    const fabPlayChordBtn = document.getElementById('fab-play-chord-quick');
+    if (fabPlayChordBtn) {
+        fabPlayChordBtn.classList.toggle('hidden', tabId !== 'builder');
+    }
+
+    // Show/hide Melody quick buttons (above FAB, visible when FAB is collapsed in Composition Studio)
+    const fabMelodyQuickBtns = document.getElementById('fab-melody-quick-buttons');
+    if (fabMelodyQuickBtns) {
+        fabMelodyQuickBtns.classList.toggle('hidden', tabId !== 'melody');
     }
 
     const tabs = ['builder', 'melody', 'scales', 'learn'];
@@ -201,6 +229,18 @@ export function switchTab(tabId, options = {}) {
     clearHighlights();
     // Note: Stop all playback functionality would go here if needed
 
+    // Adjust spacing based on tab (Chord Lab and Composition Studio have no action bar, so content moves closer to keyboard)
+    const keyboardSection = document.getElementById('keyboard-section');
+    if (keyboardSection) {
+        if (tabId === 'builder' || tabId === 'melody') {
+            // Remove margin since action bar is hidden - content moves up
+            keyboardSection.style.marginBottom = '4px';
+        } else {
+            // Reset to default (mb-2 = 0.5rem = 8px) for other tabs that may show action bar
+            keyboardSection.style.marginBottom = '';
+        }
+    }
+
     // Restore visibility logic for the correct display panel
     document.getElementById('builder-info-display').classList.toggle('hidden', tabId !== 'builder');
     document.getElementById('progression-chord-display').classList.add('hidden'); // Always hidden (trainer tab removed)
@@ -208,7 +248,6 @@ export function switchTab(tabId, options = {}) {
 
     // Manage visibility of floating controls
     document.getElementById('floating-builder-controls').classList.add('hidden');
-    document.getElementById('floating-melody-controls').classList.toggle('hidden', tabId !== 'melody');
     document.getElementById('floating-scale-controls').classList.toggle('hidden', tabId !== 'scales');
     document.getElementById('floating-learn-controls').classList.toggle('hidden', tabId !== 'learn');
 
