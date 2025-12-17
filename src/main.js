@@ -4984,6 +4984,93 @@ window.updateBassOctaveSelector = function() {
     });
 };
 
+/**
+ * Apply bass pattern to selected measure only
+ * Allows generating bass for a specific measure without affecting the whole composition
+ */
+window.applyBassToSelection = function() {
+    // Get selected measure index
+    const selectedIndex = window.getNotationSelectedMeasure ? window.getNotationSelectedMeasure() : -1;
+
+    if (selectedIndex < 0) {
+        if (window.toast) {
+            window.toast.warning('Please select a measure first');
+        }
+        return;
+    }
+
+    // Get compositionState
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) {
+        if (window.toast) {
+            window.toast.error('Composition state not available');
+        }
+        return;
+    }
+
+    // Get the building block for the selected measure
+    const blocks = compositionState.getBuildingBlocks();
+    if (!blocks || selectedIndex >= blocks.length) {
+        if (window.toast) {
+            window.toast.error('Invalid measure selection');
+        }
+        return;
+    }
+
+    const block = blocks[selectedIndex];
+    if (!block || !block.chord) {
+        if (window.toast) {
+            window.toast.warning('Selected measure has no chord');
+        }
+        return;
+    }
+
+    // Get current bass settings
+    const settings = getBridgeSettings();
+    const bassPattern = settings?.bassPattern || 'root-fifth';
+    const bassOctave = settings?.bassOctave || null;
+    const bassFollowsInversion = settings?.bassFollowsInversion || false;
+
+    // Get time signature
+    const timeSig = compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
+    const beatsPerMeasure = timeSig.num;
+
+    // Import and call generateBuildingBlockBass
+    import('./modules/integration/bassAutoFill.js').then(({ generateBuildingBlockBass }) => {
+        // Get previous chord for voice leading
+        const previousChord = selectedIndex > 0 ? blocks[selectedIndex - 1]?.chord : null;
+
+        // Generate bass for this measure
+        const bassNotes = generateBuildingBlockBass(block.chord, previousChord, beatsPerMeasure, {
+            bassPattern,
+            bassOctave,
+            bassFollowsInversion,
+            timeSignature: timeSig
+        });
+
+        // Update the building block's bass notes
+        if (bassNotes && bassNotes.length > 0) {
+            block.bassNotes = bassNotes;
+
+            // Mark as modified and refresh
+            compositionState.markModified();
+
+            if (window.refreshNotationFromProgression) {
+                window.refreshNotationFromProgression();
+            }
+
+            if (window.toast) {
+                window.toast.success(`Applied "${bassPattern}" pattern to measure ${selectedIndex + 1}`);
+            }
+        }
+    }).catch(err => {
+        console.error('[applyBassToSelection] Error:', err);
+        if (window.toast) {
+            window.toast.error('Failed to generate bass pattern');
+        }
+    });
+};
+
 // ===========================
 // MELODY COMPOSER UI FUNCTIONS
 // ===========================

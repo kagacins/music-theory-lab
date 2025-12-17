@@ -104,7 +104,6 @@ export class NotationToolbar {
     this.onTupletModeToggle = options.onTupletModeToggle || (() => {});
     this.onTupletRemove = options.onTupletRemove || (() => {});
     this.onTranspose = options.onTranspose || (() => {});
-    this.onTemplateInsert = options.onTemplateInsert || (() => {});
 
     // Tuplet mode state
     this.tupletInsertMode = null; // null, 'triplet', 'quintuplet', 'sextuplet'
@@ -272,24 +271,6 @@ export class NotationToolbar {
               <button class="toolbar-btn paste-btn" data-action="paste" title="Paste (Ctrl+V)">📥</button>
               <button class="toolbar-btn copy-block-btn" data-action="copyBlock" title="Copy Block">📦</button>
               <button class="toolbar-btn delete-btn" data-action="delete" title="Delete (Del)">🗑</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- TEMPLATES GROUP -->
-        <div class="toolbar-group templates-group">
-          <span class="group-label">Templates</span>
-          <div class="toolbar-group-content">
-            <div class="toolbar-section templates-section">
-              <select class="template-select" title="Insert a pattern template into selected measure">
-                <option value="">Insert Pattern...</option>
-                <option value="block-chord">Block Chords (whole notes)</option>
-                <option value="arpeggio-up">Arpeggio Up (8ths)</option>
-                <option value="arpeggio-down">Arpeggio Down (8ths)</option>
-                <option value="alberti-bass">Alberti Bass</option>
-                <option value="walking-bass">Walking Bass</option>
-                <option value="tremolo">Tremolo (16ths)</option>
-              </select>
             </div>
           </div>
         </div>
@@ -870,16 +851,6 @@ export class NotationToolbar {
     // Voice leading toggle button
     this.container.querySelector('.voice-leading-btn')?.addEventListener('click', () => {
       this.toggleVoiceLeading();
-    });
-
-    // Template select
-    this.container.querySelector('.template-select')?.addEventListener('change', (e) => {
-      const templateType = e.target.value;
-      if (templateType) {
-        this.onTemplateInsert(templateType);
-        // Reset select to placeholder
-        e.target.value = '';
-      }
     });
 
     // Keyboard shortcuts

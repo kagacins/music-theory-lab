@@ -2172,7 +2172,9 @@
                                     <option value="pedal">Pedal</option>
                                 </optgroup>
                                 <optgroup label="Arpeggiated">
-                                    <option value="arpeggio">Arpeggio</option>
+                                    <option value="arpeggio">Arpeggio (Quarter)</option>
+                                    <option value="arpeggio-8th">Arpeggio (8th)</option>
+                                    <option value="tremolo">Tremolo (16th)</option>
                                     <option value="alberti">Alberti</option>
                                     <option value="broken-octave">Broken Oct</option>
                                 </optgroup>
@@ -2230,6 +2232,12 @@
                                 </label>
                                 <span class="text-[10px] text-gray-500" title="When ON, bass plays the inversion note (3rd for 1st inv, 5th for 2nd inv)">Inv</span>
                             </div>
+                            <!-- Apply to Selection button - hidden until feature is working
+                            <div class="w-px h-5 bg-gray-300"></div>
+                            <button id="apply-bass-to-selection-btn" onclick="window.applyBassToSelection && window.applyBassToSelection()" class="px-2 py-1 text-[10px] font-medium bg-emerald-500 hover:bg-emerald-600 text-white rounded transition-colors" title="Apply bass pattern to selected measure only (requires selection)">
+                                Apply to Selection
+                            </button>
+                            -->
                         </div>
 
                         <!-- Notation Toolbar (uses original ID for JS compatibility) -->
@@ -2511,7 +2519,9 @@
                                                         <option value="pedal">Pedal Pulse - Rhythmic root pulse</option>
                                                     </optgroup>
                                                     <optgroup label="Arpeggiated Patterns">
-                                                        <option value="arpeggio">Arpeggio - Ascending chord tones</option>
+                                                        <option value="arpeggio">Arpeggio (Quarter) - Ascending chord tones</option>
+                                                        <option value="arpeggio-8th">Arpeggio (8th) - Faster ascending pattern</option>
+                                                        <option value="tremolo">Tremolo (16th) - Rapid repeated notes</option>
                                                         <option value="alberti">Alberti Bass - Classical pattern</option>
                                                         <option value="broken-octave">Broken Octave - Low/high alternation</option>
                                                     </optgroup>

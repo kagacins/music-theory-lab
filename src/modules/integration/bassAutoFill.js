@@ -111,6 +111,8 @@ export const BASS_PATTERN_OCTAVE_DEFAULTS = {
     // Octave 3 - Higher, clearer register
     'alberti': 3,          // Classical Alberti is mid-register (Mozart, etc.)
     'arpeggio': 3,         // Arpeggios often clearer in higher register
+    'arpeggio-8th': 3,     // Eighth note arpeggios - same register as quarter note
+    'tremolo': 3,          // Tremolo (16ths) - clearer in mid-register
     'bossa-nova': 3,       // Bossa guitar/piano bass is often mid-register
     'shell-voicing': 3,    // Jazz shells need clarity
     'ballad': 3,           // Ballad accompaniment is lighter
@@ -991,6 +993,12 @@ export function generateBuildingBlockBass(chord, previousChord = null, totalBeat
         case 'arpeggio':
             return generateArpeggioBlockBass(chordNotes, totalBeats, beatsPerMeasure, chord.root, effectiveOctave);
 
+        case 'arpeggio-8th':
+            return generateArpeggio8thBlockBass(chordNotes, totalBeats, beatsPerMeasure, chord.root, effectiveOctave);
+
+        case 'tremolo':
+            return generateTremoloBlockBass(chordNotes, totalBeats, beatsPerMeasure, chord.root, effectiveOctave);
+
         case 'alberti':
             return generateAlbertiBlockBass(chordNotes, totalBeats, beatsPerMeasure);
 
@@ -1229,6 +1237,80 @@ function generateArpeggioBlockBass(chordNotes, totalBeats, beatsPerMeasure, root
 
         // Each arpeggio note is 1 beat (quarter note)
         const noteBeats = Math.min(1, remainingBeats);
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        notes.push({
+            type: 'note',
+            pitch: pitch,
+            pitches: [pitch],
+            duration: duration,
+            beat: currentBeat,
+            dotted: dotted,
+            isTied: false,
+        });
+
+        currentBeat += noteBeats;
+        noteIndex++;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate Eighth Note Arpeggio pattern for a building block
+ * Faster arpeggio using eighth notes (0.5 beats each)
+ */
+function generateArpeggio8thBlockBass(chordNotes, totalBeats, beatsPerMeasure, root = null) {
+    const notes = [];
+    let currentBeat = 0;
+    let noteIndex = 0;
+
+    // Reorder to start from root for proper arpeggio (R-3-5-R)
+    const orderedNotes = root ? reorderFromRoot(chordNotes, root) : chordNotes;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const pitch = orderedNotes[noteIndex % orderedNotes.length];
+
+        // Each arpeggio note is 0.5 beats (eighth note)
+        const noteBeats = Math.min(0.5, remainingBeats);
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        notes.push({
+            type: 'note',
+            pitch: pitch,
+            pitches: [pitch],
+            duration: duration,
+            beat: currentBeat,
+            dotted: dotted,
+            isTied: false,
+        });
+
+        currentBeat += noteBeats;
+        noteIndex++;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate Tremolo pattern for a building block
+ * Rapid repeated notes using sixteenth notes (0.25 beats each)
+ */
+function generateTremoloBlockBass(chordNotes, totalBeats, beatsPerMeasure, root = null) {
+    const notes = [];
+    let currentBeat = 0;
+    let noteIndex = 0;
+
+    // Reorder to start from root for proper arpeggio (R-3-5-R)
+    const orderedNotes = root ? reorderFromRoot(chordNotes, root) : chordNotes;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const pitch = orderedNotes[noteIndex % orderedNotes.length];
+
+        // Each tremolo note is 0.25 beats (sixteenth note)
+        const noteBeats = Math.min(0.25, remainingBeats);
         const { duration, dotted } = findBestDuration(noteBeats);
 
         notes.push({
