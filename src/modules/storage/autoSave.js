@@ -24,6 +24,7 @@ let intervalTimer = null;
 let compositionStateRef = null;
 let onSaveCallbacks = [];
 let isDirty = false;
+let dirtyStateCallbacks = [];
 
 /**
  * Initialize the auto-save system
@@ -81,8 +82,57 @@ function stopPeriodicSave() {
  * Call this after any significant user action
  */
 export function markDirty() {
+    const wasClean = !isDirty;
     isDirty = true;
+
+    // Notify dirty state listeners if state changed
+    if (wasClean) {
+        notifyDirtyStateChange(true);
+    }
+
     triggerDebouncedSave();
+}
+
+/**
+ * Check if there are unsaved changes
+ * @returns {boolean} Whether there are unsaved changes
+ */
+export function hasUnsavedChanges() {
+    return isDirty;
+}
+
+/**
+ * Subscribe to dirty state changes
+ * @param {Function} callback - Function called with (isDirty: boolean) when state changes
+ * @returns {Function} Unsubscribe function
+ */
+export function onDirtyStateChange(callback) {
+    dirtyStateCallbacks.push(callback);
+
+    // Immediately call with current state
+    callback(isDirty);
+
+    // Return unsubscribe function
+    return () => {
+        const index = dirtyStateCallbacks.indexOf(callback);
+        if (index > -1) {
+            dirtyStateCallbacks.splice(index, 1);
+        }
+    };
+}
+
+/**
+ * Notify all dirty state listeners
+ * @param {boolean} dirty - Current dirty state
+ */
+function notifyDirtyStateChange(dirty) {
+    dirtyStateCallbacks.forEach(callback => {
+        try {
+            callback(dirty);
+        } catch (error) {
+            console.error('[autoSave] Dirty state callback error:', error);
+        }
+    });
 }
 
 /**
@@ -135,6 +185,9 @@ function performAutoSave(trigger = 'manual') {
         if (success) {
             lastSaveTime = new Date();
             isDirty = false;
+
+            // Notify dirty state listeners that we're now clean
+            notifyDirtyStateChange(false);
 
             // Save metadata separately for quick access
             saveToStorage(AUTO_SAVE_META_KEY, {

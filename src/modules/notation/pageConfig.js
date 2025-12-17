@@ -3,7 +3,8 @@
  * Defines page sizes, margins, and layout settings for paginated music notation
  */
 
-export const PAGE_CONFIG = {
+// Mutable configuration object that can be updated at runtime
+const _pageConfig = {
   // Standard page dimensions (8.5" x 11" at 96 DPI)
   width: 816,
   height: 1056,
@@ -19,7 +20,7 @@ export const PAGE_CONFIG = {
   // Layout settings
   measuresPerPage: 8,    // Default: 2 systems of 4 measures each
   systemsPerPage: 2,     // Number of grand staff systems per page
-  measuresPerSystem: 4,  // Measures per system
+  measuresPerSystem: 4,  // Measures per system (can be changed via toolbar)
 
   // Pagination presets
   paginationPresets: {
@@ -50,6 +51,25 @@ export const PAGE_CONFIG = {
   // Default view mode
   defaultViewMode: 'continuous',
 };
+
+// Export as a getter object so it stays in sync
+export const PAGE_CONFIG = _pageConfig;
+
+/**
+ * Update page configuration settings
+ * @param {Object} newConfig - New configuration values
+ */
+export function updatePageConfig(newConfig) {
+  if (newConfig.measuresPerSystem !== undefined) {
+    _pageConfig.measuresPerSystem = newConfig.measuresPerSystem;
+    // Recalculate dependent values
+    _pageConfig.measuresPerPage = _pageConfig.systemsPerPage * _pageConfig.measuresPerSystem;
+  }
+  if (newConfig.systemsPerPage !== undefined) {
+    _pageConfig.systemsPerPage = newConfig.systemsPerPage;
+    _pageConfig.measuresPerPage = _pageConfig.systemsPerPage * _pageConfig.measuresPerSystem;
+  }
+}
 
 /**
  * Calculate usable area within page margins

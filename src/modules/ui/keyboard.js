@@ -623,6 +623,14 @@ export function updateKeyboardLabels() {
         return; // Exit if the feature is turned off
     }
 
+    console.log('[RomanNumeral] updateKeyboardLabels called, currentTab:', currentTab);
+    console.log('[RomanNumeral] Globals available:', {
+        SHARP_NOTES: !!SHARP_NOTES,
+        FLAT_NOTES: !!FLAT_NOTES,
+        ALL_NOTES: !!ALL_NOTES,
+        MAJOR_SCALE_STEPS: !!MAJOR_SCALE_STEPS
+    });
+
     // Get root note name based on current tab
     let rootNoteName;
     let isMinorKey = false;
@@ -655,13 +663,28 @@ export function updateKeyboardLabels() {
         rootNoteName = (enharmonicPreference === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[currentBuilderRootIndex];
     } else if (currentTab === 'scales') {
         // Get scale root index from window or state module
-        const scaleRootIndex = window.scaleRootIndex !== undefined ? window.scaleRootIndex : 
+        const scaleRootIndex = window.scaleRootIndex !== undefined ? window.scaleRootIndex :
             (window.getScaleRootIndex ? window.getScaleRootIndex() : 0);
         if (!SHARP_NOTES || !FLAT_NOTES || scaleRootIndex < 0 || scaleRootIndex >= (enharmonicPreference === 'sharp' ? SHARP_NOTES.length : FLAT_NOTES.length)) {
             return; // Invalid state
         }
         rootNoteName = (enharmonicPreference === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[scaleRootIndex];
+    } else if (currentTab === 'melody' || currentTab === 'learn') {
+        // Composition Studio or Learn tab - get key from compositionState
+        const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+        if (compositionState && compositionState.getSettings) {
+            const settings = compositionState.getSettings();
+            rootNoteName = settings.key || 'C';
+            // Check if key is minor (ends with 'm')
+            isMinorKey = rootNoteName.endsWith('m');
+            if (isMinorKey) {
+                rootNoteName = rootNoteName.replace(/m$/, '');
+            }
+        } else {
+            rootNoteName = 'C'; // Default fallback
+        }
     } else {
+        console.log('[RomanNumeral] Tab not supported:', currentTab);
         return; // Don't show labels on other tabs
     }
 

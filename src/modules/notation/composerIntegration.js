@@ -28,7 +28,7 @@ import { getInteractiveMelody, playMeasure } from '../audio/melodyGenerator.js';
 import { generateBassVoicing } from '../integration/bassAutoFill.js';
 import { showNoteTooltip, hideNoteTooltip } from '../ui/noteHighlighter.js';
 import { PageManager } from './pageManager.js';
-import { PAGE_CONFIG, getMeasurePagePosition, applyPaginationPreset, getTotalPages } from './pageConfig.js';
+import { PAGE_CONFIG, getMeasurePagePosition, applyPaginationPreset, getTotalPages, updatePageConfig } from './pageConfig.js';
 import { PageLayoutManager } from './pageLayoutManager.js';
 import { PageNavigator } from './pageNavigator.js';
 import { initVoiceLeadingOverlay, getVoiceLeadingOverlay } from './voiceLeadingOverlay.js';
@@ -87,6 +87,9 @@ export class NotationComposer {
     this.selectedMeasureIndex = -1;   // Blue border for selected measure
     this.activeMeasureIndex = -1;     // Yellow background for playing measure
     this.activeNotes = new Set();     // Note IDs for red highlighting during playback
+
+    // Playback cursor state
+    this.playbackCursor = null;       // { measureIndex, beat } for vertical cursor line
 
     // Section view filtering state
     this.measureFilter = null;        // { startMeasure, endMeasure } for section view mode
@@ -157,6 +160,13 @@ export class NotationComposer {
         onMeasuresPerLineChange: (mpl) => {
           this.config.measuresPerLine = mpl;
           this.layoutManager.setConfig({ measuresPerLine: mpl });
+          // Also update PAGE_CONFIG for pagination
+          updatePageConfig({ measuresPerSystem: mpl });
+          // Re-layout pages if pagination is enabled
+          if (this.pageLayoutManager) {
+            const measures = this.measureManager.measures || [];
+            this.pageLayoutManager.layoutPages(measures.length);
+          }
           this.render();
         },
         onTimeSignatureChange: (num, denom) => {
@@ -215,6 +225,14 @@ export class NotationComposer {
             // Re-trigger selection state update after tuplet removal
             this.updateToolbarSelectionState();
           }
+        },
+        onTranspose: (semitones) => {
+          if (this.noteEditor) {
+            this.noteEditor.transposeSelection(semitones);
+          }
+        },
+        onTemplateInsert: (templateType) => {
+          this.insertMeasureTemplate(templateType);
         },
         onVoiceChange: (voiceNumber) => {
           // Update composition state with new active voice for the current staff
@@ -439,6 +457,10 @@ export class NotationComposer {
       window.removeNotationActiveNote = (noteId) => self.removeActiveNote(noteId);
       window.clearNotationActiveNotes = () => self.clearActiveNotes();
       window.stopNotationPlaybackHighlighting = () => self.stopPlaybackHighlighting();
+
+      // Expose playback cursor methods for position marker
+      window.setNotationPlaybackCursor = (measureIndex, beat) => self.setPlaybackCursor(measureIndex, beat);
+      window.clearNotationPlaybackCursor = () => self.clearPlaybackCursor();
 
       // Expose toolbar state for melody suggestions
       window.getCurrentNoteDuration = () => self.toolbar ? self.toolbar.getState().duration : '4n';
@@ -977,6 +999,7 @@ export class NotationComposer {
         selectedMeasureIndex: this.selectedMeasureIndex,
         activeMeasureIndex: this.activeMeasureIndex,
         activeNotes: this.activeNotes,
+        playbackCursor: this.playbackCursor,
         enableHarmonicColoring: this.config.enableHarmonicColoring,
         // Chord span settings
         showChordSpans: showChordSpans,
@@ -1286,6 +1309,7 @@ export class NotationComposer {
       selectedMeasureIndex: localSelectedIndex,
       activeMeasureIndex: localActiveIndex,
       activeNotes: localActiveNotes,
+      playbackCursor: this.playbackCursor,
       enableHarmonicColoring: this.config.enableHarmonicColoring,
       enableChordSpans: this.config.enableChordSpans,
     };
@@ -1298,6 +1322,7 @@ export class NotationComposer {
         selectedMeasureIndexOverride: localSelectedIndex,
         activeMeasureIndexOverride: localActiveIndex,
         activeNotesOverride: localActiveNotes,
+        playbackCursorOverride: this.playbackCursor,
         globalMeasureOffset: validStart, // So renderToPages knows the offset
       });
     } else {
@@ -1449,6 +1474,7 @@ export class NotationComposer {
     const baseActiveNotes = useOverrideHighlighting
       ? overrideOptions.activeNotesOverride
       : this.activeNotes;
+    const basePlaybackCursor = overrideOptions.playbackCursorOverride || this.playbackCursor;
     const globalOffset = overrideOptions.globalMeasureOffset || 0;
 
     // Group measures by page (8 measures per page)
@@ -1477,6 +1503,10 @@ export class NotationComposer {
         selectedMeasureIndex: baseSelectedIndex - startMeasure,
         activeMeasureIndex: baseActiveIndex - startMeasure,
         activeNotes: baseActiveNotes,
+        // Adjust playback cursor for page offset
+        playbackCursor: basePlaybackCursor && basePlaybackCursor.measureIndex >= startMeasure && basePlaybackCursor.measureIndex < endMeasure
+          ? { measureIndex: basePlaybackCursor.measureIndex - startMeasure, beat: basePlaybackCursor.beat }
+          : null,
         enableHarmonicColoring: this.config.enableHarmonicColoring,
         // Chord span settings
         showChordSpans: settings.showChordSpans !== false, // Default to true
@@ -1655,6 +1685,16 @@ export class NotationComposer {
       localActiveIndex = this.activeMeasureIndex - startMeasure;
     }
 
+    // Calculate local playback cursor
+    let localPlaybackCursor = null;
+    const baseCursor = hasOverrides ? overrideOptions.playbackCursorOverride : this.playbackCursor;
+    if (baseCursor && baseCursor.measureIndex >= startMeasure && baseCursor.measureIndex <= endMeasure) {
+      localPlaybackCursor = {
+        measureIndex: baseCursor.measureIndex - startMeasure,
+        beat: baseCursor.beat
+      };
+    }
+
     // Get settings for chord spans
     const compositionState = getCompositionState();
     const settings = compositionState ? compositionState.getSettings() : {};
@@ -1676,6 +1716,7 @@ export class NotationComposer {
       selectedMeasureIndex: localSelectedIndex,
       activeMeasureIndex: localActiveIndex,
       activeNotes: pageLocalActiveNotes, // CRITICAL: Use page-local note IDs
+      playbackCursor: localPlaybackCursor,
       enableHarmonicColoring: this.config.enableHarmonicColoring,
       // Chord span settings
       showChordSpans: settings.showChordSpans !== false, // Default to true
@@ -1999,6 +2040,252 @@ export class NotationComposer {
   }
 
   /**
+   * Insert a pattern template into the selected measure
+   * @param {string} templateType - Type of template to insert
+   */
+  insertMeasureTemplate(templateType) {
+    const measureIndex = this.selectedMeasureIndex;
+    if (measureIndex < 0) {
+      if (window.toast) {
+        window.toast.warning('Please select a measure first');
+      }
+      return;
+    }
+
+    const compositionState = getCompositionState();
+    if (!compositionState || !compositionState.measures[measureIndex]) {
+      return;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    // Get current chord info for the measure (for chord-based templates)
+    const chord = this.getChordForMeasure(measureIndex);
+    const rootNote = chord?.root || 'C';
+    const octave = 4;
+
+    // Template definitions - each returns an array of notes
+    const templates = {
+      'block-chord': () => {
+        // Whole note chord
+        const pitches = this.getChordPitches(chord, octave);
+        return [{
+          pitches,
+          duration: '1n',
+          beat: 0,
+        }];
+      },
+      'arpeggio-up': () => {
+        // Ascending arpeggio in 8th notes
+        const pitches = this.getChordPitches(chord, octave);
+        return pitches.map((pitch, i) => ({
+          pitch,
+          duration: '8n',
+          beat: i * 0.5,
+        }));
+      },
+      'arpeggio-down': () => {
+        // Descending arpeggio in 8th notes
+        const pitches = this.getChordPitches(chord, octave).reverse();
+        return pitches.map((pitch, i) => ({
+          pitch,
+          duration: '8n',
+          beat: i * 0.5,
+        }));
+      },
+      'alberti-bass': () => {
+        // Classic Alberti bass pattern: root-fifth-third-fifth
+        const pitches = this.getChordPitches(chord, octave - 1);
+        const [root, third, fifth] = pitches;
+        const pattern = [root, fifth || third, third || root, fifth || third];
+        return pattern.map((pitch, i) => ({
+          pitch,
+          duration: '8n',
+          beat: i * 0.5,
+        }));
+      },
+      'walking-bass': () => {
+        // Walking bass: root-third-fifth-approach
+        const pitches = this.getChordPitches(chord, octave - 1);
+        const [root, third, fifth] = pitches;
+        const approachNote = this.getApproachNote(root);
+        const pattern = [root, third || root, fifth || third || root, approachNote];
+        return pattern.map((pitch, i) => ({
+          pitch,
+          duration: '4n',
+          beat: i,
+        }));
+      },
+      'tremolo': () => {
+        // Tremolo pattern in 16th notes
+        const pitches = this.getChordPitches(chord, octave);
+        const notes = [];
+        for (let i = 0; i < 8; i++) {
+          notes.push({
+            pitches: pitches.slice(0, 2), // Use first two pitches
+            duration: '16n',
+            beat: i * 0.25,
+          });
+        }
+        return notes;
+      },
+    };
+
+    const templateFn = templates[templateType];
+    if (!templateFn) {
+      console.warn(`Unknown template type: ${templateType}`);
+      return;
+    }
+
+    const notes = templateFn();
+
+    // Get the target voice (use bass for bass patterns, treble otherwise)
+    const isBassPattern = templateType === 'alberti-bass' || templateType === 'walking-bass';
+    const staff = isBassPattern ? 'bass' : 'treble';
+    const voiceIndex = 0;
+
+    // Clear existing notes in the target voice for this measure
+    const measure = compositionState.measures[measureIndex];
+    if (measure.notation?.[staff]?.voices?.[voiceIndex]) {
+      measure.notation[staff].voices[voiceIndex].notes = [];
+    }
+
+    // Insert the template notes
+    for (const note of notes) {
+      const noteData = {
+        measureIndex,
+        staff,
+        voiceIndex,
+        beat: note.beat,
+        duration: note.duration,
+        pitch: note.pitch || note.pitches?.[0],
+        pitches: note.pitches,
+      };
+
+      compositionState.addNoteToMeasure(noteData);
+    }
+
+    // Mark dirty for auto-save
+    if (typeof window.markAutoSaveDirty === 'function') {
+      window.markAutoSaveDirty();
+    }
+
+    // Sync changes
+    if (isBassPattern && compositionState.bassBlockSequence?.blocks?.length > 0) {
+      compositionState.syncMeasuresToBuildingBlocks();
+    } else if (compositionState.trebleBlockSequence?.blocks?.length > 0) {
+      compositionState.syncMeasuresToTrebleBlock();
+    }
+
+    // Show success toast
+    if (window.toast) {
+      const templateNames = {
+        'block-chord': 'Block Chords',
+        'arpeggio-up': 'Arpeggio Up',
+        'arpeggio-down': 'Arpeggio Down',
+        'alberti-bass': 'Alberti Bass',
+        'walking-bass': 'Walking Bass',
+        'tremolo': 'Tremolo',
+      };
+      window.toast.success(`Inserted ${templateNames[templateType]} pattern`);
+    }
+
+    // Re-render
+    this.render(true);
+  }
+
+  /**
+   * Get chord information for a measure
+   * @param {number} measureIndex - Measure index
+   * @returns {Object|null} Chord info or null
+   */
+  getChordForMeasure(measureIndex) {
+    const compositionState = getCompositionState();
+    if (!compositionState) return null;
+
+    const segments = compositionState.getChordSegments?.();
+    if (segments) {
+      // Find segment that contains this measure
+      const beatsPerMeasure = compositionState.getBeatsPerMeasure?.() || 4;
+      const measureStartBeat = measureIndex * beatsPerMeasure;
+
+      for (const segment of segments) {
+        if (segment.startBeat <= measureStartBeat && segment.startBeat + segment.durationBeats > measureStartBeat) {
+          return segment.chord;
+        }
+      }
+    }
+
+    return { root: 'C', type: 'Major' };
+  }
+
+  /**
+   * Get chord pitches based on chord info
+   * @param {Object} chord - Chord info
+   * @param {number} octave - Base octave
+   * @returns {Array<string>} Array of pitch strings
+   */
+  getChordPitches(chord, octave) {
+    if (!chord) {
+      return [`C${octave}`, `E${octave}`, `G${octave}`];
+    }
+
+    const root = chord.root || 'C';
+    const type = chord.type || 'Major';
+
+    // Note intervals for different chord types
+    const intervals = {
+      'Major': [0, 4, 7],
+      'Minor': [0, 3, 7],
+      'Diminished': [0, 3, 6],
+      'Augmented': [0, 4, 8],
+      'Dominant 7th': [0, 4, 7, 10],
+      'Major 7th': [0, 4, 7, 11],
+      'Minor 7th': [0, 3, 7, 10],
+    };
+
+    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const rootIndex = noteNames.indexOf(root.replace(/[#b]/g, ''));
+
+    const chordIntervals = intervals[type] || intervals['Major'];
+
+    return chordIntervals.map(interval => {
+      let noteIndex = (rootIndex + interval) % 12;
+      let noteOctave = octave + Math.floor((rootIndex + interval) / 12);
+      return `${noteNames[noteIndex]}${noteOctave}`;
+    });
+  }
+
+  /**
+   * Get an approach note (semitone below or above the root)
+   * @param {string} rootPitch - Root pitch (e.g., "C3")
+   * @returns {string} Approach note pitch
+   */
+  getApproachNote(rootPitch) {
+    const match = rootPitch.match(/^([A-G][#b]?)(\d+)$/);
+    if (!match) return rootPitch;
+
+    const [, noteName, octaveStr] = match;
+    let octave = parseInt(octaveStr, 10);
+
+    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    let noteIndex = noteNames.indexOf(noteName);
+    if (noteIndex === -1) noteIndex = 0;
+
+    // Go down one semitone for approach
+    noteIndex--;
+    if (noteIndex < 0) {
+      noteIndex = 11;
+      octave--;
+    }
+
+    return `${noteNames[noteIndex]}${octave}`;
+  }
+
+  /**
    * Set the active measure for playback highlighting
    * @param {number} index - Measure index (-1 for none)
    */
@@ -2088,6 +2375,37 @@ export class NotationComposer {
   stopPlaybackHighlighting() {
     this.activeMeasureIndex = -1;
     this.activeNotes.clear();
+    this.playbackCursor = null;
+    this.render();
+  }
+
+  /**
+   * Set playback cursor position for visual marker
+   * @param {number} measureIndex - Measure index
+   * @param {number} beat - Beat position within measure (0-based, can be fractional)
+   */
+  setPlaybackCursor(measureIndex, beat) {
+    // DISABLED: Playback cursor feature disabled due to conflicts with multiple render triggers
+    // this.playbackCursor = { measureIndex, beat };
+    return;
+
+    // PAGINATION: Auto-navigate to the page containing the cursor
+    if (this.config.enablePagination && this.pageLayoutManager && measureIndex >= 0) {
+      const pageForMeasure = this.pageLayoutManager.getPageForMeasure(measureIndex);
+      if (pageForMeasure && pageForMeasure.pageIndex !== this.pageManager.getCurrentPage()) {
+        this.pageManager.goToPage(pageForMeasure.pageIndex);
+        return;
+      }
+    }
+
+    this.render();
+  }
+
+  /**
+   * Clear the playback cursor
+   */
+  clearPlaybackCursor() {
+    this.playbackCursor = null;
     this.render();
   }
 
@@ -2416,6 +2734,13 @@ export class NotationComposer {
 
     if (config.measuresPerLine) {
       this.layoutManager.setConfig({ measuresPerLine: config.measuresPerLine });
+      // Also update PAGE_CONFIG for pagination
+      updatePageConfig({ measuresPerSystem: config.measuresPerLine });
+      // Re-layout pages if pagination is enabled
+      if (this.pageLayoutManager) {
+        const measures = this.measureManager.measures || [];
+        this.pageLayoutManager.layoutPages(measures.length);
+      }
     }
 
     this.render();

@@ -2071,55 +2071,18 @@ export function parseShareableLink() {
 
 /**
  * Show a toast notification
+ * Uses the global toast system from toastNotifications.js
  * @param {string} message - Message to display
- * @param {number} duration - Duration in ms (default 3000)
+ * @param {string} type - Toast type: 'success', 'info', 'error', 'warning'
  */
-function showToast(message, duration = 3000) {
-    // Remove any existing toast
-    const existing = document.getElementById('export-toast');
-    if (existing) existing.remove();
-
-    // Create toast element
-    const toast = document.createElement('div');
-    toast.id = 'export-toast';
-    toast.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #1f2937;
-        color: white;
-        padding: 12px 24px;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 500;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        z-index: 10000;
-        animation: slideUp 0.3s ease-out;
-    `;
-    toast.textContent = message;
-
-    // Add animation keyframes if not present
-    if (!document.getElementById('toast-animation-style')) {
-        const style = document.createElement('style');
-        style.id = 'toast-animation-style';
-        style.textContent = `
-            @keyframes slideUp {
-                from { opacity: 0; transform: translateX(-50%) translateY(20px); }
-                to { opacity: 1; transform: translateX(-50%) translateY(0); }
-            }
-        `;
-        document.head.appendChild(style);
+function showToast(message, type = 'success') {
+    // Use global toast system if available
+    if (window.showToast) {
+        window.showToast(message, type);
+    } else {
+        // Fallback: simple console log
+        console.log(`[Toast] ${message}`);
     }
-
-    document.body.appendChild(toast);
-
-    // Remove after duration
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transition = 'opacity 0.3s ease-out';
-        setTimeout(() => toast.remove(), 300);
-    }, duration);
 }
 
 /**

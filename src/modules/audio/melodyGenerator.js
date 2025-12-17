@@ -3930,11 +3930,17 @@ export function playAllMelody() {
                 window.addNotationActiveNote(noteId);
             }
         });
-        updateCanvas();
+        // Note: Removed updateCanvas() call here - the individual state update methods
+        // (addNotationActiveNote, setNotationPlaybackCursor) already trigger renders
 
         // Visual feedback on keyboard - add highlight when note starts
         // Also highlight chord card based on measure's chordIndex
         Tone.Draw.schedule(() => {
+            // Update playback cursor position in notation FIRST (before other state changes)
+            if (window.setNotationPlaybackCursor) {
+                window.setNotationPlaybackCursor(measureNum, beatNum);
+            }
+
             notesToPlay.forEach(pitch => {
                 const keyEl = document.getElementById(getNoteKeyId(pitch));
                 if (keyEl) keyEl.classList.add('active-melody-playback');
@@ -3971,7 +3977,7 @@ export function playAllMelody() {
                     const keyEl = document.getElementById(getNoteKeyId(pitch));
                     if (keyEl) keyEl.classList.remove('active-melody-playback');
                 });
-                updateCanvas();
+                // Note: Removed updateCanvas() call - removeNotationActiveNote already triggers render
             }, removeTime);
         }
     }, (() => {
@@ -4145,8 +4151,15 @@ export function playAllMelody() {
         // Schedule bass notes from compositionState
         if (bassNoteData.length > 0) {
             // Set active measure for yellow highlighting when auto-generated bass plays
-            // Also highlight the corresponding chord card
+            // Also highlight the corresponding chord card and update playback cursor
             Tone.Draw.schedule(() => {
+                // IMPORTANT: Set playback cursor FIRST, before setNotationActiveMeasure
+                // because setNotationActiveMeasure triggers a render and we want the cursor
+                // to be set before that render happens
+                if (window.setNotationPlaybackCursor) {
+                    window.setNotationPlaybackCursor(measureIndex, 0);
+                }
+                // Now set active measure (which will render with the cursor already set)
                 if (window.isNotationInitialized && window.isNotationInitialized()) {
                     if (window.setNotationActiveMeasure) {
                         window.setNotationActiveMeasure(measureIndex);

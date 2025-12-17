@@ -103,6 +103,8 @@ export class NotationToolbar {
     this.onTupletCreate = options.onTupletCreate || (() => {});
     this.onTupletModeToggle = options.onTupletModeToggle || (() => {});
     this.onTupletRemove = options.onTupletRemove || (() => {});
+    this.onTranspose = options.onTranspose || (() => {});
+    this.onTemplateInsert = options.onTemplateInsert || (() => {});
 
     // Tuplet mode state
     this.tupletInsertMode = null; // null, 'triplet', 'quintuplet', 'sextuplet'
@@ -129,6 +131,31 @@ export class NotationToolbar {
     this.container = container;
     this.render();
     this.attachEventListeners();
+    this.handleMobileTooltips();
+  }
+
+  /**
+   * Handle tooltips for mobile/touch devices
+   * On touch devices, native title tooltips can interfere with button presses
+   * This method removes them and stores the info in data-tooltip for accessibility
+   */
+  handleMobileTooltips() {
+    // Detect touch capability
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+    if (isTouchDevice && this.container) {
+      // Find all elements with title attributes and convert them
+      const elementsWithTitles = this.container.querySelectorAll('[title]');
+      elementsWithTitles.forEach(el => {
+        const title = el.getAttribute('title');
+        if (title) {
+          // Store in data attribute for potential custom tooltip/accessibility
+          el.setAttribute('data-tooltip', title);
+          // Remove native title to prevent popup on tap
+          el.removeAttribute('title');
+        }
+      });
+    }
   }
 
   /**
@@ -139,9 +166,16 @@ export class NotationToolbar {
 
     this.container.innerHTML = `
       <div class="notation-toolbar">
-        <!-- Selection Indicator (shown when notes selected) -->
+        <!-- Selection Indicator and Tools (shown when notes selected) -->
         <div class="toolbar-section selection-indicator" style="display: ${this.selectedNotesCount > 0 ? 'flex' : 'none'};">
           <span class="selection-badge">✓ ${this.selectedNotesCount} note${this.selectedNotesCount !== 1 ? 's' : ''} selected</span>
+          <!-- Transpose Tools -->
+          <div class="transpose-tools">
+            <button class="toolbar-btn transpose-btn" data-transpose="-12" title="Transpose down octave">⬇8va</button>
+            <button class="toolbar-btn transpose-btn" data-transpose="-1" title="Transpose down semitone">−</button>
+            <button class="toolbar-btn transpose-btn" data-transpose="1" title="Transpose up semitone">+</button>
+            <button class="toolbar-btn transpose-btn" data-transpose="12" title="Transpose up octave">⬆8va</button>
+          </div>
         </div>
 
         <!-- NOTE INPUT GROUP -->
@@ -212,12 +246,6 @@ export class NotationToolbar {
               </div>
             </div>
 
-            <!-- Octave -->
-            <div class="toolbar-section octave-section">
-              <button class="toolbar-btn octave-up-btn" data-action="octaveUp" title="Octave Up (Ctrl+↑)">⬆8</button>
-              <button class="toolbar-btn octave-down-btn" data-action="octaveDown" title="Octave Down (Ctrl+↓)">⬇8</button>
-            </div>
-
             <!-- Articulations -->
             <div class="toolbar-section articulations-section">
               <div class="button-group">
@@ -244,6 +272,24 @@ export class NotationToolbar {
               <button class="toolbar-btn paste-btn" data-action="paste" title="Paste (Ctrl+V)">📥</button>
               <button class="toolbar-btn copy-block-btn" data-action="copyBlock" title="Copy Block">📦</button>
               <button class="toolbar-btn delete-btn" data-action="delete" title="Delete (Del)">🗑</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TEMPLATES GROUP -->
+        <div class="toolbar-group templates-group">
+          <span class="group-label">Templates</span>
+          <div class="toolbar-group-content">
+            <div class="toolbar-section templates-section">
+              <select class="template-select" title="Insert a pattern template into selected measure">
+                <option value="">Insert Pattern...</option>
+                <option value="block-chord">Block Chords (whole notes)</option>
+                <option value="arpeggio-up">Arpeggio Up (8ths)</option>
+                <option value="arpeggio-down">Arpeggio Down (8ths)</option>
+                <option value="alberti-bass">Alberti Bass</option>
+                <option value="walking-bass">Walking Bass</option>
+                <option value="tremolo">Tremolo (16ths)</option>
+              </select>
             </div>
           </div>
         </div>
@@ -279,14 +325,21 @@ export class NotationToolbar {
                 `).join('')}
               </select>
             </div>
+          </div>
+        </div>
+
+        <!-- 2ND VOICE OPTIONS GROUP -->
+        <div class="toolbar-group voice-options-group">
+          <span class="group-label">2nd Voice Rests</span>
+          <div class="toolbar-group-content">
             <div class="toolbar-section rest-display-section">
               <div class="button-group">
-                <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'clean' ? 'active' : ''}" data-rest-mode="clean" title="Clean: Hide redundant rests">Clean</button>
-                <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'explicit' ? 'active' : ''}" data-rest-mode="explicit" title="Show all rests">All</button>
+                <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'clean' ? 'active' : ''}" data-rest-mode="clean" title="Clean: Hide redundant rests in 2nd voice">Clean</button>
+                <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'explicit' ? 'active' : ''}" data-rest-mode="explicit" title="Show all rests in both voices">All</button>
               </div>
               <label class="cue-rest-toggle ${this.restDisplayMode === 'explicit' ? 'disabled' : ''}" title="Show small gray cue rests where voices overlap (only applies in Clean mode)">
                 <input type="checkbox" class="cue-rest-checkbox" ${this.cueRestsForSecondaryVoice ? 'checked' : ''} ${this.restDisplayMode === 'explicit' ? 'disabled' : ''}>
-                <span class="cue-rest-label">Show Cue Rests</span>
+                <span class="cue-rest-label">Cue Rests</span>
               </label>
             </div>
           </div>
@@ -476,6 +529,34 @@ export class NotationToolbar {
         white-space: nowrap;
       }
 
+      .transpose-tools {
+        display: flex;
+        gap: 2px;
+        margin-left: 8px;
+        padding-left: 8px;
+        border-left: 1px solid rgba(255, 255, 255, 0.3);
+      }
+
+      .transpose-btn {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: none;
+        padding: 2px 6px;
+        font-size: 10px;
+        font-weight: 600;
+        border-radius: 3px;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+
+      .transpose-btn:hover {
+        background: rgba(255, 255, 255, 0.35);
+      }
+
+      .transpose-btn:active {
+        background: rgba(255, 255, 255, 0.5);
+      }
+
       .chord-symbol-input {
         padding: 4px 8px;
         border-radius: 4px;
@@ -504,6 +585,16 @@ export class NotationToolbar {
         padding: 0;
         font-size: 12px;
         font-weight: 600;
+      }
+
+      /* 2nd Voice options group - subtle highlight */
+      .voice-options-group {
+        background: rgba(74, 158, 255, 0.05);
+        border-color: rgba(74, 158, 255, 0.15);
+      }
+
+      .voice-options-group .group-label {
+        color: var(--accent-color, #4a9eff);
       }
 
       /* Rest display mode section */
@@ -643,6 +734,16 @@ export class NotationToolbar {
       });
     });
 
+    // Transpose buttons - transpose selected notes by semitones
+    this.container.querySelectorAll('.transpose-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const semitones = parseInt(e.currentTarget.dataset.transpose, 10);
+        if (!isNaN(semitones) && this.selectedNotesCount > 0) {
+          this.onTranspose(semitones);
+        }
+      });
+    });
+
     // Tuplet buttons
     this.container.querySelectorAll('.tuplet-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -769,6 +870,16 @@ export class NotationToolbar {
     // Voice leading toggle button
     this.container.querySelector('.voice-leading-btn')?.addEventListener('click', () => {
       this.toggleVoiceLeading();
+    });
+
+    // Template select
+    this.container.querySelector('.template-select')?.addEventListener('change', (e) => {
+      const templateType = e.target.value;
+      if (templateType) {
+        this.onTemplateInsert(templateType);
+        // Reset select to placeholder
+        e.target.value = '';
+      }
     });
 
     // Keyboard shortcuts
@@ -1253,6 +1364,7 @@ export class NotationToolbar {
     this.currentArticulation = null;
     this.render();
     this.attachEventListeners();
+    this.handleMobileTooltips();
   }
 
   /**

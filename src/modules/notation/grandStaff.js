@@ -2912,6 +2912,7 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     selectedMeasureIndex = -1,   // Blue border for selected measure
     activeMeasureIndex = -1,     // Yellow background for playing measure
     activeNotes = null,          // Set of note IDs for red highlighting
+    playbackCursor = null,       // { measureIndex, beat } for vertical cursor line
     enableHarmonicColoring = false, // Enable chord tone coloring
     showChordSpans = true,       // Show chord span shading and brackets
     // Multi-voice rest display options
@@ -3352,6 +3353,49 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
   // This helps users see which measure is selected independently of playback state
   if (selectedMeasureIndex >= 0 && selectedMeasureIndex < measures.length) {
     drawMeasureHighlight(selectedMeasureIndex, 'rgba(59, 130, 246, 0.8)', true);
+  }
+
+  // Draw playback cursor (vertical line showing current playback position)
+  // DISABLED: Feature disabled due to render conflicts
+  if (playbackCursor && playbackCursor.measureIndex >= 0 && playbackCursor.measureIndex < measures.length) {
+    const cursorMeasureIndex = playbackCursor.measureIndex;
+    const cursorBeat = playbackCursor.beat || 0;
+    const systemIndex = Math.floor(cursorMeasureIndex / measuresPerLine);
+    const measureInSystem = cursorMeasureIndex % measuresPerLine;
+    const isFirstInSystem = measureInSystem === 0;
+
+    // Parse time signature for beats per measure
+    const [beatsNum] = timeSignature.split('/').map(Number);
+    const beatsPerMeasure = beatsNum || 4;
+
+    // Calculate x position within the measure
+    const measureX = dimensions.braceWidth + (measureInSystem * measureWidth) +
+      (isFirstInSystem ? dimensions.firstMeasureExtra : 0);
+    const measureContentWidth = isFirstInSystem
+      ? measureWidth
+      : measureWidth;
+
+    // Calculate cursor position based on beat (as fraction of measure)
+    const beatFraction = cursorBeat / beatsPerMeasure;
+    const cursorX = measureX + (beatFraction * measureContentWidth);
+
+    // Calculate y positions for the full system height
+    const y = dimensions.trebleY + (systemIndex * dimensions.systemHeight);
+    const h = dimensions.systemHeight - GRAND_STAFF_DEFAULTS.systemMarginTop - GRAND_STAFF_DEFAULTS.systemMarginBottom;
+
+    // Draw the cursor line
+    if (context.svg) {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', cursorX);
+      line.setAttribute('y1', y);
+      line.setAttribute('x2', cursorX);
+      line.setAttribute('y2', y + h);
+      line.setAttribute('stroke', '#E53935');
+      line.setAttribute('stroke-width', '2');
+      line.setAttribute('stroke-linecap', 'round');
+      line.classList.add('playback-cursor');
+      context.svg.appendChild(line);
+    }
   }
 
   // Draw chord span shading and brackets - alternating colors for consecutive chords

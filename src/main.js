@@ -31,6 +31,7 @@ import { initWhyThisWorksPanel } from './modules/ui/whyThisWorksPanel.js';
 import { openManualChordEntryModal, closeManualChordEntryModal } from './modules/ui/manualChordEntryModal.js';
 import { showAutoHarmonizeModal } from './modules/ui/autoHarmonizeModal.js';
 import { showTensionOptimizerModal } from './modules/ui/tensionOptimizerModal.js';
+import { toast, showToast } from './modules/ui/toastNotifications.js';
 // Phase 1.3 & Phase 2: Interactive Learning Tools
 import { showChordComparisonModal } from './modules/ui/chordComparisonModal.js';
 import { showWhatIfSandbox } from './modules/ui/whatIfSandbox.js';
@@ -184,7 +185,9 @@ import {
     loadAutoSave,
     clearAutoSave,
     getAutoSaveStatus,
-    onAutoSave
+    onAutoSave,
+    onDirtyStateChange,
+    hasUnsavedChanges
 } from './modules/storage/autoSave.js';
 import {
     initVersionHistory,
@@ -394,6 +397,236 @@ import {
     generateDiatonicChords
 } from './data/music-data.js';
 
+// ============================================================================
+// MOBILE/TOUCH DEVICE HANDLING
+// ============================================================================
+
+/**
+ * Handle tooltips on mobile/touch devices
+ * On touch devices, native title tooltips can interfere with button presses
+ * This removes them and stores the info in data-tooltip for accessibility
+ */
+function handleMobileTooltips() {
+    // Detect touch capability (for tooltip handling)
+    const hasTouchCapability = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+    // More conservative mobile detection for FAB (actual mobile devices)
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+        || (hasTouchCapability && window.innerWidth <= 768);
+
+    if (hasTouchCapability) {
+        // Find all elements with title attributes and convert them
+        const elementsWithTitles = document.querySelectorAll('[title]');
+        elementsWithTitles.forEach(el => {
+            const title = el.getAttribute('title');
+            if (title) {
+                // Store in data attribute for potential custom tooltip/accessibility
+                el.setAttribute('data-tooltip', title);
+                // Remove native title to prevent popup on tap
+                el.removeAttribute('title');
+            }
+        });
+
+        // Add a class to body so CSS can adjust for touch
+        document.body.classList.add('touch-device');
+    }
+
+    // Only show mobile FAB on actual mobile devices (not touch-enabled desktops)
+    if (isMobileDevice) {
+        const mobileFab = document.getElementById('mobile-fab');
+        if (mobileFab) {
+            mobileFab.classList.remove('hidden');
+        }
+        initMobileFab();
+    }
+}
+
+/**
+ * Initialize the Mobile Floating Action Button (FAB)
+ * 2-tier Speed Dial for comprehensive quick access on touch devices
+ */
+function initMobileFab() {
+    const fabMain = document.getElementById('mobile-fab-main');
+    const fabMenu = document.getElementById('mobile-fab-menu');
+    const fabSuggestions = document.getElementById('mobile-fab-suggestions');
+    const fabSettings = document.getElementById('mobile-fab-settings');
+    const fabCategories = document.querySelectorAll('.fab-category');
+
+    if (!fabMain || !fabMenu) return;
+
+    let isOpen = false;
+    let activeSubmenu = null;
+
+    // Toggle main FAB menu (first tier)
+    fabMain.addEventListener('click', (e) => {
+        e.stopPropagation();
+        isOpen = !isOpen;
+        fabMenu.classList.toggle('hidden', !isOpen);
+        fabMain.querySelector('.fab-icon').style.transform = isOpen ? 'rotate(45deg)' : 'rotate(0deg)';
+
+        // Close any open submenu when closing main menu
+        if (!isOpen) {
+            closeAllSubmenus();
+        }
+
+        // Show labels on hover
+        if (isOpen) {
+            showCategoryLabels();
+        }
+    });
+
+    // Category buttons toggle submenus (second tier)
+    fabCategories.forEach(category => {
+        const categoryBtn = category.querySelector('.fab-category-btn');
+        const submenu = category.querySelector('.fab-submenu');
+
+        categoryBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            // Close other submenus
+            fabCategories.forEach(other => {
+                if (other !== category) {
+                    const otherSubmenu = other.querySelector('.fab-submenu');
+                    if (otherSubmenu) otherSubmenu.classList.add('hidden');
+                }
+            });
+
+            // Toggle this submenu
+            if (submenu) {
+                const isSubmenuOpen = !submenu.classList.contains('hidden');
+                submenu.classList.toggle('hidden', isSubmenuOpen);
+                activeSubmenu = isSubmenuOpen ? null : submenu;
+            }
+        });
+
+        // Handle submenu action buttons
+        const actionBtns = category.querySelectorAll('.fab-action');
+        actionBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = btn.dataset.action;
+                handleFabAction(action);
+                closeFab();
+            });
+        });
+    });
+
+    // Suggestions button (direct action, no submenu)
+    if (fabSuggestions) {
+        fabSuggestions.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const actionSuggestionsBtn = document.getElementById('action-tab-suggestions');
+            if (actionSuggestionsBtn) actionSuggestionsBtn.click();
+            closeFab();
+        });
+    }
+
+    // Settings button (direct action, no submenu)
+    if (fabSettings) {
+        fabSettings.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Open sidebar which contains settings
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            if (sidebarToggle) sidebarToggle.click();
+            closeFab();
+        });
+    }
+
+    // Close FAB when clicking outside
+    document.addEventListener('click', (e) => {
+        if (isOpen && !e.target.closest('#mobile-fab')) {
+            closeFab();
+        }
+    });
+
+    function closeAllSubmenus() {
+        fabCategories.forEach(category => {
+            const submenu = category.querySelector('.fab-submenu');
+            if (submenu) submenu.classList.add('hidden');
+        });
+        activeSubmenu = null;
+    }
+
+    function showCategoryLabels() {
+        // Briefly show labels then fade them
+        const labels = document.querySelectorAll('.fab-label');
+        labels.forEach(label => {
+            label.style.opacity = '1';
+            setTimeout(() => {
+                label.style.opacity = '0';
+            }, 1500);
+        });
+    }
+
+    function closeFab() {
+        isOpen = false;
+        fabMenu.classList.add('hidden');
+        fabMain.querySelector('.fab-icon').style.transform = 'rotate(0deg)';
+        closeAllSubmenus();
+    }
+
+    function handleFabAction(action) {
+        switch (action) {
+            // Playback actions
+            case 'play-all':
+                const playBtn = document.getElementById('action-play-btn');
+                if (playBtn) playBtn.click();
+                break;
+            case 'stop':
+                const stopBtn = document.getElementById('action-stop-btn');
+                if (stopBtn) stopBtn.click();
+                break;
+            case 'play-measure':
+                // Play just the selected/current measure
+                if (window.composerIntegration && window.composerIntegration.playCurrentMeasure) {
+                    window.composerIntegration.playCurrentMeasure();
+                }
+                break;
+
+            // Edit actions
+            case 'undo':
+                const undoBtn = document.getElementById('action-undo');
+                if (undoBtn) undoBtn.click();
+                break;
+            case 'redo':
+                const redoBtn = document.getElementById('action-redo');
+                if (redoBtn) redoBtn.click();
+                break;
+            case 'delete':
+                // Trigger delete on selected notes via keyboard event
+                if (window.noteEditor && window.noteEditor.deleteSelectedNotes) {
+                    window.noteEditor.deleteSelectedNotes();
+                }
+                break;
+
+            // File actions
+            case 'save':
+                const saveBtn = document.getElementById('action-save');
+                if (saveBtn) saveBtn.click();
+                break;
+            case 'load':
+                const loadBtn = document.getElementById('action-load');
+                if (loadBtn) loadBtn.click();
+                break;
+            case 'export-midi':
+                const midiBtn = document.getElementById('action-export-midi');
+                if (midiBtn) midiBtn.click();
+                break;
+            case 'export-pdf':
+                const pdfBtn = document.getElementById('action-export-pdf');
+                if (pdfBtn) pdfBtn.click();
+                break;
+            case 'share-link':
+                const shareBtn = document.getElementById('action-copy-link');
+                if (shareBtn) shareBtn.click();
+                break;
+
+            default:
+                console.warn('Unknown FAB action:', action);
+        }
+    }
+}
+
 // Global Settings Functions
 function toggleEnharmonic() {
     const toggle = document.getElementById('enharmonic-toggle');
@@ -450,10 +683,12 @@ function toggleNotationStyle() {
 
 function toggleRomanNumeralEngine() {
     const toggle = document.getElementById('roman-numeral-toggle');
+    console.log('[RomanNumeral] Toggle clicked, checkbox checked:', toggle.checked);
     setIsRomanNumeralEngineOn(toggle.checked);
-    
+
     // Update window.isRomanNumeralEngineOn for modules that access it
     window.isRomanNumeralEngineOn = getIsRomanNumeralEngineOn();
+    console.log('[RomanNumeral] State after set:', window.isRomanNumeralEngineOn);
     
     // Update indicator colors
     const offIndicator = document.getElementById('roman-off-indicator');
@@ -1206,6 +1441,10 @@ window.toggleDisplayPanel = toggleDisplayPanel;
 window.handleOctaveRangeChange = handleOctaveRangeChange;
 window.updateRecommendations = updateUnifiedSuggestions;
 window.updateUnifiedSuggestions = updateUnifiedSuggestions;
+
+// Toast notifications
+window.toast = toast;
+window.showToast = showToast;
 
 // Landing page functions
 window.enterApp = enterApp;
@@ -2682,6 +2921,10 @@ window.onload = () => {
     // Set initial tab data attribute on body
     document.body.setAttribute('data-active-tab', getCurrentTab());
 
+    // Handle tooltips on mobile/touch devices
+    // Native title tooltips can interfere with button presses on touch devices
+    handleMobileTooltips();
+
     // Hide Tab hint banner if user previously dismissed it
     const tabHintBanner = document.getElementById('tab-hint-banner');
     if (tabHintBanner && localStorage.getItem('tab-hint-dismissed') === 'true') {
@@ -2697,6 +2940,14 @@ window.onload = () => {
         if (compositionState) {
             // Initialize auto-save system
             initAutoSave(compositionState);
+
+            // Subscribe to dirty state changes for unsaved indicator
+            onDirtyStateChange((isDirty) => {
+                const indicator = document.getElementById('unsaved-indicator');
+                if (indicator) {
+                    indicator.classList.toggle('hidden', !isDirty);
+                }
+            });
 
             // Initialize version history
             initVersionHistory(compositionState);
@@ -3246,12 +3497,17 @@ window.onload = () => {
         sharpIndicator.classList.remove('text-indigo-300');
         sharpIndicator.classList.add('text-gray-500');
     }
-    document.getElementById('notation-toggle').checked = false;
-    document.getElementById('suggestion-toggle').checked = false;
-    document.getElementById('roman-numeral-toggle').checked = false;
-    document.getElementById('key-names-toggle').checked = false;
-    document.getElementById('classic-keyboard-toggle').checked = false;
-    document.getElementById('compact-controls-toggle').checked = false;
+    // Initialize toggle states (with null checks for optional toggles)
+    const notationToggle = document.getElementById('notation-toggle');
+    if (notationToggle) notationToggle.checked = false;
+    const romanNumeralToggle = document.getElementById('roman-numeral-toggle');
+    if (romanNumeralToggle) romanNumeralToggle.checked = false;
+    const keyNamesToggle = document.getElementById('key-names-toggle');
+    if (keyNamesToggle) keyNamesToggle.checked = false;
+    const classicKeyboardToggle = document.getElementById('classic-keyboard-toggle');
+    if (classicKeyboardToggle) classicKeyboardToggle.checked = false;
+    const compactControlsToggle = document.getElementById('compact-controls-toggle');
+    if (compactControlsToggle) compactControlsToggle.checked = false;
     
     // Initialize chord tone highlighting toggle
     const chordToneToggle = document.getElementById('chord-tone-highlighting-toggle');
@@ -4023,41 +4279,6 @@ window.loadProject = async function() {
         alert('An unexpected error occurred while loading the project.');
     }
 };
-
-/**
- * Simple toast notification helper
- */
-function showToast(message, type = 'info') {
-    // Check if a toast container exists, create one if not
-    let toastContainer = document.getElementById('toast-container');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.id = 'toast-container';
-        toastContainer.className = 'fixed bottom-4 right-4 z-50 flex flex-col gap-2';
-        document.body.appendChild(toastContainer);
-    }
-
-    // Create toast element
-    const toast = document.createElement('div');
-    const bgColor = type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-blue-600';
-    toast.className = `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in-up`;
-
-    // Add icon based on type
-    const icon = type === 'success'
-        ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>'
-        : type === 'error'
-        ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>'
-        : '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
-
-    toast.innerHTML = `${icon}<span>${message}</span>`;
-    toastContainer.appendChild(toast);
-
-    // Auto-remove after 4 seconds
-    setTimeout(() => {
-        toast.classList.add('animate-fade-out');
-        setTimeout(() => toast.remove(), 300);
-    }, 4000);
-}
 
 // ===========================
 // AUTO-SAVE & VERSION HISTORY UI

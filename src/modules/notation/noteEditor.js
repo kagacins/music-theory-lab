@@ -2139,6 +2139,116 @@ export class NoteEditor {
   }
 
   /**
+   * Transpose selected notes by specified semitones
+   * @param {number} semitones - Number of semitones to transpose (positive = up, negative = down)
+   */
+  transposeSelection(semitones) {
+    if (this.selectedNotes.size === 0 || semitones === 0) return;
+
+    // Save state before change for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    // Note names for transposition
+    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const flatNames = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+    // Helper to transpose a single pitch string (e.g., "C4" -> "D4" for +2 semitones)
+    const transposePitch = (pitch) => {
+      const match = pitch.match(/^([A-G][#b]?)(\d+)$/);
+      if (!match) return pitch;
+
+      const [, noteName, octaveStr] = match;
+      let octave = parseInt(octaveStr, 10);
+
+      // Convert note name to semitone index (0-11)
+      let noteIndex = noteNames.indexOf(noteName);
+      if (noteIndex === -1) {
+        // Try flat names
+        noteIndex = flatNames.indexOf(noteName);
+      }
+      if (noteIndex === -1) return pitch;
+
+      // Add semitones
+      let newIndex = noteIndex + semitones;
+
+      // Handle octave changes
+      while (newIndex >= 12) {
+        newIndex -= 12;
+        octave++;
+      }
+      while (newIndex < 0) {
+        newIndex += 12;
+        octave--;
+      }
+
+      // Clamp octave to reasonable range
+      octave = Math.max(0, Math.min(8, octave));
+
+      // Use sharp names for transposed notes
+      const newNoteName = noteNames[newIndex];
+      return `${newNoteName}${octave}`;
+    };
+
+    let changedCount = 0;
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex, pitchIndex] = this.parseNoteId(noteId);
+
+      const measure = compositionState.measures[measureIndex];
+      if (!measure) continue;
+
+      const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+      const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex];
+      if (!voice || !voice.notes[noteIndex]) continue;
+
+      const note = voice.notes[noteIndex];
+      if (note.isRest) continue; // Skip rests
+
+      // If pitchIndex is specified, only transpose that pitch
+      if (pitchIndex !== null && note.pitches) {
+        if (pitchIndex >= 0 && pitchIndex < note.pitches.length) {
+          note.pitches[pitchIndex] = transposePitch(note.pitches[pitchIndex]);
+          changedCount++;
+        }
+      } else {
+        // Transpose all pitches in the note
+        if (note.pitches && note.pitches.length > 0) {
+          note.pitches = note.pitches.map(p => transposePitch(p));
+          changedCount++;
+        }
+        // Also transpose the primary pitch if it exists
+        if (note.pitch) {
+          note.pitch = transposePitch(note.pitch);
+          changedCount++;
+        }
+      }
+    }
+
+    if (changedCount > 0) {
+      // Mark as dirty for auto-save
+      if (typeof window.markAutoSaveDirty === 'function') {
+        window.markAutoSaveDirty();
+      }
+
+      // Sync changes to block sequences
+      if (compositionState.trebleBlockSequence?.blocks?.length > 0) {
+        compositionState.syncMeasuresToTrebleBlock();
+      }
+      if (compositionState.bassBlockSequence?.blocks?.length > 0) {
+        compositionState.syncMeasuresToBuildingBlocks();
+      }
+
+      // Re-render
+      this.composerIntegration.render(true);
+    }
+  }
+
+  /**
    * Play selected notes with audio playback
    */
   playSelectedNotes() {
