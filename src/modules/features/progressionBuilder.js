@@ -9450,10 +9450,6 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             }
         }
 
-        // Add action buttons toolbar above the scrolling cards (always visible)
-        const actionToolbar = createActionButtonsToolbar(containerId);
-        container.appendChild(actionToolbar);
-
         // Create container for cards
         const gridContainer = document.createElement('div');
         gridContainer.id = `${containerId}-cards-grid`;

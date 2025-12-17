@@ -134,27 +134,76 @@ export class NotationToolbar {
   }
 
   /**
-   * Handle tooltips for mobile/touch devices
-   * On touch devices, native title tooltips can interfere with button presses
-   * This method removes them and stores the info in data-tooltip for accessibility
+   * Handle tooltips - create hover tooltips for all buttons
+   * Uses actual DOM elements for reliable display
    */
   handleMobileTooltips() {
-    // Detect touch capability
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (!this.container) return;
 
-    if (isTouchDevice && this.container) {
-      // Find all elements with title attributes and convert them
-      const elementsWithTitles = this.container.querySelectorAll('[title]');
-      elementsWithTitles.forEach(el => {
-        const title = el.getAttribute('title');
-        if (title) {
-          // Store in data attribute for potential custom tooltip/accessibility
-          el.setAttribute('data-tooltip', title);
-          // Remove native title to prevent popup on tap
-          el.removeAttribute('title');
-        }
-      });
+    // Create a single tooltip element that will be reused
+    let tooltip = document.getElementById('notation-toolbar-tooltip');
+    if (!tooltip) {
+      tooltip = document.createElement('div');
+      tooltip.id = 'notation-toolbar-tooltip';
+      tooltip.style.cssText = `
+        position: fixed;
+        background: #1f2937;
+        color: white;
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+        z-index: 999999;
+        pointer-events: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        opacity: 0;
+        transition: opacity 0.15s ease;
+        display: none;
+      `;
+      document.body.appendChild(tooltip);
     }
+
+    // Find all elements with title attributes
+    const elementsWithTitles = this.container.querySelectorAll('[title]');
+    elementsWithTitles.forEach(el => {
+      const title = el.getAttribute('title');
+      if (title) {
+        // Store in data attribute
+        el.setAttribute('data-tooltip', title);
+        // Remove native title to prevent double tooltips
+        el.removeAttribute('title');
+
+        // Add hover listeners
+        el.addEventListener('mouseenter', (e) => {
+          const text = el.getAttribute('data-tooltip');
+          if (!text) return;
+
+          tooltip.textContent = text;
+          tooltip.style.display = 'block';
+
+          // Position tooltip above the element
+          const rect = el.getBoundingClientRect();
+          tooltip.style.left = `${rect.left + rect.width / 2}px`;
+          tooltip.style.top = `${rect.top - 8}px`;
+          tooltip.style.transform = 'translate(-50%, -100%)';
+
+          // Fade in
+          requestAnimationFrame(() => {
+            tooltip.style.opacity = '1';
+          });
+        });
+
+        el.addEventListener('mouseleave', () => {
+          tooltip.style.opacity = '0';
+          setTimeout(() => {
+            if (tooltip.style.opacity === '0') {
+              tooltip.style.display = 'none';
+            }
+          }, 150);
+        });
+      }
+    });
   }
 
   /**
@@ -187,12 +236,12 @@ export class NotationToolbar {
                 <button
                   class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'noteEntry' ? 'active' : ''}"
                   data-interaction-mode="noteEntry"
-                  title="Note Entry Mode (Alt+Click adds note)"
+                  title="Note Entry Mode - Click to add notes"
                 >✏</button>
                 <button
                   class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'select' ? 'active' : ''}"
                   data-interaction-mode="select"
-                  title="Select Mode (Click selects, Alt+Click adds)"
+                  title="Select Mode - Click to select notes, Alt+Click to add"
                 >⎀</button>
               </div>
             </div>
@@ -212,9 +261,9 @@ export class NotationToolbar {
 
             <!-- Modifiers -->
             <div class="toolbar-section modifiers-section">
-              <button class="toolbar-btn rest-btn ${this.isRestMode ? 'active' : ''}" data-action="rest" title="Rest">𝄽</button>
-              <button class="toolbar-btn dot-btn ${this.isDotted ? 'active' : ''}" data-action="dot" title="Dotted">•</button>
-              <button class="toolbar-btn tie-btn" data-action="tie" title="Tie">⁀</button>
+              <button class="toolbar-btn rest-btn ${this.isRestMode ? 'active' : ''}" data-action="rest" title="Rest mode (R)">𝄽</button>
+              <button class="toolbar-btn dot-btn ${this.isDotted ? 'active' : ''}" data-action="dot" title="Dotted note (.)">•</button>
+              <button class="toolbar-btn tie-btn" data-action="tie" title="Tie notes (T)">⁀</button>
             </div>
 
             <!-- Tuplets -->
@@ -235,13 +284,15 @@ export class NotationToolbar {
             <!-- Accidentals -->
             <div class="toolbar-section accidentals-section">
               <div class="button-group">
-                ${ACCIDENTALS.map(a => `
+                ${ACCIDENTALS.map(a => {
+                  const shortcut = a.id === '#' ? 'S' : a.id === 'b' ? 'F' : 'N';
+                  return `
                   <button
                     class="toolbar-btn accidental-btn ${a.id === this.currentAccidental ? 'active' : ''}"
                     data-accidental="${a.id}"
-                    title="${a.label}"
+                    title="${a.label} (${shortcut})"
                   >${a.symbol}</button>
-                `).join('')}
+                `;}).join('')}
               </div>
             </div>
 
@@ -252,7 +303,7 @@ export class NotationToolbar {
                   <button
                     class="toolbar-btn articulation-btn ${a.id === this.currentArticulation ? 'active' : ''}"
                     data-articulation="${a.id}"
-                    title="${a.label}"
+                    title="${a.label} articulation"
                   >${a.symbol}</button>
                 `).join('')}
               </div>
@@ -265,12 +316,12 @@ export class NotationToolbar {
           <span class="group-label">Edit</span>
           <div class="toolbar-group-content">
             <div class="toolbar-section edit-section">
-              <button class="toolbar-btn undo-btn" data-action="undo" title="Undo (Ctrl+Z)">↩</button>
-              <button class="toolbar-btn redo-btn" data-action="redo" title="Redo (Ctrl+Y)">↪</button>
-              <button class="toolbar-btn copy-btn" data-action="copy" title="Copy (Ctrl+C)">📋</button>
-              <button class="toolbar-btn paste-btn" data-action="paste" title="Paste (Ctrl+V)">📥</button>
-              <button class="toolbar-btn copy-block-btn" data-action="copyBlock" title="Copy Block">📦</button>
-              <button class="toolbar-btn delete-btn" data-action="delete" title="Delete (Del)">🗑</button>
+              <button class="toolbar-btn undo-btn" data-action="undo" title="Undo last action (Ctrl+Z)">↩</button>
+              <button class="toolbar-btn redo-btn" data-action="redo" title="Redo last action (Ctrl+Y)">↪</button>
+              <button class="toolbar-btn copy-btn" data-action="copy" title="Copy selected notes (Ctrl+C)">📋</button>
+              <button class="toolbar-btn paste-btn" data-action="paste" title="Paste notes (Ctrl+V)">📥</button>
+              <button class="toolbar-btn copy-block-btn" data-action="copyBlock" title="Copy entire block/measure">📦</button>
+              <button class="toolbar-btn delete-btn" data-action="delete" title="Delete selected (Del/Backspace)">🗑</button>
             </div>
           </div>
         </div>
@@ -280,8 +331,8 @@ export class NotationToolbar {
           <span class="group-label">Chord</span>
           <div class="toolbar-group-content">
             <div class="toolbar-section chord-symbol-section">
-              <input type="text" class="chord-symbol-input" placeholder="Cmaj7" title="Enter chord symbol">
-              <button class="toolbar-btn apply-chord-btn" data-action="applyChord" title="Apply Chord Symbol">✓</button>
+              <input type="text" class="chord-symbol-input" placeholder="Cmaj7" title="Type chord symbol (e.g., Cmaj7, Dm, G7)">
+              <button class="toolbar-btn apply-chord-btn" data-action="applyChord" title="Apply chord symbol to measure (Enter)">✓</button>
             </div>
           </div>
         </div>
@@ -291,16 +342,16 @@ export class NotationToolbar {
           <span class="group-label">View</span>
           <div class="toolbar-group-content">
             <div class="toolbar-section view-section">
-              <select class="time-signature-select" title="Time Signature">
+              <select class="time-signature-select" title="Change time signature">
                 ${TIME_SIGNATURES.map(ts => `
                   <option value="${ts.value}" ${this.timeSignature === ts.value ? 'selected' : ''}>${ts.value}</option>
                 `).join('')}
               </select>
-              <select class="voice-select" title="Select voice for editing">
+              <select class="voice-select" title="Select voice to edit (V to cycle, Alt+1/2 to switch)">
                 <option value="1" ${this.voiceNumber === 1 ? 'selected' : ''}>Voice 1</option>
                 <option value="2" ${this.voiceNumber === 2 ? 'selected' : ''}>Voice 2</option>
               </select>
-              <select class="measures-select" title="Measures per line">
+              <select class="measures-select" title="Number of measures per line">
                 ${MEASURES_PER_LINE_OPTIONS.map(m => `
                   <option value="${m}" ${m === this.measuresPerLine ? 'selected' : ''}>${m} measures</option>
                 `).join('')}
@@ -336,7 +387,9 @@ export class NotationToolbar {
    * Add toolbar styles
    */
   addStyles() {
-    if (document.getElementById('notation-toolbar-styles')) return;
+    // Remove existing styles to ensure updates are applied
+    const existing = document.getElementById('notation-toolbar-styles');
+    if (existing) existing.remove();
 
     const styles = document.createElement('style');
     styles.id = 'notation-toolbar-styles';
@@ -634,6 +687,52 @@ export class NotationToolbar {
         color: var(--text-muted, #888);
       }
 
+      /* Ensure tooltips aren't clipped */
+      .notation-toolbar,
+      .toolbar-group,
+      .toolbar-group-content,
+      .toolbar-section,
+      .button-group {
+        overflow: visible !important;
+      }
+
+      /* Custom tooltips using data-tooltip attribute */
+      [data-tooltip] {
+        position: relative;
+      }
+
+      [data-tooltip]:hover::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        bottom: calc(100% + 6px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: #1f2937;
+        color: white;
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+        z-index: 99999;
+        pointer-events: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        opacity: 1;
+      }
+
+      /* Arrow for tooltip */
+      [data-tooltip]:hover::before {
+        content: '';
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-top-color: #1f2937;
+        z-index: 99999;
+        pointer-events: none;
+      }
+
       @media (max-width: 768px) {
         .notation-toolbar {
           padding: 8px;
@@ -647,6 +746,12 @@ export class NotationToolbar {
         }
 
         .section-label {
+          display: none;
+        }
+
+        /* Hide tooltips on small screens to avoid clutter */
+        .toolbar-btn[data-tooltip]:hover::after,
+        .toolbar-btn[data-tooltip]:hover::before {
           display: none;
         }
       }

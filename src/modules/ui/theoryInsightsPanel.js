@@ -385,6 +385,11 @@ export class TheoryInsightsPanel {
         } else {
             this.show();
         }
+
+        // Update the quick analysis bar now that elements exist
+        if (window.updateUnifiedSuggestions) {
+            setTimeout(() => window.updateUnifiedSuggestions(), 100);
+        }
     }
 
     /**
@@ -741,6 +746,31 @@ export class TheoryInsightsPanel {
 
             <!-- Panel Content -->
             <div id="theory-insights-panel" class="mt-2 bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg border border-amber-200 border-l-4 border-l-amber-500 overflow-hidden ${expandedClass}">
+                <!-- Quick Analysis Bar (moved from Chord Progression Card) -->
+                <div id="quick-analysis-bar-melody" class="flex items-center justify-between p-2 bg-white rounded-t-lg border-b border-amber-200 shadow-sm">
+                    <div class="flex items-center gap-3 flex-wrap text-xs">
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-600">Analysis:</span>
+                            <span id="quick-roman-numerals-melody" class="font-bold text-purple-700">—</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-600">Mood:</span>
+                            <span id="quick-mood-melody" class="font-semibold">—</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-600">Tension:</span>
+                            <button onclick="window.showTensionMapModal && window.showTensionMapModal()"
+                                    class="px-1.5 py-0.5 bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs font-semibold rounded transition"
+                                    title="View tension map">
+                                <span id="quick-tension-melody">—</span>
+                            </button>
+                        </div>
+                    </div>
+                    <button onclick="window.showFullAnalysisModal && window.showFullAnalysisModal()"
+                            class="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded transition">
+                        Details
+                    </button>
+                </div>
                 <!-- Content will be rendered here -->
                 <div id="theory-insights-inner" class="p-3 space-y-3">
                     <div class="text-sm text-gray-500 text-center py-4">
@@ -1844,6 +1874,11 @@ export class TheoryInsightsPanel {
     update() {
         this.analyze();
         this.render();
+
+        // Also update the quick analysis bar
+        if (window.updateUnifiedSuggestions) {
+            window.updateUnifiedSuggestions();
+        }
     }
 
     /**

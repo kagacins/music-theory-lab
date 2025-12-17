@@ -72,14 +72,14 @@ export function initSectionDragDrop(tabId, containerId, sectionClass) {
         invertSwap: false,
         direction: 'vertical', // Explicitly set vertical direction
         onStart: function(evt) {
-            // Prevent button click when starting drag
+            // Prevent toggle click when starting drag
             if (evt.item) {
-                const button = evt.item.querySelector('button[id$="-toggle"]');
-                if (button) {
+                const toggle = evt.item.querySelector('[id$="-toggle"]');
+                if (toggle) {
                     // Store original onclick
-                    button._originalOnclick = button.onclick;
-                    button.onclick = null;
-                    button.style.pointerEvents = 'none';
+                    toggle._originalOnclick = toggle.onclick;
+                    toggle.onclick = null;
+                    toggle.style.pointerEvents = 'none';
                 }
             }
         },
@@ -88,14 +88,14 @@ export function initSectionDragDrop(tabId, containerId, sectionClass) {
             return true;
         },
         onEnd: function(evt) {
-            // Restore button functionality
+            // Restore toggle functionality
             if (evt.item) {
-                const button = evt.item.querySelector('button[id$="-toggle"]');
-                if (button) {
-                    button.style.pointerEvents = '';
-                    if (button._originalOnclick) {
-                        button.onclick = button._originalOnclick;
-                        delete button._originalOnclick;
+                const toggle = evt.item.querySelector('[id$="-toggle"]');
+                if (toggle) {
+                    toggle.style.pointerEvents = '';
+                    if (toggle._originalOnclick) {
+                        toggle.onclick = toggle._originalOnclick;
+                        delete toggle._originalOnclick;
                     }
                 }
             }
@@ -119,8 +119,8 @@ export function initSectionDragDrop(tabId, containerId, sectionClass) {
 function getSectionOrder(container, sectionClass) {
     const sections = Array.from(container.querySelectorAll(`.${sectionClass}`));
     return sections.map(section => {
-        // Find the toggle button ID to identify the section
-        const toggle = section.querySelector('button[id$="-toggle"]');
+        // Find the toggle element ID to identify the section (can be button or div)
+        const toggle = section.querySelector('[id$="-toggle"]');
         return toggle ? toggle.id.replace('-toggle', '') : null;
     }).filter(id => id !== null);
 }
@@ -134,9 +134,10 @@ function getSectionOrder(container, sectionClass) {
 function reorderSections(container, sectionClass, order) {
     const sections = Array.from(container.querySelectorAll(`.${sectionClass}`));
     const sectionMap = new Map();
-    
+
     sections.forEach(section => {
-        const toggle = section.querySelector('button[id$="-toggle"]');
+        // Find toggle element (can be button or div)
+        const toggle = section.querySelector('[id$="-toggle"]');
         if (toggle) {
             const sectionId = toggle.id.replace('-toggle', '');
             sectionMap.set(sectionId, section);

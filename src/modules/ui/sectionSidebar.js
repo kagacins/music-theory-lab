@@ -226,7 +226,8 @@ function createSidebar(tabId) {
  * @param {boolean} saveState - Whether to save state to localStorage (default: true)
  */
 function updateSectionState(section, sidebar, collapsedSections, container, saveState = true) {
-    const toggle = section.querySelector('button[id$="-toggle"]');
+    // Find toggle element (can be button or div)
+    const toggle = section.querySelector('[id$="-toggle"]');
     if (!toggle) return;
 
     const sectionId = toggle.id.replace('-toggle', '');
@@ -448,7 +449,7 @@ function animateFromSidebar(section, sidebar, sectionId, collapsedSections, cont
 
     // Get positions
     const tabRect = tab.getBoundingClientRect();
-    const toggle = section.querySelector('button[id$="-toggle"]');
+    const toggle = section.querySelector('[id$="-toggle"]');
     if (!toggle) {
         section.style.display = '';
         removeFromSidebar(section, sidebar, sectionId, collapsedSections);
@@ -541,7 +542,7 @@ function addToSidebar(section, sidebar, sectionId, collapsedSections, container)
     // Check if already in sidebar
     if (sidebar.querySelector(`[data-section-id="${sectionId}"]`)) return;
 
-    const toggle = section.querySelector('button[id$="-toggle"]');
+    const toggle = section.querySelector('[id$="-toggle"]');
     if (!toggle) return;
 
     // Extract gradient colors from toggle button
@@ -838,7 +839,7 @@ function syncSidebarOrder(sidebar, container) {
     // Get all sections in their current order (including hidden ones)
     const sections = Array.from(container.children);
     const sectionOrder = sections.map(section => {
-        const toggle = section.querySelector('button[id$="-toggle"]');
+        const toggle = section.querySelector('[id$="-toggle"]');
         return toggle ? toggle.id.replace('-toggle', '') : null;
     }).filter(id => id !== null);
 
@@ -870,7 +871,7 @@ function reorderSectionsFromSidebar(sidebar, container, sectionClass) {
     const sectionMap = new Map();
     
     sections.forEach(section => {
-        const toggle = section.querySelector('button[id$="-toggle"]');
+        const toggle = section.querySelector('[id$="-toggle"]');
         if (toggle) {
             const sectionId = toggle.id.replace('-toggle', '');
             sectionMap.set(sectionId, section);
@@ -879,7 +880,7 @@ function reorderSectionsFromSidebar(sidebar, container, sectionClass) {
     
     // Get all section IDs in current container order
     const currentOrder = Array.from(container.children).map(section => {
-        const toggle = section.querySelector('button[id$="-toggle"]');
+        const toggle = section.querySelector('[id$="-toggle"]');
         return toggle ? toggle.id.replace('-toggle', '') : null;
     }).filter(id => id !== null);
     
@@ -915,7 +916,7 @@ function reorderSectionsFromSidebar(sidebar, container, sectionClass) {
     if (tabId && typeof localStorage !== 'undefined') {
         try {
             const finalOrder = Array.from(container.children).map(section => {
-                const toggle = section.querySelector('button[id$="-toggle"]');
+                const toggle = section.querySelector('[id$="-toggle"]');
                 return toggle ? toggle.id.replace('-toggle', '') : null;
             }).filter(id => id !== null);
             localStorage.setItem(`sectionOrder_${tabId}`, JSON.stringify(finalOrder));

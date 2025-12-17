@@ -45,6 +45,13 @@
     transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
+/* Allow tooltips to overflow in notation areas */
+.dashboard-card:has(.notation-toolbar),
+#staff-notation-card-panel,
+.staff-notation-container {
+    overflow: visible;
+}
+
 .dashboard-card:hover {
     box-shadow: var(--card-shadow-hover);
 }

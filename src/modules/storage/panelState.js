@@ -143,6 +143,9 @@ function getTabPanelConfigs(tabId) {
             { panelId: 'theory-tools-panel', toggleId: 'theory-tools-toggle', chevronId: 'theory-tools-chevron' }
         ],
         melody: [
+            { panelId: 'melody-progression-setup-panel', toggleId: 'melody-progression-setup-toggle', chevronId: 'melody-progression-setup-chevron' },
+            { panelId: 'chord-progression-card-panel', toggleId: 'chord-progression-card-toggle', chevronId: 'chord-progression-card-chevron' },
+            { panelId: 'staff-notation-card-panel', toggleId: 'staff-notation-card-toggle', chevronId: 'staff-notation-card-chevron' },
             { panelId: 'melody-progression-panel', toggleId: 'melody-progression-toggle', chevronId: 'melody-progression-chevron' },
             { panelId: 'melody-controls-panel', toggleId: 'melody-controls-toggle', chevronId: 'melody-controls-chevron' },
             { panelId: 'current-melody-panel', toggleId: 'current-melody-toggle', chevronId: 'current-melody-chevron' }

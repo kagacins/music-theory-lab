@@ -2186,63 +2186,47 @@
 
                 <!-- Chord Progression Card -->
                 <div class="mb-3 melody-section-item">
-                    <button id="chord-progression-card-toggle" onclick="if (!event.target.closest('.drag-handle') && !event.target.closest('.toggle-switch')) { window.toggleMelodySection && window.toggleMelodySection('chord-progression-card'); }" class="w-full px-4 py-2 bg-gradient-to-r from-purple-400 to-pink-400 hover:from-purple-500 hover:to-pink-500 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between">
-                        <span class="flex items-center gap-3">
+                    <div id="chord-progression-card-toggle" class="w-full px-4 py-2 bg-gradient-to-r from-purple-400 to-pink-400 hover:from-purple-500 hover:to-pink-500 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between cursor-pointer">
+                        <span class="flex items-center gap-2 flex-wrap">
                             <svg class="w-4 h-4 text-white/70 cursor-move drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Drag to reorder" style="pointer-events: auto;">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
                             </svg>
-                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v1a2 2 0 01-2 2h-5v1h3a2 2 0 012 2v1a2 2 0 01-2 2h-3v1h5a2 2 0 012 2v1a2 2 0 01-2 2H4a2 2 0 01-2-2v-1a2 2 0 012-2h5v-1H6a2 2 0 01-2-2v-1a2 2 0 012-2h3V8H4a2 2 0 01-2-2V5z" clip-rule="evenodd"></path></svg>
-                            Chord Progression
-                            <span class="ml-2 px-2 py-0.5 bg-white/20 rounded text-xs">
-                                Key: <span id="melody-current-key-display">C Major</span>
+                            <span class="flex items-center gap-2 cursor-pointer" onclick="if (!event.target.closest('.drag-handle')) { window.toggleMelodySection && window.toggleMelodySection('chord-progression-card'); }">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v1a2 2 0 01-2 2h-5v1h3a2 2 0 012 2v1a2 2 0 01-2 2h-3v1h5a2 2 0 012 2v1a2 2 0 01-2 2H4a2 2 0 01-2-2v-1a2 2 0 012-2h5v-1H6a2 2 0 01-2-2v-1a2 2 0 012-2h3V8H4a2 2 0 01-2-2V5z" clip-rule="evenodd"></path></svg>
+                                Chord Progression
                             </span>
-                            <!-- View Toggle (abc/note) -->
-                            <div class="flex items-center gap-1.5 ml-2" onclick="event.stopPropagation()" title="Toggle view: Cards ↔ Notation">
-                                <span class="text-[10px] font-bold text-white/70">abc</span>
-                                <label class="relative inline-flex items-center cursor-pointer toggle-switch">
-                                    <input type="checkbox" id="melody-view-toggle-card" class="sr-only" onchange="window.toggleAllStaffNotation && window.toggleAllStaffNotation(this.checked)">
-                                    <div class="toggle-bg w-9 h-5 bg-white/30 rounded-full border border-white/50"></div>
-                                </label>
-                                <svg class="w-3.5 h-3.5 text-white/70" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>
+                            <button onclick="event.stopPropagation(); window.toggleCircleOfFifthsPanel && window.toggleCircleOfFifthsPanel()" class="px-2 py-0.5 bg-white/20 hover:bg-white/30 rounded text-xs cursor-pointer transition" title="Change Key">
+                                Key: <span id="melody-current-key-display">C Major</span>
+                            </button>
+                            <!-- Header Action Buttons -->
+                            <div class="flex items-center gap-1">
+                                <button onclick="event.stopPropagation(); window.toggleQuickAddChordForm && window.toggleQuickAddChordForm('quick-add-chord-form-melody')" class="header-action-btn px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded transition flex items-center gap-1" title="Add Chord">
+                                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
+                                    <span class="hidden sm:inline">Add Chord</span>
+                                </button>
+                                <button onclick="event.stopPropagation(); window.showAddSectionMenu && window.showAddSectionMenu(event, 'melody-progression-visualization')" class="header-action-btn px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded transition flex items-center gap-1" title="Add Section">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                    <span class="hidden sm:inline">+Add Section</span>
+                                </button>
+                                <button onclick="event.stopPropagation(); window.showSongBuilderModal && window.showSongBuilderModal()" class="header-action-btn px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded transition flex items-center gap-1" title="Song Builder">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                    <span class="hidden sm:inline">Song Builder</span>
+                                </button>
+                                <button onclick="event.stopPropagation(); window.clearProgression && window.clearProgression()" class="header-action-btn px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded transition flex items-center gap-1" title="Clear Progression">
+                                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                                    <span class="hidden sm:inline">Clear</span>
+                                </button>
+                                <button onclick="event.stopPropagation(); window.toggleChordFunctionLegend && window.toggleChordFunctionLegend()" class="header-action-btn px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded transition flex items-center gap-1" title="View Color Legend">
+                                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/></svg>
+                                    <span class="hidden sm:inline">Colors</span>
+                                </button>
                             </div>
                             <!-- Section View Toggle (placeholder - populated by JS when sections exist) -->
-                            <div id="header-section-view-toggle" class="hidden ml-2" onclick="event.stopPropagation()"></div>
+                            <div id="header-section-view-toggle" class="hidden" onclick="event.stopPropagation()"></div>
                         </span>
-                        <svg id="chord-progression-card-chevron" class="w-5 h-5 transform rotate-180 transition-transform" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
-                    </button>
+                        <svg id="chord-progression-card-chevron" class="w-5 h-5 transform rotate-180 transition-transform cursor-pointer" onclick="window.toggleMelodySection && window.toggleMelodySection('chord-progression-card')" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                    </div>
                     <div id="chord-progression-card-panel" class="bg-gradient-to-br from-purple-400/5 to-pink-400/5 rounded-b-lg p-3">
-                        <!-- Quick Analysis Bar - z-index set low so chord tooltips can appear above it -->
-                        <div id="quick-analysis-bar-melody" class="mb-3 flex items-center justify-between p-2 bg-white rounded-lg border border-purple-200 shadow-sm relative z-10">
-                            <div class="flex items-center gap-3 flex-wrap text-xs">
-                                <div class="flex items-center gap-1">
-                                    <span class="text-gray-600">Analysis:</span>
-                                    <span id="quick-roman-numerals-melody" class="font-bold text-purple-700">—</span>
-                                </div>
-                                <div class="flex items-center gap-1">
-                                    <span class="text-gray-600">Mood:</span>
-                                    <span id="quick-mood-melody" class="font-semibold">—</span>
-                                </div>
-                                <div class="flex items-center gap-1">
-                                    <span class="text-gray-600">Tension:</span>
-                                    <button onclick="window.showTensionMapModal && window.showTensionMapModal()"
-                                            class="px-1.5 py-0.5 bg-purple-100 hover:bg-purple-200 text-purple-700 text-xs font-semibold rounded transition"
-                                            title="View tension map">
-                                        <span id="quick-tension-melody">—</span>
-                                    </button>
-                                </div>
-                            </div>
-                            <!-- Interactive Learning Tools -->
-                            <div class="flex items-center gap-1.5">
-                                <button onclick="window.toggleChordFunctionLegend && window.toggleChordFunctionLegend()"
-                                        class="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded transition flex items-center gap-1" title="Toggle chord function color legend">
-                                    <span>Colors</span>
-                                </button>
-                                <button onclick="window.showFullAnalysisModal && window.showFullAnalysisModal()"
-                                        class="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded transition">
-                                    Details
-                                </button>
-                            </div>
-                        </div>
                         <!-- Quick Add Chord Form -->
                         <div id="quick-add-chord-form-melody" class="hidden mb-3 p-4 bg-white rounded-lg border-2 border-indigo-300 shadow-lg relative z-20">
                             <div class="flex items-center justify-between mb-3">
