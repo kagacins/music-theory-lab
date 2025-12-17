@@ -14658,6 +14658,42 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
         }
     });
 
+    // For basic "Load" (not voice leading), normalize voicings so progression "shape" is consistent across keys
+    // This ensures I-IV-V-vi sounds the same whether in C or Ab
+    // The issue: In C, all scale degrees are above C3 (MIDI 48). But in Ab, some are below Ab3 (MIDI 56).
+    // Solution: If a chord root is below the key's tonic, shift it up an octave.
+    if (!applyVoiceLeading && progressionData.length > 0) {
+        const newChordsStartIndex = baseAction === 'append' && trainerState.progressionData ?
+            trainerState.progressionData.length : 0;
+
+        // Get the MIDI value of the key's root at octave 3
+        const keyRootMidi = noteToMidi(`${currentKey}3`);
+
+        // Normalize each newly added chord
+        for (let i = newChordsStartIndex; i < progressionData.length; i++) {
+            const chord = progressionData[i];
+            if (!chord.notes || chord.notes.length === 0) continue;
+
+            // Get the current root MIDI (first note is the root in root position)
+            const rootNote = chord.notes[0];
+            const currentRootMidi = noteToMidi(rootNote);
+            if (isNaN(currentRootMidi) || isNaN(keyRootMidi)) continue;
+
+            // If the chord root is below the key's tonic, shift all notes up an octave
+            // This keeps the progression "shape" consistent across all keys
+            if (currentRootMidi < keyRootMidi) {
+                chord.notes = chord.notes.map(note => {
+                    const midi = noteToMidi(note);
+                    if (isNaN(midi)) return note;
+                    const newMidi = midi + 12;
+                    // Convert back to note name preserving enharmonic spelling
+                    const newNote = Tone.Midi(newMidi).toNote();
+                    return newNote;
+                });
+            }
+        }
+    }
+
     // Apply voice leading optimization if requested
     if (applyVoiceLeading && progressionData.length > 0) {
         // Get the index where new chords start (for append mode)
@@ -14690,6 +14726,14 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
     // Render progression display
     renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
+
+    // Sync to melody composer and refresh notation
+    if (window.syncProgressionToMelodyComposer) {
+        window.syncProgressionToMelodyComposer();
+    }
+    if (window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
+    }
 
     // Update UI controls
     updateProgressionControlsUI();

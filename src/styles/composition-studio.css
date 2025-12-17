@@ -52,6 +52,47 @@
     overflow: visible;
 }
 
+/* Make notation canvas responsive with horizontal scroll when needed */
+.notation-canvas-wrapper {
+    overflow-x: auto;
+    overflow-y: visible;
+    max-width: 100%;
+    padding-bottom: 8px; /* Space for scrollbar */
+    /* Ensure content starts from left edge, not centered */
+    text-align: left;
+}
+
+/* Ensure notation pages container doesn't center content */
+#notation-pages-container {
+    text-align: left;
+    display: block;
+}
+
+/* Ensure canvases aren't centered */
+.notation-page {
+    margin-left: 0 !important;
+    margin-right: auto !important;
+}
+
+/* Style the scrollbar for notation area */
+.notation-canvas-wrapper::-webkit-scrollbar {
+    height: 8px;
+}
+
+.notation-canvas-wrapper::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.notation-canvas-wrapper::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 4px;
+}
+
+.notation-canvas-wrapper::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+}
+
 .dashboard-card:hover {
     box-shadow: var(--card-shadow-hover);
 }

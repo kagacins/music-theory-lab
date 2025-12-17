@@ -3212,9 +3212,15 @@ export function playMeasure(measureIndex) {
     const piano = getPiano();
     const synth = getInstrument();
 
-    // Helper function to update canvas rendering
+    // Helper function to update canvas rendering (throttled to prevent stuttering)
+    let canvasUpdatePending = false;
     const updateCanvas = () => {
+        // Throttle: only allow one update per animation frame
+        if (canvasUpdatePending) return;
+        canvasUpdatePending = true;
+
         requestAnimationFrame(() => {
+            canvasUpdatePending = false;
             const canvas = document.getElementById('interactive-melody-notation-canvas');
             if (canvas && window.refreshNotationFromProgression) {
                 window.refreshNotationFromProgression();
@@ -3729,6 +3735,9 @@ export function stopPlayAllMelody() {
     isPlayAllActive = false;
     activeMeasureIndex = -1;
     selectedMeasureIndex = 0;
+
+    // Release global scroll lock
+    window._playbackScrollLock = false;
     
     // Update button text - ensure both buttons are updated
     updatePlayAllButton();
@@ -3880,17 +3889,23 @@ export function playAllMelody() {
     // Calculate timing based on time signature and tempo
     const beatDuration = 60.0 / tempo; // seconds per beat
     const measureDuration = beatDuration * beatsPerMeasure; // seconds per measure
-    
-    // Helper function to update canvas rendering
+
+    // Helper function to update canvas rendering (throttled to prevent stuttering)
+    let canvasUpdatePending = false;
     const updateCanvas = () => {
+        // Throttle: only allow one update per animation frame
+        if (canvasUpdatePending) return;
+        canvasUpdatePending = true;
+
         requestAnimationFrame(() => {
+            canvasUpdatePending = false;
             const canvas = document.getElementById('interactive-melody-notation-canvas');
             if (canvas && window.refreshNotationFromProgression) {
                 window.refreshNotationFromProgression();
             }
         });
     };
-    
+
     // Schedule melody notes
     const melodyPart = new Tone.Part((time, noteData) => {
         // Get effective dynamic for this note (either stored or inherited)
@@ -4368,7 +4383,34 @@ export function playAllMelody() {
     
     // Set playback state
     isPlayAllActive = true;
-    
+
+    // Enable global scroll lock during playback to prevent scroll hijacking
+    window._playbackScrollLock = true;
+
+    // Save original scroll methods and override them to prevent scroll during playback
+    if (!window._originalScrollTo) {
+        window._originalScrollTo = window.scrollTo.bind(window);
+        window._originalScrollBy = window.scrollBy.bind(window);
+        window._originalScrollIntoView = Element.prototype.scrollIntoView;
+
+        // Override scroll methods to be no-ops during playback
+        window.scrollTo = function(...args) {
+            if (!window._playbackScrollLock) {
+                window._originalScrollTo(...args);
+            }
+        };
+        window.scrollBy = function(...args) {
+            if (!window._playbackScrollLock) {
+                window._originalScrollBy(...args);
+            }
+        };
+        Element.prototype.scrollIntoView = function(...args) {
+            if (!window._playbackScrollLock) {
+                window._originalScrollIntoView.apply(this, args);
+            }
+        };
+    }
+
     // Update buttons immediately and also after a short delay to ensure DOM is ready
     updatePlayAllButton();
     setTimeout(() => {

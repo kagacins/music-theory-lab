@@ -150,7 +150,7 @@ function generateBeamsWithTuplets(vexNotes, tupletGroups) {
  * Default dimensions for grand staff layout
  */
 export const GRAND_STAFF_DEFAULTS = {
-  measureWidth: 220,           // Width of each measure
+  measureWidth: 252,           // Width of each measure (balanced for 16 sixteenth notes and standard screens)
   staffSpacing: 80,            // Vertical space between staves
   systemMarginTop: 20,         // Top margin for first system
   systemMarginBottom: 160,     // Bottom margin (increased for chord brackets + deep bass ledger lines)

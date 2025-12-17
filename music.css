@@ -389,19 +389,6 @@ body[data-active-tab="learn"] #main-app > .max-w-7xl.mx-auto {
     background: rgba(139, 92, 246, 0.7);
 }
 
-/* Expand/Collapse Header Buttons - Improved Hover Behavior */
-#header-expand-collapse-group .group:hover .absolute {
-    pointer-events: auto !important;
-}
-
-#header-expand-collapse-group .group .absolute {
-    transition-delay: 0s;
-}
-
-#header-expand-collapse-group .group:hover .absolute {
-    transition-delay: 0.1s;
-}
-
 /* ============================================================================
    UNIFIED PANEL/MODAL STYLES
    Base classes for consistent panel styling across the application

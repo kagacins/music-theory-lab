@@ -37,6 +37,13 @@ export function initAudio() {
     if (piano || audioIsLoading) return;
 
     audioIsLoading = true;
+
+    // Increase lookahead for better buffering during dense passages
+    // This helps prevent stuttering when main thread is busy with rendering
+    if (Tone.context && Tone.context.lookAhead !== undefined) {
+        Tone.context.lookAhead = 0.2; // 200ms lookahead (default is ~0.1)
+    }
+
     Tone.context.resume();
     // Loading modal removed - landing page provides time for samples to load
 
@@ -357,6 +364,9 @@ function playSilentKeepAliveTick() {
 
     // Don't tick if page is hidden (save resources)
     if (document.hidden) return;
+
+    // Don't tick during active playback - it's already awake and this could cause stuttering
+    if (window._playbackScrollLock) return;
 
     try {
         // Create a very short, inaudible oscillator burst

@@ -2294,7 +2294,8 @@ export class NotationComposer {
     this.activeMeasureIndex = index;
 
     // PAGINATION: Auto-navigate to the page containing the active measure
-    if (this.config.enablePagination && this.pageLayoutManager && index >= 0) {
+    // Skip page navigation during playback to prevent scroll issues
+    if (this.config.enablePagination && this.pageLayoutManager && index >= 0 && !window._playbackScrollLock) {
       const pageForMeasure = this.pageLayoutManager.getPageForMeasure(index);
       if (pageForMeasure && pageForMeasure.pageIndex !== this.pageManager.getCurrentPage()) {
         // Navigate to the page containing this measure

@@ -642,35 +642,6 @@
                     </div>
                 </div>
 
-                <!-- Separator -->
-                <div class="hidden xl:block w-px h-8 bg-gray-200"></div>
-
-                <!-- Expand/Collapse All Hover Button (tab-specific) -->
-                <div id="header-expand-collapse-group" class="relative">
-                    <div class="group relative">
-                        <!-- Chevron Icon (always visible) -->
-                        <button class="p-1 text-gray-500 hover:text-gray-700 transition-colors rounded-lg hover:bg-gray-100" title="Expand/Collapse All Sections">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4"></path>
-                            </svg>
-                        </button>
-                        <!-- Expanded Buttons (visible on hover) -->
-                        <div class="absolute right-0 top-full pt-1.5 flex gap-1 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-200 transform translate-y-1 group-hover:translate-y-0 z-50">
-                            <button onmouseenter="this.closest('.group').classList.add('hover')" onmouseleave="this.closest('.group').classList.remove('hover')" onclick="window.expandAllCurrentTab && window.expandAllCurrentTab()" class="px-2.5 py-1 text-[11px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-lg whitespace-nowrap transition-colors" title="Expand All Sections">
-                                <div class="flex items-center gap-1">
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                                    <span>Expand All</span>
-                                </div>
-                            </button>
-                            <button onmouseenter="this.closest('.group').classList.add('hover')" onmouseleave="this.closest('.group').classList.remove('hover')" onclick="window.collapseAllCurrentTab && window.collapseAllCurrentTab()" class="px-2.5 py-1 text-[11px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-lg whitespace-nowrap transition-colors" title="Collapse All Sections">
-                                <div class="flex items-center gap-1">
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>
-                                    <span>Collapse All</span>
-                                </div>
-                            </button>
-                        </div>
-                    </div>
-                </div>
                 <!-- Header Tab buttons - Icon + Text Pills -->
                 <div class="hidden md:flex items-center gap-1">
                     <button id="header-tab-btn-builder" onclick="window.switchTab && window.switchTab('builder')" class="header-tab-pill" data-tab="builder" title="Chord Lab">
@@ -2186,12 +2157,12 @@
 
                 <!-- Chord Progression Card -->
                 <div class="mb-3 melody-section-item">
-                    <div id="chord-progression-card-toggle" class="w-full px-4 py-2 bg-gradient-to-r from-purple-400 to-pink-400 hover:from-purple-500 hover:to-pink-500 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between cursor-pointer">
+                    <div id="chord-progression-card-toggle" onclick="if (!event.target.closest('.drag-handle') && !event.target.closest('.header-action-btn') && !event.target.closest('button')) { window.toggleMelodySection && window.toggleMelodySection('chord-progression-card'); }" class="w-full px-4 py-2 bg-gradient-to-r from-purple-400 to-pink-400 hover:from-purple-500 hover:to-pink-500 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between cursor-pointer">
                         <span class="flex items-center gap-2 flex-wrap">
                             <svg class="w-4 h-4 text-white/70 cursor-move drag-handle" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Drag to reorder" style="pointer-events: auto;">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
                             </svg>
-                            <span class="flex items-center gap-2 cursor-pointer" onclick="if (!event.target.closest('.drag-handle')) { window.toggleMelodySection && window.toggleMelodySection('chord-progression-card'); }">
+                            <span class="flex items-center gap-2">
                                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v1a2 2 0 01-2 2h-5v1h3a2 2 0 012 2v1a2 2 0 01-2 2h-3v1h5a2 2 0 012 2v1a2 2 0 01-2 2H4a2 2 0 01-2-2v-1a2 2 0 012-2h5v-1H6a2 2 0 01-2-2v-1a2 2 0 012-2h3V8H4a2 2 0 01-2-2V5z" clip-rule="evenodd"></path></svg>
                                 Chord Progression
                             </span>
@@ -2224,7 +2195,7 @@
                             <!-- Section View Toggle (placeholder - populated by JS when sections exist) -->
                             <div id="header-section-view-toggle" class="hidden" onclick="event.stopPropagation()"></div>
                         </span>
-                        <svg id="chord-progression-card-chevron" class="w-5 h-5 transform rotate-180 transition-transform cursor-pointer" onclick="window.toggleMelodySection && window.toggleMelodySection('chord-progression-card')" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                        <svg id="chord-progression-card-chevron" class="w-5 h-5 transform rotate-180 transition-transform" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                     </div>
                     <div id="chord-progression-card-panel" class="bg-gradient-to-br from-purple-400/5 to-pink-400/5 rounded-b-lg p-3">
                         <!-- Quick Add Chord Form -->

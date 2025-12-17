@@ -131,19 +131,6 @@
     transform: rotate(180deg);
 }
 
-/* Header expand/collapse button group */
-#header-expand-collapse-group .group:hover .absolute {
-    display: block;
-}
-
-#header-expand-collapse-group .group .absolute {
-    display: none;
-}
-
-#header-expand-collapse-group .group:hover .absolute {
-    display: block;
-}
-
 /* ============================================================================
    LEGACY SIDEBAR BUTTON SUPPORT
    ============================================================================ */
