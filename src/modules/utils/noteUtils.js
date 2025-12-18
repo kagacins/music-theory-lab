@@ -301,22 +301,48 @@ export function getChordNotes(rootNoteName, chordType, key, octave = 3, enharmon
                 } else if (noteInFlatArray && noteInFlatArray.charAt(0) === expectedLetter) {
                     noteName = noteInFlatArray;
                 } else {
-                    // Fallback: use enharmonic preference
-                    noteName = (enharmonicPreference === 'sharp' ? noteInSharpArray : noteInFlatArray) || rawNoteName;
+                    // Neither array has a note with the expected letter at this pitch class
+                    // This happens for unusual enharmonics like E#, B#, Cb, Fb
+                    // Calculate what accidental is needed
+                    const naturalPitchClasses = { 'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11 };
+                    const expectedNaturalPitch = naturalPitchClasses[expectedLetter];
+
+                    if (expectedNaturalPitch !== undefined) {
+                        let diff = pitchClass - expectedNaturalPitch;
+                        // Normalize to -6 to +6 range
+                        if (diff > 6) diff -= 12;
+                        if (diff < -6) diff += 12;
+
+                        if (diff === 1) {
+                            noteName = expectedLetter + '#';  // E# for pitch class 5 when expecting E
+                        } else if (diff === -1) {
+                            noteName = expectedLetter + 'b';  // Cb for pitch class 11 when expecting C
+                        } else if (diff === 2) {
+                            noteName = expectedLetter + '##'; // Double sharp
+                        } else if (diff === -2) {
+                            noteName = expectedLetter + 'bb'; // Double flat
+                        } else {
+                            // Fallback: use enharmonic preference
+                            noteName = (enharmonicPreference === 'sharp' ? noteInSharpArray : noteInFlatArray) || rawNoteName;
+                        }
+                    } else {
+                        // Fallback: use enharmonic preference
+                        noteName = (enharmonicPreference === 'sharp' ? noteInSharpArray : noteInFlatArray) || rawNoteName;
+                    }
                 }
             }
         }
 
-        // Handle octave adjustments for edge cases (Cb, Fb, B#, E#)
+        // Handle octave adjustments for enharmonics that cross octave boundaries
+        // B#/C boundary: B#3 = C4, so when spelling C as B#, subtract 1 from octave
+        // Cb/B boundary: Cb4 = B3, so when spelling B as Cb, add 1 to octave
+        // Note: E#/F and Fb/E do NOT cross octave boundaries (E#3 = F3, Fb3 = E3)
         if (noteName === "Cb" && rawNoteName !== "Cb") {
-            noteOctave = noteOctave + 1;
-        } else if (noteName === "Fb" && rawNoteName !== "Fb") {
             noteOctave = noteOctave + 1;
         } else if (noteName === "B#" && rawNoteName !== "B#") {
             noteOctave = noteOctave - 1;
-        } else if (noteName === "E#" && rawNoteName !== "E#") {
-            noteOctave = noteOctave - 1;
         }
+        // E# and Fb don't need octave adjustment - they're in the same octave as F and E
 
         // Final return — this single string is what's used for both playback and highlighting
         return `${noteName}${noteOctave}`;

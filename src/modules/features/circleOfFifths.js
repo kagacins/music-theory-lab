@@ -431,6 +431,8 @@ function handleKeyClick(event) {
                     if (melodyKeyDisplay) melodyKeyDisplay.textContent = targetKey;
                     const melodyKeyDisplayText = document.getElementById('melody-key-display-text');
                     if (melodyKeyDisplayText) melodyKeyDisplayText.textContent = targetKey;
+                    const melodyWorkbenchKeyDisplay = document.getElementById('melody-workbench-key-display');
+                    if (melodyWorkbenchKeyDisplay) melodyWorkbenchKeyDisplay.textContent = targetKey;
                     // Close the modal after key is set
                     closeCircleOfFifthsPanel();
                 } else {
@@ -457,6 +459,8 @@ function handleKeyClick(event) {
                         if (melodyKeyDisplay2) melodyKeyDisplay2.textContent = targetKey;
                         const melodyKeyDisplayText2 = document.getElementById('melody-key-display-text');
                         if (melodyKeyDisplayText2) melodyKeyDisplayText2.textContent = targetKey;
+                        const melodyWorkbenchKeyDisplay2 = document.getElementById('melody-workbench-key-display');
+                        if (melodyWorkbenchKeyDisplay2) melodyWorkbenchKeyDisplay2.textContent = targetKey;
                     }
                 }
             } else {
@@ -492,6 +496,8 @@ function handleKeyClick(event) {
         if (melodyKeyDisplay3) melodyKeyDisplay3.textContent = targetKey;
         const melodyKeyDisplayText3 = document.getElementById('melody-key-display-text');
         if (melodyKeyDisplayText3) melodyKeyDisplayText3.textContent = targetKey;
+        const melodyWorkbenchKeyDisplay3 = document.getElementById('melody-workbench-key-display');
+        if (melodyWorkbenchKeyDisplay3) melodyWorkbenchKeyDisplay3.textContent = targetKey;
         // Close the modal after key is set
         closeCircleOfFifthsPanel();
     }

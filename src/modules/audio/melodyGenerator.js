@@ -1146,7 +1146,19 @@ export function setAccidental(accidental) {
 }
 
 /**
- * Set the tempo (BPM) for melody playback
+ * Get the current tempo (BPM) - SINGLE SOURCE OF TRUTH
+ * Always use this function to get BPM instead of reading from UI elements directly.
+ * The FAB BPM slider is the primary UI control; this function reads from interactiveMelody.tempo
+ * which is kept in sync by setMelodyTempo().
+ * @returns {number} Current BPM (40-200, defaults to 120)
+ */
+export function getCurrentTempo() {
+    return interactiveMelody.tempo || 120;
+}
+
+/**
+ * Set the tempo (BPM) for melody playback - SINGLE SOURCE OF TRUTH
+ * Always use this function to set BPM. The FAB slider calls this via window.setMelodyTempo.
  * @param {number} bpm - Beats per minute (40-200)
  */
 export function setMelodyTempo(bpm) {
@@ -1155,13 +1167,19 @@ export function setMelodyTempo(bpm) {
         return;
     }
     interactiveMelody.tempo = bpm;
-    
-    // Update slider value if it exists
+
+    // Sync FAB slider (the primary BPM control)
+    const fabSlider = document.getElementById('fab-bpm-slider');
+    const fabValue = document.getElementById('fab-bpm-value');
+    if (fabSlider) fabSlider.value = bpm;
+    if (fabValue) fabValue.textContent = bpm;
+
+    // Sync melody settings slider if it exists
     const slider = document.getElementById('melody-bpm-slider');
     if (slider) {
         slider.value = bpm;
     }
-    
+
     // Update display value if it exists
     const display = document.getElementById('melody-bpm-value');
     if (display) {
@@ -3881,11 +3899,11 @@ export function playAllMelody() {
     
     const piano = getPiano();
     const synth = getInstrument();
-    
+
     // Parse time signature (default to 4/4)
     const [beatsPerMeasure, beatValue] = interactiveMelody.timeSignature.split('/').map(Number);
     const tempo = interactiveMelody.tempo || 120;
-    
+
     // Calculate timing based on time signature and tempo
     const beatDuration = 60.0 / tempo; // seconds per beat
     const measureDuration = beatDuration * beatsPerMeasure; // seconds per measure

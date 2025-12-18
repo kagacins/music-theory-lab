@@ -289,7 +289,8 @@ import {
     getEditorState,
     setAccidental,
     setDynamic,
-    setMelodyTempo
+    setMelodyTempo,
+    getCurrentTempo
 } from './modules/audio/melodyGenerator.js';
 
 // Phase 1A: New composition integration modules
@@ -892,27 +893,31 @@ function initMobileFab() {
  * Syncs with the main settings controls in the action bar
  */
 function initFabSettingsPanel() {
-    // BPM Slider
+    // BPM Slider (FAB is the single source of truth for BPM)
     const fabBpmSlider = document.getElementById('fab-bpm-slider');
     const fabBpmValue = document.getElementById('fab-bpm-value');
-    const actionBpmSlider = document.getElementById('action-bpm-slider');
-    const actionBpmValue = document.getElementById('action-bpm-value');
 
     if (fabBpmSlider && fabBpmValue) {
-        // Sync initial value from action bar
-        if (actionBpmSlider) {
-            fabBpmSlider.value = actionBpmSlider.value;
-            fabBpmValue.textContent = actionBpmSlider.value;
-        }
+        // Initialize from interactiveMelody.tempo or default
+        const interactiveMelody = window.getInteractiveMelody?.() || {};
+        const initialTempo = interactiveMelody.tempo || window.g_Tempo || 120;
+        fabBpmSlider.value = initialTempo;
+        fabBpmValue.textContent = initialTempo;
 
         fabBpmSlider.addEventListener('input', (e) => {
-            const bpm = e.target.value;
+            const bpm = parseInt(e.target.value);
             fabBpmValue.textContent = bpm;
-            // Sync to action bar
-            if (actionBpmSlider) actionBpmSlider.value = bpm;
-            if (actionBpmValue) actionBpmValue.textContent = bpm;
-            // Apply BPM change
-            if (window.setPlaybackBPM) window.setPlaybackBPM(parseInt(bpm));
+            // Apply BPM change globally
+            window.g_Tempo = bpm;
+            if (window.setPlaybackBPM) window.setPlaybackBPM(bpm);
+            // Update interactiveMelody.tempo for Play All
+            if (window.setMelodyTempo) window.setMelodyTempo(bpm);
+            // Update compositionState settings
+            const compositionState = window.getCompositionState?.();
+            if (compositionState?.setSettings) {
+                const currentSettings = compositionState.getSettings?.() || {};
+                compositionState.setSettings({ ...currentSettings, tempo: bpm });
+            }
         });
     }
 
@@ -2873,6 +2878,7 @@ window.getEditorState = getEditorState;
 window.setAccidental = setAccidental;
 window.setDynamic = setDynamic;
 window.setMelodyTempo = setMelodyTempo;
+window.getCurrentTempo = getCurrentTempo; // Single source of truth for BPM
 
 // Notation Control Panel Tab Switching
 window.showNotationTab = function(tabName) {
@@ -3521,8 +3527,6 @@ window.onload = () => {
     const actionCopyLink = document.getElementById('action-copy-link');
     const actionSettingsBtn = document.getElementById('action-settings-btn');
     const actionSettingsPopover = document.getElementById('action-settings-popover');
-    const actionBpmSlider = document.getElementById('action-bpm-slider');
-    const actionBpmValue = document.getElementById('action-bpm-value');
     const actionLoopToggle = document.getElementById('action-loop-toggle');
     const actionHighlightToggle = document.getElementById('action-highlight-toggle');
     const actionHelpBtn = document.getElementById('action-help-btn');
@@ -3755,41 +3759,6 @@ window.onload = () => {
     }
 
     // Settings popover is now hover-based (no click handler needed)
-
-    // BPM slider
-    if (actionBpmSlider && actionBpmValue) {
-        // Initialize from current tempo (prefer interactiveMelody.tempo if available)
-        const interactiveMelody = window.getInteractiveMelody?.() || {};
-        const initialTempo = interactiveMelody.tempo || window.g_Tempo || 120;
-        actionBpmSlider.value = initialTempo;
-        actionBpmValue.textContent = initialTempo;
-
-        actionBpmSlider.addEventListener('input', (e) => {
-            const bpm = parseInt(e.target.value);
-            actionBpmValue.textContent = bpm;
-            window.g_Tempo = bpm;
-
-            // Update interactiveMelody.tempo for melody playback
-            if (window.setMelodyTempo) {
-                window.setMelodyTempo(bpm);
-            }
-
-            // Update compositionState settings for notation playback
-            const compositionState = window.getCompositionState?.();
-            if (compositionState?.setSettings) {
-                const currentSettings = compositionState.getSettings?.() || {};
-                compositionState.setSettings({ ...currentSettings, tempo: bpm });
-            }
-
-            // Sync with existing BPM inputs
-            const bpmInput = document.getElementById('bpm-input');
-            if (bpmInput) bpmInput.value = bpm;
-            const melodyBpm = document.getElementById('melody-bpm-value');
-            if (melodyBpm) melodyBpm.textContent = bpm;
-            const melodyBpmSlider = document.getElementById('melody-bpm');
-            if (melodyBpmSlider) melodyBpmSlider.value = bpm;
-        });
-    }
 
     // Loop toggle
     if (actionLoopToggle) {
@@ -4180,21 +4149,6 @@ window.onload = () => {
 
     // Initialize window.isClassicKeyboardOn
     window.isClassicKeyboardOn = getIsClassicKeyboardOn();
-
-    // Initialize indicator colors for Compact Controls
-    const compactOffIndicator = document.getElementById('compact-off-indicator');
-    const compactOnIndicator = document.getElementById('compact-on-indicator');
-    if (getIsCompactModeOn()) {
-        compactOnIndicator.classList.remove('text-gray-500');
-        compactOnIndicator.classList.add('text-indigo-300');
-        compactOffIndicator.classList.remove('text-indigo-300');
-        compactOffIndicator.classList.add('text-gray-500');
-    } else {
-        compactOffIndicator.classList.remove('text-gray-500');
-        compactOffIndicator.classList.add('text-indigo-300');
-        compactOnIndicator.classList.remove('text-indigo-300');
-        compactOnIndicator.classList.add('text-gray-500');
-    }
 
     // Apply compact mode class if enabled
     if (getIsCompactModeOn()) {
@@ -5568,6 +5522,7 @@ window.syncProgressionToMelodyTab = function() {
     const trainerState = getTrainerState();
     const melodyCurrentKeyDisplay = document.getElementById('melody-current-key-display');
     const melodyKeyDisplayText = document.getElementById('melody-key-display-text');
+    const melodyWorkbenchKeyDisplay = document.getElementById('melody-workbench-key-display');
 
     // Update key display in header badge
     if (melodyCurrentKeyDisplay && trainerState.currentKey) {
@@ -5577,6 +5532,11 @@ window.syncProgressionToMelodyTab = function() {
     // Update key display in Progression Setup panel
     if (melodyKeyDisplayText && trainerState.currentKey) {
         melodyKeyDisplayText.textContent = trainerState.currentKey;
+    }
+
+    // Update key display in Song Workbench
+    if (melodyWorkbenchKeyDisplay && trainerState.currentKey) {
+        melodyWorkbenchKeyDisplay.textContent = trainerState.currentKey;
     }
 
     // Use the same rendering function as the Progression Builder

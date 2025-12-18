@@ -17,6 +17,77 @@ import { noteToMidi, resolveEnharmonic, getInvertedChordNotes } from './noteUtil
 // These will need to be passed as parameters or accessed via a state management system
 
 /**
+ * Get the properly spelled note name for a scale degree in a given key.
+ * This ensures correct enharmonic spelling (e.g., E# instead of F in F# major).
+ *
+ * @param {string} key - Key signature (e.g., "F#", "Ab", "C")
+ * @param {number} scaleDegreeIndex - 0-based scale degree (0=I, 1=II, ..., 6=VII)
+ * @returns {string} Properly spelled note name (e.g., "E#", "Bb", "C")
+ */
+function getScaleDegreeNote(key, scaleDegreeIndex) {
+    const noteLetters = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+
+    // Get the key's letter (without accidentals)
+    const keyLetter = key.charAt(0).toUpperCase();
+    const keyLetterIndex = noteLetters.indexOf(keyLetter);
+
+    if (keyLetterIndex === -1) {
+        // Fallback to simple calculation if key letter not found
+        return null;
+    }
+
+    // The target letter for this scale degree
+    const targetLetterIndex = (keyLetterIndex + scaleDegreeIndex) % 7;
+    const targetLetter = noteLetters[targetLetterIndex];
+
+    // Calculate what pitch class the scale degree should be
+    // First, get the key's pitch class
+    let keyPitchClass = ALL_NOTES.indexOf(key);
+    if (keyPitchClass === -1) {
+        // Try enharmonic equivalent
+        keyPitchClass = ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
+    }
+    if (keyPitchClass === -1) {
+        return null;
+    }
+
+    // Get the semitone offset for this scale degree
+    const semitoneOffset = MAJOR_SCALE_STEPS[scaleDegreeIndex];
+    const targetPitchClass = (keyPitchClass + semitoneOffset) % 12;
+
+    // Now we need to find what accidental makes targetLetter equal targetPitchClass
+    // First, find the natural pitch class for targetLetter
+    const naturalPitchClasses = { 'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11 };
+    const naturalPitch = naturalPitchClasses[targetLetter];
+
+    // Calculate the difference (how many semitones we need to adjust)
+    let diff = targetPitchClass - naturalPitch;
+
+    // Normalize diff to be between -6 and +6 (to prefer simpler accidentals)
+    if (diff > 6) diff -= 12;
+    if (diff < -6) diff += 12;
+
+    // Determine accidental
+    let accidental = '';
+    if (diff === 0) {
+        accidental = '';  // Natural
+    } else if (diff === 1) {
+        accidental = '#';  // Sharp
+    } else if (diff === -1) {
+        accidental = 'b';  // Flat
+    } else if (diff === 2) {
+        accidental = '##';  // Double sharp
+    } else if (diff === -2) {
+        accidental = 'bb';  // Double flat
+    } else {
+        // Unusual interval - fall back to simple array lookup
+        return null;
+    }
+
+    return targetLetter + accidental;
+}
+
+/**
  * Calculate the notes in a major scale for a given key
  * @param {string} key - Key signature (e.g., "C", "G", "Ab")
  * @param {number} octave - Base octave (default 4)
@@ -26,15 +97,50 @@ import { noteToMidi, resolveEnharmonic, getInvertedChordNotes } from './noteUtil
  */
 export function calculateScaleNotes(key, octave = 4, octaveShift = 0, enharmonicPreference = 'sharp') {
     const baseOctave = octave + octaveShift;
-    let scaleRootIndex = ALL_NOTES.indexOf(key);
-    if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
 
-    const scaleRootMidi = noteToMidi(ALL_NOTES[scaleRootIndex] + baseOctave);
-    const scaleMidiNotes = MAJOR_SCALE_STEPS.map(step => scaleRootMidi + step);
-    const rawNoteNames = scaleMidiNotes.map(midi => Tone.Midi(midi).toNote());
-    const resolvedNoteNames = rawNoteNames.map(note => resolveEnharmonic(note, key, enharmonicPreference));
+    // Use proper scale degree spelling for each note
+    const scaleNotes = [];
+    for (let i = 0; i < 7; i++) {
+        const properlySpelledNote = getScaleDegreeNote(key, i);
 
-    return resolvedNoteNames;
+        if (properlySpelledNote) {
+            // Calculate the correct octave for this scale degree
+            let noteOctave = baseOctave;
+
+            // Handle octave wrap for notes like B# (same pitch as C but different letter)
+            // and Cb (same pitch as B but different letter)
+            const keyLetter = key.charAt(0).toUpperCase();
+            const noteLetters = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+            const keyLetterIndex = noteLetters.indexOf(keyLetter);
+            const noteLetterIndex = (keyLetterIndex + i) % 7;
+
+            // If we've wrapped past B to C/D/E..., increment octave
+            if (noteLetterIndex < keyLetterIndex && i > 0) {
+                noteOctave++;
+            }
+
+            // Special handling for B# (sounds like C, written as B#)
+            if (properlySpelledNote === 'B#') {
+                noteOctave--; // B# in octave 4 sounds like C5
+            }
+            // Special handling for Cb (sounds like B, written as Cb)
+            if (properlySpelledNote === 'Cb') {
+                noteOctave++; // Cb in octave 4 sounds like B3
+            }
+
+            scaleNotes.push(properlySpelledNote + noteOctave);
+        } else {
+            // Fallback to old method if proper spelling fails
+            let scaleRootIndex = ALL_NOTES.indexOf(key);
+            if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
+            const scaleRootMidi = noteToMidi(ALL_NOTES[scaleRootIndex] + baseOctave);
+            const noteMidi = scaleRootMidi + MAJOR_SCALE_STEPS[i];
+            const rawNote = Tone.Midi(noteMidi).toNote();
+            scaleNotes.push(resolveEnharmonic(rawNote, key, enharmonicPreference));
+        }
+    }
+
+    return scaleNotes;
 }
 
 /**
@@ -56,12 +162,20 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
     if (!mapEntry) {
         chordRootNote = romanNumeral; // The 'romanNumeral' is actually the root note.
     } else {
-        let scaleRootIndex = ALL_NOTES.indexOf(key);
-        if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
+        // Try to get properly spelled scale degree note (handles E#, B#, Cb, Fb, etc.)
+        const properlySpelledRoot = getScaleDegreeNote(key, mapEntry.index);
 
-        const scaleStep = MAJOR_SCALE_STEPS[mapEntry.index];
-        const chordRootIndex = (scaleRootIndex + scaleStep) % 12;
-        chordRootNote = (enharmonicPreference === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[chordRootIndex];
+        if (properlySpelledRoot) {
+            chordRootNote = properlySpelledRoot;
+        } else {
+            // Fallback to simple calculation if proper spelling fails
+            let scaleRootIndex = ALL_NOTES.indexOf(key);
+            if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
+
+            const scaleStep = MAJOR_SCALE_STEPS[mapEntry.index];
+            const chordRootIndex = (scaleRootIndex + scaleStep) % 12;
+            chordRootNote = (enharmonicPreference === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[chordRootIndex];
+        }
     }
 
     if (!chordRootNote) {
