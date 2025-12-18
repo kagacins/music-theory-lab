@@ -1882,12 +1882,12 @@ function renderChordNotation(chord, key, canvas) {
         renderer.resize(canvas.width, canvas.height);
         const ctx = renderer.getContext();
 
-        // Create stave with treble clef
+        // Create stave with bass clef (chords are in octave 3)
         const staveX = 5;
         const staveY = 10;
         const staveWidth = displayWidth - 10;
         const stave = new Stave(staveX, staveY, staveWidth);
-        stave.addClef('treble');
+        stave.addClef('bass');
 
         // Add key signature - VexFlow handles minor keys better via relative major
         const vexFlowKey = getVexFlowKeySignature(key);
@@ -1921,7 +1921,7 @@ function renderChordNotation(chord, key, canvas) {
 
         // Create a single chord (all notes stacked as whole notes)
         const keys = vexFlowNotes.map(n => n.vexNote);
-        const staveNote = new StaveNote({ clef: 'treble', keys: keys, duration: 'w' });
+        const staveNote = new StaveNote({ clef: 'bass', keys: keys, duration: 'w' });
 
         // Center the notes horizontally
         try {

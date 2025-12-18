@@ -1219,39 +1219,6 @@ function toggleClassicKeyboard() {
     }
 }
 
-function toggleCompactControls() {
-    const toggle = document.getElementById('compact-controls-toggle');
-    setIsCompactModeOn(toggle.checked);
-
-    const isCompact = getIsCompactModeOn();
-
-    // Update indicator colors
-    const offIndicator = document.getElementById('compact-off-indicator');
-    const onIndicator = document.getElementById('compact-on-indicator');
-
-    if (isCompact) {
-        onIndicator.classList.remove('text-gray-500');
-        onIndicator.classList.add('text-indigo-300');
-        offIndicator.classList.remove('text-indigo-300');
-        offIndicator.classList.add('text-gray-500');
-    } else {
-        offIndicator.classList.remove('text-gray-500');
-        offIndicator.classList.add('text-indigo-300');
-        onIndicator.classList.remove('text-indigo-300');
-        onIndicator.classList.add('text-gray-500');
-    }
-
-    // Add/remove compact-mode class from body for CSS selectors
-    if (isCompact) {
-        document.body.classList.add('compact-mode');
-    } else {
-        document.body.classList.remove('compact-mode');
-    }
-
-    // The CSS now handles everything via body.compact-mode selectors
-    // No need for manual classList manipulation
-}
-
 function toggleDarkMode() {
     const toggle = document.getElementById('dark-mode-toggle');
     setIsDarkModeOn(toggle.checked);
@@ -1876,7 +1843,6 @@ window.toggleSuggestionEngine = toggleSuggestionEngine;
 window.toggleRomanNumeralEngine = toggleRomanNumeralEngine;
 window.toggleKeyNames = toggleKeyNames;
 window.toggleClassicKeyboard = toggleClassicKeyboard;
-window.toggleCompactControls = toggleCompactControls;
 window.toggleDarkMode = toggleDarkMode;
 window.toggleFretboard = toggleFretboard;
 window.toggleChordToneHighlighting = toggleChordToneHighlighting;

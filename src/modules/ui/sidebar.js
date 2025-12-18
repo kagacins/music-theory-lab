@@ -94,41 +94,6 @@ export function toggleNotationStyle() {
 }
 
 /**
- * Toggle compact controls mode
- * Depends on: global isCompactModeOn, switchTab, currentTab
- */
-export function toggleCompactControls() {
-    const isCompactModeOn = document.getElementById('compact-controls-toggle').checked;
-    // Update global state
-    window.isCompactModeOn = isCompactModeOn;
-
-    // Update indicator colors
-    const offIndicator = document.getElementById('compact-off-indicator');
-    const onIndicator = document.getElementById('compact-on-indicator');
-
-    if (isCompactModeOn) {
-        onIndicator.classList.remove('text-gray-500');
-        onIndicator.classList.add('text-indigo-300');
-        offIndicator.classList.remove('text-indigo-300');
-        offIndicator.classList.add('text-gray-500');
-    } else {
-        offIndicator.classList.remove('text-gray-500');
-        offIndicator.classList.add('text-indigo-300');
-        onIndicator.classList.remove('text-indigo-300');
-        onIndicator.classList.add('text-gray-500');
-    }
-
-    document.body.classList.toggle('compact-mode', isCompactModeOn);
-
-    // Force a re-render of the current tab's floating controls to apply new sizing/visibility
-    const switchTab = window.switchTab;
-    const currentTab = window.currentTab;
-    switchTab(currentTab);
-
-    localStorage.setItem('isCompactModeOn', isCompactModeOn);
-}
-
-/**
  * Toggle floating controls visibility
  * Depends on: global isFloatingControlsVisible
  */
