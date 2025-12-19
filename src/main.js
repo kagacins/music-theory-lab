@@ -1077,34 +1077,38 @@ function initFabSettingsPanel() {
     }
 }
 
-// Global Settings Functions
-function toggleEnharmonic() {
-    const toggle = document.getElementById('enharmonic-toggle');
-    // User wants: when b/flat is selected (checked=true), use FLAT_NOTES
-    // When #/sharp is selected (checked=false), use SHARP_NOTES
-    // This is the reverse of the current broken behavior
+// Chord Lab Enharmonic Toggle - only affects root note display in Chord Lab
+function toggleChordLabEnharmonic() {
+    const toggle = document.getElementById('chordlab-enharmonic-toggle');
+    // When flat is selected (checked=true), use FLAT_NOTES
+    // When sharp is selected (checked=false), use SHARP_NOTES
     setEnharmonicPreference(toggle.checked ? 'flat' : 'sharp');
 
-    // Update indicator colors
-    const sharpIndicator = document.getElementById('sharp-indicator');
-    const flatIndicator = document.getElementById('flat-indicator');
+    // Update indicator label styles
+    const sharpIndicator = document.getElementById('chordlab-sharp-indicator');
+    const flatIndicator = document.getElementById('chordlab-flat-indicator');
 
     if (getEnharmonicPreference() === 'sharp') {
-        sharpIndicator.classList.remove('text-gray-500');
-        sharpIndicator.classList.add('text-indigo-300');
-        flatIndicator.classList.remove('text-indigo-300');
-        flatIndicator.classList.add('text-gray-500');
+        // Sharps active - white text in header
+        sharpIndicator.className = 'text-[9px] font-semibold text-white/90';
+        flatIndicator.className = 'text-[9px] font-semibold text-white/60';
     } else {
-        flatIndicator.classList.remove('text-gray-500');
-        flatIndicator.classList.add('text-indigo-300');
-        sharpIndicator.classList.remove('text-indigo-300');
-        sharpIndicator.classList.add('text-gray-500');
+        // Flats active - white text in header
+        sharpIndicator.className = 'text-[9px] font-semibold text-white/60';
+        flatIndicator.className = 'text-[9px] font-semibold text-white/90';
     }
 
-    // Update window.enharmonicPreference for modules that access it
+    // Update window.enharmonicPreference for Chord Lab modules that access it
     window.enharmonicPreference = getEnharmonicPreference();
 
-    refreshAllTabs();
+    // Re-render the root note selector buttons to show sharps or flats
+    if (window.renderBuilderSelectors) {
+        window.renderBuilderSelectors();
+    }
+    // Also update the display
+    if (window.updateBuilderDisplay) {
+        window.updateBuilderDisplay();
+    }
 }
 
 function toggleNotationStyle() {
@@ -1842,7 +1846,7 @@ window.toggleHeaderDisplays = toggleHeaderDisplays;
 window.showSettingsModal = showSettingsModal;
 window.showChordWeightsModal = showChordWeightsModal;
 window.showMelodyWeightsModal = showMelodyWeightsModal;
-window.toggleEnharmonic = toggleEnharmonic;
+window.toggleChordLabEnharmonic = toggleChordLabEnharmonic;
 window.toggleNotationStyle = toggleNotationStyle;
 window.toggleSuggestionEngine = toggleSuggestionEngine;
 window.toggleRomanNumeralEngine = toggleRomanNumeralEngine;
@@ -1930,6 +1934,7 @@ window.addSpecificChordToProgression = addSpecificChordToProgression;
 window.changeArpeggioSpeed = changeArpeggioSpeed;
 window.changeBuilderOctave = changeBuilderOctave;
 window.updateBuilderDisplay = updateBuilderDisplay;
+window.renderBuilderSelectors = renderBuilderSelectors;
 window.selectBuilderRootNote = selectBuilderRootNote;
 window.selectBuilderChordType = selectBuilderChordType;
 window.selectBuilderInterval = selectBuilderInterval;
@@ -1951,6 +1956,7 @@ window.toggleChordSetupPanel = toggleChordSetupPanel;
 window.toggleChordLibraryPanel = toggleChordLibraryPanel;
 window.toggleChordLibraryMode = toggleChordLibraryMode;
 window.toggleChordIntervalsPanel = toggleChordIntervalsPanel;
+window.loadProgression = loadProgression;
 
 // Chord and Interval tooltips toggles
 // These use CSS classes to show/hide the custom tooltip elements
@@ -3901,22 +3907,24 @@ window.onload = () => {
     // This allows the back button to return to previous tabs/lessons
     initTabHistory();
     
-    // Initialize toggle states to match initial preferences
-    // enharmonic: initial preference is 'sharp', so toggle should be unchecked (false = sharp)
-    document.getElementById('enharmonic-toggle').checked = false;
-    // Update enharmonic indicators to match initial state
-    const sharpIndicator = document.getElementById('sharp-indicator');
-    const flatIndicator = document.getElementById('flat-indicator');
-    if (getEnharmonicPreference() === 'sharp') {
-        sharpIndicator.classList.remove('text-gray-500');
-        sharpIndicator.classList.add('text-indigo-300');
-        flatIndicator.classList.remove('text-indigo-300');
-        flatIndicator.classList.add('text-gray-500');
-    } else {
-        flatIndicator.classList.remove('text-gray-500');
-        flatIndicator.classList.add('text-indigo-300');
-        sharpIndicator.classList.remove('text-indigo-300');
-        sharpIndicator.classList.add('text-gray-500');
+    // Initialize Chord Lab enharmonic toggle state (if it exists)
+    // Chord Lab has its own toggle; Composition Studio auto-determines from key
+    const chordLabEnharmonicToggle = document.getElementById('chordlab-enharmonic-toggle');
+    if (chordLabEnharmonicToggle) {
+        // enharmonic: initial preference is 'sharp', so toggle should be unchecked (false = sharp)
+        chordLabEnharmonicToggle.checked = getEnharmonicPreference() === 'flat';
+        // Update enharmonic indicators to match initial state
+        const sharpIndicator = document.getElementById('chordlab-sharp-indicator');
+        const flatIndicator = document.getElementById('chordlab-flat-indicator');
+        if (sharpIndicator && flatIndicator) {
+            if (getEnharmonicPreference() === 'sharp') {
+                sharpIndicator.className = 'text-[9px] font-semibold text-white/90';
+                flatIndicator.className = 'text-[9px] font-semibold text-white/60';
+            } else {
+                sharpIndicator.className = 'text-[9px] font-semibold text-white/60';
+                flatIndicator.className = 'text-[9px] font-semibold text-white/90';
+            }
+        }
     }
     // Initialize toggle states (with null checks for optional toggles)
     const notationToggle = document.getElementById('notation-toggle');
@@ -5451,7 +5459,8 @@ window.applyBassToSelection = function() {
             bassPattern,
             bassOctave,
             bassFollowsInversion,
-            timeSignature: timeSig
+            timeSignature: timeSig,
+            key: compositionState.metadata?.key || 'C'
         });
 
         // Update the building block's bass notes

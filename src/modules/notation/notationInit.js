@@ -1447,6 +1447,7 @@ export function updateMeasureBass(measureIndex, chord) {
     voiceLeadingStrict: false,
     bassPattern: 'whole-note',
     timeSignature: '4/4',
+    key: getCurrentKey() // Pass key for enharmonic preference
   });
 
   // Update the measure's bass notes directly in measureManager

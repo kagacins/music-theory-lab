@@ -4,7 +4,6 @@
  */
 
 import { SHARP_NOTES, FLAT_NOTES, MAJOR_SCALE_STEPS, CHORD_DEFINITIONS, INVERSION_NAMES } from '../../data/music-data.js';
-import { getEnharmonicPreference } from '../state/globalState.js';
 import {
     getCurrentKey,
     getProgressionData,
@@ -16,7 +15,15 @@ import {
 import { saveState } from '../utils/undoRedo.js';
 import { showModalHTML } from '../ui/modals.js';
 import { noteToRomanNumeral } from '../utils/romanNumerals.js';
-import { noteToMidi, getInvertedChordNotes } from '../utils/noteUtils.js';
+import { noteToMidi, getInvertedChordNotes, getEnharmonicPreferenceForKey } from '../utils/noteUtils.js';
+
+/**
+ * Get the enharmonic preference based on the current key.
+ * Used throughout theoryTools for proper note spelling.
+ */
+function getKeyBasedEnharmonic() {
+    return getEnharmonicPreferenceForKey(getCurrentKey());
+}
 
 // Track whether substitution suggestions are currently shown
 let substitutionsShown = false;
@@ -115,7 +122,7 @@ export function insertSecondaryDominant(targetRoman) {
  * @returns {Object} Chord object
  */
 function calculateSecondaryDominant(key, targetRoman) {
-    const enharmonic = getEnharmonicPreference();
+    const enharmonic = getKeyBasedEnharmonic();
     const notes = enharmonic === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
 
     // Remove 'm' suffix if it's a minor key
@@ -163,7 +170,7 @@ function calculateSecondaryDominant(key, targetRoman) {
  * @returns {Array} Array of note names with octaves
  */
 function buildChordNotes(rootNote, chordType) {
-    const enharmonic = getEnharmonicPreference();
+    const enharmonic = getKeyBasedEnharmonic();
     const notes = enharmonic === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
 
     const rootIndex = notes.indexOf(rootNote);
@@ -248,7 +255,7 @@ export function showModalInterchangeChords(mode) {
  * @returns {Array} Array of chord objects
  */
 function getModalInterchangeChords(key, mode) {
-    const enharmonic = getEnharmonicPreference();
+    const enharmonic = getKeyBasedEnharmonic();
     const notes = enharmonic === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
 
     const isMinorKey = key.endsWith('m');
@@ -536,7 +543,7 @@ export function showChordSubstitutions() {
  * @returns {Array} Array of substitution objects with voicing suggestions
  */
 function getChordSubstitutions(chord, key, chordIndex = null, progressionData = null) {
-    const enharmonic = getEnharmonicPreference();
+    const enharmonic = getKeyBasedEnharmonic();
     const notes = enharmonic === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
 
     const isMinorKey = key.endsWith('m');
@@ -678,7 +685,7 @@ function analyzeVoiceLeading(rootNote, chordType, previousChord, nextChord, key)
     const chordDef = CHORD_DEFINITIONS[chordType];
     if (!chordDef) return result;
 
-    const enharmonic = getEnharmonicPreference();
+    const enharmonic = getKeyBasedEnharmonic();
     
     // Calculate the number of inversions available for this chord type
     const numInversions = chordDef.intervals.length;
@@ -1178,7 +1185,7 @@ export function insertTwoFiveOne() {
     });
     saveState(captureState());
 
-    const enharmonic = getEnharmonicPreference();
+    const enharmonic = getKeyBasedEnharmonic();
     const notes = enharmonic === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
     const rootIndex = notes.indexOf(currentKey.replace(/m$/, ''));
 
@@ -1306,7 +1313,7 @@ export function insertDiminishedPassing() {
     const currentChord = progressionData[getSelectedIndex()];
     const nextChord = progressionData[getSelectedIndex() + 1];
 
-    const enharmonic = getEnharmonicPreference();
+    const enharmonic = getKeyBasedEnharmonic();
     const notes = enharmonic === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
 
     // Get MIDI values of roots
@@ -1398,7 +1405,7 @@ export function insertChromaticApproach(direction) {
     saveState(captureState());
 
     const targetChord = progressionData[getSelectedIndex()];
-    const enharmonic = getEnharmonicPreference();
+    const enharmonic = getKeyBasedEnharmonic();
     const notes = enharmonic === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
 
     const targetRoot = targetChord.root || targetChord.rootNote;
@@ -1547,7 +1554,7 @@ export function insertTritoneSubstitution() {
     });
     saveState(captureState());
 
-    const enharmonic = getEnharmonicPreference();
+    const enharmonic = getKeyBasedEnharmonic();
     const notes = enharmonic === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
 
     const rootNote = chord.root || chord.rootNote;
@@ -1725,7 +1732,7 @@ export function suggestReharmonization() {
 
     // 2. Tritone substitution
     if (chordType.includes('Dominant') || chordType.includes('7')) {
-        const enharmonic = getEnharmonicPreference();
+        const enharmonic = getKeyBasedEnharmonic();
         const notes = enharmonic === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
         const rootIndex = notes.indexOf(rootNote);
         if (rootIndex !== -1) {

@@ -9,6 +9,7 @@
 
 import { getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
 import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
+import { getEnharmonicPreferenceForKey } from '../utils/noteUtils.js';
 
 // Intervals for different chord types (in semitones from root)
 // Includes both canonical names (with spaces) and common aliases
@@ -77,8 +78,13 @@ function getChordIntervalsRobust(chordType) {
     return intervals;
 }
 
-// Note names for calculation
+// Note names for calculation - sharps version (default)
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+// Note names for flat keys
+const NOTE_NAMES_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+// Module-level key for enharmonic preference (set by generateBassVoicing)
+let currentBassKey = 'C';
 
 /**
  * Default octave for each bass pattern
@@ -179,7 +185,10 @@ function getBassNoteForChord(chord, bassFollowsInversion, octave = 2) {
     }
 
     const bassNoteSemitone = (rootSemitone + semitones) % 12;
-    const bassNoteName = NOTE_NAMES[bassNoteSemitone];
+    // Use key-based enharmonic preference
+    const enharmonicPref = getEnharmonicPreferenceForKey(currentBassKey);
+    const noteNames = enharmonicPref === 'flat' ? NOTE_NAMES_FLAT : NOTE_NAMES;
+    const bassNoteName = noteNames[bassNoteSemitone];
 
     return `${bassNoteName}${octave}`;
 }
@@ -241,8 +250,12 @@ export function generateBassVoicing(chord, previousChord = null, options = {}) {
         style = 'classical',
         beatsInMeasure = 4, // New: how many beats this chord occupies in this measure
         isChordContinuation = false, // New: is this a tied continuation from previous measure?
-        bassFollowsInversion = false // New: whether bass should follow chord inversion
+        bassFollowsInversion = false, // New: whether bass should follow chord inversion
+        key = 'C' // Key for enharmonic preference
     } = options;
+
+    // Set module-level key for enharmonic preference in note generation
+    currentBassKey = key;
 
     if (!chord || !chord.root) {
         return { notes: [] };
@@ -810,7 +823,9 @@ function findApproachNote(fromMidi, toMidi) {
  * @returns {string} Note name (e.g., 'C2', 'D#3')
  */
 function midiToNoteName(midi) {
-    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    // Use key-based enharmonic preference
+    const enharmonicPref = getEnharmonicPreferenceForKey(currentBassKey);
+    const noteNames = enharmonicPref === 'flat' ? NOTE_NAMES_FLAT : NOTE_NAMES;
     const octave = Math.floor(midi / 12) - 1;
     const noteIndex = midi % 12;
     return `${noteNames[noteIndex]}${octave}`;
@@ -965,7 +980,11 @@ export function generateBuildingBlockBass(chord, previousChord = null, totalBeat
         bassFollowsInversion = false,
         timeSignature = DEFAULT_TIME_SIGNATURE,
         bassOctave = null,  // null means use pattern-specific default
+        key = 'C' // Key for enharmonic preference
     } = options;
+
+    // Set module-level key for enharmonic preference in note generation
+    currentBassKey = key;
 
     if (!chord || !chord.root) {
         return [];

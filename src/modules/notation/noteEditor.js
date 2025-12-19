@@ -22,7 +22,8 @@ import {
 } from '../state/buildingBlock.js';
 import { getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
 import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
-import { getEnharmonicPreference } from '../state/globalState.js';
+import { getEnharmonicPreferenceForKey } from '../utils/noteUtils.js';
+import { getCurrentKey } from '../state/trainerState.js';
 
 // ============================================================================
 // CONSTANTS
@@ -2193,8 +2194,8 @@ export class NoteEditor {
       // Clamp octave to reasonable range
       octave = Math.max(0, Math.min(8, octave));
 
-      // Use enharmonic preference to determine sharp or flat spelling
-      const enharmonicPref = getEnharmonicPreference();
+      // Use key-based enharmonic preference to determine sharp or flat spelling
+      const enharmonicPref = getEnharmonicPreferenceForKey(getCurrentKey());
       const newNoteName = (enharmonicPref === 'flat' ? flatNames : noteNames)[newIndex];
       return `${newNoteName}${octave}`;
     };

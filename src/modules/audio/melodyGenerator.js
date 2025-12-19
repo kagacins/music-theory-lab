@@ -5,11 +5,19 @@
 
 import { getProgressionData, getCurrentKey } from '../state/trainerState.js';
 import { getInstrument, getAudioIsReady, initAudio, getPiano, getPianoReverb } from './audioEngine.js';
-import { getEnharmonicPreference, getNotationPreference } from '../state/globalState.js';
-import { getNoteKeyId, noteToMidi, getLHNotes, getNotePitches, hasPitch, getPrimaryPitch } from '../utils/noteUtils.js';
+import { getNotationPreference } from '../state/globalState.js';
+import { getNoteKeyId, noteToMidi, getLHNotes, getNotePitches, hasPitch, getPrimaryPitch, getEnharmonicPreferenceForKey } from '../utils/noteUtils.js';
 import { CHORD_DEFINITIONS, ALL_NOTES, MAJOR_SCALE_STEPS, DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
 import { analyzeChordTone, CHORD_TONE_COLORS, NOTE_RELATIONSHIPS } from '../analysis/chordToneAnalyzer.js';
 import { getCompositionState, getBeatsPerMeasureFromTimeSignature } from '../state/compositionState.js';
+
+/**
+ * Get the enharmonic preference based on the current key.
+ * Used for proper note spelling in melody generation.
+ */
+function getKeyBasedEnharmonic() {
+    return getEnharmonicPreferenceForKey(getCurrentKey());
+}
 
 // Global state
 let currentMelody = null;
@@ -2127,7 +2135,7 @@ function playNotesInBeat(canvas, measure, beat, clickedType) {
                     interactiveMelody.key,
                     chord.lhOctaveShift || 0,
                     chord.type,
-                    getEnharmonicPreference()
+                    getKeyBasedEnharmonic()
                 ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
             }
 
@@ -2211,7 +2219,7 @@ function playNotesInBeat(canvas, measure, beat, clickedType) {
                         interactiveMelody.key,
                         chord.lhOctaveShift || 0,
                         chord.type,
-                        getEnharmonicPreference()
+                        getKeyBasedEnharmonic()
                     ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
                 }
 
@@ -2380,7 +2388,7 @@ function startMeasurePlayback(canvas, measureIndex) {
             interactiveMelody.key,
             chord.lhOctaveShift || 0,
             chord.type,
-            getEnharmonicPreference()
+            getKeyBasedEnharmonic()
         ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
     }
 
@@ -3067,7 +3075,7 @@ export function playFromSelectedMeasure() {
             interactiveMelody.key,
             chord.lhOctaveShift || 0,
             chord.type,
-            getEnharmonicPreference()
+            getKeyBasedEnharmonic()
         ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
         const chordNotes = [...rhNotes, ...lhNotes];
 

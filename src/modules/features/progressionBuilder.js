@@ -65,8 +65,6 @@ import {
 
 import {
     getCurrentTab,
-    getEnharmonicPreference,
-    setEnharmonicPreference,
     getNotationPreference
 } from '../state/globalState.js';
 
@@ -318,11 +316,24 @@ import {
     resolveEnharmonic,
     getNoteKeyId,
     getInvertedChordNotes,
-    getLHNotes
+    getLHNotes,
+    getEnharmonicPreferenceForKey
 } from '../utils/noteUtils.js';
 
 // Import roman numeral utilities
 import { noteToRomanNumeral } from '../utils/romanNumerals.js';
+
+/**
+ * Get the enharmonic preference based on the current key in Composition Studio.
+ * This replaces the global enharmonic preference toggle for composition context.
+ * Returns 'sharp' for keys with sharps (G, D, A, E, B, F#, C#) and their relative minors,
+ * 'flat' for keys with flats (F, Bb, Eb, Ab, Db, Gb) and their relative minors,
+ * and 'sharp' for neutral keys (C major, A minor).
+ */
+function getKeyBasedEnharmonic() {
+    const currentKey = getCurrentKey();
+    return getEnharmonicPreferenceForKey(currentKey);
+}
 
 // Import data definitions
 import {
@@ -1264,7 +1275,7 @@ function suggestInversion(chordIndex) {
             inv,
             trainerState.currentKey,
             currentChord.octaveShift || 0,
-            getEnharmonicPreference(),
+            getKeyBasedEnharmonic(),
             getNotationPreference()
         );
         
@@ -1624,7 +1635,7 @@ function restoreStaffNotationStates() {
  * @returns {string} Relative major key name (e.g., "F#", "C", "Gb")
  */
 function getRelativeMajorForVexFlow(minorKey) {
-    const enharmonic = getEnharmonicPreference();
+    const enharmonic = getKeyBasedEnharmonic();
     const notes = enharmonic === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
     
     // Remove 'm' suffix
@@ -2012,7 +2023,7 @@ function renderStaffNotation(chordIndex, canvas) {
             trainerState.currentKey,
             chord.lhOctaveShift || 0,
             chord.type,
-            getEnharmonicPreference()
+            getKeyBasedEnharmonic()
         ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
 
         const allNotes = [...rhNotes, ...lhNotes];
@@ -2543,7 +2554,7 @@ export function renderChordStaffNotation(canvas, chordData, key) {
                 key,
                 chordData.lhOctaveShift || 0,
                 chordData.type,
-                getEnharmonicPreference()
+                getKeyBasedEnharmonic()
             ).filter(n => !(chordData.lhOmittedNotes || []).includes(n)) : [];
 
         const allNotes = [...rhNotes, ...lhNotes];
@@ -4318,6 +4329,9 @@ function initializeSectionCardsAreaSortables(container) {
             chosenClass: 'sortable-chosen',
             dragClass: 'sortable-drag',
             handle: '.drag-handle',
+            // Exclude buttons from triggering drag - let them receive clicks
+            filter: 'button, select, input, .play-btn, .delete-btn, .expand-btn, .info-tooltip-btn, .no-drag',
+            preventOnFilter: false,
             draggable: '.chord-card-wrapper[data-chord-index]',
             swapThreshold: 0.65,
             // Touch-specific options
@@ -4933,6 +4947,9 @@ function createUnifiedSectionContainer(section, progressionData, key) {
             chosenClass: 'sortable-chosen',
             dragClass: 'sortable-drag',
             handle: '.drag-handle',
+            // Exclude buttons from triggering drag - let them receive clicks
+            filter: 'button, select, input, .play-btn, .delete-btn, .expand-btn, .info-tooltip-btn, .no-drag',
+            preventOnFilter: false,
             draggable: '.chord-card-wrapper[data-chord-index]',
             swapThreshold: 0.65,
             // Touch-specific options
@@ -6276,9 +6293,9 @@ function createSimplifiedCardHTML(chord, index, key) {
                 </button>
 
                 <!-- Main content: horizontal layout with chord info on left, buttons on right -->
-                <div class="chord-info-view flex items-center justify-between h-full p-2 pt-2.5 drag-handle cursor-grab active:cursor-grabbing">
-                    <!-- Left: Chord info -->
-                    <div class="flex flex-col items-center flex-1">
+                <div class="chord-info-view flex items-center justify-between h-full p-2 pt-2.5">
+                    <!-- Left: Chord info (this is the drag handle) -->
+                    <div class="flex flex-col items-center flex-1 drag-handle cursor-grab active:cursor-grabbing">
                         <!-- Chord Symbol -->
                         <div class="text-base font-bold text-white mb-0.5">${chordSymbol}</div>
                         <!-- Roman Numeral -->
@@ -6287,7 +6304,7 @@ function createSimplifiedCardHTML(chord, index, key) {
                         <div class="text-[9px] text-gray-400 mt-0.5">Pos: ${index + 1}</div>
                     </div>
 
-                    <!-- Right: Vertically stacked compact buttons -->
+                    <!-- Right: Vertically stacked compact buttons (NOT in drag-handle) -->
                     <div class="flex flex-col gap-0.5 ml-1">
                         <button class="play-btn px-1 py-0.5 bg-white hover:bg-gray-100 rounded transition shadow-sm flex items-center justify-center" title="Play">
                             <svg class="w-2.5 h-2.5" fill="#1f2937" viewBox="0 0 20 20">
@@ -6575,6 +6592,8 @@ function attachCardEventListeners(wrapper, index) {
                 // Highlight corresponding tension curve point and chord card
                 highlightTensionPoint(index);
                 highlightChordCard(index);
+            } else {
+                console.warn(`[Play Button] window.startProgressionChord is not defined!`);
             }
         });
         playBtn.addEventListener('mouseup', () => {
@@ -7628,7 +7647,7 @@ function updateChordType(index, newType) {
         chord.inversion || 0,
         chord.key || trainerState.currentKey,
         0, // Get base notes without octave shift
-        getEnharmonicPreference(),
+        getKeyBasedEnharmonic(),
         getNotationPreference()
     );
 
@@ -7696,7 +7715,7 @@ function updateChordType(index, newType) {
         trainerState.currentKey,
         absoluteLHOctaveShift,
         newType,
-        getEnharmonicPreference()
+        getKeyBasedEnharmonic()
     ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
     const allNotes = voicedNotes.concat(lhNotes);
     if (allNotes.length > 0) {
@@ -7732,7 +7751,7 @@ function updateChordRoot(index, newRoot) {
         chord.inversion || 0,
         chord.key || trainerState.currentKey,
         0, // Get base notes without octave shift
-        getEnharmonicPreference(),
+        getKeyBasedEnharmonic(),
         getNotationPreference()
     );
 
@@ -7794,7 +7813,7 @@ function updateChordRoot(index, newRoot) {
         trainerState.currentKey,
         absoluteLHOctaveShift,
         chordType,
-        getEnharmonicPreference()
+        getKeyBasedEnharmonic()
     ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
     const allNotes = voicedNotes.concat(lhNotes);
     if (allNotes.length > 0) {
@@ -8057,7 +8076,7 @@ function updateChordInversion(index, newInversion, shouldUpdateUI = true, should
         newInversion,
         chord.key || trainerState.currentKey,
         0, // Get base notes without octave shift
-        getEnharmonicPreference(),
+        getKeyBasedEnharmonic(),
         getNotationPreference()
     );
 
@@ -8190,7 +8209,7 @@ function updateRHOctaveShift(index, shift) {
         chord.inversion || 0,
         chord.key || trainerState.currentKey,
         0, // Get base notes without octave shift
-        getEnharmonicPreference(),
+        getKeyBasedEnharmonic(),
         getNotationPreference()
     );
 
@@ -8246,7 +8265,7 @@ function updateRHOctaveShift(index, shift) {
         trainerState.currentKey,
         absoluteLHOctaveShift,
         updatedChord.type,
-        getEnharmonicPreference()
+        getKeyBasedEnharmonic()
     ).filter(n => !(updatedChord.lhOmittedNotes || []).includes(n));
     const allNotes = voicedNotes.concat(lhNotes);
     if (allNotes.length > 0) {
@@ -8388,6 +8407,10 @@ function initializeSimplifiedSortable(container) {
         dragClass: 'sortable-drag',
         // Use drag-handle class for cards, section-drag-handle or section-banner for sections
         handle: '.drag-handle, .section-drag-handle, .section-banner',
+        // CRITICAL: Exclude buttons and interactive elements from triggering drag
+        // This allows play, delete, expand buttons inside drag-handle to work
+        filter: 'button, select, input, .play-btn, .delete-btn, .expand-btn, .info-tooltip-btn, .no-drag',
+        preventOnFilter: false, // Don't prevent default on filtered elements - let buttons work normally
         // Allow dragging direct children that are cards or sections
         draggable: '.chord-card-wrapper[data-chord-index], .section-unified-container',
         // Lower threshold to make section reordering easier (default is 1 which equals 50%)
@@ -10317,7 +10340,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
                 trainerState.currentKey,
                 chord.lhOctaveShift,
                 chord.type,
-                getEnharmonicPreference()
+                getKeyBasedEnharmonic()
             ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
             const voicedNotes = chord.notes.filter(n => !chord.omittedNotes.includes(n));
             const allNotes = voicedNotes.concat(lhNotes);
@@ -10369,7 +10392,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
                 trainerState.currentKey,
                 chord.lhOctaveShift,
                 chord.type,
-                getEnharmonicPreference()
+                getKeyBasedEnharmonic()
             ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
             const voicedNotes = chord.notes.filter(n => !chord.omittedNotes.includes(n));
             const allNotes = voicedNotes.concat(lhNotes);
@@ -10947,7 +10970,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             trainerState.currentKey,
             chordData.lhOctaveShift,
             chordData.type,
-            getEnharmonicPreference()
+            getKeyBasedEnharmonic()
         );
 
         if (allLhNotes.length > 0) {
@@ -10994,7 +11017,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
                     trainerState.currentKey,
                     chord.lhOctaveShift,
                     chord.type,
-                    getEnharmonicPreference()
+                    getKeyBasedEnharmonic()
                 ).filter(n => !chord.lhOmittedNotes.includes(n));
                 const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
                 const allNotes = voicedNotes.concat(lhNotes);
@@ -11043,7 +11066,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
                     trainerState.currentKey,
                     chord.lhOctaveShift,
                     chord.type,
-                    getEnharmonicPreference()
+                    getKeyBasedEnharmonic()
                 ).filter(n => !chord.lhOmittedNotes.includes(n));
                 const voicedNotes = chord.notes.filter(n => !(chord.omittedNotes || []).includes(n));
                 const allNotes = voicedNotes.concat(lhNotes);
@@ -11294,20 +11317,9 @@ export function loadProgression() {
     setCurrentKey(keySelect.value);
 
     // Automatically set enharmonic preference based on key signature
-    // Keys with flats in their signature should display flats
-    const fullKey = keySelect.value;
-    const keyRoot = fullKey.replace('m', ''); // Remove minor indicator for major flat keys check
-
-    // Major keys with flats
-    const flatMajorKeys = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'];
-    // Minor keys with flats (same key signatures as their relative majors)
-    const flatMinorKeys = ['Dm', 'Gm', 'Cm', 'Fm', 'Bbm', 'Ebm', 'Abm'];
-
-    if (flatMajorKeys.includes(keyRoot) || flatMinorKeys.includes(fullKey)) {
-        setEnharmonicPreference('flat');
-    } else {
-        setEnharmonicPreference('sharp');
-    }
+    // Note: Enharmonic spelling in Composition Studio is now automatically
+    // determined by the key via getKeyBasedEnharmonic(), not the global toggle.
+    // Chord Lab's toggle remains independent for learning purposes.
 
     setProgressionRomans(progressionSelect.value.split(','));
     setCurrentIndex(0);
@@ -11480,7 +11492,7 @@ export function updateProgressionEnharmonics() {
         return;
     }
 
-    const enharmonicPref = getEnharmonicPreference();
+    const enharmonicPref = getKeyBasedEnharmonic();
     const targetNotes = enharmonicPref === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
     const sourceNotes = enharmonicPref === 'sharp' ? FLAT_NOTES : SHARP_NOTES;
 
@@ -11610,7 +11622,7 @@ function calculateScaleNotes(key, octave = 4, octaveShift = 0) {
     const scaleRootMidi = noteToMidi(ALL_NOTES[scaleRootIndex] + baseOctave);
     const scaleMidiNotes = MAJOR_SCALE_STEPS.map(step => scaleRootMidi + step);
     const rawNoteNames = scaleMidiNotes.map(midi => Tone.Midi(midi).toNote());
-    const resolvedNoteNames = rawNoteNames.map(note => resolveEnharmonic(note, key, getEnharmonicPreference()));
+    const resolvedNoteNames = rawNoteNames.map(note => resolveEnharmonic(note, key, getKeyBasedEnharmonic()));
 
     return resolvedNoteNames;
 }
@@ -11655,7 +11667,7 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
             // The secondary dominant is a perfect 5th above the target
             // V/x means the dominant of x, which is 7 semitones above x
             const secondaryDomIndex = (targetRootIndex + 7) % 12;
-            chordRootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[secondaryDomIndex];
+            chordRootNote = (getKeyBasedEnharmonic() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[secondaryDomIndex];
 
             // Return early with the resolved chord
             if (chordRootNote) {
@@ -11665,7 +11677,7 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
                     selectedInversion,
                     key,
                     octaveShift,
-                    getEnharmonicPreference(),
+                    getKeyBasedEnharmonic(),
                     getNotationPreference()
                 );
 
@@ -11741,7 +11753,7 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
                     chordRootIndex = (chordRootIndex + 1) % 12;
                 }
 
-                chordRootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[chordRootIndex];
+                chordRootNote = (getKeyBasedEnharmonic() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[chordRootIndex];
             } else {
                 chordRootNote = cleanRoman; // Fall back to treating as note name (use cleaned version)
             }
@@ -11762,7 +11774,7 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
             chordRootIndex = (chordRootIndex + 1) % 12;
         }
         
-        chordRootNote = (getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[chordRootIndex];
+        chordRootNote = (getKeyBasedEnharmonic() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[chordRootIndex];
     }
 
     if (!chordRootNote) {
@@ -11775,7 +11787,7 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
         selectedInversion,
         key,
         octaveShift,
-        getEnharmonicPreference(),
+        getKeyBasedEnharmonic(),
         getNotationPreference()
     );
 
@@ -12004,7 +12016,7 @@ export function handleAutoPlayback() {
             trainerState.currentKey,
             chord.lhOctaveShift || 0,
             chord.type,
-            getEnharmonicPreference()
+            getKeyBasedEnharmonic()
         );
         const lhNotes = allLhNotes.filter(note => !(chord.lhOmittedNotes || []).includes(note));
         const rhNotes = chord.notes.filter(note => !(chord.omittedNotes || []).includes(note));
@@ -12451,7 +12463,9 @@ export function stopStepChord() {
  */
 export function startProgressionChord(index) {
     // Use whenAudioReady to ensure audio plays even if this is the first interaction
-    whenAudioReady(() => playProgressionChordNow(index));
+    whenAudioReady(() => {
+        playProgressionChordNow(index);
+    });
 }
 
 /**
@@ -12559,7 +12573,7 @@ function playProgressionChordNow(index) {
         trainerState.currentKey,
         absoluteLHOctaveShift,
         chord.type,
-        getEnharmonicPreference()
+        getKeyBasedEnharmonic()
     );
         // Filter out any invalid notes
         allLhNotes = (rawLhNotes || []).filter(note => {
@@ -12727,7 +12741,7 @@ function playProgressionChord(index, advance = true) {
         trainerState.currentKey,
         lhOctaveShift,
         chord.type,
-        getEnharmonicPreference()
+        getKeyBasedEnharmonic()
     );
     }
 
@@ -12896,7 +12910,7 @@ export function showProgressionChordSuggestions(chordIndex) {
             nextInversion,
             key,
             0, // octaveShift
-            getEnharmonicPreference(),
+            getKeyBasedEnharmonic(),
             getNotationPreference()
         );
 
@@ -13197,7 +13211,7 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
         inversion,
         trainerState.currentKey,
         octaveShift,
-        getEnharmonicPreference(),
+        getKeyBasedEnharmonic(),
         getNotationPreference()
     );
 
@@ -13217,7 +13231,7 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
         trainerState.currentKey,
         absoluteLHOctaveShift,
         chordType,
-        getEnharmonicPreference()
+        getKeyBasedEnharmonic()
     );
 
     // Get default beats based on current time signature (one full measure)
@@ -13812,7 +13826,7 @@ export function toggleProgressionNote(chordIndex, note) {
         trainerState.currentKey,
         updatedChord.lhOctaveShift,
         updatedChord.type,
-        getEnharmonicPreference()
+        getKeyBasedEnharmonic()
     ).filter(n => !(updatedChord.lhOmittedNotes || []).includes(n));
     const allNotes = voicedNotes.concat(lhNotes);
 
@@ -13863,7 +13877,7 @@ export function toggleProgressionLHNote(chordIndex, note) {
         trainerState.currentKey,
         chordData.lhOctaveShift,
         chordData.type,
-        getEnharmonicPreference()
+        getKeyBasedEnharmonic()
     ).filter(n => !chordData.lhOmittedNotes.includes(n));
     const allNotes = voicedNotes.concat(lhNotes);
     if (allNotes.length > 0) {
@@ -14038,7 +14052,7 @@ function updateProgressionChord(index, property, value) {
                     trainerState.currentKey,
                     chordState.lhOctaveShift || 0,
                     chordState.type,
-                    getEnharmonicPreference()
+                    getKeyBasedEnharmonic()
                 );
                 
                 // Recalculate LH notes (they might also be affected if LH octave shift changes)
@@ -14049,7 +14063,7 @@ function updateProgressionChord(index, property, value) {
                     trainerState.currentKey,
                     chordState.lhOctaveShift || 0,
                     newData.type,
-                    getEnharmonicPreference()
+                    getKeyBasedEnharmonic()
                 );
                 
                 // Map LH omitted notes
@@ -14110,7 +14124,7 @@ function updateProgressionChord(index, property, value) {
         trainerState.currentKey,
         newData.lhOctaveShift,
         newData.type,
-        getEnharmonicPreference()
+        getKeyBasedEnharmonic()
     );
 
     // Play chord respecting omitted notes (same as when clicking Play button)
@@ -14148,7 +14162,7 @@ function updateProgressionChordLH(index, property, value) {
         trainerState.currentKey,
         chord.lhOctaveShift,
         chord.type,
-        getEnharmonicPreference()
+        getKeyBasedEnharmonic()
     );
     playTrainerChordOnce(chord.notes.concat(lhNotes));
     
@@ -14260,12 +14274,80 @@ export function saveRecording() {
 
 /**
  * Add a chord to the progression data
+ * Auto-respells chord root to match the current key's enharmonic preference
  * @param {Object} chordData - Chord data object to add
  * @param {Object} options - Optional settings
  * @param {boolean} options.skipRender - Skip rendering (for batch operations)
  */
 export function addToProgressionData(chordData, options = {}) {
     const trainerState = getTrainerState();
+
+    // Auto-respell chord root to match key's enharmonic preference
+    if (chordData.root) {
+        const keyPref = getKeyBasedEnharmonic();
+        const originalRoot = chordData.root;
+
+        // Check if the root note uses the opposite accidental type
+        const rootHasSharp = originalRoot.includes('#');
+        const rootHasFlat = originalRoot.includes('b');
+
+        if ((keyPref === 'flat' && rootHasSharp) || (keyPref === 'sharp' && rootHasFlat)) {
+            // Need to respell - find the enharmonic equivalent
+            const sharpIndex = SHARP_NOTES.indexOf(originalRoot);
+            const flatIndex = FLAT_NOTES.indexOf(originalRoot);
+            const noteIndex = sharpIndex !== -1 ? sharpIndex : flatIndex;
+
+            if (noteIndex !== -1) {
+                const newRoot = keyPref === 'flat' ? FLAT_NOTES[noteIndex] : SHARP_NOTES[noteIndex];
+
+                // Only respell if the new root is different
+                if (newRoot !== originalRoot) {
+                    chordData.root = newRoot;
+
+                    // Also update simpleName and name if they contain the old root
+                    if (chordData.simpleName && chordData.simpleName.startsWith(originalRoot)) {
+                        chordData.simpleName = newRoot + chordData.simpleName.slice(originalRoot.length);
+                    }
+                    if (chordData.name && chordData.name.startsWith(originalRoot)) {
+                        chordData.name = newRoot + chordData.name.slice(originalRoot.length);
+                    }
+
+                    // Also respell the notes array to match the key
+                    if (chordData.notes && Array.isArray(chordData.notes)) {
+                        chordData.notes = chordData.notes.map(note => {
+                            // Extract the note name without octave
+                            const match = note.match(/^([A-G][#b]?)(\d+)?$/);
+                            if (!match) return note;
+
+                            const noteName = match[1];
+                            const octave = match[2] || '';
+
+                            // Check if this note needs respelling
+                            const noteHasSharp = noteName.includes('#');
+                            const noteHasFlat = noteName.includes('b');
+
+                            if ((keyPref === 'flat' && noteHasSharp) || (keyPref === 'sharp' && noteHasFlat)) {
+                                const noteSharpIdx = SHARP_NOTES.indexOf(noteName);
+                                const noteFlatIdx = FLAT_NOTES.indexOf(noteName);
+                                const noteIdx = noteSharpIdx !== -1 ? noteSharpIdx : noteFlatIdx;
+
+                                if (noteIdx !== -1) {
+                                    const newNoteName = keyPref === 'flat' ? FLAT_NOTES[noteIdx] : SHARP_NOTES[noteIdx];
+                                    return newNoteName + octave;
+                                }
+                            }
+                            return note;
+                        });
+                    }
+
+                    // Show toast notification about the respelling
+                    if (window.showToast) {
+                        window.showToast(`Respelled ${originalRoot} as ${newRoot} to match key of ${getCurrentKey()}`, 'info', 3000);
+                    }
+                }
+            }
+        }
+    }
 
     // If beats not provided, default to one full measure based on current time signature
     if (chordData.beats === undefined) {
@@ -14399,7 +14481,7 @@ export function renderProgressionControls() {
 
     // Populate key selector with both major and minor keys
     keySelect.innerHTML = '';
-    const notes = getEnharmonicPreference() === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+    const notes = getKeyBasedEnharmonic() === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
 
     // Build array of all keys for random selection
     const allKeys = [];
@@ -14986,7 +15068,7 @@ export function importChordList(mode = 'replace') {
     const currentKey = trainerState.currentKey || 'C';
     const keyForCalculation = currentKey.endsWith('m') ? currentKey.replace(/m$/, '') : currentKey;
     const octaveShift = trainerState.octaveShift || 0;
-    const enharmonicPreference = getEnharmonicPreference();
+    const enharmonicPreference = getKeyBasedEnharmonic();
     const notationPreference = getNotationPreference();
     
     

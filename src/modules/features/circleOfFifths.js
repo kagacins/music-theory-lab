@@ -4,7 +4,6 @@
  */
 
 import { SHARP_NOTES, FLAT_NOTES } from '../../data/music-data.js';
-import { getEnharmonicPreference, setEnharmonicPreference } from '../state/globalState.js';
 import { setCurrentKey, getTrainerState } from '../state/trainerState.js';
 
 // Circle of Fifths data - clockwise from C
@@ -279,6 +278,9 @@ function drawCircleOfFifths() {
 
 /**
  * Handle key segment click
+ * Note: Composition Studio now auto-determines enharmonic spelling based on the key,
+ * so we don't need to manage a global enharmonic preference here.
+ * The Chord Lab has its own independent toggle for learning purposes.
  */
 function handleKeyClick(event) {
     const key = event.target.getAttribute('data-key');
@@ -288,219 +290,40 @@ function handleKeyClick(event) {
 
     currentSelectedKey = key;
 
-    // Determine if this is a minor key (based on type attribute)
-    const isMinor = type === 'minor';
-
-    // Extract the root note (remove 'm' suffix if minor)
-    const rootNote = isMinor ? key.replace(/m$/, '') : key;
-
-    // Check if the selected key requires a specific accidental preference
-    // Sharp-only keys (from Circle of Fifths sharp side): C, G, D, A, E, B, F# (and their minor equivalents)
-    // Flat-only keys (from Circle of Fifths flat side): Db, Ab, Eb, Bb, F, Gb (and their minor equivalents)
-    // Handle F#/Gb specially - if current preference is sharp, use F#; if flat, use Gb
-    const sharpOnlyKeys = ['C', 'G', 'D', 'A', 'E', 'B'];
-    const sharpOnlyKeysMinor = ['Am', 'Em', 'Bm', 'C#m', 'G#m', 'F#m'];
-    const flatOnlyKeys = ['Db', 'Ab', 'Eb', 'Bb', 'F'];
-    const flatOnlyKeysMinor = ['Bbm', 'Fm', 'Cm', 'Gm', 'Dm', 'Ebm'];
-    const currentPreference = getEnharmonicPreference();
-    let needsPreferenceChange = false;
-    let targetPreference = currentPreference;
+    // Handle enharmonic equivalents - pick the standard/common spelling
     let actualKey = key;
-
-    // Handle enharmonic equivalents for both major and minor
     if (key === 'F#/Gb') {
-        actualKey = currentPreference === 'sharp' ? 'F#' : 'Gb';
-        // F#/Gb requires checking current preference - if flat is selected, we need to switch to sharp for F#
-        if (currentPreference === 'flat' && actualKey === 'F#') {
-            needsPreferenceChange = true;
-            targetPreference = 'sharp';
-        }
+        // F# major and Gb major are enharmonic - F# is more common in sharp keys
+        actualKey = 'F#';
     } else if (key === 'D#m/Ebm') {
-        actualKey = currentPreference === 'sharp' ? 'D#m' : 'Ebm';
-        // D#m/Ebm requires checking current preference - if flat is selected, we need to switch to sharp for D#m
-        if (currentPreference === 'flat' && actualKey === 'D#m') {
-            needsPreferenceChange = true;
-            targetPreference = 'sharp';
-        }
-    } else if (flatOnlyKeys.includes(rootNote) || flatOnlyKeysMinor.includes(key)) {
-        // This is a flat-only key (major or minor)
-        if (currentPreference === 'sharp') {
-            needsPreferenceChange = true;
-            targetPreference = 'flat';
-        }
-    } else if (sharpOnlyKeys.includes(rootNote) || sharpOnlyKeysMinor.includes(key) || rootNote.includes('#') || key.includes('#')) {
-        // This is a sharp-only key (major or minor) - includes keys like B, E, A, D, G, C that don't have #
-        if (currentPreference === 'flat') {
-            needsPreferenceChange = true;
-            targetPreference = 'sharp';
-        }
+        // D#m and Ebm are enharmonic - Ebm is more common (D#m has 6 sharps)
+        actualKey = 'Ebm';
     }
 
-    // If we need to change the preference, do it now
-    if (needsPreferenceChange) {
-        setEnharmonicPreference(targetPreference);
-        // Update window.enharmonicPreference from state to ensure consistency (same as manual toggle)
-        window.enharmonicPreference = getEnharmonicPreference();
-        
-        // Update the toggle checkbox
-        const toggle = document.getElementById('enharmonic-toggle');
-        if (toggle) {
-            toggle.checked = targetPreference === 'flat';
-            // Update indicator colors
-            const sharpIndicator = document.getElementById('sharp-indicator');
-            const flatIndicator = document.getElementById('flat-indicator');
-            if (targetPreference === 'sharp') {
-                sharpIndicator.classList.remove('text-gray-500');
-                sharpIndicator.classList.add('text-indigo-300');
-                flatIndicator.classList.remove('text-indigo-300');
-                flatIndicator.classList.add('text-gray-500');
-            } else {
-                flatIndicator.classList.remove('text-gray-500');
-                flatIndicator.classList.add('text-indigo-300');
-                sharpIndicator.classList.remove('text-indigo-300');
-                sharpIndicator.classList.add('text-gray-500');
-            }
-        }
-        
-        // Force a synchronous state update by double-checking
-        // Ensure state is fully synchronized before calling refreshAllTabs
-        const currentPref = getEnharmonicPreference();
-        if (currentPref !== targetPreference) {
-            // State didn't update, try again
-            setEnharmonicPreference(targetPreference);
-            window.enharmonicPreference = getEnharmonicPreference();
-        }
-        
-        // Explicitly call renderProgressionControls to force dropdown repopulation
-        // This ensures the dropdown is updated with the new enharmonic preference
-        if (window.renderProgressionControls) {
-            window.renderProgressionControls();
-        }
-        
-        // Also call refreshAllTabs to ensure everything else is updated
-        if (window.refreshAllTabs) {
-            window.refreshAllTabs();
-        }
-        
-        // Wait for the dropdown to be fully repopulated, then set the key
-        // Use a retry mechanism with a maximum number of attempts
-        const targetKey = actualKey !== key ? actualKey : key;
-        let attempts = 0;
-        const maxAttempts = 30; // Maximum 1.5 seconds wait (30 * 50ms) - increased to allow more time
-        
-        const setKeyAfterRefresh = () => {
-            const keySelect = document.getElementById('trainer-key-select');
-            if (keySelect) {
-                // Verify that the dropdown has been updated with the correct enharmonic preference
-                // Check if the target key exists in the dropdown options
-                const hasKey = Array.from(keySelect.options).some(option => option.value === targetKey);
-                
-                // Check if dropdown has been repopulated with correct notes
-                // Look for flat-only notes (Db, Eb, Gb, Ab, Bb) or sharp-only notes (C#, D#, F#, G#, A#)
-                const flatOnlyNotes = ['Db', 'Eb', 'Gb', 'Ab', 'Bb'];
-                const sharpOnlyNotes = ['C#', 'D#', 'F#', 'G#', 'A#'];
-                
-                const hasFlatOnlyNotes = Array.from(keySelect.options).some(option => {
-                    const value = option.value.replace(/m$/, ''); // Remove minor suffix
-                    return flatOnlyNotes.includes(value);
-                });
-                const hasSharpOnlyNotes = Array.from(keySelect.options).some(option => {
-                    const value = option.value.replace(/m$/, ''); // Remove minor suffix
-                    return sharpOnlyNotes.includes(value);
-                });
-                
-                // For flat preference, we should have flat-only notes and not sharp-only notes
-                // For sharp preference, we should have sharp-only notes and not flat-only notes
-                const dropdownMatchesPreference = targetPreference === 'flat' 
-                    ? hasFlatOnlyNotes && !hasSharpOnlyNotes
-                    : hasSharpOnlyNotes && !hasFlatOnlyNotes;
-                
-                if (hasKey && dropdownMatchesPreference) {
-                    // Key found and dropdown matches preference, set it and trigger change
-                    keySelect.value = targetKey;
-                    // Trigger change event to ensure any listeners are notified
-                    keySelect.dispatchEvent(new Event('change', { bubbles: true }));
-                    
-                    // Set current key in state and reload progression
-                    setCurrentKey(targetKey);
-                    if (window.loadProgression) {
-                        window.loadProgression();
-                    }
-                    // Update key display in melody tab header immediately
-                    const melodyKeyDisplay = document.getElementById('melody-current-key-display');
-                    if (melodyKeyDisplay) melodyKeyDisplay.textContent = targetKey;
-                    const melodyKeyDisplayText = document.getElementById('melody-key-display-text');
-                    if (melodyKeyDisplayText) melodyKeyDisplayText.textContent = targetKey;
-                    const melodyWorkbenchKeyDisplay = document.getElementById('melody-workbench-key-display');
-                    if (melodyWorkbenchKeyDisplay) melodyWorkbenchKeyDisplay.textContent = targetKey;
-                    // Close the modal after key is set
-                    closeCircleOfFifthsPanel();
-                } else {
-                    // If key not found yet or dropdown doesn't match preference, try again after a short delay
-                    // Also try to force renderProgressionControls again if it hasn't updated
-                    if (attempts < 3 && !dropdownMatchesPreference && window.renderProgressionControls) {
-                        window.renderProgressionControls();
-                    }
-                    
-                    attempts++;
-                    if (attempts < maxAttempts) {
-                        setTimeout(setKeyAfterRefresh, 50);
-                    } else {
-                        console.warn(`Could not find key ${targetKey} in dropdown after ${maxAttempts} attempts`);
-                        // Still try to set it anyway in case it exists but wasn't detected
-                        keySelect.value = targetKey;
-                        keySelect.dispatchEvent(new Event('change', { bubbles: true }));
-                        setCurrentKey(targetKey);
-                        if (window.loadProgression) {
-                            window.loadProgression();
-                        }
-                        // Update key display in melody tab header
-                        const melodyKeyDisplay2 = document.getElementById('melody-current-key-display');
-                        if (melodyKeyDisplay2) melodyKeyDisplay2.textContent = targetKey;
-                        const melodyKeyDisplayText2 = document.getElementById('melody-key-display-text');
-                        if (melodyKeyDisplayText2) melodyKeyDisplayText2.textContent = targetKey;
-                        const melodyWorkbenchKeyDisplay2 = document.getElementById('melody-workbench-key-display');
-                        if (melodyWorkbenchKeyDisplay2) melodyWorkbenchKeyDisplay2.textContent = targetKey;
-                    }
-                }
-            } else {
-                // Dropdown doesn't exist yet, try again
-                attempts++;
-                if (attempts < maxAttempts) {
-                    setTimeout(setKeyAfterRefresh, 50);
-                }
-            }
-        };
-        
-        // Start checking after a short delay to allow refreshAllTabs to complete
-        // Use a slightly longer delay to ensure state has propagated
-        setTimeout(setKeyAfterRefresh, 150);
-    } else {
-        // Update the key dropdown in Progression Builder immediately if no preference change needed
-        const keySelect = document.getElementById('trainer-key-select');
-        const targetKey = actualKey !== key ? actualKey : key;
-        if (keySelect) {
-            // Use the actual key (F# or Gb) if we had F#/Gb, otherwise use the original key
-            keySelect.value = targetKey;
-            // Trigger change event to ensure any listeners are notified
-            keySelect.dispatchEvent(new Event('change'));
-        }
-        
-        // Set current key in state and reload progression
-        setCurrentKey(targetKey);
-        if (window.loadProgression) {
-            window.loadProgression();
-        }
-        // Update key display in melody tab header
-        const melodyKeyDisplay3 = document.getElementById('melody-current-key-display');
-        if (melodyKeyDisplay3) melodyKeyDisplay3.textContent = targetKey;
-        const melodyKeyDisplayText3 = document.getElementById('melody-key-display-text');
-        if (melodyKeyDisplayText3) melodyKeyDisplayText3.textContent = targetKey;
-        const melodyWorkbenchKeyDisplay3 = document.getElementById('melody-workbench-key-display');
-        if (melodyWorkbenchKeyDisplay3) melodyWorkbenchKeyDisplay3.textContent = targetKey;
-        // Close the modal after key is set
-        closeCircleOfFifthsPanel();
+    // Update the key dropdown in Progression Builder
+    const keySelect = document.getElementById('trainer-key-select');
+    if (keySelect) {
+        keySelect.value = actualKey;
+        // Trigger change event to ensure any listeners are notified
+        keySelect.dispatchEvent(new Event('change', { bubbles: true }));
     }
+
+    // Set current key in state and reload progression
+    setCurrentKey(actualKey);
+    if (window.loadProgression) {
+        window.loadProgression();
+    }
+
+    // Update key display in melody tab header
+    const melodyKeyDisplay = document.getElementById('melody-current-key-display');
+    if (melodyKeyDisplay) melodyKeyDisplay.textContent = actualKey;
+    const melodyKeyDisplayText = document.getElementById('melody-key-display-text');
+    if (melodyKeyDisplayText) melodyKeyDisplayText.textContent = actualKey;
+    const melodyWorkbenchKeyDisplay = document.getElementById('melody-workbench-key-display');
+    if (melodyWorkbenchKeyDisplay) melodyWorkbenchKeyDisplay.textContent = actualKey;
+
+    // Close the modal after key is set
+    closeCircleOfFifthsPanel();
 
     // Switch to Composition Studio if not already there
     if (window.currentTab !== 'melody' && window.switchTab) {
@@ -512,11 +335,9 @@ function handleKeyClick(event) {
 
     // Show confirmation
     const displayKey = actualKey !== key ? actualKey : key;
-    const keyQuality = isMinor ? ' minor' : ' Major';
-    const message = needsPreferenceChange
-        ? `Key changed to ${displayKey}${keyQuality} (accidental preference switched to ${targetPreference === 'sharp' ? '♯' : '♭'})`
-        : `Key changed to ${displayKey}${keyQuality}`;
-    showKeyChangeNotification(message);
+    const isMinorKey = type === 'minor';
+    const keyQuality = isMinorKey ? ' minor' : ' Major';
+    showKeyChangeNotification(`Key changed to ${displayKey}${keyQuality}`);
 }
 
 /**
