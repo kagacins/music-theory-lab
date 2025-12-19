@@ -25,17 +25,28 @@ function noteToSemitone(noteName) {
  * Get scale degree (1-7) for a root note in a key
  */
 function getScaleDegree(chordRoot, key) {
-    const keyIndex = ALL_NOTES.indexOf(key);
+    // Detect if this is a minor key
+    const isMinorKey = key && key.endsWith('m') && !key.endsWith('dim');
+    const keyRoot = isMinorKey ? key.slice(0, -1) : key;
+
+    const keyIndex = ALL_NOTES.indexOf(keyRoot);
     const chordIndex = ALL_NOTES.indexOf(chordRoot);
 
     if (keyIndex === -1 || chordIndex === -1) return null;
 
     const distance = (chordIndex - keyIndex + 12) % 12;
 
-    const degreeMap = {
+    // Major scale intervals: 0, 2, 4, 5, 7, 9, 11
+    const majorDegreeMap = {
         0: 1, 2: 2, 4: 3, 5: 4, 7: 5, 9: 6, 11: 7
     };
 
+    // Natural minor scale intervals: 0, 2, 3, 5, 7, 8, 10
+    const minorDegreeMap = {
+        0: 1, 2: 2, 3: 3, 5: 4, 7: 5, 8: 6, 10: 7
+    };
+
+    const degreeMap = isMinorKey ? minorDegreeMap : majorDegreeMap;
     return degreeMap[distance] || null;
 }
 

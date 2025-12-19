@@ -377,11 +377,15 @@ export class RecommendationService {
     /**
      * Get scale degree of a chord root in a key (fallback implementation)
      * @param {string} chordRoot - Root note
-     * @param {string} key - Current key
+     * @param {string} key - Current key (e.g., 'C', 'G', 'Gm')
      * @returns {number|null} Scale degree (1-7)
      */
     getScaleDegree(chordRoot, key) {
-        const keyIndex = ALL_NOTES.indexOf(key);
+        // Detect if this is a minor key
+        const isMinorKey = key && key.endsWith('m') && !key.endsWith('dim');
+        const keyRoot = isMinorKey ? key.slice(0, -1) : key;
+
+        const keyIndex = ALL_NOTES.indexOf(keyRoot);
         const chordIndex = ALL_NOTES.indexOf(chordRoot);
 
         if (keyIndex === -1 || chordIndex === -1) return null;
@@ -389,8 +393,9 @@ export class RecommendationService {
         // Calculate semitone distance
         let distance = (chordIndex - keyIndex + 12) % 12;
 
-        // Map to scale degree (major scale)
-        const degreeMap = {
+        // Map to scale degree based on key type
+        // Major scale intervals: 0, 2, 4, 5, 7, 9, 11
+        const majorDegreeMap = {
             0: 1,  // Root (I)
             2: 2,  // 2nd (ii)
             4: 3,  // 3rd (iii)
@@ -400,6 +405,18 @@ export class RecommendationService {
             11: 7  // 7th (vii°)
         };
 
+        // Natural minor scale intervals: 0, 2, 3, 5, 7, 8, 10
+        const minorDegreeMap = {
+            0: 1,   // Root (i)
+            2: 2,   // 2nd (ii°)
+            3: 3,   // 3rd (III)
+            5: 4,   // 4th (iv)
+            7: 5,   // 5th (v)
+            8: 6,   // 6th (VI)
+            10: 7   // 7th (VII)
+        };
+
+        const degreeMap = isMinorKey ? minorDegreeMap : majorDegreeMap;
         return degreeMap[distance] || null;
     }
 

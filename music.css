@@ -3357,6 +3357,48 @@ canvas {
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
 }
 
+/* Section container sortable drag states */
+.section-unified-container.sortable-ghost {
+    opacity: 0.4;
+    background-color: #e5e7eb;
+    border: 2px dashed #9ca3af;
+    border-radius: 0.5rem;
+}
+
+.section-unified-container.sortable-chosen {
+    outline: 2px solid #60a5fa;
+    outline-offset: 2px;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.section-unified-container.sortable-drag {
+    opacity: 0.95;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+    transform: scale(1.02);
+}
+
+/* Section banner hover state to indicate draggability */
+.section-banner {
+    transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.section-banner:hover {
+    filter: brightness(1.1);
+}
+
+.section-banner:active {
+    filter: brightness(0.95);
+}
+
+/* Section drag handle icon styling */
+.section-drag-handle {
+    transition: transform 0.15s ease;
+}
+
+.section-banner:hover .section-drag-handle {
+    transform: scale(1.15);
+}
+
 /* Sidebar tooltip positioning fix - allow tooltips to escape overflow container */
 /* Only allow horizontal overflow to be visible on the scrollable section within sidebar */
 #sidebar > .flex-1.overflow-y-auto {

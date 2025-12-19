@@ -15,6 +15,10 @@ import { setProgressionData, getCurrentKey, setCurrentKey } from '../state/train
 import { switchTab } from './tabs.js';
 import { getCompositionState } from '../state/compositionState.js';
 import { createSongBuilder, createSectionsFromWizardStructure, SECTION_TYPES } from './songBuilder.js';
+import { getAllTemplates, getTemplate } from '../../data/songStructureTemplates.js';
+import { getSectionProfile } from '../features/sectionProfiles.js';
+import { renderProgressionDisplay, setProgressionViewMode, clearSectionSelection } from '../features/progressionBuilder.js';
+import { openNewSongwritingWizard } from './songwritingWizardModal.js';
 
 // ===========================================
 // WIZARD DATA - EXPANDED MOODS
@@ -2980,6 +2984,384 @@ export function openWizardInModal() {
 }
 
 /**
+ * Render template options for the modal dropdown
+ */
+function renderModalTemplateOptions() {
+    const templates = getAllTemplates().filter(t => t.id !== 'custom');
+    return templates.map(template => `
+        <button class="modal-template-option w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" data-template-id="${template.id}">
+            <div class="font-medium text-gray-900 dark:text-white text-sm">${template.name}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 truncate">${template.description}</div>
+            <div class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">${template.sections.length} sections • ${template.totalBars} bars</div>
+        </button>
+    `).join('');
+}
+
+/**
+ * Render a template preview in the modal content area
+ * Enhanced version with draggable sections and chord preview
+ */
+function renderTemplatePreview(template, content, modal) {
+    // Section type colors (same as used in songBuilder)
+    const sectionColors = {
+        verse: '#3b82f6',
+        chorus: '#10b981',
+        bridge: '#f59e0b',
+        intro: '#8b5cf6',
+        outro: '#6366f1',
+        'pre-chorus': '#ec4899',
+        custom: '#6b7280'
+    };
+
+    const getSectionColor = (type) => sectionColors[type] || sectionColors.custom;
+
+    // Track reordered sections - start with original order
+    let reorderedSections = [...template.sections];
+    let selectedSectionIndex = null;
+
+    const renderSections = () => {
+        const sectionsHtml = reorderedSections.map((section, idx) => `
+            <div class="template-section-item group relative flex items-center gap-2 px-3 py-2.5 rounded-lg text-white text-sm font-medium cursor-grab active:cursor-grabbing transition-all hover:scale-105 hover:shadow-lg"
+                 style="background-color: ${getSectionColor(section.type)}"
+                 data-section-index="${idx}">
+                <div class="absolute -top-1 -right-1 w-4 h-4 bg-white/20 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" title="Drag to reorder">
+                    <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
+                    </svg>
+                </div>
+                <span>${section.label || (section.type.charAt(0).toUpperCase() + section.type.slice(1))}</span>
+                <span class="opacity-70 text-xs">(${section.expectedChordCount || '?'} chords)</span>
+            </div>
+            ${idx < reorderedSections.length - 1 ? '<span class="template-section-arrow text-gray-400 dark:text-gray-500 flex-shrink-0">→</span>' : ''}
+        `).join('');
+
+        return sectionsHtml;
+    };
+
+    content.innerHTML = `
+        <div class="template-preview">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">${template.name} Template</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">${template.description}</p>
+                </div>
+                <button id="back-to-builder" class="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    Back
+                </button>
+            </div>
+
+            <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Organize Structure</div>
+                    <div class="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
+                        </svg>
+                        Drag sections to reorder
+                    </div>
+                </div>
+                <div id="template-sections-container" class="flex flex-wrap gap-2 items-center">
+                    ${renderSections()}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                    <div class="text-gray-500 dark:text-gray-400">Total Sections</div>
+                    <div class="text-xl font-bold text-gray-900 dark:text-white">${template.sections.length}</div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                    <div class="text-gray-500 dark:text-gray-400">Total Bars</div>
+                    <div class="text-xl font-bold text-gray-900 dark:text-white">${template.totalBars}</div>
+                </div>
+            </div>
+
+            ${template.genres && template.genres.length > 0 ? `
+                <div class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    <span class="font-medium">Common in:</span> ${template.genres.join(', ')}
+                </div>
+            ` : ''}
+
+            <div class="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button id="reset-order-btn" class="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 flex items-center gap-1 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Reset Order
+                </button>
+                <div class="flex gap-2">
+                    <button id="cancel-template-preview" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors font-medium">
+                        Cancel
+                    </button>
+                    <button id="apply-template-btn" class="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold rounded-lg transition-all shadow-lg hover:shadow-xl flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Finalize Structure
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Initialize drag/drop for sections if Sortable is available
+    const sectionsContainer = content.querySelector('#template-sections-container');
+    if (typeof Sortable !== 'undefined' && sectionsContainer) {
+        new Sortable(sectionsContainer, {
+            animation: 200,
+            ghostClass: 'opacity-50',
+            chosenClass: 'sortable-chosen',
+            draggable: '.template-section-item',
+            filter: '.template-section-arrow',
+            onEnd: function(evt) {
+                if (evt.oldIndex !== evt.newIndex) {
+                    // Calculate actual section indices (accounting for arrow elements)
+                    const sectionItems = Array.from(sectionsContainer.querySelectorAll('.template-section-item'));
+                    const oldIdx = Math.floor(evt.oldIndex / 2);
+                    const newIdx = Math.floor(evt.newIndex / 2);
+
+                    // Reorder the sections array
+                    const [moved] = reorderedSections.splice(oldIdx, 1);
+                    reorderedSections.splice(newIdx, 0, moved);
+
+                    // Re-render to fix arrows
+                    sectionsContainer.innerHTML = renderSections();
+
+                    // Show notification
+                    window.dispatchEvent(new CustomEvent('showNotification', {
+                        detail: { message: 'Section order updated', type: 'info' }
+                    }));
+                }
+            }
+        });
+    }
+
+    // Reset order button
+    content.querySelector('#reset-order-btn')?.addEventListener('click', () => {
+        reorderedSections = [...template.sections];
+        sectionsContainer.innerHTML = renderSections();
+        window.dispatchEvent(new CustomEvent('showNotification', {
+            detail: { message: 'Section order reset', type: 'info' }
+        }));
+    });
+
+    // Wire up buttons
+    content.querySelector('#back-to-builder')?.addEventListener('click', () => {
+        // Go back to regular builder view
+        try {
+            createSongBuilder(content, { showHeader: false });
+        } catch (e) {
+            console.error('[renderTemplatePreview] Error going back:', e);
+        }
+    });
+
+    content.querySelector('#cancel-template-preview')?.addEventListener('click', () => {
+        // Go back to regular builder view
+        try {
+            createSongBuilder(content, { showHeader: false });
+        } catch (e) {
+            console.error('[renderTemplatePreview] Error canceling:', e);
+        }
+    });
+
+    content.querySelector('#apply-template-btn')?.addEventListener('click', () => {
+        // Apply template with reordered sections
+        applyTemplateWithOrderInModal(template, reorderedSections, content, modal);
+    });
+}
+
+/**
+ * Apply a template with a custom section order
+ */
+function applyTemplateWithOrderInModal(template, reorderedSections, content, modal) {
+    const compositionState = getCompositionState();
+    const existingSections = compositionState?.getSections?.() || [];
+
+    // If there are existing sections, show confirmation first
+    if (existingSections.length > 0) {
+        const confirmDialog = document.createElement('div');
+        confirmDialog.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-[10001]';
+        confirmDialog.innerHTML = `
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full m-4 p-6">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Replace Existing Structure?</h3>
+                <p class="text-gray-600 dark:text-gray-400 mb-4">
+                    You have ${existingSections.length} section${existingSections.length !== 1 ? 's' : ''} defined.
+                    Applying this template will clear your current section structure.
+                    <span class="font-medium">Your chords will be preserved</span> but won't be assigned to sections.
+                </p>
+                <div class="flex justify-end gap-2">
+                    <button id="cancel-replace" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button id="confirm-replace" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">
+                        Replace Structure
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(confirmDialog);
+
+        confirmDialog.querySelector('#cancel-replace').addEventListener('click', () => {
+            confirmDialog.remove();
+        });
+
+        confirmDialog.querySelector('#confirm-replace').addEventListener('click', () => {
+            confirmDialog.remove();
+            doApplyTemplateWithOrder(template, reorderedSections, modal);
+        });
+
+        confirmDialog.addEventListener('click', (ev) => {
+            if (ev.target === confirmDialog) {
+                confirmDialog.remove();
+            }
+        });
+    } else {
+        // No existing sections, apply directly
+        doApplyTemplateWithOrder(template, reorderedSections, modal);
+    }
+}
+
+/**
+ * Actually apply the template with custom section order
+ */
+function doApplyTemplateWithOrder(template, reorderedSections, modal) {
+    const compositionState = getCompositionState();
+
+    // Clear existing sections
+    const existingSections = compositionState.getSections();
+    existingSections.forEach(s => compositionState.deleteSection(s.id));
+
+    // Create new sections in the reordered order
+    reorderedSections.forEach(sectionDef => {
+        compositionState.createSection(sectionDef.type, [], sectionDef.label);
+    });
+
+    // Clear section selection so "All" is shown by default after applying template
+    clearSectionSelection();
+
+    // Re-render the progression display to reflect cleared selection
+    renderProgressionDisplay('melody-progression-visualization', true);
+
+    // Close modal and refresh main view
+    modal.remove();
+    refreshMainViewOnClose();
+
+    // Show success notification
+    window.dispatchEvent(new CustomEvent('showNotification', {
+        detail: {
+            message: `Created ${reorderedSections.length} sections from "${template.name}" template!`,
+            type: 'success'
+        }
+    }));
+}
+
+/**
+ * Apply a template, close the modal, and show placeholders in the main view
+ */
+function applyTemplateInModal(templateId, content, modal) {
+    const compositionState = getCompositionState();
+    const existingSections = compositionState?.getSections?.() || [];
+
+    // If there are existing sections, show confirmation first
+    if (existingSections.length > 0) {
+        const confirmDialog = document.createElement('div');
+        confirmDialog.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-[10001]';
+        confirmDialog.innerHTML = `
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full m-4 p-6">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Replace Existing Structure?</h3>
+                <p class="text-gray-600 dark:text-gray-400 mb-4">
+                    You have ${existingSections.length} section${existingSections.length !== 1 ? 's' : ''} defined.
+                    Applying a template will clear your current section structure.
+                    <span class="font-medium">Your chords will be preserved</span> but won't be assigned to sections.
+                </p>
+                <div class="flex justify-end gap-2">
+                    <button id="cancel-replace" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button id="confirm-replace" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">
+                        Replace Structure
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(confirmDialog);
+
+        confirmDialog.querySelector('#cancel-replace').addEventListener('click', () => {
+            confirmDialog.remove();
+        });
+
+        confirmDialog.querySelector('#confirm-replace').addEventListener('click', () => {
+            confirmDialog.remove();
+            doApplyTemplate(templateId, modal);
+        });
+
+        confirmDialog.addEventListener('click', (ev) => {
+            if (ev.target === confirmDialog) {
+                confirmDialog.remove();
+            }
+        });
+    } else {
+        // No existing sections, apply directly
+        doApplyTemplate(templateId, modal);
+    }
+}
+
+/**
+ * Actually apply the template and show the builder with new sections
+ */
+function doApplyTemplate(templateId, modal) {
+    const compositionState = getCompositionState();
+    const result = compositionState.applyStructureTemplate(templateId);
+
+    if (result.success) {
+        // Get the modal content area and refresh the builder to show the new sections
+        const content = modal.querySelector('#song-builder-modal-content');
+        if (content) {
+            try {
+                createSongBuilder(content, { showHeader: false });
+            } catch (e) {
+                console.error('[doApplyTemplate] Error refreshing builder:', e);
+            }
+        }
+
+        // Show notification
+        window.dispatchEvent(new CustomEvent('showNotification', {
+            detail: {
+                message: `Applied "${result.template.name}" template with ${result.sectionsCreated} sections`,
+                type: 'success'
+            }
+        }));
+    } else {
+        window.dispatchEvent(new CustomEvent('showNotification', {
+            detail: {
+                message: 'Failed to apply template',
+                type: 'error'
+            }
+        }));
+    }
+}
+
+/**
+ * Refresh the main progression display when modal closes (called from close handlers)
+ */
+function refreshMainViewOnClose() {
+    // Switch to Section View mode to show the placeholders
+    setProgressionViewMode('section');
+
+    // Refresh the main progression display
+    renderProgressionDisplay('melody-progression-visualization', true);
+
+    // Also refresh builder tab if it exists
+    const builderViz = document.getElementById('builder-progression-visualization');
+    if (builderViz) {
+        renderProgressionDisplay('builder-progression-visualization', false);
+    }
+}
+
+/**
  * Show the Song Builder in a modal overlay
  * Used after loading composition from wizard in "Full Composition" mode
  * @param {boolean} forceShowBuilder - If true, always show builder even if no content detected
@@ -3008,24 +3390,111 @@ export function showSongBuilderModal(forceShowBuilder = false) {
 
     const sections = compositionState?.getSections?.() || [];
     const progression = compositionState?.getChords?.() || [];  // Use getChords() not getProgression()
-    // When called from wizard, we force showing the builder
-    const hasContent = forceShowBuilder || sections.length > 0 || progression.length > 0;
+
+    // Determine state:
+    // - 'empty': no chords, no sections → show create options
+    // - 'unorganized': has chords but no sections → show organize options
+    // - 'organized': has sections → show full builder
+    const hasSections = sections.length > 0;
+    const hasChords = progression.length > 0;
+    const builderState = forceShowBuilder ? 'organized' :
+                         hasSections ? 'organized' :
+                         hasChords ? 'unorganized' : 'empty';
+
+    // Different header based on builder state
+    const getHeaderHtml = () => {
+        if (builderState === 'organized') {
+            return `
+                <div class="sticky top-0 bg-white dark:bg-gray-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between z-20">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">🏗️</span>
+                        <span class="font-bold text-gray-900 dark:text-white">Song Structure Builder</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="use-wizard-btn" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg flex items-center gap-1 transition-colors" title="Use the guided wizard">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                            Wizard
+                        </button>
+                        <div class="relative">
+                            <button id="modal-template-btn" class="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-lg flex items-center gap-1 transition-colors" title="Apply a song structure template">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/>
+                                </svg>
+                                Templates
+                            </button>
+                            <div id="modal-template-dropdown" class="hidden absolute right-0 top-full mt-1 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50">
+                                <div class="p-2 border-b border-gray-200 dark:border-gray-700">
+                                    <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Song Structure Templates</span>
+                                </div>
+                                <div class="py-1 max-h-64 overflow-y-auto">
+                                    ${renderModalTemplateOptions()}
+                                </div>
+                            </div>
+                        </div>
+                        <button id="start-over-btn" class="px-3 py-1.5 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 text-sm font-medium rounded-lg flex items-center gap-1 transition-colors" title="Clear sections and start fresh">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            Start Over
+                        </button>
+                        <button class="close-modal-btn p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+        } else if (builderState === 'unorganized') {
+            return `
+                <div class="sticky top-0 bg-gradient-to-r from-blue-600 to-cyan-600 px-4 py-3 flex items-center justify-between z-20 rounded-t-2xl">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">🎼</span>
+                        <span class="font-bold text-white">Create a Song Structure</span>
+                        <span class="px-2 py-0.5 bg-white/20 rounded text-sm text-white">${progression.length} chords</span>
+                    </div>
+                    <button class="close-modal-btn p-2 hover:bg-white/20 rounded-lg text-white transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="sticky top-0 bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-3 flex items-center justify-between z-20 rounded-t-2xl">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">🎵</span>
+                        <span class="font-bold text-white">Create Your Song</span>
+                    </div>
+                    <button class="close-modal-btn p-2 hover:bg-white/20 rounded-lg text-white transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            `;
+        }
+    };
+    const headerHtml = getHeaderHtml();
+
+    // Render content based on state
+    const getContentHtml = () => {
+        if (builderState === 'empty') {
+            return renderEmptyBuilderState();
+        } else if (builderState === 'unorganized') {
+            return renderUnorganizedState(progression.length);
+        }
+        return ''; // organized state gets rendered by createSongBuilder
+    };
 
     modal.innerHTML = `
         <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto m-4 relative">
-            <div class="sticky top-0 bg-white dark:bg-gray-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between z-20">
-                <div class="flex items-center gap-2">
-                    <span class="text-xl">🏗️</span>
-                    <span class="font-bold text-gray-900 dark:text-white">Song Structure Builder</span>
-                </div>
-                <button class="close-modal-btn p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-600 dark:text-gray-300 transition-colors">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-            </div>
+            ${headerHtml}
             <div id="song-builder-modal-content" class="p-4">
-                ${!hasContent ? renderEmptyBuilderState() : ''}
+                ${getContentHtml()}
             </div>
         </div>
     `;
@@ -3033,8 +3502,8 @@ export function showSongBuilderModal(forceShowBuilder = false) {
 
     const content = modal.querySelector('#song-builder-modal-content');
 
-    // Render the builder if we have content or forced
-    if (hasContent) {
+    // Render the builder if we have organized sections
+    if (builderState === 'organized') {
         try {
             createSongBuilder(content, {
                 showHeader: false,
@@ -3069,29 +3538,99 @@ export function showSongBuilderModal(forceShowBuilder = false) {
                 }
             });
         }
-    } else {
+    } else if (builderState === 'empty') {
         // Wire up empty state buttons
-        content.querySelector('#start-wizard-from-builder')?.addEventListener('click', () => {
+        content.querySelector('#start-new-wizard')?.addEventListener('click', () => {
             modal.remove();
-            openWizardInModal();
+            openNewSongwritingWizard();
         });
 
         content.querySelector('#start-with-template')?.addEventListener('click', () => {
             showTemplateSelector(content, modal);
         });
+    } else if (builderState === 'unorganized') {
+        // Wire up unorganized state buttons
+        content.querySelector('#organize-with-wizard')?.addEventListener('click', () => {
+            modal.remove();
+            openNewSongwritingWizard();
+        });
+
+        content.querySelector('#organize-with-template')?.addEventListener('click', () => {
+            showTemplateSelector(content, modal);
+        });
     }
 
-    // Close button handler - use optional chaining to be safe
-    const closeBtn = modal.querySelector('.close-modal-btn');
-    if (closeBtn) {
+    // Wizard button in organized state header
+    modal.querySelector('#use-wizard-btn')?.addEventListener('click', () => {
+        modal.remove();
+        openNewSongwritingWizard();
+    });
+
+    // Start Over button - clears sections and shows initial state
+    modal.querySelector('#start-over-btn')?.addEventListener('click', () => {
+        // Show confirmation
+        const confirmed = confirm('This will remove all song sections. Your chords will be preserved but unorganized. Continue?');
+        if (!confirmed) return;
+
+        // Clear all sections
+        const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+        if (compositionState) {
+            const sections = compositionState.getSections();
+            sections.forEach(section => {
+                compositionState.deleteSection(section.id);
+            });
+        }
+
+        // Close and reopen modal to show the new state
+        modal.remove();
+        showSongBuilderModal();
+    });
+
+    // Close button handler - handle all close buttons (different headers for different states)
+    modal.querySelectorAll('.close-modal-btn').forEach(closeBtn => {
         closeBtn.addEventListener('click', () => {
+            refreshMainViewOnClose();
             modal.remove();
+        });
+    });
+
+    // Template button and dropdown handlers
+    const templateBtn = modal.querySelector('#modal-template-btn');
+    const templateDropdown = modal.querySelector('#modal-template-dropdown');
+    if (templateBtn && templateDropdown) {
+        // Toggle dropdown on button click
+        templateBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            templateDropdown.classList.toggle('hidden');
+        });
+
+        // Handle template option clicks - show preview first
+        templateDropdown.querySelectorAll('.modal-template-option').forEach(option => {
+            option.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const templateId = option.dataset.templateId;
+                templateDropdown.classList.add('hidden');
+
+                // Get the template and show preview
+                const template = getTemplate(templateId);
+                if (template) {
+                    renderTemplatePreview(template, content, modal);
+                }
+            });
+        });
+
+        // Close dropdown when clicking outside
+        modal.addEventListener('click', (e) => {
+            if (!templateBtn.contains(e.target) && !templateDropdown.contains(e.target)) {
+                templateDropdown.classList.add('hidden');
+            }
         });
     }
 
     // Click outside to close
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
+            refreshMainViewOnClose();
             modal.remove();
         }
     });
@@ -3099,6 +3638,7 @@ export function showSongBuilderModal(forceShowBuilder = false) {
     // Escape key to close
     const handleEscape = (e) => {
         if (e.key === 'Escape') {
+            refreshMainViewOnClose();
             modal.remove();
             document.removeEventListener('keydown', handleEscape);
         }
@@ -3116,22 +3656,21 @@ function renderEmptyBuilderState() {
             <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Start Creating Your Song</h3>
             <p class="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
                 The Song Builder organizes your chords into sections like Verse, Chorus, and Bridge.
-                <span class="font-medium text-gray-700 dark:text-gray-300">First, you need some chords to work with:</span>
             </p>
 
-            <div class="grid md:grid-cols-2 gap-4 max-w-lg mx-auto">
-                <button id="start-wizard-from-builder" class="p-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl shadow-lg transition-all hover:scale-105 ring-2 ring-purple-300 ring-offset-2">
+            <div class="grid md:grid-cols-2 gap-4 max-w-xl mx-auto">
+                <button id="start-new-wizard" class="p-5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl shadow-lg transition-all hover:scale-105 ring-2 ring-purple-300 ring-offset-2">
                     <div class="text-xs uppercase tracking-wide text-purple-200 mb-1">Recommended</div>
-                    <div class="text-2xl mb-2">🎵</div>
-                    <div class="font-bold">Songwriting Wizard</div>
-                    <div class="text-sm text-purple-100">Guided step-by-step creation</div>
+                    <div class="text-3xl mb-2">🎵</div>
+                    <div class="font-bold text-lg">Guided Wizard</div>
+                    <div class="text-sm text-purple-100">Pick structure → fill sections with suggested chords</div>
                 </button>
 
-                <button id="start-with-template" class="p-4 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white rounded-xl shadow-lg transition-all hover:scale-105">
-                    <div class="text-xs uppercase tracking-wide text-gray-300 mb-1">Quick Start</div>
-                    <div class="text-2xl mb-2">📋</div>
-                    <div class="font-bold">Use a Template</div>
-                    <div class="text-sm text-gray-300">Pick a structure, add chords later</div>
+                <button id="start-with-template" class="p-5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl shadow-lg transition-all hover:scale-105">
+                    <div class="text-xs uppercase tracking-wide text-blue-200 mb-1">Quick Start</div>
+                    <div class="text-3xl mb-2">📋</div>
+                    <div class="font-bold text-lg">Empty Template</div>
+                    <div class="text-sm text-blue-100">Pick structure → add your own chords</div>
                 </button>
             </div>
 
@@ -3145,15 +3684,58 @@ function renderEmptyBuilderState() {
 }
 
 /**
+ * Render state when chords exist but aren't organized into sections
+ */
+function renderUnorganizedState(chordCount) {
+    return `
+        <div class="text-center py-8">
+            <div class="text-6xl mb-4">🎼</div>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Create a Song Structure</h3>
+            <p class="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                You have <strong>${chordCount} chords</strong> ready! Choose how to organize them into sections like Verse, Chorus, and Bridge.
+            </p>
+
+            <div class="grid md:grid-cols-2 gap-4 max-w-xl mx-auto">
+                <button id="organize-with-wizard" class="p-5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl shadow-lg transition-all hover:scale-105 ring-2 ring-purple-300 ring-offset-2">
+                    <div class="text-xs uppercase tracking-wide text-purple-200 mb-1">Recommended</div>
+                    <div class="text-3xl mb-2">🎵</div>
+                    <div class="font-bold text-lg">Guided Wizard</div>
+                    <div class="text-sm text-purple-100">Pick structure → drag chords into sections</div>
+                </button>
+
+                <button id="organize-with-template" class="p-5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl shadow-lg transition-all hover:scale-105">
+                    <div class="text-xs uppercase tracking-wide text-blue-200 mb-1">Quick Start</div>
+                    <div class="text-3xl mb-2">📋</div>
+                    <div class="font-bold text-lg">Apply Template</div>
+                    <div class="text-sm text-blue-100">Pick structure → auto-distribute chords</div>
+                </button>
+            </div>
+
+            <div class="mt-6 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg max-w-md mx-auto">
+                <p class="text-sm text-amber-800 dark:text-amber-200">
+                    <span class="font-medium">💡 Tip:</span> Your existing chords will be preserved. Sections help organize your song structure.
+                </p>
+            </div>
+        </div>
+    `;
+}
+
+/**
  * Show template selector within the modal
  */
 function showTemplateSelector(content, modal) {
-    const templates = [
-        { id: 'verse-chorus', name: 'Verse-Chorus', icon: '🎤', desc: 'Pop/Rock standard', sections: ['Intro', 'Verse', 'Chorus', 'Verse', 'Chorus', 'Outro'] },
-        { id: 'verse-chorus-bridge', name: 'Full Structure', icon: '🏛️', desc: 'Complete song form', sections: ['Intro', 'Verse', 'Pre-Chorus', 'Chorus', 'Verse', 'Chorus', 'Bridge', 'Chorus', 'Outro'] },
-        { id: 'aaba', name: 'AABA (32-bar)', icon: '🎷', desc: 'Jazz standard', sections: ['A', 'A', 'B', 'A'] },
-        { id: 'simple', name: 'Simple Loop', icon: '🔄', desc: 'Repeating progression', sections: ['Loop'] }
-    ];
+    // Use the same templates as getAllTemplates() from songStructureTemplates.js
+    const templates = getAllTemplates().filter(t => t.id !== 'custom');
+
+    // Icons for each template type
+    const templateIcons = {
+        'simple': '🔄',
+        'standard': '🎤',
+        'extended': '🏛️',
+        'verseHeavy': '📝',
+        'aaba': '🎷',
+        'blues': '🎸'
+    };
 
     content.innerHTML = `
         <div class="py-4">
@@ -3170,13 +3752,14 @@ function showTemplateSelector(content, modal) {
                 ${templates.map(t => `
                     <button class="template-btn p-4 bg-gray-50 dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 border border-gray-200 dark:border-gray-700 hover:border-blue-400 rounded-xl text-left transition-all" data-template="${t.id}">
                         <div class="flex items-start gap-3">
-                            <span class="text-2xl">${t.icon}</span>
+                            <span class="text-2xl">${templateIcons[t.id] || '📋'}</span>
                             <div class="flex-1">
                                 <div class="font-bold text-gray-900 dark:text-white">${t.name}</div>
-                                <div class="text-sm text-gray-500 dark:text-gray-400">${t.desc}</div>
+                                <div class="text-sm text-gray-500 dark:text-gray-400">${t.description}</div>
                                 <div class="flex flex-wrap gap-1 mt-2">
-                                    ${t.sections.map(s => `<span class="px-2 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs rounded">${s}</span>`).join('')}
+                                    ${t.sections.map(s => `<span class="px-2 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs rounded">${s.label || s.type}</span>`).join('')}
                                 </div>
+                                <div class="text-xs text-gray-400 mt-1">${t.sections.length} sections • ${t.totalBars} bars</div>
                             </div>
                         </div>
                     </button>
@@ -3186,26 +3769,446 @@ function showTemplateSelector(content, modal) {
     `;
 
     content.querySelector('#back-to-empty').addEventListener('click', () => {
-        content.innerHTML = renderEmptyBuilderState();
-        content.querySelector('#start-wizard-from-builder')?.addEventListener('click', () => {
-            modal.remove();
-            openWizardInModal();
-        });
-        content.querySelector('#start-with-template')?.addEventListener('click', () => {
-            showTemplateSelector(content, modal);
-        });
+        // Determine which state to go back to
+        const compositionState = getCompositionState();
+        const progression = window.trainerState?.progressionData || [];
+        const hasChords = progression.length > 0;
+
+        if (hasChords) {
+            content.innerHTML = renderUnorganizedState(progression.length);
+            content.querySelector('#organize-with-wizard')?.addEventListener('click', () => {
+                modal.remove();
+                openNewSongwritingWizard();
+            });
+            content.querySelector('#organize-with-template')?.addEventListener('click', () => {
+                showTemplateSelector(content, modal);
+            });
+        } else {
+            content.innerHTML = renderEmptyBuilderState();
+            content.querySelector('#start-new-wizard')?.addEventListener('click', () => {
+                modal.remove();
+                openNewSongwritingWizard();
+            });
+            content.querySelector('#start-with-template')?.addEventListener('click', () => {
+                showTemplateSelector(content, modal);
+            });
+        }
     });
 
     content.querySelectorAll('.template-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const templateId = btn.dataset.template;
-            applyTemplateAndClose(templateId, modal);
+            const template = getAllTemplates().find(t => t.id === templateId);
+            if (template) {
+                // Show preview first, don't apply immediately
+                showTemplatePreviewBeforeApply(template, content, modal);
+            }
         });
     });
 }
 
 /**
- * Apply a template and close modal
+ * Show song builder-style preview of template sections BEFORE applying
+ * User can reorder sections here, then Finalize or Cancel
+ * Shows full Song Builder UI structure with placeholders for chord-dependent features
+ */
+function showTemplatePreviewBeforeApply(template, content, modal) {
+    // Section type definitions (matching songBuilder.js)
+    const SECTION_TYPES = {
+        intro: { label: 'Intro', emoji: '🎬', bgColor: 'bg-purple-100 dark:bg-purple-900/30', borderColor: 'border-purple-300 dark:border-purple-700', color: '#8b5cf6' },
+        verse: { label: 'Verse', emoji: '📝', bgColor: 'bg-blue-100 dark:bg-blue-900/30', borderColor: 'border-blue-300 dark:border-blue-700', color: '#3b82f6' },
+        'pre-chorus': { label: 'Pre-Chorus', emoji: '⬆️', bgColor: 'bg-cyan-100 dark:bg-cyan-900/30', borderColor: 'border-cyan-300 dark:border-cyan-700', color: '#06b6d4' },
+        prechorus: { label: 'Pre-Chorus', emoji: '⬆️', bgColor: 'bg-cyan-100 dark:bg-cyan-900/30', borderColor: 'border-cyan-300 dark:border-cyan-700', color: '#06b6d4' },
+        chorus: { label: 'Chorus', emoji: '🎤', bgColor: 'bg-green-100 dark:bg-green-900/30', borderColor: 'border-green-300 dark:border-green-700', color: '#10b981' },
+        bridge: { label: 'Bridge', emoji: '🌉', bgColor: 'bg-amber-100 dark:bg-amber-900/30', borderColor: 'border-amber-300 dark:border-amber-700', color: '#f59e0b' },
+        outro: { label: 'Outro', emoji: '🎬', bgColor: 'bg-indigo-100 dark:bg-indigo-900/30', borderColor: 'border-indigo-300 dark:border-indigo-700', color: '#6366f1' },
+        instrumental: { label: 'Instrumental', emoji: '🎸', bgColor: 'bg-pink-100 dark:bg-pink-900/30', borderColor: 'border-pink-300 dark:border-pink-700', color: '#ec4899' },
+        custom: { label: 'Custom', emoji: '✨', bgColor: 'bg-gray-100 dark:bg-gray-800', borderColor: 'border-gray-300 dark:border-gray-600', color: '#6b7280' }
+    };
+
+    // Track reordered sections and selected section for details
+    let reorderedSections = [...template.sections];
+    let selectedSectionIndex = 0;
+
+    const renderTimeline = () => {
+        return reorderedSections.map((section, idx) => {
+            const sectionType = SECTION_TYPES[section.type] || SECTION_TYPES.custom;
+            const label = section.label || sectionType.label;
+            const chordCount = section.expectedChordCount || 4;
+            const isSelected = idx === selectedSectionIndex;
+
+            return `
+                <div class="section-block group relative flex items-center gap-1.5 px-2 py-1.5 rounded-lg cursor-pointer transition-all hover:shadow-md border ${sectionType.borderColor} ${sectionType.bgColor} ${isSelected ? 'ring-2 ring-blue-500 shadow-md' : ''}"
+                     data-section-index="${idx}">
+                    <svg class="w-3 h-3 text-gray-400 opacity-50 group-hover:opacity-100 cursor-grab active:cursor-grabbing flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" title="Drag to reorder">
+                        <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
+                    </svg>
+                    <span class="text-base">${sectionType.emoji}</span>
+                    <span class="text-xs font-semibold text-gray-700 dark:text-gray-200">${label}</span>
+                    <span class="text-[10px] text-gray-500 dark:text-gray-400">(${chordCount})</span>
+                </div>
+                ${idx < reorderedSections.length - 1 ? `
+                    <svg class="section-arrow w-3 h-3 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                    </svg>
+                ` : ''}
+            `;
+        }).join('');
+    };
+
+    // Render section details panel (like Song Builder's section details)
+    const renderSectionDetails = (sectionData, sectionIndex) => {
+        const sectionType = SECTION_TYPES[sectionData.type] || SECTION_TYPES.custom;
+        const profile = getSectionProfile(sectionData.type);
+        const nextSection = sectionIndex < reorderedSections.length - 1 ? reorderedSections[sectionIndex + 1] : null;
+        const nextSectionType = nextSection ? (SECTION_TYPES[nextSection.type] || SECTION_TYPES.custom) : null;
+
+        // Describe tension range
+        const tensionMin = Math.round((profile?.characteristics?.tensionRange?.[0] || 0.3) * 100);
+        const tensionMax = Math.round((profile?.characteristics?.tensionRange?.[1] || 0.6) * 100);
+
+        // Describe harmonic density
+        const densityDescriptions = {
+            'sparse': 'Few chord changes (1-2 per phrase)',
+            'low': 'Slow chord changes (2-3 per phrase)',
+            'medium': 'Moderate chord changes (4 per phrase)',
+            'high': 'Frequent chord changes (many per phrase)',
+            'variable': 'Mixed - varies throughout'
+        };
+        const density = profile?.characteristics?.harmonicDensity || 'medium';
+
+        return `
+            <!-- Section Header + Chords placeholder on same row -->
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-base">${sectionType.emoji}</span>
+                    <h4 class="text-sm font-bold text-gray-900 dark:text-white">${sectionData.label || sectionType.label}</h4>
+                    <span class="text-[10px] text-gray-500 dark:text-gray-400">(${sectionData.expectedChordCount || 4} chords)</span>
+                </div>
+                <span class="text-[10px] text-gray-400 dark:text-gray-500 italic border border-dashed border-gray-300 dark:border-gray-600 px-1.5 py-0.5 rounded">
+                    Add chords after finalizing
+                </span>
+            </div>
+
+            <!-- Analysis Row - more compact -->
+            <div class="flex gap-3 mb-2 p-1.5 bg-white/50 dark:bg-gray-800/50 rounded text-[11px]">
+                <div class="flex items-center gap-1.5 flex-1">
+                    <span class="text-gray-500 dark:text-gray-400">Tension:</span>
+                    <div class="flex-1 relative h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden max-w-[60px]">
+                        <div class="absolute h-full bg-blue-400 dark:bg-blue-600"
+                             style="left: ${tensionMin}%; width: ${tensionMax - tensionMin}%"></div>
+                    </div>
+                    <span class="font-medium text-gray-700 dark:text-gray-200">${tensionMin}-${tensionMax}%</span>
+                </div>
+                <div class="flex items-center gap-1 border-l border-gray-200 dark:border-gray-600 pl-3">
+                    <span class="text-gray-500 dark:text-gray-400">Rhythm:</span>
+                    <span class="text-gray-700 dark:text-gray-300">${density}</span>
+                </div>
+            </div>
+
+            <!-- Transition - compact -->
+            ${nextSection ? `
+                <div class="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800 text-[11px]">
+                    <svg class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    <span class="text-blue-700 dark:text-blue-300">
+                        <strong>Next:</strong> ${nextSectionType.emoji} ${nextSection.label || nextSectionType.label}
+                    </span>
+                    <span class="text-blue-500 dark:text-blue-400 ml-auto">Add chords for suggestions</span>
+                </div>
+            ` : `
+                <div class="p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 text-[11px] text-center text-gray-500 dark:text-gray-400">
+                    Last section
+                </div>
+            `}
+        `;
+    };
+
+    content.innerHTML = `
+        <div class="py-2">
+            <button id="back-to-templates" class="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-2 transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+                Back
+            </button>
+
+            <div class="mb-3">
+                <h3 class="text-base font-bold text-gray-900 dark:text-white">${template.name}</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400">${template.description}</p>
+            </div>
+
+            <!-- Timeline Section -->
+            <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-2 mb-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">Song Structure</span>
+                    <span class="text-[10px] text-gray-500 dark:text-gray-400">Drag to reorder</span>
+                </div>
+                <div id="sections-timeline" class="flex items-center gap-1 overflow-x-auto py-1">
+                    ${renderTimeline()}
+                </div>
+            </div>
+
+            <!-- Section Details Panel -->
+            <div id="section-details-panel" class="mb-3">
+                <div class="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+                    ${renderSectionDetails(reorderedSections[0], 0)}
+                </div>
+            </div>
+
+            <!-- Stats - inline -->
+            <div class="flex items-center gap-4 mb-3 text-[11px]">
+                <div class="flex items-center gap-1">
+                    <span class="text-gray-500 dark:text-gray-400">Sections:</span>
+                    <span class="font-bold text-gray-900 dark:text-white">${template.sections.length}</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="text-gray-500 dark:text-gray-400">Bars:</span>
+                    <span class="font-bold text-gray-900 dark:text-white">${template.totalBars}</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <span class="text-gray-500 dark:text-gray-400">Style:</span>
+                    <span class="font-bold text-gray-900 dark:text-white">${template.genres?.[0] || 'General'}</span>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+                <button id="reset-sections-btn" class="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Reset
+                </button>
+                <div class="flex gap-2">
+                    <button id="cancel-preview-btn" class="px-3 py-1.5 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors font-medium">
+                        Cancel
+                    </button>
+                    <button id="finalize-template-btn" class="px-4 py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white text-xs font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Finalize
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Add click handlers for section blocks
+    const updateSectionDetails = () => {
+        const detailsPanel = content.querySelector('#section-details-panel > div');
+        if (detailsPanel) {
+            detailsPanel.innerHTML = renderSectionDetails(reorderedSections[selectedSectionIndex], selectedSectionIndex);
+        }
+    };
+
+    const attachSectionClickHandlers = () => {
+        content.querySelectorAll('.section-block').forEach(block => {
+            block.addEventListener('click', (e) => {
+                // Don't trigger on drag handle
+                if (e.target.closest('.cursor-grab')) return;
+
+                const idx = parseInt(block.dataset.sectionIndex, 10);
+                if (!isNaN(idx)) {
+                    selectedSectionIndex = idx;
+                    // Re-render timeline to update selection state
+                    const timelineContainer = content.querySelector('#sections-timeline');
+                    if (timelineContainer) {
+                        timelineContainer.innerHTML = renderTimeline();
+                        attachSectionClickHandlers();
+                    }
+                    updateSectionDetails();
+                }
+            });
+        });
+    };
+
+    attachSectionClickHandlers();
+
+    // Initialize Sortable for section reordering
+    const timelineContainer = content.querySelector('#sections-timeline');
+    if (typeof Sortable !== 'undefined' && timelineContainer) {
+        new Sortable(timelineContainer, {
+            animation: 200,
+            ghostClass: 'opacity-50',
+            chosenClass: 'sortable-chosen',
+            dragClass: 'shadow-2xl',
+            draggable: '.section-block',
+            filter: '.section-arrow',
+            onEnd: function(evt) {
+                if (evt.oldIndex !== evt.newIndex) {
+                    // Calculate actual indices (accounting for arrow elements)
+                    const oldIdx = Math.floor(evt.oldIndex / 2);
+                    const newIdx = Math.floor(evt.newIndex / 2);
+
+                    // Reorder array
+                    const [moved] = reorderedSections.splice(oldIdx, 1);
+                    reorderedSections.splice(newIdx, 0, moved);
+
+                    // Re-render to fix arrows
+                    timelineContainer.innerHTML = renderTimeline();
+
+                    // Re-init sortable
+                    initSortable();
+
+                    window.dispatchEvent(new CustomEvent('showNotification', {
+                        detail: { message: 'Section order updated', type: 'info' }
+                    }));
+                }
+            }
+        });
+    }
+
+    function initSortable() {
+        if (typeof Sortable !== 'undefined' && timelineContainer) {
+            new Sortable(timelineContainer, {
+                animation: 200,
+                ghostClass: 'opacity-50',
+                chosenClass: 'sortable-chosen',
+                dragClass: 'shadow-2xl',
+                draggable: '.section-block',
+                filter: '.section-arrow',
+                onEnd: function(evt) {
+                    if (evt.oldIndex !== evt.newIndex) {
+                        const oldIdx = Math.floor(evt.oldIndex / 2);
+                        const newIdx = Math.floor(evt.newIndex / 2);
+                        const [moved] = reorderedSections.splice(oldIdx, 1);
+                        reorderedSections.splice(newIdx, 0, moved);
+                        timelineContainer.innerHTML = renderTimeline();
+                        initSortable();
+                    }
+                }
+            });
+        }
+    }
+
+    // Back button
+    content.querySelector('#back-to-templates')?.addEventListener('click', () => {
+        showTemplateSelector(content, modal);
+    });
+
+    // Reset order
+    content.querySelector('#reset-sections-btn')?.addEventListener('click', () => {
+        reorderedSections = [...template.sections];
+        timelineContainer.innerHTML = renderTimeline();
+        initSortable();
+        window.dispatchEvent(new CustomEvent('showNotification', {
+            detail: { message: 'Section order reset', type: 'info' }
+        }));
+    });
+
+    // Cancel - close modal without applying
+    content.querySelector('#cancel-preview-btn')?.addEventListener('click', () => {
+        modal.remove();
+    });
+
+    // Finalize - NOW apply the template
+    content.querySelector('#finalize-template-btn')?.addEventListener('click', () => {
+        applyTemplateWithCustomOrder(template, reorderedSections, content, modal);
+    });
+}
+
+/**
+ * Apply template with custom section order (called only when Finalize is clicked)
+ */
+function applyTemplateWithCustomOrder(template, reorderedSections, content, modal) {
+    const compositionState = getCompositionState();
+
+    // Clear existing sections first
+    const existingSections = compositionState.getSections();
+    existingSections.forEach(s => compositionState.deleteSection(s.id));
+
+    // Create sections in the reordered order as placeholders with expected chord counts
+    reorderedSections.forEach(sectionDef => {
+        compositionState.createPlaceholderSection(sectionDef.type, {
+            expectedChordCount: sectionDef.expectedChordCount || 4,
+            label: sectionDef.label
+        });
+    });
+
+    // Clear section selection
+    clearSectionSelection();
+
+    // Re-render progression display
+    renderProgressionDisplay('melody-progression-visualization', true);
+
+    // Close modal and refresh main view
+    modal.remove();
+    refreshMainViewOnClose();
+
+    window.dispatchEvent(new CustomEvent('showNotification', {
+        detail: {
+            message: `Created ${reorderedSections.length} sections from "${template.name}"!`,
+            type: 'success'
+        }
+    }));
+}
+
+/**
+ * Apply a template and show the song builder in the modal
+ * This keeps the user in the modal instead of kicking them out
+ */
+function applyTemplateAndShowBuilder(templateId, content, modal) {
+    const compositionState = getCompositionState();
+
+    // Use the proper template system from songStructureTemplates.js
+    const result = compositionState.applyStructureTemplate(templateId);
+
+    if (result.success) {
+        // Clear section selection so "All" is shown by default after applying template
+        clearSectionSelection();
+
+        // Re-render the progression display to reflect cleared selection
+        renderProgressionDisplay('melody-progression-visualization', true);
+
+        // Show the song builder in the modal content area
+        try {
+            createSongBuilder(content, { showHeader: false });
+        } catch (e) {
+            console.error('[applyTemplateAndShowBuilder] Error creating builder:', e);
+        }
+
+        // Show notification
+        window.dispatchEvent(new CustomEvent('showNotification', {
+            detail: { message: `Created ${result.sectionsCreated} sections from "${result.template?.name}" template!`, type: 'success' }
+        }));
+    } else {
+        // Fallback: use legacy section creation
+        const template = getTemplate(templateId);
+        if (template && template.sections) {
+            // Clear existing sections
+            const existingSections = compositionState.getSections();
+            existingSections.forEach(s => compositionState.deleteSection(s.id));
+
+            // Create new sections from template
+            template.sections.forEach(sectionDef => {
+                compositionState.createSection(sectionDef.type, []);
+            });
+
+            // Clear section selection so "All" is shown by default after applying template
+            clearSectionSelection();
+
+            // Re-render the progression display to reflect cleared selection
+            renderProgressionDisplay('melody-progression-visualization', true);
+
+            // Show the song builder
+            try {
+                createSongBuilder(content, { showHeader: false });
+            } catch (e) {
+                console.error('[applyTemplateAndShowBuilder] Error creating builder:', e);
+            }
+
+            window.dispatchEvent(new CustomEvent('showNotification', {
+                detail: { message: `Created ${template.sections.length} sections. Add chords to fill them in!`, type: 'success' }
+            }));
+        }
+    }
+}
+
+/**
+ * Apply a template and close modal (legacy function, kept for compatibility)
  */
 function applyTemplateAndClose(templateId, modal) {
     const compositionState = getCompositionState();
@@ -3243,12 +4246,16 @@ function applyTemplateAndClose(templateId, modal) {
 }
 
 // Export for window access
-window.openSongwritingWizard = openWizardInModal;
+// New structure-first wizard is now the default entry point
+window.openSongwritingWizard = openNewSongwritingWizard;
+window.openLegacyWizard = openWizardInModal; // Old mood-based wizard still available
 window.showSongBuilderModal = showSongBuilderModal;
+window.openNewSongwritingWizard = openNewSongwritingWizard;
 
 export default {
     renderSongwritingWizard,
     showSongwritingWizard,
     openWizardInModal,
-    showSongBuilderModal
+    showSongBuilderModal,
+    openNewSongwritingWizard
 };

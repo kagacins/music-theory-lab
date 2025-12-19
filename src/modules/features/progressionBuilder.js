@@ -116,6 +116,10 @@ let progressionViewMode = 'scroll';
 // Selected section IDs for section view mode (supports multi-select)
 let selectedSectionIds = new Set();
 
+// User's preferred section order (includes both real section IDs and pseudo-section IDs)
+// null means use default ordering, array means use this specific order
+let userSectionOrder = null;
+
 // LocalStorage key for view mode persistence
 const VIEW_MODE_STORAGE_KEY = 'progression-view-mode';
 
@@ -154,22 +158,9 @@ export function setProgressionViewMode(mode) {
         if (notationComposer && typeof notationComposer.clearMeasureFilter === 'function') {
             notationComposer.clearMeasureFilter();
         }
-    } else if (mode === 'section') {
-        // Auto-select first section when switching to section view
-        const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-        if (compositionState) {
-            const sections = compositionState.getSections();
-            if (sections.length > 0 && selectedSectionIds.size === 0) {
-                // Sort by first chord index to get the "first" section
-                const sortedSections = [...sections].sort((a, b) => {
-                    const aMin = Math.min(...(a.chordIndices || [0]));
-                    const bMin = Math.min(...(b.chordIndices || [0]));
-                    return aMin - bMin;
-                });
-                selectedSectionIds.add(sortedSections[0].id);
-            }
-        }
     }
+    // Note: Removed auto-selection of first section when switching to section view
+    // "All" (empty selection) is now the default, showing all chords
 }
 
 /**
@@ -214,6 +205,8 @@ export function deselectSectionInView(sectionId) {
  */
 export function clearSectionSelection() {
     selectedSectionIds.clear();
+    // Reset user section order to default when selection is cleared (e.g., after template load)
+    userSectionOrder = null;
     // Also clear the notation measure filter when clearing section selection
     const notationComposer = window.getNotationComposer ? window.getNotationComposer() : null;
     if (notationComposer && typeof notationComposer.clearMeasureFilter === 'function') {
@@ -385,6 +378,7 @@ import {
 import {
     getInsertAfterIndex,
     getSectionIntent,
+    setSectionIntent,
     INTENT_MODES
 } from '../state/sectionIntentState.js';
 
@@ -446,6 +440,9 @@ function getChordFunction(roman) {
         'VII': 'Dominant'
     };
     
+    // Handle undefined/null roman numerals
+    if (!roman) return null;
+
     // Handle roman numerals with suffixes (like 'V7', 'ii7', etc.)
     const baseRoman = roman.replace(/[0-9°]/g, '');
     return functionMap[baseRoman] || null;
@@ -3327,10 +3324,16 @@ function renderSectionViewModeForBuilder(gridContainer, progressionData, key, se
     const pickerBar = createSectionPickerBar(sections);
     gridContainer.appendChild(pickerBar);
 
+    // Initialize Sortable on the chips container now that it's in the DOM
+    const chipsContainer = pickerBar.querySelector('#section-chips-container');
+    if (chipsContainer) {
+        initializeSectionChipsSortable(chipsContainer);
+    }
+
     // Create cards container
     const cardsContainer = document.createElement('div');
     cardsContainer.className = 'section-filtered-cards scroll-view-container flex flex-nowrap gap-2 overflow-x-auto pb-2';
-    cardsContainer.style.cssText = 'scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;';
+    cardsContainer.style.cssText = '-webkit-overflow-scrolling: touch;';
 
     // Get selected section IDs or show all if none selected
     const selectedIds = selectedSectionIds.size > 0 ? selectedSectionIds : new Set(sections.map(s => s.id));
@@ -3610,8 +3613,10 @@ function createSectionChip(section, isSelected, onClick) {
     const chip = document.createElement('button');
     const chordCount = section.chordIndices?.length || 0;
     const sectionColor = section.color || '#c084fc';
+    const isPseudo = section.isPseudoSection;
 
     // Much stronger visual difference for selected state
+    // Dragging is via the handle, so keep cursor-pointer for the chip itself
     chip.className = `section-chip flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold
                       transition-all duration-200 flex-shrink-0 cursor-pointer
                       ${isSelected ? 'ring-2 ring-offset-2 shadow-lg transform scale-105' : 'hover:scale-102'}`;
@@ -3622,7 +3627,13 @@ function createSectionChip(section, isSelected, onClick) {
         ${isSelected ? `--tw-ring-color: ${sectionColor}; box-shadow: 0 4px 12px ${hexToRgba(sectionColor, 0.4)};` : ''}
     `;
 
+    // Add drag grip icon for all sections (including pseudo-sections for reordering)
+    const dragGrip = `<span class="section-pill-drag-handle cursor-grab active:cursor-grabbing"><svg class="w-3 h-3 opacity-40 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
+        <path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm0 6a2 2 0 10.001 4.001A2 2 0 007 14zm6-8a2 2 0 10.001-4.001A2 2 0 0013 6zm0 2a2 2 0 10.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10.001 4.001A2 2 0 0013 14z"/>
+    </svg></span>`;
+
     chip.innerHTML = `
+        ${dragGrip}
         <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background: ${sectionColor}; ${isSelected ? 'box-shadow: 0 0 8px ' + sectionColor + ';' : ''}"></span>
         <span class="truncate max-w-[100px]">${section.label || 'Section'}</span>
         <span class="text-[10px] ${isSelected ? 'font-bold' : 'opacity-70'}">(${chordCount})</span>
@@ -3631,6 +3642,11 @@ function createSectionChip(section, isSelected, onClick) {
 
     chip.onclick = (e) => onClick(section.id, e.shiftKey, e.ctrlKey || e.metaKey);
     chip.setAttribute('data-section-id', section.id);
+    // Mark pseudo-sections and store their chord indices for reordering
+    if (isPseudo) {
+        chip.setAttribute('data-pseudo-section', 'true');
+        chip.setAttribute('data-chord-indices', JSON.stringify(section.chordIndices || []));
+    }
 
     return chip;
 }
@@ -3671,7 +3687,8 @@ function createSectionPickerBar(sections) {
 
     // Section chips container
     const chipsContainer = document.createElement('div');
-    chipsContainer.className = 'flex items-center gap-1.5 flex-1 overflow-x-auto py-1 px-1';
+    chipsContainer.className = 'section-chips-container flex items-center gap-1.5 flex-1 overflow-x-auto py-1 px-1';
+    chipsContainer.id = 'section-chips-container';
     chipsContainer.style.scrollbarWidth = 'none'; // Hide scrollbar
 
     // Build combined list of real sections and ungrouped pseudo-sections
@@ -3684,6 +3701,9 @@ function createSectionPickerBar(sections) {
     });
 
     bar.appendChild(chipsContainer);
+
+    // Note: Sortable initialization is done AFTER this bar is appended to the document
+    // See renderSectionViewMode where initializeSectionChipsSortable is called
 
     // Next section button
     const nextBtn = document.createElement('button');
@@ -3771,13 +3791,30 @@ function buildSectionChipsWithUngrouped(sections) {
         isPseudoSection: true
     }));
 
-    // Combine real sections and pseudo-sections, sort by first chord index
+    // Combine real sections and pseudo-sections
     const allSections = [...sections, ...pseudoSections];
-    allSections.sort((a, b) => {
-        const aMin = Math.min(...(a.chordIndices || [Infinity]));
-        const bMin = Math.min(...(b.chordIndices || [Infinity]));
-        return aMin - bMin;
-    });
+
+    // If user has set a preferred order, use it
+    if (userSectionOrder && userSectionOrder.length > 0) {
+        // Sort by user's preferred order
+        allSections.sort((a, b) => {
+            const aIndex = userSectionOrder.indexOf(a.id);
+            const bIndex = userSectionOrder.indexOf(b.id);
+            // Items not in userSectionOrder go to the end
+            if (aIndex === -1 && bIndex === -1) return 0;
+            if (aIndex === -1) return 1;
+            if (bIndex === -1) return -1;
+            return aIndex - bIndex;
+        });
+    } else {
+        // Default: Sort all sections (real and pseudo) by their first chord index position
+        // This ensures appended chords appear at the end, not the beginning
+        allSections.sort((a, b) => {
+            const aMin = Math.min(...(a.chordIndices || [Infinity]));
+            const bMin = Math.min(...(b.chordIndices || [Infinity]));
+            return aMin - bMin;
+        });
+    }
 
     return allSections;
 }
@@ -3984,13 +4021,18 @@ function renderSectionViewMode(container, progressionData, key, sections) {
     const pickerBar = createSectionPickerBar(sections);
     container.appendChild(pickerBar);
 
+    // Initialize Sortable on the chips container now that it's in the DOM
+    const chipsContainer = pickerBar.querySelector('#section-chips-container');
+    if (chipsContainer) {
+        initializeSectionChipsSortable(chipsContainer);
+    }
+
     // Create cards container with horizontal scroll wrapper
     const cardsWrapper = document.createElement('div');
     cardsWrapper.className = 'section-cards-wrapper relative overflow-x-auto custom-scrollbar scroll-view-container';
     cardsWrapper.id = 'section-cards-wrapper';
-    // Add inline styles for smooth scrolling
+    // Add inline styles for smooth scrolling - no snap for fluid user control
     cardsWrapper.style.cssText = `
-        scroll-snap-type: x mandatory;
         scroll-behavior: smooth;
         -webkit-overflow-scrolling: touch;
         padding-bottom: 8px;
@@ -4027,31 +4069,88 @@ function renderSectionViewMode(container, progressionData, key, sections) {
     // Render filtered cards grouped by sections (with outlines and labels)
     let animationIndex = 0;
 
-    // Render each section/pseudo-section that has visible chords
-    // (allSectionsWithPseudo was already built above for filtering)
-    allSectionsWithPseudo.forEach(sectionData => {
+    // For placeholder sections (from templates), we need to show them even if empty
+    // Get the composition state sections which include placeholder info
+    let compositionSections = [];
+    try {
+        const compositionState = window.getCompositionState?.();
+        compositionSections = compositionState?.getSections?.() || [];
+    } catch (e) {
+        // Fallback if compositionState not available
+    }
+
+    // Build ordered list based on chord positions (supports user reordering)
+    // allSectionsWithPseudo is already sorted by first chord index
+    const orderedSections = allSectionsWithPseudo.map(section => {
+        if (section.isPseudoSection) {
+            return section;
+        }
+        // For real sections, merge placeholder info from compositionState
+        const compositionSection = compositionSections.find(s => s.id === section.id);
+        if (compositionSection) {
+            return {
+                ...section,
+                isPlaceholder: compositionSection.isPlaceholder,
+                expectedChordCount: compositionSection.expectedChordCount || 4,
+                targetBars: compositionSection.targetBars
+            };
+        }
+        return section;
+    });
+
+    // Also add any empty placeholder sections that aren't in allSectionsWithPseudo
+    compositionSections.forEach(section => {
+        if (!orderedSections.find(s => s.id === section.id)) {
+            // Empty placeholder section - add at the end
+            orderedSections.push({
+                ...section,
+                chordIndices: section.chordIndices || [],
+                isPlaceholder: section.isPlaceholder !== false,
+                expectedChordCount: section.expectedChordCount || 4
+            });
+        }
+    });
+
+    // Render each section (including empty placeholders)
+    orderedSections.forEach(sectionData => {
         // Check if any of this section's chords are visible
-        const visibleInSection = sectionData.chordIndices.filter(idx => visibleChordIndices.has(idx));
-        if (visibleInSection.length === 0) return;
+        const visibleInSection = (sectionData.chordIndices || []).filter(idx => visibleChordIndices.has(idx));
+
+        // For placeholder sections, show even if empty (when no filter or this section is selected)
+        const isPlaceholder = sectionData.isPlaceholder && visibleInSection.length === 0;
+        const showPlaceholder = isPlaceholder && (selectedIds.length === 0 || selectedIds.includes(sectionData.id));
+
+        // Skip if no visible chords AND not a placeholder to show
+        if (visibleInSection.length === 0 && !showPlaceholder) return;
 
         // Create section container with outline and label
         const sectionContainer = document.createElement('div');
         sectionContainer.className = 'section-unified-container inline-flex flex-col flex-shrink-0 rounded-lg overflow-visible section-view-card';
         sectionContainer.setAttribute('data-section-id', sectionData.id);
-        sectionContainer.style.cssText = `animation-delay: ${animationIndex * 50}ms; scroll-snap-align: start;`;
+        sectionContainer.style.cssText = `animation-delay: ${animationIndex * 50}ms;`;
 
-        // Banner header with section label
+        const isPseudoSection = sectionData.isPseudoSection;
+
+        // Mark pseudo-sections so they can be filtered from section reorder logic
+        if (isPseudoSection) {
+            sectionContainer.setAttribute('data-pseudo-section', 'true');
+        }
+
+        // Banner header with section label and chord count
         const banner = document.createElement('div');
         banner.className = 'section-banner flex items-center gap-2 px-2 py-1 rounded-t-lg cursor-grab active:cursor-grabbing';
         banner.style.backgroundColor = sectionData.color || '#9ca3af';
         banner.setAttribute('data-section-id', sectionData.id);
+        const chordCount = visibleInSection.length;
+        const expectedCount = sectionData.expectedChordCount || 4;
+        const countDisplay = isPlaceholder ? `0/${expectedCount}` : (expectedCount > 0 ? `${chordCount}/${expectedCount}` : `${chordCount}`);
 
-        const isPseudoSection = sectionData.isPseudoSection;
         banner.innerHTML = `
-            <svg class="w-3 h-3 text-white/70 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <svg class="section-drag-handle w-3 h-3 text-white/70 flex-shrink-0 cursor-grab active:cursor-grabbing" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
             </svg>
             <span class="text-white text-xs font-semibold flex-grow">${sectionData.label || 'Section'}</span>
+            <span class="text-white/70 text-xs">${countDisplay}</span>
             ${!isPseudoSection ? `
                 <button class="section-menu-btn p-0.5 rounded hover:bg-white/20 transition"
                         onclick="event.stopPropagation(); window.showSectionMenu && window.showSectionMenu(event, '${sectionData.id}')"
@@ -4088,6 +4187,28 @@ function renderSectionViewMode(container, progressionData, key, sections) {
             }
         });
 
+        // For placeholder sections or sections needing more chords, show placeholder slots
+        if (showPlaceholder || (chordCount < expectedCount && !isPseudoSection)) {
+            const slotsNeeded = expectedCount - chordCount;
+            for (let i = 0; i < slotsNeeded; i++) {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'placeholder-chord-slot flex-shrink-0 w-20 h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-solid hover:bg-white/50 dark:hover:bg-gray-700/50 transition-all';
+                placeholder.style.borderColor = sectionData.color || '#9ca3af';
+                placeholder.setAttribute('data-section-id', sectionData.id);
+                placeholder.innerHTML = `
+                    <svg class="w-5 h-5 mb-1" style="color: ${sectionData.color || '#9ca3af'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    <span class="text-xs" style="color: ${sectionData.color || '#9ca3af'}">Add</span>
+                `;
+                // Click handler to add chord to this section
+                placeholder.addEventListener('click', () => {
+                    window.addChordToSection?.(sectionData.id);
+                });
+                cardsArea.appendChild(placeholder);
+            }
+        }
+
         sectionContainer.appendChild(cardsArea);
         cardsContainer.appendChild(sectionContainer);
         animationIndex++;
@@ -4098,11 +4219,63 @@ function renderSectionViewMode(container, progressionData, key, sections) {
     container.appendChild(cardsWrapper);
 
     // Initialize sortable on the main container (for section dragging)
-    initializeSimplifiedSortable(cardsContainer);
+    initializeSectionContainerSortable(cardsContainer);
 
     // Also initialize sortable on each section's cards area for card dragging within sections
     initializeSectionCardsAreaSortables(cardsContainer);
 
+}
+
+/**
+ * Initialize Sortable specifically for section container reordering
+ * This is a simpler, more focused sortable than initializeSimplifiedSortable
+ * @param {HTMLElement} container - The container holding section-unified-container elements
+ */
+function initializeSectionContainerSortable(container) {
+    if (typeof Sortable === 'undefined') {
+        console.warn('[SectionView] Sortable not available');
+        return;
+    }
+
+    // Destroy existing sortable if any
+    if (container.sortableInstance) {
+        container.sortableInstance.destroy();
+    }
+
+    // Create a simple sortable for section containers only
+    container.sortableInstance = new Sortable(container, {
+        animation: 200,
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        dragClass: 'sortable-drag',
+        // Only drag by the section banner or drag handle icon
+        handle: '.section-banner',
+        // Only section containers are draggable
+        draggable: '.section-unified-container',
+        // Lower swap threshold for easier reordering
+        swapThreshold: 0.3,
+        // Allow sorting within this container
+        sort: true,
+        onEnd: function(evt) {
+            // Get all section containers in their new DOM order
+            const allContainers = Array.from(container.querySelectorAll(':scope > .section-unified-container'));
+
+            // Build the new order of section IDs
+            const newSectionOrder = allContainers
+                .map(el => el.getAttribute('data-section-id'))
+                .filter(Boolean);
+
+            // Update the user's preferred section order
+            userSectionOrder = newSectionOrder;
+
+            // Re-render to apply the new order
+            renderProgressionDisplay('melody-progression-visualization', true);
+
+            window.dispatchEvent(new CustomEvent('showNotification', {
+                detail: { message: 'Section order updated', type: 'success' }
+            }));
+        }
+    });
 }
 
 /**
@@ -4133,7 +4306,12 @@ function initializeSectionCardsAreaSortables(container) {
             group: {
                 name: 'section-cards',
                 pull: true,
-                put: true  // Accept cards from other section-cards areas
+                // Only accept chord cards, not section containers
+                put: function(to, from, dragEl) {
+                    // Only accept elements that are chord cards
+                    return dragEl.classList.contains('chord-card-wrapper') &&
+                           dragEl.hasAttribute('data-chord-index');
+                }
             },
             animation: 200,
             ghostClass: 'sortable-ghost',
@@ -4147,15 +4325,219 @@ function initializeSectionCardsAreaSortables(container) {
             delayOnTouchOnly: true,
             touchStartThreshold: 5,
             onEnd: function(evt) {
-                // Handle card reordering within section or moving between sections
-                handleCardDragWithinSection(evt, sectionId);
+                // onEnd fires on source container - only handle same-section reordering here
+                if (evt.from === evt.to) {
+                    handleCardDragWithinSection(evt, sectionId);
+                }
+                // Cross-section moves are handled by onAdd on the destination
             },
             onAdd: function(evt) {
-                // Card was added from another section
-                handleCardDragWithinSection(evt, evt.from.getAttribute('data-section-id'));
+                // Card was added from another section - handle cross-section move
+                // evt.to is this container (destination), evt.from is source
+                handleCardDragWithinSection(evt, sectionId);
             }
         });
     });
+}
+
+/**
+ * Initialize Sortable on section chips container for drag-drop reordering of sections
+ * Only real sections (not pseudo-sections) are draggable
+ * Dragging reorders sections AND their chords in the progression
+ * @param {HTMLElement} chipsContainer - The container holding section chip buttons
+ */
+function initializeSectionChipsSortable(chipsContainer) {
+    if (typeof Sortable === 'undefined') {
+        console.warn('[SectionChips] Sortable not available');
+        return;
+    }
+
+    if (!chipsContainer) return;
+
+    // Destroy existing sortable if any
+    if (chipsContainer.sortableInstance) {
+        chipsContainer.sortableInstance.destroy();
+    }
+
+    chipsContainer.sortableInstance = new Sortable(chipsContainer, {
+        animation: 200,
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        dragClass: 'sortable-drag',
+        // Allow dragging all section chips including pseudo-sections (No Group)
+        draggable: '.section-chip',
+        // Use the drag handle to initiate drag (avoids conflict with click handler)
+        handle: '.section-pill-drag-handle',
+        // Touch support
+        delay: 100,
+        delayOnTouchOnly: true,
+        touchStartThreshold: 3,
+        onEnd: function(evt) {
+            // Get all chips in their new DOM order (after the drag)
+            const allChips = Array.from(chipsContainer.querySelectorAll('.section-chip'));
+
+            // Build the new order of section IDs (including pseudo-section IDs)
+            const newSectionOrder = allChips
+                .map(chip => chip.getAttribute('data-section-id'))
+                .filter(Boolean);
+
+            // Update the user's preferred section order
+            userSectionOrder = newSectionOrder;
+
+            // Re-render to apply the new order
+            renderProgressionDisplay('melody-progression-visualization', true);
+
+            window.dispatchEvent(new CustomEvent('showNotification', {
+                detail: { message: 'Section order updated', type: 'success' }
+            }));
+        }
+    });
+}
+
+/**
+ * Reorder sections AND their chord cards in the progression
+ * When a section is moved, all its chords move with it
+ * @param {Array} sections - Array of section objects
+ * @param {number} fromIndex - Old section index
+ * @param {number} toIndex - New section index
+ */
+function reorderSectionsWithChords(sections, fromIndex, toIndex) {
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    const trainerState = getTrainerState();
+    const progressionData = trainerState.progressionData;
+    const progressionRomans = trainerState.progressionRomans || [];
+
+    if (!progressionData || progressionData.length === 0) return;
+
+    // Build the new section order
+    const newSectionOrder = [...sections];
+    const [movedSection] = newSectionOrder.splice(fromIndex, 1);
+    newSectionOrder.splice(toIndex, 0, movedSection);
+
+    // Build the new chord order based on new section order
+    // Collect all chord indices from sections in the new order
+    const newChordOrder = [];
+    newSectionOrder.forEach(section => {
+        // Sort chord indices within each section to preserve internal order
+        const sortedIndices = [...(section.chordIndices || [])].sort((a, b) => a - b);
+        newChordOrder.push(...sortedIndices);
+    });
+
+    // Add any ungrouped chords (not in any section) at the end
+    const sectionedIndices = new Set(newChordOrder);
+    for (let i = 0; i < progressionData.length; i++) {
+        if (!sectionedIndices.has(i)) {
+            newChordOrder.push(i);
+        }
+    }
+
+    // Reorder progression data
+    const newProgressionData = newChordOrder.map(oldIdx => progressionData[oldIdx]);
+    const newProgressionRomans = newChordOrder.map(oldIdx => progressionRomans[oldIdx]);
+
+    // Update all section chord indices to reflect new positions
+    // Create a mapping from old index to new index
+    const indexMap = new Map();
+    newChordOrder.forEach((oldIdx, newIdx) => {
+        indexMap.set(oldIdx, newIdx);
+    });
+
+    // Update each section's chord indices
+    newSectionOrder.forEach(section => {
+        const newIndices = (section.chordIndices || []).map(oldIdx => indexMap.get(oldIdx)).filter(idx => idx !== undefined);
+        compositionState.updateSection(section.id, { chordIndices: newIndices });
+    });
+
+    // Update the section order in compositionState
+    compositionState.reorderSections(fromIndex, toIndex);
+
+    // Update trainer state
+    setProgressionData(newProgressionData);
+    setProgressionRomans(newProgressionRomans);
+}
+
+/**
+ * Reorder the entire progression based on the new pill order
+ * This handles both real sections and pseudo-sections (ungrouped chords)
+ * @param {Array} newOrder - Array of {type: 'section', sectionId} or {type: 'ungrouped', chordIndices}
+ * @param {Object} compositionState - CompositionState instance
+ */
+function reorderProgressionByPillOrder(newOrder, compositionState) {
+    if (!compositionState) return;
+
+    const trainerState = getTrainerState();
+    const progressionData = trainerState.progressionData;
+    const progressionRomans = trainerState.progressionRomans || [];
+
+    if (!progressionData || progressionData.length === 0) return;
+
+    const sections = compositionState.getSections();
+
+    // Build the new chord order based on pill order
+    const newChordOrder = [];
+    const newSectionOrder = [];
+
+    newOrder.forEach(item => {
+        if (item.type === 'ungrouped') {
+            // Add ungrouped chord indices in their current internal order
+            const sortedIndices = [...item.chordIndices].sort((a, b) => a - b);
+            newChordOrder.push(...sortedIndices);
+        } else if (item.type === 'section') {
+            // Find the section and add its chord indices
+            const section = sections.find(s => s.id === item.sectionId);
+            if (section) {
+                newSectionOrder.push(section);
+                const sortedIndices = [...(section.chordIndices || [])].sort((a, b) => a - b);
+                newChordOrder.push(...sortedIndices);
+            }
+        }
+    });
+
+    // Make sure we haven't lost any chords (defensive check)
+    const includedIndices = new Set(newChordOrder);
+    for (let i = 0; i < progressionData.length; i++) {
+        if (!includedIndices.has(i)) {
+            newChordOrder.push(i);
+        }
+    }
+
+    // Reorder progression data
+    const newProgressionData = newChordOrder.map(oldIdx => progressionData[oldIdx]);
+    const newProgressionRomans = newChordOrder.map(oldIdx => progressionRomans[oldIdx]);
+
+    // Create mapping from old index to new index
+    const indexMap = new Map();
+    newChordOrder.forEach((oldIdx, newIdx) => {
+        indexMap.set(oldIdx, newIdx);
+    });
+
+    // Update each section's chord indices to reflect new positions
+    sections.forEach(section => {
+        const newIndices = (section.chordIndices || []).map(oldIdx => indexMap.get(oldIdx)).filter(idx => idx !== undefined);
+        compositionState.updateSection(section.id, { chordIndices: newIndices.sort((a, b) => a - b) });
+    });
+
+    // Reorder sections in compositionState to match new pill order
+    if (newSectionOrder.length > 0) {
+        // Get current section IDs in order
+        const currentSectionIds = sections.map(s => s.id);
+        const newSectionIds = newSectionOrder.map(s => s.id);
+
+        // Apply reorderings one at a time
+        newSectionIds.forEach((sectionId, targetIndex) => {
+            const currentSections = compositionState.getSections();
+            const currentIndex = currentSections.findIndex(s => s.id === sectionId);
+            if (currentIndex !== -1 && currentIndex !== targetIndex) {
+                compositionState.reorderSections(currentIndex, targetIndex);
+            }
+        });
+    }
+
+    // Update trainer state
+    setProgressionData(newProgressionData);
+    setProgressionRomans(newProgressionRomans);
 }
 
 /**
@@ -4166,10 +4548,9 @@ function initializeSectionCardsAreaSortables(container) {
  * @param {Object} options - Rendering options
  */
 function renderScrollViewMode(gridContainer, progressionData, key, options = {}) {
-    // Apply scroll view styles
+    // Apply scroll view styles - no snap for fluid user control
     gridContainer.className = 'scroll-view-container flex flex-nowrap items-start gap-2 overflow-x-auto pb-2';
     gridContainer.style.cssText = `
-        scroll-snap-type: x mandatory;
         scroll-behavior: smooth;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: thin;
@@ -4440,36 +4821,30 @@ function renderSectionAwareCards(gridContainer, progressionData, key, options = 
         gridContainer.appendChild(buttonContainer);
     }
 
-    // Track which sections have already been rendered (to avoid duplicates)
-    const renderedSections = new Set();
+    // Use buildSectionChipsWithUngrouped to get consistent ordering with section pills
+    // Sections are sorted by their first chord index position (supports user reordering)
+    const allSectionsOrdered = buildSectionChipsWithUngrouped(sections);
 
-    // Render cards in positional order - maintaining original chord sequence
-    // Ungrouped chords stay in their positions, sections are rendered when we hit their first chord
-    let i = 0;
-    while (i < progressionData.length) {
-        const section = chordToSection.get(i);
-
-        if (section && !renderedSections.has(section.id)) {
-            // This chord is in a section we haven't rendered yet - render entire section
-            const sectionContainer = createUnifiedSectionContainer(section, progressionData, key);
-            gridContainer.appendChild(sectionContainer);
-            renderedSections.add(section.id);
-
-            // Skip all cards in this section (by finding max index in section)
-            const maxIndex = Math.max(...section.chordIndices);
-            i = maxIndex + 1;
-        } else if (section && renderedSections.has(section.id)) {
-            // This chord is in a section we already rendered (non-contiguous indices)
-            // Skip it - it was already rendered with its section
-            i++;
+    // Render sections/pseudo-sections in the consistent order
+    allSectionsOrdered.forEach(sectionOrPseudo => {
+        if (sectionOrPseudo.isPseudoSection) {
+            // Pseudo-section: render ungrouped chords in a container
+            const pseudoContainer = createPseudoSectionContainer(sectionOrPseudo, progressionData, key);
+            gridContainer.appendChild(pseudoContainer);
         } else {
-            // Ungrouped card - render directly in grid at its position
+            // Real section: render as unified section container
+            const sectionContainer = createUnifiedSectionContainer(sectionOrPseudo, progressionData, key);
+            gridContainer.appendChild(sectionContainer);
+        }
+    });
+
+    // If there are no sections at all (including pseudo), render all chords as ungrouped
+    if (allSectionsOrdered.length === 0) {
+        for (let i = 0; i < progressionData.length; i++) {
             const chord = progressionData[i];
             const wrapper = createChordCardWrapper(chord, i, key);
-            // Mark as ungrouped for drag/drop handling
             wrapper.setAttribute('data-ungrouped', 'true');
             gridContainer.appendChild(wrapper);
-            i++;
         }
     }
 
@@ -4499,7 +4874,7 @@ function createUnifiedSectionContainer(section, progressionData, key) {
     banner.setAttribute('data-section-id', section.id);
 
     banner.innerHTML = `
-        <svg class="w-3 h-3 text-white/70 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+        <svg class="section-drag-handle w-3 h-3 text-white/70 flex-shrink-0 cursor-grab active:cursor-grabbing" fill="currentColor" viewBox="0 0 20 20">
             <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
         </svg>
         <span class="text-white text-xs font-semibold flex-grow">${section.label}</span>
@@ -4576,6 +4951,99 @@ function createUnifiedSectionContainer(section, progressionData, key) {
                 }
                 // Handle card movement within this section
                 handleCardDragWithinSection(evt, section.id);
+            }
+        });
+    }
+
+    return container;
+}
+
+/**
+ * Create a pseudo-section container for ungrouped chords
+ * Similar to createUnifiedSectionContainer but styled for ungrouped chords
+ * @param {Object} pseudoSection - Pseudo-section object with id, label, chordIndices, isPseudoSection
+ * @param {Array} progressionData - Full progression data
+ * @param {string} key - Current key
+ * @returns {HTMLElement} Pseudo-section container element
+ */
+function createPseudoSectionContainer(pseudoSection, progressionData, key) {
+    const container = document.createElement('div');
+    container.className = 'section-unified-container inline-flex flex-col rounded-lg overflow-visible pseudo-section';
+    container.setAttribute('data-section-id', pseudoSection.id);
+    container.setAttribute('data-pseudo-section', 'true');
+    const color = pseudoSection.color || '#9ca3af'; // Gray for ungrouped
+    container.style.setProperty('--section-color', color);
+
+    // Banner header (draggable for pseudo-sections too - for reordering)
+    const banner = document.createElement('div');
+    banner.className = 'section-banner flex items-center gap-2 px-2 py-1 rounded-t-lg cursor-grab active:cursor-grabbing';
+    banner.style.backgroundColor = color;
+    banner.setAttribute('data-section-id', pseudoSection.id);
+
+    banner.innerHTML = `
+        <svg class="section-drag-handle w-3 h-3 text-white/70 flex-shrink-0 cursor-grab active:cursor-grabbing" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
+        </svg>
+        <span class="text-white text-xs font-semibold flex-grow">${pseudoSection.label}</span>
+        <span class="text-white/60 text-xs">Assign to section</span>
+    `;
+
+    container.appendChild(banner);
+
+    // Cards container with colored background
+    const cardsArea = document.createElement('div');
+    cardsArea.className = 'section-cards-area items-start gap-2 p-2 rounded-b-lg';
+    cardsArea.style.display = 'flex';
+    cardsArea.style.flexDirection = 'row';
+    cardsArea.style.flexWrap = 'nowrap';
+    cardsArea.style.overflowX = 'auto';
+    cardsArea.style.overflowY = 'visible';
+    cardsArea.style.backgroundColor = color + '20'; // 20% opacity
+    cardsArea.style.borderLeft = `3px dashed ${color}`;
+    cardsArea.style.borderRight = `3px dashed ${color}`;
+    cardsArea.style.borderBottom = `3px dashed ${color}`;
+    cardsArea.setAttribute('data-section-id', pseudoSection.id);
+    cardsArea.setAttribute('data-pseudo-section', 'true');
+
+    // Render cards in this pseudo-section
+    pseudoSection.chordIndices.forEach(chordIdx => {
+        if (chordIdx < progressionData.length) {
+            const chord = progressionData[chordIdx];
+            const wrapper = createChordCardWrapper(chord, chordIdx, key);
+            wrapper.setAttribute('data-ungrouped', 'true');
+            cardsArea.appendChild(wrapper);
+        }
+    });
+
+    container.appendChild(cardsArea);
+
+    // Initialize Sortable on the cards area for dragging cards within/out of pseudo-section
+    if (typeof Sortable !== 'undefined') {
+        cardsArea.sortableInstance = new Sortable(cardsArea, {
+            group: {
+                name: 'progression-cards',
+                pull: true,
+                put: function(to, from, dragEl) {
+                    return dragEl.classList.contains('chord-card-wrapper') &&
+                           dragEl.hasAttribute('data-chord-index');
+                }
+            },
+            animation: 200,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            dragClass: 'sortable-drag',
+            handle: '.drag-handle',
+            draggable: '.chord-card-wrapper[data-chord-index]',
+            swapThreshold: 0.65,
+            delay: 150,
+            delayOnTouchOnly: true,
+            touchStartThreshold: 5,
+            onAdd: function(evt) {
+                handleCardDragWithinSection(evt, null); // null for ungrouped
+            },
+            onEnd: function(evt) {
+                if (evt.from !== evt.to) return;
+                handleCardDragWithinSection(evt, null);
             }
         });
     }
@@ -4819,7 +5287,7 @@ function initializeSectionSortables(container) {
             sectionsContainer.sectionSortable = new Sortable(sectionsContainer, {
                 animation: 200,
                 handle: '.section-drag-handle',
-                draggable: '.section-wrapper',
+                draggable: '.section-wrapper:not([data-pseudo-section])',
                 ghostClass: 'section-ghost',
                 // Exclude label and buttons from triggering drag (allow double-click rename)
                 filter: '.section-label, .section-menu-btn, .section-collapse-btn',
@@ -4829,7 +5297,40 @@ function initializeSectionSortables(container) {
                 delayOnTouchOnly: true,
                 touchStartThreshold: 5,
                 onEnd: function(evt) {
-                    handleSectionReorder(evt.oldIndex - 1, evt.newIndex - 1); // -1 to account for toolbar
+                    // Get the section ID from the dragged element
+                    const draggedSection = evt.item;
+                    const sectionId = draggedSection.getAttribute('data-section-id');
+                    if (!sectionId) return;
+
+                    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+                    if (!compositionState) return;
+
+                    // Get real sections (not pseudo) from DOM in new order
+                    const realSectionWrappers = Array.from(sectionsContainer.querySelectorAll('.section-wrapper:not([data-pseudo-section])'));
+                    const newSectionOrder = realSectionWrappers.map(el => el.getAttribute('data-section-id')).filter(Boolean);
+
+                    // Get current section order from compositionState
+                    const currentSections = compositionState.getSections();
+                    const oldIndex = currentSections.findIndex(s => s.id === sectionId);
+                    const newIndex = newSectionOrder.indexOf(sectionId);
+
+                    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+
+                    // Use reorderSectionsWithChords for consistent behavior with pill reordering
+                    saveStateBeforeChange();
+                    reorderSectionsWithChords(currentSections, oldIndex, newIndex);
+
+                    // Re-render
+                    renderProgressionDisplay('melody-progression-visualization', true);
+                    updateNotationForSelectedSections();
+
+                    if (window.refreshNotationFromProgression) {
+                        window.refreshNotationFromProgression();
+                    }
+
+                    window.dispatchEvent(new CustomEvent('showNotification', {
+                        detail: { message: 'Section order updated', type: 'success' }
+                    }));
                 }
             });
         }
@@ -7865,10 +8366,7 @@ function toggleSimplifiedCardNotation(wrapper, index) {
  * @param {HTMLElement} container - Container with simplified cards
  */
 function initializeSimplifiedSortable(container) {
-    if (typeof Sortable === 'undefined') {
-        return;
-    }
-
+    if (typeof Sortable === 'undefined') return;
 
     if (container.sortableInstance) {
         container.sortableInstance.destroy();
@@ -7888,16 +8386,57 @@ function initializeSimplifiedSortable(container) {
         ghostClass: 'sortable-ghost',
         chosenClass: 'sortable-chosen',
         dragClass: 'sortable-drag',
-        // Use drag-handle class which exists on both cards and section banners
-        handle: '.drag-handle, .section-banner',
+        // Use drag-handle class for cards, section-drag-handle or section-banner for sections
+        handle: '.drag-handle, .section-drag-handle, .section-banner',
         // Allow dragging direct children that are cards or sections
         draggable: '.chord-card-wrapper[data-chord-index], .section-unified-container',
-        swapThreshold: 0.65,
+        // Lower threshold to make section reordering easier (default is 1 which equals 50%)
+        swapThreshold: 0.4,
         // Touch-specific options
         delay: 150,
         delayOnTouchOnly: true,
         touchStartThreshold: 5,
+        // Sort items within the same container - required for reordering
+        sort: true,
         onStart: function(evt) {
+            // Add a class to indicate section drag is in progress
+            const draggedItem = evt.item;
+            if (draggedItem.classList.contains('section-unified-container')) {
+                container.classList.add('section-drag-in-progress');
+            }
+        },
+        // Prevent dropping sections into another section's cards-area (nesting)
+        // But allow section reordering at the container level
+        onMove: function(evt, originalEvent) {
+            const draggedItem = evt.dragged;
+            const targetEl = evt.related;
+
+            // Safety check - if no target element, allow the move
+            if (!targetEl) return true;
+
+            // Only apply restrictions when dragging a section container
+            if (draggedItem && draggedItem.classList.contains('section-unified-container')) {
+                // Get the target's parent section (if any)
+                const targetSection = targetEl.closest('.section-unified-container');
+
+                // If target is the dragged item itself or inside it, allow (internal movement)
+                if (targetSection === draggedItem) return true;
+
+                // If target is another section-unified-container (sibling reordering), allow
+                if (targetEl.classList.contains('section-unified-container')) return true;
+
+                // If target is a section-banner of another section, allow (reordering)
+                if (targetEl.classList.contains('section-banner')) return true;
+
+                // If target is inside a section-cards-area (not the dragged item's),
+                // still allow the move - Sortable will handle sibling positioning
+                // We just don't want the section to become a CHILD of another section
+                // This is controlled by the draggable option, not onMove
+                return true;
+            }
+
+            // For card dragging, allow all moves within this sortable
+            return true;
         },
         // Handle cards added FROM sections TO the main container (ungrouped)
         onAdd: function(evt) {
@@ -7905,10 +8444,11 @@ function initializeSimplifiedSortable(container) {
             handleCardDragWithinSection(evt, evt.from.getAttribute('data-section-id'));
         },
         onEnd: function(evt) {
+            // Remove section drag class
+            container.classList.remove('section-drag-in-progress');
+
             // Cross-container moves are handled by onAdd
-            if (evt.from !== evt.to) {
-                return;
-            }
+            if (evt.from !== evt.to) return;
 
             const draggedItem = evt.item;
 
@@ -8101,9 +8641,13 @@ function handleCardDragWithinSection(evt, originalSectionId) {
         }
     }
 
-    // If dragging within the same section, reorder the actual chord data
-    if (fromSectionId && fromSectionId === toSectionId) {
-        const section = compositionState.getSection(toSectionId);
+    // If dragging within the same section (or both ungrouped), reorder the actual chord data
+    if (fromSectionId === toSectionId) {
+        // Try to get real section - returns null for pseudo-sections like "No Group"
+        const section = fromSectionId ? compositionState.getSection(toSectionId) : null;
+
+        // Check if this is a pseudo-section (ungrouped chords) - ID starts with "no-group"
+        const isPseudoSection = fromSectionId && fromSectionId.startsWith('no-group');
 
         if (section) {
             // Get the new order of chord indices within this section from the DOM
@@ -8147,9 +8691,51 @@ function handleCardDragWithinSection(evt, originalSectionId) {
                 setProgressionData(newProgressionData);
                 setProgressionRomans(newProgressionRomans);
             }
+        } else if (!fromSectionId || isPseudoSection) {
+            // Ungrouped chords being reordered within a pseudo-section
+            // For pseudo-sections, we reorder the actual progression data
+            const ungroupedCards = Array.from(toContainer.querySelectorAll('.chord-card-wrapper[data-chord-index]'));
+            const newVisualOrder = ungroupedCards.map(card =>
+                parseInt(card.getAttribute('data-chord-index'), 10)
+            );
+
+            // Get the indices that are in this pseudo-section (sorted for position mapping)
+            const indicesInSection = [...newVisualOrder].sort((a, b) => a - b);
+
+            // Check if visual order differs from sorted order (i.e., user reordered)
+            if (JSON.stringify(newVisualOrder) !== JSON.stringify(indicesInSection)) {
+                saveStateBeforeChange();
+
+                const trainerState = getTrainerState();
+                const newProgressionData = [...trainerState.progressionData];
+                const newProgressionRomans = [...trainerState.progressionRomans];
+
+                // Simple approach: copy data from old positions to new positions
+                // Visual position i should show data from newVisualOrder[i]
+                // Put it at sorted position indicesInSection[i]
+                for (let i = 0; i < indicesInSection.length; i++) {
+                    const sourceIdx = newVisualOrder[i];
+                    const targetIdx = indicesInSection[i];
+                    newProgressionData[targetIdx] = trainerState.progressionData[sourceIdx];
+                    newProgressionRomans[targetIdx] = trainerState.progressionRomans[sourceIdx];
+                }
+
+                setProgressionData(newProgressionData);
+                setProgressionRomans(newProgressionRomans);
+
+                // Sync to composition state before re-render
+                if (window.syncProgressionToMelodyComposer) {
+                    window.syncProgressionToMelodyComposer();
+                }
+
+                window.dispatchEvent(new CustomEvent('showNotification', {
+                    detail: { message: 'Cards reordered', type: 'success' }
+                }));
+            }
+            // Fall through to re-render below
         }
 
-        // Re-render to update visuals
+        // Re-render to update visuals (for real sections)
         renderProgressionDisplay('melody-progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
 
@@ -8229,59 +8815,23 @@ function handleCardDragWithinSection(evt, originalSectionId) {
  * @param {Object} evt - Sortable event
  */
 function handleSectionDragEnd(container, sectionEl, evt) {
-    const sectionId = sectionEl.getAttribute('data-section-id');
-    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    // Get all section containers in their new DOM order
+    const allContainers = Array.from(container.querySelectorAll('.section-unified-container'));
 
-    if (!compositionState || !sectionId) return;
+    // Build the new order of section IDs (including pseudo-section IDs)
+    const newSectionOrder = allContainers
+        .map(el => el.getAttribute('data-section-id'))
+        .filter(Boolean);
 
-    const section = compositionState.getSection(sectionId);
-    if (!section) return;
+    // Update the user's preferred section order
+    userSectionOrder = newSectionOrder;
 
-
-    // Get the new order of all chords by walking through the container
-    const newChordOrder = getAllChordWrappersInOrder(container).map(el => parseInt(el.getAttribute('data-chord-index'), 10));
-
-
-    // Only proceed if order actually changed
-    const trainerState = getTrainerState();
-    const oldOrder = trainerState.progressionData.map((_, i) => i);
-
-    if (JSON.stringify(newChordOrder) === JSON.stringify(oldOrder)) {
-        return;
-    }
-
-    // Save state for undo BEFORE making changes
-    saveStateBeforeChange();
-
-    // Reorder progression data to match new order
-    const newProgressionData = newChordOrder.map(oldIdx => trainerState.progressionData[oldIdx]);
-    const newProgressionRomans = newChordOrder.map(oldIdx => trainerState.progressionRomans[oldIdx]);
-
-    // Update ALL section chord indices to reflect new positions
-    // Each section's chords move to their new positions in the reordered array
-    compositionState.getSections().forEach(sec => {
-        const oldIndices = [...sec.chordIndices];
-        const newIndices = sec.chordIndices.map(oldIdx => newChordOrder.indexOf(oldIdx));
-        compositionState.updateSection(sec.id, { chordIndices: newIndices.filter(idx => idx >= 0) });
-    });
-
-    // Update trainer state (setProgressionData internally calls syncWithProgressionData)
-    setProgressionData(newProgressionData);
-    setProgressionRomans(newProgressionRomans);
-
-    // Re-render
+    // Re-render to apply the new order
     renderProgressionDisplay('melody-progression-visualization', true);
-    renderProgressionDisplay('melody-progression-visualization', false);
 
-    // Update notation
-    if (window.refreshNotationFromProgression) {
-        window.refreshNotationFromProgression();
-    }
-
-    // Update voice leading analysis after section reorder
-    if (window.updateVoiceLeading) {
-        window.updateVoiceLeading();
-    }
+    window.dispatchEvent(new CustomEvent('showNotification', {
+        detail: { message: 'Section order updated', type: 'success' }
+    }));
 }
 
 /**
@@ -9222,10 +9772,33 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
 
     // Capture staff notation states before clearing DOM (always capture from both tabs)
     captureStaffNotationStates();
-    
+
     const container = document.getElementById(containerId);
     if (!container) {
         return;
+    }
+
+    // Save scroll positions of all scrollable containers before re-rendering
+    const scrollPositions = new Map();
+    const scrollableSelectors = [
+        '.scroll-view-container',
+        '.section-filtered-cards',
+        '.section-cards-wrapper',
+        '.section-chips-container',
+        '[class*="overflow-x-auto"]'
+    ];
+    scrollableSelectors.forEach(selector => {
+        container.querySelectorAll(selector).forEach(el => {
+            if (el.scrollLeft > 0) {
+                // Use a unique key based on class or id
+                const key = el.id || el.className;
+                scrollPositions.set(key, el.scrollLeft);
+            }
+        });
+    });
+    // Also check if container itself is scrollable
+    if (container.scrollLeft > 0) {
+        scrollPositions.set('container', container.scrollLeft);
     }
     
     // IMPORTANT: Destroy Sortable BEFORE clearing innerHTML
@@ -10659,6 +11232,25 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         window.updateUnifiedSuggestions();
     }
 
+    // Restore scroll positions after rendering
+    if (scrollPositions.size > 0) {
+        requestAnimationFrame(() => {
+            // Restore container scroll
+            if (scrollPositions.has('container')) {
+                container.scrollLeft = scrollPositions.get('container');
+            }
+            // Restore scroll for other containers by matching class names
+            scrollableSelectors.forEach(selector => {
+                container.querySelectorAll(selector).forEach(el => {
+                    const key = el.id || el.className;
+                    if (scrollPositions.has(key)) {
+                        el.scrollLeft = scrollPositions.get(key);
+                    }
+                });
+            });
+        });
+    }
+
     // Restore selection state after rendering (persistent purple ring)
     const selectedIndex = getSelectedChordIndex();
     const freshState = getTrainerState();
@@ -10703,9 +11295,15 @@ export function loadProgression() {
 
     // Automatically set enharmonic preference based on key signature
     // Keys with flats in their signature should display flats
-    const selectedKey = keySelect.value.replace('m', ''); // Remove minor indicator
-    const flatKeys = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'];
-    if (flatKeys.includes(selectedKey)) {
+    const fullKey = keySelect.value;
+    const keyRoot = fullKey.replace('m', ''); // Remove minor indicator for major flat keys check
+
+    // Major keys with flats
+    const flatMajorKeys = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'];
+    // Minor keys with flats (same key signatures as their relative majors)
+    const flatMinorKeys = ['Dm', 'Gm', 'Cm', 'Fm', 'Bbm', 'Ebm', 'Abm'];
+
+    if (flatMajorKeys.includes(keyRoot) || flatMinorKeys.includes(fullKey)) {
         setEnharmonicPreference('flat');
     } else {
         setEnharmonicPreference('sharp');
@@ -12769,6 +13367,182 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
 window.addChordToProgressionByParams = addChordToProgressionByParams;
 
 /**
+ * Add a chord directly to a specific section
+ * Used by placeholder slots in Section View mode
+ * @param {string} sectionId - The section ID to add the chord to
+ */
+export function addChordToSection(sectionId) {
+    // Get the composition state and find the section
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) {
+        console.warn('[addChordToSection] No composition state available');
+        return;
+    }
+
+    const section = compositionState.getSection?.(sectionId);
+    if (!section) {
+        console.warn('[addChordToSection] Section not found:', sectionId);
+        return;
+    }
+
+    // Calculate insertion index based on section position
+    // For sections with chords, insert after the last chord in the section
+    // For empty placeholder sections, calculate position based on section order
+    let insertAfterIndex = -1; // Default: insert at beginning
+
+    if (section.chordIndices && section.chordIndices.length > 0) {
+        // Section has chords - insert after the last one
+        insertAfterIndex = Math.max(...section.chordIndices);
+    } else {
+        // Empty placeholder section - find the right position based on template order
+        const allSections = compositionState.getSections?.() || [];
+        const sectionIndex = allSections.findIndex(s => s.id === sectionId);
+
+        if (sectionIndex > 0) {
+            // Find the previous section's last chord index
+            for (let i = sectionIndex - 1; i >= 0; i--) {
+                const prevSection = allSections[i];
+                if (prevSection.chordIndices && prevSection.chordIndices.length > 0) {
+                    insertAfterIndex = Math.max(...prevSection.chordIndices);
+                    break;
+                }
+            }
+        }
+    }
+
+    // Set up the section intent so when a chord is added, it goes to this section
+    setSectionIntent({
+        mode: INTENT_MODES.CONTINUE,
+        targetSection: section,
+        insertAfterIndex: insertAfterIndex,
+        needsSelection: false
+    });
+
+    // Scroll to and highlight the Builder tab to add a chord
+    // Or open a quick chord picker modal
+    openQuickChordPicker(sectionId, section, insertAfterIndex);
+}
+
+/**
+ * Open a quick chord picker for adding to a section
+ * @param {string} sectionId - Section ID
+ * @param {Object} section - Section object
+ * @param {number} insertAfterIndex - Index to insert after
+ */
+function openQuickChordPicker(sectionId, section, insertAfterIndex) {
+    // Create a modal with common chord options for quick adding
+    const existingModal = document.getElementById('quick-chord-picker-modal');
+    if (existingModal) existingModal.remove();
+
+    const trainerState = getTrainerState();
+    const currentKey = trainerState.currentKey || 'C';
+
+    // Generate common chords in the current key
+    const commonRoots = getScaleNotesForKey(currentKey);
+    const commonTypes = ['Major', 'Minor', 'Major 7th', 'Minor 7th', 'Dominant 7th'];
+
+    const modal = document.createElement('div');
+    modal.id = 'quick-chord-picker-modal';
+    modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]';
+    modal.innerHTML = `
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full m-4 max-h-[80vh] overflow-hidden flex flex-col">
+            <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between" style="background-color: ${section.color || '#6366f1'}20">
+                <div class="flex items-center gap-2">
+                    <span class="text-lg font-bold text-gray-900 dark:text-white">Add Chord to ${section.label || 'Section'}</span>
+                </div>
+                <button class="close-modal-btn p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors text-gray-500">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-4 overflow-y-auto">
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">Key: <strong>${currentKey}</strong> — Select a chord to add:</p>
+                <div class="grid grid-cols-4 gap-2 mb-4">
+                    ${commonRoots.slice(0, 8).map((root, i) => {
+                        // Determine chord type based on scale degree
+                        const isMinor = [1, 2, 5].includes(i); // ii, iii, vi are minor in major key
+                        const type = isMinor ? 'Minor' : 'Major';
+                        const display = root + (isMinor ? 'm' : '');
+                        return `
+                            <button class="quick-chord-btn px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-gray-600 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all text-center"
+                                    data-root="${root}" data-type="${type}">
+                                <span class="font-bold text-gray-900 dark:text-white">${display}</span>
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+                <details class="mb-3">
+                    <summary class="text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">More chord types...</summary>
+                    <div class="grid grid-cols-3 gap-2 mt-2">
+                        ${commonRoots.slice(0, 6).flatMap(root =>
+                            ['Major 7th', 'Minor 7th', 'Dominant 7th'].map(type => {
+                                const suffix = type === 'Major 7th' ? 'maj7' : type === 'Minor 7th' ? 'm7' : '7';
+                                return `
+                                    <button class="quick-chord-btn px-2 py-1.5 rounded border border-gray-200 dark:border-gray-600 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all text-center text-sm"
+                                            data-root="${root}" data-type="${type}">
+                                        <span class="text-gray-900 dark:text-white">${root}${suffix}</span>
+                                    </button>
+                                `;
+                            })
+                        ).join('')}
+                    </div>
+                </details>
+                <div class="pt-3 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                    <button class="open-full-builder-btn text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                        Open Full Chord Builder
+                    </button>
+                    <button class="close-modal-btn px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Handle chord selection
+    modal.querySelectorAll('.quick-chord-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const root = btn.dataset.root;
+            const type = btn.dataset.type;
+
+            // Add the chord to the progression
+            addChordToProgressionByParams(type, root, 0, 0);
+
+            // The chord will be added and section intent will assign it
+            modal.remove();
+
+            // Refresh the display
+            renderProgressionDisplay('melody-progression-visualization', true);
+        });
+    });
+
+    // Handle close
+    modal.querySelectorAll('.close-modal-btn').forEach(btn => {
+        btn.addEventListener('click', () => modal.remove());
+    });
+
+    // Open full builder
+    modal.querySelector('.open-full-builder-btn')?.addEventListener('click', () => {
+        modal.remove();
+        // Switch to builder tab if available
+        if (window.switchTab) {
+            window.switchTab('builder');
+        }
+    });
+
+    // Click outside to close
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+}
+
+// Make addChordToSection available globally
+window.addChordToSection = addChordToSection;
+
+/**
  * Highlight trainer scale and chord notes on keyboard
  * @param {Array<string>} scaleNotes - Scale notes to highlight
  * @param {Array<string>} chordNotes - Chord notes to highlight
@@ -14657,7 +15431,6 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
             progressionData[newChordsStartIndex + i] = optimizedChords[i];
         }
 
-        console.log(`[loadTemplateToProgression] Applied voice leading optimization to ${optimizedChords.length} chords`);
     }
 
     // Update state
@@ -14669,6 +15442,67 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
     // Clear undo/redo history for fresh start (only on load, not append)
     if (baseAction === 'load') {
         clearHistory();
+    }
+
+    // For append mode: fill placeholder sections with newly added chords
+    if (baseAction === 'append') {
+        const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+        if (compositionState) {
+            // Calculate which chord indices are new (appended)
+            const existingChordCount = trainerState.progressionData?.length || 0;
+            const newChordIndices = [];
+            for (let i = existingChordCount; i < progressionData.length; i++) {
+                newChordIndices.push(i);
+            }
+
+            if (newChordIndices.length > 0) {
+                // Get all sections and find placeholders that need filling
+                const sections = compositionState.getSections();
+                let remainingNewIndices = [...newChordIndices];
+
+                // Find the last section that has chords - we want to fill IT first, then subsequent sections
+                // This ensures appended chords continue from where the user left off
+                let lastFilledSectionIndex = -1;
+                for (let i = sections.length - 1; i >= 0; i--) {
+                    if (sections[i].chordIndices?.length > 0) {
+                        lastFilledSectionIndex = i;
+                        break;
+                    }
+                }
+
+                // Build fill order: start with the last filled section, then subsequent sections
+                const sectionsToFill = [];
+                if (lastFilledSectionIndex >= 0) {
+                    // Start with the last filled section (might have room)
+                    sectionsToFill.push(sections[lastFilledSectionIndex]);
+                    // Then add all sections after it
+                    for (let i = lastFilledSectionIndex + 1; i < sections.length; i++) {
+                        sectionsToFill.push(sections[i]);
+                    }
+                } else {
+                    // No filled sections - just use all sections in order
+                    sectionsToFill.push(...sections);
+                }
+
+                // Fill sections that have room (based on expectedChordCount)
+                for (const section of sectionsToFill) {
+                    if (remainingNewIndices.length === 0) break;
+
+                    const currentCount = section.chordIndices?.length || 0;
+                    const expectedCount = section.expectedChordCount || 0;
+                    const roomAvailable = expectedCount - currentCount;
+
+                    if (roomAvailable > 0) {
+                        // This section has room based on its expected chord count - fill it
+                        const indicesToAdd = remainingNewIndices.splice(0, roomAvailable);
+                        indicesToAdd.forEach(idx => {
+                            compositionState.addChordToSection(idx, section.id);  // (chordIndex, sectionId)
+                        });
+                    }
+                }
+                // Any remaining indices stay ungrouped (will appear as pseudo-section at end)
+            }
+        }
     }
 
     // Render progression display
@@ -14709,46 +15543,42 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
 
 /**
  * Show rhythm pattern selector modal for applying patterns to existing progressions
+ * Modal can open regardless of progression state - user selects section inside the modal
  */
 export function showRhythmPatternModal() {
-    const progressionData = getProgressionData();
-    if (!progressionData || progressionData.length === 0) {
-        if (window.showModal) {
-            window.showModal('No Chords', 'Add chords to the progression first before applying a rhythm pattern.');
+    const progressionData = getProgressionData() || [];
+
+    // Build sections list (real + pseudo)
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    const realSections = compositionState ? compositionState.getSections() : [];
+    const allSectionsWithPseudo = buildSectionChipsWithUngrouped(realSections);
+
+    // Track currently selected section (null = all chords)
+    let selectedSectionId = null;
+
+    // Get target indices based on selected section
+    const getTargetIndices = () => {
+        if (!selectedSectionId || selectedSectionId === 'all') {
+            return progressionData.map((_, i) => i);
         }
-        return;
-    }
-
-    const selection = getSelectedIndicesArray ? getSelectedIndicesArray() : [];
-    const hasSelection = selection && selection.length > 0;
-
-    const getTargetIndices = (scope) => {
-        if (scope === 'selection' && hasSelection) {
-            return [...selection];
+        const section = allSectionsWithPseudo.find(s => s.id === selectedSectionId);
+        if (section && section.chordIndices) {
+            return [...section.chordIndices];
         }
         return progressionData.map((_, i) => i);
     };
 
-    let currentScope = hasSelection ? 'selection' : 'all';
-    const getTargetChords = () => getTargetIndices(currentScope).map(i => progressionData[i]).filter(Boolean);
-    const getChordCount = () => getTargetIndices(currentScope).length;
+    const getTargetChords = () => getTargetIndices().map(i => progressionData[i]).filter(Boolean);
+    const getChordCount = () => getTargetIndices().length;
 
     const buildPatterns = () => getAllPatternsForCount(getChordCount());
     const getCurrentPattern = () => detectCurrentPattern(getTargetChords());
-
-    if (buildPatterns().length === 0) {
-        if (window.showModal) {
-            window.showModal('No Patterns Available', `No rhythm patterns available for ${getChordCount()}-chord selection.`);
-        }
-        return;
-    }
 
     const modal = document.createElement('div');
     modal.id = 'rhythm-pattern-modal';
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
 
-    // Get current time signature from compositionState
-    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    // Get current time signature from compositionState (reuse variable from above)
     const timeSignature = compositionState?.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
     const timeSignatureDisplay = `${timeSignature.num}/${timeSignature.denom}`;
 
@@ -14782,7 +15612,7 @@ export function showRhythmPatternModal() {
 
             <!-- Info Panel (collapsible) -->
             <div id="rhythm-info-panel" class="hidden px-5 py-2 bg-gray-800 border-b border-gray-700 text-xs text-gray-300 leading-relaxed">
-                <strong>Target:</strong> Choose entire progression or your current selection.
+                <strong>Section:</strong> Choose a section or all chords to apply the pattern to.
                 <strong>Patterns:</strong> Pick a rhythm pattern (beats per chord).
                 <strong>Grid:</strong> Edit beats per chord, then Apply.
             </div>
@@ -14793,17 +15623,12 @@ export function showRhythmPatternModal() {
                     <!-- Left Column: Pattern Selection -->
                     <div class="flex-1 space-y-3 min-w-0">
                         <div class="p-3 bg-gray-800 border border-gray-700 rounded">
-                            <div class="text-xs text-gray-400 mb-1.5 font-medium">Target</div>
-                            <div class="flex items-center gap-4">
-                                <label class="inline-flex items-center gap-1.5 text-sm text-gray-200 cursor-pointer">
-                                    <input type="radio" name="rhythm-scope" value="all" class="text-orange-500" ${currentScope === 'all' ? 'checked' : ''}>
-                                    All (${progressionData.length})
-                                </label>
-                                <label class="inline-flex items-center gap-1.5 text-sm text-gray-200 cursor-pointer ${hasSelection ? '' : 'opacity-40'}">
-                                    <input type="radio" name="rhythm-scope" value="selection" class="text-orange-500" ${currentScope === 'selection' ? 'checked' : ''} ${hasSelection ? '' : 'disabled'}>
-                                    Selected (${selection.length || 0})
-                                </label>
-                            </div>
+                            <div class="text-xs text-gray-400 mb-1.5 font-medium">Apply To Section</div>
+                            <select id="rhythm-section-select" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-orange-500 text-sm">
+                                <option value="all">All Chords (${progressionData.length})</option>
+                                ${allSectionsWithPseudo.map(s => `<option value="${s.id}" style="color: ${s.color || '#fff'}">${s.label || s.name || s.id} (${(s.chordIndices || []).length} chords)</option>`).join('')}
+                            </select>
+                            ${progressionData.length === 0 ? '<p class="text-xs text-amber-400 mt-1.5">Add chords to your progression first</p>' : ''}
                         </div>
 
                         <div class="p-3 bg-gray-800 border border-gray-700 rounded">
@@ -14888,10 +15713,10 @@ export function showRhythmPatternModal() {
     document.body.appendChild(modal);
 
     const patternSelectEl = modal.querySelector('#rhythm-pattern-select');
+    const sectionSelectEl = modal.querySelector('#rhythm-section-select');
     const compingSelectEl = null; // hidden comping UI
     const previewEl = modal.querySelector('#rhythm-pattern-preview');
     const gridEl = modal.querySelector('#rhythm-grid');
-    const scopeRadios = modal.querySelectorAll('input[name="rhythm-scope"]');
     const customNameInput = modal.querySelector('#rhythm-custom-name');
     const infoBtn = modal.querySelector('#rhythm-info-btn');
     const infoPanel = modal.querySelector('#rhythm-info-panel');
@@ -14905,17 +15730,29 @@ export function showRhythmPatternModal() {
     const stopPreviewBtn = modal.querySelector('#rhythm-stop-preview-btn');
     const bassFollowToggle = modal.querySelector('#rhythm-bass-follow-toggle');
 
-    const getTargetChordsDynamic = () => getTargetIndices(currentScope).map(i => progressionData[i]).filter(Boolean);
+    const getTargetChordsDynamic = () => getTargetIndices().map(i => progressionData[i]).filter(Boolean);
 
     const populatePatternOptions = () => {
+        const chordCount = getChordCount();
         const patterns = buildPatterns();
-        const customCount = getCustomPatternsForCount(getChordCount()).length;
+        const customCount = getCustomPatternsForCount(chordCount).length;
         if (customCountEl) {
             customCountEl.textContent = customCount > 0 ? `${customCount} custom` : '';
         }
         if (customCountInlineEl) {
             customCountInlineEl.textContent = customCount > 0 ? `${customCount} custom` : 'No custom patterns';
         }
+
+        // Handle case when no chords or no patterns available
+        if (chordCount === 0) {
+            patternSelectEl.innerHTML = '<option value="">No chords in selected section</option>';
+            return;
+        }
+        if (patterns.length === 0) {
+            patternSelectEl.innerHTML = `<option value="">No patterns for ${chordCount} chords</option>`;
+            return;
+        }
+
         const currentPattern = getCurrentPattern();
 
         // Sort patterns: ideal for time signature first, then compatible, then incompatible
@@ -15034,13 +15871,14 @@ export function showRhythmPatternModal() {
     modal.querySelectorAll('#rhythm-modal-cancel-btn').forEach(btn => btn.addEventListener('click', closeModal));
     patternSelectEl.addEventListener('change', updatePreview);
 
-    scopeRadios.forEach(r => {
-        r.addEventListener('change', () => {
-            currentScope = r.value === 'selection' && hasSelection ? 'selection' : 'all';
+    // Section selector change handler
+    if (sectionSelectEl) {
+        sectionSelectEl.addEventListener('change', () => {
+            selectedSectionId = sectionSelectEl.value;
             populatePatternOptions();
             updatePreview();
         });
-    });
+    }
 
     modal.addEventListener('click', (e) => {
         if (e.target === modal) closeModal();
@@ -15079,13 +15917,17 @@ export function showRhythmPatternModal() {
 
     modal.querySelectorAll('#rhythm-modal-apply-btn').forEach(btn => btn.addEventListener('click', () => {
         const chords = getTargetChordsDynamic();
+        if (chords.length === 0) {
+            if (window.showModal) window.showModal('No chords in selected section', false);
+            return;
+        }
         const inputs = Array.from(gridEl.querySelectorAll('input[data-beat-index]'));
         const beats = inputs.map(inp => Number(inp.value) || 1);
         if (beats.length !== chords.length) {
             if (window.showModal) window.showModal('Beat count must match chord count.', false);
             return;
         }
-        const targetIndices = getTargetIndices(currentScope);
+        const targetIndices = getTargetIndices();
         const compBeats = beats;
 
         // Apply beats to target chords
@@ -15122,8 +15964,10 @@ export function showRhythmPatternModal() {
         // Show confirmation
         const pattern = getAnyPatternById(patternSelectEl.value);
         const patternName = pattern ? pattern.name : 'Custom beats';
+        const selectedSection = allSectionsWithPseudo.find(s => s.id === selectedSectionId);
+        const sectionName = selectedSection ? (selectedSection.label || selectedSection.name) : 'all chords';
         if (window.showModal) {
-            window.showModal(`Applied "${patternName}"`, false);
+            window.showModal(`Applied "${patternName}" to ${sectionName}`, false);
             setTimeout(() => window.hideModal && window.hideModal(), 1500);
         }
 

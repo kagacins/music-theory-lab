@@ -1631,18 +1631,38 @@ export function calculateGrandStaffDimensions(options = {}) {
  * @returns {number} - Number of accidentals
  */
 function getKeySignatureAccidentalCount(key) {
-  const sharpKeys = ['G', 'D', 'A', 'E', 'B', 'F#', 'C#'];
-  const flatKeys = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'];
+  // Major keys with sharps (in order: 1, 2, 3, 4, 5, 6, 7 sharps)
+  const sharpMajorKeys = ['G', 'D', 'A', 'E', 'B', 'F#', 'C#'];
+  // Major keys with flats (in order: 1, 2, 3, 4, 5, 6, 7 flats)
+  const flatMajorKeys = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'];
+  // Minor keys with sharps (relative to major: Em=1, Bm=2, F#m=3, C#m=4, G#m=5, D#m=6, A#m=7)
+  const sharpMinorKeys = ['Em', 'Bm', 'F#m', 'C#m', 'G#m', 'D#m', 'A#m'];
+  // Minor keys with flats (relative to major: Dm=1, Gm=2, Cm=3, Fm=4, Bbm=5, Ebm=6, Abm=7)
+  const flatMinorKeys = ['Dm', 'Gm', 'Cm', 'Fm', 'Bbm', 'Ebm', 'Abm'];
 
-  const normalized = getVexFlowKeySignature(key).replace('m', '');
+  const normalized = getVexFlowKeySignature(key);
+  const isMinor = normalized.endsWith('m');
 
-  let sharpIndex = sharpKeys.indexOf(normalized);
-  if (sharpIndex !== -1) return sharpIndex + 1;
+  if (isMinor) {
+    // Handle minor keys
+    let sharpIndex = sharpMinorKeys.indexOf(normalized);
+    if (sharpIndex !== -1) return sharpIndex + 1;
 
-  let flatIndex = flatKeys.indexOf(normalized);
-  if (flatIndex !== -1) return flatIndex + 1;
+    let flatIndex = flatMinorKeys.indexOf(normalized);
+    if (flatIndex !== -1) return flatIndex + 1;
 
-  return 0;
+    // Am (A minor) has 0 accidentals
+    if (normalized === 'Am') return 0;
+  } else {
+    // Handle major keys
+    let sharpIndex = sharpMajorKeys.indexOf(normalized);
+    if (sharpIndex !== -1) return sharpIndex + 1;
+
+    let flatIndex = flatMajorKeys.indexOf(normalized);
+    if (flatIndex !== -1) return flatIndex + 1;
+  }
+
+  return 0; // C major or Am have 0 accidentals
 }
 
 // ============================================================================

@@ -86,13 +86,15 @@ export class TensionArcUI {
     convertSections(sections) {
         if (!sections || sections.length === 0) return [];
 
-        return sections.map(section => ({
-            type: section.type,
-            startIndex: Math.min(...section.chordIndices),
-            endIndex: Math.max(...section.chordIndices),
-            label: section.label,
-            color: section.color
-        }));
+        return sections
+            .filter(section => section.chordIndices && section.chordIndices.length > 0)
+            .map(section => ({
+                type: section.type,
+                startIndex: Math.min(...section.chordIndices),
+                endIndex: Math.max(...section.chordIndices),
+                label: section.label,
+                color: section.color
+            }));
     }
 
     /**
@@ -387,21 +389,23 @@ export class TensionArcUI {
     renderSectionBackgrounds(sections, progressionData, padding, graphWidth, graphHeight, xStep) {
         if (!sections || sections.length === 0) return '';
 
-        return sections.map(section => {
-            const startX = padding.left + (Math.min(...section.chordIndices) * xStep);
-            const endX = padding.left + (Math.max(...section.chordIndices) * xStep);
-            const width = endX - startX + xStep * 0.5;
+        return sections
+            .filter(section => section.chordIndices && section.chordIndices.length > 0)
+            .map(section => {
+                const startX = padding.left + (Math.min(...section.chordIndices) * xStep);
+                const endX = padding.left + (Math.max(...section.chordIndices) * xStep);
+                const width = endX - startX + xStep * 0.5;
 
-            return `
-                <rect x="${startX - xStep * 0.25}" y="${padding.top - 5}"
-                      width="${width}" height="${graphHeight + 10}"
-                      fill="${section.color}" opacity="0.1" rx="4" />
-                <text x="${startX + width / 2 - xStep * 0.25}" y="${padding.top - 8}"
-                      text-anchor="middle" font-size="9" fill="${section.color}" font-weight="600">
-                    ${section.label || section.type}
-                </text>
-            `;
-        }).join('');
+                return `
+                    <rect x="${startX - xStep * 0.25}" y="${padding.top - 5}"
+                          width="${width}" height="${graphHeight + 10}"
+                          fill="${section.color}" opacity="0.1" rx="4" />
+                    <text x="${startX + width / 2 - xStep * 0.25}" y="${padding.top - 8}"
+                          text-anchor="middle" font-size="9" fill="${section.color}" font-weight="600">
+                        ${section.label || section.type}
+                    </text>
+                `;
+            }).join('');
     }
 
     /**

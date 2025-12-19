@@ -633,11 +633,19 @@ class CoordinatedRecommendationService extends EventEmitter {
      * Get note at scale degree in key
      */
     _getScaleDegree(key, degree) {
-        const keyIndex = ALL_NOTES.indexOf(key);
+        // Detect if this is a minor key
+        const isMinorKey = key && key.endsWith('m') && !key.endsWith('dim');
+        const keyRoot = isMinorKey ? key.slice(0, -1) : key;
+
+        const keyIndex = ALL_NOTES.indexOf(keyRoot);
         if (keyIndex === -1) return key;
 
-        // Major scale intervals
-        const intervals = [0, 2, 4, 5, 7, 9, 11];
+        // Major scale intervals: 0, 2, 4, 5, 7, 9, 11
+        const majorIntervals = [0, 2, 4, 5, 7, 9, 11];
+        // Natural minor scale intervals: 0, 2, 3, 5, 7, 8, 10
+        const minorIntervals = [0, 2, 3, 5, 7, 8, 10];
+
+        const intervals = isMinorKey ? minorIntervals : majorIntervals;
         const interval = intervals[(degree - 1) % 7];
 
         return ALL_NOTES[(keyIndex + interval) % 12];

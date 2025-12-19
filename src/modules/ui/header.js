@@ -34,15 +34,36 @@ export function updateKeySignatureDisplay(key) {
 
     if (!textDisplay || !trebleImg) return;
 
-    const text = KEY_SIGNATURE_TEXT[key] || "Unknown Key";
-    textDisplay.textContent = `Key: ${key} Major (${text})`;
+    // Detect if this is a minor key
+    const isMinor = key.endsWith('m') && !key.endsWith('dim') && !key.endsWith('dom');
 
-    // Handle image display with enharmonic fallback
+    // Get the relative major for minor keys (e.g., Gm -> Bb)
+    // Minor key relative majors (same key signatures)
+    const RELATIVE_MAJOR_MAP = {
+        'Am': 'C', 'Em': 'G', 'Bm': 'D', 'F#m': 'A', 'C#m': 'E', 'G#m': 'B', 'D#m': 'F#', 'A#m': 'C#',
+        'Dm': 'F', 'Gm': 'Bb', 'Cm': 'Eb', 'Fm': 'Ab', 'Bbm': 'Db', 'Ebm': 'Gb', 'Abm': 'Cb'
+    };
+
+    // Get the key to look up in KEY_SIGNATURE_TEXT (use relative major for minor keys)
+    const lookupKey = isMinor ? RELATIVE_MAJOR_MAP[key] : key;
+    const text = KEY_SIGNATURE_TEXT[lookupKey] || KEY_SIGNATURE_TEXT[key] || "Unknown Key";
+
+    // Display with correct mode (Major or Minor)
+    if (isMinor) {
+        const keyRoot = key.slice(0, -1); // Remove 'm' suffix
+        textDisplay.textContent = `Key: ${keyRoot} Minor (${text})`;
+    } else {
+        textDisplay.textContent = `Key: ${key} Major (${text})`;
+    }
+
+    // Handle image display - use relative major key for minor keys
+    const imageKey = isMinor ? RELATIVE_MAJOR_MAP[key] : key;
     let enharmonicKeyUsed = null;
-    let imageInfo = KEY_SIGNATURE_IMAGES[key];
+    let imageInfo = KEY_SIGNATURE_IMAGES[imageKey];
+
     // If no direct image, check for an enharmonic equivalent
     if (!imageInfo) {
-        const enharmonicKey = ENHARMONIC_MAP[key];
+        const enharmonicKey = ENHARMONIC_MAP[imageKey];
         if (enharmonicKey) {
             imageInfo = KEY_SIGNATURE_IMAGES[enharmonicKey];
             enharmonicKeyUsed = enharmonicKey;
@@ -61,14 +82,28 @@ export function updateKeySignatureDisplay(key) {
     }
 
     // Show the enharmonic label if an equivalent key was used for the image
-    enharmonicLabel.textContent = enharmonicKeyUsed;
-    enharmonicLabel.classList.toggle('hidden', !enharmonicKeyUsed);
+    if (enharmonicLabel) {
+        enharmonicLabel.textContent = enharmonicKeyUsed || '';
+        enharmonicLabel.classList.toggle('hidden', !enharmonicKeyUsed);
+    }
 
-    // Handle relative minor display
-    const relativeMinor = RELATIVE_MINOR_MAP[key];
-    if (relativeMinor && relativeMinorDisplay) {
-        relativeMinorDisplay.textContent = relativeMinor;
-        relativeMinorDisplay.title = `Relative minor of ${key} Major`;
+    // Handle relative key display
+    if (relativeMinorDisplay) {
+        if (isMinor) {
+            // For minor keys, show the relative MAJOR
+            const relativeMajor = RELATIVE_MAJOR_MAP[key];
+            if (relativeMajor) {
+                relativeMinorDisplay.textContent = `${relativeMajor} Major`;
+                relativeMinorDisplay.title = `Relative major of ${key.slice(0, -1)} Minor`;
+            }
+        } else {
+            // For major keys, show the relative minor
+            const relativeMinor = RELATIVE_MINOR_MAP[key];
+            if (relativeMinor) {
+                relativeMinorDisplay.textContent = relativeMinor;
+                relativeMinorDisplay.title = `Relative minor of ${key} Major`;
+            }
+        }
     }
 }
 

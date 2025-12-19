@@ -4035,11 +4035,6 @@ export function playAllMelody() {
             const events = [];
             let exportedIndex = 0;
 
-            // Debug: Log all melody notes with their beat positions
-            melodyNotes.forEach((n, idx) => {
-                console.log(`[playAllMelody] Note ${idx}: measure=${n.measure}, beat=${n.beat?.toFixed?.(3) || n.beat}, duration=${n.duration}, pitch=${n.pitch || n.pitches?.[0]}, tuplet=${JSON.stringify(n.tuplet)}`);
-            });
-
             for (let i = 0; i < melodyNotes.length; i++) {
                 const note = melodyNotes[i];
 
@@ -4071,9 +4066,6 @@ export function playAllMelody() {
 
                 // Start with this note's duration - use tuplet-aware calculation
                 let totalDurationSeconds = getDurationInSeconds(note.duration, tempo, note.tuplet);
-
-                // Debug log for timing
-                console.log(`[playAllMelody] Scheduling note ${i}: pitch=${note.pitch}, measure=${note.measure}, beat=${note.beat?.toFixed?.(3)}, baseTime=${baseTime.toFixed(3)}s, duration=${totalDurationSeconds.toFixed(3)}s`);
 
                 // Look ahead to merge durations of tied continuation notes
                 let j = i + 1;
@@ -4146,12 +4138,10 @@ export function playAllMelody() {
                 // Force immediate release of all notes from previous chord
                 // Use releaseAll for immediate cutoff (bypasses the 1-second envelope)
                 piano.releaseAll(time);
-                console.log(`[Release] Released previous chord ${lastChordIndex} at time=${time}s (measure ${measureIndex}), starting chord ${chordIndex}`);
             } catch (e) {
                 // Ignore errors
             }
             currentlyPlayingChordNotes = [];
-        } else {
         }
 
         // Update last chord index
@@ -4236,16 +4226,9 @@ export function playAllMelody() {
                         // Must verify chordIndex matches to avoid adding tied notes from other chords
                         if (nextNote && nextNote.isTied && nextNote.beat === 0 && nextNote.chordIndex === chordIndex) {
                             const addedDuration = Tone.Time(nextNote.duration).toSeconds();
-                            console.log(`[Duration]   Found tied continuation at measure ${nextMeasureIndex} (chordIndex=${nextNote.chordIndex}), adding ${addedDuration}s`);
                             totalDuration += addedDuration;
                             nextMeasureIndex++;
                         } else {
-                            const reason = !nextNote ? 'no note' :
-                                          !nextNote.isTied ? 'not tied' :
-                                          nextNote.beat !== 0 ? 'not at beat 0' :
-                                          nextNote.chordIndex !== chordIndex ? `different chord (${nextNote.chordIndex} vs ${chordIndex})` :
-                                          'unknown';
-                            console.log(`[Duration]   No more tied continuations at measure ${nextMeasureIndex} (${reason})`);
                             break; // No more tied continuations
                         }
                     }
@@ -4368,9 +4351,6 @@ export function playAllMelody() {
             // Sort events by time to ensure correct playback order
             events.sort((a, b) => a.time - b.time);
 
-            console.log(
-                `[playAllMelody] Scheduled ${events.length} bass note events from all measures`,
-            );
             return events;
         }
 

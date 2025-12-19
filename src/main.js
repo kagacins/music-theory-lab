@@ -849,8 +849,8 @@ function initMobileFab() {
                 if (shareBtn) shareBtn.click();
                 break;
             case 'new-song':
-                if (window.openSongwritingWizard) {
-                    window.openSongwritingWizard();
+                if (window.showSongBuilderModal) {
+                    window.showSongBuilderModal();
                 }
                 break;
             case 'version-history':

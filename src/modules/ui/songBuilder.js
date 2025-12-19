@@ -16,6 +16,8 @@ import { SECTION_PROFILES, getSectionProfile, getTransitionRules, isTypicalTrans
 import { getChordNotes } from '../utils/noteUtils.js';
 import { getPiano } from '../audio/audioEngine.js';
 import { HarmonyAnalyzer } from '../analysis/harmonyAnalyzer.js';
+import { getAllTemplates, SONG_STRUCTURE_TEMPLATES } from '../../data/songStructureTemplates.js';
+import { clearSectionSelection, renderProgressionDisplay } from '../features/progressionBuilder.js';
 
 // Create harmony analyzer instance for roman numeral calculation
 const harmonyAnalyzer = new HarmonyAnalyzer();
@@ -259,6 +261,121 @@ export const STRUCTURE_TEMPLATES = {
 };
 
 // ===========================================
+// TEMPLATE UI HELPERS
+// ===========================================
+
+/**
+ * Render template options for the dropdown menu
+ * Excludes 'custom' template as that's handled separately
+ */
+function renderTemplateOptions() {
+    const templates = getAllTemplates().filter(t => t.id !== 'custom');
+    return templates.map(template => `
+        <button class="template-option w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" data-template-id="${template.id}">
+            <div class="font-medium text-gray-900 dark:text-white text-sm">${template.name}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 truncate">${template.description}</div>
+            <div class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">${template.sections.length} sections • ${template.totalBars} bars</div>
+        </button>
+    `).join('');
+}
+
+/**
+ * Apply a template and refresh the builder
+ * @param {string} templateId - Template ID to apply
+ * @param {HTMLElement} container - Container to refresh
+ * @param {Function} onStructureChange - Callback for structure changes
+ */
+function applyTemplateAndRefresh(templateId, container, onStructureChange) {
+    const compositionState = getCompositionState();
+    const result = compositionState.applyStructureTemplate(templateId);
+
+    if (result.success) {
+        // Clear section selection so "All" is shown by default after applying template
+        clearSectionSelection();
+
+        // Re-render the progression display to reflect cleared selection
+        renderProgressionDisplay('melody-progression-visualization', true);
+
+        // Notify of structure change
+        if (typeof onStructureChange === 'function') {
+            onStructureChange();
+        }
+
+        // Refresh the builder
+        createSongBuilder(container, { showHeader: true, onStructureChange });
+
+        // Show notification
+        window.dispatchEvent(new CustomEvent('showNotification', {
+            detail: {
+                message: `Applied "${result.template.name}" template with ${result.sectionsCreated} sections`,
+                type: 'success'
+            }
+        }));
+    } else {
+        window.dispatchEvent(new CustomEvent('showNotification', {
+            detail: {
+                message: 'Failed to apply template',
+                type: 'error'
+            }
+        }));
+    }
+}
+
+/**
+ * Show confirmation dialog before applying template if sections exist
+ * @param {string} templateId - Template ID
+ * @param {HTMLElement} container - Container element
+ * @param {Function} onStructureChange - Callback
+ */
+function confirmAndApplyTemplate(templateId, container, onStructureChange) {
+    const compositionState = getCompositionState();
+    const existingSections = compositionState.getSections();
+
+    if (existingSections.length > 0) {
+        // Show confirmation dialog
+        const confirmDialog = document.createElement('div');
+        confirmDialog.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]';
+        confirmDialog.innerHTML = `
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full m-4 p-6">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Replace Existing Structure?</h3>
+                <p class="text-gray-600 dark:text-gray-400 mb-4">
+                    You have ${existingSections.length} section${existingSections.length !== 1 ? 's' : ''} defined.
+                    Applying a template will clear your current section structure.
+                    <span class="font-medium">Your chords will be preserved</span> but won't be assigned to sections.
+                </p>
+                <div class="flex justify-end gap-2">
+                    <button id="cancel-template" class="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button id="confirm-template" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">
+                        Apply Template
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(confirmDialog);
+
+        confirmDialog.querySelector('#cancel-template').addEventListener('click', () => {
+            confirmDialog.remove();
+        });
+
+        confirmDialog.querySelector('#confirm-template').addEventListener('click', () => {
+            confirmDialog.remove();
+            applyTemplateAndRefresh(templateId, container, onStructureChange);
+        });
+
+        confirmDialog.addEventListener('click', (e) => {
+            if (e.target === confirmDialog) {
+                confirmDialog.remove();
+            }
+        });
+    } else {
+        // No existing sections, apply directly
+        applyTemplateAndRefresh(templateId, container, onStructureChange);
+    }
+}
+
+// ===========================================
 // STATE
 // ===========================================
 
@@ -331,6 +448,22 @@ export function createSongBuilder(container, options = {}) {
                 </div>
             </div>
             <div class="flex items-center gap-2">
+                <div class="relative">
+                    <button id="structure-template-btn" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg flex items-center gap-1 transition-colors" title="Apply a song structure template">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/>
+                        </svg>
+                        Templates
+                    </button>
+                    <div id="structure-template-dropdown" class="hidden absolute right-0 top-full mt-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50">
+                        <div class="p-2 border-b border-gray-200 dark:border-gray-700">
+                            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Song Structure Templates</span>
+                        </div>
+                        <div class="py-1 max-h-64 overflow-y-auto">
+                            ${renderTemplateOptions()}
+                        </div>
+                    </div>
+                </div>
                 <button id="add-section-btn" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg flex items-center gap-1 transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -373,6 +506,34 @@ export function createSongBuilder(container, options = {}) {
     if (addBtn) {
         addBtn.addEventListener('click', () => {
             showAddSectionModal(container, onStructureChange);
+        });
+    }
+
+    // Template button and dropdown handlers
+    const templateBtn = container.querySelector('#structure-template-btn');
+    const templateDropdown = container.querySelector('#structure-template-dropdown');
+    if (templateBtn && templateDropdown) {
+        // Toggle dropdown on button click
+        templateBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            templateDropdown.classList.toggle('hidden');
+        });
+
+        // Handle template option clicks
+        templateDropdown.querySelectorAll('.template-option').forEach(option => {
+            option.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const templateId = option.dataset.templateId;
+                templateDropdown.classList.add('hidden');
+                confirmAndApplyTemplate(templateId, container, onStructureChange);
+            });
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!templateBtn.contains(e.target) && !templateDropdown.contains(e.target)) {
+                templateDropdown.classList.add('hidden');
+            }
         });
     }
 
@@ -445,7 +606,7 @@ function createTimelineVisualization(sections, progression, options = {}) {
         const isSelected = index === initialSelectedIndex;
 
         const sectionEl = document.createElement('div');
-        sectionEl.className = `section-block relative flex flex-col items-center justify-center p-3 rounded-lg cursor-pointer transition-all hover:scale-105 hover:shadow-lg border-2 ${sectionType.borderColor} ${sectionType.bgColor} ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 scale-105 shadow-lg' : ''}`;
+        sectionEl.className = `section-block group relative flex flex-col items-center justify-center p-3 rounded-lg cursor-grab active:cursor-grabbing transition-all hover:scale-105 hover:shadow-lg border-2 ${sectionType.borderColor} ${sectionType.bgColor} ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 scale-105 shadow-lg' : ''}`;
         sectionEl.style.minWidth = '90px';
         sectionEl.style.flexGrow = widthPercent / 10;
         sectionEl.setAttribute('data-section-id', section.id);
@@ -453,6 +614,11 @@ function createTimelineVisualization(sections, progression, options = {}) {
 
         sectionEl.innerHTML = `
             ${isSelected ? '<div class="absolute -top-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-blue-500 text-white text-[10px] font-bold rounded uppercase tracking-wide">Selected</div>' : ''}
+            <div class="absolute top-1 right-1 text-gray-400 dark:text-gray-500 opacity-50 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing" title="Drag to reorder">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
+                </svg>
+            </div>
             <span class="text-xl">${sectionType.emoji}</span>
             <span class="text-xs font-semibold text-gray-700 dark:text-gray-200 text-center">${section.label || sectionType.label}</span>
             <span class="text-xs text-gray-500 dark:text-gray-400">${chordCount} chords</span>
@@ -548,88 +714,88 @@ function renderSectionDetails(container, section, sectionIndex) {
 
     const sectionOctave = detectSectionOctave(sectionChords);
 
+    // Determine placeholder status
+    const isPlaceholder = section.isPlaceholder || sectionChords.length === 0;
+    const expectedChords = section.expectedChordCount || 4;
+
     container.innerHTML = `
-        <div class="flex items-start justify-between mb-4">
-            <div class="flex items-center gap-3">
-                <span class="text-3xl">${sectionType.emoji}</span>
-                <div>
-                    <h4 class="text-lg font-bold text-gray-900 dark:text-white">${section.label || sectionType.label}</h4>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">${sectionType.description}</p>
-                </div>
-            </div>
+        <!-- Compact header row -->
+        <div class="flex items-center justify-between mb-2">
             <div class="flex items-center gap-2">
-                <button id="copy-section-btn" class="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Duplicate section">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <span class="text-xl">${sectionType.emoji}</span>
+                <h4 class="text-base font-bold text-gray-900 dark:text-white">${section.label || sectionType.label}</h4>
+                <span class="text-xs text-gray-400 dark:text-gray-500">— ${sectionType.description}</span>
+            </div>
+            <div class="flex items-center gap-1">
+                <button id="copy-section-btn" class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="Duplicate section">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                     </svg>
                 </button>
-                <button id="delete-section-btn" class="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Delete section">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button id="delete-section-btn" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors" title="Delete section">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                     </svg>
                 </button>
             </div>
         </div>
 
-        <!-- Section chords display -->
-        <div class="mb-4">
-            <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Chords (${sectionChords.length}): <span class="text-xs text-gray-400 font-normal">Hold to play</span></p>
-            <div class="flex flex-wrap items-center gap-2" id="section-chord-chips" data-section-octave="${sectionOctave}">
-                ${sectionChords.length > 0 ? sectionChords.map((chord, i) => `
-                    <button class="chord-chip px-3 py-1.5 bg-gradient-to-r ${sectionType.color} text-white text-sm font-medium rounded cursor-pointer hover:scale-105 hover:shadow-md active:scale-95 transition-all select-none"
+        <!-- Chords row -->
+        <div class="flex items-center gap-2 mb-2 flex-wrap" id="section-chord-chips" data-section-octave="${sectionOctave}">
+            <span class="text-xs text-gray-500 dark:text-gray-400">Chords:</span>
+            ${isPlaceholder ? `
+                <span class="text-xs text-gray-400 dark:text-gray-500 italic border border-dashed border-gray-300 dark:border-gray-600 px-2 py-0.5 rounded">Empty — needs ${expectedChords} chords</span>
+            ` : sectionChords.map((chord, i) => `
+                <button class="chord-chip px-2 py-0.5 bg-gradient-to-r ${sectionType.color} text-white text-xs font-medium rounded cursor-pointer hover:scale-105 hover:shadow-md active:scale-95 transition-all select-none"
+                        data-root="${chord.root}"
+                        data-type="${chord.type}"
+                        data-octave="${sectionOctave}"
+                        data-chord-index="${section.chordIndices[i]}">
+                    ${formatChordDisplay(chord)}
+                </button>
+            `).join('')}
+            ${nextSectionChords.length > 0 ? `
+                <span class="text-gray-300 dark:text-gray-600">│</span>
+                <span class="text-xs text-gray-400">${nextSectionType?.emoji || ''}</span>
+                ${nextSectionChords.map((chord, i) => `
+                    <button class="next-section-chord-btn px-2 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs font-medium rounded cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600 transition-all select-none opacity-75"
                             data-root="${chord.root}"
                             data-type="${chord.type}"
                             data-octave="${sectionOctave}"
-                            data-chord-index="${section.chordIndices[i]}">
+                            title="Hold to play (${nextSectionType?.label || 'next section'})">
                         ${formatChordDisplay(chord)}
                     </button>
-                `).join('') : '<span class="text-gray-400 text-sm">No chords yet</span>'}
-                ${nextSectionChords.length > 0 ? `
-                    <span class="text-gray-300 dark:text-gray-600 mx-1">│</span>
-                    <span class="text-xs text-gray-400 dark:text-gray-500 mr-1">${nextSectionType?.emoji || ''} Next:</span>
-                    ${nextSectionChords.map((chord, i) => `
-                        <button class="next-section-chord-btn px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium rounded cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600 transition-all select-none opacity-75"
-                                data-root="${chord.root}"
-                                data-type="${chord.type}"
-                                data-octave="${sectionOctave}"
-                                title="Hold to play (${nextSectionType?.label || 'next section'})">
-                            ${formatChordDisplay(chord)}
-                        </button>
-                    `).join('')}
-                ` : ''}
+                `).join('')}
+            ` : ''}
+            <span class="text-xs text-gray-400 ml-1">(hold to play)</span>
+        </div>
+
+        <!-- Compact analysis row: Tension + Harmonic Rhythm side by side -->
+        <div class="flex gap-4 mb-2 p-2 bg-gray-50 dark:bg-gray-700/50 rounded text-xs">
+            <div class="flex-1">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="text-gray-500 dark:text-gray-400">Tension:</span>
+                    <div class="flex-1 relative h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+                        <div class="absolute h-full bg-gray-300 dark:bg-gray-500 opacity-50"
+                             style="left: ${profile.characteristics.tensionRange[0] * 100}%; width: ${(profile.characteristics.tensionRange[1] - profile.characteristics.tensionRange[0]) * 100}%"></div>
+                        <div class="absolute h-full w-1 bg-gradient-to-r ${sectionType.color} rounded"
+                             style="left: calc(${calculateActualTension(sectionChords)}% - 2px)"></div>
+                    </div>
+                    <span class="font-medium text-gray-700 dark:text-gray-200 w-8">${calculateActualTension(sectionChords)}%</span>
+                </div>
+                <span class="text-gray-400 dark:text-gray-500">
+                    ${calculateActualTension(sectionChords) < profile.characteristics.tensionRange[0] * 100 ? 'More relaxed than typical' :
+                      calculateActualTension(sectionChords) > profile.characteristics.tensionRange[1] * 100 ? 'More tense than typical' :
+                      'Typical range'}
+                </span>
+            </div>
+            <div class="flex-1 border-l border-gray-200 dark:border-gray-600 pl-4">
+                <span class="text-gray-500 dark:text-gray-400">Rhythm:</span>
+                <span class="text-gray-700 dark:text-gray-300 ml-1">${describeHarmonicDensity(profile.characteristics.harmonicDensity)}</span>
             </div>
         </div>
 
-        <!-- Section tension analysis -->
-        <div class="mb-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <div class="mb-3">
-                <div class="flex items-center justify-between mb-1">
-                    <p class="text-xs font-medium text-gray-600 dark:text-gray-300">Your Section's Tension</p>
-                    <span class="text-xs font-bold text-gray-700 dark:text-gray-200">${calculateActualTension(sectionChords)}%</span>
-                </div>
-                <div class="relative h-3 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                    <!-- Typical range indicator -->
-                    <div class="absolute h-full bg-gray-300 dark:bg-gray-500 opacity-50"
-                         style="left: ${profile.characteristics.tensionRange[0] * 100}%; width: ${(profile.characteristics.tensionRange[1] - profile.characteristics.tensionRange[0]) * 100}%"
-                         title="Typical range for ${sectionType.label}: ${Math.round(profile.characteristics.tensionRange[0] * 100)}-${Math.round(profile.characteristics.tensionRange[1] * 100)}%"></div>
-                    <!-- Actual tension marker -->
-                    <div class="absolute h-full w-1.5 bg-gradient-to-r ${sectionType.color} rounded shadow-sm"
-                         style="left: calc(${calculateActualTension(sectionChords)}% - 3px)"></div>
-                </div>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Gray zone = typical for ${sectionType.label}s (${Math.round(profile.characteristics.tensionRange[0] * 100)}-${Math.round(profile.characteristics.tensionRange[1] * 100)}%).
-                    ${calculateActualTension(sectionChords) < profile.characteristics.tensionRange[0] * 100 ? 'Your chords are more relaxed than typical.' :
-                      calculateActualTension(sectionChords) > profile.characteristics.tensionRange[1] * 100 ? 'Your chords are more tense than typical.' :
-                      'Your chords fit the typical range.'}
-                </p>
-            </div>
-            <div>
-                <p class="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Harmonic Rhythm</p>
-                <p class="text-sm text-gray-700 dark:text-gray-300">${describeHarmonicDensity(profile.characteristics.harmonicDensity)}</p>
-            </div>
-        </div>
-
-        <!-- Transition suggestions -->
+        <!-- Transition suggestions (compact) -->
         ${renderTransitionSuggestions(section, sectionIndex, sections)}
     `;
 
@@ -1520,9 +1686,17 @@ function initializeDragDrop(container) {
     new Sortable(timeline, {
         animation: 200,
         ghostClass: 'opacity-50',
+        chosenClass: 'sortable-chosen',
         draggable: '.section-block',
         filter: 'svg', // Don't drag arrows
+        handle: '.section-block', // Entire block is draggable
+        onStart: function(evt) {
+            // Add visual feedback that dragging is happening
+            evt.item.classList.add('z-50', 'shadow-2xl');
+        },
         onEnd: function(evt) {
+            evt.item.classList.remove('z-50', 'shadow-2xl');
+
             if (evt.oldIndex !== evt.newIndex) {
                 const compositionState = getCompositionState();
                 // Account for arrows between sections (every other element)
@@ -1533,6 +1707,9 @@ function initializeDragDrop(container) {
                 window.dispatchEvent(new CustomEvent('sectionsReordered', {
                     detail: { fromIndex, toIndex }
                 }));
+
+                // Re-render the song builder to fix arrows after reordering
+                refreshSongBuilder();
             }
         }
     });

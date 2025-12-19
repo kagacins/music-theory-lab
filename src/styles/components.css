@@ -285,11 +285,15 @@
 
 /* Scroll view container */
 .scroll-view-container {
-    scroll-snap-type: x mandatory;
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
     scrollbar-color: #cbd5e1 transparent;
+    /* Horizontal padding to prevent selection ring clipping on leftmost/rightmost cards */
+    padding-left: 8px;
+    padding-right: 8px;
+    margin-left: -8px;
+    margin-right: -8px;
 }
 
 .scroll-view-container::-webkit-scrollbar {
@@ -311,7 +315,6 @@
 
 .scroll-view-container .chord-card-wrapper,
 .scroll-view-container .section-unified-container {
-    scroll-snap-align: start;
     flex-shrink: 0;
 }
 

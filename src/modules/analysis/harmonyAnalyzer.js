@@ -463,7 +463,7 @@ export class HarmonyAnalyzer {
     /**
      * Get Roman numeral for a chord
      * @param {Object} chord - Chord object
-     * @param {string} key - Current key
+     * @param {string} key - Current key (e.g., "G" for G major, "Gm" for G minor)
      * @returns {string} Roman numeral
      */
     getRomanNumeral(chord, key) {
@@ -473,15 +473,19 @@ export class HarmonyAnalyzer {
         const romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
         const minorRomanNumerals = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii'];
 
+        // Detect if this is a minor key
+        const isMinorKey = key && key.endsWith('m') && !key.endsWith('dim');
+        const keyRoot = isMinorKey ? key.slice(0, -1) : key;
+
         let degree = this.getScaleDegree(chord.root, key);
         let chromaticPrefix = '';
 
         // Handle chromatic (non-diatonic) chords
         if (degree === null) {
             // Calculate the semitone distance to find the chromatic degree
-            const keyIndex = ALL_NOTES.indexOf(key) !== -1
-                ? ALL_NOTES.indexOf(key)
-                : ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
+            const keyIndex = ALL_NOTES.indexOf(keyRoot) !== -1
+                ? ALL_NOTES.indexOf(keyRoot)
+                : ALL_NOTES.indexOf(ENHARMONIC_MAP[keyRoot]);
             const chordIndex = ALL_NOTES.indexOf(chord.root) !== -1
                 ? ALL_NOTES.indexOf(chord.root)
                 : ALL_NOTES.indexOf(ENHARMONIC_MAP[chord.root]);
@@ -491,13 +495,32 @@ export class HarmonyAnalyzer {
             const interval = (chordIndex - keyIndex + 12) % 12;
 
             // Map chromatic intervals to nearest diatonic degree with appropriate prefix
-            const chromaticMapping = {
-                1: { degree: 2, prefix: '♭' },  // ♭II (e.g., Db in C)
-                3: { degree: 3, prefix: '♭' },  // ♭III (e.g., Eb in C)
-                6: { degree: 4, prefix: '♯' },  // ♯IV (e.g., F# in C)
-                8: { degree: 6, prefix: '♭' },  // ♭VI (e.g., Ab in C)
-                10: { degree: 7, prefix: '♭' }  // ♭VII (e.g., Bb in C)
-            };
+            // Different mappings for major vs minor keys
+            let chromaticMapping;
+
+            if (isMinorKey) {
+                // In minor keys, chromatic notes are those NOT in natural minor scale
+                // Natural minor intervals: 0, 2, 3, 5, 7, 8, 10
+                // Chromatic in minor: 1, 4, 6, 9, 11
+                chromaticMapping = {
+                    1: { degree: 2, prefix: '♭' },   // ♭II (Neapolitan)
+                    4: { degree: 3, prefix: '♯' },   // ♯III or natural III (borrowed from parallel major)
+                    6: { degree: 4, prefix: '♯' },   // ♯IV (tritone)
+                    9: { degree: 6, prefix: '♯' },   // ♯VI (borrowed from parallel major)
+                    11: { degree: 7, prefix: '♯' }   // ♯VII (leading tone from harmonic minor)
+                };
+            } else {
+                // In major keys, chromatic notes are those NOT in major scale
+                // Major scale intervals: 0, 2, 4, 5, 7, 9, 11
+                // Chromatic in major: 1, 3, 6, 8, 10
+                chromaticMapping = {
+                    1: { degree: 2, prefix: '♭' },   // ♭II (e.g., Db in C)
+                    3: { degree: 3, prefix: '♭' },   // ♭III (e.g., Eb in C)
+                    6: { degree: 4, prefix: '♯' },   // ♯IV (e.g., F# in C)
+                    8: { degree: 6, prefix: '♭' },   // ♭VI (e.g., Ab in C)
+                    10: { degree: 7, prefix: '♭' }   // ♭VII (e.g., Bb in C)
+                };
+            }
 
             const mapping = chromaticMapping[interval];
             if (mapping) {
@@ -509,9 +532,9 @@ export class HarmonyAnalyzer {
         }
 
         const index = degree - 1;
-        const isMinor = chord.type && (chord.type === 'Minor' || chord.type === 'Diminished');
+        const isMinorChord = chord.type && (chord.type === 'Minor' || chord.type === 'Diminished');
 
-        let numeral = isMinor ? minorRomanNumerals[index] : romanNumerals[index];
+        let numeral = isMinorChord ? minorRomanNumerals[index] : romanNumerals[index];
 
         // Add quality indicators
         if (chord.type) {
@@ -526,14 +549,18 @@ export class HarmonyAnalyzer {
     /**
      * Get scale degree of a note in a key
      * @param {string} chordRoot - Root note
-     * @param {string} key - Current key
+     * @param {string} key - Current key (e.g., "G" for G major, "Gm" for G minor)
      * @returns {number|null} Scale degree (1-7)
      */
     getScaleDegree(chordRoot, key) {
+        // Detect if this is a minor key
+        const isMinorKey = key && key.endsWith('m') && !key.endsWith('dim');
+        const keyRoot = isMinorKey ? key.slice(0, -1) : key;
+
         // Handle enharmonic equivalents (e.g., Bb -> A#, Db -> C#)
-        let keyIndex = ALL_NOTES.indexOf(key);
-        if (keyIndex === -1 && ENHARMONIC_MAP[key]) {
-            keyIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
+        let keyIndex = ALL_NOTES.indexOf(keyRoot);
+        if (keyIndex === -1 && ENHARMONIC_MAP[keyRoot]) {
+            keyIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[keyRoot]);
         }
 
         let chordIndex = ALL_NOTES.indexOf(chordRoot);
@@ -546,8 +573,9 @@ export class HarmonyAnalyzer {
         // Calculate semitone distance
         let distance = (chordIndex - keyIndex + 12) % 12;
 
-        // Map to scale degree (major scale)
-        const degreeMap = {
+        // Map to scale degree based on key type
+        // Major scale intervals: 0, 2, 4, 5, 7, 9, 11
+        const majorDegreeMap = {
             0: 1,   // Root (I)
             2: 2,   // 2nd (ii)
             4: 3,   // 3rd (iii)
@@ -557,6 +585,18 @@ export class HarmonyAnalyzer {
             11: 7   // 7th (vii°)
         };
 
+        // Natural minor scale intervals: 0, 2, 3, 5, 7, 8, 10
+        const minorDegreeMap = {
+            0: 1,   // Root (i)
+            2: 2,   // 2nd (ii°)
+            3: 3,   // 3rd (III) - minor 3rd
+            5: 4,   // 4th (iv)
+            7: 5,   // 5th (v)
+            8: 6,   // 6th (VI) - minor 6th
+            10: 7   // 7th (VII) - minor 7th
+        };
+
+        const degreeMap = isMinorKey ? minorDegreeMap : majorDegreeMap;
         return degreeMap[distance] || null;
     }
 

@@ -77,6 +77,9 @@ function normalizeToSharp(note) {
  * Returns an object with degree and whether it's chromatic
  */
 function getScaleDegree(chordRoot, key) {
+    // Detect if this is a minor key
+    const isMinorKey = key && key.endsWith('m') && !key.endsWith('dim');
+
     // Normalize both to sharp notation
     const normalizedKey = normalizeToSharp(key?.replace('m', '')); // Remove 'm' for minor keys
     const normalizedRoot = normalizeToSharp(chordRoot);
@@ -89,8 +92,9 @@ function getScaleDegree(chordRoot, key) {
     // Calculate semitone distance
     let distance = (chordIndex - keyIndex + 12) % 12;
 
-    // Map to scale degree (major scale diatonic)
-    const diatonicDegreeMap = {
+    // Map to scale degree based on key type
+    // Major scale diatonic intervals: 0, 2, 4, 5, 7, 9, 11
+    const majorDiatonicDegreeMap = {
         0: 1,  // Root (I)
         2: 2,  // 2nd (ii)
         4: 3,  // 3rd (iii)
@@ -100,14 +104,42 @@ function getScaleDegree(chordRoot, key) {
         11: 7  // 7th (vii°)
     };
 
-    // Map chromatic notes to their closest scale degree with alteration
-    const chromaticDegreeMap = {
-        1: 'b2',   // b2 / #1
-        3: 'b3',   // b3 / #2
-        6: 'b5',   // b5 / #4 (tritone)
-        8: 'b6',   // b6 / #5
-        10: 'b7'   // b7
+    // Natural minor scale diatonic intervals: 0, 2, 3, 5, 7, 8, 10
+    const minorDiatonicDegreeMap = {
+        0: 1,   // Root (i)
+        2: 2,   // 2nd (ii°)
+        3: 3,   // 3rd (III)
+        5: 4,   // 4th (iv)
+        7: 5,   // 5th (v)
+        8: 6,   // 6th (VI)
+        10: 7   // 7th (VII)
     };
+
+    const diatonicDegreeMap = isMinorKey ? minorDiatonicDegreeMap : majorDiatonicDegreeMap;
+
+    // Map chromatic notes to their closest scale degree with alteration
+    // Different chromatic mappings for major vs minor keys
+    let chromaticDegreeMap;
+
+    if (isMinorKey) {
+        // In minor keys, chromatic notes are: 1, 4, 6, 9, 11
+        chromaticDegreeMap = {
+            1: 'b2',   // ♭II (Neapolitan)
+            4: '#3',   // ♯III (borrowed from parallel major)
+            6: '#4',   // ♯IV (tritone)
+            9: '#6',   // ♯VI (borrowed from parallel major)
+            11: '#7'   // ♯VII (leading tone)
+        };
+    } else {
+        // In major keys, chromatic notes are: 1, 3, 6, 8, 10
+        chromaticDegreeMap = {
+            1: 'b2',   // b2 / #1
+            3: 'b3',   // b3 / #2
+            6: 'b5',   // b5 / #4 (tritone)
+            8: 'b6',   // b6 / #5
+            10: 'b7'   // b7
+        };
+    }
 
     // Return diatonic degree if found
     if (diatonicDegreeMap[distance]) {

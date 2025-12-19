@@ -13,6 +13,7 @@
  */
 
 import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
+import { getCurrentKey, setCurrentKey } from '../state/trainerState.js';
 
 // Project file format version - increment when format changes
 // 1.0.0 - Initial format
@@ -109,12 +110,13 @@ export function createProjectData(compositionState) {
         modifiedAt: now,
 
         // Composition metadata
+        // Use getCurrentKey() as primary source for key (it's the UI source of truth)
         metadata: {
             title: compositionState.metadata?.title || 'Untitled Project',
             composer: compositionState.metadata?.composer || '',
             tempo: compositionState.metadata?.tempo || 120,
             timeSignature: compositionState.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE,
-            key: compositionState.metadata?.key || 'C'
+            key: getCurrentKey() || compositionState.metadata?.key || 'C'
         },
 
         // Composition settings
@@ -307,6 +309,12 @@ export async function loadProjectFromFile() {
 export function applyProjectToState(projectData, compositionState, trainerState, callbacks = {}) {
     try {
         console.log('[projectManager] Applying project to state:', projectData.metadata?.title);
+
+        // 0. Set the key FIRST - this ensures all subsequent operations use the correct key
+        if (projectData.metadata?.key) {
+            console.log('[projectManager] Setting key from project:', projectData.metadata.key);
+            setCurrentKey(projectData.metadata.key);
+        }
 
         // 1. Update composition metadata
         if (projectData.metadata) {

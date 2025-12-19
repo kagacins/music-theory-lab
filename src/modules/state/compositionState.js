@@ -18,6 +18,7 @@ import { generateBassVoicing, generateBuildingBlockBass, splitBlockBassIntoMeasu
 import { getChordNotes } from '../utils/noteUtils.js';
 import { BuildingBlockSequence, BuildingBlock, durationToUnits, unitsToDuration, UNITS_PER_BEAT } from './buildingBlock.js';
 import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
+import { SONG_STRUCTURE_TEMPLATES, getTemplate } from '../../data/songStructureTemplates.js';
 
 // ============================================================================
 // BASS NOTE STORE - Single Source of Truth for Bass Notes
@@ -5359,7 +5360,12 @@ export class CompositionState {
      * Create a new section
      * @param {string} type - Section type (verse, chorus, etc.)
      * @param {Array<number>} chordIndices - Indices of chords to include
-     * @param {Object} options - Optional settings { label, color }
+     * @param {Object} options - Optional settings
+     * @param {string} [options.label] - Custom label for the section
+     * @param {string} [options.color] - Custom color for the section
+     * @param {number} [options.expectedChordCount] - Expected number of chords (for placeholder sections)
+     * @param {number} [options.targetBars] - Target length in bars (for structure-first workflow)
+     * @param {boolean} [options.isPlaceholder] - Whether this is an empty placeholder section
      * @returns {Object} The created section
      */
     createSection(type, chordIndices = [], options = {}) {
@@ -5404,13 +5410,23 @@ export class CompositionState {
             autoLabel = lowestAvailable === 1 ? baseLabel : `${baseLabel} ${lowestAvailable}`;
         }
 
+        // Determine if this is a placeholder section
+        const isPlaceholder = options.isPlaceholder !== undefined
+            ? options.isPlaceholder
+            : (chordIndices.length === 0 && options.expectedChordCount > 0);
+
         const section = {
             id: this._generateSectionId(),
             type: type,
             label: options.label || autoLabel,
             chordIndices: [...chordIndices],
             color: options.color || sectionType.color,
-            collapsed: false
+            collapsed: false,
+            // New optional fields for structure-first workflow
+            expectedChordCount: options.expectedChordCount || chordIndices.length || 4,
+            targetBars: options.targetBars || null,
+            isPlaceholder: isPlaceholder,
+            fromTemplate: options.fromTemplate || false  // Sections from templates won't auto-delete when empty
         };
 
         this.sections.push(section);
@@ -5421,7 +5437,7 @@ export class CompositionState {
     /**
      * Update a section's properties
      * @param {string} sectionId - Section ID
-     * @param {Object} updates - Properties to update { label, type, color, collapsed, chordIndices }
+     * @param {Object} updates - Properties to update { label, type, color, collapsed, chordIndices, expectedChordCount, targetBars, isPlaceholder }
      * @returns {Object|null} Updated section or null if not found
      */
     updateSection(sectionId, updates) {
@@ -5440,6 +5456,10 @@ export class CompositionState {
         if (updates.color !== undefined) section.color = updates.color;
         if (updates.collapsed !== undefined) section.collapsed = updates.collapsed;
         if (updates.chordIndices !== undefined) section.chordIndices = updates.chordIndices;
+        // New optional fields for structure-first workflow
+        if (updates.expectedChordCount !== undefined) section.expectedChordCount = updates.expectedChordCount;
+        if (updates.targetBars !== undefined) section.targetBars = updates.targetBars;
+        if (updates.isPlaceholder !== undefined) section.isPlaceholder = updates.isPlaceholder;
 
         this.events.emit('sectionUpdated', section);
         return section;
@@ -5480,6 +5500,12 @@ export class CompositionState {
             section.chordIndices.splice(position, 0, chordIndex);
         }
 
+        // If section was a placeholder, mark it's no longer empty but keep fromTemplate flag
+        if (section.isPlaceholder && section.chordIndices.length > 0) {
+            section.isPlaceholder = false;
+            // Preserve fromTemplate flag so section isn't auto-deleted if emptied again
+        }
+
         this.events.emit('chordAddedToSection', { chordIndex, sectionId });
         return true;
     }
@@ -5499,8 +5525,12 @@ export class CompositionState {
                 this.events.emit('chordRemovedFromSection', { chordIndex, sectionId });
 
                 // Auto-delete section if it becomes empty
-                if (section.chordIndices.length === 0) {
+                // BUT don't delete sections from templates (check fromTemplate or isPlaceholder)
+                if (section.chordIndices.length === 0 && !section.isPlaceholder && !section.fromTemplate) {
                     this.deleteSection(sectionId);
+                } else if (section.chordIndices.length === 0 && (section.isPlaceholder || section.fromTemplate)) {
+                    // Section came from a template - restore placeholder state
+                    section.isPlaceholder = true;
                 }
 
                 return sectionId;
@@ -5538,6 +5568,115 @@ export class CompositionState {
         this.sections.splice(toIndex, 0, section);
         this.events.emit('sectionsReordered', { fromIndex, toIndex });
         return true;
+    }
+
+    // ========================================================================
+    // STRUCTURE-FIRST WORKFLOW METHODS
+    // ========================================================================
+
+    /**
+     * Create a placeholder section (empty section for structure-first workflow)
+     * @param {string} type - Section type (verse, chorus, etc.)
+     * @param {Object} options - Optional settings
+     * @param {number} [options.expectedChordCount=4] - Expected number of chords
+     * @param {number} [options.targetBars=8] - Target length in bars
+     * @param {string} [options.label] - Custom label
+     * @returns {Object} The created placeholder section
+     */
+    createPlaceholderSection(type, options = {}) {
+        return this.createSection(type, [], {
+            ...options,
+            expectedChordCount: options.expectedChordCount || 4,
+            targetBars: options.targetBars || 8,
+            isPlaceholder: true,
+            fromTemplate: true  // Marks this section as template-originated (won't auto-delete when empty)
+        });
+    }
+
+    /**
+     * Clear all sections (chords remain but become ungrouped)
+     * @returns {number} Number of sections cleared
+     */
+    clearAllSections() {
+        const count = this.sections.length;
+        this.sections = [];
+        this._nextSectionId = 1;
+        this.events.emit('allSectionsCleared', { count });
+        return count;
+    }
+
+    /**
+     * Apply a song structure template
+     * Creates placeholder sections based on the template definition.
+     * Preserves existing chords but removes their section assignments.
+     * @param {string} templateId - Template ID from SONG_STRUCTURE_TEMPLATES
+     * @returns {Object} Result { success: boolean, sectionsCreated: number, template: Object }
+     */
+    applyStructureTemplate(templateId) {
+        const template = getTemplate(templateId);
+
+        if (!template || templateId === 'custom') {
+            return { success: false, sectionsCreated: 0, template: null };
+        }
+
+        // Clear existing sections (but preserve chords)
+        this.clearAllSections();
+
+        // Create placeholder sections from template
+        let sectionsCreated = 0;
+        template.sections.forEach((sectionDef) => {
+            this.createPlaceholderSection(sectionDef.type, {
+                expectedChordCount: sectionDef.expectedChordCount,
+                targetBars: sectionDef.targetBars,
+                label: sectionDef.label // Some templates may specify labels
+            });
+            sectionsCreated++;
+        });
+
+        this.events.emit('templateApplied', { templateId, template, sectionsCreated });
+
+        return {
+            success: true,
+            sectionsCreated,
+            template
+        };
+    }
+
+    /**
+     * Get all placeholder sections (sections that need to be filled)
+     * @returns {Array} Array of placeholder sections
+     */
+    getPlaceholderSections() {
+        return this.sections.filter(s => s.isPlaceholder);
+    }
+
+    /**
+     * Get sections that are filled (have at least one chord)
+     * @returns {Array} Array of filled sections
+     */
+    getFilledSections() {
+        return this.sections.filter(s => !s.isPlaceholder && s.chordIndices.length > 0);
+    }
+
+    /**
+     * Check if all sections are filled (no placeholders remain)
+     * @returns {boolean} True if all sections have chords
+     */
+    allSectionsFilled() {
+        return this.sections.length > 0 && this.getPlaceholderSections().length === 0;
+    }
+
+    /**
+     * Get the completion status of the song structure
+     * @returns {Object} { total: number, filled: number, placeholder: number, percentComplete: number }
+     */
+    getStructureCompletionStatus() {
+        const total = this.sections.length;
+        const filled = this.getFilledSections().length;
+        const placeholder = this.getPlaceholderSections().length;
+        const percentComplete = total > 0 ? Math.round((filled / total) * 100) : 0;
+
+        return { total, filled, placeholder, percentComplete };
     }
 
     /**
