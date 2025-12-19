@@ -208,7 +208,7 @@
     color: white;
 }
 
-.card-icon.icon-progression { background: linear-gradient(135deg, #a855f7, #ec4899); }
+.card-icon.icon-progression { background: linear-gradient(135deg, #059669, #16a34a); }
 .card-icon.icon-actions { background: linear-gradient(135deg, #10b981, #3b82f6); }
 .card-icon.icon-notation { background: linear-gradient(135deg, #8b5cf6, #6366f1); }
 .card-icon.icon-suggestions { background: linear-gradient(135deg, #f59e0b, #ef4444); }
@@ -427,7 +427,7 @@
 }
 
 .progression-scroll-container::-webkit-scrollbar-thumb {
-    background: #d1d5db;
+    background: #10b981;
     border-radius: 3px;
 }
 
@@ -446,14 +446,14 @@
 }
 
 .progression-chord-chip:hover {
-    border-color: #a855f7;
-    background: #faf5ff;
+    border-color: #10b981;
+    background: #ecfdf5;
 }
 
 .progression-chord-chip.selected {
-    border-color: #8b5cf6;
-    background: linear-gradient(135deg, #f5f3ff, #ede9fe);
-    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+    border-color: #059669;
+    background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+    box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2);
 }
 
 .chord-chip-name {

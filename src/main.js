@@ -2020,6 +2020,36 @@ window.toggleIntervalTooltips = function(enabled) {
         });
     }
 };
+
+// Progression tooltips toggle (for chord cards in progression)
+window.progressionTooltipsEnabled = true;
+
+window.toggleProgressionTooltips = function(enabled) {
+    window.progressionTooltipsEnabled = enabled;
+    const statusText = document.getElementById('progression-tooltips-status');
+    const progressionContainer = document.getElementById('melody-progression-visualization');
+
+    if (statusText) {
+        statusText.textContent = enabled ? 'On' : 'Off';
+    }
+
+    // Add class to progression container to control tooltip visibility
+    if (progressionContainer) {
+        progressionContainer.classList.toggle('progression-tooltips-disabled', !enabled);
+    }
+
+    // Add class to body as fallback for tooltips appended to body
+    document.body.classList.toggle('progression-tooltips-disabled', !enabled);
+
+    // Hide any currently visible progression tooltips
+    if (!enabled) {
+        document.querySelectorAll('.chord-card-tooltip, .chord-tooltip').forEach(t => {
+            t.style.opacity = '0';
+            t.style.visibility = 'hidden';
+        });
+    }
+};
+
 window.toggleBuilderProgressionPanel = toggleBuilderProgressionPanel;
 window.toggleBuilderCardView = toggleBuilderCardView;
 window.renderBuilderProgressionCards = renderBuilderProgressionCards;
@@ -5399,16 +5429,101 @@ window.updateBassOctaveSelector = function() {
 };
 
 /**
- * Apply bass pattern to selected measure only
- * Allows generating bass for a specific measure without affecting the whole composition
+ * Apply bass pattern to ALL chords with confirmation dialog
+ */
+window.applyBassPatternToAll = function() {
+    // Get compositionState
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) {
+        if (window.toast) {
+            window.toast.error('Composition state not available');
+        }
+        return;
+    }
+
+    const chordCount = compositionState.storedProgressionData?.length || 0;
+    if (chordCount === 0) {
+        if (window.toast) {
+            window.toast.warning('No chords in progression');
+        }
+        return;
+    }
+
+    // Get current bass pattern from selector
+    const patternSelect = document.getElementById('bass-pattern-select-card') ||
+                         document.getElementById('bass-pattern-select');
+    const bassPattern = patternSelect?.value || 'root-fifth';
+
+    // Get octave and inversion settings
+    const octaveSelect = document.getElementById('bass-octave-select-card');
+    const inversionToggle = document.getElementById('bass-follows-inversion-toggle-card');
+    const bassOctave = octaveSelect?.value === 'auto' ? null : parseInt(octaveSelect?.value || '2');
+    const bassFollowsInversion = inversionToggle?.checked || false;
+
+    // Confirmation dialog
+    const confirmed = confirm(
+        `Apply "${bassPattern}" bass pattern to all ${chordCount} chords?\n\n` +
+        'This will overwrite any existing bass notes.'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    // Update settings
+    compositionState.updateSettings({
+        bassPattern: bassPattern,
+        bassOctave: bassOctave,
+        bassFollowsInversion: bassFollowsInversion
+    });
+
+    // Clear any per-chord patterns (reset all to global)
+    if (compositionState.storedProgressionData) {
+        for (let i = 0; i < compositionState.storedProgressionData.length; i++) {
+            compositionState.storedProgressionData[i].bassPattern = null;
+        }
+    }
+
+    // Get trainer state to also update progressionData
+    const trainerState = window.getTrainerState ? window.getTrainerState() : null;
+    if (trainerState && trainerState.progressionData) {
+        for (let i = 0; i < trainerState.progressionData.length; i++) {
+            if (trainerState.progressionData[i]) {
+                trainerState.progressionData[i].bassPattern = null;
+            }
+        }
+    }
+
+    // Regenerate all bass using the new pattern
+    if (typeof compositionState.regenerateAllAutoBassByBuildingBlock === 'function') {
+        compositionState.regenerateAllAutoBassByBuildingBlock();
+    }
+
+    // Refresh notation
+    if (window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
+    }
+
+    // Update chord cards
+    if (window.renderProgressionDisplay) {
+        window.renderProgressionDisplay();
+    }
+
+    if (window.toast) {
+        window.toast.success(`Applied "${bassPattern}" to all ${chordCount} chords`);
+    }
+};
+
+/**
+ * Apply bass pattern to selected chord cards
  */
 window.applyBassToSelection = function() {
-    // Get selected measure index
-    const selectedIndex = window.getNotationSelectedMeasure ? window.getNotationSelectedMeasure() : -1;
+    // Get selected chord indices from multi-selection
+    const selectedIndices = window.getSelectedChordIndicesArray ? window.getSelectedChordIndicesArray() : [];
 
-    if (selectedIndex < 0) {
+    if (selectedIndices.length === 0) {
         if (window.toast) {
-            window.toast.warning('Please select a measure first');
+            window.toast.warning('Please select one or more chord cards first (Ctrl+click or Shift+click)');
         }
         return;
     }
@@ -5422,68 +5537,189 @@ window.applyBassToSelection = function() {
         return;
     }
 
-    // Get the building block for the selected measure
-    const blocks = compositionState.getBuildingBlocks();
-    if (!blocks || selectedIndex >= blocks.length) {
+    // Verify setChordBassPattern method exists
+    if (typeof compositionState.setChordBassPattern !== 'function') {
         if (window.toast) {
-            window.toast.error('Invalid measure selection');
+            window.toast.error('Per-chord bass pattern feature not available');
         }
         return;
     }
 
-    const block = blocks[selectedIndex];
-    if (!block || !block.chord) {
+    // Get current bass pattern from selector
+    const patternSelect = document.getElementById('bass-pattern-select-card') ||
+                         document.getElementById('bass-pattern-select');
+    const bassPattern = patternSelect?.value || 'root-fifth';
+
+    // Get trainer state to also update progressionData (for chord card visuals)
+    const trainerState = window.getTrainerState ? window.getTrainerState() : null;
+
+    // Apply the pattern to each selected chord
+    let successCount = 0;
+    for (const chordIndex of selectedIndices) {
+        if (compositionState.setChordBassPattern(chordIndex, bassPattern)) {
+            // Also update trainerState.progressionData for chord card visual indicators
+            if (trainerState && trainerState.progressionData && trainerState.progressionData[chordIndex]) {
+                trainerState.progressionData[chordIndex].bassPattern = bassPattern;
+            }
+            successCount++;
+        }
+    }
+
+    // Refresh notation and update UI
+    if (window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
+    }
+
+    // Update the custom patterns info display
+    if (window.updateCustomBassPatternInfo) {
+        window.updateCustomBassPatternInfo();
+    }
+
+    // Update chord cards to show visual indicator
+    if (window.renderProgressionDisplay) {
+        window.renderProgressionDisplay();
+    }
+
+    if (window.toast && successCount > 0) {
+        window.toast.success(`Applied "${bassPattern}" to ${successCount} chord${successCount > 1 ? 's' : ''}`);
+    }
+};
+
+/**
+ * Revert selected chords' bass to their chord card voicings
+ * Places the chord notes directly in the bass clef
+ */
+window.revertBassToChordVoicing = function() {
+    // Get selected chord indices from multi-selection
+    const selectedIndices = window.getSelectedChordIndicesArray ? window.getSelectedChordIndicesArray() : [];
+
+    if (selectedIndices.length === 0) {
         if (window.toast) {
-            window.toast.warning('Selected measure has no chord');
+            window.toast.warning('Please select one or more chord cards first');
         }
         return;
     }
 
-    // Get current bass settings
-    const settings = getBridgeSettings();
-    const bassPattern = settings?.bassPattern || 'root-fifth';
-    const bassOctave = settings?.bassOctave || null;
-    const bassFollowsInversion = settings?.bassFollowsInversion || false;
-
-    // Get time signature
-    const timeSig = compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
-    const beatsPerMeasure = timeSig.num;
-
-    // Import and call generateBuildingBlockBass
-    import('./modules/integration/bassAutoFill.js').then(({ generateBuildingBlockBass }) => {
-        // Get previous chord for voice leading
-        const previousChord = selectedIndex > 0 ? blocks[selectedIndex - 1]?.chord : null;
-
-        // Generate bass for this measure
-        const bassNotes = generateBuildingBlockBass(block.chord, previousChord, beatsPerMeasure, {
-            bassPattern,
-            bassOctave,
-            bassFollowsInversion,
-            timeSignature: timeSig,
-            key: compositionState.metadata?.key || 'C'
-        });
-
-        // Update the building block's bass notes
-        if (bassNotes && bassNotes.length > 0) {
-            block.bassNotes = bassNotes;
-
-            // Mark as modified and refresh
-            compositionState.markModified();
-
-            if (window.refreshNotationFromProgression) {
-                window.refreshNotationFromProgression();
-            }
-
-            if (window.toast) {
-                window.toast.success(`Applied "${bassPattern}" pattern to measure ${selectedIndex + 1}`);
-            }
-        }
-    }).catch(err => {
-        console.error('[applyBassToSelection] Error:', err);
+    // Get compositionState
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) {
         if (window.toast) {
-            window.toast.error('Failed to generate bass pattern');
+            window.toast.error('Composition state not available');
         }
-    });
+        return;
+    }
+
+    // Get trainer state for chord data
+    const trainerState = window.getTrainerState ? window.getTrainerState() : null;
+
+    // Revert each selected chord to its chord voicing
+    let successCount = 0;
+    for (const chordIndex of selectedIndices) {
+        // Clear per-chord pattern
+        if (compositionState.storedProgressionData?.[chordIndex]) {
+            compositionState.storedProgressionData[chordIndex].bassPattern = null;
+        }
+        if (trainerState?.progressionData?.[chordIndex]) {
+            trainerState.progressionData[chordIndex].bassPattern = null;
+        }
+
+        // Place chord voicing in bass clef
+        if (typeof compositionState.placeChordVoicingInBass === 'function') {
+            // Get the measure index for this chord
+            const segment = compositionState.getChordSegment ? compositionState.getChordSegment(chordIndex) : null;
+            if (segment) {
+                const beatsPerMeasure = 4; // Default, should come from time signature
+                const measureIndex = Math.floor(segment.startBeat / beatsPerMeasure);
+                compositionState.placeChordVoicingInBass(measureIndex);
+                successCount++;
+            }
+        }
+    }
+
+    // Refresh notation
+    if (window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
+    }
+
+    // Update chord cards
+    if (window.renderProgressionDisplay) {
+        window.renderProgressionDisplay();
+    }
+
+    if (window.toast && successCount > 0) {
+        window.toast.success(`Reverted ${successCount} chord${successCount > 1 ? 's' : ''} to chord voicing`);
+    }
+};
+
+/**
+ * Revert ALL chords' bass to their chord card voicings
+ */
+window.revertAllBassToChordVoicing = function() {
+    // Get compositionState
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) {
+        if (window.toast) {
+            window.toast.error('Composition state not available');
+        }
+        return;
+    }
+
+    const chordCount = compositionState.storedProgressionData?.length || 0;
+    if (chordCount === 0) {
+        if (window.toast) {
+            window.toast.warning('No chords in progression');
+        }
+        return;
+    }
+
+    // Confirmation dialog
+    const confirmed = confirm(
+        `Revert bass for all ${chordCount} chords to their chord card voicings?\n\n` +
+        'This will replace any bass patterns with the chord notes.'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    // Get trainer state for chord data
+    const trainerState = window.getTrainerState ? window.getTrainerState() : null;
+
+    // Clear all per-chord patterns
+    if (compositionState.storedProgressionData) {
+        for (let i = 0; i < compositionState.storedProgressionData.length; i++) {
+            compositionState.storedProgressionData[i].bassPattern = null;
+        }
+    }
+    if (trainerState?.progressionData) {
+        for (let i = 0; i < trainerState.progressionData.length; i++) {
+            if (trainerState.progressionData[i]) {
+                trainerState.progressionData[i].bassPattern = null;
+            }
+        }
+    }
+
+    // Place chord voicing in bass for each measure
+    const measureCount = compositionState.getMeasureCount ? compositionState.getMeasureCount() : 0;
+    for (let i = 0; i < measureCount; i++) {
+        if (typeof compositionState.placeChordVoicingInBass === 'function') {
+            compositionState.placeChordVoicingInBass(i);
+        }
+    }
+
+    // Refresh notation
+    if (window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
+    }
+
+    // Update chord cards
+    if (window.renderProgressionDisplay) {
+        window.renderProgressionDisplay();
+    }
+
+    if (window.toast) {
+        window.toast.success(`Reverted all ${chordCount} chords to chord voicings`);
+    }
 };
 
 // ===========================

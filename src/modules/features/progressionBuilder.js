@@ -3341,27 +3341,108 @@ function renderSectionViewModeForBuilder(gridContainer, progressionData, key, se
         initializeSectionChipsSortable(chipsContainer);
     }
 
-    // Create cards container
+    // Create cards container wrapper
+    const cardsWrapper = document.createElement('div');
+    cardsWrapper.className = 'section-cards-wrapper relative overflow-x-auto custom-scrollbar scroll-view-container';
+    cardsWrapper.style.cssText = 'scroll-behavior: smooth; -webkit-overflow-scrolling: touch; padding-bottom: 8px;';
+
     const cardsContainer = document.createElement('div');
-    cardsContainer.className = 'section-filtered-cards scroll-view-container flex flex-nowrap gap-2 overflow-x-auto pb-2';
-    cardsContainer.style.cssText = '-webkit-overflow-scrolling: touch;';
+    cardsContainer.className = 'section-filtered-cards flex flex-nowrap items-start gap-2 transition-all duration-300';
+    cardsContainer.id = `${gridContainer.id}-cards-grid`;
 
-    // Get selected section IDs or show all if none selected
-    const selectedIds = selectedSectionIds.size > 0 ? selectedSectionIds : new Set(sections.map(s => s.id));
+    // Collect visible chord indices based on selected sections
+    let visibleChordIndices = new Set();
+    const selectedIds = getSelectedSectionIds();
 
-    // Build combined list including pseudo-sections for ungrouped chords
+    // Build the combined sections list (including pseudo-sections for ungrouped chords)
     const allSectionsWithPseudo = buildSectionChipsWithUngrouped(sections);
 
-    // Filter to only selected sections
-    const visibleSections = allSectionsWithPseudo.filter(s => selectedIds.has(s.id));
+    if (selectedIds.length === 0) {
+        // No section selected - show all cards
+        progressionData.forEach((_, idx) => visibleChordIndices.add(idx));
+    } else {
+        // Show only cards from selected sections (including pseudo-sections)
+        selectedIds.forEach(sectionId => {
+            const section = allSectionsWithPseudo.find(s => s.id === sectionId);
+            if (section && section.chordIndices) {
+                section.chordIndices.forEach(idx => visibleChordIndices.add(idx));
+            }
+        });
+    }
 
-    // Render section-grouped cards using the scroll view approach
-    renderSectionAwareCardsScroll(cardsContainer, progressionData, key, {
-        showActionButtons: showActionButtons,
-        filterSections: visibleSections
+    // Render each section (including pseudo-sections for ungrouped chords)
+    allSectionsWithPseudo.forEach(sectionData => {
+        // Check if any of this section's chords are visible
+        const visibleInSection = (sectionData.chordIndices || []).filter(idx => visibleChordIndices.has(idx));
+
+        // Skip if no visible chords
+        if (visibleInSection.length === 0) return;
+
+        // Create section container with outline and label
+        const sectionContainer = document.createElement('div');
+        sectionContainer.className = 'section-unified-container inline-flex flex-col flex-shrink-0 rounded-lg overflow-visible section-view-card';
+        sectionContainer.setAttribute('data-section-id', sectionData.id);
+
+        const isPseudoSection = sectionData.isPseudoSection;
+
+        if (isPseudoSection) {
+            sectionContainer.setAttribute('data-pseudo-section', 'true');
+        }
+
+        // Banner header with section label
+        const banner = document.createElement('div');
+        banner.className = 'section-banner flex items-center gap-2 px-2 py-1 rounded-t-lg cursor-grab active:cursor-grabbing';
+        banner.style.backgroundColor = sectionData.color || '#9ca3af';
+        banner.setAttribute('data-section-id', sectionData.id);
+
+        banner.innerHTML = `
+            <svg class="section-drag-handle w-3 h-3 text-white/70 flex-shrink-0 cursor-grab active:cursor-grabbing" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
+            </svg>
+            <span class="text-white text-xs font-semibold flex-grow">${sectionData.label || 'Section'}</span>
+            <span class="text-white/70 text-xs">${visibleInSection.length}</span>
+            ${!isPseudoSection ? `
+                <button class="section-menu-btn p-0.5 rounded hover:bg-white/20 transition"
+                        onclick="event.stopPropagation(); window.showSectionMenu && window.showSectionMenu(event, '${sectionData.id}')"
+                        title="Section options">
+                    <svg class="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
+                    </svg>
+                </button>
+            ` : ''}
+        `;
+        sectionContainer.appendChild(banner);
+
+        // Cards area with colored background
+        const cardsArea = document.createElement('div');
+        cardsArea.className = 'section-cards-area items-start gap-2 p-2 rounded-b-lg';
+        cardsArea.style.display = 'flex';
+        cardsArea.style.flexDirection = 'row';
+        cardsArea.style.flexWrap = 'nowrap';
+        cardsArea.style.overflowX = 'auto';
+        cardsArea.style.overflowY = 'visible';
+        cardsArea.style.backgroundColor = (sectionData.color || '#9ca3af') + '20';
+        cardsArea.style.borderLeft = `3px solid ${sectionData.color || '#9ca3af'}`;
+        cardsArea.style.borderRight = `3px solid ${sectionData.color || '#9ca3af'}`;
+        cardsArea.style.borderBottom = `3px solid ${sectionData.color || '#9ca3af'}`;
+        cardsArea.setAttribute('data-section-id', sectionData.id);
+
+        // Render cards in this section
+        visibleInSection.forEach(chordIdx => {
+            if (chordIdx < progressionData.length) {
+                const chord = progressionData[chordIdx];
+                const wrapper = createChordCardWrapper(chord, chordIdx, key);
+                wrapper.setAttribute('data-in-section', sectionData.id);
+                cardsArea.appendChild(wrapper);
+            }
+        });
+
+        sectionContainer.appendChild(cardsArea);
+        cardsContainer.appendChild(sectionContainer);
     });
 
-    gridContainer.appendChild(cardsContainer);
+    cardsWrapper.appendChild(cardsContainer);
+    gridContainer.appendChild(cardsWrapper);
 
     // Initialize sortable on section cards areas
     initializeSectionCardsAreaSortables(cardsContainer);
@@ -3614,6 +3695,35 @@ function createCompactViewModeToggle() {
 }
 
 /**
+ * Get the active progression container ID based on current tab
+ * @returns {string} Container ID for the active tab's progression display
+ */
+function getActiveProgressionContainerId() {
+    const tab = getCurrentTab();
+    if (tab === 'builder') return 'builder-progression-visualization';
+    if (tab === 'melody') return 'melody-progression-visualization';
+    // trainer and others default to progression-visualization
+    return 'progression-visualization';
+}
+
+/**
+ * Re-render the active tab's progression display after section changes
+ * Calls the appropriate render function based on current tab
+ */
+function rerenderActiveProgressionDisplay() {
+    const tab = getCurrentTab();
+    if (tab === 'builder') {
+        // Chord Lab uses updateBuilderProgressionPanel
+        if (window.updateBuilderProgressionPanel) {
+            window.updateBuilderProgressionPanel();
+        }
+    } else {
+        // Composition Studio and others use renderProgressionDisplay
+        renderProgressionDisplay(getActiveProgressionContainerId(), true);
+    }
+}
+
+/**
  * Create section chip element for section picker bar
  * @param {Object} section - Section object
  * @param {boolean} isSelected - Whether section is selected
@@ -3691,7 +3801,7 @@ function createSectionPickerBar(sections) {
     allBtn.title = 'Show all chords';
     allBtn.onclick = () => {
         clearSectionSelection();
-        renderProgressionDisplay('melody-progression-visualization', true);
+        rerenderActiveProgressionDisplay();
         updateNotationForSelectedSections();
     };
     bar.appendChild(allBtn);
@@ -3867,7 +3977,7 @@ function handleSectionChipClick(sectionId, isShiftClick, isCtrlClick = false) {
 
 
     // Re-render with new selection
-    renderProgressionDisplay('melody-progression-visualization', true);
+    rerenderActiveProgressionDisplay();
 
     // Update notation to show only selected section measures
     updateNotationForSelectedSections();
@@ -3906,7 +4016,7 @@ function navigateToPreviousSection() {
         }
     }
 
-    renderProgressionDisplay('melody-progression-visualization', true);
+    rerenderActiveProgressionDisplay();
     updateNotationForSelectedSections();
 }
 
@@ -3939,7 +4049,7 @@ function navigateToNextSection() {
         }
     }
 
-    renderProgressionDisplay('melody-progression-visualization', true);
+    rerenderActiveProgressionDisplay();
     updateNotationForSelectedSections();
 }
 
@@ -6683,6 +6793,8 @@ function attachCardEventListeners(wrapper, index) {
                 selectChordCard(index);
                 // Also add to multi-select state for consistency
                 selectSingle(index);
+                // Update bass selection UI for single selection
+                updateMultiSelectVisuals();
             }
             // No longer need to preserve transforms - flexbox/grid handles layout
         });
@@ -6885,6 +6997,11 @@ function attachCardEventListeners(wrapper, index) {
         };
 
         const showTooltip = () => {
+            // Check if progression tooltips are disabled
+            if (window.progressionTooltipsEnabled === false) {
+                return;
+            }
+
             if (hideTimeout) {
                 clearTimeout(hideTimeout);
                 hideTimeout = null;
@@ -9441,10 +9558,13 @@ function updateMultiSelectVisuals() {
         });
     });
 
-    // Update selection count display (if we add one later)
-    const count = selectedIndices.length;
-    if (count > 1) {
-    }
+    // Update bass selection UI when selection changes
+    // Use setTimeout to ensure this runs after DOM updates
+    setTimeout(() => {
+        if (typeof updateBassSelectionUI === 'function') {
+            updateBassSelectionUI();
+        }
+    }, 0);
 }
 
 /**
@@ -9455,8 +9575,66 @@ function clearMultiSelection() {
     updateMultiSelectVisuals();
 }
 
-// Expose to window for keyboard shortcuts
+// Expose to window for keyboard shortcuts and bass pattern selection
 window.clearMultiSelection = clearMultiSelection;
+window.getChordSelectionCount = getSelectionCount;
+window.getSelectedChordIndicesArray = getSelectedIndicesArray;
+
+/**
+ * Update the bass selection UI based on current chord selection
+ * Shows/hides the "Apply to Selected" controls and selection count
+ */
+function updateBassSelectionUI() {
+    const selectionControls = document.getElementById('bass-selection-controls');
+    const selectionCountEl = document.getElementById('bass-selection-count');
+    const customPatternsInfo = document.getElementById('custom-bass-patterns-info');
+
+    const selectedCount = getSelectionCount();
+    const selectedIndices = getSelectedIndicesArray();
+
+    // Show/hide selection controls
+    if (selectionControls) {
+        selectionControls.style.display = selectedCount > 0 ? 'flex' : 'none';
+    }
+
+    // Update count label
+    if (selectionCountEl && selectedCount > 0) {
+        selectionCountEl.textContent = `${selectedCount} chord${selectedCount > 1 ? 's' : ''}`;
+    }
+
+    // Update custom patterns info
+    updateCustomBassPatternInfo();
+}
+
+/**
+ * Update the info display showing which chords have custom bass patterns
+ */
+function updateCustomBassPatternInfo() {
+    const infoEl = document.getElementById('custom-bass-patterns-info');
+    if (!infoEl) return;
+
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState || typeof compositionState.getChordsWithCustomBassPatterns !== 'function') {
+        infoEl.classList.add('hidden');
+        return;
+    }
+
+    const customIndices = compositionState.getChordsWithCustomBassPatterns();
+
+    if (customIndices.length === 0) {
+        infoEl.classList.add('hidden');
+        return;
+    }
+
+    // Format the list (1-indexed for user display)
+    const chordList = customIndices.map(i => i + 1).join(', ');
+    infoEl.textContent = `Custom: ${chordList}`;
+    infoEl.classList.remove('hidden');
+}
+
+// Expose to window for external calls
+window.updateBassSelectionUI = updateBassSelectionUI;
+window.updateCustomBassPatternInfo = updateCustomBassPatternInfo;
 
 // ============================================================================
 // GLOBAL KEYBOARD SHORTCUTS FOR MULTI-SELECT AND SECTIONS
@@ -9956,7 +10134,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             initializeSimplifiedSortable(gridContainer);
         } else {
             // Default: Use flexbox with horizontal scroll (no wrapping)
-            gridContainer.className = 'flex flex-nowrap items-start gap-2 overflow-x-auto pb-2';
+            gridContainer.className = 'scroll-view-container flex flex-nowrap items-start gap-2 overflow-x-auto pb-2';
             if (hasSections) {
                 renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
                     showActionButtons: true
@@ -10041,7 +10219,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
             initializeSimplifiedSortable(gridContainer);
         } else {
             // Default: Use flexbox with horizontal scroll (no wrapping)
-            gridContainer.className = 'flex flex-nowrap items-start gap-2 overflow-x-auto pb-2';
+            gridContainer.className = 'scroll-view-container flex flex-nowrap items-start gap-2 overflow-x-auto pb-2';
             if (hasSections) {
                 renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
                     showActionButtons: false

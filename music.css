@@ -171,9 +171,9 @@ body[data-active-tab="learn"] .builder-only {
     border-left-color: #0d9488;
 }
 
-/* Current Chord Progression (purple/pink) */
+/* Current Chord Progression (emerald/green) */
 #progression-visualization-panel {
-    border-left-color: #a855f7;
+    border-left-color: #10b981;
 }
 
 /* Smart Suggestions (indigo) */
@@ -196,9 +196,9 @@ body[data-active-tab="learn"] .builder-only {
     border-left-color: #f59e0b;
 }
 
-/* Chord Progression Cards (purple) */
+/* Chord Progression Cards (emerald/green) */
 #chord-progression-card-panel {
-    border-left-color: #a855f7;
+    border-left-color: #10b981;
 }
 
 /* Staff Notation (blue/cyan) */
@@ -206,9 +206,9 @@ body[data-active-tab="learn"] .builder-only {
     border-left-color: #0ea5e9;
 }
 
-/* Builder Chord Progression (purple/pink - matches header) */
+/* Builder Chord Progression (emerald/green - matches header) */
 #builder-progression-panel {
-    border-left-color: #a855f7;
+    border-left-color: #10b981;
 }
 
 /* Body and Background */
@@ -3146,7 +3146,7 @@ canvas {
 /* Scrollbar styling for melody notation container - uses unified scrollbar */
 .overflow-x-auto {
     scrollbar-width: thin;
-    scrollbar-color: rgba(139, 92, 246, 0.5) rgba(0, 0, 0, 0.1);
+    scrollbar-color: rgba(16, 185, 129, 0.6) rgba(0, 0, 0, 0.1);
 }
 
 .overflow-x-auto::-webkit-scrollbar {
@@ -3159,12 +3159,12 @@ canvas {
 }
 
 .overflow-x-auto::-webkit-scrollbar-thumb {
-    background: rgba(139, 92, 246, 0.5);
+    background: rgba(16, 185, 129, 0.6);
     border-radius: 3px;
 }
 
 .overflow-x-auto::-webkit-scrollbar-thumb:hover {
-    background: rgba(139, 92, 246, 0.7);
+    background: rgba(5, 150, 105, 0.8);
 }
 
 /* Main header styling for better visibility */

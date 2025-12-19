@@ -1124,6 +1124,51 @@ export function generateBuildingBlockBass(chord, previousChord = null, totalBeat
         case 'half-time':
             return generateHalfTimeBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth);
 
+        case 'lament':
+            return generateLamentBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
+
+        case 'boogie-woogie':
+            return generateBoogieWoogieBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
+
+        case 'ragtime':
+            return generateRagtimeBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth, effectiveOctave);
+
+        case 'gospel-run':
+            return generateGospelRunBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
+
+        case 'counterpoint':
+            return generateCounterpointBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
+
+        case 'ostinato':
+            return generateOstinatoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
+
+        case 'arpeggio-stride':
+            return generateArpeggioStrideBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
+
+        case 'habanera':
+            return generateHabaneraBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth);
+
+        case 'descant':
+            return generateDescantBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
+
+        case 'ballad-stride':
+            return generateBalladStrideBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
+
+        case 'hymn':
+            return generateHymnBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
+
+        case 'waltz':
+            return generateWaltzBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
+
+        case 'romantic':
+            return generateRomanticBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
+
+        case 'call-answer':
+            return generateCallAnswerBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth, effectiveOctave);
+
+        case 'comp':
+            return generateCompBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave);
+
         default:
             return generateWholeNoteBlockBass(bassNote, totalBeats, beatsPerMeasure);
     }
@@ -3074,6 +3119,1176 @@ function generateHalfTimeBlockBass(chord, chordNotes, totalBeats, beatsPerMeasur
 
         currentBeat += noteBeats;
         patternIndex++;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate lament bass pattern for a building block
+ * Chromatic descending bass line characteristic of baroque laments
+ * Descends chromatically from the root down to the 5th over the chord duration
+ */
+function generateLamentBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
+    const notes = [];
+    let currentBeat = 0;
+
+    // Extract root note name and octave
+    const match = bassNote.match(/^([A-G][#b]?)(\d+)$/);
+    if (!match) {
+        // Fallback to whole notes if we can't parse the bass note
+        return generateWholeNoteBlockBass(bassNote, totalBeats, beatsPerMeasure);
+    }
+
+    const rootNote = match[1];
+    const octave = parseInt(match[2]);
+
+    // Chromatic note order (both directions)
+    const chromaticScale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const flatMap = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+
+    // Normalize to sharp notation for consistent indexing
+    const normalizedRoot = flatMap[rootNote] || rootNote;
+    let rootIndex = chromaticScale.indexOf(normalizedRoot);
+
+    if (rootIndex === -1) {
+        return generateWholeNoteBlockBass(bassNote, totalBeats, beatsPerMeasure);
+    }
+
+    // Calculate how many chromatic steps we can fit (one note per beat, descending)
+    // Classic lament descends from root to 5th (7 semitones down for perfect 5th below)
+    // We'll cycle the pattern if the chord duration exceeds the descent range
+    const descendPattern = [];
+    const maxDescent = 7; // Root to 5th below = 7 semitones
+
+    for (let i = 0; i <= maxDescent; i++) {
+        let noteIndex = rootIndex - i;
+        let noteOctave = octave;
+
+        // Handle octave wrapping when descending below C
+        while (noteIndex < 0) {
+            noteIndex += 12;
+            noteOctave--;
+        }
+
+        const noteName = chromaticScale[noteIndex];
+        descendPattern.push(`${noteName}${noteOctave}`);
+    }
+
+    // Generate notes using the descending pattern (quarter notes)
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+
+        // Cycle through the pattern
+        const pitch = descendPattern[patternIndex % descendPattern.length];
+
+        // Use quarter notes for the characteristic slow descent
+        const noteBeats = Math.min(1, remainingBeats);
+        const { duration, dotted } = findBestDuration(noteBeats);
+
+        notes.push({
+            type: 'note',
+            pitch: pitch,
+            pitches: [pitch],
+            duration: duration,
+            beat: currentBeat,
+            dotted: dotted,
+            isTied: false,
+        });
+
+        currentBeat += noteBeats;
+        patternIndex++;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate classic boogie-woogie bass pattern
+ * The iconic 8th note pattern: 1-3-5-6-b7-6-5-3 (or similar)
+ * Creates that rolling, driving feel of early rock and blues piano
+ */
+function generateBoogieWoogieBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
+    const notes = [];
+    let currentBeat = 0;
+
+    // Extract root note and octave
+    const match = bassNote.match(/^([A-G][#b]?)(\d+)$/);
+    if (!match) {
+        return generateWholeNoteBlockBass(bassNote, totalBeats, beatsPerMeasure);
+    }
+
+    const rootNote = match[1];
+    const octave = parseInt(match[2]);
+
+    // Chromatic scale for interval calculation
+    const chromaticScale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const flatMap = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+    const normalizedRoot = flatMap[rootNote] || rootNote;
+    const rootIndex = chromaticScale.indexOf(normalizedRoot);
+
+    if (rootIndex === -1) {
+        return generateWholeNoteBlockBass(bassNote, totalBeats, beatsPerMeasure);
+    }
+
+    // Helper to get note at semitone offset
+    const getNoteAtOffset = (semitones) => {
+        let noteIndex = (rootIndex + semitones) % 12;
+        let noteOctave = octave + Math.floor((rootIndex + semitones) / 12);
+        return `${chromaticScale[noteIndex]}${noteOctave}`;
+    };
+
+    // Classic boogie pattern: 1-3-5-6-b7-6-5-3 in 8th notes
+    // Intervals: 0, 4, 7, 9, 10, 9, 7, 4 semitones from root
+    const boogiePattern = [
+        getNoteAtOffset(0),   // Root
+        getNoteAtOffset(4),   // Major 3rd
+        getNoteAtOffset(7),   // Perfect 5th
+        getNoteAtOffset(9),   // Major 6th
+        getNoteAtOffset(10),  // Minor 7th
+        getNoteAtOffset(9),   // Major 6th
+        getNoteAtOffset(7),   // Perfect 5th
+        getNoteAtOffset(4),   // Major 3rd
+    ];
+
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const pitch = boogiePattern[patternIndex % boogiePattern.length];
+        const noteBeats = Math.min(0.5, remainingBeats); // 8th notes
+
+        notes.push({
+            type: 'note',
+            pitch: pitch,
+            pitches: [pitch],
+            duration: '8n',
+            beat: currentBeat,
+            dotted: false,
+            isTied: false,
+        });
+
+        currentBeat += noteBeats;
+        patternIndex++;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate ragtime bass pattern
+ * Syncopated stride with anticipations - bass lands slightly before the beat
+ * Creates the characteristic "ragged time" bounce
+ */
+function generateRagtimeBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth, effectiveOctave) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const root = bassNote;
+    const octave = effectiveOctave || 2;
+
+    // Get chord notes in higher octave for the "chick" part
+    const chordVoicing = chordNotes.slice(0, 3).map(note => {
+        const noteMatch = note.match(/^([A-G][#b]?)(\d*)$/);
+        if (noteMatch) {
+            return `${noteMatch[1]}${octave + 1}`;
+        }
+        return note;
+    });
+
+    // Ragtime pattern per 4 beats:
+    // Beat 0.875: bass note (anticipation - 8th before beat 1)
+    // Beat 1.5: chord (on the "and" of 1)
+    // Beat 2.875: bass note (anticipation - 8th before beat 3)
+    // Beat 3.5: chord (on the "and" of 3)
+    const ragtimeEvents = [
+        { beat: 0, pitch: root, isChord: false, duration: 0.5 },
+        { beat: 0.5, pitches: chordVoicing, isChord: true, duration: 0.375 },
+        { beat: 1, pitch: root, isChord: false, duration: 0.5 },  // Anticipation feel
+        { beat: 1.5, pitches: chordVoicing, isChord: true, duration: 0.375 },
+        { beat: 2, pitch: fifth, isChord: false, duration: 0.5 },
+        { beat: 2.5, pitches: chordVoicing, isChord: true, duration: 0.375 },
+        { beat: 3, pitch: fifth, isChord: false, duration: 0.5 },
+        { beat: 3.5, pitches: chordVoicing, isChord: true, duration: 0.375 },
+    ];
+
+    // Generate notes for each measure
+    let measureStart = 0;
+    while (measureStart < totalBeats) {
+        for (const event of ragtimeEvents) {
+            const absoluteBeat = measureStart + event.beat;
+            if (absoluteBeat >= totalBeats) break;
+
+            if (event.isChord) {
+                notes.push({
+                    type: 'chord',
+                    pitch: event.pitches[0],
+                    pitches: event.pitches,
+                    duration: '8n',
+                    beat: absoluteBeat,
+                    dotted: false,
+                    isTied: false,
+                });
+            } else {
+                notes.push({
+                    type: 'note',
+                    pitch: event.pitch,
+                    pitches: [event.pitch],
+                    duration: '8n',
+                    beat: absoluteBeat,
+                    dotted: false,
+                    isTied: false,
+                });
+            }
+        }
+        measureStart += beatsPerMeasure;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate gospel run bass pattern
+ * Scalar or chromatic runs connecting chord tones expressively
+ * Holds root on beats 1-2, then runs to next chord tone on beats 3-4
+ */
+function generateGospelRunBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
+    const notes = [];
+    let currentBeat = 0;
+
+    // Extract root note and octave
+    const match = bassNote.match(/^([A-G][#b]?)(\d+)$/);
+    if (!match) {
+        return generateWholeNoteBlockBass(bassNote, totalBeats, beatsPerMeasure);
+    }
+
+    const rootNote = match[1];
+    const octave = parseInt(match[2]);
+
+    // Chromatic scale
+    const chromaticScale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const flatMap = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+    const normalizedRoot = flatMap[rootNote] || rootNote;
+    const rootIndex = chromaticScale.indexOf(normalizedRoot);
+
+    if (rootIndex === -1) {
+        return generateWholeNoteBlockBass(bassNote, totalBeats, beatsPerMeasure);
+    }
+
+    // Helper to get note at semitone offset
+    const getNoteAtOffset = (semitones) => {
+        let noteIndex = rootIndex + semitones;
+        let noteOctave = octave;
+        while (noteIndex < 0) {
+            noteIndex += 12;
+            noteOctave--;
+        }
+        while (noteIndex >= 12) {
+            noteIndex -= 12;
+            noteOctave++;
+        }
+        return `${chromaticScale[noteIndex]}${noteOctave}`;
+    };
+
+    // Gospel run pattern: root (half note), then scalar run up to 5th
+    // Per 4 beats: root for 2 beats, then 4 8th notes running up
+    let measureStart = 0;
+
+    while (measureStart < totalBeats) {
+        const remainingBeats = totalBeats - measureStart;
+
+        // Beat 1-2: Hold the root
+        if (remainingBeats >= 2) {
+            notes.push({
+                type: 'note',
+                pitch: bassNote,
+                pitches: [bassNote],
+                duration: '2n',
+                beat: measureStart,
+                dotted: false,
+                isTied: false,
+            });
+        } else if (remainingBeats > 0) {
+            const { duration, dotted } = findBestDuration(remainingBeats);
+            notes.push({
+                type: 'note',
+                pitch: bassNote,
+                pitches: [bassNote],
+                duration: duration,
+                beat: measureStart,
+                dotted: dotted,
+                isTied: false,
+            });
+            break;
+        }
+
+        // Beats 3-4: Gospel run (ascending scale in 8th notes)
+        if (remainingBeats >= 4) {
+            const runNotes = [
+                getNoteAtOffset(2),  // 2nd
+                getNoteAtOffset(4),  // 3rd
+                getNoteAtOffset(5),  // 4th
+                getNoteAtOffset(7),  // 5th
+            ];
+
+            for (let i = 0; i < runNotes.length; i++) {
+                notes.push({
+                    type: 'note',
+                    pitch: runNotes[i],
+                    pitches: [runNotes[i]],
+                    duration: '8n',
+                    beat: measureStart + 2 + (i * 0.5),
+                    dotted: false,
+                    isTied: false,
+                });
+            }
+        }
+
+        measureStart += beatsPerMeasure;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate counterpoint bass pattern
+ * Two independent voices: lower holds/moves slowly, upper weaves melodically
+ * Creates Bach-like texture with contrary and oblique motion
+ */
+function generateCounterpointBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
+    const notes = [];
+    let currentBeat = 0;
+
+    // Extract root note and octave
+    const match = bassNote.match(/^([A-G][#b]?)(\d+)$/);
+    if (!match) {
+        return generateWholeNoteBlockBass(bassNote, totalBeats, beatsPerMeasure);
+    }
+
+    const rootNote = match[1];
+    const octave = parseInt(match[2]);
+    const upperOctave = octave + 1;
+
+    // Chromatic scale
+    const chromaticScale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const flatMap = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+    const normalizedRoot = flatMap[rootNote] || rootNote;
+    const rootIndex = chromaticScale.indexOf(normalizedRoot);
+
+    if (rootIndex === -1) {
+        return generateWholeNoteBlockBass(bassNote, totalBeats, beatsPerMeasure);
+    }
+
+    // Helper to get note at semitone offset
+    const getNoteAtOffset = (semitones, baseOctave) => {
+        let noteIndex = rootIndex + semitones;
+        let noteOctave = baseOctave;
+        while (noteIndex < 0) {
+            noteIndex += 12;
+            noteOctave--;
+        }
+        while (noteIndex >= 12) {
+            noteIndex -= 12;
+            noteOctave++;
+        }
+        return `${chromaticScale[noteIndex]}${noteOctave}`;
+    };
+
+    // Lower voice: whole notes on root
+    // Upper voice: quarter note melody weaving through chord tones
+    let measureStart = 0;
+
+    while (measureStart < totalBeats) {
+        const remainingBeats = totalBeats - measureStart;
+
+        // Lower voice (voiceIndex 0): root whole note (or tied across measures)
+        const lowerDuration = Math.min(beatsPerMeasure, remainingBeats);
+        const { duration: lowerDur, dotted: lowerDotted } = findBestDuration(lowerDuration);
+        notes.push({
+            type: 'note',
+            pitch: bassNote,
+            pitches: [bassNote],
+            duration: lowerDur,
+            beat: measureStart,
+            dotted: lowerDotted,
+            isTied: false,
+            voiceIndex: 0,  // Primary bass voice
+        });
+
+        // Upper voice (voiceIndex 1): melodic line in contrary motion (quarter notes)
+        // Pattern descends as if responding to an ascending melody
+        const upperPattern = [
+            getNoteAtOffset(7, upperOctave),   // 5th - beat 1
+            getNoteAtOffset(5, upperOctave),   // 4th - beat 2
+            getNoteAtOffset(4, upperOctave),   // 3rd - beat 3
+            getNoteAtOffset(0, upperOctave),   // root - beat 4
+        ];
+
+        for (let i = 0; i < Math.min(upperPattern.length, remainingBeats); i++) {
+            notes.push({
+                type: 'note',
+                pitch: upperPattern[i],
+                pitches: [upperPattern[i]],
+                duration: '4n',
+                beat: measureStart + i,
+                dotted: false,
+                isTied: false,
+                voiceIndex: 1,  // Secondary melodic voice
+            });
+        }
+
+        measureStart += beatsPerMeasure;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate ostinato bass pattern
+ * Short repeating melodic figure (3-4 notes) that cycles continuously
+ * Minimalist texture like "Tubular Bells" or Philip Glass
+ */
+function generateOstinatoBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
+    const notes = [];
+    let currentBeat = 0;
+
+    // Extract root note and octave
+    const match = bassNote.match(/^([A-G][#b]?)(\d+)$/);
+    if (!match) {
+        return generateWholeNoteBlockBass(bassNote, totalBeats, beatsPerMeasure);
+    }
+
+    const rootNote = match[1];
+    const octave = parseInt(match[2]);
+
+    // Chromatic scale
+    const chromaticScale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const flatMap = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+    const normalizedRoot = flatMap[rootNote] || rootNote;
+    const rootIndex = chromaticScale.indexOf(normalizedRoot);
+
+    if (rootIndex === -1) {
+        return generateWholeNoteBlockBass(bassNote, totalBeats, beatsPerMeasure);
+    }
+
+    // Helper to get note at semitone offset
+    const getNoteAtOffset = (semitones) => {
+        let noteIndex = rootIndex + semitones;
+        let noteOctave = octave;
+        while (noteIndex < 0) {
+            noteIndex += 12;
+            noteOctave--;
+        }
+        while (noteIndex >= 12) {
+            noteIndex -= 12;
+            noteOctave++;
+        }
+        return `${chromaticScale[noteIndex]}${noteOctave}`;
+    };
+
+    // Ostinato pattern: 3-note figure in 8th notes
+    // Root - 5th - 3rd, repeating (1.5 beats per cycle)
+    const ostinatoFigure = [
+        getNoteAtOffset(0),   // Root
+        getNoteAtOffset(7),   // 5th
+        getNoteAtOffset(4),   // 3rd
+    ];
+
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const pitch = ostinatoFigure[patternIndex % ostinatoFigure.length];
+        const noteBeats = Math.min(0.5, remainingBeats); // 8th notes
+
+        notes.push({
+            type: 'note',
+            pitch: pitch,
+            pitches: [pitch],
+            duration: '8n',
+            beat: currentBeat,
+            dotted: false,
+            isTied: false,
+        });
+
+        currentBeat += noteBeats;
+        patternIndex++;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate arpeggio stride bass pattern
+ * Like stride, but chord tones on off-beats are arpeggiated instead of blocked
+ * More flowing and harp-like than standard stride
+ */
+function generateArpeggioStrideBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const octave = effectiveOctave || 2;
+    const upperOctave = octave + 1;
+
+    // Get chord notes for arpeggiation
+    const chordTonesRaw = chordNotes.slice(0, 3);
+    const chordTones = chordTonesRaw.map(note => {
+        const noteMatch = note.match(/^([A-G][#b]?)(\d*)$/);
+        if (noteMatch) {
+            return `${noteMatch[1]}${upperOctave}`;
+        }
+        return note;
+    });
+
+    // Arpeggio stride pattern per 4 beats:
+    // Beat 1: Bass note (quarter)
+    // Beat 2: Arpeggiate chord (3 8th notes starting on beat 2)
+    // Beat 3: Bass note (quarter)
+    // Beat 4: Arpeggiate chord (3 8th notes, may extend into next measure)
+    let measureStart = 0;
+
+    while (measureStart < totalBeats) {
+        const remainingBeats = totalBeats - measureStart;
+
+        // Beat 1: Bass
+        if (remainingBeats > 0) {
+            notes.push({
+                type: 'note',
+                pitch: bassNote,
+                pitches: [bassNote],
+                duration: '4n',
+                beat: measureStart,
+                dotted: false,
+                isTied: false,
+            });
+        }
+
+        // Beat 2: Arpeggiate up (8th notes)
+        for (let i = 0; i < chordTones.length && measureStart + 1 + (i * 0.5) < totalBeats; i++) {
+            notes.push({
+                type: 'note',
+                pitch: chordTones[i],
+                pitches: [chordTones[i]],
+                duration: '8n',
+                beat: measureStart + 1 + (i * 0.5),
+                dotted: false,
+                isTied: false,
+            });
+        }
+
+        // Beat 3: Bass (if we have room)
+        if (remainingBeats > 2.5) {
+            notes.push({
+                type: 'note',
+                pitch: bassNote,
+                pitches: [bassNote],
+                duration: '4n',
+                beat: measureStart + 2.5,
+                dotted: false,
+                isTied: false,
+            });
+        }
+
+        // Beat 4: Arpeggiate down (8th notes)
+        const reversedChord = [...chordTones].reverse();
+        for (let i = 0; i < reversedChord.length && measureStart + 3.5 + (i * 0.5) < totalBeats; i++) {
+            notes.push({
+                type: 'note',
+                pitch: reversedChord[i],
+                pitches: [reversedChord[i]],
+                duration: '8n',
+                beat: measureStart + 3.5 + (i * 0.5),
+                dotted: false,
+                isTied: false,
+            });
+        }
+
+        measureStart += beatsPerMeasure;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate habanera bass pattern
+ * The distinctive Cuban rhythm: dotted-8th + 16th + two 8ths
+ * Weaving between root, fifth, and octave. Sultry and dance-like.
+ */
+function generateHabaneraBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth) {
+    const notes = [];
+    let currentBeat = 0;
+
+    const root = bassNote;
+
+    // Extract octave for the upper root
+    const match = bassNote.match(/^([A-G][#b]?)(\d+)$/);
+    let upperRoot = bassNote;
+    if (match) {
+        upperRoot = `${match[1]}${parseInt(match[2]) + 1}`;
+    }
+
+    // Habanera rhythm per 2 beats (half measure):
+    // dotted-8th (0.75) + 16th (0.25) + 8th (0.5) + 8th (0.5) = 2 beats
+    // Pattern: root (dotted 8th) - fifth (16th) - root (8th) - fifth (8th)
+    const habaneraCell = [
+        { pitch: root, duration: '8n', dotted: true, beats: 0.75 },
+        { pitch: fifth, duration: '16n', dotted: false, beats: 0.25 },
+        { pitch: root, duration: '8n', dotted: false, beats: 0.5 },
+        { pitch: fifth, duration: '8n', dotted: false, beats: 0.5 },
+    ];
+
+    while (currentBeat < totalBeats) {
+        for (const event of habaneraCell) {
+            if (currentBeat >= totalBeats) break;
+
+            const remainingBeats = totalBeats - currentBeat;
+            if (remainingBeats < event.beats) break;
+
+            notes.push({
+                type: 'note',
+                pitch: event.pitch,
+                pitches: [event.pitch],
+                duration: event.duration,
+                beat: currentBeat,
+                dotted: event.dotted,
+                isTied: false,
+            });
+
+            currentBeat += event.beats;
+        }
+    }
+
+    return notes;
+}
+
+/**
+ * Generate descant bass pattern
+ * Counter-melody that moves in contrary motion to implied melody
+ * Uses chord tones and passing tones for smooth voice leading
+ */
+function generateDescantBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
+    const notes = [];
+
+    // Extract root note and octave
+    const match = bassNote.match(/^([A-G][#b]?)(\d+)$/);
+    if (!match) {
+        return generateWholeNoteBlockBass(bassNote, totalBeats, beatsPerMeasure);
+    }
+
+    const rootNote = match[1];
+    const octave = parseInt(match[2]);
+
+    // Chromatic scale
+    const chromaticScale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const flatMap = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+    const normalizedRoot = flatMap[rootNote] || rootNote;
+    const rootIndex = chromaticScale.indexOf(normalizedRoot);
+
+    if (rootIndex === -1) {
+        return generateWholeNoteBlockBass(bassNote, totalBeats, beatsPerMeasure);
+    }
+
+    // Helper to get note at semitone offset
+    const getNoteAtOffset = (semitones) => {
+        let noteIndex = rootIndex + semitones;
+        let noteOctave = octave;
+        while (noteIndex < 0) {
+            noteIndex += 12;
+            noteOctave--;
+        }
+        while (noteIndex >= 12) {
+            noteIndex -= 12;
+            noteOctave++;
+        }
+        return `${chromaticScale[noteIndex]}${noteOctave}`;
+    };
+
+    // Descant pattern: ascending line (contrary to typical descending melody)
+    // Uses scale degrees: 1 - 2 - 3 - 5 - 5 - 3 - 2 - 1 in 8th notes
+    // This creates a "call" that rises then falls
+    const descantPattern = [
+        getNoteAtOffset(0),   // 1
+        getNoteAtOffset(2),   // 2
+        getNoteAtOffset(4),   // 3
+        getNoteAtOffset(7),   // 5
+        getNoteAtOffset(7),   // 5
+        getNoteAtOffset(4),   // 3
+        getNoteAtOffset(2),   // 2
+        getNoteAtOffset(0),   // 1
+    ];
+
+    let currentBeat = 0;
+    let patternIndex = 0;
+
+    while (currentBeat < totalBeats) {
+        const remainingBeats = totalBeats - currentBeat;
+        const pitch = descantPattern[patternIndex % descantPattern.length];
+        const noteBeats = Math.min(0.5, remainingBeats); // 8th notes
+
+        notes.push({
+            type: 'note',
+            pitch: pitch,
+            pitches: [pitch],
+            duration: '8n',
+            beat: currentBeat,
+            dotted: false,
+            isTied: false,
+        });
+
+        currentBeat += noteBeats;
+        patternIndex++;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate ballad stride bass pattern
+ * Slow, spacious stride: bass whole note on beat 1, block chord on beat 3
+ * Creates a gentle, expansive feel perfect for slow ballads
+ */
+function generateBalladStrideBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
+    const notes = [];
+    const octave = effectiveOctave || 2;
+    const upperOctave = octave + 1;
+
+    // Get chord voicing in upper octave
+    const chordVoicing = chordNotes.slice(0, 3).map(note => {
+        const noteMatch = note.match(/^([A-G][#b]?)(\d*)$/);
+        if (noteMatch) {
+            return `${noteMatch[1]}${upperOctave}`;
+        }
+        return note;
+    });
+
+    let measureStart = 0;
+
+    while (measureStart < totalBeats) {
+        const remainingBeats = totalBeats - measureStart;
+
+        // Beat 1: Bass note (half note, voiceIndex 0)
+        if (remainingBeats >= 2) {
+            notes.push({
+                type: 'note',
+                pitch: bassNote,
+                pitches: [bassNote],
+                duration: '2n',
+                beat: measureStart,
+                dotted: false,
+                isTied: false,
+                voiceIndex: 0,
+            });
+        }
+
+        // Beat 3: Block chord (half note, voiceIndex 1)
+        if (remainingBeats >= 4 && chordVoicing.length > 0) {
+            notes.push({
+                type: 'chord',
+                pitch: chordVoicing[0],
+                pitches: chordVoicing,
+                duration: '2n',
+                beat: measureStart + 2,
+                dotted: false,
+                isTied: false,
+                voiceIndex: 1,
+            });
+        }
+
+        measureStart += beatsPerMeasure;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate hymn bass pattern
+ * Church/chorale style: bass quarter note, then sustained block chord
+ * Stately and reverent texture
+ */
+function generateHymnBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
+    const notes = [];
+    const octave = effectiveOctave || 2;
+    const upperOctave = octave + 1;
+
+    // Get chord voicing in upper octave
+    const chordVoicing = chordNotes.slice(0, 3).map(note => {
+        const noteMatch = note.match(/^([A-G][#b]?)(\d*)$/);
+        if (noteMatch) {
+            return `${noteMatch[1]}${upperOctave}`;
+        }
+        return note;
+    });
+
+    let measureStart = 0;
+
+    while (measureStart < totalBeats) {
+        const remainingBeats = totalBeats - measureStart;
+
+        // Beat 1: Bass note (quarter note, voiceIndex 0)
+        if (remainingBeats >= 1) {
+            notes.push({
+                type: 'note',
+                pitch: bassNote,
+                pitches: [bassNote],
+                duration: '4n',
+                beat: measureStart,
+                dotted: false,
+                isTied: false,
+                voiceIndex: 0,
+            });
+        }
+
+        // Beat 2-4: Block chord (dotted half note, voiceIndex 1)
+        if (remainingBeats >= 4 && chordVoicing.length > 0) {
+            notes.push({
+                type: 'chord',
+                pitch: chordVoicing[0],
+                pitches: chordVoicing,
+                duration: '2n',
+                beat: measureStart + 1,
+                dotted: true,  // dotted half = 3 beats
+                isTied: false,
+                voiceIndex: 1,
+            });
+        }
+
+        measureStart += beatsPerMeasure;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate waltz bass pattern
+ * Oom-pah-pah feel: bass on 1, chord hits on 2 and 3
+ * Works in 4/4 by treating it as stretched waltz feel
+ */
+function generateWaltzBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
+    const notes = [];
+    const octave = effectiveOctave || 2;
+    const upperOctave = octave + 1;
+
+    // Get chord voicing in upper octave
+    const chordVoicing = chordNotes.slice(0, 3).map(note => {
+        const noteMatch = note.match(/^([A-G][#b]?)(\d*)$/);
+        if (noteMatch) {
+            return `${noteMatch[1]}${upperOctave}`;
+        }
+        return note;
+    });
+
+    let measureStart = 0;
+
+    while (measureStart < totalBeats) {
+        const remainingBeats = totalBeats - measureStart;
+
+        // Beat 1: Bass note (quarter, voiceIndex 0)
+        if (remainingBeats >= 1) {
+            notes.push({
+                type: 'note',
+                pitch: bassNote,
+                pitches: [bassNote],
+                duration: '4n',
+                beat: measureStart,
+                dotted: false,
+                isTied: false,
+                voiceIndex: 0,
+            });
+        }
+
+        // Beat 2: Chord hit (quarter, voiceIndex 1)
+        if (remainingBeats >= 2 && chordVoicing.length > 0) {
+            notes.push({
+                type: 'chord',
+                pitch: chordVoicing[0],
+                pitches: chordVoicing,
+                duration: '4n',
+                beat: measureStart + 1,
+                dotted: false,
+                isTied: false,
+                voiceIndex: 1,
+            });
+        }
+
+        // Beat 3: Chord hit (quarter, voiceIndex 1)
+        if (remainingBeats >= 3 && chordVoicing.length > 0) {
+            notes.push({
+                type: 'chord',
+                pitch: chordVoicing[0],
+                pitches: chordVoicing,
+                duration: '4n',
+                beat: measureStart + 2,
+                dotted: false,
+                isTied: false,
+                voiceIndex: 1,
+            });
+        }
+
+        // Beat 4: Rest or sustain (leave empty for waltz feel)
+        // In 4/4, we add another bass note to transition
+        if (remainingBeats >= 4) {
+            notes.push({
+                type: 'note',
+                pitch: bassNote,
+                pitches: [bassNote],
+                duration: '4n',
+                beat: measureStart + 3,
+                dotted: false,
+                isTied: false,
+                voiceIndex: 0,
+            });
+        }
+
+        measureStart += beatsPerMeasure;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate romantic bass pattern
+ * Chopin-esque: bass note, then rolled/arpeggiated chord that sustains
+ * Flowing, expressive, rubato-friendly
+ */
+function generateRomanticBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
+    const notes = [];
+    const octave = effectiveOctave || 2;
+    const upperOctave = octave + 1;
+
+    // Get chord tones in upper octave
+    const chordTones = chordNotes.slice(0, 4).map(note => {
+        const noteMatch = note.match(/^([A-G][#b]?)(\d*)$/);
+        if (noteMatch) {
+            return `${noteMatch[1]}${upperOctave}`;
+        }
+        return note;
+    });
+
+    let measureStart = 0;
+
+    while (measureStart < totalBeats) {
+        const remainingBeats = totalBeats - measureStart;
+
+        // Beat 1: Bass note (quarter, voiceIndex 0)
+        if (remainingBeats >= 1) {
+            notes.push({
+                type: 'note',
+                pitch: bassNote,
+                pitches: [bassNote],
+                duration: '4n',
+                beat: measureStart,
+                dotted: false,
+                isTied: false,
+                voiceIndex: 0,
+            });
+        }
+
+        // Beats 1.5-3: Rolled arpeggio (16th notes rolling up through chord, voiceIndex 1)
+        // This creates the romantic "rolled chord" effect
+        const rollStartBeat = measureStart + 0.5;
+        for (let i = 0; i < Math.min(chordTones.length, 4); i++) {
+            const rollBeat = rollStartBeat + (i * 0.25);  // 16th notes
+            if (rollBeat < measureStart + remainingBeats) {
+                notes.push({
+                    type: 'note',
+                    pitch: chordTones[i],
+                    pitches: [chordTones[i]],
+                    duration: '16n',
+                    beat: rollBeat,
+                    dotted: false,
+                    isTied: false,
+                    voiceIndex: 1,
+                });
+            }
+        }
+
+        // Beat 2: Sustained chord (held from the roll, half note voiceIndex 1)
+        if (remainingBeats >= 3 && chordTones.length > 0) {
+            notes.push({
+                type: 'chord',
+                pitch: chordTones[0],
+                pitches: chordTones.slice(0, 3),
+                duration: '2n',
+                beat: measureStart + 1.5,
+                dotted: false,
+                isTied: false,
+                voiceIndex: 1,
+            });
+        }
+
+        measureStart += beatsPerMeasure;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate call and answer bass pattern
+ * Bass plays 2 beats, chord answers for 2 beats
+ * Conversational, antiphonal texture
+ */
+function generateCallAnswerBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, fifth, effectiveOctave) {
+    const notes = [];
+    const octave = effectiveOctave || 2;
+    const upperOctave = octave + 1;
+
+    // Get chord voicing in upper octave
+    const chordVoicing = chordNotes.slice(0, 3).map(note => {
+        const noteMatch = note.match(/^([A-G][#b]?)(\d*)$/);
+        if (noteMatch) {
+            return `${noteMatch[1]}${upperOctave}`;
+        }
+        return note;
+    });
+
+    let measureStart = 0;
+
+    while (measureStart < totalBeats) {
+        const remainingBeats = totalBeats - measureStart;
+
+        // Beats 1-2: Bass "call" (two quarter notes: root then fifth, voiceIndex 0)
+        if (remainingBeats >= 1) {
+            notes.push({
+                type: 'note',
+                pitch: bassNote,
+                pitches: [bassNote],
+                duration: '4n',
+                beat: measureStart,
+                dotted: false,
+                isTied: false,
+                voiceIndex: 0,
+            });
+        }
+
+        if (remainingBeats >= 2) {
+            notes.push({
+                type: 'note',
+                pitch: fifth,
+                pitches: [fifth],
+                duration: '4n',
+                beat: measureStart + 1,
+                dotted: false,
+                isTied: false,
+                voiceIndex: 0,
+            });
+        }
+
+        // Beats 3-4: Chord "answer" (two quarter note chords, voiceIndex 1)
+        if (remainingBeats >= 3 && chordVoicing.length > 0) {
+            notes.push({
+                type: 'chord',
+                pitch: chordVoicing[0],
+                pitches: chordVoicing,
+                duration: '4n',
+                beat: measureStart + 2,
+                dotted: false,
+                isTied: false,
+                voiceIndex: 1,
+            });
+        }
+
+        if (remainingBeats >= 4 && chordVoicing.length > 0) {
+            notes.push({
+                type: 'chord',
+                pitch: chordVoicing[0],
+                pitches: chordVoicing,
+                duration: '4n',
+                beat: measureStart + 3,
+                dotted: false,
+                isTied: false,
+                voiceIndex: 1,
+            });
+        }
+
+        measureStart += beatsPerMeasure;
+    }
+
+    return notes;
+}
+
+/**
+ * Generate comp bass pattern
+ * Jazz comping style: bass on 1, syncopated chord stabs on 2+ and 4
+ * Creates that laid-back jazz feel with anticipations
+ */
+function generateCompBlockBass(chord, chordNotes, totalBeats, beatsPerMeasure, bassNote, effectiveOctave) {
+    const notes = [];
+    const octave = effectiveOctave || 2;
+    const upperOctave = octave + 1;
+
+    // Get chord voicing in upper octave (jazz voicing - maybe just 3 notes)
+    const chordVoicing = chordNotes.slice(0, 3).map(note => {
+        const noteMatch = note.match(/^([A-G][#b]?)(\d*)$/);
+        if (noteMatch) {
+            return `${noteMatch[1]}${upperOctave}`;
+        }
+        return note;
+    });
+
+    let measureStart = 0;
+
+    while (measureStart < totalBeats) {
+        const remainingBeats = totalBeats - measureStart;
+
+        // Beat 1: Bass note (quarter, voiceIndex 0)
+        if (remainingBeats >= 1) {
+            notes.push({
+                type: 'note',
+                pitch: bassNote,
+                pitches: [bassNote],
+                duration: '4n',
+                beat: measureStart,
+                dotted: false,
+                isTied: false,
+                voiceIndex: 0,
+            });
+        }
+
+        // Beat 2+: Syncopated chord stab (8th note on the "and" of 2, voiceIndex 1)
+        if (remainingBeats >= 2 && chordVoicing.length > 0) {
+            notes.push({
+                type: 'chord',
+                pitch: chordVoicing[0],
+                pitches: chordVoicing,
+                duration: '4n',  // Let it ring
+                beat: measureStart + 1.5,  // "and" of 2
+                dotted: false,
+                isTied: false,
+                voiceIndex: 1,
+            });
+        }
+
+        // Beat 3: Bass note (optional walking feel, voiceIndex 0)
+        if (remainingBeats >= 3) {
+            notes.push({
+                type: 'note',
+                pitch: bassNote,
+                pitches: [bassNote],
+                duration: '4n',
+                beat: measureStart + 2,
+                dotted: false,
+                isTied: false,
+                voiceIndex: 0,
+            });
+        }
+
+        // Beat 4: Syncopated chord stab (8th note on beat 4, voiceIndex 1)
+        if (remainingBeats >= 4 && chordVoicing.length > 0) {
+            notes.push({
+                type: 'chord',
+                pitch: chordVoicing[0],
+                pitches: chordVoicing,
+                duration: '8n',
+                beat: measureStart + 3,
+                dotted: false,
+                isTied: false,
+                voiceIndex: 1,
+            });
+        }
+
+        measureStart += beatsPerMeasure;
     }
 
     return notes;

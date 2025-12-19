@@ -2981,13 +2981,17 @@ export class CompositionState {
                 continue;
             }
 
+            // Use per-chord bass pattern if set, otherwise fall back to global pattern
+            const chordBassPattern = this.storedProgressionData?.[chordIndex]?.bassPattern;
+            const effectiveBassPattern = chordBassPattern || this.settings.bassPattern;
+
             // Generate bass pattern for the entire building block duration
             const blockBassNotes = generateBuildingBlockBass(
                 chord,
                 previousChord,
                 durationBeats,
                 {
-                    bassPattern: this.settings.bassPattern,
+                    bassPattern: effectiveBassPattern,
                     bassOctave: this.settings.bassOctave,
                     bassFollowsInversion: this.settings.bassFollowsInversion,
                     timeSignature: timeSignature,
@@ -3079,13 +3083,17 @@ export class CompositionState {
             );
         }
 
+        // Use per-chord bass pattern if set, otherwise fall back to global pattern
+        const chordBassPattern = this.storedProgressionData?.[chordIndex]?.bassPattern;
+        const effectiveBassPattern = chordBassPattern || this.settings.bassPattern;
+
         // Generate bass pattern for the entire building block duration
         const blockBassNotes = generateBuildingBlockBass(
             chord,
             previousChord,
             durationBeats,
             {
-                bassPattern: this.settings.bassPattern,
+                bassPattern: effectiveBassPattern,
                 bassOctave: this.settings.bassOctave,
                 bassFollowsInversion: this.settings.bassFollowsInversion,
                 timeSignature: timeSignature,
@@ -3834,6 +3842,7 @@ export class CompositionState {
                 octaveShift: chord.octaveShift || 0,
                 lhOctaveShift: chord.lhOctaveShift || 0,
                 lhNotes: chord.lhNotes || [],
+                bassPattern: chord.bassPattern || null, // Per-chord bass pattern (null = use global)
             }));
 
         // Get time signature to determine beats per measure
@@ -4180,7 +4189,8 @@ export class CompositionState {
                     lhOctaveShift: measure.chord.lhOctaveShift || 0,
                     lhType: measure.chord.lhType || 'off',
                     lhInversion: measure.chord.lhInversion || 0,
-                    lhNotes: measure.chord.lhNotes || [] // Left-hand specific notes
+                    lhNotes: measure.chord.lhNotes || [], // Left-hand specific notes
+                    bassPattern: measure.chord.bassPattern || null // Per-chord bass pattern (null = use global)
                 };
 
                 uniqueChords.push(chordData);
@@ -4425,6 +4435,79 @@ export class CompositionState {
      */
     forceApplyChordDuration(chordIndex, newBeats) {
         return this.updateChordDuration(chordIndex, newBeats);
+    }
+
+    /**
+     * Set the bass pattern for a specific chord (per-chord bass pattern)
+     * @param {number} chordIndex - The chord index to update
+     * @param {string|null} pattern - The bass pattern to use (null = use global pattern)
+     * @returns {boolean} - Success
+     */
+    setChordBassPattern(chordIndex, pattern) {
+        if (chordIndex < 0 || chordIndex >= (this.storedProgressionData?.length || 0)) {
+            console.warn(`setChordBassPattern: Invalid chordIndex ${chordIndex}`);
+            return false;
+        }
+
+        // Update the stored progression data
+        this.storedProgressionData[chordIndex].bassPattern = pattern;
+
+        // Update the measure chord objects for this chord
+        const segment = this.getChordSegment(chordIndex);
+        if (segment) {
+            const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(
+                this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE
+            );
+            const startMeasure = Math.floor(segment.startBeat / beatsPerMeasure);
+            const endBeat = segment.startBeat + segment.durationBeats;
+            const endMeasure = Math.ceil(endBeat / beatsPerMeasure) - 1;
+
+            for (let i = startMeasure; i <= endMeasure && i < this.measures.length; i++) {
+                const measure = this.measures[i];
+                if (measure && measure.chord) {
+                    measure.chord.bassPattern = pattern;
+                }
+            }
+        }
+
+        // Regenerate bass for this chord with the new pattern
+        this.regenerateAutoBassByChordIndex(chordIndex);
+
+        this.events.emit('chordBassPatternChanged', chordIndex, pattern);
+        return true;
+    }
+
+    /**
+     * Get the bass pattern for a specific chord
+     * @param {number} chordIndex - The chord index
+     * @returns {string|null} - The bass pattern or null if using global
+     */
+    getChordBassPattern(chordIndex) {
+        if (chordIndex < 0 || chordIndex >= (this.storedProgressionData?.length || 0)) {
+            return null;
+        }
+        return this.storedProgressionData[chordIndex]?.bassPattern || null;
+    }
+
+    /**
+     * Clear bass patterns from specified chords (reset to global)
+     * @param {number[]} chordIndices - Array of chord indices to reset
+     */
+    clearChordBassPatterns(chordIndices) {
+        for (const chordIndex of chordIndices) {
+            this.setChordBassPattern(chordIndex, null);
+        }
+    }
+
+    /**
+     * Get list of chord indices that have custom bass patterns
+     * @returns {number[]} - Array of chord indices with custom patterns
+     */
+    getChordsWithCustomBassPatterns() {
+        if (!this.storedProgressionData) return [];
+        return this.storedProgressionData
+            .map((chord, index) => chord.bassPattern ? index : -1)
+            .filter(index => index !== -1);
     }
 
     // ========================================================================
@@ -5873,6 +5956,20 @@ export class CompositionState {
 
         // Re-render bass blocks to measures
         this.renderBassBlocksToMeasures();
+
+        // ================================================================
+        // STEP 5b: Re-regenerate bass for auto-generated patterns
+        // The cloned blocks in Step 5 only capture voice 0 notes from syncMeasuresToBuildingBlocks.
+        // Multi-voice patterns (like Ballad Stride, Hymn, etc.) use voice 0 AND voice 1,
+        // so we need to regenerate the patterns to restore voice 1 notes.
+        // ================================================================
+        if (this.settings.autoGenerateBass) {
+            // Regenerate bass for both original and new chord indices
+            const allAffectedChords = [...originalSection.chordIndices, ...newChordIndices];
+            for (const chordIdx of allAffectedChords) {
+                this.regenerateAutoBassByChordIndex(chordIdx);
+            }
+        }
 
         // ================================================================
         // STEP 6: Restore treble notes to the duplicated section

@@ -288,7 +288,7 @@
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
-    scrollbar-color: #cbd5e1 transparent;
+    scrollbar-color: #10b981 transparent;
     /* Horizontal padding to prevent selection ring clipping on leftmost/rightmost cards */
     padding-left: 8px;
     padding-right: 8px;
@@ -305,12 +305,12 @@
 }
 
 .scroll-view-container::-webkit-scrollbar-thumb {
-    background-color: #cbd5e1;
+    background-color: #10b981;
     border-radius: 3px;
 }
 
 .scroll-view-container::-webkit-scrollbar-thumb:hover {
-    background-color: #94a3b8;
+    background-color: #059669;
 }
 
 .scroll-view-container .chord-card-wrapper,
@@ -385,6 +385,9 @@
     overflow-x: auto;
     overflow-y: visible;
     padding-top: 8px;
+    /* Prevent selection ring clipping on leftmost card */
+    padding-left: 8px;
+    margin-left: -8px;
 }
 
 /* Section cards area inside unified section containers */
@@ -394,17 +397,37 @@
     overflow-x: auto;
     overflow-y: visible;
     padding-top: 8px;
+    /* Prevent selection ring clipping on leftmost card - no negative margin to keep border aligned with header */
+    padding-left: 8px;
 }
 
 /* Section unified container - prevent shrinking in parent flex */
 .section-unified-container {
     overflow: visible;
     flex-shrink: 0;
+    /* Add margin for spacing between sections when in flex container */
+    margin-right: 0.5rem;
+}
+
+/* Remove extra margin from last section */
+.section-unified-container:last-child {
+    margin-right: 0;
 }
 
 /* Chord tooltip must appear above everything */
 .chord-tooltip {
     z-index: 999999 !important;
+}
+
+/* Hide progression tooltips when toggle is off */
+.progression-tooltips-disabled .chord-tooltip,
+.progression-tooltips-disabled .chord-card-tooltip,
+body.progression-tooltips-disabled .chord-tooltip,
+body.progression-tooltips-disabled .chord-card-tooltip {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
 }
 
 /* Section picker bar */
