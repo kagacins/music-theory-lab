@@ -514,6 +514,10 @@ function formatChordNameForDisplay(chord) {
 
   // If we have root, build the display name from root + type
   if (root) {
+    // For intervals, use "C P4" format; for chords, use normal symbol
+    if (chord.selectionMode === 'interval') {
+      return root + ' ' + (chord.simpleName || type);
+    }
     const suffix = getChordTypeSuffix(type);
     return root + suffix;
   }
@@ -3581,7 +3585,11 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       const beatInMeasure = segment.startBeat % beatsPerMeasureForSymbols;
       chordStartBeatInMeasure.set(startMeasure, {
         beatOffset: beatInMeasure,
-        chordSymbol: segment.chord?.root ? `${segment.chord.root}${getChordTypeSuffix(segment.chord.type)}` : null,
+        chordSymbol: segment.chord?.root
+          ? (segment.chord.selectionMode === 'interval'
+              ? `${segment.chord.root} ${segment.chord.simpleName || segment.chord.type}`
+              : `${segment.chord.root}${getChordTypeSuffix(segment.chord.type)}`)
+          : null,
         segmentIndex
       });
     });

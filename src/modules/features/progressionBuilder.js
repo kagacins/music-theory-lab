@@ -6241,12 +6241,15 @@ function createSimplifiedCardHTML(chord, index, key) {
     const roman = chord.roman || harmonyAnalyzer.getRomanNumeral(chord, key);
     const colors = getFunctionColors(roman);
 
+    // Check if this is an interval (not a chord)
+    const isInterval = chord.selectionMode === 'interval';
+
     // Use simpleName for accurate chord symbol (e.g., "Gm9" for G Minor 9th)
     // Falls back to building symbol if simpleName not available
     let chordSymbol = chord.simpleName || chord.root;
 
     // If no simpleName, build it manually (backup)
-    if (!chord.simpleName) {
+    if (!chord.simpleName && !isInterval) {
         if (chord.type === 'Dominant 7th') chordSymbol += '7';
         else if (chord.type === 'Major 7th') chordSymbol += 'maj7';
         else if (chord.type === 'Minor 7th') chordSymbol += 'm7';
@@ -6264,6 +6267,9 @@ function createSimplifiedCardHTML(chord, index, key) {
         else if (chord.type === 'Major 6th') chordSymbol += '6';
         else if (chord.type === 'Minor 6th') chordSymbol += 'm6';
     }
+
+    // For intervals, prepare separate root and interval symbol for display
+    const intervalSymbol = isInterval ? (chord.simpleName || chord.type) : null;
 
     let inversionText = '';
     if (chord.inversion === 1) { inversionText = '¹'; }
@@ -6296,8 +6302,13 @@ function createSimplifiedCardHTML(chord, index, key) {
                 <div class="chord-info-view flex items-center justify-between h-full p-2 pt-2.5">
                     <!-- Left: Chord info (this is the drag handle) -->
                     <div class="flex flex-col items-center flex-1 drag-handle cursor-grab active:cursor-grabbing">
-                        <!-- Chord Symbol -->
-                        <div class="text-base font-bold text-white mb-0.5">${chordSymbol}</div>
+                        <!-- Chord/Interval Symbol -->
+                        ${isInterval ? `
+                            <div class="text-base font-bold text-white mb-0">${chord.root}</div>
+                            <div class="text-[10px] text-gray-300 font-medium">${intervalSymbol}</div>
+                        ` : `
+                            <div class="text-base font-bold text-white mb-0.5">${chordSymbol}</div>
+                        `}
                         <!-- Roman Numeral -->
                         <div class="text-xs ${colors.romanColor} font-bold">${roman}</div>
                         <!-- Position Label -->
@@ -6354,7 +6365,9 @@ function createSimplifiedCardHTML(chord, index, key) {
 function createDetailedCardHTML(chord, index, key) {
     const roman = chord.roman || harmonyAnalyzer.getRomanNumeral(chord, key);
     const colors = getFunctionColors(roman);
+    const isInterval = chord.selectionMode === 'interval';
     const chordSymbol = chord.simpleName || chord.name || `${chord.root}${chord.type}`;
+    const intervalSymbol = isInterval ? (chord.simpleName || chord.type) : null;
     const functionLabel = getChordFunction(roman);
 
     // Get scale notes for highlighting
@@ -6399,7 +6412,12 @@ function createDetailedCardHTML(chord, index, key) {
             <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1.5 drag-handle cursor-grab active:cursor-grabbing">
                 <div class="flex justify-between items-start">
                     <div class="flex-1">
-                        <div class="text-sm font-bold">${chordSymbol}</div>
+                        ${isInterval ? `
+                            <div class="text-sm font-bold">${chord.root}</div>
+                            <div class="text-[10px]" style="color: rgba(255,255,255,0.8);">${intervalSymbol}</div>
+                        ` : `
+                            <div class="text-sm font-bold">${chordSymbol}</div>
+                        `}
                         <div class="text-xs" style="color: rgba(255,255,255,0.9);">${roman}</div>
                         ${functionLabel ? `<div class="text-[9px] text-blue-200">${functionLabel}</div>` : ''}
                         <div class="text-[9px] text-blue-200">Pos: ${index + 1}</div>
@@ -12495,27 +12513,12 @@ function playProgressionChordNow(index) {
 
     document.getElementById('progression-chord-notes-display').textContent = `${chord.roman} (${chord.name})`;
 
-    const { lhType, lhInversion, lhOctaveShift, omittedNotes = [], lhOmittedNotes = [], octaveShift = 0, inversion = 0 } = chord;
+    const { omittedNotes = [] } = chord;
 
-    // Regenerate chord notes based on current inversion (in case inversion was changed)
-    // Get key without 'm' suffix for calculation
-    let keyForCalculation = trainerState.currentKey || 'C';
-    const isMinorKey = keyForCalculation && keyForCalculation.endsWith('m');
-    if (isMinorKey) {
-        keyForCalculation = keyForCalculation.replace(/m$/, '');
-    }
-    
-    const chordNotesData = getProgressionChordNotes(
-        keyForCalculation,
-        chord.roman,
-        chord.type,
-        inversion, // Use current inversion from chord data
-        octaveShift
-    );
-    
-    // Use regenerated notes if available, otherwise fall back to stored notes
+    // ALWAYS use the chord card's stored notes - this is what the user sees and expects to hear
+    // chord.notes contains the exact notes displayed on the chord card
     // Filter out any invalid notes (null, undefined, empty strings, NaN values)
-    const rawChordNotes = chordNotesData ? chordNotesData.notes : (chord.notes || []);
+    const rawChordNotes = chord.notes || [];
     const chordNotes = rawChordNotes.filter(note => {
         // Check for null, undefined, empty string
         if (note == null || note === '') return false;
@@ -12528,69 +12531,10 @@ function playProgressionChordNow(index) {
         return true;
     });
 
-    // Use auto-generated bass notes if available
-    let allLhNotes = [];
-    let bassAutoFillActive = false;
-
-    // Check if bass auto-fill is active
-    if (window.getCompositionState) {
-        const compositionState = window.getCompositionState();
-        const settings = compositionState.getSettings();
-
-        if (settings && settings.autoGenerateBass && compositionState.getMeasureCount() > index) {
-            const measure = compositionState.getMeasure(index);
-            if (measure && measure.notation && measure.notation.bass) {
-                const bassVoices = measure.notation.bass.voices || [];
-                // MULTI-VOICE: Gather notes from ALL bass voices
-                const allBassNotes = bassVoices.flatMap(voice => voice?.notes || []);
-                if (allBassNotes.length > 0) {
-                    // Use auto-generated bass notes (blue notes)
-                    bassAutoFillActive = true;
-                    // Extract pitch from bass notes, filter out rests and invalid pitches
-                    allLhNotes = allBassNotes
-                        .filter(note => note.type !== 'rest' && note.pitch)
-                        .map(note => note.pitch)
-                        .filter(pitch => {
-                            if (pitch == null || pitch === '') return false;
-                            if (typeof pitch !== 'string') return false;
-                            if (pitch === 'NaN' || pitch.includes('NaN')) return false;
-                            if (!/^[A-G][#b]?\d+$/.test(pitch)) return false;
-                            return true;
-                        });
-                }
-            }
-        }
-    }
-
-    // If no auto-generated bass, use traditional LH chord notes
-    if (!bassAutoFillActive) {
-        // Calculate absolute LH octave shift (RH octave + relative LH shift)
-        const absoluteLHOctaveShift = octaveShift + (lhOctaveShift || 0);
-        const rawLhNotes = getLHNotes(
-        chord.root,
-        lhType || 'off',
-        lhInversion || 0,
-        trainerState.currentKey,
-        absoluteLHOctaveShift,
-        chord.type,
-        getKeyBasedEnharmonic()
-    );
-        // Filter out any invalid notes
-        allLhNotes = (rawLhNotes || []).filter(note => {
-            if (note == null || note === '') return false;
-            if (typeof note !== 'string') return false;
-            if (note === 'NaN' || note.includes('NaN')) return false;
-            if (!/^[A-G][#b]?\d+$/.test(note)) return false;
-            return true;
-        });
-    }
-
-    // Apply saved voicing from the chord data
+    // Apply saved voicing from the chord data (filter out omitted notes)
     const voicedNotes = chordNotes.filter(note => !omittedNotes.includes(note));
-    const lhNotes = allLhNotes.filter(note => !lhOmittedNotes.includes(note));
-    // Filter out any invalid notes (null, undefined, empty strings, NaN values) before playing
-    const allNotes = voicedNotes.concat(lhNotes)
-        .filter(note => note != null && note !== '' && typeof note === 'string' && note !== 'NaN');
+    // The chord card only has RH notes (LH was removed from chord cards)
+    const allNotes = voicedNotes;
 
     highlightTrainer(trainerState.scaleNotes, allNotes);
 

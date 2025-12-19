@@ -597,8 +597,13 @@ export class NotationComposer {
 
       // Add chord symbol if available
       if (measure.chord && measure.chord.root) {
-        const typeSuffix = this.getChordTypeSuffix(measure.chord.type);
-        measureData.chordSymbol = measure.chord.root + typeSuffix;
+        // For intervals, use "C P4" format; for chords, use normal symbol
+        if (measure.chord.selectionMode === 'interval') {
+          measureData.chordSymbol = measure.chord.root + ' ' + (measure.chord.simpleName || measure.chord.type);
+        } else {
+          const typeSuffix = this.getChordTypeSuffix(measure.chord.type);
+          measureData.chordSymbol = measure.chord.root + typeSuffix;
+        }
       }
 
       measures.push(measureData);
@@ -715,8 +720,13 @@ export class NotationComposer {
         // Generate chord symbol from chord data
         let chordSymbol = null;
         if (chord.root) {
-          const typeSuffix = this.getChordTypeSuffix(chord.type);
-          chordSymbol = chord.root + typeSuffix;
+          // For intervals, use "C P4" format; for chords, use normal symbol
+          if (chord.selectionMode === 'interval') {
+            chordSymbol = chord.root + ' ' + (chord.simpleName || chord.type);
+          } else {
+            const typeSuffix = this.getChordTypeSuffix(chord.type);
+            chordSymbol = chord.root + typeSuffix;
+          }
         }
 
         // Get time signature from compositionState metadata (not hardcoded 4/4)
@@ -945,7 +955,9 @@ export class NotationComposer {
           metadata: m.metadata?.chordSymbol
             ? m.metadata
             : (m.chord?.root
-              ? { ...m.metadata, chordSymbol: m.chord.root + this.getChordTypeSuffix(m.chord.type) }
+              ? { ...m.metadata, chordSymbol: m.chord.selectionMode === 'interval'
+                  ? m.chord.root + ' ' + (m.chord.simpleName || m.chord.type)
+                  : m.chord.root + this.getChordTypeSuffix(m.chord.type) }
               : m.metadata),
         }))
       : []; // compositionState is now required - no fallback
@@ -1266,7 +1278,9 @@ export class NotationComposer {
       metadata: m.metadata?.chordSymbol
         ? m.metadata
         : (m.chord?.root
-          ? { ...m.metadata, chordSymbol: m.chord.root + this.getChordTypeSuffix(m.chord.type) }
+          ? { ...m.metadata, chordSymbol: m.chord.selectionMode === 'interval'
+              ? m.chord.root + ' ' + (m.chord.simpleName || m.chord.type)
+              : m.chord.root + this.getChordTypeSuffix(m.chord.type) }
           : m.metadata),
     }));
 

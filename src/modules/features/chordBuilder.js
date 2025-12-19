@@ -287,8 +287,9 @@ function getNearestHalfStepDown(rootNote) {
  * @param {string} tooltipText - The text to display in the tooltip
  * @param {string} chordType - (Optional) The chord type, used to show inversion options
  * @param {string} chordRoot - (Optional) The chord root for diatonic mode, used to play the correct chord
+ * @param {string} intervalType - (Optional) The interval type, used to show "Add Interval" button
  */
-function createButtonTooltip(button, tooltipText, chordType = null, chordRoot = null) {
+function createButtonTooltip(button, tooltipText, chordType = null, chordRoot = null, intervalType = null) {
     if (!tooltipText || tooltipText.length === 0) return null;
 
     const tooltip = document.createElement('div');
@@ -711,7 +712,51 @@ function createButtonTooltip(button, tooltipText, chordType = null, chordRoot = 
         // Append the container to the tooltip
         tooltip.appendChild(buttonContainer);
     }
-    
+
+    // Add "Add Interval" button if this is an interval tooltip
+    if (intervalType && lines.length > 1) {
+        // Create a container for the button
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.display = 'flex';
+        buttonContainer.style.gap = '6px';
+        buttonContainer.style.marginTop = '8px';
+        buttonContainer.style.width = '100%';
+
+        // Create "Add Interval" button
+        const addIntervalBtn = document.createElement('button');
+        addIntervalBtn.textContent = 'Add Interval';
+        addIntervalBtn.style.padding = '4px 8px';
+        addIntervalBtn.style.fontSize = '10px';
+        addIntervalBtn.style.backgroundColor = '#6366f1'; // indigo-500
+        addIntervalBtn.style.color = 'white';
+        addIntervalBtn.style.border = '1px solid #4f46e5'; // indigo-600
+        addIntervalBtn.style.borderRadius = '3px';
+        addIntervalBtn.style.cursor = 'pointer';
+        addIntervalBtn.style.flex = '1';
+        addIntervalBtn.style.fontWeight = '600';
+        addIntervalBtn.style.transition = 'all 0.2s';
+        addIntervalBtn.onmouseover = () => addIntervalBtn.style.backgroundColor = '#4f46e5'; // indigo-600
+        addIntervalBtn.onmouseout = () => addIntervalBtn.style.backgroundColor = '#6366f1'; // indigo-500
+        addIntervalBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            // Select the interval in the builder
+            selectBuilderInterval(intervalType, false);
+
+            // Add to progression (addChordToProgression already handles intervals)
+            if (window.addChordToProgression) {
+                window.addChordToProgression(false);
+            }
+
+            // Hide tooltip after adding
+            hideTooltip();
+        });
+        buttonContainer.appendChild(addIntervalBtn);
+
+        // Append the container to the tooltip
+        tooltip.appendChild(buttonContainer);
+    }
+
     // Track tooltip timeout for touch devices
     let tooltipTimeout = null;
     
@@ -2770,9 +2815,9 @@ export function renderBuilderSelectors() {
                     }, { passive: false });
                     buttonContainer.appendChild(mainButton);
                     
-                    // Create tooltip for interval button with name included
+                    // Create tooltip for interval button with name included and "Add Interval" button
                     const tooltipText = `${intervalType}\n\n${intervalDescription}`;
-                    createButtonTooltip(mainButton, tooltipText);
+                    createButtonTooltip(mainButton, tooltipText, null, null, intervalType);
 
                     // Container for arpeggio buttons
                     const arpContainer = document.createElement('div');
