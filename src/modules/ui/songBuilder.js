@@ -13,11 +13,14 @@
 import { getCompositionState } from '../state/compositionState.js';
 import { invalidateProgressionDataCache } from '../state/trainerState.js';
 import { SECTION_PROFILES, getSectionProfile, getTransitionRules, isTypicalTransition } from '../features/sectionProfiles.js';
-import { getChordNotes } from '../utils/noteUtils.js';
+import { getChordNotes, getInvertedChordNotes } from '../utils/noteUtils.js';
 import { getPiano } from '../audio/audioEngine.js';
 import { HarmonyAnalyzer } from '../analysis/harmonyAnalyzer.js';
 import { getAllTemplates, SONG_STRUCTURE_TEMPLATES } from '../../data/songStructureTemplates.js';
 import { clearSectionSelection, renderProgressionDisplay } from '../features/progressionBuilder.js';
+import { generateComprehensiveRecommendations } from '../features/comprehensiveChordRecommendations.js';
+import { CONTINUE_SUBMODES } from '../state/sectionIntentState.js';
+import { getSavedWeights } from '../config/weightPresets.js';
 
 // Create harmony analyzer instance for roman numeral calculation
 const harmonyAnalyzer = new HarmonyAnalyzer();
@@ -28,33 +31,21 @@ const harmonyAnalyzer = new HarmonyAnalyzer();
 
 /**
  * Format a chord for display (e.g., "G (Imaj7)" or "Am7")
+ * Uses getChordSymbol for consistent naming across the app
  */
 function formatChordDisplay(chord) {
     if (!chord) return '?';
 
     const root = chord.root || '?';
-    let suffix = '';
-
-    // Convert chord type to common notation
     const type = chord.type || 'Major';
-    if (type === 'Major') suffix = '';
-    else if (type === 'Minor') suffix = 'm';
-    else if (type === 'Major 7th') suffix = 'maj7';
-    else if (type === 'Minor 7th') suffix = 'm7';
-    else if (type === 'Dominant 7th') suffix = '7';
-    else if (type === 'Diminished') suffix = 'dim';
-    else if (type === 'Diminished 7th') suffix = 'dim7';
-    else if (type === 'Half-Diminished 7th') suffix = 'ø7';
-    else if (type === 'Augmented') suffix = 'aug';
-    else if (type === 'Suspended 2nd') suffix = 'sus2';
-    else if (type === 'Suspended 4th') suffix = 'sus4';
-    else if (type === 'Major 9th') suffix = 'maj9';
-    else if (type === 'Minor 9th') suffix = 'm9';
-    else if (type === 'Dominant 9th') suffix = '9';
-    else if (type === 'Add 9') suffix = 'add9';
-    else suffix = type.replace('Major ', 'M').replace('Minor', 'm').replace('Dominant', '').replace(' 7th', '7').replace(' 9th', '9');
+    const suffix = getChordSymbolEarly(type);
 
     let display = root + suffix;
+
+    // Add slash bass if present (e.g., "G/B")
+    if (chord.bassNote) {
+        display += '/' + chord.bassNote;
+    }
 
     // Add roman numeral if available
     if (chord.roman) {
@@ -65,34 +56,34 @@ function formatChordDisplay(chord) {
 }
 
 /**
+ * Early version of getChordSymbol for use before the main function is defined
+ * (Due to JavaScript hoisting, we need this helper at the top)
+ */
+function getChordSymbolEarly(type) {
+    const symbolMap = {
+        'Major': '', 'Minor': 'm', 'Diminished': 'dim', 'Augmented': 'aug',
+        'Major 7th': 'maj7', 'Minor 7th': 'm7', 'Dominant 7th': '7',
+        'Diminished 7th': 'dim7', 'Half-Diminished 7th': 'ø7',
+        'Minor-Major 7th': 'mMaj7', 'Augmented 7th': 'aug7',
+        'Major 6th': '6', 'Minor 6th': 'm6', '6/9': '6/9',
+        'Suspended 2nd': 'sus2', 'Suspended 4th': 'sus4', '7sus4': '7sus4',
+        'Add 9': 'add9', 'Add 11': 'add11', 'Add 2': 'add2',
+        'Major 9th': 'maj9', 'Minor 9th': 'm9', 'Dominant 9th': '9',
+        'Dominant 11th': '11', 'Minor 11th': 'm11', 'Major 11th': 'maj11',
+        'Dominant 13th': '13', 'Minor 13th': 'm13', 'Major 13th': 'maj13',
+        'Power': '5'
+    };
+    return symbolMap[type] || type.replace('Major ', 'M').replace('Minor', 'm').replace('Dominant', '').replace(' 7th', '7');
+}
+
+/**
  * Generate simpleName for a chord (e.g., "E7" for E Dominant 7th)
  * This is used by chord cards for display labels
+ * Uses getChordSymbolEarly for consistent naming across the app
  */
 function generateSimpleName(root, type) {
     if (!root) return '?';
-
-    let suffix = '';
-    switch (type) {
-        case 'Major': suffix = ''; break;
-        case 'Minor': suffix = 'm'; break;
-        case 'Major 7th': suffix = 'maj7'; break;
-        case 'Minor 7th': suffix = 'm7'; break;
-        case 'Dominant 7th': suffix = '7'; break;
-        case 'Diminished': suffix = 'dim'; break;
-        case 'Diminished 7th': suffix = 'dim7'; break;
-        case 'Half-Diminished 7th': suffix = 'ø7'; break;
-        case 'Augmented': suffix = 'aug'; break;
-        case 'Suspended 2nd': suffix = 'sus2'; break;
-        case 'Suspended 4th': suffix = 'sus4'; break;
-        case 'Major 9th': suffix = 'maj9'; break;
-        case 'Minor 9th': suffix = 'm9'; break;
-        case 'Dominant 9th': suffix = '9'; break;
-        case 'Add 9': suffix = 'add9'; break;
-        default:
-            // Fallback: try to abbreviate the type
-            suffix = type ? type.replace('Major ', 'M').replace('Minor', 'm').replace('Dominant', '').replace(' 7th', '7').replace(' 9th', '9') : '';
-    }
-
+    const suffix = getChordSymbolEarly(type || 'Major');
     return root + suffix;
 }
 
@@ -111,6 +102,8 @@ function calculateActualTension(chords) {
         'Dominant 7th': 45,
         'Suspended 2nd': 25,
         'Suspended 4th': 30,
+        'Sus2': 25,  // Alias
+        'Sus4': 30,  // Alias
         'Diminished': 60,
         'Diminished 7th': 70,
         'Half-Diminished 7th': 65,
@@ -118,7 +111,14 @@ function calculateActualTension(chords) {
         'Major 9th': 35,
         'Minor 9th': 40,
         'Dominant 9th': 50,
-        'Add 9': 30
+        'Add 9': 30,
+        'Add9': 30,  // Alias
+        'Major 6th': 20,
+        'Minor 6th': 25,
+        'Dominant 11th': 55,
+        'Minor 11th': 50,
+        'Dominant 13th': 60,
+        'Minor 13th': 55
     };
 
     let totalTension = 0;
@@ -223,6 +223,22 @@ export const SECTION_TYPES = {
         typicalLength: [4, 8]
     }
 };
+
+/**
+ * Get hex color for section border (used in inline styles)
+ */
+function getSectionBorderColor(sectionType) {
+    const colorMap = {
+        intro: '#9ca3af',     // gray-400
+        verse: '#4ade80',     // green-400
+        prechorus: '#facc15', // yellow-400
+        chorus: '#c084fc',    // purple-400
+        bridge: '#60a5fa',    // blue-400
+        instrumental: '#f472b6', // pink-400
+        outro: '#6b7280'      // gray-500
+    };
+    return colorMap[sectionType] || '#9ca3af';
+}
 
 /**
  * Common song structure templates
@@ -704,6 +720,16 @@ function renderSectionDetails(container, section, sectionIndex) {
         .map(idx => progression[idx])
         .filter(c => c);
 
+    // Get previous section's last 2 chords (if exists)
+    const prevSection = sectionIndex > 0 ? sections[sectionIndex - 1] : null;
+    const prevSectionType = prevSection ? (SECTION_TYPES[prevSection.type] || SECTION_TYPES.verse) : null;
+    const prevSectionChords = prevSection?.chordIndices
+        ?.slice(-2)  // Last 2 chords of previous section
+        .map(idx => progression[idx])
+        .filter(c => c) || [];
+    // Get the chord indices for prev section's last 2 chords
+    const prevSectionChordIndices = prevSection?.chordIndices?.slice(-2) || [];
+
     // Get next section's first 2 chords (if exists)
     const nextSection = sectionIndex < sections.length - 1 ? sections[sectionIndex + 1] : null;
     const nextSectionType = nextSection ? (SECTION_TYPES[nextSection.type] || SECTION_TYPES.verse) : null;
@@ -711,6 +737,8 @@ function renderSectionDetails(container, section, sectionIndex) {
         ?.slice(0, 2)
         .map(idx => progression[idx])
         .filter(c => c) || [];
+    // Get the chord indices for next section's first 2 chords
+    const nextSectionChordIndices = nextSection?.chordIndices?.slice(0, 2) || [];
 
     const sectionOctave = detectSectionOctave(sectionChords);
 
@@ -740,34 +768,76 @@ function renderSectionDetails(container, section, sectionIndex) {
             </div>
         </div>
 
-        <!-- Chords row -->
-        <div class="flex items-center gap-2 mb-2 flex-wrap" id="section-chord-chips" data-section-octave="${sectionOctave}">
-            <span class="text-xs text-gray-500 dark:text-gray-400">Chords:</span>
-            ${isPlaceholder ? `
-                <span class="text-xs text-gray-400 dark:text-gray-500 italic border border-dashed border-gray-300 dark:border-gray-600 px-2 py-0.5 rounded">Empty — needs ${expectedChords} chords</span>
-            ` : sectionChords.map((chord, i) => `
-                <button class="chord-chip px-2 py-0.5 bg-gradient-to-r ${sectionType.color} text-white text-xs font-medium rounded cursor-pointer hover:scale-105 hover:shadow-md active:scale-95 transition-all select-none"
-                        data-root="${chord.root}"
-                        data-type="${chord.type}"
-                        data-octave="${sectionOctave}"
-                        data-chord-index="${section.chordIndices[i]}">
-                    ${formatChordDisplay(chord)}
-                </button>
-            `).join('')}
-            ${nextSectionChords.length > 0 ? `
-                <span class="text-gray-300 dark:text-gray-600">│</span>
-                <span class="text-xs text-gray-400">${nextSectionType?.emoji || ''}</span>
-                ${nextSectionChords.map((chord, i) => `
-                    <button class="next-section-chord-btn px-2 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs font-medium rounded cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600 transition-all select-none opacity-75"
-                            data-root="${chord.root}"
-                            data-type="${chord.type}"
-                            data-octave="${sectionOctave}"
-                            title="Hold to play (${nextSectionType?.label || 'next section'})">
-                        ${formatChordDisplay(chord)}
-                    </button>
-                `).join('')}
+        <!-- Chords row with prev/current/next sections - section names ABOVE chords -->
+        <div class="flex items-end gap-2 mb-2 overflow-x-auto pb-1" id="section-chord-chips" data-section-octave="${sectionOctave}">
+            <!-- Previous section (last 2 chords) -->
+            ${prevSectionChords.length > 0 ? `
+                <div class="flex flex-col items-center shrink-0 opacity-60">
+                    <div class="flex items-center gap-1 mb-1">
+                        <span class="text-xs text-gray-400 dark:text-gray-500">${prevSectionType?.emoji || ''}</span>
+                        <span class="text-[10px] text-gray-400 dark:text-gray-500 font-medium">${prevSection.label || prevSectionType?.label}</span>
+                    </div>
+                    <div class="flex items-center gap-1 px-2 py-1.5 bg-gray-100 dark:bg-gray-700/50 rounded-lg">
+                        ${prevSectionChords.map((chord, i) => `
+                            <button class="prev-section-chord-btn px-1.5 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400 text-xs font-medium rounded cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-500 transition-all select-none"
+                                    data-root="${chord.root}"
+                                    data-type="${chord.type}"
+                                    data-octave="${sectionOctave}"
+                                    data-chord-index="${prevSectionChordIndices[i]}"
+                                    title="Hold to play (${prevSectionType?.label || 'prev section'})">
+                                ${formatChordDisplay(chord)}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+                <svg class="w-4 h-4 text-gray-300 dark:text-gray-600 shrink-0 mb-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
             ` : ''}
-            <span class="text-xs text-gray-400 ml-1">(hold to play)</span>
+
+            <!-- Current section (highlighted) -->
+            <div class="flex flex-col items-center shrink-0">
+                <div class="flex items-center gap-1 mb-1">
+                    <span class="text-sm">${sectionType.emoji}</span>
+                    <span class="text-xs font-bold text-gray-700 dark:text-gray-200">${section.label || sectionType.label}</span>
+                </div>
+                <div class="flex items-center gap-1 px-2 py-1.5 bg-gradient-to-r ${sectionType.color} bg-opacity-10 border-2 rounded-lg" style="border-color: ${getSectionBorderColor(section.type)};">
+                    ${isPlaceholder ? `
+                        <span class="text-xs text-gray-400 dark:text-gray-500 italic border border-dashed border-gray-300 dark:border-gray-600 px-2 py-0.5 rounded">Empty — needs ${expectedChords} chords</span>
+                    ` : sectionChords.map((chord, i) => `
+                        <button class="chord-chip px-2 py-0.5 bg-gradient-to-r ${sectionType.color} text-white text-xs font-medium rounded cursor-pointer hover:scale-105 hover:shadow-md active:scale-95 transition-all select-none"
+                                data-root="${chord.root}"
+                                data-type="${chord.type}"
+                                data-octave="${sectionOctave}"
+                                data-chord-index="${section.chordIndices[i]}"
+                                data-section-index="${sectionIndex}">
+                            ${formatChordDisplay(chord)}
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+
+            <!-- Next section (first 2 chords) -->
+            ${nextSectionChords.length > 0 ? `
+                <svg class="w-4 h-4 text-gray-300 dark:text-gray-600 shrink-0 mb-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                <div class="flex flex-col items-center shrink-0 opacity-60">
+                    <div class="flex items-center gap-1 mb-1">
+                        <span class="text-xs text-gray-400 dark:text-gray-500">${nextSectionType?.emoji || ''}</span>
+                        <span class="text-[10px] text-gray-400 dark:text-gray-500 font-medium">${nextSection.label || nextSectionType?.label}</span>
+                    </div>
+                    <div class="flex items-center gap-1 px-2 py-1.5 bg-gray-100 dark:bg-gray-700/50 rounded-lg">
+                        ${nextSectionChords.map((chord, i) => `
+                            <button class="next-section-chord-btn px-1.5 py-0.5 bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400 text-xs font-medium rounded cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-500 transition-all select-none"
+                                    data-root="${chord.root}"
+                                    data-type="${chord.type}"
+                                    data-octave="${sectionOctave}"
+                                    data-chord-index="${nextSectionChordIndices[i]}"
+                                    title="Hold to play (${nextSectionType?.label || 'next section'})">
+                                ${formatChordDisplay(chord)}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+            <span class="text-[10px] text-gray-400 ml-2 shrink-0 mb-2">(hold to play, click for alternatives)</span>
         </div>
 
         <!-- Compact analysis row: Tension + Harmonic Rhythm side by side -->
@@ -816,6 +886,7 @@ function renderSectionDetails(container, section, sectionIndex) {
 
     // Wire up chord chip playback
     // Logic: mousedown starts playback, mouseup stops it. No separate click handler.
+    // Use the chord's actual notes if available, otherwise use section octave
     const chordChips = container.querySelectorAll('.chord-chip');
     chordChips.forEach(chip => {
         let isPlaying = false;
@@ -824,13 +895,25 @@ function renderSectionDetails(container, section, sectionIndex) {
             if (isPlaying) return; // Already playing
             const root = chip.dataset.root;
             const type = chip.dataset.type;
-            const octave = parseInt(chip.dataset.octave, 10) || 4;
+            const chordIndex = parseInt(chip.dataset.chordIndex, 10);
             try {
                 const piano = getPiano();
                 if (piano) {
-                    // getChordNotes returns {baseNotes, specificNotes} - use specificNotes for playback
-                    const chordData = getChordNotes(root, type, 'C', octave);
-                    const notes = chordData.specificNotes || [];
+                    // Try to use the chord's actual notes for accurate playback
+                    const compositionState = getCompositionState();
+                    const progression = compositionState.getChords();
+                    const chord = !isNaN(chordIndex) ? progression[chordIndex] : null;
+
+                    let notes = [];
+                    if (chord?.notes && Array.isArray(chord.notes) && chord.notes.length > 0) {
+                        // Use the chord's actual stored notes for accurate octave playback
+                        notes = chord.notes;
+                    } else {
+                        // Fallback: generate notes at octave 4 (middle of piano)
+                        const chordData = getChordNotes(root, type, 'C', 4);
+                        notes = chordData.specificNotes || [];
+                    }
+
                     if (notes.length === 0) {
                         console.warn('[SongBuilder] No notes for chord:', root, type);
                         return;
@@ -956,6 +1039,7 @@ function renderSectionDetails(container, section, sectionIndex) {
             const newRoot = btn.dataset.newRoot;
             const newType = btn.dataset.newType;
             const newOctave = parseInt(btn.dataset.newOctave, 10) || 4;
+            const newBass = btn.dataset.newBass || null;  // Slash bass note (e.g., "B" in "G/B")
             const newChord = btn.dataset.newChord;
 
             if (isNaN(chordIndex) || chordIndex < 0) return;
@@ -964,10 +1048,10 @@ function renderSectionDetails(container, section, sectionIndex) {
             const progression = compositionState.getChords();
             const originalChord = progression[chordIndex];
 
-            // Store the pending swap (including octave for proper voicing)
+            // Store the pending swap (including octave and bass note for proper voicing)
             songBuilderState.pendingTransitionSwaps.set(chordIndex, {
                 original: originalChord,
-                swapped: { root: newRoot, type: newType, octave: newOctave, roman: originalChord?.roman }
+                swapped: { root: newRoot, type: newType, octave: newOctave, bassNote: newBass, roman: originalChord?.roman }
             });
 
             // Re-render section details to show the swap
@@ -1052,28 +1136,77 @@ function renderSectionDetails(container, section, sectionIndex) {
     }
 
     // Wire up next section chord buttons (hold to play)
+    // Use chord's actual notes for accurate octave playback
     const nextSectionChordBtns = container.querySelectorAll('.next-section-chord-btn');
     nextSectionChordBtns.forEach(btn => {
-        btn.addEventListener('mousedown', (e) => {
+        const playHandler = (e) => {
             e.preventDefault();
-            const root = btn.dataset.root;
-            const type = btn.dataset.type;
-            const octave = parseInt(btn.dataset.octave, 10) || 4;
-            playTransitionChord(root, type, octave, btn);
-        });
+            const chordIndex = parseInt(btn.dataset.chordIndex, 10);
+            const compositionState = getCompositionState();
+            const progression = compositionState.getChords();
+            const chord = !isNaN(chordIndex) ? progression[chordIndex] : null;
+            if (chord?.notes && chord.notes.length > 0) {
+                playChordWithNotes(chord.notes, btn);
+            } else {
+                playTransitionChord(btn.dataset.root, btn.dataset.type, 4, btn);
+            }
+        };
+        btn.addEventListener('mousedown', playHandler);
         btn.addEventListener('mouseup', () => stopTransitionChord(btn));
         btn.addEventListener('mouseleave', () => stopTransitionChord(btn));
-        btn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            const root = btn.dataset.root;
-            const type = btn.dataset.type;
-            const octave = parseInt(btn.dataset.octave, 10) || 4;
-            playTransitionChord(root, type, octave, btn);
-        }, { passive: false });
+        btn.addEventListener('touchstart', playHandler, { passive: false });
         btn.addEventListener('touchend', (e) => {
             e.preventDefault();
             stopTransitionChord(btn);
         }, { passive: false });
+    });
+
+    // Wire up previous section chord buttons (hold to play)
+    const prevSectionChordBtns = container.querySelectorAll('.prev-section-chord-btn');
+    prevSectionChordBtns.forEach(btn => {
+        const playHandler = (e) => {
+            e.preventDefault();
+            const chordIndex = parseInt(btn.dataset.chordIndex, 10);
+            const compositionState = getCompositionState();
+            const progression = compositionState.getChords();
+            const chord = !isNaN(chordIndex) ? progression[chordIndex] : null;
+            if (chord?.notes && chord.notes.length > 0) {
+                playChordWithNotes(chord.notes, btn);
+            } else {
+                playTransitionChord(btn.dataset.root, btn.dataset.type, 4, btn);
+            }
+        };
+        btn.addEventListener('mousedown', playHandler);
+        btn.addEventListener('mouseup', () => stopTransitionChord(btn));
+        btn.addEventListener('mouseleave', () => stopTransitionChord(btn));
+        btn.addEventListener('touchstart', playHandler, { passive: false });
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            stopTransitionChord(btn);
+        }, { passive: false });
+    });
+
+    // Wire up click handler for chord chips to show alternatives popup
+    const currentSectionChips = container.querySelectorAll('.chord-chip');
+    currentSectionChips.forEach(chip => {
+        // Track mousedown time to differentiate click from hold
+        let mouseDownTime = 0;
+        chip.addEventListener('mousedown', () => {
+            mouseDownTime = Date.now();
+        });
+        chip.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent bubbling that might interfere
+            // Only show popup on quick clicks (< 300ms), not long presses for playback
+            const clickDuration = Date.now() - mouseDownTime;
+            if (clickDuration > 300) {
+                return; // This was a hold for playback, not a click for alternatives
+            }
+            const chordIndex = parseInt(chip.dataset.chordIndex, 10);
+            const sectionIdx = parseInt(chip.dataset.sectionIndex, 10);
+            if (!isNaN(chordIndex) && !isNaN(sectionIdx)) {
+                showChordAlternativesPopup(chip, chordIndex, sectionIdx, sections);
+            }
+        });
     });
 }
 
@@ -1100,6 +1233,24 @@ function playTransitionChord(root, type, octave, btn) {
 }
 
 /**
+ * Play chord using pre-defined notes (for accurate octave playback)
+ */
+function playChordWithNotes(notes, btn) {
+    if (!notes || notes.length === 0) return;
+    try {
+        const piano = getPiano();
+        if (piano) {
+            btn.classList.add('ring-2', 'ring-blue-400');
+            notes.forEach(note => {
+                piano.triggerAttack(note, undefined, 0.7);
+            });
+        }
+    } catch (e) {
+        console.warn('[SongBuilder] Could not play chord:', e);
+    }
+}
+
+/**
  * Stop playing transition chord
  */
 function stopTransitionChord(btn) {
@@ -1112,6 +1263,644 @@ function stopTransitionChord(btn) {
     } catch (e) {
         // Ignore
     }
+}
+
+// Track last replaced chord for undo functionality
+let lastReplacedChord = null;
+
+/**
+ * Show chord alternatives popup for a selected chord
+ * Enhanced version with persistent popup, explicit buttons, undo, and weights integration
+ * @param {HTMLElement} anchorElement - The chord chip element
+ * @param {number} chordIndex - Index of the chord in progression
+ * @param {number} sectionIndex - Index of the section
+ * @param {Array} allSections - All sections in the song
+ */
+function showChordAlternativesPopup(anchorElement, chordIndex, sectionIndex, allSections) {
+    // Remove any existing popup
+    document.querySelector('.chord-alternatives-popup')?.remove();
+
+    const compositionState = getCompositionState();
+    const progression = compositionState.getChords();
+    const key = compositionState.metadata?.key || 'C';
+    const currentChord = progression[chordIndex];
+
+    if (!currentChord) return;
+
+    const section = allSections[sectionIndex];
+    const sectionType = SECTION_TYPES[section?.type] || SECTION_TYPES.verse;
+
+    // Gather context
+    const prevChord = chordIndex > 0 ? progression[chordIndex - 1] : null;
+    const nextChord = chordIndex < progression.length - 1 ? progression[chordIndex + 1] : null;
+    const nextSection = sectionIndex < allSections.length - 1 ? allSections[sectionIndex + 1] : null;
+    const nextSectionType = nextSection ? (SECTION_TYPES[nextSection.type] || SECTION_TYPES.verse) : null;
+
+    // Build section info for the recommendation engine
+    const sectionInfo = {
+        mode: 'continue',
+        subMode: CONTINUE_SUBMODES.BUILDING,
+        targetSection: section,
+        sections: allSections,
+        currentChordIndex: chordIndex
+    };
+
+    // Prepare progression data for recommendations
+    const progressionData = progression.map(c => ({
+        root: c.root,
+        type: c.type,
+        inversion: c.inversion || 0
+    }));
+
+    // Get saved recommendation weights (integrates with global settings)
+    const customWeights = getSavedWeights(true); // contextMode = true
+
+    // Generate alternatives using the recommendation engine with custom weights
+    let alternatives = [];
+    try {
+        const forwardContext = nextChord ? {
+            enabled: true,
+            nextChord: { root: nextChord.root, type: nextChord.type },
+            weight: 0.15
+        } : null;
+
+        alternatives = generateComprehensiveRecommendations(
+            currentChord.root,
+            currentChord.type,
+            currentChord.inversion || 0,
+            key,
+            'balanced', // style
+            'balanced', // mood
+            'maintain', // tensionDirection
+            8,          // limit (get more to filter)
+            progressionData,
+            true,       // contextMode
+            4,          // lookbackDepth
+            customWeights, // Use saved weights from global settings
+            true,       // useEnhancedScoring
+            sectionInfo,
+            null,       // tensionArcInfo
+            null,       // rhythmInfo
+            forwardContext
+        ).filter(rec =>
+            // Filter out the current chord
+            rec.root !== currentChord.root || rec.type !== currentChord.type
+        );
+
+        // Deduplicate: keep only the highest-scoring version of each chord (root + type)
+        // This prevents showing the same chord multiple times with different inversions
+        const seenChords = new Map();
+        alternatives = alternatives.filter(rec => {
+            const key = `${rec.root}-${rec.type}`;
+            if (!seenChords.has(key)) {
+                seenChords.set(key, rec.score);
+                return true;
+            }
+            // Only keep if this version scores higher (shouldn't happen since sorted)
+            return false;
+        });
+
+        // Limit sus chords to max 1 to prevent over-representation
+        let susCount = 0;
+        const maxSusChords = 1;
+        alternatives = alternatives.filter(rec => {
+            const isSus = rec.type === 'Sus4' || rec.type === 'Sus2' ||
+                          rec.type === 'Suspended 4th' || rec.type === 'Suspended 2nd';
+            if (isSus) {
+                susCount++;
+                return susCount <= maxSusChords;
+            }
+            return true;
+        });
+
+        // Take top 6 after deduplication and sus limiting
+        alternatives = alternatives.slice(0, 6);
+    } catch (e) {
+        console.warn('[SongBuilder] Could not generate alternatives:', e);
+    }
+
+    // Context label based on section position
+    let contextLabel = `${sectionType.emoji} ${section?.label || sectionType.label}`;
+    const isTransitionChord = nextSection && section.chordIndices.indexOf(chordIndex) === section.chordIndices.length - 1;
+    if (isTransitionChord) {
+        contextLabel = `Transitioning to ${nextSectionType.emoji} ${nextSection.label || nextSectionType.label}`;
+    }
+
+    // Determine the octave from the current chord's actual notes for context-aware playback
+    let contextOctave = 4; // Default fallback
+    if (currentChord?.notes && Array.isArray(currentChord.notes) && currentChord.notes.length > 0) {
+        const firstNote = currentChord.notes[0];
+        const match = firstNote.match(/(\d)$/);
+        if (match) {
+            contextOctave = parseInt(match[1], 10);
+        }
+    }
+
+    // Format current chord for display
+    const currentChordDisplay = formatChordDisplay(currentChord);
+    const currentChordSymbol = getChordSymbol(currentChord.type);
+
+    // Create popup
+    const popup = document.createElement('div');
+    popup.className = 'chord-alternatives-popup fixed z-[10001] bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-0 w-80 max-h-[80vh] overflow-hidden';
+
+    const rect = anchorElement.getBoundingClientRect();
+    // Position popup, ensuring it stays within viewport
+    let leftPos = Math.min(rect.left, window.innerWidth - 340);
+    let topPos = rect.bottom + 8;
+    // If popup would go off bottom, position above the anchor
+    if (topPos + 400 > window.innerHeight) {
+        topPos = Math.max(8, rect.top - 400);
+    }
+    popup.style.left = `${Math.max(8, leftPos)}px`;
+    popup.style.top = `${topPos}px`;
+
+    // Check if there's a swap to undo
+    const canUndo = lastReplacedChord && lastReplacedChord.chordIndex === chordIndex;
+
+    popup.innerHTML = `
+        <!-- Header with close button -->
+        <div class="flex items-center justify-between px-4 py-2 bg-gradient-to-r ${sectionType.color} text-white">
+            <div class="flex items-center gap-2">
+                <span class="text-lg">${sectionType.emoji}</span>
+                <span class="text-sm font-semibold">Chord Alternatives</span>
+            </div>
+            <button class="popup-close-btn p-1 hover:bg-white/20 rounded-full transition-colors" title="Close">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Context info -->
+        <div class="px-4 py-2 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-600">
+            <div class="text-xs text-gray-500 dark:text-gray-400">${contextLabel}</div>
+        </div>
+
+        <!-- Current chord display -->
+        <div class="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+            <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Current chord:</div>
+            <div class="flex items-center gap-2">
+                <button class="current-chord-preview-btn px-3 py-1.5 bg-gradient-to-r ${sectionType.color} text-white text-sm font-bold rounded-lg shadow-md hover:shadow-lg transition-all cursor-pointer"
+                        data-root="${currentChord.root}"
+                        data-type="${currentChord.type}"
+                        title="Hold to play current chord">
+                    ${currentChord.root}${currentChordSymbol}
+                </button>
+                ${currentChord.roman ? `<span class="text-xs text-gray-400 dark:text-gray-500">(${currentChord.roman})</span>` : ''}
+                ${canUndo ? `
+                    <button class="undo-swap-btn ml-auto px-2 py-1 text-xs text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors flex items-center gap-1" title="Undo last swap">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                        </svg>
+                        Undo
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+
+        <!-- Alternatives section -->
+        <div class="px-4 py-3 overflow-y-auto max-h-64">
+            ${alternatives.length === 0 ? `
+                <div class="text-sm text-gray-500 dark:text-gray-400 italic text-center py-4">
+                    No alternatives found for this context
+                </div>
+            ` : `
+                <div class="text-xs font-semibold text-gray-600 dark:text-gray-300 mb-2">Suggestions:</div>
+                <div class="space-y-1.5">
+                    ${alternatives.map((alt, idx) => {
+                        const altSymbol = getChordSymbol(alt.type);
+                        const isBorrowed = alt.reason?.toLowerCase().includes('borrow');
+                        const isInversion = alt.inversion > 0;
+                        return `
+                            <div class="alt-chord-row flex items-center gap-2 p-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors group" data-alt-index="${idx}">
+                                <button class="alt-chord-play-btn flex-shrink-0 min-w-[4rem] px-2 py-1.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-sm font-bold rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-all cursor-pointer"
+                                        data-root="${alt.root}"
+                                        data-type="${alt.type}"
+                                        data-inversion="${alt.inversion || 0}"
+                                        title="Hold to preview">
+                                    ${alt.root}${altSymbol}
+                                </button>
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-xs text-gray-500 dark:text-gray-400 truncate" title="${alt.reason || 'Alternative chord'}">
+                                        ${alt.reason || 'Alternative'}
+                                        ${isBorrowed ? '<span class="text-purple-500">(borrowed)</span>' : ''}
+                                        ${isInversion ? `<span class="text-green-500">(inv.)</span>` : ''}
+                                    </div>
+                                </div>
+                                <button class="alt-chord-use-btn flex-shrink-0 px-2 py-1 text-xs font-medium text-white bg-green-500 hover:bg-green-600 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                        data-root="${alt.root}"
+                                        data-type="${alt.type}"
+                                        data-inversion="${alt.inversion || 0}"
+                                        title="Replace current chord with this">
+                                    Use
+                                </button>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `}
+        </div>
+
+        <!-- Footer with settings link -->
+        <div class="px-4 py-2 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-600 flex items-center justify-between">
+            <button class="weights-link-btn text-[10px] text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:underline transition-colors flex items-center gap-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                Recommendation Weights
+            </button>
+            <span class="text-[10px] text-gray-300 dark:text-gray-600">Hold to preview</span>
+        </div>
+    `;
+
+    document.body.appendChild(popup);
+
+    // Track selected alternative for visual feedback
+    let selectedAltIndex = -1;
+
+    // Helper to update visual selection state
+    const updateSelectionState = (index) => {
+        popup.querySelectorAll('.alt-chord-row').forEach((row, i) => {
+            if (i === index) {
+                row.classList.add('bg-blue-50', 'dark:bg-blue-900/30', 'ring-1', 'ring-blue-300', 'dark:ring-blue-600');
+            } else {
+                row.classList.remove('bg-blue-50', 'dark:bg-blue-900/30', 'ring-1', 'ring-blue-300', 'dark:ring-blue-600');
+            }
+        });
+        selectedAltIndex = index;
+    };
+
+    // Wire up close button
+    const closeBtn = popup.querySelector('.popup-close-btn');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            popup.remove();
+        });
+    }
+
+    // Wire up current chord preview button
+    const currentChordBtn = popup.querySelector('.current-chord-preview-btn');
+    if (currentChordBtn) {
+        let isPlaying = false;
+        const stopPlayback = () => {
+            if (isPlaying) {
+                isPlaying = false;
+                currentChordBtn.classList.remove('ring-2', 'ring-white/50', 'scale-105');
+                try {
+                    const piano = getPiano();
+                    if (piano?.releaseAll) piano.releaseAll();
+                } catch (e) { }
+            }
+        };
+
+        currentChordBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            // Use chord's actual notes for accurate playback
+            let notes = [];
+            if (currentChord?.notes && Array.isArray(currentChord.notes) && currentChord.notes.length > 0) {
+                notes = currentChord.notes;
+            } else {
+                const chordData = getChordNotes(currentChord.root, currentChord.type, 'C', contextOctave);
+                notes = chordData.specificNotes || [];
+            }
+            if (notes.length > 0) {
+                try {
+                    const piano = getPiano();
+                    if (piano) {
+                        isPlaying = true;
+                        currentChordBtn.classList.add('ring-2', 'ring-white/50', 'scale-105');
+                        notes.forEach(note => piano.triggerAttack(note, undefined, 0.7));
+                    }
+                } catch (e) { }
+            }
+        });
+
+        currentChordBtn.addEventListener('mouseup', stopPlayback);
+        currentChordBtn.addEventListener('mouseleave', stopPlayback);
+    }
+
+    // Wire up undo button
+    const undoBtn = popup.querySelector('.undo-swap-btn');
+    if (undoBtn && canUndo) {
+        undoBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Restore the previous chord
+            const prev = lastReplacedChord;
+            applyChordReplacement(
+                prev.chordIndex,
+                prev.originalRoot,
+                prev.originalType,
+                prev.originalInversion || 0,
+                prev.originalOctave || contextOctave
+            );
+            lastReplacedChord = null;
+            // Refresh the popup
+            showChordAlternativesPopup(anchorElement, chordIndex, sectionIndex, allSections);
+        });
+    }
+
+    // Wire up alternative play buttons (hold to preview)
+    popup.querySelectorAll('.alt-chord-play-btn').forEach((btn, idx) => {
+        let isPlaying = false;
+
+        const stopPlayback = () => {
+            if (isPlaying) {
+                isPlaying = false;
+                btn.classList.remove('ring-2', 'ring-blue-400', 'scale-105');
+                try {
+                    const piano = getPiano();
+                    if (piano?.releaseAll) piano.releaseAll();
+                } catch (e) { }
+            }
+        };
+
+        btn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            const root = btn.dataset.root;
+            const type = btn.dataset.type;
+            const inversion = parseInt(btn.dataset.inversion, 10) || 0;
+            try {
+                const piano = getPiano();
+                if (piano) {
+                    // Use inversion-aware playback
+                    let notes = [];
+                    if (inversion > 0) {
+                        const invertedData = getInvertedChordNotes(root, type, inversion, key, 0);
+                        notes = invertedData.specificNotes || [];
+                    } else {
+                        const chordData = getChordNotes(root, type, key, contextOctave);
+                        notes = chordData.specificNotes || [];
+                    }
+                    if (notes.length > 0) {
+                        isPlaying = true;
+                        btn.classList.add('ring-2', 'ring-blue-400', 'scale-105');
+                        notes.forEach(note => piano.triggerAttack(note, undefined, 0.7));
+                        // Update visual selection
+                        updateSelectionState(idx);
+                    }
+                }
+            } catch (e) { }
+        });
+
+        btn.addEventListener('mouseup', stopPlayback);
+        btn.addEventListener('mouseleave', stopPlayback);
+
+        // Touch support
+        btn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const mouseEvent = new MouseEvent('mousedown', { bubbles: true });
+            btn.dispatchEvent(mouseEvent);
+        }, { passive: false });
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            stopPlayback();
+        }, { passive: false });
+    });
+
+    // Wire up "Use" buttons
+    popup.querySelectorAll('.alt-chord-use-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const newRoot = btn.dataset.root;
+            const newType = btn.dataset.type;
+            const newInversion = parseInt(btn.dataset.inversion, 10) || 0;
+
+            // Store for undo
+            lastReplacedChord = {
+                chordIndex: chordIndex,
+                originalRoot: currentChord.root,
+                originalType: currentChord.type,
+                originalInversion: currentChord.inversion || 0,
+                originalOctave: contextOctave,
+                originalNotes: currentChord.notes
+            };
+
+            // Close popup first
+            popup.remove();
+
+            // Apply the replacement (this re-renders section details with updated chord)
+            applyChordReplacement(chordIndex, newRoot, newType, newInversion, contextOctave);
+
+            // After section details re-render, find the new chord chip and reopen popup
+            setTimeout(() => {
+                // Find the newly rendered chord chip by its chord index
+                const newChordChip = document.querySelector(`.chord-chip[data-chord-index="${chordIndex}"]`);
+                if (newChordChip) {
+                    const compositionState = getCompositionState();
+                    const sections = compositionState.getSections();
+                    showChordAlternativesPopup(newChordChip, chordIndex, sectionIndex, sections);
+                }
+            }, 150);
+        });
+    });
+
+    // Wire up weights link button
+    const weightsLinkBtn = popup.querySelector('.weights-link-btn');
+    if (weightsLinkBtn) {
+        weightsLinkBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Open the settings modal (recommendation weights)
+            if (window.showSettingsModal) {
+                window.showSettingsModal();
+                popup.remove();
+            }
+        });
+    }
+
+    // Listen for weight changes to refresh recommendations
+    const weightsChangeHandler = () => {
+        // Refresh the popup with new weights
+        const compositionState = getCompositionState();
+        const sections = compositionState.getSections();
+        showChordAlternativesPopup(anchorElement, chordIndex, sectionIndex, sections);
+    };
+    document.addEventListener('chord-weights-changed', weightsChangeHandler);
+
+    // Clean up event listener when popup is removed
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            mutation.removedNodes.forEach((node) => {
+                if (node === popup) {
+                    document.removeEventListener('chord-weights-changed', weightsChangeHandler);
+                    observer.disconnect();
+                }
+            });
+        });
+    });
+    observer.observe(document.body, { childList: true });
+
+    // ESC key to close popup
+    const escHandler = (e) => {
+        if (e.key === 'Escape') {
+            popup.remove();
+            document.removeEventListener('keydown', escHandler);
+        }
+    };
+    document.addEventListener('keydown', escHandler);
+}
+
+/**
+ * Get chord symbol for display (e.g., "m7" for Minor 7th)
+ * Complete mapping of all chord types to standard notation
+ */
+function getChordSymbol(type) {
+    const symbolMap = {
+        // Basic triads
+        'Major': '',
+        'Minor': 'm',
+        'Diminished': 'dim',
+        'Augmented': 'aug',
+
+        // Seventh chords
+        'Major 7th': 'maj7',
+        'Minor 7th': 'm7',
+        'Dominant 7th': '7',
+        'Diminished 7th': 'dim7',
+        'Half-Diminished 7th': 'ø7',
+        'Minor-Major 7th': 'mMaj7',
+        'Augmented 7th': 'aug7',
+        'Augmented Major 7th': 'augMaj7',
+
+        // Sixth chords
+        'Major 6th': '6',
+        'Minor 6th': 'm6',
+        '6/9': '6/9',
+
+        // Suspended chords
+        'Suspended 2nd': 'sus2',
+        'Suspended 4th': 'sus4',
+        '7sus4': '7sus4',
+        '7sus2': '7sus2',
+
+        // Add chords
+        'Add 9': 'add9',
+        'Add 11': 'add11',
+        'Add 2': 'add2',
+
+        // Extended chords (9th)
+        'Major 9th': 'maj9',
+        'Minor 9th': 'm9',
+        'Dominant 9th': '9',
+
+        // Extended chords (11th)
+        'Dominant 11th': '11',
+        'Minor 11th': 'm11',
+        'Major 11th': 'maj11',
+
+        // Extended chords (13th)
+        'Dominant 13th': '13',
+        'Minor 13th': 'm13',
+        'Major 13th': 'maj13',
+
+        // Altered chords
+        'Altered': 'alt',
+        '7#5': '7#5',
+        '7b5': '7b5',
+        '7#9': '7#9',
+        '7b9': '7b9',
+
+        // Power chord
+        'Power': '5'
+    };
+    return symbolMap[type] || type.replace('Major ', 'M').replace('Minor', 'm').replace('Dominant', '').replace(' 7th', '7');
+}
+
+/**
+ * Apply a chord replacement and refresh the Song Builder panel
+ * @param {number} chordIndex - Index of chord to replace
+ * @param {string} newRoot - New chord root
+ * @param {string} newType - New chord type
+ * @param {number} newInversion - New inversion
+ * @param {number} sectionOctave - Octave from section context
+ */
+function applyChordReplacement(chordIndex, newRoot, newType, newInversion, sectionOctave = 4) {
+    const compositionState = getCompositionState();
+    const progression = compositionState.getChords();
+    const key = compositionState.metadata?.key || 'C';
+
+    if (chordIndex < 0 || chordIndex >= progression.length) return;
+
+    const oldChord = progression[chordIndex];
+
+    // Use section octave for proper voice placement
+    const octave = sectionOctave;
+
+    // Generate new notes with proper octave
+    const chordData = getChordNotes(newRoot, newType, key, octave);
+    const newNotes = chordData.specificNotes || [];
+
+    if (newNotes.length === 0) {
+        console.warn('[SongBuilder] Could not compute notes for new chord');
+        return;
+    }
+
+    // Calculate Roman numeral - getRomanNumeral expects (chord, key) where chord is {root, type}
+    const newRoman = harmonyAnalyzer.getRomanNumeral({ root: newRoot, type: newType }, key) || newRoot;
+
+    // Build update object - preserve existing chord properties like duration, omissions, etc.
+    const updates = {
+        root: newRoot,
+        type: newType,
+        inversion: newInversion,
+        notes: newNotes,
+        roman: newRoman,
+        simpleName: generateSimpleName(newRoot, newType),
+        // Preserve existing duration/beats
+        beats: oldChord.beats,
+        // Reset octave-related properties to use the new octave context
+        octaveShift: 0,
+        lhOctaveShift: oldChord.lhOctaveShift || 0
+    };
+
+    // Save state for undo
+    if (window.saveStateBeforeChange) {
+        window.saveStateBeforeChange();
+    }
+
+    // Update the chord using compositionState's method
+    compositionState.updateChordByIndex(chordIndex, updates);
+
+    // Invalidate cache and refresh displays
+    invalidateProgressionDataCache();
+
+    // Force a full re-sync of progression data to ensure all displays get fresh data
+    // This is critical for chord labels to update properly
+    const progressionData = compositionState.exportToProgressionData();
+    compositionState.syncWithProgressionData(progressionData, {
+        key: key,
+        timeSignature: compositionState.timeSignature
+    });
+
+    // Invalidate cache again after sync
+    invalidateProgressionDataCache();
+
+    // Refresh progression displays
+    renderProgressionDisplay();
+    if (typeof window.renderProgressionDisplay === 'function') {
+        window.renderProgressionDisplay('progression-visualization', true);
+        window.renderProgressionDisplay('melody-progression-visualization', false);
+    }
+
+    // Dispatch events for other listeners
+    window.dispatchEvent(new CustomEvent('progressionUpdated'));
+    window.dispatchEvent(new CustomEvent('progressionChanged'));
+    document.dispatchEvent(new CustomEvent('progression-changed', {
+        detail: { action: 'replace', index: chordIndex }
+    }));
+
+    // Refresh the Song Builder panel with fresh section data
+    const detailsPanel = document.getElementById('song-builder-section-details');
+    if (detailsPanel && songBuilderState.selectedSectionIndex >= 0) {
+        const freshSections = compositionState.getSections();
+        if (freshSections[songBuilderState.selectedSectionIndex]) {
+            renderSectionDetails(detailsPanel, freshSections[songBuilderState.selectedSectionIndex], songBuilderState.selectedSectionIndex);
+        }
+    }
+
+    console.log(`[SongBuilder] Replaced chord ${chordIndex} with ${newRoot} ${newType} (octave: ${octave})`);
 }
 
 /**
@@ -1128,20 +1917,24 @@ function applyAllPendingSwaps(container) {
         const newRoot = swapData.swapped.root;
         const newType = swapData.swapped.type;
         const octave = swapData.swapped.octave || 4;
+        const bassNote = swapData.swapped.bassNote || null;  // Slash bass note
 
         // Generate new chord notes for the updated chord
         const chordNotesData = getChordNotes(newRoot, newType, key, octave);
         const newNotes = chordNotesData.specificNotes || [];
 
-        // Generate simpleName for chord card display
-        const simpleName = generateSimpleName(newRoot, newType);
+        // Generate simpleName for chord card display (include slash bass if present)
+        let simpleName = generateSimpleName(newRoot, newType);
+        if (bassNote) {
+            simpleName = simpleName + '/' + bassNote;
+        }
 
         // Calculate the roman numeral for the new chord in the current key
         // This is CRITICAL - playback uses roman numeral to regenerate notes
         const roman = harmonyAnalyzer.getRomanNumeral({ root: newRoot, type: newType }, key);
 
-        // Update with full chord data including regenerated notes, simpleName, and roman numeral
-        compositionState.updateChordByIndex(chordIndex, {
+        // Build the chord update object
+        const chordUpdate = {
             root: newRoot,
             type: newType,
             notes: newNotes,
@@ -1149,7 +1942,17 @@ function applyAllPendingSwaps(container) {
             roman: roman,
             // Clear lhNotes so they get regenerated
             lhNotes: null
-        });
+        };
+
+        // Add slash bass note if present
+        if (bassNote) {
+            chordUpdate.bassNote = bassNote;
+            // Set inversion to indicate slash bass (typically first inversion context)
+            chordUpdate.inversion = 1;
+        }
+
+        // Update with full chord data including regenerated notes, simpleName, and roman numeral
+        compositionState.updateChordByIndex(chordIndex, chordUpdate);
     }
 
     // Clear pending swaps
@@ -1339,6 +2142,7 @@ function renderTransitionSuggestions(currentSection, sectionIndex, allSections) 
                                 data-new-root="${s.root || ''}"
                                 data-new-type="${s.type || 'Major'}"
                                 data-new-octave="${s.octave || sectionOctave}"
+                                data-new-bass="${s.bassNote || ''}"
                                 data-new-chord="${s.chord}">
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
@@ -1478,10 +2282,13 @@ function generateTransitionSuggestions(fromType, toType, lastChord = null, first
 
     if (rules.buildTension && suggestions.length < 3) {
         const dom = getDominantChord(key);
+        // Calculate bass note for walkup (typically B for G/B in key of C)
+        const walkupBass = getWalkupBassNote(key);
         suggestions.push({
-            chord: dom + '/B',
+            chord: dom + '/' + walkupBass,
             root: dom,
             type: 'Major',
+            bassNote: walkupBass,
             octave: octave,
             reason: 'Bass walkup builds energy'
         });
@@ -1640,7 +2447,7 @@ function addNewSection(sectionType) {
  */
 function copySection(section, sectionIndex) {
     const compositionState = getCompositionState();
-    compositionState.duplicateSectionWithChords(section.id);
+    compositionState.duplicateSection(section.id);
 
     // Emit event for UI refresh
     window.dispatchEvent(new CustomEvent('sectionCopied', {
@@ -1782,6 +2589,27 @@ function getBorrowedChord(key, degree) {
         return borrowedRoot + 'm';
     }
     return borrowedRoot;
+}
+
+/**
+ * Get bass note for a walkup to the tonic (e.g., G/B → C)
+ * Returns the 7th scale degree (leading tone) for major keys
+ */
+function getWalkupBassNote(key) {
+    const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const flatNotes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+    // Normalize key to find index
+    let keyIndex = notes.indexOf(key);
+    const usesFlats = keyIndex === -1;
+    if (usesFlats) {
+        keyIndex = flatNotes.indexOf(key);
+    }
+    if (keyIndex === -1) return 'B'; // Fallback
+
+    // Leading tone is 11 semitones up from tonic (or 1 down)
+    const leadingToneIndex = (keyIndex + 11) % 12;
+    return usesFlats ? flatNotes[leadingToneIndex] : notes[leadingToneIndex];
 }
 
 /**

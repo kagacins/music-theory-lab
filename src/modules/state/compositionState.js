@@ -2495,8 +2495,6 @@ export class CompositionState {
         const startUnit = Math.round(startBeat * UNITS_PER_BEAT);
         const durationUnits = Math.round(durationBeats * UNITS_PER_BEAT);
 
-        console.log(`Clearing treble notes from beat ${startBeat} for ${durationBeats} beats (units ${startUnit} to ${startUnit + durationUnits})`);
-
         // Make sure we don't exceed the block length
         const endUnit = Math.min(startUnit + durationUnits, block.units.length);
         const actualDurationUnits = endUnit - startUnit;
@@ -2504,6 +2502,55 @@ export class CompositionState {
         if (actualDurationUnits > 0 && startUnit < block.units.length) {
             block.setRest(startUnit, actualDurationUnits);
             this.renderTrebleBlocksToMeasures();
+        }
+    }
+
+    /**
+     * Clear second voice (voice 1) notes in a beat range
+     * Unlike clearTrebleBeatRange which operates on the block sequence,
+     * this operates directly on measure notation since voice 1 is not in the block sequence.
+     * @param {number} startBeat - Starting beat (absolute position from beginning)
+     * @param {number} durationBeats - Number of beats to clear
+     */
+    clearSecondVoiceBeatRange(startBeat, durationBeats) {
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
+        const endBeat = startBeat + durationBeats;
+
+        // Calculate which measures are affected
+        const startMeasureIndex = Math.floor(startBeat / beatsPerMeasure);
+        const endMeasureIndex = Math.floor((endBeat - 0.001) / beatsPerMeasure); // -0.001 to handle exact boundaries
+
+        for (let measureIndex = startMeasureIndex; measureIndex <= endMeasureIndex && measureIndex < this.measures.length; measureIndex++) {
+            const measure = this.measures[measureIndex];
+            if (!measure?.notation?.treble?.voices?.[1]) continue;
+
+            const voice1 = measure.notation.treble.voices[1];
+            if (!voice1.notes || voice1.notes.length === 0) continue;
+
+            const measureStartBeat = measureIndex * beatsPerMeasure;
+
+            // Filter out notes that overlap with the clear range
+            const filteredNotes = [];
+            let currentNoteBeat = measureStartBeat;
+
+            for (const note of voice1.notes) {
+                const noteDuration = getDurationInBeats(note.duration);
+                const noteEndBeat = currentNoteBeat + noteDuration;
+
+                // Check if this note overlaps with the range to clear
+                const overlapsWithRange = currentNoteBeat < endBeat && noteEndBeat > startBeat;
+
+                if (!overlapsWithRange) {
+                    // Keep notes that don't overlap with the range
+                    filteredNotes.push(note);
+                }
+                // Notes that overlap are simply not included (removed)
+
+                currentNoteBeat = noteEndBeat;
+            }
+
+            // Update the voice with filtered notes
+            voice1.notes = filteredNotes;
         }
     }
 
@@ -4135,7 +4182,8 @@ export class CompositionState {
 
         // If auto-generate bass is enabled, regenerate bass for all building blocks
         // This properly handles chords that span multiple measures
-        if (this.settings.autoGenerateBass) {
+        // Skip if caller explicitly requests (e.g., during duplication where we preserve existing notes)
+        if (this.settings.autoGenerateBass && !options.skipAutoGenerateBass) {
             this.regenerateAllAutoBassByBuildingBlock();
         }
 
@@ -4577,6 +4625,20 @@ export class CompositionState {
             this.syncMeasuresToBuildingBlocks();
         }
 
+        // Clone existing bass blocks - they'll shift up after insertion
+        const clonedBassBlocks = [];
+        if (this.bassBlockSequence?.blocks) {
+            this.bassBlockSequence.blocks.forEach((block, idx) => {
+                if (block && block.clone) {
+                    clonedBassBlocks.push({
+                        originalIndex: idx,
+                        newIndex: idx >= atIndex ? idx + 1 : idx,  // Shift up if at or after insert point
+                        clonedBlock: block.clone()
+                    });
+                }
+            });
+        }
+
         // Insert the new chord
         progressionData.splice(atIndex, 0, { ...chordData });
 
@@ -4584,10 +4646,30 @@ export class CompositionState {
         this.updateSectionsAfterChordInsert(atIndex);
 
         // Rebuild measures from the updated progression
+        // Skip auto-generate - we'll restore preserved blocks and generate only for new chord
         this.syncWithProgressionData(progressionData, {
             key: this.metadata.key,
             timeSignature: this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE,
+            skipAutoGenerateBass: true
         });
+
+        // Restore the cloned blocks to their new positions (shifted)
+        clonedBassBlocks.forEach(({ newIndex, clonedBlock }) => {
+            if (newIndex < this.bassBlockSequence.blocks.length) {
+                const targetBlock = this.bassBlockSequence.blocks[newIndex];
+                if (targetBlock && clonedBlock.units) {
+                    targetBlock.units = clonedBlock.units.map(u => u.clone ? u.clone() : { ...u });
+                }
+            }
+        });
+
+        // Generate bass for the NEW chord only (if auto-generate is enabled)
+        if (this.settings.autoGenerateBass) {
+            this.regenerateAutoBassByChordIndex(atIndex);
+        }
+
+        // Re-render bass blocks to measures
+        this.renderBassBlocksToMeasures();
 
         this.events.emit('chordInserted', atIndex, chordData);
         return true;
@@ -4612,6 +4694,21 @@ export class CompositionState {
             this.syncMeasuresToBuildingBlocks();
         }
 
+        // Clone all bass blocks EXCEPT the one being removed
+        // These will be restored after sync to preserve existing notes
+        const clonedBassBlocks = [];
+        if (this.bassBlockSequence?.blocks) {
+            this.bassBlockSequence.blocks.forEach((block, idx) => {
+                if (idx !== atIndex && block && block.clone) {
+                    clonedBassBlocks.push({
+                        originalIndex: idx,
+                        newIndex: idx > atIndex ? idx - 1 : idx,  // Shift down if after deleted index
+                        clonedBlock: block.clone()
+                    });
+                }
+            });
+        }
+
         // Remove the chord
         progressionData.splice(atIndex, 1);
 
@@ -4619,10 +4716,25 @@ export class CompositionState {
         this.updateSectionsAfterChordDelete(atIndex);
 
         // Rebuild measures from the updated progression
+        // Skip auto-generate bass - we'll restore the preserved blocks
         this.syncWithProgressionData(progressionData, {
             key: this.metadata.key,
             timeSignature: this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE,
+            skipAutoGenerateBass: true  // Preserve existing notes
         });
+
+        // Restore the cloned blocks to their new positions
+        clonedBassBlocks.forEach(({ newIndex, clonedBlock }) => {
+            if (newIndex < this.bassBlockSequence.blocks.length) {
+                const targetBlock = this.bassBlockSequence.blocks[newIndex];
+                if (targetBlock && clonedBlock.units) {
+                    targetBlock.units = clonedBlock.units.map(u => u.clone ? u.clone() : { ...u });
+                }
+            }
+        });
+
+        // Re-render bass blocks to measures
+        this.renderBassBlocksToMeasures();
 
         this.events.emit('chordRemoved', atIndex);
         return true;
@@ -5921,10 +6033,12 @@ export class CompositionState {
 
         // ================================================================
         // STEP 4: Sync progression data (this reinitializes blocks)
+        // Skip auto-generate bass - we'll restore the cloned blocks in Step 5
         // ================================================================
         this.syncWithProgressionData(progressionData, {
             key: this.metadata.key,
-            timeSignature: this.metadata.timeSignature
+            timeSignature: this.metadata.timeSignature,
+            skipAutoGenerateBass: true  // Preserve existing notes, don't regenerate
         });
 
         // ================================================================
@@ -5956,20 +6070,6 @@ export class CompositionState {
 
         // Re-render bass blocks to measures
         this.renderBassBlocksToMeasures();
-
-        // ================================================================
-        // STEP 5b: Re-regenerate bass for auto-generated patterns
-        // The cloned blocks in Step 5 only capture voice 0 notes from syncMeasuresToBuildingBlocks.
-        // Multi-voice patterns (like Ballad Stride, Hymn, etc.) use voice 0 AND voice 1,
-        // so we need to regenerate the patterns to restore voice 1 notes.
-        // ================================================================
-        if (this.settings.autoGenerateBass) {
-            // Regenerate bass for both original and new chord indices
-            const allAffectedChords = [...originalSection.chordIndices, ...newChordIndices];
-            for (const chordIdx of allAffectedChords) {
-                this.regenerateAutoBassByChordIndex(chordIdx);
-            }
-        }
 
         // ================================================================
         // STEP 6: Restore treble notes to the duplicated section

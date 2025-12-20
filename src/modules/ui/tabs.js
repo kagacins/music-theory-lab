@@ -132,10 +132,10 @@ export function switchTab(tabId, options = {}) {
         }
     }
 
-    // Show/hide Play Chord quick button (above FAB, visible when FAB is collapsed in Chord Lab)
-    const fabPlayChordBtn = document.getElementById('fab-play-chord-quick');
-    if (fabPlayChordBtn) {
-        fabPlayChordBtn.classList.toggle('hidden', tabId !== 'builder');
+    // Show/hide Chord Lab quick buttons container (above FAB, visible when FAB is collapsed in Chord Lab)
+    const fabBuilderQuickBtns = document.getElementById('fab-builder-quick-buttons');
+    if (fabBuilderQuickBtns) {
+        fabBuilderQuickBtns.classList.toggle('hidden', tabId !== 'builder');
     }
 
     // Show/hide Melody quick buttons (above FAB, visible when FAB is collapsed in Composition Studio)

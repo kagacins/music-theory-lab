@@ -900,10 +900,17 @@
             </div>
         </section>
 
-        <!-- Quick Play Chord button (above FAB, visible when FAB collapsed in Chord Lab) -->
-        <button id="fab-play-chord-quick" class="fixed bottom-36 right-4 z-50 hidden w-14 h-14 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95" aria-label="Play Chord">
-            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
-        </button>
+        <!-- Quick buttons for Chord Lab (above FAB, visible when FAB collapsed) -->
+        <div id="fab-builder-quick-buttons" class="fixed bottom-36 right-4 z-50 hidden flex flex-col gap-2">
+            <!-- Add Chord button -->
+            <button id="fab-add-chord-quick" class="w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95" aria-label="Add Chord" title="Add Chord to Progression">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/></svg>
+            </button>
+            <!-- Play Chord button -->
+            <button id="fab-play-chord-quick" class="w-14 h-14 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95" aria-label="Play Chord" title="Play Chord">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+            </button>
+        </div>
 
         <!-- Quick buttons for Composition Studio (above FAB, visible when FAB collapsed) -->
         <div id="fab-melody-quick-buttons" class="fixed bottom-36 right-4 z-50 hidden flex flex-col gap-2">
@@ -1091,7 +1098,7 @@
                     <!-- Add submenu - Chord Lab context -->
                     <div id="fab-add-builder" class="fab-submenu hidden absolute bottom-0 right-14 w-40 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
                         <button data-action="add-chord" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-indigo-50 flex items-center gap-2 active:bg-indigo-100">
-                            <svg class="w-4 h-4 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
+                            <svg class="w-4 h-4 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/></svg>
                             <span class="text-indigo-700 font-medium">Add Chord</span>
                         </button>
                         <button data-action="add-go" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-teal-50 flex items-center gap-2 active:bg-teal-100">
@@ -3066,24 +3073,28 @@
 
     <!-- Audio Analyzer Modal -->
     <div id="audio-analyzer-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50 overflow-y-auto">
-        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-4xl w-full my-8 max-h-[90vh] overflow-y-auto relative">
-            <!-- Close button -->
-            <button onclick="window.closeAudioAnalyzerModal && window.closeAudioAnalyzerModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition p-1" title="Close">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-            </button>
-
-            <!-- Header -->
-            <div class="mb-6">
-                <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                    <svg class="w-7 h-7 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full my-8 max-h-[90vh] flex flex-col relative">
+            <!-- Sticky Header with Close Button -->
+            <div class="flex items-start justify-between p-6 pb-4 border-b border-gray-100 shrink-0">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                        <svg class="w-7 h-7 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                        </svg>
+                        Analyze Audio for Chords
+                    </h2>
+                    <p class="text-gray-600 mt-1">Upload an audio file to detect its chord progression automatically.</p>
+                </div>
+                <!-- Close button in top right -->
+                <button onclick="window.closeAudioAnalyzerModal && window.closeAudioAnalyzerModal()" class="text-gray-400 hover:text-gray-600 transition p-1 -mt-1 -mr-1" title="Close">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
-                    Analyze Audio for Chords
-                </h2>
-                <p class="text-gray-600 mt-1">Upload an audio file to detect its chord progression automatically.</p>
+                </button>
             </div>
+
+            <!-- Scrollable Content -->
+            <div class="p-6 pt-4 overflow-y-auto">
 
             <!-- Upload Section -->
             <div id="audio-upload-section" class="mb-6">
@@ -3357,8 +3368,9 @@
                     Bass notes are detected separately for inversion hints.
                 </p>
             </div>
-        </div>
-    </div>
+            </div><!-- End Scrollable Content -->
+        </div><!-- End Modal Content -->
+    </div><!-- End Audio Analyzer Modal -->
     </div><!-- End main-app -->
 
     <!-- About Modal -->

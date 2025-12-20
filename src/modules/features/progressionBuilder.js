@@ -60,7 +60,9 @@ import {
     setClipboard,
     getClipboard,
     clearClipboard,
-    hasClipboard
+    hasClipboard,
+    // Cache management
+    invalidateProgressionDataCache
 } from '../state/trainerState.js';
 
 import {
@@ -6153,6 +6155,10 @@ window.showDuplicateSectionDialog = function(sectionId, sectionLabel, compositio
 
         // Perform duplication with selected mode
         compositionState.duplicateSection(sectionId, { mode });
+
+        // Invalidate cache to ensure render sees the updated progression data
+        invalidateProgressionDataCache();
+
         renderProgressionDisplay('melody-progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
     };
@@ -10178,10 +10184,15 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
     }
 
     // COMPOSITION STUDIO: Use simplified/detailed card style with Add/Clear buttons
-    if (containerId === 'melody-progression-visualization' && trainerState.progressionData.length > 0) {
+    // Also render when we have wireframe sections (even if no chords yet) so users can see placeholders
+    const compositionStateForCheck = window.getCompositionState ? window.getCompositionState() : null;
+    const sectionsForCheck = compositionStateForCheck ? compositionStateForCheck.getSections() : [];
+    const hasWireframeSections = sectionsForCheck.length > 0;
+
+    if (containerId === 'melody-progression-visualization' && (trainerState.progressionData.length > 0 || hasWireframeSections)) {
         // Check if we have any sections defined - if so, use section-aware rendering
-        const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-        const sections = compositionState ? compositionState.getSections() : [];
+        const compositionState = compositionStateForCheck;
+        const sections = sectionsForCheck;
         const hasSections = sections.length > 0;
 
         // Same restructured layout as Progression Builder
@@ -13462,6 +13473,32 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
             } catch (e) {
             }
         }
+
+        // Fallback: If no sectionIntent was set, check for wireframe sections with available slots
+        // This ensures chords fill wireframe sections before creating pseudo groups
+        if (!sectionIntent && compositionState && !sectionWasModified) {
+            try {
+                const allSections = compositionState.getSections?.() || [];
+
+                // Find the first section with available slots (chordIndices.length < expectedChordCount)
+                // This includes placeholder sections (empty) and partially filled sections
+                const sectionWithSlot = allSections.find(section => {
+                    const currentCount = section.chordIndices?.length || 0;
+                    const expectedCount = section.expectedChordCount || 4;
+                    // Section has room if it's either:
+                    // 1. A placeholder section (isPlaceholder or fromTemplate with no chords)
+                    // 2. A section that hasn't reached its expected chord count
+                    return currentCount < expectedCount;
+                });
+
+                if (sectionWithSlot) {
+                    compositionState.addChordToSection(insertedIndex, sectionWithSlot.id);
+                    sectionWasModified = true;
+                }
+            } catch (e) {
+                // Silently fail - chord will remain ungrouped
+            }
+        }
     }
 
     // Re-render display if a section was modified (to show section visuals)
@@ -14593,6 +14630,73 @@ export function addToProgressionData(chordData, options = {}) {
 }
 
 /**
+ * Helper function to repopulate the key dropdown based on a specific enharmonic preference
+ * @param {string} enharmonicPref - 'sharp' or 'flat'
+ */
+function repopulateKeyDropdown(enharmonicPref) {
+    const keySelect = document.getElementById('trainer-key-select');
+    if (!keySelect) return;
+
+    const notes = enharmonicPref === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
+    keySelect.innerHTML = '';
+
+    // Add major keys
+    notes.forEach((note) => {
+        const option = document.createElement('option');
+        option.value = note;
+        option.textContent = `${note} Major`;
+        keySelect.appendChild(option);
+    });
+
+    // Add minor keys
+    notes.forEach((note) => {
+        const option = document.createElement('option');
+        option.value = `${note}m`;
+        option.textContent = `${note} minor`;
+        keySelect.appendChild(option);
+    });
+}
+
+/**
+ * Set the key dropdown value, repopulating the dropdown if needed to match the key's enharmonic spelling.
+ * This solves the chicken-and-egg problem where the dropdown might be populated with sharps
+ * but the key being set uses flats (e.g., "Bb").
+ * @param {string} targetKey - The key to set (e.g., "Bb", "F#m", "C")
+ * @param {boolean} triggerLoad - Whether to trigger loadProgression after setting (default: false)
+ */
+export function setKeyDropdownValue(targetKey, triggerLoad = false) {
+    const keySelect = document.getElementById('trainer-key-select');
+    if (!keySelect || !targetKey) return;
+
+    // Determine what enharmonic preference this key needs
+    const targetEnharmonic = getEnharmonicPreferenceForKey(targetKey);
+
+    // Check if the dropdown currently has this key as an option
+    const hasOption = Array.from(keySelect.options).some(opt => opt.value === targetKey);
+
+    // If the key isn't in the dropdown, repopulate with the correct note set
+    if (!hasOption) {
+        repopulateKeyDropdown(targetEnharmonic);
+    }
+
+    // Now set the value
+    keySelect.value = targetKey;
+
+    // Update trainerState
+    setCurrentKey(targetKey);
+
+    // Optionally trigger load
+    if (triggerLoad && window.loadProgression) {
+        window.loadProgression();
+    }
+}
+
+// Make it available globally for other modules
+if (typeof window !== 'undefined') {
+    window.setKeyDropdownValue = setKeyDropdownValue;
+}
+
+/**
  * Render progression controls (populate dropdowns)
  */
 export function renderProgressionControls() {
@@ -14694,7 +14798,8 @@ export function renderProgressionControls() {
         selectedProgName = progressionKeys[0];
     }
 
-    keySelect.value = selectedKey;
+    // Use setKeyDropdownValue to properly handle flat keys that may need dropdown repopulation
+    setKeyDropdownValue(selectedKey, false); // false = don't trigger loadProgression yet
     progressionSelect.selectedIndex = selectedProgIndex;
     console.log(`Loaded random progression: ${selectedProgName} in ${selectedKey}`);
 

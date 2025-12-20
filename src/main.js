@@ -456,10 +456,12 @@ function initMobileFab() {
     let activeSubmenu = null;
     let isHandlingAction = false; // Flag to prevent closing during action handling
 
-    // Quick Play Chord button (above FAB, visible when FAB collapsed in Chord Lab)
-    const fabPlayChordQuick = document.getElementById('fab-play-chord-quick');
-    // Quick buttons for Composition Studio (above FAB, visible when FAB collapsed)
+    // Quick buttons containers for each tab
+    const fabBuilderQuickButtons = document.getElementById('fab-builder-quick-buttons');
     const fabMelodyQuickButtons = document.getElementById('fab-melody-quick-buttons');
+    // Individual button references for event handlers
+    const fabAddChordQuick = document.getElementById('fab-add-chord-quick');
+    const fabPlayChordQuick = document.getElementById('fab-play-chord-quick');
 
     // Toggle main FAB menu (first tier)
     fabMain.addEventListener('click', (e) => {
@@ -469,8 +471,8 @@ function initMobileFab() {
         fabMain.querySelector('.fab-icon').style.transform = isOpen ? 'rotate(45deg)' : 'rotate(0deg)';
 
         // Hide/show quick buttons based on FAB state and current tab
-        if (fabPlayChordQuick && window.currentTab === 'builder') {
-            fabPlayChordQuick.classList.toggle('hidden', isOpen);
+        if (fabBuilderQuickButtons && window.currentTab === 'builder') {
+            fabBuilderQuickButtons.classList.toggle('hidden', isOpen);
         }
         if (fabMelodyQuickButtons && window.currentTab === 'melody') {
             fabMelodyQuickButtons.classList.toggle('hidden', isOpen);
@@ -493,8 +495,8 @@ function initMobileFab() {
                 const btn = suggestionsCategory.querySelector('.fab-category-btn');
                 if (currentTab === 'builder') {
                     if (label) label.textContent = 'Add';
-                    // Change icon to plus
-                    if (btn) btn.innerHTML = '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>';
+                    // Change icon to plus-circle (distinct from FAB expand button)
+                    if (btn) btn.innerHTML = '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/></svg>';
                 } else {
                     if (label) label.textContent = 'Suggestions';
                     // Change icon to lightbulb
@@ -657,8 +659,8 @@ function initMobileFab() {
         fabMain.querySelector('.fab-icon').style.transform = 'rotate(0deg)';
         closeAllSubmenus();
         // Show quick buttons when closing FAB based on current tab
-        if (fabPlayChordQuick && window.currentTab === 'builder') {
-            fabPlayChordQuick.classList.remove('hidden');
+        if (fabBuilderQuickButtons && window.currentTab === 'builder') {
+            fabBuilderQuickButtons.classList.remove('hidden');
         }
         if (fabMelodyQuickButtons && window.currentTab === 'melody') {
             fabMelodyQuickButtons.classList.remove('hidden');
@@ -692,6 +694,14 @@ function initMobileFab() {
         });
         fabPlayChordQuick.addEventListener('touchcancel', () => {
             if (window.stopBuilderChord) window.stopBuilderChord();
+        });
+    }
+
+    // Quick Add Chord button - click to open add chord menu
+    if (fabAddChordQuick) {
+        fabAddChordQuick.addEventListener('click', () => {
+            const addChordBtn = document.getElementById('action-add-chord');
+            if (addChordBtn) addChordBtn.click();
         });
     }
 
@@ -3402,6 +3412,17 @@ window.onSelectNoteToEdit = function() {
 window.onload = () => {
     // Clear any old landing page skip preference (we now always show landing page)
     localStorage.removeItem('skipLandingPage');
+
+    // Scroll all tab content areas to top on initial page load
+    const tabIds = ['tab-builder', 'tab-melody', 'tab-scales', 'tab-learn'];
+    tabIds.forEach(tabId => {
+        const tabContent = document.getElementById(tabId);
+        if (tabContent) {
+            tabContent.scrollTop = 0;
+        }
+    });
+    // Also scroll the main window to top
+    window.scrollTo(0, 0);
 
     // Calculate and set keyboard sticky position based on header height
     const header = document.getElementById('main-header');

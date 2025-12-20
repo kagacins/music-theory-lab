@@ -3111,6 +3111,34 @@ export function addChordToProgression(switchToCompositionStudio = false, playShu
         }
     }
 
+    // Check for wireframe sections with available slots and assign the new chord
+    // This ensures chords fill wireframe sections before creating pseudo groups
+    const compositionState = window.getCompositionState?.();
+    if (compositionState) {
+        const insertedIndex = trainerState.progressionData.length - 1;
+        const allSections = compositionState.getSections?.() || [];
+
+        // Find the first section with available slots (chordIndices.length < expectedChordCount)
+        const sectionWithSlot = allSections.find(section => {
+            const currentCount = section.chordIndices?.length || 0;
+            const expectedCount = section.expectedChordCount || 4;
+            return currentCount < expectedCount;
+        });
+
+        if (sectionWithSlot && insertedIndex >= 0) {
+            try {
+                compositionState.addChordToSection(insertedIndex, sectionWithSlot.id);
+                // Re-render to show the chord in the section
+                if (window.renderProgressionDisplay) {
+                    window.renderProgressionDisplay('melody-progression-visualization', true);
+                    window.renderProgressionDisplay('melody-progression-visualization', false);
+                }
+            } catch (e) {
+                // Silently fail - chord will remain ungrouped
+            }
+        }
+    }
+
     // Update smart recommendations panel
     if (window.updateRecommendations) {
         window.updateRecommendations();
@@ -3301,6 +3329,37 @@ export function addSpecificChordToProgression(chordType, inversion, playShutterS
                             window.refreshNotationFromProgression();
                         }
                     }, 50);
+                }
+            }
+        }
+    }
+
+    // Check for wireframe sections with available slots and assign the new chord
+    // This ensures chords fill wireframe sections before creating pseudo groups
+    if (!options.skipRender) {
+        const compositionState = window.getCompositionState?.();
+        if (compositionState) {
+            const trainerState = getTrainerState();
+            const insertedIndex = trainerState.progressionData.length - 1;
+            const allSections = compositionState.getSections?.() || [];
+
+            // Find the first section with available slots (chordIndices.length < expectedChordCount)
+            const sectionWithSlot = allSections.find(section => {
+                const currentCount = section.chordIndices?.length || 0;
+                const expectedCount = section.expectedChordCount || 4;
+                return currentCount < expectedCount;
+            });
+
+            if (sectionWithSlot && insertedIndex >= 0) {
+                try {
+                    compositionState.addChordToSection(insertedIndex, sectionWithSlot.id);
+                    // Re-render to show the chord in the section
+                    if (window.renderProgressionDisplay) {
+                        window.renderProgressionDisplay('melody-progression-visualization', true);
+                        window.renderProgressionDisplay('melody-progression-visualization', false);
+                    }
+                } catch (e) {
+                    // Silently fail - chord will remain ungrouped
                 }
             }
         }

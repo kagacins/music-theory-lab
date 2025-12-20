@@ -274,7 +274,11 @@ function getRemainingBeats(measureIndex, staff) {
         usedBeats += noteBeats;
     }
 
-    return 4 - usedBeats; // 4/4 time
+    // Use actual time signature instead of hardcoding 4/4
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(
+        compositionState?.metadata?.timeSignature || { num: 4, denom: 4 }
+    );
+    return beatsPerMeasure - usedBeats;
 }
 
 /**

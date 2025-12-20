@@ -275,12 +275,14 @@ export const RHYTHM_PATTERNS = {
         id: 'even8th',
         label: 'Even 8th Notes',
         description: 'All eighth notes - steady 8th note feel',
+        fixedNoteValue: 0.5, // Each note is exactly 0.5 beats (8th note)
         getPattern: (length) => Array(length).fill(0.5) // All 8th notes (0.5 beats each)
     },
     even16th: {
         id: 'even16th',
         label: 'Even 16th Notes',
         description: 'All sixteenth notes - fast, busy feel',
+        fixedNoteValue: 0.25, // Each note is exactly 0.25 beats (16th note)
         getPattern: (length) => Array(length).fill(0.25) // All 16th notes (0.25 beats each)
     },
     swing: {
@@ -540,12 +542,20 @@ export function generatePhrase({
     const sectionDensityMultiplier = sectionProfile?.densityMultiplier || 1.0;
     const effectiveDensityMultiplier = densityMultiplier * sectionDensityMultiplier;
 
-    // Apply density multiplier to note count
-    // Clamp between 2 notes minimum and a dynamic maximum based on target beats
-    // For short phrases (4 beats), max ~16 notes (sixteenths)
-    // For longer selections, scale proportionally: max = targetBeats * 4 (allowing up to 16th notes throughout)
-    const dynamicMaxNotes = Math.max(24, Math.round(effectiveTargetBeats * 4));
-    const noteCount = Math.max(2, Math.min(dynamicMaxNotes, Math.round(baseNoteCount * effectiveDensityMultiplier)));
+    // For fixed note-value patterns (even8th, even16th), calculate noteCount from target beats
+    // This ensures we get the exact number of notes needed to fill the target duration
+    let noteCount;
+    if (rhythmPattern.fixedNoteValue) {
+        // Fixed note value: calculate how many notes fit in the target beats
+        noteCount = Math.round(effectiveTargetBeats / rhythmPattern.fixedNoteValue);
+    } else {
+        // Apply density multiplier to note count
+        // Clamp between 2 notes minimum and a dynamic maximum based on target beats
+        // For short phrases (4 beats), max ~16 notes (sixteenths)
+        // For longer selections, scale proportionally: max = targetBeats * 4 (allowing up to 16th notes throughout)
+        const dynamicMaxNotes = Math.max(24, Math.round(effectiveTargetBeats * 4));
+        noteCount = Math.max(2, Math.min(dynamicMaxNotes, Math.round(baseNoteCount * effectiveDensityMultiplier)));
+    }
     const notes = [];
     const noteDetails = [];
 

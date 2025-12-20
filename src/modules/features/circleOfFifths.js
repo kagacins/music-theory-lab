@@ -7,18 +7,46 @@ import { SHARP_NOTES, FLAT_NOTES } from '../../data/music-data.js';
 import { setCurrentKey, getTrainerState } from '../state/trainerState.js';
 
 // Circle of Fifths data - clockwise from C
+// For enharmonic positions, we store both options and track which is currently selected
 const CIRCLE_MAJOR_KEYS = [
-    'C', 'G', 'D', 'A', 'E', 'B', 'F#/Gb', 'Db', 'Ab', 'Eb', 'Bb', 'F'
+    'C', 'G', 'D', 'A', 'E', 'B', 'F#/Gb', 'C#/Db', 'Ab', 'Eb', 'Bb', 'F'
 ];
 
 const CIRCLE_MINOR_KEYS = [
-    'Am', 'Em', 'Bm', 'F#m', 'C#m', 'G#m', 'D#m/Ebm', 'Bbm', 'Fm', 'Cm', 'Gm', 'Dm'
+    'Am', 'Em', 'Bm', 'F#m', 'C#m', 'G#m/Abm', 'D#m/Ebm', 'A#m/Bbm', 'Fm', 'Cm', 'Gm', 'Dm'
 ];
+
+// Enharmonic equivalents - maps position index to [sharp spelling, flat spelling]
+const ENHARMONIC_MAJOR = {
+    5: ['B', 'Cb'],      // Position 5: B/Cb (rarely used, but available)
+    6: ['F#', 'Gb'],     // Position 6: F#/Gb
+    7: ['C#', 'Db'],     // Position 7: C#/Db
+};
+
+const ENHARMONIC_MINOR = {
+    5: ['G#m', 'Abm'],   // Position 5: G#m/Abm
+    6: ['D#m', 'Ebm'],   // Position 6: D#m/Ebm
+    7: ['A#m', 'Bbm'],   // Position 7: A#m/Bbm
+};
+
+// Global enharmonic preference toggle
+// 'sharp' = prefer sharp spellings (C#, F#, G#m, etc.)
+// 'flat' = prefer flat spellings (Db, Gb, Abm, etc.)
+let enharmonicPreference = 'sharp';
 
 // Key signatures (number of sharps/flats)
 const KEY_SIGNATURES = {
-    'C': '0', 'G': '1♯', 'D': '2♯', 'A': '3♯', 'E': '4♯', 'B': '5♯',
-    'F#/Gb': '6♯/6♭', 'Db': '5♭', 'Ab': '4♭', 'Eb': '3♭', 'Bb': '2♭', 'F': '1♭'
+    'C': '0', 'G': '1♯', 'D': '2♯', 'A': '3♯', 'E': '4♯',
+    'B': '5♯', 'Cb': '7♭',
+    'F#': '6♯', 'Gb': '6♭',
+    'C#': '7♯', 'Db': '5♭',
+    'Ab': '4♭', 'Eb': '3♭', 'Bb': '2♭', 'F': '1♭',
+    // Minor keys (same as relative major)
+    'Am': '0', 'Em': '1♯', 'Bm': '2♯', 'F#m': '3♯', 'C#m': '4♯',
+    'G#m': '5♯', 'Abm': '7♭',
+    'D#m': '6♯', 'Ebm': '6♭',
+    'A#m': '7♯', 'Bbm': '5♭',
+    'Fm': '4♭', 'Cm': '3♭', 'Gm': '2♭', 'Dm': '1♭'
 };
 
 let currentSelectedKey = 'C';
@@ -50,6 +78,17 @@ function createCircleOfFifthsPanel() {
             <div class="circle-of-fifths-body">
                 <div class="circle-of-fifths-layout">
                     <div class="circle-of-fifths-visual">
+                        <div class="flex items-center justify-center gap-3 mb-3 p-2 bg-gray-100 rounded-lg">
+                            <span class="text-sm font-medium text-gray-600">Enharmonic Spelling:</span>
+                            <div class="flex items-center gap-2">
+                                <span id="sharp-label" class="text-sm font-bold text-blue-600">♯ Sharps</span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="enharmonic-toggle" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-blue-500 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                                </label>
+                                <span id="flat-label" class="text-sm font-medium text-gray-400">♭ Flats</span>
+                            </div>
+                        </div>
                         <svg id="circle-of-fifths-svg" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
                             <!-- Circle will be drawn here by JavaScript -->
                         </svg>
@@ -99,8 +138,44 @@ function createCircleOfFifthsPanel() {
     document.getElementById('close-circle-of-fifths').addEventListener('click', closeCircleOfFifthsPanel);
     document.querySelector('.circle-of-fifths-overlay').addEventListener('click', closeCircleOfFifthsPanel);
 
+    // Setup enharmonic toggle listener
+    const enharmonicToggle = document.getElementById('enharmonic-toggle');
+    if (enharmonicToggle) {
+        enharmonicToggle.addEventListener('change', handleEnharmonicToggle);
+    }
+
     // Draw the circle
     drawCircleOfFifths();
+}
+
+/**
+ * Handle enharmonic toggle change
+ */
+function handleEnharmonicToggle(event) {
+    enharmonicPreference = event.target.checked ? 'flat' : 'sharp';
+    updateToggleLabels();
+    drawCircleOfFifths();
+}
+
+/**
+ * Update toggle label styling based on current preference
+ */
+function updateToggleLabels() {
+    const sharpLabel = document.getElementById('sharp-label');
+    const flatLabel = document.getElementById('flat-label');
+    const toggle = document.getElementById('enharmonic-toggle');
+
+    if (sharpLabel && flatLabel && toggle) {
+        if (enharmonicPreference === 'sharp') {
+            sharpLabel.className = 'text-sm font-bold text-blue-600';
+            flatLabel.className = 'text-sm font-medium text-gray-400';
+            toggle.checked = false;
+        } else {
+            sharpLabel.className = 'text-sm font-medium text-gray-400';
+            flatLabel.className = 'text-sm font-bold text-amber-600';
+            toggle.checked = true;
+        }
+    }
 }
 
 /**
@@ -149,19 +224,36 @@ function drawCircleOfFifths() {
         const x4 = centerX + innerRadius * Math.cos(angle);
         const y4 = centerY + innerRadius * Math.sin(angle);
 
-        const majorKey = CIRCLE_MAJOR_KEYS[i];
-        const keySignature = KEY_SIGNATURES[majorKey];
+        const majorKeyRaw = CIRCLE_MAJOR_KEYS[i];
+        const isEnharmonic = ENHARMONIC_MAJOR[i] !== undefined;
 
-        // Create path for segment
+        // Get the display key based on enharmonic preference
+        let displayKey, altKey, keySignature;
+        if (isEnharmonic) {
+            const prefIndex = enharmonicPreference === 'sharp' ? 0 : 1;
+            displayKey = ENHARMONIC_MAJOR[i][prefIndex];
+            altKey = ENHARMONIC_MAJOR[i][1 - prefIndex];
+            keySignature = KEY_SIGNATURES[displayKey];
+        } else {
+            displayKey = majorKeyRaw;
+            altKey = null;
+            keySignature = KEY_SIGNATURES[majorKeyRaw];
+        }
+
+        // Create path for segment - use different fill for enharmonic wedges
         const pathData = `M ${x1} ${y1} A ${outerRadius} ${outerRadius} 0 0 1 ${x2} ${y2} L ${x3} ${y3} A ${innerRadius} ${innerRadius} 0 0 0 ${x4} ${y4} Z`;
+        const fillColor = isEnharmonic ? '#dbeafe' : '#e0f2fe'; // Slightly different for enharmonic
 
         svgContent += `
             <path
-                class="circle-segment circle-major-segment"
-                data-key="${majorKey}"
+                class="circle-segment circle-major-segment${isEnharmonic ? ' enharmonic' : ''}"
+                data-key="${displayKey}"
+                data-raw-key="${majorKeyRaw}"
                 data-type="major"
+                data-position="${i}"
+                data-is-enharmonic="${isEnharmonic}"
                 d="${pathData}"
-                fill="#e0f2fe"
+                fill="${fillColor}"
                 stroke="#0284c7"
                 stroke-width="2"
                 cursor="pointer"
@@ -174,31 +266,71 @@ function drawCircleOfFifths() {
         const textX = centerX + textRadius * Math.cos(textAngle);
         const textY = centerY + textRadius * Math.sin(textAngle);
 
-        svgContent += `
-            <text
-                x="${textX}"
-                y="${textY}"
-                text-anchor="middle"
-                dominant-baseline="middle"
-                font-size="18"
-                font-weight="bold"
-                fill="#0c4a6e"
-                pointer-events="none"
-            >
-                ${majorKey}
-            </text>
-            <text
-                x="${textX}"
-                y="${textY + 15}"
-                text-anchor="middle"
-                dominant-baseline="middle"
-                font-size="10"
-                fill="#64748b"
-                pointer-events="none"
-            >
-                ${keySignature}
-            </text>
-        `;
+        // For enharmonic wedges, show both options with the alternate in parentheses
+        if (isEnharmonic) {
+            svgContent += `
+                <text
+                    x="${textX}"
+                    y="${textY - 3}"
+                    text-anchor="middle"
+                    dominant-baseline="middle"
+                    font-size="16"
+                    font-weight="bold"
+                    fill="#0c4a6e"
+                    pointer-events="none"
+                >
+                    ${displayKey}
+                </text>
+                <text
+                    x="${textX}"
+                    y="${textY + 11}"
+                    text-anchor="middle"
+                    dominant-baseline="middle"
+                    font-size="9"
+                    fill="#6b7280"
+                    pointer-events="none"
+                >
+                    (${altKey})
+                </text>
+                <text
+                    x="${textX}"
+                    y="${textY + 22}"
+                    text-anchor="middle"
+                    dominant-baseline="middle"
+                    font-size="9"
+                    fill="#64748b"
+                    pointer-events="none"
+                >
+                    ${keySignature}
+                </text>
+            `;
+        } else {
+            svgContent += `
+                <text
+                    x="${textX}"
+                    y="${textY}"
+                    text-anchor="middle"
+                    dominant-baseline="middle"
+                    font-size="18"
+                    font-weight="bold"
+                    fill="#0c4a6e"
+                    pointer-events="none"
+                >
+                    ${displayKey}
+                </text>
+                <text
+                    x="${textX}"
+                    y="${textY + 15}"
+                    text-anchor="middle"
+                    dominant-baseline="middle"
+                    font-size="10"
+                    fill="#64748b"
+                    pointer-events="none"
+                >
+                    ${keySignature}
+                </text>
+            `;
+        }
     }
 
     // Draw inner circle (minor keys)
@@ -215,17 +347,35 @@ function drawCircleOfFifths() {
         const x4 = centerX + minorRadius * Math.cos(angle);
         const y4 = centerY + minorRadius * Math.sin(angle);
 
-        const minorKey = CIRCLE_MINOR_KEYS[i];
+        const minorKeyRaw = CIRCLE_MINOR_KEYS[i];
+        const isEnharmonic = ENHARMONIC_MINOR[i] !== undefined;
+
+        // Get the display key based on enharmonic preference
+        let displayKey, altKey, keySignature;
+        if (isEnharmonic) {
+            const prefIndex = enharmonicPreference === 'sharp' ? 0 : 1;
+            displayKey = ENHARMONIC_MINOR[i][prefIndex];
+            altKey = ENHARMONIC_MINOR[i][1 - prefIndex];
+            keySignature = KEY_SIGNATURES[displayKey];
+        } else {
+            displayKey = minorKeyRaw;
+            altKey = null;
+            keySignature = KEY_SIGNATURES[minorKeyRaw];
+        }
 
         const pathData = `M ${x1} ${y1} A ${innerRadius} ${innerRadius} 0 0 1 ${x2} ${y2} L ${x3} ${y3} A ${minorRadius} ${minorRadius} 0 0 0 ${x4} ${y4} Z`;
+        const fillColor = isEnharmonic ? '#fef9c3' : '#fef3c7'; // Slightly different for enharmonic
 
         svgContent += `
             <path
-                class="circle-segment circle-minor-segment"
-                data-key="${minorKey}"
+                class="circle-segment circle-minor-segment${isEnharmonic ? ' enharmonic' : ''}"
+                data-key="${displayKey}"
+                data-raw-key="${minorKeyRaw}"
                 data-type="minor"
+                data-position="${i}"
+                data-is-enharmonic="${isEnharmonic}"
                 d="${pathData}"
-                fill="#fef3c7"
+                fill="${fillColor}"
                 stroke="#f59e0b"
                 stroke-width="2"
                 cursor="pointer"
@@ -238,20 +388,49 @@ function drawCircleOfFifths() {
         const textX = centerX + textRadius * Math.cos(textAngle);
         const textY = centerY + textRadius * Math.sin(textAngle);
 
-        svgContent += `
-            <text
-                x="${textX}"
-                y="${textY}"
-                text-anchor="middle"
-                dominant-baseline="middle"
-                font-size="14"
-                font-weight="600"
-                fill="#92400e"
-                pointer-events="none"
-            >
-                ${minorKey}
-            </text>
-        `;
+        // For enharmonic wedges, show both options with the alternate in parentheses
+        if (isEnharmonic) {
+            svgContent += `
+                <text
+                    x="${textX}"
+                    y="${textY - 3}"
+                    text-anchor="middle"
+                    dominant-baseline="middle"
+                    font-size="12"
+                    font-weight="600"
+                    fill="#92400e"
+                    pointer-events="none"
+                >
+                    ${displayKey}
+                </text>
+                <text
+                    x="${textX}"
+                    y="${textY + 9}"
+                    text-anchor="middle"
+                    dominant-baseline="middle"
+                    font-size="8"
+                    fill="#a16207"
+                    pointer-events="none"
+                >
+                    (${altKey})
+                </text>
+            `;
+        } else {
+            svgContent += `
+                <text
+                    x="${textX}"
+                    y="${textY}"
+                    text-anchor="middle"
+                    dominant-baseline="middle"
+                    font-size="14"
+                    font-weight="600"
+                    fill="#92400e"
+                    pointer-events="none"
+                >
+                    ${displayKey}
+                </text>
+            `;
+        }
     }
 
     // Add center circle with label
@@ -278,40 +457,34 @@ function drawCircleOfFifths() {
 
 /**
  * Handle key segment click
- * Note: Composition Studio now auto-determines enharmonic spelling based on the key,
- * so we don't need to manage a global enharmonic preference here.
- * The Chord Lab has its own independent toggle for learning purposes.
+ * The key displayed on the wedge (based on current enharmonic toggle) is selected.
  */
 function handleKeyClick(event) {
-    const key = event.target.getAttribute('data-key');
-    const type = event.target.getAttribute('data-type');
+    const segment = event.target;
+    const key = segment.getAttribute('data-key');
+    const type = segment.getAttribute('data-type');
 
     if (!key) return;
 
-    currentSelectedKey = key;
+    // The data-key attribute already reflects the current enharmonic preference
+    const actualKey = key;
+    currentSelectedKey = actualKey;
 
-    // Handle enharmonic equivalents - pick the standard/common spelling
-    let actualKey = key;
-    if (key === 'F#/Gb') {
-        // F# major and Gb major are enharmonic - F# is more common in sharp keys
-        actualKey = 'F#';
-    } else if (key === 'D#m/Ebm') {
-        // D#m and Ebm are enharmonic - Ebm is more common (D#m has 6 sharps)
-        actualKey = 'Ebm';
-    }
-
-    // Update the key dropdown in Progression Builder
-    const keySelect = document.getElementById('trainer-key-select');
-    if (keySelect) {
-        keySelect.value = actualKey;
-        // Trigger change event to ensure any listeners are notified
-        keySelect.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-
-    // Set current key in state and reload progression
-    setCurrentKey(actualKey);
-    if (window.loadProgression) {
-        window.loadProgression();
+    // Use the helper function that properly handles enharmonic dropdown repopulation
+    // This solves the chicken-and-egg problem where the dropdown might be populated with
+    // sharps but the key being set uses flats (e.g., "Bb")
+    if (window.setKeyDropdownValue) {
+        window.setKeyDropdownValue(actualKey, true); // true = trigger loadProgression
+    } else {
+        // Fallback if helper not available
+        const keySelect = document.getElementById('trainer-key-select');
+        if (keySelect) {
+            keySelect.value = actualKey;
+        }
+        setCurrentKey(actualKey);
+        if (window.loadProgression) {
+            window.loadProgression();
+        }
     }
 
     // Update key display in melody tab header
@@ -331,13 +504,12 @@ function handleKeyClick(event) {
     }
 
     // Visual feedback
-    highlightSelectedKey(key);
+    highlightSelectedKey(actualKey);
 
     // Show confirmation
-    const displayKey = actualKey !== key ? actualKey : key;
     const isMinorKey = type === 'minor';
     const keyQuality = isMinorKey ? ' minor' : ' Major';
-    showKeyChangeNotification(`Key changed to ${displayKey}${keyQuality}`);
+    showKeyChangeNotification(`Key changed to ${actualKey}${keyQuality}`);
 }
 
 /**
@@ -374,19 +546,23 @@ function highlightSelectedKey(key) {
     const svg = document.getElementById('circle-of-fifths-svg');
     if (!svg) return;
 
-    // Reset all segments
+    // Reset all segments to their base colors
     const segments = svg.querySelectorAll('.circle-segment');
     segments.forEach(segment => {
         const type = segment.getAttribute('data-type');
+        const isEnharmonic = segment.getAttribute('data-is-enharmonic') === 'true';
+
         if (type === 'major') {
-            segment.setAttribute('fill', '#e0f2fe');
+            segment.setAttribute('fill', isEnharmonic ? '#dbeafe' : '#e0f2fe');
             segment.setAttribute('stroke', '#0284c7');
             segment.setAttribute('stroke-width', '2');
+            segment.removeAttribute('filter');
             segment.classList.remove('selected-key');
         } else {
-            segment.setAttribute('fill', '#fef3c7');
+            segment.setAttribute('fill', isEnharmonic ? '#fef9c3' : '#fef3c7');
             segment.setAttribute('stroke', '#f59e0b');
             segment.setAttribute('stroke-width', '2');
+            segment.removeAttribute('filter');
             segment.classList.remove('selected-key');
         }
     });
@@ -448,6 +624,36 @@ export function toggleCircleOfFifthsPanel() {
 }
 
 /**
+ * Sync enharmonic preference toggle based on the current key
+ * If the key uses sharps (C#, F#, G#m, etc.), set to 'sharp'
+ * If the key uses flats (Db, Gb, Abm, etc.), set to 'flat'
+ */
+function syncEnharmonicPreferenceFromKey(key) {
+    if (!key) return;
+
+    // Check if the key is a sharp spelling
+    for (const spellings of Object.values(ENHARMONIC_MAJOR)) {
+        if (spellings[0] === key) {
+            enharmonicPreference = 'sharp';
+            return;
+        } else if (spellings[1] === key) {
+            enharmonicPreference = 'flat';
+            return;
+        }
+    }
+
+    for (const spellings of Object.values(ENHARMONIC_MINOR)) {
+        if (spellings[0] === key) {
+            enharmonicPreference = 'sharp';
+            return;
+        } else if (spellings[1] === key) {
+            enharmonicPreference = 'flat';
+            return;
+        }
+    }
+}
+
+/**
  * Open Circle of Fifths panel
  */
 export function openCircleOfFifthsPanel() {
@@ -456,10 +662,20 @@ export function openCircleOfFifthsPanel() {
         panel.classList.remove('hidden');
         isPanelOpen = true;
 
-        // Highlight current key if available
+        // Sync enharmonic preference toggle based on current key
         const trainerState = getTrainerState();
         if (trainerState && trainerState.currentKey) {
             currentSelectedKey = trainerState.currentKey;
+            // Update toggle to match the current key's spelling (sharp vs flat)
+            syncEnharmonicPreferenceFromKey(currentSelectedKey);
+        }
+
+        // Update toggle UI and redraw circle
+        updateToggleLabels();
+        drawCircleOfFifths();
+
+        // Highlight current key if available
+        if (currentSelectedKey) {
             highlightSelectedKey(currentSelectedKey);
         }
     }

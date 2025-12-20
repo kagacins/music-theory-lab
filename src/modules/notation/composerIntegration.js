@@ -2821,11 +2821,14 @@ export class NotationComposer {
     // Generate example text based on what's changing
     const noteValueExample = scalingInfo.denominatorChanged
       ? `A whole note in ${scalingInfo.oldTimeSignature} becomes a half note in ${scalingInfo.newTimeSignature}`
-      : 'Note values stay the same';
+      : 'Not applicable when beat unit stays the same';
 
     const measureExample = scalingInfo.beatsPerMeasureChanged
-      ? `A 1-measure chord stays 1 measure`
+      ? `A 1-measure chord stays 1 measure (durations scale proportionally)`
       : 'Measure count stays the same';
+
+    // Generate example for "no scaling" option
+    const noScalingExample = `A whole note in ${scalingInfo.oldTimeSignature} stays ${scalingInfo.oldDenom} beats but now straddles measures in ${scalingInfo.newTimeSignature}`;
 
     // Create dialog
     const dialog = document.createElement('div');
@@ -2841,12 +2844,12 @@ export class NotationComposer {
         <p class="text-gray-700 font-medium mb-4">How should chord durations be handled?</p>
 
         <div class="space-y-3 mb-6">
-          <label class="flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition ${scalingInfo.denominatorChanged ? '' : 'opacity-50'}">
-            <input type="radio" name="scaling-option" value="noteValue" class="mt-1" ${scalingInfo.denominatorChanged ? 'checked' : ''}>
+          <label class="flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition ${scalingInfo.denominatorChanged ? '' : 'opacity-50 cursor-not-allowed'}">
+            <input type="radio" name="scaling-option" value="noteValue" class="mt-1" ${scalingInfo.denominatorChanged ? 'checked' : 'disabled'}>
             <div>
               <div class="font-medium text-gray-800">Keep note values</div>
               <div class="text-sm text-gray-500">${noteValueExample}</div>
-              <div class="text-xs text-blue-600 mt-1">Duration numbers adjust to match the new beat unit</div>
+              <div class="text-xs text-blue-600 mt-1">Only applies when beat unit changes (e.g., /4 to /8)</div>
             </div>
           </label>
 
@@ -2855,16 +2858,15 @@ export class NotationComposer {
             <div>
               <div class="font-medium text-gray-800">Keep measure count</div>
               <div class="text-sm text-gray-500">${measureExample}</div>
-              <div class="text-xs text-green-600 mt-1">Chord spans the same number of measures</div>
+              <div class="text-xs text-green-600 mt-1">Chords fill the same number of measures</div>
             </div>
           </label>
 
           <label class="flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-100 hover:border-gray-400 transition">
             <input type="radio" name="scaling-option" value="none" class="mt-1">
             <div>
-              <div class="font-medium text-gray-800">Keep internal values (no scaling)</div>
-              <div class="text-sm text-gray-500">Raw beat numbers stay exactly the same</div>
-              <div class="text-xs text-gray-500 mt-1">May result in chords spanning partial measures</div>
+              <div class="font-medium text-gray-800">Keep beat count (no scaling)</div>
+              <div class="text-sm text-gray-500">${noScalingExample}</div>
             </div>
           </label>
         </div>

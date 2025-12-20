@@ -193,8 +193,6 @@ export function setProgressionData(value) {
     if (window.getCompositionState && Array.isArray(value)) {
         const compositionState = window.getCompositionState();
         if (compositionState) {
-            // DEBUGGING: Uncomment to trace when progression data is set
-            // console.log('[setProgressionData] Setting progression with', value.length, 'chords:', value.map(c => `${c.root}${c.type}`));
             // CRITICAL FIX: Use the CURRENT time signature from compositionState, not hardcoded 4/4
             const currentTimeSignature = compositionState.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
             compositionState.syncWithProgressionData(value, {

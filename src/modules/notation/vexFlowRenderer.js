@@ -515,18 +515,71 @@ export function createMeasureAccidentalTracker() {
 
 /**
  * Get VexFlow key signature string from key name
- * @param {string} key - Key name like "C Major", "G", "Am"
- * @returns {string} - VexFlow key signature like "C", "G", "Am"
+ * VexFlow accepts specific key formats:
+ * - Major keys: "C", "G", "D", "A", "E", "B", "F#", "C#", "F", "Bb", "Eb", "Ab", "Db", "Gb", "Cb"
+ * - Minor keys: "Am", "Em", "Bm", "F#m", "C#m", "G#m", "D#m", "A#m", "Dm", "Gm", "Cm", "Fm", "Bbm", "Ebm", "Abm"
+ * @param {string} key - Key name like "C Major", "G", "Am", "Bb", "Dm"
+ * @returns {string} - VexFlow key signature like "C", "G", "Am", "Bb", "Dm"
  */
 export function getVexFlowKeySignature(key) {
-  if (!key) return 'C';
+  if (!key) {
+    return 'C';
+  }
+
+  // VexFlow valid key signatures
+  const validMajorKeys = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'];
+  const validMinorKeys = ['Am', 'Em', 'Bm', 'F#m', 'C#m', 'G#m', 'D#m', 'A#m', 'Dm', 'Gm', 'Cm', 'Fm', 'Bbm', 'Ebm', 'Abm'];
+
+  // Check if it's already a valid key BEFORE normalizing
+  // This prevents the normalization regex from stripping 'm' from minor keys
+  const trimmedKey = key.trim();
+  if (validMajorKeys.includes(trimmedKey) || validMinorKeys.includes(trimmedKey)) {
+    return trimmedKey;
+  }
 
   // Handle formats like "C Major", "A Minor", "G"
-  const normalized = key
-    .replace(/\s*(Major|major|M)\s*$/i, '')
-    .replace(/\s*(Minor|minor)\s*$/i, 'm')
+  // Note: We use separate patterns without /i flag for 'M' to avoid matching lowercase 'm'
+  let normalized = key
+    .replace(/\s*(Major|major)\s*$/i, '')  // Remove "Major" or "major" suffix
+    .replace(/\s*M\s*$/, '')               // Remove uppercase "M" suffix (case-sensitive)
+    .replace(/\s*(Minor|minor)\s*$/i, 'm') // Convert "Minor" to "m"
     .trim();
 
+  // Check if normalized version is valid
+  if (validMajorKeys.includes(normalized) || validMinorKeys.includes(normalized)) {
+    return normalized;
+  }
+
+  // Handle enharmonic equivalents for major keys
+  const majorEnharmonics = {
+    'Db': 'Db', 'C#': 'Db',  // 5 flats vs 7 sharps - use flats
+    'Gb': 'Gb', 'F#': 'F#',  // Both are valid, prefer as given
+    'Cb': 'Cb', 'B': 'B',    // Both valid
+    'D#': 'Eb', 'Fb': 'E',   // Invalid for VexFlow, convert
+    'G#': 'Ab', 'A#': 'Bb',  // Invalid for VexFlow, convert
+    'E#': 'F', 'B#': 'C',    // Unusual, convert
+  };
+
+  // Handle enharmonic equivalents for minor keys
+  const minorEnharmonics = {
+    'D#m': 'Ebm', 'A#m': 'Bbm', 'E#m': 'Fm', 'B#m': 'Cm',
+    'Fbm': 'Em', 'Cbm': 'Bm',
+  };
+
+  // Check for enharmonic conversion needed
+  if (normalized.endsWith('m')) {
+    const converted = minorEnharmonics[normalized];
+    if (converted) {
+      return converted;
+    }
+  } else {
+    const converted = majorEnharmonics[normalized];
+    if (converted) {
+      return converted;
+    }
+  }
+
+  // Default to C if we can't parse
   return normalized || 'C';
 }
 
@@ -635,7 +688,8 @@ export function createStave(options = {}) {
   }
 
   if (showKeySignature && keySignature) {
-    stave.addKeySignature(getVexFlowKeySignature(keySignature));
+    const vexKey = getVexFlowKeySignature(keySignature);
+    stave.addKeySignature(vexKey);
   }
 
   if (showTimeSignature && timeSignature) {

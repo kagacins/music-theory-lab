@@ -8075,6 +8075,14 @@ function renderMelodyPhrasesView(container, currentChord, key) {
         { value: 3.0, label: 'Rapid' }         // Mix with 16ths (12 notes per 4 beats)
     ];
 
+    // Rhythm patterns that have explicit note values (density doesn't apply)
+    const explicitNoteValuePatterns = ['even8th', 'even16th'];
+    const isDensityDisabled = explicitNoteValuePatterns.includes(modalState.phraseRhythmId);
+    const densityDisabledInfo = {
+        'even8th': 'Fixed: 8th notes',
+        'even16th': 'Fixed: 16th notes'
+    }[modalState.phraseRhythmId] || '';
+
     const rangeOptions = [
         { value: 5, label: 'Narrow (5st)' },
         { value: 8, label: 'Medium (8st)' },
@@ -8214,13 +8222,19 @@ function renderMelodyPhrasesView(container, currentChord, key) {
                         `).join('')}
                     </select>
                 </div>
-                <div style="${controlRowStyle}">
+                <div style="${controlRowStyle}" ${isDensityDisabled ? 'title="Density is fixed by the selected rhythm pattern"' : ''}>
                     <label style="${labelStyle}">Density</label>
-                    <select id="phrase-density-select" style="${selectStyle}">
-                        ${densityOptions.map(d => `
-                            <option value="${d.value}" ${d.value === modalState.phraseDensity ? 'selected' : ''}>${d.label}</option>
-                        `).join('')}
-                    </select>
+                    ${isDensityDisabled ? `
+                        <span style="padding: 4px 8px; background: #e5e7eb; border-radius: 4px; font-size: 11px; color: #6b7280; font-weight: 500;">
+                            ${densityDisabledInfo}
+                        </span>
+                    ` : `
+                        <select id="phrase-density-select" style="${selectStyle}">
+                            ${densityOptions.map(d => `
+                                <option value="${d.value}" ${d.value === modalState.phraseDensity ? 'selected' : ''}>${d.label}</option>
+                            `).join('')}
+                        </select>
+                    `}
                 </div>
             </div>
         </div>
@@ -8259,8 +8273,8 @@ function renderMelodyPhrasesView(container, currentChord, key) {
     `;
     container.appendChild(phrasesContainer);
 
-    // Set up phrase control listeners
-    setupPhraseControlListeners(currentChord, key, phrasesContainer);
+    // Set up phrase control listeners (pass container for re-rendering on rhythm change)
+    setupPhraseControlListeners(currentChord, key, phrasesContainer, container);
 
     // Generate initial phrases or show prompt
     if (currentChord) {
@@ -8279,7 +8293,7 @@ function renderMelodyPhrasesView(container, currentChord, key) {
     }
 }
 
-function setupPhraseControlListeners(currentChord, key, phrasesContainer) {
+function setupPhraseControlListeners(currentChord, key, phrasesContainer, mainContainer) {
     const styleSelect = document.getElementById('phrase-style-select');
     const sectionSelect = document.getElementById('phrase-section-select');
     const contourSelect = document.getElementById('phrase-contour-select');
@@ -8326,7 +8340,15 @@ function setupPhraseControlListeners(currentChord, key, phrasesContainer) {
         rhythmSelect.addEventListener('change', () => {
             modalState.phraseRhythmId = rhythmSelect.value;
             localStorage.setItem('phrase-rhythm', rhythmSelect.value);
-            updateAndRegenerate();
+            // Clear cached phrases so new rhythm is applied
+            modalState.currentPhraseCandidates = [];
+            // Re-render the entire view to update density control state
+            // (density is disabled for explicit note value patterns like even8th/even16th)
+            if (mainContainer) {
+                renderMelodyPhrasesView(mainContainer, currentChord, key);
+            } else {
+                updateAndRegenerate();
+            }
         });
     }
 
@@ -8443,13 +8465,6 @@ function generateAndDisplayPhrases(container, chord, key) {
         };
         // Use global style setting (from context bar), fall back to section-based mapping
         const styleId = modalState.style || sectionStyleMap[effectiveSectionType] || 'balanced';
-
-        // Log style and mood for debugging
-
-        // Log target beats for debugging
-        if (isSectionModeWithChord) {
-            console.log(`Generating phrases for ${maxChordIdx - minChordIdx + 1} chord(s), targetBeats: ${targetBeats}`);
-        }
 
         const candidates = generatePhraseCandidates({
             chord,
@@ -9082,6 +9097,10 @@ function applyPhrase(phrase) {
                 if (compositionState.clearTrebleBeatRange) {
                     compositionState.clearTrebleBeatRange(insertAtBeat, maxDuration);
                 }
+                // Also clear second voice notes in the same range
+                if (compositionState.clearSecondVoiceBeatRange) {
+                    compositionState.clearSecondVoiceBeatRange(insertAtBeat, maxDuration);
+                }
                 let currentBeat = insertAtBeat;
                 let addedCount = 0;
 
@@ -9233,6 +9252,21 @@ function generateAndDisplayMelodySuggestions(container, chord, key) {
         }
     }
 
+    // Get section context for melody suggestions
+    const intent = getSectionIntent();
+    const effectiveContext = getEffectiveSectionContext();
+
+    // Build sectionIntent for melody engine
+    // This allows melody suggestions to adapt based on section type and position
+    let sectionIntent = null;
+    if (intent && effectiveContext) {
+        sectionIntent = {
+            mode: intent.mode,
+            subMode: intent.subMode,
+            newSectionType: intent.newSectionType || effectiveContext.currentSectionType
+        };
+    }
+
     // Generate suggestions
     try {
         const result = generateMelodySuggestions({
@@ -9243,7 +9277,8 @@ function generateAndDisplayMelodySuggestions(container, chord, key) {
             contourId: modalState.melodyContourId,
             mood: modalState.mood, // Use global mood
             octave: modalState.melodyOctave,
-            range: 2
+            range: 2,
+            sectionIntent: sectionIntent // Pass section context for section-aware melody suggestions
         });
 
         modalState.currentMelodySuggestions = result.suggestions || [];
