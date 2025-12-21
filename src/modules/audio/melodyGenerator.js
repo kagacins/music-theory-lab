@@ -3264,6 +3264,12 @@ export function playFromSelectedMeasure() {
 
     Tone.Transport.start();
 
+    // Dispatch event for guided mode tutorials
+    dispatchBuilderEvent('progressionPlayed', {
+        chordCount: progressionData.length,
+        key: getCurrentKey()
+    });
+
     // Calculate total duration
     let maxMeasure = measureCountFromState - 1;
     if (hasMelodyNotes && window.getCompositionState) {
@@ -4591,7 +4597,13 @@ export function playAllMelody() {
 
     // Start transport
     Tone.Transport.start();
-    
+
+    // Dispatch event for guided mode tutorials
+    dispatchBuilderEvent('progressionPlayed', {
+        chordCount: progressionData.length,
+        key: getCurrentKey()
+    });
+
     // Calculate total duration - use actual measure count from compositionState
     let maxMeasure = progressionData.length - 1; // Fallback
     if (window.getCompositionState) {
@@ -4964,6 +4976,12 @@ export function playProgressionOnly() {
     measureHighlightPart.start(0);
 
     Tone.Transport.start();
+
+    // Dispatch event for guided mode tutorials
+    dispatchBuilderEvent('progressionPlayed', {
+        chordCount: progressionData.length,
+        key: getCurrentKey()
+    });
 
     // Calculate total duration
     let maxMeasure = progressionData.length - 1;

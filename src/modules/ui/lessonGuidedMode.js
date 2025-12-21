@@ -293,7 +293,11 @@ export function endGuidedMode(completed = false) {
     }
 
     // For site tutorials (not from Theory Academy), don't switch to learn tab
-    const isSiteTutorial = lessonId && lessonId.includes('site-tutorial');
+    // Check for site-tutorial suffix OR the Let It Be tutorials
+    const isSiteTutorial = lessonId && (
+        lessonId.includes('site-tutorial') ||
+        lessonId.startsWith('let-it-be-')
+    );
 
     if (!isSiteTutorial) {
         // Switch back to learn tab for Theory Academy lessons
@@ -362,7 +366,10 @@ function createFloatingBanner() {
     const currentStepNum = stepIndex + 1;
 
     // Check if this is a site tutorial (not from Theory Academy)
-    const isSiteTutorial = lessonId && lessonId.includes('site-tutorial');
+    const isSiteTutorial = lessonId && (
+        lessonId.includes('site-tutorial') ||
+        lessonId.startsWith('let-it-be-')
+    );
 
     // Determine exercise type label based on target tab
     const exerciseTypeLabel = isSiteTutorial
@@ -372,7 +379,7 @@ function createFloatingBanner() {
             : 'GUIDED CHORD LAB EXERCISE');
 
     // Button text for return/end
-    const returnButtonText = isSiteTutorial ? 'End Tutorial' : 'Return to Lesson';
+    const returnButtonText = isSiteTutorial ? 'End Lesson' : 'Return to Lesson';
 
     floatingBanner.innerHTML = `
         <div class="max-w-6xl mx-auto px-4 py-3">
@@ -538,7 +545,10 @@ function goToPreviousStep() {
  */
 function returnToLesson() {
     const lessonId = guidedModeState.lessonId;
-    const isSiteTutorial = lessonId && lessonId.includes('site-tutorial');
+    const isSiteTutorial = lessonId && (
+        lessonId.includes('site-tutorial') ||
+        lessonId.startsWith('let-it-be-')
+    );
 
     // Remove UI elements
     removeFloatingBanner();
@@ -576,8 +586,8 @@ function returnToLesson() {
     }
 
     if (isSiteTutorial) {
-        // For site tutorials, go to Chord Lab
-        switchTab('builder');
+        // For site tutorials, stay in Composition Studio
+        switchTab('melody');
     } else {
         // For Theory Academy lessons, go back to Learn tab and show the lesson
         switchTab('learn');
@@ -1657,8 +1667,11 @@ function handleBuilderAction(event) {
 
             if (isLastStep) {
                 // On the last step, don't auto-advance - let user explore freely
-                const isSiteTutorial = guidedModeState.lessonId && guidedModeState.lessonId.includes('site-tutorial');
-                const endButtonText = isSiteTutorial ? 'End Tutorial' : 'Return to Lesson';
+                const isSiteTutorial = guidedModeState.lessonId && (
+                    guidedModeState.lessonId.includes('site-tutorial') ||
+                    guidedModeState.lessonId.startsWith('let-it-be-')
+                );
+                const endButtonText = isSiteTutorial ? 'End Lesson' : 'Return to Lesson';
                 updateBannerInstruction('🎉 ' + (currentStep?.successMessage || `Great! Keep exploring - click "${endButtonText}" when you're ready.`), 'success');
             } else {
                 // Show success feedback

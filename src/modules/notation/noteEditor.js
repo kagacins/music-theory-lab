@@ -10,7 +10,7 @@
  */
 
 import { StaffLayoutManager, pitchToLine as layoutPitchToLine } from './staffLayouter.js';
-import { noteToMidi, midiToNote } from './vexFlowRenderer.js';
+import { noteToMidi, midiToNote, applyKeySignatureToPitch } from './vexFlowRenderer.js';
 import { analyzeChordTone, CHORD_TONE_COLORS } from '../analysis/chordToneAnalyzer.js';
 import { getPiano } from '../audio/audioEngine.js';
 import { showNoteOverflowDialog } from '../ui/modals.js';
@@ -395,12 +395,15 @@ export class NoteEditor {
         // Add this pitch to the selected note (polyphony)
         // SECTION VIEW FIX: Apply filter offset to convert local index to global
         const filterOffset = this.composerIntegration?.getMeasureFilterOffset?.() || 0;
+        // Apply key signature to pitch when no explicit accidental is selected
+        const polyphonyCompositionState = window.getCompositionState?.();
+        const effectivePitch = this.getEffectivePitch(staffPosition.pitch, polyphonyCompositionState);
         this.onPolyphonyAdd({
           measureIndex: selectedNoteInMeasure.measureIndex + filterOffset,
           staff: selectedNoteInMeasure.staff,
           voiceIndex: selectedNoteInMeasure.voiceIndex || 0,
           noteIndex: selectedNoteInMeasure.noteIndex,
-          pitch: staffPosition.pitch,
+          pitch: effectivePitch,
         });
       } else if (e.shiftKey && this.canAddPitchToNearbyNote(staffPosition)) {
         // Legacy: Shift+Alt+Click adds to last note in measure (kept for compatibility)
@@ -480,12 +483,16 @@ export class NoteEditor {
       // SECTION VIEW FIX: Apply filter offset to convert local index to global
       const filterOffset = this.composerIntegration?.getMeasureFilterOffset?.() || 0;
 
+      // Apply key signature to pitch when no explicit accidental is selected
+      const nearbyCompositionState = window.getCompositionState?.();
+      const effectivePitch = this.getEffectivePitch(staffPosition.pitch, nearbyCompositionState);
+
       // Emit polyphony add event
       this.onPolyphonyAdd({
         measureIndex: targetNote.measureIndex + filterOffset,
         staff: targetNote.staff,
         noteIndex: targetNote.noteIndex,
-        pitch: staffPosition.pitch,
+        pitch: effectivePitch,
       });
     }
   }
@@ -1418,9 +1425,11 @@ export class NoteEditor {
         const isAppendingToEnd = insertionPoint.noteIndex >= voice.notes.length - 1;
 
         // Prepare note data for use in callback
+        // Apply key signature to pitch when no explicit accidental is selected
+        const effectivePitch = this.getEffectivePitch(staffPosition.pitch, compositionState);
         const noteDataForCallback = {
-          pitch: staffPosition.pitch,
-          pitches: [staffPosition.pitch],
+          pitch: effectivePitch,
+          pitches: [effectivePitch],
           duration: this.currentDuration,
           isRest: this.isRestMode,
           dotted: this.isDotted,
@@ -1519,9 +1528,11 @@ export class NoteEditor {
         const context = staff === 'bass' ? 'building block' : 'measure';
       }
 
+      // Apply key signature to pitch when no explicit accidental is selected
+      const effectivePitch = this.getEffectivePitch(staffPosition.pitch, compositionState);
       const noteData = {
-        pitch: staffPosition.pitch,
-        pitches: [staffPosition.pitch],
+        pitch: effectivePitch,
+        pitches: [effectivePitch],
         duration: durationToUse,
         isRest: this.isRestMode,
         dotted: dottedToUse,
@@ -1569,9 +1580,12 @@ export class NoteEditor {
       const overflowBeats = noteBeats - effectiveRemainingBeats;
 
       // Prepare note data for use in callback
+      // Apply key signature to pitch when no explicit accidental is selected
+      const overflowCompositionState = window.getCompositionState?.();
+      const effectivePitch = this.getEffectivePitch(staffPosition.pitch, overflowCompositionState);
       const noteDataForCallback = {
-        pitch: staffPosition.pitch,
-        pitches: [staffPosition.pitch],
+        pitch: effectivePitch,
+        pitches: [effectivePitch],
         duration: this.currentDuration,
         isRest: this.isRestMode,
         dotted: this.isDotted,
@@ -1625,9 +1639,12 @@ export class NoteEditor {
       // getCurrentBeat now respects the current voice (Voice 1 or Voice 2)
       const beatPosition = this.getCurrentBeat(targetMeasureIndex, staff);
 
+      // Apply key signature to pitch when no explicit accidental is selected
+      const normalCompositionState = window.getCompositionState?.();
+      const effectivePitch = this.getEffectivePitch(staffPosition.pitch, normalCompositionState);
       const noteData = {
         type: this.isRestMode ? 'rest' : 'note',
-        pitch: staffPosition.pitch,
+        pitch: effectivePitch,
         duration: this.currentDuration,
         isRest: this.isRestMode,
         dotted: this.isDotted,
@@ -1663,9 +1680,12 @@ export class NoteEditor {
         // Truncate to fit remaining space in building block
         const truncatedBeats = Math.min(noteBeats, effectiveRemainingBeats);
         const fitDuration = this.beatsToDuration(truncatedBeats);
+        // Apply key signature to pitch when no explicit accidental is selected
+        const bassCompositionState = window.getCompositionState?.();
+        const effectivePitch = this.getEffectivePitch(staffPosition.pitch, bassCompositionState);
         const truncatedNote = {
           type: this.isRestMode ? 'rest' : 'note',
-          pitch: staffPosition.pitch,
+          pitch: effectivePitch,
           duration: fitDuration.duration,
           isRest: this.isRestMode,
           dotted: fitDuration.dotted,
@@ -1689,13 +1709,18 @@ export class NoteEditor {
     }
 
     // TREBLE CLEF: Split across measures with ties (original behavior)
+    // Apply key signature to pitch when no explicit accidental is selected
+    // Calculate effective pitch ONCE for consistency across tied notes
+    const tieCompositionState = window.getCompositionState?.();
+    const effectivePitch = this.getEffectivePitch(staffPosition.pitch, tieCompositionState);
+
     // Add first part to fill current measure
     if (effectiveRemainingBeats > 0) {
       const beatPosition = this.getCurrentBeat(targetMeasureIndex, staff);
       const firstPartDuration = this.beatsToDuration(effectiveRemainingBeats);
       const firstPartNote = {
         type: this.isRestMode ? 'rest' : 'note',
-        pitch: staffPosition.pitch,
+        pitch: effectivePitch,
         duration: firstPartDuration.duration,
         isRest: this.isRestMode,
         dotted: firstPartDuration.dotted,
@@ -1724,7 +1749,7 @@ export class NoteEditor {
 
       const tiedNote = {
         type: this.isRestMode ? 'rest' : 'note',
-        pitch: staffPosition.pitch,
+        pitch: effectivePitch, // Use same pitch as first part of tie
         duration: tiedDuration.duration,
         isRest: this.isRestMode,
         dotted: tiedDuration.dotted,
@@ -4882,9 +4907,13 @@ export class NoteEditor {
     // Duration from toolbar may have dotted suffix, strip it
     durationFromToolbar = durationFromToolbar.replace('.', '');
 
+    // Apply key signature to pitch when no explicit accidental is selected
+    const ghostCompositionState = window.getCompositionState?.();
+    const effectivePitch = this.getEffectivePitch(staffPosition.pitch, ghostCompositionState);
+
     // Create ghost note data
     this.ghostNote = {
-      pitch: staffPosition.pitch,
+      pitch: effectivePitch,
       staff: staffPosition.staff,
       measure: staffPosition.measure,
       duration: durationFromToolbar,
@@ -4899,13 +4928,13 @@ export class NoteEditor {
     const measureIndex = staffPosition.measure?.index;
     if (!isRestFromToolbar && measureIndex !== undefined) {
       // Get chord for the current measure being hovered
-      const compositionState = window.getCompositionState?.();
+      const compositionState = ghostCompositionState;
       const chord = compositionState?.getChord?.(measureIndex) || this.chordContext;
       const key = compositionState?.metadata?.key || this.keySignature || 'C';
 
       if (chord) {
         const analysis = analyzeChordTone(
-          staffPosition.pitch,
+          effectivePitch,
           chord,
           key
         );
@@ -5301,6 +5330,33 @@ export class NoteEditor {
    */
   setAccidental(accidental) {
     this.currentAccidental = accidental;
+  }
+
+  /**
+   * Get the effective pitch for a diatonic position, applying key signature if no explicit accidental is selected.
+   * When currentAccidental is null, the key signature's accidental is applied to the pitch.
+   * When currentAccidental is '#', 'b', or 'n', that explicit accidental is used instead.
+   * @param {string} diatonicPitch - The diatonic pitch from staff position (e.g., "F4")
+   * @param {Object} compositionState - The composition state containing metadata
+   * @returns {string} - The pitch with accidental applied (e.g., "F#4" in G major if no accidental selected)
+   */
+  getEffectivePitch(diatonicPitch, compositionState) {
+    const key = compositionState?.metadata?.key || this.keySignature || 'C';
+
+    if (this.currentAccidental === null) {
+      // No explicit accidental selected - apply key signature
+      return applyKeySignatureToPitch(diatonicPitch, key);
+    } else if (this.currentAccidental === 'n') {
+      // User explicitly selected natural - keep the diatonic pitch as-is
+      return diatonicPitch;
+    } else {
+      // User explicitly selected sharp or flat - apply it to the pitch
+      const match = diatonicPitch.match(/^([A-Ga-g])([#b]?)(\d+)$/);
+      if (match) {
+        return `${match[1].toUpperCase()}${this.currentAccidental}${match[3]}`;
+      }
+      return diatonicPitch;
+    }
   }
 
   /**

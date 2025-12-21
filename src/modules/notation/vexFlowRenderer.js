@@ -420,6 +420,35 @@ export function getRequiredAccidental(noteStr, key) {
 }
 
 /**
+ * Apply key signature accidentals to a pitch
+ * When the user clicks on a staff line/space without selecting an accidental,
+ * this function applies the key signature's accidental to the pitch.
+ * For example: clicking on F in G major (which has F#) returns "F#4" instead of "F4"
+ * @param {string} pitch - Diatonic pitch like "F4", "C5"
+ * @param {string} key - Key signature like "C", "G", "F"
+ * @returns {string} - Pitch with key signature accidental applied
+ */
+export function applyKeySignatureToPitch(pitch, key) {
+  const { noteName, octave } = parseNote(pitch);
+  if (!noteName || octave === undefined) return pitch;
+
+  const keyAccidentals = KEY_SIGNATURES[key] || [];
+
+  // Check if this note has an accidental in the key signature
+  const sharpInKey = keyAccidentals.includes(noteName + '#');
+  const flatInKey = keyAccidentals.includes(noteName + 'b');
+
+  if (sharpInKey) {
+    return `${noteName}#${octave}`;
+  } else if (flatInKey) {
+    return `${noteName}b${octave}`;
+  }
+
+  // No accidental in key signature for this note
+  return pitch;
+}
+
+/**
  * Create a measure-level accidental tracker
  * Tracks which accidentals have been shown in the current measure
  * so we can properly show naturals when an accidental is cancelled
@@ -730,9 +759,9 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
   // Add 'r' suffix for rests
   if (isRest) {
     // Remove the 'd' (dotted) suffix temporarily, add 'r' for rest
+    // Note: Don't add 'd' back to rest durations - VexFlow doesn't support 'hdr' etc.
+    // The dot is added via addDot(0) later for both notes and rests
     vexDuration = vexDuration.replace(/d$/, '') + 'r';
-    // Re-add 'd' if it was dotted
-    if (isDotted) vexDuration = vexDuration.replace('r', 'dr');
   } else if (isDotted && !vexDuration.includes('d')) {
     vexDuration += 'd';
   }
@@ -785,9 +814,10 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
   }
 
   // Add dot if needed (use isDotted which checks both dotted flag and duration string)
-  // Note: Rests don't use addDot() - the dot is already encoded in the duration string (e.g., 'hdr')
-  if (isDotted && !isRest) {
-    staveNote.addDot(0);
+  // Note: Both notes AND rests need the dot modifier to visually show the dot
+  // Use addModifier(new VF.Dot(), 0) which works for both notes and rests
+  if (isDotted) {
+    staveNote.addModifier(new VF.Dot(), 0);
   }
 
   // Add articulation if specified
@@ -919,12 +949,13 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
  * @returns {Object} - VexFlow StaveNote (rest)
  */
 export function createRest(duration = '4n', clef = 'treble', options = {}) {
-  const { isCue = false, hidden = false } = options;
+  const { isCue = false, hidden = false, dotted = false } = options;
 
   const restNote = createStaveNote({
     pitch: null,
     duration,
     isRest: true,
+    dotted,
   }, 'C', clef);
 
   if (!restNote) return null;
@@ -1257,7 +1288,7 @@ export function renderMeasure(context, measureData, options = {}) {
   // Create VexFlow notes
   const vexNotes = notes.map(note => {
     if (note.isRest) {
-      return createRest(note.duration, clef);
+      return createRest(note.duration, clef, { dotted: note.dotted || false });
     } else if (Array.isArray(note.pitches)) {
       return createChordNote(note.pitches, note.duration, keySignature, clef);
     } else {
@@ -1310,6 +1341,7 @@ export default {
 
   // Accidentals
   getRequiredAccidental,
+  applyKeySignatureToPitch,
   getVexFlowKeySignature,
 
   // Octave shifts

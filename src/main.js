@@ -1939,17 +1939,23 @@ function launchLetItBeTutorial() {
         return;
     }
 
-    // Show confirmation modal that explains the tutorial will clear progression
-    showTutorialStartModal(() => {
-        // User confirmed - start the tutorial (clearing happens inside actuallyLaunchLetItBeTutorial)
-        actuallyLaunchLetItBeTutorial();
-    });
+    // Show modal with choice of Chords or Melody tutorial
+    showTutorialStartModal(
+        // Chords tutorial callback
+        () => {
+            actuallyLaunchLetItBeTutorial();
+        },
+        // Melody tutorial callback
+        () => {
+            actuallyLaunchLetItBeMelodyTutorial();
+        }
+    );
 }
 
 /**
- * Show a modal explaining the tutorial will clear the current progression
+ * Show a modal explaining the tutorial options
  */
-function showTutorialStartModal(onConfirm) {
+function showTutorialStartModal(onConfirmChords, onConfirmMelody) {
     // Remove any existing modal
     const existingModal = document.getElementById('tutorial-start-modal');
     if (existingModal) existingModal.remove();
@@ -1958,30 +1964,43 @@ function showTutorialStartModal(onConfirm) {
     modal.id = 'tutorial-start-modal';
     modal.className = 'fixed inset-0 z-[10000] flex items-center justify-center bg-black/50';
     modal.innerHTML = `
-        <div class="bg-white rounded-xl shadow-2xl max-w-md mx-4 p-6">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg mx-4 p-6">
             <div class="flex items-center gap-3 mb-4">
                 <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
                     <span class="text-2xl">🎸</span>
                 </div>
                 <div>
-                    <h3 class="text-lg font-bold text-gray-900">"Let It Be" Tutorial</h3>
-                    <p class="text-sm text-gray-500">Interactive chord progression lesson</p>
+                    <h3 class="text-lg font-bold text-gray-900">"Let It Be" Interactive Tutorial</h3>
+                    <p class="text-sm text-gray-500">Learn to create the iconic Beatles chorus</p>
                 </div>
             </div>
             <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                 <p class="text-sm text-amber-800">
-                    <strong>Note:</strong> This tutorial will clear any existing chord progression you have so you can start fresh. Your work will not be saved.
+                    <strong>Note:</strong> These tutorials will clear any existing chord progression so you can start fresh. Your work will not be saved.
                 </p>
             </div>
-            <p class="text-gray-600 mb-6">
-                You'll learn to build the iconic "Let It Be" chorus using Chord Lab and Composition Studio. We'll intentionally make some "mistakes" so you can practice fixing them!
+            <p class="text-gray-600 mb-4">
+                Choose which part of "Let It Be" you'd like to learn:
             </p>
-            <div class="flex gap-3 justify-end">
+            <div class="space-y-3 mb-6">
+                <button id="tutorial-start-chords" class="w-full px-4 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all font-medium flex items-center gap-3">
+                    <span class="text-2xl">🎹</span>
+                    <div class="text-left">
+                        <div class="font-bold">Create Chords of Chorus</div>
+                        <div class="text-sm opacity-90">Learn Chord Lab, drag & drop, inversions, BPM (do this first!)</div>
+                    </div>
+                </button>
+                <button id="tutorial-start-melody" class="w-full px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg hover:from-emerald-600 hover:to-teal-700 transition-all font-medium flex items-center gap-3">
+                    <span class="text-2xl">🎵</span>
+                    <div class="text-left">
+                        <div class="font-bold">Create Melody of Chorus</div>
+                        <div class="text-sm opacity-90">Learn VexFlow notation, add melody notes to the chord progression</div>
+                    </div>
+                </button>
+            </div>
+            <div class="flex justify-end">
                 <button id="tutorial-start-cancel" class="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors">
                     Cancel
-                </button>
-                <button id="tutorial-start-confirm" class="px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all font-medium">
-                    Start Tutorial
                 </button>
             </div>
         </div>
@@ -1992,9 +2011,14 @@ function showTutorialStartModal(onConfirm) {
         modal.remove();
     });
 
-    document.getElementById('tutorial-start-confirm').addEventListener('click', () => {
+    document.getElementById('tutorial-start-chords').addEventListener('click', () => {
         modal.remove();
-        if (onConfirm) onConfirm();
+        if (onConfirmChords) onConfirmChords();
+    });
+
+    document.getElementById('tutorial-start-melody').addEventListener('click', () => {
+        modal.remove();
+        if (onConfirmMelody) onConfirmMelody();
     });
 
     // Close on backdrop click
@@ -2019,6 +2043,25 @@ function actuallyLaunchLetItBeTutorial() {
     // Disable chord card tooltips during tutorial for cleaner UI
     document.body.classList.add('progression-tooltips-disabled');
 
+    // Helper function to expand Composition Studio panels for tutorial
+    function expandCompositionStudioPanels() {
+        // Expand the Chord Progression panel
+        const chordProgressionPanel = document.getElementById('chord-progression-card-panel');
+        const chordProgressionChevron = document.getElementById('chord-progression-card-chevron');
+        if (chordProgressionPanel && chordProgressionPanel.classList.contains('hidden')) {
+            chordProgressionPanel.classList.remove('hidden');
+            if (chordProgressionChevron) chordProgressionChevron.classList.add('rotate-180');
+        }
+
+        // Expand the Progression Setup panel (contains key selector area)
+        const setupPanel = document.getElementById('melody-progression-setup-panel');
+        const setupChevron = document.getElementById('melody-progression-setup-chevron');
+        if (setupPanel && setupPanel.classList.contains('hidden')) {
+            setupPanel.classList.remove('hidden');
+            if (setupChevron) setupChevron.classList.add('rotate-180');
+        }
+    }
+
     // Define the tutorial steps
     // "Let It Be" CHORUS progression: Am - G - F - C
     const letItBeTutorialSteps = [
@@ -2037,7 +2080,8 @@ function actuallyLaunchLetItBeTutorial() {
             callout: 'We\'ll set the key in the Composition Studio so our chords show Roman numerals correctly.',
             isActionStep: true,
             validation: { type: 'tab_selected', value: 'melody' },
-            successMessage: 'Welcome to the Composition Studio!'
+            successMessage: 'Welcome to the Composition Studio!',
+            quickAdvance: true
         },
         {
             instruction: 'Click the "Key" button (next to "Chord Progression") to open the Circle of Fifths.',
@@ -2046,7 +2090,9 @@ function actuallyLaunchLetItBeTutorial() {
             callout: '"Let It Be" is in the key of C Major. Setting the key helps us see Roman numerals (like vi, V, IV, I) for each chord.',
             isActionStep: true,
             validation: { type: 'circle_of_fifths_opened' },
-            successMessage: 'Circle of Fifths opened!'
+            successMessage: 'Circle of Fifths opened!',
+            quickAdvance: true,
+            onEnter: expandCompositionStudioPanels
         },
         {
             instruction: 'Click on "C" in the Circle of Fifths to set the key to C Major.',
@@ -2056,7 +2102,8 @@ function actuallyLaunchLetItBeTutorial() {
             callout: 'C Major has no sharps or flats - it\'s the most common key for pop songs!',
             isActionStep: true,
             validation: { type: 'progression_key_changed', value: 'C Major' },
-            successMessage: 'Key set to C Major! Now the chords will show their Roman numerals.'
+            successMessage: 'Key set to C Major! Now the chords will show their Roman numerals.',
+            quickAdvance: true
         },
         // ========== NAVIGATE TO CHORD LAB ==========
         {
@@ -2066,7 +2113,8 @@ function actuallyLaunchLetItBeTutorial() {
             callout: 'The Chord Lab is where you create and explore individual chords before adding them to your progression.',
             isActionStep: true,
             validation: { type: 'tab_selected', value: 'builder' },
-            successMessage: 'Welcome to the Chord Lab!'
+            successMessage: 'Welcome to the Chord Lab!',
+            quickAdvance: true
         },
         // ========== CHORD LAB: Add Am (first chord of chorus) ==========
         {
@@ -2075,7 +2123,8 @@ function actuallyLaunchLetItBeTutorial() {
             targetElement: '#builder-note-selector',
             callout: 'The "Let It Be" chorus starts with Am - the vi chord that gives it that emotional feel.',
             validation: { type: 'root_selected', value: 'A' },
-            successMessage: 'A selected!'
+            successMessage: 'A selected!',
+            quickAdvance: true
         },
         {
             instruction: 'Now select "Minor" as the chord type.',
@@ -2083,7 +2132,8 @@ function actuallyLaunchLetItBeTutorial() {
             targetElement: '#builder-chord-type-selector',
             callout: 'Am (A Minor) sets the melancholic, reflective mood of the chorus.',
             validation: { type: 'type_selected', value: 'Minor' },
-            successMessage: 'Minor selected!'
+            successMessage: 'Minor selected!',
+            quickAdvance: true
         },
         {
             instruction: 'Click the purple "+" button on the right side of the screen to add Am to your progression.',
@@ -2092,6 +2142,7 @@ function actuallyLaunchLetItBeTutorial() {
             callout: 'This Am chord starts our "Let It Be" chorus. The Add Chord button is in the floating action menu.',
             validation: { type: 'chord_added_to_progression', value: 'A Minor' },
             successMessage: 'Am added! First chord done.'
+            // No quickAdvance - allow time for next step to position correctly
         },
         // ========== CHORD LAB: Add C Major (INTENTIONALLY WRONG - should be G) ==========
         {
@@ -2100,7 +2151,8 @@ function actuallyLaunchLetItBeTutorial() {
             targetElement: '#builder-note-selector',
             callout: 'We\'re adding C in the wrong position on purpose. You\'ll learn to reorder chords in the Composition Studio!',
             validation: { type: 'root_selected', value: 'C' },
-            successMessage: 'C selected!'
+            successMessage: 'C selected!',
+            quickAdvance: true
         },
         {
             instruction: 'Select "Major" as the chord type.',
@@ -2109,6 +2161,7 @@ function actuallyLaunchLetItBeTutorial() {
             callout: 'C Major is the I chord - home base. But it belongs at the END of the chorus, not here!',
             validation: { type: 'type_selected', value: 'Major' },
             successMessage: 'Major selected!'
+            // No quickAdvance - allow time for UI to adjust before FAB step
         },
         {
             instruction: 'Click the purple "+" button to add C Major to the progression.',
@@ -2117,6 +2170,7 @@ function actuallyLaunchLetItBeTutorial() {
             callout: 'Remember: C is in the wrong position. We\'ll move it to the end later!',
             validation: { type: 'chord_added_to_progression', value: 'C Major' },
             successMessage: 'C Major added (in wrong position - we\'ll fix this)!'
+            // No quickAdvance - allow time for next step to position correctly
         },
         // ========== CHORD LAB: Add G Major ==========
         {
@@ -2125,7 +2179,8 @@ function actuallyLaunchLetItBeTutorial() {
             targetElement: '#builder-note-selector',
             callout: 'G is the V chord - the dominant that creates tension before resolving to C.',
             validation: { type: 'root_selected', value: 'G' },
-            successMessage: 'G selected!'
+            successMessage: 'G selected!',
+            quickAdvance: true
         },
         {
             instruction: 'Select "Major" as the chord type.',
@@ -2133,7 +2188,8 @@ function actuallyLaunchLetItBeTutorial() {
             targetElement: '#builder-chord-type-selector',
             callout: 'G Major should be the 2nd chord in the chorus. We\'re also skipping F (another intentional mistake)!',
             validation: { type: 'type_selected', value: 'Major' },
-            successMessage: 'Major selected!'
+            successMessage: 'Major selected!',
+            quickAdvance: true
         },
         {
             instruction: 'Click the purple "+" button to add G Major to the progression.',
@@ -2142,6 +2198,7 @@ function actuallyLaunchLetItBeTutorial() {
             callout: 'We now have Am - C - G, but we need Am - G - F - C. Time to fix it in the Composition Studio!',
             validation: { type: 'chord_added_to_progression', value: 'G Major' },
             successMessage: 'G Major added! Now let\'s head to the Composition Studio.'
+            // No quickAdvance - allow time for next step to position correctly
         },
         // ========== SWITCH TO COMPOSITION STUDIO ==========
         {
@@ -2150,7 +2207,8 @@ function actuallyLaunchLetItBeTutorial() {
             targetElement: '#header-tab-btn-melody',
             callout: 'The Composition Studio is where you arrange, edit, and perfect your chord progressions.',
             validation: { type: 'tab_selected', value: 'melody' },
-            successMessage: 'Welcome to the Composition Studio!'
+            successMessage: 'Welcome to the Composition Studio!',
+            quickAdvance: true
         },
         // ========== COMPOSITION STUDIO: Summary + Drag/Drop combined ==========
         {
@@ -2160,7 +2218,9 @@ function actuallyLaunchLetItBeTutorial() {
             spotlightExtraHeight: 100,
             callout: 'Click on the C Major card (black rectangle) and drag it to the right of G. The order should become Am - G - C.',
             validation: { type: 'chord_reordered' },
-            successMessage: 'C moved to the end! Now it\'s Am - G - C. We just need to add F!'
+            successMessage: 'C moved to the end! Now it\'s Am - G - C. We just need to add F!',
+            quickAdvance: true,
+            onEnter: expandCompositionStudioPanels
         },
         // ========== QUICK ADD: First show the button, then the form ==========
         {
@@ -2170,7 +2230,9 @@ function actuallyLaunchLetItBeTutorial() {
             callout: 'This button opens a quick way to add chords without going back to Chord Lab.',
             isActionStep: true,
             validation: { type: 'quick_add_form_opened' },
-            successMessage: 'Quick Add form opened!'
+            successMessage: 'Quick Add form opened!',
+            // No quickAdvance - allow time to scroll to Quick Add button
+            onEnter: expandCompositionStudioPanels
         },
         {
             instruction: 'In the Quick Add form, select "F" as the root, leave it as "Major", and click "Add Chord".',
@@ -2181,6 +2243,7 @@ function actuallyLaunchLetItBeTutorial() {
             isActionStep: true,
             validation: { type: 'chord_added_to_progression', value: 'F Major' },
             successMessage: 'F Major added! Now we have Am - G - C - F. One more reorder to go!'
+            // No quickAdvance - allow time to scroll to Quick Add form
         },
         // ========== DRAG F before C ==========
         {
@@ -2190,7 +2253,9 @@ function actuallyLaunchLetItBeTutorial() {
             spotlightExtraHeight: 100,
             callout: 'Drag the C Major card to the right of F. This completes the correct chorus order!',
             validation: { type: 'chord_reordered' },
-            successMessage: 'Perfect! The chorus is now Am - G - F - C!'
+            successMessage: 'Perfect! The chorus is now Am - G - F - C!',
+            quickAdvance: true,
+            onEnter: expandCompositionStudioPanels
         },
         // ========== EDIT G INVERSION: First expand the card ==========
         {
@@ -2201,7 +2266,9 @@ function actuallyLaunchLetItBeTutorial() {
             callout: 'Each chord card has a "⋯" expand button. Click it on the G chord to reveal the inversion options.',
             isActionStep: true,
             validation: { type: 'chord_card_expanded' },
-            successMessage: 'Card expanded! Now find the yellow INVERSION section.'
+            successMessage: 'Card expanded! Now find the yellow INVERSION section.',
+            quickAdvance: true,
+            onEnter: expandCompositionStudioPanels
         },
         {
             instruction: '🎹 LOOK FOR THE YELLOW BOX! In the expanded G card, find the yellow "🎹 Inversion" section and click the "1" button.',
@@ -2212,6 +2279,7 @@ function actuallyLaunchLetItBeTutorial() {
             isActionStep: true,
             validation: { type: 'chord_card_edited', property: 'inversion' },
             successMessage: 'G chord is now 1st inversion! The bass line will be smoother.',
+            quickAdvance: true,
             onEnter: () => {
                 // Add pulsing animation to inversion section
                 setTimeout(() => {
@@ -2240,7 +2308,9 @@ function actuallyLaunchLetItBeTutorial() {
             callout: 'We\'ll change Am to 1st inversion to get C in the bass - creating a smooth half-step from C → B (G chord).',
             isActionStep: true,
             validation: { type: 'chord_card_expanded' },
-            successMessage: 'Card expanded! Now find the yellow INVERSION section again.'
+            successMessage: 'Card expanded! Now find the yellow INVERSION section again.',
+            quickAdvance: true,
+            onEnter: expandCompositionStudioPanels
         },
         {
             instruction: '🎹 In the yellow "🎹 Inversion" section, click the "1" button to change Am to 1st inversion.',
@@ -2251,6 +2321,7 @@ function actuallyLaunchLetItBeTutorial() {
             isActionStep: true,
             validation: { type: 'chord_card_edited', property: 'inversion' },
             successMessage: 'Am is now in 1st inversion! Beautiful voice leading.',
+            quickAdvance: true,
             onEnter: () => {
                 // Add pulsing animation to inversion section
                 setTimeout(() => {
@@ -2280,7 +2351,8 @@ function actuallyLaunchLetItBeTutorial() {
             isActionStep: true,
             validation: { type: 'all_cards_collapsed' },
             successMessage: 'Cards collapsed! Now let\'s adjust the note durations.',
-            quickAdvance: true
+            quickAdvance: true,
+            onEnter: expandCompositionStudioPanels
         },
         // ========== CHANGE DURATION TO HALF NOTES ==========
         {
@@ -2292,7 +2364,8 @@ function actuallyLaunchLetItBeTutorial() {
             isActionStep: true,
             validation: { type: 'all_chords_duration', beats: 2 },
             successMessage: 'All chords set to half notes! Now the rhythm matches the original song.',
-            quickAdvance: true
+            quickAdvance: true,
+            onEnter: expandCompositionStudioPanels
         },
         // ========== FAB: Open and adjust BPM ==========
         {
@@ -2302,7 +2375,8 @@ function actuallyLaunchLetItBeTutorial() {
             callout: 'The FAB (Floating Action Button) gives you quick access to playback settings, BPM, and more.',
             isActionStep: true,
             validation: { type: 'fab_opened' },
-            successMessage: 'FAB opened! Now find the Settings (gear icon).'
+            successMessage: 'FAB opened! Now find the Settings (gear icon).',
+            quickAdvance: true
         },
         {
             instruction: 'Click the gray Settings button (gear icon) in the FAB menu to see the BPM controls.',
@@ -2311,7 +2385,8 @@ function actuallyLaunchLetItBeTutorial() {
             callout: 'The Settings section contains tempo (BPM), arpeggio speed, and other playback options.',
             isActionStep: true,
             validation: { type: 'settings_section_clicked' },
-            successMessage: 'Settings expanded! Now adjust the BPM.'
+            successMessage: 'Settings expanded! Now adjust the BPM.',
+            quickAdvance: true
         },
         {
             instruction: 'Use the BPM slider to set the tempo to around 70 BPM for the classic ballad feel.',
@@ -2320,7 +2395,8 @@ function actuallyLaunchLetItBeTutorial() {
             callout: '"Let It Be" is a ballad at ~70 BPM. Set the tempo between 65-75 BPM.',
             isActionStep: true,
             validation: { type: 'bpm_changed', minBpm: 65, maxBpm: 75 },
-            successMessage: 'Perfect tempo! The progression is ready to play.'
+            successMessage: 'Perfect tempo! The progression is ready to play.',
+            quickAdvance: true
         },
         // ========== CLOSE FAB FIRST ==========
         {
@@ -2341,7 +2417,8 @@ function actuallyLaunchLetItBeTutorial() {
             callout: 'You\'ve built the iconic Am-G-F-C progression. Click Play to hear it!',
             isActionStep: true,
             validation: { type: 'progression_played' },
-            successMessage: 'Beautiful! You\'ve created the "Let It Be" chorus progression!'
+            successMessage: 'Beautiful! You\'ve created the "Let It Be" chorus progression!',
+            quickAdvance: true
         },
         // ========== COMPLETION ==========
         {
@@ -2355,18 +2432,392 @@ function actuallyLaunchLetItBeTutorial() {
 
     // Start the guided mode
     window.startGuidedMode({
-        lessonId: 'let-it-be-site-tutorial',
-        lessonTitle: '"Let It Be" Interactive Tutorial',
+        lessonId: 'let-it-be-chords-tutorial',
+        lessonTitle: '"Let It Be" Chords Interactive Tutorial',
         targetTab: 'builder',
         steps: letItBeTutorialSteps,
         onComplete: (actionHistory) => {
             console.log('[LetItBeTutorial] Tutorial completed!', actionHistory);
+            // Stay in Composition Studio
+            if (window.switchTab) {
+                window.switchTab('melody');
+            }
             if (window.showModal) {
-                window.showModal('🎉 Congratulations! You\'ve completed the "Let It Be" tutorial. Keep exploring and creating!', true);
+                window.showModal('🎉 Congratulations! You\'ve completed the "Let It Be" Chords tutorial. Keep exploring and creating!', true);
             }
         },
         onCancel: () => {
             console.log('[LetItBeTutorial] Tutorial cancelled by user.');
+            // Return to Composition Studio on cancel too
+            if (window.switchTab) {
+                window.switchTab('melody');
+            }
+        }
+    });
+}
+
+/**
+ * Launch the "Let It Be" Melody Tutorial
+ * Sets up the chord progression and starts the melody creation tutorial
+ */
+function actuallyLaunchLetItBeMelodyTutorial() {
+    console.log('[LetItBeMelodyTutorial] Starting melody tutorial, setting up progression...');
+
+    // Clear the progression first
+    clearProgression(true); // true = skip confirmation dialog
+
+    // Disable chord card tooltips during tutorial for cleaner UI
+    document.body.classList.add('progression-tooltips-disabled');
+
+    // Switch to Composition Studio tab
+    if (window.switchTab) {
+        window.switchTab('melody');
+    }
+
+    // Helper function to expand necessary panels for the melody tutorial
+    function expandMelodyTutorialPanels() {
+        // Expand the Staff Notation panel
+        const notationPanel = document.getElementById('staff-notation-card-panel');
+        const notationChevron = document.getElementById('staff-notation-card-chevron');
+        if (notationPanel && notationPanel.classList.contains('hidden')) {
+            notationPanel.classList.remove('hidden');
+            if (notationChevron) notationChevron.classList.add('rotate-180');
+        }
+
+        // Expand the Chord Progression panel
+        const chordProgressionPanel = document.getElementById('chord-progression-card-panel');
+        const chordProgressionChevron = document.getElementById('chord-progression-card-chevron');
+        if (chordProgressionPanel && chordProgressionPanel.classList.contains('hidden')) {
+            chordProgressionPanel.classList.remove('hidden');
+            if (chordProgressionChevron) chordProgressionChevron.classList.add('rotate-180');
+        }
+    }
+
+    // Set the key to C Major FIRST - use same method as Circle of Fifths
+    setTimeout(() => {
+        console.log('[LetItBeMelodyTutorial] Setting key to C Major...');
+
+        // Use setKeyDropdownValue which properly handles the key change (same as Circle of Fifths)
+        // This internally calls setCurrentKey and updates all necessary state
+        if (window.setKeyDropdownValue) {
+            window.setKeyDropdownValue('C', false); // 'C' not 'C Major' - the function handles quality
+            console.log('[LetItBeMelodyTutorial] Used setKeyDropdownValue to set key to C Major');
+        } else {
+            // Fallback: directly update the dropdown and displays
+            console.warn('[LetItBeMelodyTutorial] setKeyDropdownValue not available, using fallback');
+            const keySelect = document.getElementById('trainer-key-select');
+            if (keySelect) {
+                keySelect.value = 'C';
+                // Trigger change event to update state
+                keySelect.dispatchEvent(new Event('change'));
+            }
+        }
+
+        // Update ALL key displays (same as Circle of Fifths does)
+        const keyDisplays = [
+            'melody-current-key-display',
+            'melody-key-display-text',
+            'melody-workbench-key-display'
+        ];
+        keyDisplays.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = 'C Major';
+        });
+
+        console.log('[LetItBeMelodyTutorial] Key set to C Major');
+
+        // Set BPM to 72 (ballad tempo)
+        if (window.interactiveMelody) {
+            window.interactiveMelody.tempo = 72;
+        }
+        // Update BPM slider
+        const bpmSlider = document.getElementById('fab-bpm-slider');
+        const bpmDisplay = document.getElementById('fab-bpm-value');
+        if (bpmSlider) bpmSlider.value = 72;
+        if (bpmDisplay) bpmDisplay.textContent = '72';
+
+        // Add the chord progression with pickup measure:
+        // C (pickup) - Am (1st inv) - G (1st inv) - F - C
+        // Each chord is a half note (2 beats)
+        const chordsToAdd = [
+            { root: 'C', type: 'Major', inversion: 0, beats: 2 },      // Pickup measure
+            { root: 'A', type: 'Minor', inversion: 1, beats: 2 },      // Am 1st inv
+            { root: 'G', type: 'Major', inversion: 1, beats: 2 },      // G 1st inv
+            { root: 'F', type: 'Major', inversion: 0, beats: 2 },      // F root
+            { root: 'C', type: 'Major', inversion: 0, beats: 2 }       // C root (end)
+        ];
+
+        chordsToAdd.forEach((chord, index) => {
+            setTimeout(() => {
+                if (window.addSpecificChordToProgression) {
+                    window.addSpecificChordToProgression(chord.type, chord.inversion, false, chord.root);
+
+                    // After adding, update the duration
+                    setTimeout(() => {
+                        const progressionData = window.getProgressionData?.() || [];
+                        if (progressionData.length > index) {
+                            if (window.updateChordDuration) {
+                                window.updateChordDuration(index, chord.beats);
+                            }
+                        }
+                    }, 50);
+                }
+            }, index * 100); // Stagger chord additions
+        });
+
+        // After all chords are added, set up the pickup measure and start the tutorial
+        setTimeout(() => {
+            // Expand panels BEFORE adding the rest
+            expandMelodyTutorialPanels();
+
+            // Add a dotted half rest to the pickup measure (beats 1-3)
+            // This leaves beat 4 free for the user to add the pickup notes
+            // First, select measure 0 so subsequent edits go there
+            const notationComposer = window.getNotationComposer && window.getNotationComposer();
+            if (notationComposer) {
+                notationComposer.setSelectedMeasure(0);
+            }
+
+            // Add a dotted half rest directly to compositionState
+            // This is more reliable than addNoteIntelligently for programmatic setup
+            try {
+                if (window.getCompositionState) {
+                    const compositionState = window.getCompositionState();
+
+                    console.log('[LetItBeMelodyTutorial] Measure count:', compositionState.getMeasureCount());
+
+                    // Ensure measure 0 exists and has the proper structure
+                    if (compositionState.getMeasureCount() > 0) {
+                        const measure = compositionState.getMeasure(0);
+                        console.log('[LetItBeMelodyTutorial] Measure 0:', measure);
+
+                        // Ensure treble clef voice exists
+                        if (measure && measure.notation && measure.notation.treble) {
+                            // Ensure voice 0 exists
+                            if (!measure.notation.treble.voices) {
+                                measure.notation.treble.voices = [{ notes: [] }];
+                            }
+                            if (!measure.notation.treble.voices[0]) {
+                                measure.notation.treble.voices[0] = { notes: [] };
+                            }
+
+                            // Add the dotted half rest at beat 0
+                            const restNote = {
+                                type: 'rest',
+                                isRest: true,
+                                duration: '2n',  // half note base
+                                dotted: true,    // makes it 3 beats
+                                beat: 0
+                            };
+
+                            measure.notation.treble.voices[0].notes.push(restNote);
+                            console.log('[LetItBeMelodyTutorial] Added dotted half rest (3 beats) to measure 0 treble clef');
+                            console.log('[LetItBeMelodyTutorial] Treble notes now:', measure.notation.treble.voices[0].notes);
+                        } else {
+                            console.warn('[LetItBeMelodyTutorial] Measure 0 treble notation not found. Measure:', measure);
+                        }
+                    } else {
+                        console.warn('[LetItBeMelodyTutorial] No measures exist yet');
+                    }
+                } else {
+                    console.warn('[LetItBeMelodyTutorial] getCompositionState not available');
+                }
+            } catch (e) {
+                console.warn('[LetItBeMelodyTutorial] Could not add rest:', e);
+            }
+
+            // Verify the rest is still in compositionState before refresh
+            const csBeforeRefresh = window.getCompositionState && window.getCompositionState();
+            if (csBeforeRefresh) {
+                const m0 = csBeforeRefresh.getMeasure(0);
+                console.log('[LetItBeMelodyTutorial] Before refresh - Measure 0 treble voices:', m0?.notation?.treble?.voices);
+            }
+
+            // Refresh notation - call render directly on the notationComposer
+            // to ensure our compositionState changes are rendered
+            const nc = window.getNotationComposer && window.getNotationComposer();
+            if (nc) {
+                console.log('[LetItBeMelodyTutorial] Calling syncFromProgression...');
+                nc.syncFromProgression();
+                console.log('[LetItBeMelodyTutorial] syncFromProgression complete');
+
+                // Check measureManager to see what was loaded
+                if (nc.measureManager && nc.measureManager.measures && nc.measureManager.measures[0]) {
+                    console.log('[LetItBeMelodyTutorial] MeasureManager measure 0 trebleNotes:', nc.measureManager.measures[0].trebleNotes);
+                }
+            } else if (window.refreshNotationFromProgression) {
+                window.refreshNotationFromProgression();
+            }
+
+            // Start the melody tutorial after setup is complete
+            setTimeout(() => {
+                launchLetItBeMelodyTutorialSteps();
+            }, 300);
+        }, chordsToAdd.length * 100 + 800); // Extra delay to ensure measures are fully initialized
+
+    }, 100);
+}
+
+/**
+ * Launch the actual melody tutorial steps
+ */
+function launchLetItBeMelodyTutorialSteps() {
+    console.log('[LetItBeMelodyTutorial] Starting tutorial steps...');
+
+    // Helper function to expand Staff Notation panel
+    function expandStaffNotationPanel() {
+        const notationPanel = document.getElementById('staff-notation-card-panel');
+        const notationChevron = document.getElementById('staff-notation-card-chevron');
+        if (notationPanel && notationPanel.classList.contains('hidden')) {
+            notationPanel.classList.remove('hidden');
+            if (notationChevron) notationChevron.classList.add('rotate-180');
+        }
+    }
+
+    // Define the melody tutorial steps
+    // "Let It Be" melody for the chorus:
+    // Pickup (beat 4): "Let it" = eighth note G, eighth note A
+    // Measure 2 (Am): "be" = quarter note A tied over, "let it" = eighth G, eighth A
+    // etc.
+    const letItBeMelodySteps = [
+        // ========== INTRODUCTION ==========
+        {
+            instruction: 'Welcome to the "Let It Be" Melody Tutorial! 🎵 We\'ve set up the chord progression for you with inversions for smooth voice leading.',
+            callout: '🎸 Notice we added an extra C chord at the beginning as a "pickup measure." This is where the words "Let it" start - before the main Am chord!',
+            validation: null,
+            successMessage: null
+        },
+        {
+            instruction: 'Look at the Musical Notation below. We\'ve added a dotted half rest (3 beats) in the pickup measure, leaving beat 4 free for "Let it".',
+            spotlight: '#staff-notation-card-panel',
+            targetElement: '#staff-notation-card-panel',
+            spotlightExtraHeight: 100,
+            callout: '💡 The dotted half rest fills beats 1-3. Beat 4 is where you\'ll add the pickup notes "Let it" (two eighth notes: G and A).',
+            validation: null,
+            successMessage: null,
+            onEnter: expandStaffNotationPanel
+        },
+        // ========== NOTATION TOOLBAR INTRODUCTION ==========
+        {
+            instruction: '🎹 Let\'s look at the Notation Toolbar. This is where you select note durations before clicking on the staff to add notes.',
+            spotlight: '#notation-toolbar-container',
+            targetElement: '#notation-toolbar-container',
+            spotlightExtraHeight: 20,
+            callout: 'The toolbar shows duration buttons (whole, half, quarter, eighth, sixteenth), plus rest, dot, tie, and accidental controls.',
+            validation: null,
+            successMessage: null,
+            onEnter: expandStaffNotationPanel
+        },
+        // ========== SELECT EIGHTH NOTE DURATION ==========
+        {
+            instruction: '🎵 First, let\'s set the duration to EIGHTH NOTE. Click the eighth note button (♪ with the flag) in the toolbar.',
+            spotlight: '#notation-toolbar-container',
+            targetElement: '#notation-toolbar-container',
+            spotlightExtraHeight: 20,
+            callout: 'The "Let it" pickup uses two eighth notes. An eighth note = 0.5 beats, so two eighth notes fill beat 4.',
+            validation: null, // For now info-only, could add validation later
+            successMessage: null,
+            onEnter: expandStaffNotationPanel
+        },
+        // ========== ADD FIRST NOTE (G) ==========
+        {
+            instruction: '🎤 Now click on the staff in Measure 1 to add the first note "Let" - which is a G4 (on the second line from bottom).',
+            spotlight: '#staff-notation-card-panel',
+            targetElement: '#staff-notation-card-panel',
+            spotlightExtraHeight: 100,
+            callout: '💡 TIP: You can also click a key on the keyboard at the bottom of the screen to add a note! The note will be added to the currently selected measure.',
+            validation: null,
+            successMessage: null,
+            onEnter: expandStaffNotationPanel
+        },
+        // ========== ADD SECOND NOTE (A) ==========
+        {
+            instruction: '🎤 Add the second pickup note "it" - which is an A4 (in the second space from bottom, one step up from G).',
+            spotlight: '#staff-notation-card-panel',
+            targetElement: '#staff-notation-card-panel',
+            spotlightExtraHeight: 100,
+            callout: '🎵 After this, the pickup measure will have: dotted half rest (beats 1-3) + eighth G + eighth A (beat 4) = "Let it"',
+            validation: null,
+            successMessage: null,
+            onEnter: expandStaffNotationPanel
+        },
+        // ========== MEASURE 2 - "BE" ==========
+        {
+            instruction: '📍 Click on Measure 2 (the Am chord) to select it. This is where "be" lands on the downbeat.',
+            spotlight: '#staff-notation-card-panel',
+            targetElement: '#staff-notation-card-panel',
+            spotlightExtraHeight: 100,
+            callout: 'Click anywhere in measure 2 in the staff notation to select it. The measure will highlight when selected.',
+            validation: null,
+            successMessage: null,
+            onEnter: expandStaffNotationPanel
+        },
+        {
+            instruction: '🎵 Change the duration to QUARTER NOTE, then add an A4 for "be" on beat 1 of measure 2.',
+            spotlight: '#notation-toolbar-container',
+            targetElement: '#notation-toolbar-container',
+            spotlightExtraHeight: 20,
+            callout: '"be" is held longer than the pickup notes. A quarter note = 1 beat. Click the quarter note button (♩) then click A4.',
+            validation: null,
+            successMessage: null,
+            onEnter: expandStaffNotationPanel
+        },
+        // ========== CONTINUE THE MELODY ==========
+        {
+            instruction: '🎤 Continue with "let it" in measure 2 - add two more eighth notes: G4 and A4.',
+            spotlight: '#staff-notation-card-panel',
+            targetElement: '#staff-notation-card-panel',
+            spotlightExtraHeight: 100,
+            callout: 'Switch back to eighth notes, then add G and A. The pattern repeats: "Let it BE, let it BE..."',
+            validation: null,
+            successMessage: null,
+            onEnter: expandStaffNotationPanel
+        },
+        // ========== PLAY BACK ==========
+        {
+            instruction: '▶️ Let\'s hear what you\'ve created! Click the Play button (▶️) in the floating action menu (bottom right).',
+            spotlight: '#mobile-fab-main',
+            targetElement: '#mobile-fab-main',
+            callout: 'The purple floating button opens playback controls. You can play just the chords, just the melody, or both together!',
+            validation: null,
+            successMessage: null
+        },
+        // ========== EXPLORATION ==========
+        {
+            instruction: '🎉 Great start! Now continue adding the melody. The full "Let It Be" chorus melody follows the pattern: G-A-A-G-A (Let it be, let it be).',
+            spotlight: '#staff-notation-card-panel',
+            targetElement: '#staff-notation-card-panel',
+            spotlightExtraHeight: 100,
+            callout: '💡 Experiment with the notation tools! Try the tie button (⌒) to connect notes across measures, or the dot button (•) for dotted rhythms.',
+            validation: null,
+            successMessage: null,
+            allowFreeExplore: true,
+            onEnter: expandStaffNotationPanel
+        }
+    ];
+
+    // Start the guided mode
+    window.startGuidedMode({
+        lessonId: 'let-it-be-melody-tutorial',
+        lessonTitle: '"Let It Be" Melody Interactive Tutorial',
+        targetTab: 'melody',
+        steps: letItBeMelodySteps,
+        onComplete: (actionHistory) => {
+            console.log('[LetItBeMelodyTutorial] Tutorial completed!', actionHistory);
+            // Stay in Composition Studio
+            if (window.switchTab) {
+                window.switchTab('melody');
+            }
+            if (window.showModal) {
+                window.showModal('🎉 Congratulations! You\'ve completed the "Let It Be" melody tutorial. Keep creating!', true);
+            }
+        },
+        onCancel: () => {
+            console.log('[LetItBeMelodyTutorial] Tutorial cancelled by user.');
+            // Stay in Composition Studio
+            if (window.switchTab) {
+                window.switchTab('melody');
+            }
         }
     });
 }

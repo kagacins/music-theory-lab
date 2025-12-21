@@ -2728,6 +2728,7 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature, options =
         // Use regular rest (possibly cue-sized)
         const restDisplayOptions = {
           isCue: note._restDisplay?.isCue || false,
+          dotted: note.dotted || false,
         };
         restNote = createRest(note.duration || '4n', clef, restDisplayOptions);
       }
