@@ -256,17 +256,17 @@ function scoreVoicing(voicing, previousVoicing = null) {
  * @param {Array<string>} notes - Note names with octaves
  * @param {Array<number>} previousMidi - Previous chord's MIDI values
  * @param {Object} options - Options for voicing
- * @returns {Array<string>} Optimized note names with octaves
+ * @returns {Object} Object with notes array and inversion number
  */
 function findOptimalVoicing(notes, previousMidi = null, options = {}) {
-    if (!notes || notes.length === 0) return notes;
+    if (!notes || notes.length === 0) return { notes, inversion: 0 };
 
     // Generate all playable voicings for this chord
     const voicings = generatePlayableVoicings(notes);
 
     if (voicings.length === 0) {
         // No valid voicings found, return original
-        return notes;
+        return { notes, inversion: 0 };
     }
 
     // If no previous chord, pick a voicing in a comfortable middle range
@@ -277,7 +277,7 @@ function findOptimalVoicing(notes, previousMidi = null, options = {}) {
             const avgB = b.midiValues.reduce((x, y) => x + y, 0) / b.midiValues.length;
             return Math.abs(avgA - 60) - Math.abs(avgB - 60);
         });
-        return voicings[0].notes;
+        return { notes: voicings[0].notes, inversion: voicings[0].inversion };
     }
 
     // Score each voicing and pick the best one
@@ -292,7 +292,7 @@ function findOptimalVoicing(notes, previousMidi = null, options = {}) {
         }
     }
 
-    return bestVoicing.notes;
+    return { notes: bestVoicing.notes, inversion: bestVoicing.inversion };
 }
 
 /**
@@ -314,11 +314,12 @@ export function optimizeProgressionVoiceLeading(progression, options = {}) {
 
         if (chord.notes && chord.notes.length > 0) {
             // Find optimal voicing (guaranteed to be playable by one hand)
-            const optimizedNotes = findOptimalVoicing(chord.notes, previousMidi, options);
-            optimizedChord.notes = optimizedNotes;
+            const result = findOptimalVoicing(chord.notes, previousMidi, options);
+            optimizedChord.notes = result.notes;
+            optimizedChord.inversion = result.inversion;
 
             // Update previousMidi for next iteration
-            previousMidi = optimizedNotes.map(toMidi).filter(m => m !== null);
+            previousMidi = result.notes.map(toMidi).filter(m => m !== null);
         }
 
         optimized.push(optimizedChord);

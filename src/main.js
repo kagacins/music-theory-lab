@@ -38,6 +38,7 @@ import { showWhatIfSandbox } from './modules/ui/whatIfSandbox.js';
 import { initChordFunctionLegend, showLegend as showChordFunctionLegend, hideLegend as hideChordFunctionLegend, toggleLegend as toggleChordFunctionLegend } from './modules/ui/chordFunctionLegend.js';
 // Phase 3: Guided Learning Journeys
 import { initLearnTab } from './modules/ui/learnTabController.js';
+import { dispatchBuilderEvent } from './modules/ui/lessonGuidedMode.js';
 import { initCircleOfFifths, toggleCircleOfFifthsPanel, openCircleOfFifthsPanel, closeCircleOfFifthsPanel } from './modules/features/circleOfFifths.js';
 import { initGuitarFretboard, toggleGuitarFretboardPanel, openGuitarFretboardPanel, closeGuitarFretboardPanel, updateGuitarFretboard } from './modules/features/guitarFretboard.js';
 import {
@@ -470,6 +471,11 @@ function initMobileFab() {
         fabMenu.classList.toggle('hidden', !isOpen);
         fabMain.querySelector('.fab-icon').style.transform = isOpen ? 'rotate(45deg)' : 'rotate(0deg)';
 
+        // Dispatch event for guided mode tutorials when FAB is opened
+        if (isOpen) {
+            dispatchBuilderEvent('fabOpened', { tab: window.currentTab || 'builder' });
+        }
+
         // Hide/show quick buttons based on FAB state and current tab
         if (fabBuilderQuickButtons && window.currentTab === 'builder') {
             fabBuilderQuickButtons.classList.toggle('hidden', isOpen);
@@ -481,6 +487,8 @@ function initMobileFab() {
         // Close any open submenu when closing main menu
         if (!isOpen) {
             closeAllSubmenus();
+            // Dispatch event for guided mode tutorials when FAB is closed
+            dispatchBuilderEvent('fabClosed', {});
         }
 
         // Show labels on hover
@@ -582,6 +590,19 @@ function initMobileFab() {
                 } else {
                     activeSubmenu = null;
                 }
+            } else if (categoryType === 'settings') {
+                // For settings category, toggle submenu and dispatch event for tutorial
+                const submenu = category.querySelector('.fab-submenu');
+                if (submenu) {
+                    const isSubmenuOpen = !submenu.classList.contains('hidden');
+                    submenu.classList.toggle('hidden', isSubmenuOpen);
+                    activeSubmenu = isSubmenuOpen ? null : submenu;
+
+                    // Dispatch event for tutorial tracking
+                    if (!isSubmenuOpen) {
+                        dispatchBuilderEvent('settingsSectionClicked', {});
+                    }
+                }
             } else {
                 // For other categories, toggle their single submenu
                 const submenu = category.querySelector('.fab-submenu');
@@ -665,6 +686,8 @@ function initMobileFab() {
         if (fabMelodyQuickButtons && window.currentTab === 'melody') {
             fabMelodyQuickButtons.classList.remove('hidden');
         }
+        // Dispatch event for guided mode tutorials
+        dispatchBuilderEvent('fabClosed', {});
     }
 
     // Expose closeFab globally so it can be called on tab change
@@ -712,8 +735,19 @@ function initMobileFab() {
 
     if (fabPlayAllQuick) {
         fabPlayAllQuick.addEventListener('click', () => {
-            const playAllBtn = document.getElementById('action-play-all');
-            if (playAllBtn) playAllBtn.click();
+            // Context-aware play button - plays progression on Chord Lab/Composition Studio
+            const currentTab = document.querySelector('.tab-pane.active')?.id?.replace('tab-', '') || 'melody';
+            // Play chord progression on builder, trainer, or melody (Composition Studio) tabs
+            if (currentTab === 'builder' || currentTab === 'trainer' || currentTab === 'melody') {
+                // Chord Lab, Trainer, or Composition Studio: play the chord progression
+                if (window.handleAutoPlayback) {
+                    window.handleAutoPlayback();
+                }
+            } else {
+                // Other tabs: click the play-all button
+                const playAllBtn = document.getElementById('action-play-all');
+                if (playAllBtn) playAllBtn.click();
+            }
         });
     }
 
@@ -928,6 +962,8 @@ function initFabSettingsPanel() {
                 const currentSettings = compositionState.getSettings?.() || {};
                 compositionState.setSettings({ ...currentSettings, tempo: bpm });
             }
+            // Dispatch event for guided mode tutorials
+            dispatchBuilderEvent('bpmChanged', { bpm });
         });
     }
 
@@ -1840,6 +1876,435 @@ function showStartHereModal() {
     }
 }
 
+/**
+ * Start the "Let It Be" interactive site tutorial
+ * This tutorial walks users through creating the Beatles chorus progression,
+ * teaching Chord Lab, Composition Studio, chord editing, and more.
+ */
+function startLetItBeTutorial() {
+    const landingPage = document.getElementById('landing-page');
+    const mainApp = document.getElementById('main-app');
+
+    // If we're on the landing page, enter the app first
+    if (landingPage && !landingPage.classList.contains('hidden')) {
+        // Fade out landing page
+        landingPage.style.transition = 'opacity 0.3s ease-out';
+        landingPage.style.opacity = '0';
+
+        setTimeout(() => {
+            landingPage.classList.add('hidden');
+            mainApp.classList.remove('hidden');
+
+            // Fade in main app
+            mainApp.style.opacity = '0';
+            mainApp.style.transition = 'opacity 0.3s ease-in';
+            setTimeout(() => {
+                mainApp.style.opacity = '1';
+                // Switch to Chord Lab and start the tutorial
+                if (window.switchTab) {
+                    window.switchTab('builder');
+                }
+                // Start the guided tutorial after a brief delay
+                setTimeout(() => {
+                    launchLetItBeTutorial();
+                }, 500);
+            }, 50);
+        }, 300);
+    } else {
+        // Already in the app, just start the tutorial
+        if (window.switchTab) {
+            window.switchTab('builder');
+        }
+        setTimeout(() => {
+            launchLetItBeTutorial();
+        }, 300);
+    }
+}
+
+/**
+ * Launch the Let It Be tutorial steps
+ * This is called after the app is ready and we're on the Chord Lab tab
+ */
+function launchLetItBeTutorial() {
+    // Check if the guided mode system is available
+    if (!window.startGuidedMode) {
+        console.warn('[LetItBeTutorial] Guided mode not available yet. Retrying...');
+        setTimeout(launchLetItBeTutorial, 500);
+        return;
+    }
+
+    // Show confirmation modal that explains the tutorial will clear progression
+    showTutorialStartModal(() => {
+        // User confirmed - start the tutorial (clearing happens inside actuallyLaunchLetItBeTutorial)
+        actuallyLaunchLetItBeTutorial();
+    });
+}
+
+/**
+ * Show a modal explaining the tutorial will clear the current progression
+ */
+function showTutorialStartModal(onConfirm) {
+    // Remove any existing modal
+    const existingModal = document.getElementById('tutorial-start-modal');
+    if (existingModal) existingModal.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'tutorial-start-modal';
+    modal.className = 'fixed inset-0 z-[10000] flex items-center justify-center bg-black/50';
+    modal.innerHTML = `
+        <div class="bg-white rounded-xl shadow-2xl max-w-md mx-4 p-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
+                    <span class="text-2xl">🎸</span>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900">"Let It Be" Tutorial</h3>
+                    <p class="text-sm text-gray-500">Interactive chord progression lesson</p>
+                </div>
+            </div>
+            <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p class="text-sm text-amber-800">
+                    <strong>Note:</strong> This tutorial will clear any existing chord progression you have so you can start fresh. Your work will not be saved.
+                </p>
+            </div>
+            <p class="text-gray-600 mb-6">
+                You'll learn to build the iconic "Let It Be" chorus using Chord Lab and Composition Studio. We'll intentionally make some "mistakes" so you can practice fixing them!
+            </p>
+            <div class="flex gap-3 justify-end">
+                <button id="tutorial-start-cancel" class="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors">
+                    Cancel
+                </button>
+                <button id="tutorial-start-confirm" class="px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all font-medium">
+                    Start Tutorial
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById('tutorial-start-cancel').addEventListener('click', () => {
+        modal.remove();
+    });
+
+    document.getElementById('tutorial-start-confirm').addEventListener('click', () => {
+        modal.remove();
+        if (onConfirm) onConfirm();
+    });
+
+    // Close on backdrop click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+}
+
+/**
+ * Actually launch the tutorial (after confirmation)
+ */
+function actuallyLaunchLetItBeTutorial() {
+    console.log('[LetItBeTutorial] Starting tutorial, clearing progression...');
+
+    // Clear the progression first (user already confirmed in the modal)
+    clearProgression(true); // true = skip confirmation dialog
+
+    console.log('[LetItBeTutorial] Progression cleared, chords remaining:', window.getProgressionData?.()?.length || 0);
+
+    // Disable chord card tooltips during tutorial for cleaner UI
+    document.body.classList.add('progression-tooltips-disabled');
+
+    // Define the tutorial steps
+    // "Let It Be" CHORUS progression: Am - G - F - C
+    const letItBeTutorialSteps = [
+        // ========== INTRODUCTION ==========
+        {
+            instruction: 'Welcome to the Interactive Tutorial! We\'re going to create the iconic chorus of "Let It Be" by The Beatles.',
+            callout: '🎸 This tutorial will teach you the Chord Lab, Composition Studio, and more. We\'ll intentionally make a few "mistakes" along the way so you can learn how to fix them!',
+            validation: null,
+            successMessage: null
+        },
+        // ========== GO TO COMPOSITION STUDIO TO SET KEY ==========
+        {
+            instruction: '🎹 First, let\'s set the key. Click the "Composition Studio" tab.',
+            spotlight: '#header-tab-btn-melody',
+            targetElement: '#header-tab-btn-melody',
+            callout: 'We\'ll set the key in the Composition Studio so our chords show Roman numerals correctly.',
+            isActionStep: true,
+            validation: { type: 'tab_selected', value: 'melody' },
+            successMessage: 'Welcome to the Composition Studio!'
+        },
+        {
+            instruction: 'Click the "Key" button (next to "Chord Progression") to open the Circle of Fifths.',
+            spotlight: '#melody-key-button',
+            targetElement: '#melody-key-button',
+            callout: '"Let It Be" is in the key of C Major. Setting the key helps us see Roman numerals (like vi, V, IV, I) for each chord.',
+            isActionStep: true,
+            validation: { type: 'circle_of_fifths_opened' },
+            successMessage: 'Circle of Fifths opened!'
+        },
+        {
+            instruction: 'Click on "C" in the Circle of Fifths to set the key to C Major.',
+            spotlight: '#circle-of-fifths-panel',
+            targetElement: '#circle-of-fifths-panel',
+            spotlightExtraHeight: 50,
+            callout: 'C Major has no sharps or flats - it\'s the most common key for pop songs!',
+            isActionStep: true,
+            validation: { type: 'progression_key_changed', value: 'C Major' },
+            successMessage: 'Key set to C Major! Now the chords will show their Roman numerals.'
+        },
+        // ========== NAVIGATE TO CHORD LAB ==========
+        {
+            instruction: '🎵 Now let\'s go to the Chord Lab to build our chords. Click the "Chord Lab" tab.',
+            spotlight: '#header-tab-btn-builder',
+            targetElement: '#header-tab-btn-builder',
+            callout: 'The Chord Lab is where you create and explore individual chords before adding them to your progression.',
+            isActionStep: true,
+            validation: { type: 'tab_selected', value: 'builder' },
+            successMessage: 'Welcome to the Chord Lab!'
+        },
+        // ========== CHORD LAB: Add Am (first chord of chorus) ==========
+        {
+            instruction: 'Let\'s start by building our first chord. Select "A" as the root note in the Note Selector grid.',
+            spotlight: '#builder-note-selector',
+            targetElement: '#builder-note-selector',
+            callout: 'The "Let It Be" chorus starts with Am - the vi chord that gives it that emotional feel.',
+            validation: { type: 'root_selected', value: 'A' },
+            successMessage: 'A selected!'
+        },
+        {
+            instruction: 'Now select "Minor" as the chord type.',
+            spotlight: '#builder-chord-type-selector',
+            targetElement: '#builder-chord-type-selector',
+            callout: 'Am (A Minor) sets the melancholic, reflective mood of the chorus.',
+            validation: { type: 'type_selected', value: 'Minor' },
+            successMessage: 'Minor selected!'
+        },
+        {
+            instruction: 'Click the purple "+" button on the right side of the screen to add Am to your progression.',
+            spotlight: '#fab-add-chord-quick',
+            targetElement: '#fab-add-chord-quick',
+            callout: 'This Am chord starts our "Let It Be" chorus. The Add Chord button is in the floating action menu.',
+            validation: { type: 'chord_added_to_progression', value: 'A Minor' },
+            successMessage: 'Am added! First chord done.'
+        },
+        // ========== CHORD LAB: Add C Major (INTENTIONALLY WRONG - should be G) ==========
+        {
+            instruction: '⚠️ INTENTIONAL MISTAKE: Let\'s add C next - but wait, the chorus goes Am-G-F-C, so C should be LAST! Select "C" as the root.',
+            spotlight: '#builder-note-selector',
+            targetElement: '#builder-note-selector',
+            callout: 'We\'re adding C in the wrong position on purpose. You\'ll learn to reorder chords in the Composition Studio!',
+            validation: { type: 'root_selected', value: 'C' },
+            successMessage: 'C selected!'
+        },
+        {
+            instruction: 'Select "Major" as the chord type.',
+            spotlight: '#builder-chord-type-selector',
+            targetElement: '#builder-chord-type-selector',
+            callout: 'C Major is the I chord - home base. But it belongs at the END of the chorus, not here!',
+            validation: { type: 'type_selected', value: 'Major' },
+            successMessage: 'Major selected!'
+        },
+        {
+            instruction: 'Click the purple "+" button to add C Major to the progression.',
+            spotlight: '#fab-add-chord-quick',
+            targetElement: '#fab-add-chord-quick',
+            callout: 'Remember: C is in the wrong position. We\'ll move it to the end later!',
+            validation: { type: 'chord_added_to_progression', value: 'C Major' },
+            successMessage: 'C Major added (in wrong position - we\'ll fix this)!'
+        },
+        // ========== CHORD LAB: Add G Major ==========
+        {
+            instruction: 'Now let\'s add the G chord. Select "G" as the root.',
+            spotlight: '#builder-note-selector',
+            targetElement: '#builder-note-selector',
+            callout: 'G is the V chord - the dominant that creates tension before resolving to C.',
+            validation: { type: 'root_selected', value: 'G' },
+            successMessage: 'G selected!'
+        },
+        {
+            instruction: 'Select "Major" as the chord type.',
+            spotlight: '#builder-chord-type-selector',
+            targetElement: '#builder-chord-type-selector',
+            callout: 'G Major should be the 2nd chord in the chorus. We\'re also skipping F (another intentional mistake)!',
+            validation: { type: 'type_selected', value: 'Major' },
+            successMessage: 'Major selected!'
+        },
+        {
+            instruction: 'Click the purple "+" button to add G Major to the progression.',
+            spotlight: '#fab-add-chord-quick',
+            targetElement: '#fab-add-chord-quick',
+            callout: 'We now have Am - C - G, but we need Am - G - F - C. Time to fix it in the Composition Studio!',
+            validation: { type: 'chord_added_to_progression', value: 'G Major' },
+            successMessage: 'G Major added! Now let\'s head to the Composition Studio.'
+        },
+        // ========== SWITCH TO COMPOSITION STUDIO ==========
+        {
+            instruction: 'Great! Now click on the "Composition Studio" tab to see our progression and fix those mistakes.',
+            spotlight: '#header-tab-btn-melody',
+            targetElement: '#header-tab-btn-melody',
+            callout: 'The Composition Studio is where you arrange, edit, and perfect your chord progressions.',
+            validation: { type: 'tab_selected', value: 'melody' },
+            successMessage: 'Welcome to the Composition Studio!'
+        },
+        // ========== COMPOSITION STUDIO: Summary + Drag/Drop combined ==========
+        {
+            instruction: '🔄 Your progression shows Am - C - G, but the chorus is Am - G - F - C. First, drag the C chord card to the END (after G). Click and hold the C card, then drag it past G.',
+            spotlight: '#melody-progression-visualization',
+            targetElement: '#melody-progression-visualization',
+            spotlightExtraHeight: 100,
+            callout: 'Click on the C Major card (black rectangle) and drag it to the right of G. The order should become Am - G - C.',
+            validation: { type: 'chord_reordered' },
+            successMessage: 'C moved to the end! Now it\'s Am - G - C. We just need to add F!'
+        },
+        // ========== QUICK ADD: First show the button, then the form ==========
+        {
+            instruction: '➕ ADD MISSING F: Click the "+ Add Chord" button (next to the "Chord Progression" header) to open the Quick Add form.',
+            spotlight: '#melody-quick-add-btn',
+            targetElement: '#melody-quick-add-btn',
+            callout: 'This button opens a quick way to add chords without going back to Chord Lab.',
+            isActionStep: true,
+            validation: { type: 'quick_add_form_opened' },
+            successMessage: 'Quick Add form opened!'
+        },
+        {
+            instruction: 'In the Quick Add form, select "F" as the root, leave it as "Major", and click "Add Chord".',
+            spotlight: '#quick-add-chord-form-melody',
+            targetElement: '#quick-add-chord-form-melody',
+            spotlightExtraHeight: 50,
+            callout: 'F Major (IV chord) is the missing piece! Leave the inversion as Root Position for now.',
+            isActionStep: true,
+            validation: { type: 'chord_added_to_progression', value: 'F Major' },
+            successMessage: 'F Major added! Now we have Am - G - C - F. One more reorder to go!'
+        },
+        // ========== DRAG F before C ==========
+        {
+            instruction: '🔄 Almost there! The order is Am - G - C - F but we need Am - G - F - C. Drag the C chord card to the END (after F).',
+            spotlight: '#melody-progression-visualization',
+            targetElement: '#melody-progression-visualization',
+            spotlightExtraHeight: 100,
+            callout: 'Drag the C Major card to the right of F. This completes the correct chorus order!',
+            validation: { type: 'chord_reordered' },
+            successMessage: 'Perfect! The chorus is now Am - G - F - C!'
+        },
+        // ========== EDIT G INVERSION: First expand the card ==========
+        {
+            instruction: '🔧 FIX G INVERSION: Find the G Major chord card and click the "⋯" button (three dots) below the red X to expand it.',
+            spotlight: '#melody-progression-visualization',
+            targetElement: '#melody-progression-visualization',
+            spotlightExtraHeight: 100,
+            callout: 'Each chord card has a "⋯" expand button. Click it on the G chord to see the inversion options.',
+            isActionStep: true,
+            validation: { type: 'chord_card_expanded' },
+            successMessage: 'Card expanded! Now find the inversion buttons.'
+        },
+        {
+            instruction: 'In the expanded G chord card, find the inversion buttons and click "1st" to change to 1st inversion.',
+            spotlight: '#melody-progression-visualization',
+            targetElement: '#melody-progression-visualization',
+            spotlightExtraHeight: 200,
+            callout: '1st inversion puts B (the 3rd) in the bass. Look for buttons labeled "Root", "1st", "2nd" in the expanded card.',
+            isActionStep: true,
+            validation: { type: 'chord_card_edited', property: 'inversion' },
+            successMessage: 'G chord updated to 1st inversion! The bass line is smoother.'
+        },
+        // ========== EDIT Am INVERSION ==========
+        {
+            instruction: '🔧 BONUS: Let\'s also fix Am! Click the "⋯" button on the Am chord card to expand it.',
+            spotlight: '#melody-progression-visualization',
+            targetElement: '#melody-progression-visualization',
+            spotlightExtraHeight: 100,
+            callout: 'We\'ll change Am to 1st inversion to get C in the bass - creating a smooth half-step from C → B (G chord).',
+            isActionStep: true,
+            validation: { type: 'chord_card_expanded' },
+            successMessage: 'Card expanded! Now change the inversion.'
+        },
+        {
+            instruction: 'In the expanded Am chord card, click "1st" to change to 1st inversion.',
+            spotlight: '#melody-progression-visualization',
+            targetElement: '#melody-progression-visualization',
+            spotlightExtraHeight: 200,
+            callout: 'Am/C (1st inversion) puts C in the bass, creating the classic bass line: C → B → F → C.',
+            isActionStep: true,
+            validation: { type: 'chord_card_edited', property: 'inversion' },
+            successMessage: 'Am is now in 1st inversion! Beautiful voice leading.'
+        },
+        // ========== FAB: Open and adjust BPM ==========
+        {
+            instruction: '⚙️ ADJUST TEMPO: Click the floating action button (the purple circle with +) in the bottom right corner to open it.',
+            spotlight: '#mobile-fab-main',
+            targetElement: '#mobile-fab-main',
+            callout: 'The FAB (Floating Action Button) gives you quick access to playback settings, BPM, and more.',
+            isActionStep: true,
+            validation: { type: 'fab_opened' },
+            successMessage: 'FAB opened! Now find the Settings (gear icon).'
+        },
+        {
+            instruction: 'Click the gray Settings button (gear icon) in the FAB menu to see the BPM controls.',
+            spotlight: '.fab-category[data-category="settings"]',
+            targetElement: '.fab-category[data-category="settings"]',
+            callout: 'The Settings section contains tempo (BPM), arpeggio speed, and other playback options.',
+            isActionStep: true,
+            validation: { type: 'settings_section_clicked' },
+            successMessage: 'Settings expanded! Now adjust the BPM.'
+        },
+        {
+            instruction: 'Use the BPM slider to set the tempo to around 140 BPM for an upbeat feel.',
+            spotlight: '#fab-bpm-slider',
+            targetElement: '#fab-bpm-slider',
+            callout: 'Set the tempo between 135-145 BPM. Drag the slider to adjust.',
+            isActionStep: true,
+            validation: { type: 'bpm_changed', minBpm: 135, maxBpm: 145 },
+            successMessage: 'Perfect tempo! The progression is ready to play.'
+        },
+        // ========== CLOSE FAB FIRST ==========
+        {
+            instruction: '📱 Close the FAB menu by tapping the purple + button.',
+            spotlight: '#mobile-fab-main',
+            targetElement: '#mobile-fab-main',
+            callout: 'Close the menu to access the Play button.',
+            isActionStep: true,
+            validation: { type: 'fab_closed' },
+            successMessage: 'Great!',
+            quickAdvance: true  // Advance immediately without delay
+        },
+        // ========== FINAL PLAYBACK ==========
+        {
+            instruction: '🎵 LISTEN: Click the green "Play" button to hear your complete "Let It Be" progression!',
+            spotlight: '#fab-play-all-quick',
+            targetElement: '#fab-play-all-quick',
+            callout: 'You\'ve built the iconic Am-G-F-C progression. Click Play to hear it!',
+            isActionStep: true,
+            validation: { type: 'progression_played' },
+            successMessage: 'Beautiful! You\'ve created the "Let It Be" chorus progression!'
+        },
+        // ========== COMPLETION ==========
+        {
+            instruction: '🎉 Congratulations! You\'ve completed the "Let It Be" tutorial!',
+            callout: '📚 You learned: Adding chords in Chord Lab, Reordering with drag & drop, Quick Add for missing chords, Editing inversions on chord cards, Adjusting BPM, and Playing your progression!',
+            validation: null,
+            successMessage: null,
+            allowFreeExplore: true
+        }
+    ];
+
+    // Start the guided mode
+    window.startGuidedMode({
+        lessonId: 'let-it-be-site-tutorial',
+        lessonTitle: '"Let It Be" Interactive Tutorial',
+        targetTab: 'builder',
+        steps: letItBeTutorialSteps,
+        onComplete: (actionHistory) => {
+            console.log('[LetItBeTutorial] Tutorial completed!', actionHistory);
+            if (window.showModal) {
+                window.showModal('🎉 Congratulations! You\'ve completed the "Let It Be" tutorial. Keep exploring and creating!', true);
+            }
+        },
+        onCancel: () => {
+            console.log('[LetItBeTutorial] Tutorial cancelled by user.');
+        }
+    });
+}
+
 // Landing page now always shows on root site visit - no skip behavior
 
 // Expose functions to global scope for HTML event handlers
@@ -1880,6 +2345,7 @@ window.showToast = showToast;
 window.enterApp = enterApp;
 window.enterAppToTab = enterAppToTab;
 window.showStartHereModal = showStartHereModal;
+window.startLetItBeTutorial = startLetItBeTutorial;
 
 // Phase 1.3 & Phase 2: Interactive Learning Tools
 window.showChordComparisonModal = showChordComparisonModal;

@@ -270,6 +270,21 @@ export function endGuidedMode(completed = false) {
     // Clean up listeners
     cleanupActionListeners();
 
+    // Re-enable chord card tooltips (they may have been disabled during site tutorial)
+    document.body.classList.remove('progression-tooltips-disabled');
+
+    // Clean up any expanded chord cards and open tooltips
+    // First, collapse all chord cards using the proper function
+    if (window.collapseAllChordCards) {
+        window.collapseAllChordCards();
+    }
+
+    // Force re-render of progression display to ensure all cards are in collapsed state
+    if (window.renderProgressionDisplay) {
+        window.renderProgressionDisplay('melody-progression-visualization', true);
+        window.renderProgressionDisplay('builder-progression-display', true);
+    }
+
     // Call appropriate callback
     if (completed && guidedModeState.onComplete) {
         guidedModeState.onComplete(guidedModeState.actionHistory);
@@ -277,18 +292,23 @@ export function endGuidedMode(completed = false) {
         guidedModeState.onCancel();
     }
 
-    // Switch back to learn tab
-    switchTab('learn');
+    // For site tutorials (not from Theory Academy), don't switch to learn tab
+    const isSiteTutorial = lessonId && lessonId.includes('site-tutorial');
 
-    // Then render the specific lesson into the correct container
-    if (lessonId) {
-        setTimeout(() => {
-            // Use learn-tab-content (the inner container) not tab-learn (the outer wrapper)
-            const learnContainer = document.getElementById('learn-tab-content');
-            if (learnContainer && typeof renderLessonViewer === 'function') {
-                renderLessonViewer(lessonId, learnContainer, false);
-            }
-        }, 100);
+    if (!isSiteTutorial) {
+        // Switch back to learn tab for Theory Academy lessons
+        switchTab('learn');
+
+        // Then render the specific lesson into the correct container
+        if (lessonId) {
+            setTimeout(() => {
+                // Use learn-tab-content (the inner container) not tab-learn (the outer wrapper)
+                const learnContainer = document.getElementById('learn-tab-content');
+                if (learnContainer && typeof renderLessonViewer === 'function') {
+                    renderLessonViewer(lessonId, learnContainer, false);
+                }
+            }, 100);
+        }
     }
 
     // Reset state
@@ -331,20 +351,28 @@ function createFloatingBanner() {
 
     floatingBanner = document.createElement('div');
     floatingBanner.id = 'lesson-guided-banner';
-    floatingBanner.className = 'fixed top-0 left-0 right-0 z-[9999] transform transition-transform duration-300';
+    floatingBanner.className = 'fixed top-0 left-0 right-0 z-[10001] transform transition-transform duration-300';
     floatingBanner.style.cssText = `
         background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
         box-shadow: 0 4px 20px rgba(79, 70, 229, 0.4);
     `;
 
-    const { lessonTitle, steps, stepIndex, targetTab } = guidedModeState;
+    const { lessonTitle, lessonId, steps, stepIndex, targetTab } = guidedModeState;
     const totalSteps = steps.length;
     const currentStepNum = stepIndex + 1;
 
+    // Check if this is a site tutorial (not from Theory Academy)
+    const isSiteTutorial = lessonId && lessonId.includes('site-tutorial');
+
     // Determine exercise type label based on target tab
-    const exerciseTypeLabel = targetTab === 'trainer'
-        ? 'GUIDED PROGRESSION WORKSHOP EXERCISE'
-        : 'GUIDED CHORD LAB EXERCISE';
+    const exerciseTypeLabel = isSiteTutorial
+        ? 'INTERACTIVE TUTORIAL'
+        : (targetTab === 'trainer'
+            ? 'GUIDED PROGRESSION WORKSHOP EXERCISE'
+            : 'GUIDED CHORD LAB EXERCISE');
+
+    // Button text for return/end
+    const returnButtonText = isSiteTutorial ? 'End Tutorial' : 'Return to Lesson';
 
     floatingBanner.innerHTML = `
         <div class="max-w-6xl mx-auto px-4 py-3">
@@ -388,13 +416,13 @@ function createFloatingBanner() {
                     </button>
                 </div>
 
-                <!-- Right: Return button -->
+                <!-- Right: Return/End button -->
                 <div class="flex items-center gap-2">
                     <button id="guided-return-btn" class="px-4 py-1.5 bg-white text-indigo-700 hover:bg-indigo-50 rounded-lg text-sm font-bold transition shadow-md flex items-center gap-1">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                         </svg>
-                        Return to Lesson
+                        ${returnButtonText}
                     </button>
                 </div>
             </div>
@@ -506,10 +534,11 @@ function goToPreviousStep() {
 }
 
 /**
- * Return to the specific lesson (not just Learn tab)
+ * Return to the specific lesson (or end tutorial for site tutorials)
  */
 function returnToLesson() {
     const lessonId = guidedModeState.lessonId;
+    const isSiteTutorial = lessonId && lessonId.includes('site-tutorial');
 
     // Remove UI elements
     removeFloatingBanner();
@@ -525,23 +554,44 @@ function returnToLesson() {
     // Clean up listeners
     cleanupActionListeners();
 
+    // Re-enable chord card tooltips (they may have been disabled during site tutorial)
+    document.body.classList.remove('progression-tooltips-disabled');
+
+    // Clean up any expanded chord cards and open tooltips
+    // First, collapse all chord cards using the proper function
+    if (window.collapseAllChordCards) {
+        window.collapseAllChordCards();
+    }
+
+    // Force re-render of progression display to ensure all cards are in collapsed state
+    // Do this immediately before tab switch
+    if (window.renderProgressionDisplay) {
+        window.renderProgressionDisplay('melody-progression-visualization', true);
+        window.renderProgressionDisplay('builder-progression-display', true);
+    }
+
     // Call cancel callback
     if (guidedModeState.onCancel) {
         guidedModeState.onCancel();
     }
 
-    // Switch to learn tab first
-    switchTab('learn');
+    if (isSiteTutorial) {
+        // For site tutorials, go to Chord Lab
+        switchTab('builder');
+    } else {
+        // For Theory Academy lessons, go back to Learn tab and show the lesson
+        switchTab('learn');
 
-    // Then render the specific lesson into the correct container
-    if (lessonId) {
-        setTimeout(() => {
-            // Use learn-tab-content (the inner container) not tab-learn (the outer wrapper)
-            const learnContainer = document.getElementById('learn-tab-content');
-            if (learnContainer && typeof renderLessonViewer === 'function') {
-                renderLessonViewer(lessonId, learnContainer, false);
-            }
-        }, 100);
+        // Then render the specific lesson into the correct container
+        if (lessonId) {
+            setTimeout(() => {
+                // Use learn-tab-content (the inner container) not tab-learn (the outer wrapper)
+                const learnContainer = document.getElementById('learn-tab-content');
+                if (learnContainer && typeof renderLessonViewer === 'function') {
+                    renderLessonViewer(lessonId, learnContainer, false);
+                }
+            }, 100);
+        }
     }
 
     // Reset state
@@ -643,7 +693,8 @@ function showCurrentStep() {
     if (currentStep.targetElement && !isFreeExploreStep && !isLastStep) {
         // Pass whether this is an info-only step (no validation required)
         const isInfoOnly = !currentStep.validation;
-        showStepIndicator(currentStep.targetElement, stepIndex + 1, isInfoOnly);
+        const extraHeight = currentStep.spotlightExtraHeight || 0;
+        showStepIndicator(currentStep.targetElement, stepIndex + 1, isInfoOnly, extraHeight);
     } else {
         removeStepIndicator();
     }
@@ -651,9 +702,29 @@ function showCurrentStep() {
     // Handle steps based on validation type
     if (currentStep.validation) {
         // Step requires user action - set up validation
-        guidedModeState.validationCallback = (action) => {
-            return validateAction(action, currentStep.validation);
-        };
+        // Record when this step started so we can ignore stale events
+        const stepStartTime = Date.now();
+        const currentStepIndex = stepIndex;
+
+        // Add a small delay before enabling validation to prevent stale events
+        // Use shorter delay for quickAdvance steps
+        const validationDelay = currentStep.quickAdvance ? 100 : 500;
+        guidedModeState.validationCallback = null;
+        setTimeout(() => {
+            // Make sure we're still on the same step (didn't navigate away)
+            if (guidedModeState.stepIndex !== currentStepIndex) {
+                return;
+            }
+            guidedModeState.validationCallback = (action) => {
+                // Only validate events that happened AFTER this step started (with buffer)
+                const minValidTime = stepStartTime + validationDelay;
+                if (action.timestamp && action.timestamp < minValidTime) {
+                    return false; // Ignore stale events
+                }
+                return validateAction(action, currentStep.validation);
+            };
+        }, validationDelay);
+
         hideNextButton();
     } else {
         // Info-only step - show "Continue" button
@@ -743,50 +814,27 @@ let originalTabStyle = null;
 let bannerHeight = 0;
 
 /**
- * Shift page content down to make room for the banner and lock scrolling
- * Also makes the tab content scrollable so we can scroll to spotlight targets
+ * Set up the page for the tutorial banner
+ * Uses a simpler approach - banner is fixed overlay, no body padding manipulation
  */
+// Store original styles for multiple tabs
+let originalTabStyles = {};
+
 function shiftPageForBanner() {
-    // Get banner height
+    // Get banner height for scroll calculations
     const banner = document.getElementById('lesson-guided-banner');
     bannerHeight = banner ? banner.offsetHeight : 120;
 
-    // Store original body styles
+    // Store original body overflow style only
     originalBodyStyle = {
-        paddingTop: document.body.style.paddingTop,
-        overflow: document.body.style.overflow,
-        position: document.body.style.position
+        overflow: document.body.style.overflow
     };
 
-    // Add padding to push content below banner
-    document.body.style.paddingTop = `${bannerHeight}px`;
-
-    // Lock body scrolling
-    document.body.style.overflow = 'hidden';
-    document.body.style.position = 'relative';
-
-    // Scroll to top to ensure consistent positioning
+    // Scroll to top to ensure consistent starting position
     window.scrollTo(0, 0);
 
-    // Make the tab content scrollable with a fixed height
-    const targetTab = guidedModeState.targetTab;
-    const tabContent = document.getElementById(`tab-${targetTab}`);
-    if (tabContent) {
-        originalTabStyle = {
-            tabId: targetTab, // Save tab ID for later restoration
-            height: tabContent.style.height,
-            maxHeight: tabContent.style.maxHeight,
-            overflowY: tabContent.style.overflowY,
-            position: tabContent.style.position
-        };
-
-        // Set the tab to be scrollable with height = viewport - banner height - some padding
-        const availableHeight = window.innerHeight - bannerHeight - 20;
-        tabContent.style.height = `${availableHeight}px`;
-        tabContent.style.maxHeight = `${availableHeight}px`;
-        tabContent.style.overflowY = 'auto';
-        tabContent.style.position = 'relative';
-    }
+    // No body padding or tab height manipulation - keep layout natural
+    // The banner is fixed overlay, and we'll scroll elements into view with offset
 }
 
 /**
@@ -794,46 +842,21 @@ function shiftPageForBanner() {
  */
 function restorePageStyles() {
     if (originalBodyStyle) {
-        document.body.style.paddingTop = originalBodyStyle.paddingTop || '';
         document.body.style.overflow = originalBodyStyle.overflow || '';
-        document.body.style.position = originalBodyStyle.position || '';
         originalBodyStyle = null;
     }
 
-    // Restore tab content styles using the saved tab ID
-    if (originalTabStyle && originalTabStyle.tabId) {
-        const tabContent = document.getElementById(`tab-${originalTabStyle.tabId}`);
-        if (tabContent) {
-            tabContent.style.height = originalTabStyle.height || '';
-            tabContent.style.maxHeight = originalTabStyle.maxHeight || '';
-            tabContent.style.overflowY = originalTabStyle.overflowY || '';
-            tabContent.style.position = originalTabStyle.position || '';
-        }
-        originalTabStyle = null;
-    }
-
+    originalTabStyles = {};
+    originalTabStyle = null;
     bannerHeight = 0;
 }
 
 /**
  * Unlock scrolling for free exploration steps
- * Removes the fixed height constraint while keeping the banner
+ * Currently a no-op since we're not constraining scrolling anymore
  */
 function unlockScrollForExploration() {
-    // Unlock body scrolling
-    if (originalBodyStyle) {
-        document.body.style.overflow = '';
-    }
-
-    // Remove fixed height from tab content but keep it scrollable
-    const tabContent = document.getElementById(`tab-${guidedModeState.targetTab}`);
-    if (tabContent) {
-        tabContent.style.height = '';
-        tabContent.style.maxHeight = '';
-        // Keep overflow-y auto so content can scroll naturally
-        tabContent.style.overflowY = '';
-    }
-
+    // No-op - scrolling is not locked in the simplified approach
 }
 
 // ===========================================
@@ -998,6 +1021,12 @@ function forceTutorialState(targetTab) {
             container.scrollTop = 0;
             container.scrollLeft = 0;
         });
+
+        // Ensure FAB quick buttons are visible for the Add Chord button
+        const fabBuilderQuickButtons = document.getElementById('fab-builder-quick-buttons');
+        if (fabBuilderQuickButtons) {
+            fabBuilderQuickButtons.classList.remove('hidden');
+        }
     } else if (targetTab === 'trainer') {
         // Force panel states for tutorial
         Object.entries(PROGRESSION_WORKSHOP_PANELS).forEach(([panelId, config]) => {
@@ -1155,13 +1184,57 @@ let currentSpotlightTarget = null;
 function showSpotlight(targetSelector, position = 'bottom', extraHeight = 0) {
     removeSpotlight();
 
-    const targetEl = document.querySelector(targetSelector);
+    let targetEl = document.querySelector(targetSelector);
+
+    // Special handling for Circle of Fifths - it may need time to appear
+    if (targetSelector === '#circle-of-fifths-panel' && (!targetEl || targetEl.classList.contains('hidden'))) {
+        console.log('[GuidedMode] Circle of Fifths panel not visible yet, waiting...');
+        // Retry after a short delay
+        setTimeout(() => {
+            showSpotlight(targetSelector, position, extraHeight);
+        }, 300);
+        return;
+    }
+
     if (!targetEl) {
         console.warn('[GuidedMode] Spotlight target not found:', targetSelector);
         return;
     }
 
+    // Check if element is hidden
+    if (targetEl.classList.contains('hidden')) {
+        console.warn('[GuidedMode] Spotlight target is hidden:', targetSelector);
+        return;
+    }
+
     currentSpotlightTarget = targetSelector;
+
+    // Special handling for Circle of Fifths - it's a modal, skip the dimming overlay
+    const isCircleOfFifthsModal = targetSelector === '#circle-of-fifths-panel';
+    if (isCircleOfFifthsModal) {
+        console.log('[GuidedMode] Circle of Fifths modal - skipping dimming overlay');
+        // Just add pulsing border to the content area, not the whole modal
+        const contentEl = targetEl.querySelector('.circle-of-fifths-content');
+        if (contentEl) {
+            contentEl.classList.add('guided-spotlight-target');
+        }
+        // Show step indicator but no overlay
+        return;
+    }
+
+    // Check if we're spotlighting a header element - if so, shift header below banner
+    const isHeaderElement = targetSelector.startsWith('#header-') || targetEl.closest('#main-header');
+    if (isHeaderElement) {
+        const mainHeader = document.getElementById('main-header');
+        const banner = document.getElementById('lesson-guided-banner');
+        if (mainHeader && banner) {
+            const bannerHeight = banner.offsetHeight;
+            mainHeader.style.transition = 'margin-top 0.3s ease-in-out';
+            mainHeader.style.marginTop = `${bannerHeight}px`;
+            mainHeader.dataset.shiftedForSpotlight = 'true';
+            console.log('[GuidedMode] Shifted header below banner for spotlight');
+        }
+    }
 
     // Create overlay using SVG for more reliable cutout
     spotlightOverlay = document.createElement('div');
@@ -1212,6 +1285,10 @@ function updateSpotlightPosition(targetEl, extraHeight = 0) {
     const cutoutRight = Math.min(viewportWidth, rect.right + padding);
     const cutoutBottom = Math.min(viewportHeight, rect.bottom + padding + extraHeight);
 
+    // Ensure width and height are always positive (element might be off-screen)
+    const cutoutWidth = Math.max(10, cutoutRight - cutoutLeft);
+    const cutoutHeight = Math.max(10, cutoutBottom - cutoutTop);
+
     // Use SVG mask for more reliable spotlight effect
     spotlightOverlay.innerHTML = `
         <svg width="100%" height="100%" style="position: absolute; top: 0; left: 0;">
@@ -1219,8 +1296,8 @@ function updateSpotlightPosition(targetEl, extraHeight = 0) {
                 <mask id="spotlight-mask">
                     <rect width="100%" height="100%" fill="white"/>
                     <rect x="${cutoutLeft}" y="${cutoutTop}"
-                          width="${cutoutRight - cutoutLeft}"
-                          height="${cutoutBottom - cutoutTop}"
+                          width="${cutoutWidth}"
+                          height="${cutoutHeight}"
                           fill="black" rx="8"/>
                 </mask>
             </defs>
@@ -1230,68 +1307,75 @@ function updateSpotlightPosition(targetEl, extraHeight = 0) {
 }
 
 /**
- * Ensure the target element is visible in the viewport below the keyboard (which is sticky at top)
- * The keyboard sits above the tab content, so elements should appear below its bottom edge
- * Always scrolls to position the element correctly, regardless of current position
+ * Ensure the target element is visible in the viewport below the banner and keyboard
+ * Uses simple window scrolling with offset for fixed elements at top
  */
 function ensureTargetVisible(targetEl) {
     if (!targetEl) return;
 
-    const bannerEl = document.getElementById('lesson-guided-banner');
-    const currentBannerHeight = bannerEl ? bannerEl.offsetHeight : 120;
-    const viewportHeight = window.innerHeight;
+    // Check if element is in a fixed position container (like FAB, floating controls)
+    const isFixed = targetEl.closest('#floating-builder-controls, #floating-scale-controls, #mobile-fab, #fab-builder-quick-buttons');
 
-    // Get the keyboard section - it's sticky at the TOP of the viewport (below header/banner)
-    // The keyboard is OUTSIDE and ABOVE the tab content in the DOM
-    const keyboardSection = document.getElementById('keyboard-section');
-    const keyboardRect = keyboardSection ? keyboardSection.getBoundingClientRect() : null;
-
-    // The keyboard's BOTTOM edge is where our content should START
-    // Add padding to ensure elements don't get too close to the keyboard
-    const keyboardBottom = keyboardRect ? keyboardRect.bottom : currentBannerHeight;
-    const desiredTopPosition = keyboardBottom + 15;
-
-    // Get the tab content container (which we made scrollable in shiftPageForBanner)
-    const tabContent = document.getElementById(`tab-${guidedModeState.targetTab}`);
-    if (!tabContent) {
-        console.warn('[GuidedMode] Tab content not found for scrolling');
+    if (isFixed) {
+        // For fixed elements, just show spotlight immediately without scrolling
+        console.log('[GuidedMode] Fixed position element detected, showing spotlight immediately');
         updateSpotlightPosition(targetEl);
+        updateStepIndicatorPosition(targetEl);
+        if (spotlightOverlay) {
+            spotlightOverlay.style.opacity = '1';
+        }
+        if (stepIndicator) {
+            stepIndicator.style.opacity = '1';
+        }
         return;
     }
 
-    // Get the current position of the target relative to viewport
+    const bannerEl = document.getElementById('lesson-guided-banner');
+    const currentBannerHeight = bannerEl ? bannerEl.offsetHeight : 120;
+
+    // Special handling for Circle of Fifths panel - scroll to top so modal is visible
+    const isCircleOfFifths = targetEl.id === 'circle-of-fifths-panel' || targetEl.closest('#circle-of-fifths-panel');
+    if (isCircleOfFifths) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setTimeout(() => {
+            updateSpotlightPosition(targetEl);
+            updateStepIndicatorPosition(targetEl);
+            if (spotlightOverlay) spotlightOverlay.style.opacity = '1';
+            if (stepIndicator) stepIndicator.style.opacity = '1';
+        }, 400);
+        return;
+    }
+
+    // Also account for the keyboard section which is sticky below the header
+    const keyboardSection = document.getElementById('keyboard-section');
+    const keyboardBottom = keyboardSection ? keyboardSection.getBoundingClientRect().bottom : 0;
+
+    // Get element's current position relative to viewport
     const rect = targetEl.getBoundingClientRect();
-    const tabRect = tabContent.getBoundingClientRect();
 
-    // Calculate available height for the element (from below keyboard to bottom of viewport)
-    const availableHeight = viewportHeight - desiredTopPosition - 20;
+    // We want the element to appear below both the banner AND the keyboard
+    // Use whichever is lower (keyboard is usually below banner when visible)
+    // Add extra space (60px) for the "Do this step" label that appears above the spotlight
+    const topObstacle = Math.max(currentBannerHeight, keyboardBottom);
+    const desiredTopPosition = topObstacle + 70; // 70px = 60px for label + 10px padding
 
-    // Calculate the scroll position needed to place element below the keyboard
-    // Element's position within the scrollable container
-    const elementOffsetInTab = rect.top - tabRect.top + tabContent.scrollTop;
-
-    // Where we want the element's top to appear in the viewport
-    // This is relative to the tab content's position
-    const targetPositionInTab = desiredTopPosition - tabRect.top;
-
-    // Calculate scroll needed to put element at the desired position
-    let targetScrollTop = elementOffsetInTab - targetPositionInTab;
+    // Calculate how much we need to scroll
+    // If element is above where we want it, scroll up (negative)
+    // If element is below where we want it, scroll down (positive)
+    const scrollAmount = rect.top - desiredTopPosition;
 
     console.log('[GuidedMode] Scrolling to show element:', {
         elementTop: rect.top,
-        elementBottom: rect.bottom,
-        elementHeight: rect.height,
-        tabTop: tabRect.top,
-        currentScroll: tabContent.scrollTop,
-        targetScroll: targetScrollTop,
+        bannerHeight: currentBannerHeight,
         keyboardBottom: keyboardBottom,
-        desiredPosition: desiredTopPosition,
-        availableHeight: availableHeight
+        desiredTop: desiredTopPosition,
+        scrollAmount: scrollAmount,
+        currentWindowScroll: window.scrollY
     });
 
-    // Always scroll to ensure proper positioning
-    tabContent.scrollTo({
-        top: Math.max(0, targetScrollTop),
+    // Scroll the window
+    window.scrollBy({
+        top: scrollAmount,
         behavior: 'smooth'
     });
 
@@ -1329,13 +1413,21 @@ function removeSpotlight() {
     document.querySelectorAll('.guided-spotlight-target').forEach(el => {
         el.classList.remove('guided-spotlight-target');
     });
+
+    // Restore header position if it was shifted for spotlight
+    const mainHeader = document.getElementById('main-header');
+    if (mainHeader && mainHeader.dataset.shiftedForSpotlight === 'true') {
+        mainHeader.style.marginTop = '';
+        delete mainHeader.dataset.shiftedForSpotlight;
+        console.log('[GuidedMode] Restored header position');
+    }
 }
 
 // ===========================================
 // STEP INDICATOR
 // ===========================================
 
-function showStepIndicator(targetSelector, stepNumber, isInfoOnly = false) {
+function showStepIndicator(targetSelector, stepNumber, isInfoOnly = false, extraHeight = 0) {
     removeStepIndicator();
 
     const targetEl = document.querySelector(targetSelector);
@@ -1347,14 +1439,19 @@ function showStepIndicator(targetSelector, stepNumber, isInfoOnly = false) {
     // Start hidden - will be shown after scroll completes
     stepIndicator.style.opacity = '0';
     stepIndicator.style.transition = 'opacity 0.2s ease-in-out';
-    // Store the selector and step number for repositioning
+    // Store the selector, step number, and extra height for repositioning
     stepIndicator.dataset.targetSelector = targetSelector;
     stepIndicator.dataset.stepNumber = stepNumber;
+    stepIndicator.dataset.extraHeight = extraHeight;
 
     // Different label for info-only steps vs action steps
     const labelText = isInfoOnly ? 'See here' : 'Do this step';
     const bgColor = isInfoOnly ? 'bg-teal-600' : 'bg-indigo-600';
     const textColor = isInfoOnly ? 'text-teal-600' : 'text-indigo-600';
+
+    // Arrow SVG paths - down arrow and up arrow
+    const downArrowPath = 'M19 14l-7 7m0 0l-7-7m7 7V3';
+    const upArrowPath = 'M5 10l7-7m0 0l7 7m-7-7v18';
 
     stepIndicator.innerHTML = `
         <div class="flex items-center gap-2 ${bgColor} text-white px-3 py-2 rounded-lg shadow-lg">
@@ -1362,22 +1459,24 @@ function showStepIndicator(targetSelector, stepNumber, isInfoOnly = false) {
                 ${stepNumber}
             </div>
             <span class="text-sm font-medium">${labelText}</span>
-            <svg class="w-4 h-4 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+            <svg class="w-4 h-4 animate-bounce step-indicator-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${downArrowPath}"></path>
             </svg>
         </div>
     `;
 
-    // Position near target
-    updateStepIndicatorPosition(targetEl);
+    // Position near target (accounting for extra height)
+    updateStepIndicatorPosition(targetEl, extraHeight);
 
     document.body.appendChild(stepIndicator);
 }
 
 /**
  * Update the step indicator position based on target element's current position
+ * @param {Element} targetEl - The target element
+ * @param {number} extraHeight - Extra height from spotlightExtraHeight (for expanded elements)
  */
-function updateStepIndicatorPosition(targetEl) {
+function updateStepIndicatorPosition(targetEl, extraHeight = 0) {
     if (!stepIndicator) return;
 
     // If no targetEl provided, try to get it from stored selector
@@ -1386,38 +1485,82 @@ function updateStepIndicatorPosition(targetEl) {
     }
     if (!targetEl) return;
 
+    // Get extra height from dataset if not provided
+    if (extraHeight === 0 && stepIndicator.dataset.extraHeight) {
+        extraHeight = parseInt(stepIndicator.dataset.extraHeight, 10) || 0;
+    }
+
     const rect = targetEl.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     const viewportWidth = window.innerWidth;
 
-    // Get keyboard position to know where content starts
+    // Get banner and keyboard positions
+    const bannerEl = document.getElementById('lesson-guided-banner');
+    const bannerBottom = bannerEl ? bannerEl.getBoundingClientRect().bottom : 120;
     const keyboardSection = document.getElementById('keyboard-section');
     const keyboardBottom = keyboardSection ? keyboardSection.getBoundingClientRect().bottom : 250;
+
+    // The top obstacle is whichever is lower (banner or keyboard)
+    const topObstacle = Math.max(bannerBottom, keyboardBottom);
+
+    // Calculate the effective bottom including extra height (for spotlight matching)
+    const effectiveBottom = rect.bottom + extraHeight;
 
     // Default position: above the element, centered horizontally
     let top = rect.top - 50;
     let left = rect.left + rect.width / 2;
     let transformX = '-50%';
 
-    // If element is near the top of the viewport (under or close to keyboard), position indicator below instead
-    if (rect.top < keyboardBottom + 60) {
-        top = rect.bottom + 10;
-    }
+    // Calculate available space above and below the spotlight (not just element)
+    const spaceAbove = rect.top - topObstacle;
+    const spaceBelow = viewportHeight - effectiveBottom;
+    const indicatorHeight = 50;
 
-    // Only apply right-edge positioning for NARROW elements (like buttons)
-    // Wide panels should keep centered positioning
+    // Check if element is near the right edge of the viewport
+    const isNearRightEdge = rect.right > viewportWidth - 150;
     const isNarrowElement = rect.width < 200;
-    if (isNarrowElement && rect.right > viewportWidth - 100) {
-        left = rect.left - 10;
+
+    // Check if element is a FAB button (needs more vertical offset to avoid overlap)
+    const isFabElement = targetEl.closest('#mobile-fab') ||
+                         targetEl.id?.includes('fab') ||
+                         targetEl.closest('#fab-builder-quick-buttons') ||
+                         targetEl.closest('#fab-melody-quick-buttons');
+    const fabOffset = isFabElement ? 70 : 50; // Extra space for FAB buttons
+
+    // For right-edge elements, always position above (never to the left with wrong arrow)
+    if (isNearRightEdge && isNarrowElement) {
+        // Position above the element, aligned to the right
+        top = rect.top - fabOffset;
+        left = rect.right;
         transformX = '-100%';
-        top = rect.top + rect.height / 2;
-        stepIndicator.style.transform = `translate(${transformX}, -50%)`;
+        stepIndicator.style.transform = `translateX(${transformX})`;
     } else {
+        // Standard positioning logic
+        if (spaceAbove >= indicatorHeight) {
+            // Enough space above - position above the element
+            top = rect.top - fabOffset;
+        } else if (spaceBelow >= indicatorHeight) {
+            // Not enough above but enough below - position below the SPOTLIGHT (including extra height)
+            top = effectiveBottom + 10;
+        } else {
+            // Tight on both sides - position above anyway
+            top = rect.top - fabOffset;
+        }
         stepIndicator.style.transform = `translateX(${transformX})`;
     }
 
     stepIndicator.style.left = `${left}px`;
     stepIndicator.style.top = `${top}px`;
+
+    // Update arrow direction based on indicator position relative to target
+    // If indicator is below target, arrow should point UP; if above, arrow should point DOWN
+    const arrowEl = stepIndicator.querySelector('.step-indicator-arrow path');
+    if (arrowEl) {
+        const indicatorIsBelow = top > rect.top;
+        const upArrowPath = 'M5 10l7-7m0 0l7 7m-7-7v18';
+        const downArrowPath = 'M19 14l-7 7m0 0l-7-7m7 7V3';
+        arrowEl.setAttribute('d', indicatorIsBelow ? upArrowPath : downArrowPath);
+    }
 }
 
 function removeStepIndicator() {
@@ -1444,6 +1587,24 @@ function setupActionListeners() {
     window.addEventListener('progressionPlayed', handleBuilderAction);
     window.addEventListener('progressionLoopToggled', handleBuilderAction);
     window.addEventListener('progressionPlayComplete', handleBuilderAction);
+
+    // Listen for tab navigation
+    window.addEventListener('tabSelected', handleBuilderAction);
+
+    // Listen for chord card editing, expanding, and reordering (site tutorial support)
+    window.addEventListener('chordCardEdited', handleBuilderAction);
+    window.addEventListener('chordCardExpanded', handleBuilderAction);
+    window.addEventListener('chordReordered', handleBuilderAction);
+
+    // Listen for FAB/BPM events (site tutorial support)
+    window.addEventListener('fabOpened', handleBuilderAction);
+    window.addEventListener('fabClosed', handleBuilderAction);
+    window.addEventListener('bpmChanged', handleBuilderAction);
+    window.addEventListener('settingsSectionClicked', handleBuilderAction);
+
+    // Listen for Circle of Fifths and Quick Add events
+    window.addEventListener('circleOfFifthsOpened', handleBuilderAction);
+    window.addEventListener('quickAddFormOpened', handleBuilderAction);
 }
 
 function cleanupActionListeners() {
@@ -1456,6 +1617,16 @@ function cleanupActionListeners() {
     window.removeEventListener('progressionPlayed', handleBuilderAction);
     window.removeEventListener('progressionLoopToggled', handleBuilderAction);
     window.removeEventListener('progressionPlayComplete', handleBuilderAction);
+    window.removeEventListener('tabSelected', handleBuilderAction);
+    window.removeEventListener('chordCardEdited', handleBuilderAction);
+    window.removeEventListener('chordCardExpanded', handleBuilderAction);
+    window.removeEventListener('chordReordered', handleBuilderAction);
+    window.removeEventListener('fabOpened', handleBuilderAction);
+    window.removeEventListener('fabClosed', handleBuilderAction);
+    window.removeEventListener('bpmChanged', handleBuilderAction);
+    window.removeEventListener('settingsSectionClicked', handleBuilderAction);
+    window.removeEventListener('circleOfFifthsOpened', handleBuilderAction);
+    window.removeEventListener('quickAddFormOpened', handleBuilderAction);
 }
 
 function handleBuilderAction(event) {
@@ -1470,29 +1641,33 @@ function handleBuilderAction(event) {
     lastBuilderAction = action;
     guidedModeState.actionHistory.push(action);
 
-
     // Check if this action satisfies the current step
     if (guidedModeState.validationCallback) {
         const isValid = guidedModeState.validationCallback(action);
         if (isValid) {
+            // IMMEDIATELY clear the callback to prevent double-triggering
+            guidedModeState.validationCallback = null;
+
             const { stepIndex, steps, currentStep } = guidedModeState;
             const isLastStep = stepIndex === steps.length - 1;
 
             if (isLastStep) {
                 // On the last step, don't auto-advance - let user explore freely
-                // Show encouraging message but stay on this step
-                updateBannerInstruction('🎉 ' + (currentStep?.successMessage || 'Great! Keep exploring - click "Return to Lesson" when you\'re ready.'), 'success');
-
-                // Clear the validation callback so we don't keep showing messages
-                guidedModeState.validationCallback = null;
+                const isSiteTutorial = guidedModeState.lessonId && guidedModeState.lessonId.includes('site-tutorial');
+                const endButtonText = isSiteTutorial ? 'End Tutorial' : 'Return to Lesson';
+                updateBannerInstruction('🎉 ' + (currentStep?.successMessage || `Great! Keep exploring - click "${endButtonText}" when you're ready.`), 'success');
             } else {
                 // Show success feedback
                 updateBannerInstruction(currentStep?.successMessage || 'Great job!', 'success');
 
-                // Advance to next step after short delay
-                setTimeout(() => {
+                // Advance to next step - immediately if quickAdvance, otherwise after delay
+                if (currentStep?.quickAdvance) {
                     advanceToNextStep();
-                }, 1000);
+                } else {
+                    setTimeout(() => {
+                        advanceToNextStep();
+                    }, 1000);
+                }
             }
         }
     }
@@ -1540,6 +1715,71 @@ function validateAction(action, validation) {
         case 'progression_play_complete':
             return action.type === 'progressionPlayComplete';
 
+        // ========== Site Tutorial Validation Types ==========
+
+        // Chord card editing (changing root/type/inversion on existing chord)
+        case 'chord_card_edited':
+            if (action.type !== 'chordCardEdited') return false;
+            // If specific property/value is required, validate it
+            if (validation.property && action.detail?.property !== validation.property) return false;
+            if (validation.value !== undefined && action.detail?.value !== validation.value) return false;
+            if (validation.chordIndex !== undefined && action.detail?.chordIndex !== validation.chordIndex) return false;
+            return true;
+
+        // Chord card expanded (clicking ⋯ button)
+        case 'chord_card_expanded':
+            return action.type === 'chordCardExpanded';
+
+        // Chord reordering via drag/drop
+        case 'chord_reordered':
+            if (action.type !== 'chordReordered') return false;
+            // Optionally validate specific from/to indices
+            if (validation.fromIndex !== undefined && action.detail?.fromIndex !== validation.fromIndex) return false;
+            if (validation.toIndex !== undefined && action.detail?.toIndex !== validation.toIndex) return false;
+            return true;
+
+        // FAB menu opened
+        case 'fab_opened':
+            return action.type === 'fabOpened';
+
+        // FAB menu closed
+        case 'fab_closed':
+            return action.type === 'fabClosed';
+
+        // BPM/tempo changed
+        case 'bpm_changed':
+            if (action.type !== 'bpmChanged') return false;
+            const bpm = action.detail?.bpm;
+            if (validation.minBpm !== undefined && bpm < validation.minBpm) return false;
+            if (validation.maxBpm !== undefined && bpm > validation.maxBpm) return false;
+            if (validation.exactBpm !== undefined && bpm !== validation.exactBpm) return false;
+            return true;
+
+        // Settings section clicked in FAB
+        case 'settings_section_clicked':
+            return action.type === 'settingsSectionClicked';
+
+        // Quick Add form opened
+        case 'quick_add_form_opened':
+            return action.type === 'quickAddFormOpened';
+
+        // Circle of Fifths panel opened
+        case 'circle_of_fifths_opened':
+            return action.type === 'circleOfFifthsOpened';
+
+        // Tab/view navigation
+        case 'tab_selected':
+            return action.type === 'tabSelected' && action.detail?.tab === value;
+
+        // Chord added to progression (already exists but adding alias)
+        case 'chord_added_to_progression':
+            return action.type === 'progressionChordAdded' &&
+                   (!value || action.detail?.chord === value || areEnharmonicallyEquivalent(action.detail?.chord, value));
+
+        // Notation/melody note added
+        case 'melody_note_added':
+            return action.type === 'melodyNoteAdded';
+
         default:
             console.warn('[GuidedMode] Unknown validation type:', type);
             return false;
@@ -1568,7 +1808,8 @@ export function getExpectedChord() {
     const currentStep = guidedModeState.currentStep;
     if (!currentStep?.validation) return null;
 
-    if (currentStep.validation.type === 'progression_chord_added' && currentStep.validation.value) {
+    // Check for chord_added_to_progression validation type (used in site tutorials)
+    if (currentStep.validation.type === 'chord_added_to_progression' && currentStep.validation.value) {
         return currentStep.validation.value;
     }
 
@@ -1646,6 +1887,11 @@ if (typeof document !== 'undefined' && !document.getElementById('guided-mode-sty
 // ===========================================
 // EXPORTS
 // ===========================================
+
+// Expose to global scope for site-wide tutorials
+window.startGuidedModeWithConfirmation = startGuidedModeWithConfirmation;
+window.startGuidedMode = startGuidedMode;
+window.isGuidedModeActive = isGuidedModeActive;
 
 export default {
     startGuidedMode,

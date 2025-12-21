@@ -3012,7 +3012,10 @@ export function playFromSelectedMeasure() {
     // Parse time signature (default to 4/4)
     const [beatsPerMeasure, beatValue] = interactiveMelody.timeSignature.split('/').map(Number);
     const tempo = interactiveMelody.tempo || 120;
-    
+
+    // Set Transport BPM to match tempo - this ensures note durations like '1n' are correct
+    Tone.Transport.bpm.value = tempo;
+
     // Calculate timing based on time signature and tempo
     const beatDuration = 60.0 / tempo; // seconds per beat
     const measureDuration = beatDuration * beatsPerMeasure; // seconds per measure
@@ -3577,6 +3580,10 @@ export function playInteractiveMelodyWithChords() {
 
     // Calculate timing based on tempo
     const tempo = interactiveMelody.tempo || 120;
+
+    // Set Transport BPM to match tempo - this ensures note durations like '1n' are correct
+    Tone.Transport.bpm.value = tempo;
+
     const beatDuration = 60.0 / tempo; // seconds per beat (based on tempo)
     const measureDuration = beatDuration * 4; // seconds per measure (4/4 time)
 
@@ -3911,6 +3918,9 @@ export function playAllMelody() {
     // Parse time signature (default to 4/4)
     const [beatsPerMeasure, beatValue] = interactiveMelody.timeSignature.split('/').map(Number);
     const tempo = interactiveMelody.tempo || 120;
+
+    // Set Transport BPM to match tempo - this ensures note durations like '1n' are correct
+    Tone.Transport.bpm.value = tempo;
 
     // Calculate timing based on time signature and tempo
     const beatDuration = 60.0 / tempo; // seconds per beat

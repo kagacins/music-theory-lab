@@ -2911,7 +2911,7 @@ body:has(#piano-keyboard.modern-keyboard) #guitar-fretboard-container {
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 9998;
+    z-index: 10000; /* Above spotlight overlay (9998) during tutorials */
     display: flex;
     align-items: center;
     justify-content: center;

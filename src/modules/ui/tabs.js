@@ -392,6 +392,11 @@ export function switchTab(tabId, options = {}) {
         updateTabSidebarHeight(tabId);
     }
 
+    // Dispatch event for guided mode tutorials
+    window.dispatchEvent(new CustomEvent('tabSelected', {
+        detail: { tab: tabId, previousTab: previousTab }
+    }));
+
     // Sidebar stays open - user may want to make other selections
 }
 

@@ -350,17 +350,26 @@
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
                         Overview
                     </a>
+                    <!-- Let It Be Tutorial + About & Support stacked -->
+                    <div class="flex flex-col items-center gap-2">
+                        <button onclick="window.startLetItBeTutorial && window.startLetItBeTutorial()" class="group px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white text-lg font-bold rounded-xl shadow-lg hover:shadow-xl hover:shadow-emerald-500/25 transition-all transform hover:scale-105 flex items-center gap-3">
+                            <span class="text-2xl">🎸</span>
+                            <span class="flex flex-col items-start leading-tight">
+                                <span class="text-xs font-normal opacity-90">Interactive Tutorial</span>
+                                <span>"Let It Be"</span>
+                            </span>
+                        </button>
+                        <!-- About & Support Button -->
+                        <button onclick="window.showAboutModal && window.showAboutModal()" class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-rose-500/80 to-orange-500/80 hover:from-rose-500 hover:to-orange-500 text-white text-sm font-medium rounded-lg transition-all">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"></path></svg>
+                            About & Support
+                        </button>
+                    </div>
                     <button onclick="window.enterApp && window.enterApp()" class="px-8 py-4 bg-white/10 hover:bg-white/20 backdrop-blur text-white text-lg font-semibold rounded-xl border border-white/30 hover:border-white/50 transition-all flex items-center gap-2">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
                         Jump In
                     </button>
                 </div>
-
-                <!-- About & Support Button -->
-                <button onclick="window.showAboutModal && window.showAboutModal()" class="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-rose-500/80 to-orange-500/80 hover:from-rose-500 hover:to-orange-500 text-white font-medium rounded-lg transition-all">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"></path></svg>
-                    About & Support
-                </button>
             </header>
 
             <!-- Features Grid -->
@@ -569,6 +578,11 @@
                     </div>
                     <span id="tab-subtitle" class="text-[11px] text-amber-600 font-semibold leading-tight">Chord Lab</span>
                 </div>
+                <!-- Let It Be Tutorial Button -->
+                <button onclick="window.startLetItBeTutorial && window.startLetItBeTutorial()" class="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white text-xs font-medium rounded-lg shadow hover:shadow-md transition-all" title="Interactive Tutorial: Let It Be">
+                    <span class="text-sm">🎸</span>
+                    <span class="hidden sm:flex flex-col leading-none text-left"><span class="font-semibold">Tutorial</span><span class="text-[9px] opacity-90">Let It Be</span></span>
+                </button>
                 <!-- About & Support Button -->
                 <button onclick="window.showAboutModal && window.showAboutModal()" class="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white text-xs font-medium rounded-lg shadow hover:shadow-md transition-all" title="About & Support">
                     <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"></path></svg>
@@ -1199,6 +1213,10 @@
                             <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
                             <span class="text-green-700 font-medium">Start Here Guide</span>
                         </button>
+                        <button onclick="window.startLetItBeTutorial && window.startLetItBeTutorial()" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-emerald-50 flex items-center gap-2 active:bg-emerald-100">
+                            <span class="text-lg">🎸</span>
+                            <span class="text-emerald-700 font-medium">"Let It Be" Tutorial</span>
+                        </button>
                         <button data-action="keyboard-shortcuts" class="w-full px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-2 active:bg-blue-100">
                             <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                             <span class="text-blue-700">Keyboard Shortcuts</span>
@@ -1495,7 +1513,7 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <!-- Key Button (styled as obvious button) -->
                         <div class="relative group">
-                            <button onclick="window.toggleCircleOfFifthsPanel && window.toggleCircleOfFifthsPanel()"
+                            <button id="builder-key-button" onclick="window.toggleCircleOfFifthsPanel && window.toggleCircleOfFifthsPanel()"
                                     class="flex items-center gap-1.5 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md shadow transition">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
@@ -2103,29 +2121,29 @@
                                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v1a2 2 0 01-2 2h-5v1h3a2 2 0 012 2v1a2 2 0 01-2 2h-3v1h5a2 2 0 012 2v1a2 2 0 01-2 2H4a2 2 0 01-2-2v-1a2 2 0 012-2h5v-1H6a2 2 0 01-2-2v-1a2 2 0 012-2h3V8H4a2 2 0 01-2-2V5z" clip-rule="evenodd"></path></svg>
                                 Chord Progression
                             </span>
-                            <button onclick="event.stopPropagation(); window.toggleCircleOfFifthsPanel && window.toggleCircleOfFifthsPanel()" class="px-2 py-0.5 bg-white/20 hover:bg-white/30 rounded text-xs cursor-pointer transition" title="Change Key">
+                            <button id="melody-key-button" onclick="event.stopPropagation(); window.toggleCircleOfFifthsPanel && window.toggleCircleOfFifthsPanel()" class="px-3 py-2 bg-white/20 hover:bg-white/30 rounded text-xs cursor-pointer transition flex items-center gap-1" title="Change Key">
                                 Key: <span id="melody-current-key-display">C Major</span>
                             </button>
                             <!-- Header Action Buttons -->
                             <div class="flex items-center gap-1">
-                                <button onclick="event.stopPropagation(); window.toggleQuickAddChordForm && window.toggleQuickAddChordForm('quick-add-chord-form-melody')" class="header-action-btn px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded transition flex items-center gap-1" title="Add Chord">
-                                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
+                                <button id="melody-quick-add-btn" onclick="event.stopPropagation(); window.toggleQuickAddChordForm && window.toggleQuickAddChordForm('quick-add-chord-form-melody')" class="header-action-btn px-3 py-2 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded transition flex items-center gap-1" title="Add Chord">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
                                     <span class="hidden sm:inline">Add Chord</span>
                                 </button>
-                                <button onclick="event.stopPropagation(); window.showAddSectionMenu && window.showAddSectionMenu(event, 'melody-progression-visualization')" class="header-action-btn px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded transition flex items-center gap-1" title="Add Section">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                <button onclick="event.stopPropagation(); window.showAddSectionMenu && window.showAddSectionMenu(event, 'melody-progression-visualization')" class="header-action-btn px-3 py-2 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded transition flex items-center gap-1" title="Add Section">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                     <span class="hidden sm:inline">+Add Section</span>
                                 </button>
-                                <button onclick="event.stopPropagation(); window.showSongBuilderModal && window.showSongBuilderModal()" class="header-action-btn px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded transition flex items-center gap-1" title="Song Builder">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                <button onclick="event.stopPropagation(); window.showSongBuilderModal && window.showSongBuilderModal()" class="header-action-btn px-3 py-2 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded transition flex items-center gap-1" title="Song Builder">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                                     <span class="hidden sm:inline">Song Builder</span>
                                 </button>
-                                <button onclick="event.stopPropagation(); window.clearProgression && window.clearProgression()" class="header-action-btn px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded transition flex items-center gap-1" title="Clear Progression">
-                                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                                <button onclick="event.stopPropagation(); window.clearProgression && window.clearProgression()" class="header-action-btn px-3 py-2 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded transition flex items-center gap-1" title="Clear Progression">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
                                     <span class="hidden sm:inline">Clear</span>
                                 </button>
-                                <button onclick="event.stopPropagation(); window.toggleChordFunctionLegend && window.toggleChordFunctionLegend()" class="header-action-btn px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded transition flex items-center gap-1" title="View Color Legend">
-                                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/></svg>
+                                <button onclick="event.stopPropagation(); window.toggleChordFunctionLegend && window.toggleChordFunctionLegend()" class="header-action-btn px-3 py-2 bg-white/20 hover:bg-white/30 text-white text-xs font-medium rounded transition flex items-center gap-1" title="View Color Legend">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z" clip-rule="evenodd"/></svg>
                                     <span class="hidden sm:inline">Colors</span>
                                 </button>
                                 <!-- Tooltips Toggle -->
@@ -2993,7 +3011,7 @@
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg> 
                     <span class="compact-hide">Play Chord</span><span class="compact-show">Play</span>
                 </button>
-                <button onclick="window.addChordToProgression && window.addChordToProgression(false)" class="px-2 py-1 bg-indigo-500 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-1 whitespace-nowrap text-sm" title="Add Chord to Progression">
+                <button id="add-chord-btn" onclick="window.addChordToProgression && window.addChordToProgression(false)" class="px-2 py-1 bg-indigo-500 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-600 active:scale-95 transition duration-150 transform flex items-center justify-center gap-1 whitespace-nowrap text-sm" title="Add Chord to Progression">
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"></path></svg> 
                     <span class="compact-hide">Add Chord</span><span class="compact-show">Add</span>
                 </button>

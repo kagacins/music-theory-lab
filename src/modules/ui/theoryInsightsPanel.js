@@ -899,23 +899,90 @@ export class TheoryInsightsPanel {
         // In major keys, suggest borrowed chords from parallel minor and other modes
         if (!isMinorKey) {
             const borrowedOptions = [
-                { numeral: 'bVI', source: 'Parallel Minor', description: 'Dramatic lift, emotional depth', color: '#ec4899' },
-                { numeral: 'bVII', source: 'Mixolydian', description: 'Rock/folk color, resolves to I', color: '#f59e0b' },
-                { numeral: 'iv', source: 'Parallel Minor', description: 'Melancholy touch, bittersweet', color: '#8b5cf6' },
-                { numeral: 'bIII', source: 'Parallel Minor', description: 'Open, expansive feeling', color: '#3b82f6' }
+                {
+                    numeral: 'bVI',
+                    source: 'Parallel Minor',
+                    description: 'Dramatic lift, emotional depth',
+                    color: '#ec4899',
+                    placementHint: 'Try after V for deceptive cadence, or before V as pre-dominant'
+                },
+                {
+                    numeral: 'bVII',
+                    source: 'Mixolydian',
+                    description: 'Rock/folk color, resolves to I',
+                    color: '#f59e0b',
+                    placementHint: 'Try before I (bVII→I) or in bVII→IV→I patterns'
+                },
+                {
+                    numeral: 'iv',
+                    source: 'Parallel Minor',
+                    description: 'Melancholy touch, bittersweet',
+                    color: '#8b5cf6',
+                    placementHint: 'Try before I (plagal cadence) or as substitute for IV'
+                },
+                {
+                    numeral: 'bIII',
+                    source: 'Parallel Minor',
+                    description: 'Open, expansive feeling',
+                    color: '#3b82f6',
+                    placementHint: 'Try between I and IV for classic rock movement'
+                }
             ];
 
             // Check which borrowed chords are NOT already in the progression
             const usedNumerals = new Set(progressionData.map(c => c.roman || c.romanNumeral || ''));
 
+            // Analyze progression for context-aware suggestions
+            const hasV = progressionData.some(c => ['V', 'V7', 'Vmaj7'].includes(c.roman || c.romanNumeral));
+            const hasI = progressionData.some(c => ['I', 'Imaj7'].includes(c.roman || c.romanNumeral));
+            const hasIV = progressionData.some(c => ['IV', 'IVmaj7'].includes(c.roman || c.romanNumeral));
+            const lastRoman = progressionData[progressionData.length - 1]?.roman || progressionData[progressionData.length - 1]?.romanNumeral || '';
+
+            // Find chord positions for specific suggestions
+            const findPositions = (numerals) => progressionData
+                .map((c, i) => numerals.includes(c.roman || c.romanNumeral) ? i : -1)
+                .filter(i => i !== -1);
+
+            const vPositions = findPositions(['V', 'V7', 'Vmaj7']);
+            const iPositions = findPositions(['I', 'Imaj7']);
+
             borrowedOptions.forEach(option => {
                 if (!usedNumerals.has(option.numeral)) {
                     // Suggest for a position in the progression
                     const suggestedPosition = this.findGoodPositionFor(option.numeral, progressionData);
+                    const chordName = this.getRootFromNumeral(option.numeral, key);
+
+                    // Generate context-aware suggestion
+                    let contextSuggestion = null;
+
+                    if (option.numeral === 'bVI') {
+                        if (hasV && vPositions.length > 0) {
+                            const vChord = progressionData[vPositions[0]];
+                            contextSuggestion = `Place after ${vChord.root || 'V'} (chord ${vPositions[0] + 1}) for deceptive cadence`;
+                        } else if (['V', 'V7'].includes(lastRoman)) {
+                            contextSuggestion = `Your progression ends on V — add this for a surprise ending!`;
+                        }
+                    } else if (option.numeral === 'bVII') {
+                        if (hasI && iPositions.length > 0) {
+                            const iChord = progressionData[iPositions[0]];
+                            contextSuggestion = `Place before ${iChord.root || 'I'} (chord ${iPositions[0] + 1}) for rock cadence`;
+                        }
+                    } else if (option.numeral === 'iv') {
+                        if (hasI && iPositions.length > 0) {
+                            const iChord = progressionData[iPositions[0]];
+                            contextSuggestion = `Place before ${iChord.root || 'I'} for melancholy plagal cadence`;
+                        }
+                    } else if (option.numeral === 'bIII') {
+                        if (hasI && hasIV) {
+                            contextSuggestion = `Insert between I and IV for classic rock movement`;
+                        }
+                    }
+
                     opportunities.push({
                         ...option,
                         suggestedPosition,
-                        chordName: this.getRootFromNumeral(option.numeral, key)
+                        chordName,
+                        contextSuggestion
                     });
                 }
             });
@@ -1491,28 +1558,45 @@ export class TheoryInsightsPanel {
             const chordType = this.getChordTypeFromNumeral(opp.numeral);
             const displayName = `${opp.chordName} ${chordType === 'Minor' ? 'm' : ''}`;
 
+            // Build context suggestion HTML if available
+            const contextHtml = opp.contextSuggestion
+                ? `<div class="text-[10px] text-emerald-700 bg-emerald-50 border-l-2 border-emerald-400 px-2 py-1 rounded-r mt-1">
+                     💡 ${opp.contextSuggestion}
+                   </div>`
+                : '';
+
+            // Build placement hint HTML
+            const placementHtml = opp.placementHint
+                ? `<div class="text-[10px] text-purple-600 bg-purple-50 border-l-2 border-purple-300 px-2 py-0.5 rounded-r mt-1">
+                     ${opp.placementHint}
+                   </div>`
+                : '';
+
             html += `
-                <div class="flex items-center gap-2 text-sm bg-white/50 rounded px-2 py-1.5 hover:bg-white/80 transition-colors">
-                    <span class="font-mono font-semibold text-xs px-1.5 py-0.5 rounded" style="background: ${opp.color}20; color: ${opp.color}">${opp.numeral}</span>
-                    <span class="font-medium text-gray-700">${displayName}</span>
-                    <span class="text-xs text-gray-400">from ${opp.source}</span>
-                    <div class="flex gap-1 flex-shrink-0">
-                        <button class="preview-borrowed-chord-btn w-7 h-7 flex items-center justify-center bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-full transition-all text-xs"
-                                data-root="${opp.chordName}"
-                                data-type="${chordType}"
-                                data-numeral="${opp.numeral}"
-                                title="Hold to preview ${displayName}">
-                            ▶
-                        </button>
-                        <button class="add-borrowed-chord-btn w-7 h-7 flex items-center justify-center bg-purple-100 hover:bg-purple-200 text-purple-600 rounded-full transition-all text-sm font-bold"
-                                data-root="${opp.chordName}"
-                                data-type="${chordType}"
-                                data-numeral="${opp.numeral}"
-                                title="Add ${displayName} after selected chord">
-                            +
-                        </button>
+                <div class="text-sm bg-white/50 rounded px-2 py-1.5 hover:bg-white/80 transition-colors">
+                    <div class="flex items-center gap-2">
+                        <span class="font-mono font-semibold text-xs px-1.5 py-0.5 rounded" style="background: ${opp.color}20; color: ${opp.color}">${opp.numeral}</span>
+                        <span class="font-medium text-gray-700">${displayName}</span>
+                        <span class="text-xs text-gray-400">from ${opp.source}</span>
+                        <div class="flex gap-1 flex-shrink-0 ml-auto">
+                            <button class="preview-borrowed-chord-btn w-7 h-7 flex items-center justify-center bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-full transition-all text-xs"
+                                    data-root="${opp.chordName}"
+                                    data-type="${chordType}"
+                                    data-numeral="${opp.numeral}"
+                                    title="Hold to preview ${displayName}">
+                                ▶
+                            </button>
+                            <button class="add-borrowed-chord-btn w-7 h-7 flex items-center justify-center bg-purple-100 hover:bg-purple-200 text-purple-600 rounded-full transition-all text-sm font-bold"
+                                    data-root="${opp.chordName}"
+                                    data-type="${chordType}"
+                                    data-numeral="${opp.numeral}"
+                                    title="Add ${displayName} after selected chord">
+                                +
+                            </button>
+                        </div>
                     </div>
-                    <span class="flex-1 text-xs text-gray-500 truncate">${opp.description}</span>
+                    <div class="text-xs text-gray-500 mt-0.5">${opp.description}</div>
+                    ${contextHtml || placementHtml}
                 </div>
             `;
         });

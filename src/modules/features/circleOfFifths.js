@@ -5,6 +5,7 @@
 
 import { SHARP_NOTES, FLAT_NOTES } from '../../data/music-data.js';
 import { setCurrentKey, getTrainerState } from '../state/trainerState.js';
+import { dispatchBuilderEvent } from '../ui/lessonGuidedMode.js';
 
 // Circle of Fifths data - clockwise from C
 // For enharmonic positions, we store both options and track which is currently selected
@@ -473,8 +474,10 @@ function handleKeyClick(event) {
     // Use the helper function that properly handles enharmonic dropdown repopulation
     // This solves the chicken-and-egg problem where the dropdown might be populated with
     // sharps but the key being set uses flats (e.g., "Bb")
+    // IMPORTANT: Do NOT trigger loadProgression - changing the key should just update
+    // the key context (for Roman numerals, etc.), not reload a different progression
     if (window.setKeyDropdownValue) {
-        window.setKeyDropdownValue(actualKey, true); // true = trigger loadProgression
+        window.setKeyDropdownValue(actualKey, false); // false = don't reload progression
     } else {
         // Fallback if helper not available
         const keySelect = document.getElementById('trainer-key-select');
@@ -482,9 +485,14 @@ function handleKeyClick(event) {
             keySelect.value = actualKey;
         }
         setCurrentKey(actualKey);
-        if (window.loadProgression) {
-            window.loadProgression();
-        }
+        // Don't call loadProgression - just update the key
+    }
+
+    // Re-render the progression display with the new key context
+    // This updates Roman numerals without changing the actual chords
+    if (window.renderProgressionDisplay) {
+        window.renderProgressionDisplay('melody-progression-visualization', true);
+        window.renderProgressionDisplay('melody-progression-visualization', false);
     }
 
     // Update key display in melody tab header
@@ -509,7 +517,11 @@ function handleKeyClick(event) {
     // Show confirmation
     const isMinorKey = type === 'minor';
     const keyQuality = isMinorKey ? ' minor' : ' Major';
-    showKeyChangeNotification(`Key changed to ${actualKey}${keyQuality}`);
+    const fullKeyName = `${actualKey}${keyQuality}`;
+    showKeyChangeNotification(`Key changed to ${fullKeyName}`);
+
+    // Dispatch event for tutorial tracking
+    dispatchBuilderEvent('progressionKeyChanged', { key: fullKeyName });
 }
 
 /**
@@ -678,6 +690,9 @@ export function openCircleOfFifthsPanel() {
         if (currentSelectedKey) {
             highlightSelectedKey(currentSelectedKey);
         }
+
+        // Dispatch event for tutorial tracking
+        dispatchBuilderEvent('circleOfFifthsOpened', {});
     }
 }
 

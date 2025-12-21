@@ -1117,6 +1117,8 @@ export function toggleQuickAddChordForm(formId = 'quick-add-chord-form') {
         if (typeInput) {
             setTimeout(() => typeInput.focus(), 100);
         }
+        // Dispatch event for tutorial tracking
+        dispatchBuilderEvent('quickAddFormOpened', { formId });
     } else {
         form.classList.add('hidden');
     }
@@ -7474,6 +7476,9 @@ function updateContainerShifts(container) {
 function expandChordCard(index) {
     expandedChords.add(index);
 
+    // Dispatch event for tutorial tracking
+    dispatchBuilderEvent('chordCardExpanded', { chordIndex: index });
+
     // Find wrappers in both containers
     const wrappers = document.querySelectorAll(`.chord-card-wrapper[data-chord-index="${index}"]`);
 
@@ -7553,6 +7558,30 @@ function collapseChordCard(index) {
     requestAnimationFrame(() => {
         updateCardShifts();
     });
+}
+
+/**
+ * Collapse all expanded chord cards
+ * Used for tutorial cleanup and other bulk operations
+ */
+function collapseAllChordCards() {
+    // Get a copy of the Set since we're modifying it during iteration
+    const expandedIndices = [...expandedChords];
+    expandedIndices.forEach(index => {
+        collapseChordCard(index);
+    });
+
+    // Also find any expanded cards in the DOM that might not be in the Set
+    // (e.g., if expanded through a different code path)
+    document.querySelectorAll('.expanded-card-wrapper').forEach(wrapper => {
+        const index = parseInt(wrapper.getAttribute('data-chord-index'));
+        if (!isNaN(index) && !expandedIndices.includes(index)) {
+            collapseChordCard(index);
+        }
+    });
+
+    // Clear the expanded set to ensure clean state
+    expandedChords.clear();
 }
 
 /**
@@ -7862,6 +7891,14 @@ function updateChordType(index, newType) {
     if (allNotes.length > 0) {
         playTrainerChordOnce(allNotes);
     }
+
+    // Dispatch event for guided mode tutorials
+    dispatchBuilderEvent('chordCardEdited', {
+        chordIndex: index,
+        property: 'type',
+        value: newType,
+        chord: `${chord.root} ${newType}`
+    });
 }
 
 /**
@@ -7960,6 +7997,14 @@ function updateChordRoot(index, newRoot) {
     if (allNotes.length > 0) {
         playTrainerChordOnce(allNotes);
     }
+
+    // Dispatch event for guided mode tutorials
+    dispatchBuilderEvent('chordCardEdited', {
+        chordIndex: index,
+        property: 'root',
+        value: newRoot,
+        chord: `${newRoot} ${chordType}`
+    });
 }
 
 /**
@@ -8255,6 +8300,14 @@ function updateChordInversion(index, newInversion, shouldUpdateUI = true, should
 
     // Update chord in compositionState
     compositionState.updateChordByIndex(index, updates);
+
+    // Dispatch event for guided mode tutorials
+    dispatchBuilderEvent('chordCardEdited', {
+        chordIndex: index,
+        property: 'inversion',
+        value: newInversion,
+        chord: `${chord.root} ${chord.type}`
+    });
 
     // Also update trainerState.progressionData to keep in sync
     if (trainerState.progressionData && trainerState.progressionData[index]) {
@@ -8854,6 +8907,14 @@ function handleCardDragWithinSection(evt, originalSectionId) {
                 // Update trainer state
                 setProgressionData(newProgressionData);
                 setProgressionRomans(newProgressionRomans);
+
+                // Dispatch event for guided mode tutorials
+                dispatchBuilderEvent('chordReordered', {
+                    fromIndex: oldChordIndex,
+                    toIndex: newSectionOrder.indexOf(oldChordIndex) !== -1 ?
+                        sectionPositions[newSectionOrder.indexOf(oldChordIndex)] : oldChordIndex,
+                    sectionId: toSectionId
+                });
             }
         } else if (!fromSectionId || isPseudoSection) {
             // Ungrouped chords being reordered within a pseudo-section
@@ -8886,6 +8947,15 @@ function handleCardDragWithinSection(evt, originalSectionId) {
 
                 setProgressionData(newProgressionData);
                 setProgressionRomans(newProgressionRomans);
+
+                // Dispatch event for guided mode tutorials
+                const newPositionIdx = newVisualOrder.indexOf(oldChordIndex);
+                const newTargetIdx = newPositionIdx !== -1 ? indicesInSection[newPositionIdx] : oldChordIndex;
+                dispatchBuilderEvent('chordReordered', {
+                    fromIndex: oldChordIndex,
+                    toIndex: newTargetIdx,
+                    sectionId: null
+                });
 
                 // Sync to composition state before re-render
                 if (window.syncProgressionToMelodyComposer) {
@@ -8956,6 +9026,14 @@ function handleCardDragWithinSection(evt, originalSectionId) {
     // Update trainer state (setProgressionData internally calls syncWithProgressionData)
     setProgressionData(newProgressionData);
     setProgressionRomans(newProgressionRomans);
+
+    // Dispatch event for guided mode tutorials
+    const newPosition = visibleChordOrder.indexOf(oldChordIndex);
+    dispatchBuilderEvent('chordReordered', {
+        fromIndex: oldChordIndex,
+        toIndex: newPosition !== -1 ? newPosition : oldChordIndex,
+        sectionId: null
+    });
 
     // Re-render
     renderProgressionDisplay('melody-progression-visualization', true);
@@ -12187,13 +12265,19 @@ export function handleAutoPlayback() {
     selectChordCard(0);
 
     setIsPlaying(true);
-    
+
+    // Dispatch event for guided mode tutorials
+    dispatchBuilderEvent('progressionPlayed', {
+        chordCount: trainerState.progressionData.length,
+        key: trainerState.currentKey
+    });
+
     // Sync state to window for other modules - get fresh state after setting isPlaying
     const freshState = getTrainerState();
     if (typeof window !== 'undefined') {
         window.trainerState = freshState;
     }
-    
+
     updateProgressionControlsUI();
 
     // Clear highlights before starting playback
@@ -13794,14 +13878,17 @@ function renderMelodyNotationIfNeeded(preventScroll = false) {
 
 /**
  * Clear all chords from the progression
- * Shows confirmation dialog if progression has chords
+ * Shows confirmation dialog if progression has chords (unless skipConfirmation is true)
+ * @param {boolean} skipConfirmation - If true, skip the confirmation dialog
  */
-export function clearProgression() {
+export function clearProgression(skipConfirmation = false) {
+    console.log('[clearProgression] Called with skipConfirmation:', skipConfirmation);
     const trainerState = getTrainerState();
     const progressionData = getProgressionData();
+    console.log('[clearProgression] Current chord count:', progressionData?.length || 0);
 
-    // If there are chords, ask for confirmation
-    if (progressionData && progressionData.length > 0) {
+    // If there are chords, ask for confirmation (unless skipped)
+    if (!skipConfirmation && progressionData && progressionData.length > 0) {
         const chordCount = progressionData.length;
         const message = chordCount === 1
             ? 'Are you sure you want to clear the progression? This will remove 1 chord.'
@@ -13830,7 +13917,8 @@ export function clearProgression() {
     setProgressionRomans([]);
     setCurrentIndex(0);
     setIsReady(false);
-    
+    console.log('[clearProgression] After clear, chord count:', getProgressionData()?.length || 0);
+
     // Clear highlights
     if (window.clearHighlights) {
         window.clearHighlights();
@@ -13865,6 +13953,14 @@ export function clearProgression() {
     }
     if (window.refreshNotationFromProgression) {
         window.refreshNotationFromProgression();
+    }
+
+    // Update Voice Leading and Theory Insights panels to reflect empty progression
+    if (window.voiceLeadingDiagram && window.voiceLeadingDiagram.update) {
+        window.voiceLeadingDiagram.update();
+    }
+    if (window.theoryInsightsPanel && window.theoryInsightsPanel.update) {
+        window.theoryInsightsPanel.update();
     }
 }
 
@@ -15692,32 +15788,39 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
     // For basic "Load" (not voice leading), normalize voicings so progression "shape" is consistent across keys
     // This ensures I-IV-V-vi sounds the same whether in C or Ab
     // The issue: In C, all scale degrees are above C3 (MIDI 48). But in Ab, some are below Ab3 (MIDI 56).
-    // Solution: If a chord root is below the key's tonic, shift it up an octave.
+    // OCTAVE CONSISTENCY: Keep all chords at the same base octave for consistency.
+    // Previously, chords below the key root were shifted up individually, causing
+    // inconsistent octaves (e.g., G-F-C-G where F and C are at octave 4 but G is at 3).
+    // Now we keep all chords at octave 3 (or shift the entire progression if needed).
     if (!applyVoiceLeading && progressionData.length > 0) {
         const newChordsStartIndex = baseAction === 'append' && trainerState.progressionData ?
             trainerState.progressionData.length : 0;
 
-        // Get the MIDI value of the key's root at octave 3
-        const keyRootMidi = noteToMidi(`${currentKey}3`);
-
-        // Normalize each newly added chord
+        // Check if any new chord has notes that are too low (below C3 = MIDI 48)
+        // If so, shift ALL new chords up by the same amount to maintain consistency
+        let lowestMidi = Infinity;
         for (let i = newChordsStartIndex; i < progressionData.length; i++) {
             const chord = progressionData[i];
             if (!chord.notes || chord.notes.length === 0) continue;
+            for (const note of chord.notes) {
+                const midi = noteToMidi(note);
+                if (!isNaN(midi) && midi < lowestMidi) {
+                    lowestMidi = midi;
+                }
+            }
+        }
 
-            // Get the current root MIDI (first note is the root in root position)
-            const rootNote = chord.notes[0];
-            const currentRootMidi = noteToMidi(rootNote);
-            if (isNaN(currentRootMidi) || isNaN(keyRootMidi)) continue;
-
-            // If the chord root is below the key's tonic, shift all notes up an octave
-            // This keeps the progression "shape" consistent across all keys
-            if (currentRootMidi < keyRootMidi) {
+        // If the lowest note is below C3, shift all new chords up
+        const MIN_COMFORTABLE_MIDI = 48; // C3
+        if (lowestMidi < MIN_COMFORTABLE_MIDI) {
+            const shiftAmount = Math.ceil((MIN_COMFORTABLE_MIDI - lowestMidi) / 12) * 12;
+            for (let i = newChordsStartIndex; i < progressionData.length; i++) {
+                const chord = progressionData[i];
+                if (!chord.notes || chord.notes.length === 0) continue;
                 chord.notes = chord.notes.map(note => {
                     const midi = noteToMidi(note);
                     if (isNaN(midi)) return note;
-                    const newMidi = midi + 12;
-                    // Convert back to note name preserving enharmonic spelling
+                    const newMidi = midi + shiftAmount;
                     const newNote = Tone.Midi(newMidi).toNote();
                     return newNote;
                 });
@@ -16116,6 +16219,13 @@ export function showRhythmPatternModal() {
         `).join('');
     };
 
+    // Helper to snap a value to the nearest 0.25 multiple
+    const snapToQuarter = (value) => {
+        const num = parseFloat(value);
+        if (isNaN(num) || num <= 0) return 0.25;
+        return Math.max(0.25, Math.round(num * 4) / 4);
+    };
+
     const renderGrid = (beatsSource) => {
         const chords = getTargetChordsDynamic();
         gridEl.innerHTML = chords.map((chord, i) => {
@@ -16125,10 +16235,28 @@ export function showRhythmPatternModal() {
                 <div class="flex items-center gap-2">
                     <div class="w-28 text-xs text-gray-300 truncate">${label}</div>
                     <input type="number" step="0.25" min="0.25" value="${beatVal}" data-beat-index="${i}"
-                        class="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-orange-500" />
+                        class="beat-grid-input flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-orange-500" />
                 </div>
             `;
         }).join('');
+
+        // Add validation listeners to snap values to 0.25 multiples
+        gridEl.querySelectorAll('.beat-grid-input').forEach(input => {
+            input.addEventListener('blur', (e) => {
+                const snapped = snapToQuarter(e.target.value);
+                if (parseFloat(e.target.value) !== snapped) {
+                    e.target.value = snapped;
+                    // Brief visual feedback
+                    e.target.classList.add('border-orange-500');
+                    setTimeout(() => e.target.classList.remove('border-orange-500'), 300);
+                }
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.target.blur(); // Trigger validation
+                }
+            });
+        });
     };
 
     const updatePreview = () => {
@@ -16197,7 +16325,7 @@ export function showRhythmPatternModal() {
         const name = (customNameInput.value || '').trim();
         const chords = getTargetChordsDynamic();
         const inputs = Array.from(gridEl.querySelectorAll('input[data-beat-index]'));
-        const beats = inputs.map(inp => Number(inp.value) || 1);
+        const beats = inputs.map(inp => snapToQuarter(inp.value));
         if (!name) {
             if (window.showModal) window.showModal('Please name your custom pattern.', false);
             return;
@@ -16231,7 +16359,7 @@ export function showRhythmPatternModal() {
             return;
         }
         const inputs = Array.from(gridEl.querySelectorAll('input[data-beat-index]'));
-        const beats = inputs.map(inp => Number(inp.value) || 1);
+        const beats = inputs.map(inp => snapToQuarter(inp.value));
         if (beats.length !== chords.length) {
             if (window.showModal) window.showModal('Beat count must match chord count.', false);
             return;
@@ -16337,7 +16465,7 @@ export function showRhythmPatternModal() {
                 voicingNotes: ch.notes || []
             }));
             const inputs = Array.from(gridEl.querySelectorAll('input[data-beat-index]'));
-            const beats = inputs.map(inp => Number(inp.value) || 1);
+            const beats = inputs.map(inp => snapToQuarter(inp.value));
             const bpm = window.getCompositionState ? (window.getCompositionState()?.getTempo?.() || 100) : 100;
 
             setPreviewOptions({
@@ -16549,4 +16677,5 @@ if (typeof window !== 'undefined') {
     window.highlightChordCard = highlightChordCard;
     window.unhighlightAllChordCards = unhighlightAllChordCards;
     window.expandChordCard = expandChordCard;
+    window.collapseAllChordCards = collapseAllChordCards;
 }

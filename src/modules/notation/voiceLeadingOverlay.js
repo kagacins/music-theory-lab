@@ -1369,10 +1369,31 @@ export class VoiceLeadingDiagram {
      * Render the diagram
      */
     render() {
-        if (!this.analysisData || !this.container) return;
+        if (!this.container) return;
 
         const diagramArea = document.getElementById('voice-leading-diagram-area');
         if (!diagramArea) return;
+
+        // If no analysis data (empty progression), show empty state
+        if (!this.analysisData) {
+            diagramArea.innerHTML = `
+                <div class="text-center text-gray-500 py-8">
+                    <p class="text-sm">Add chords to your progression to see voice leading analysis</p>
+                </div>
+            `;
+            // Clear the badge
+            const badge = document.getElementById('voice-leading-quality-badge');
+            if (badge) {
+                badge.textContent = '--';
+                badge.style.background = '';
+            }
+            // Clear warning summary
+            const warningSummary = document.getElementById('vl-warning-summary');
+            if (warningSummary) {
+                warningSummary.innerHTML = '';
+            }
+            return;
+        }
 
         const { chords, transitions, warnings, quality } = this.analysisData;
 
