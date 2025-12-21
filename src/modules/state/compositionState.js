@@ -1580,9 +1580,16 @@ export class CompositionState {
             }
 
             // Now set each note in the block
+            // IMPORTANT: If there's only one note and it starts at beat 0, use the FULL block duration
+            // This handles the case where a chord was split across measures (tied notes) -
+            // we only collect the first part, but we want to restore the full chord duration
             for (const note of allNotes) {
                 const startUnit = Math.round(note.beat * UNITS_PER_BEAT);
-                const durationUnits = durationToUnits(note.duration);
+
+                // Use block's full duration if this is a single note at beat 0
+                // (indicating it's a simple chord voicing, possibly split across measures)
+                const useFullBlockDuration = allNotes.length === 1 && startUnit === 0;
+                const durationUnits = useFullBlockDuration ? totalUnits : durationToUnits(note.duration);
 
                 if (startUnit >= 0 && startUnit < totalUnits) {
                     block.setNote(startUnit, durationUnits, note.pitches, {

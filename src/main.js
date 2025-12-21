@@ -275,6 +275,7 @@ import {
     playMeasure,
     playSelectedMeasure,
     playFromSelectedMeasure,
+    playProgressionOnly,
     getSelectedMeasureIndex,
     setSelectedMeasureIndex,
     startStepMeasureMelody,
@@ -735,11 +736,16 @@ function initMobileFab() {
 
     if (fabPlayAllQuick) {
         fabPlayAllQuick.addEventListener('click', () => {
-            // Context-aware play button - plays progression on Chord Lab/Composition Studio
+            // Context-aware play button
             const currentTab = document.querySelector('.tab-pane.active')?.id?.replace('tab-', '') || 'melody';
-            // Play chord progression on builder, trainer, or melody (Composition Studio) tabs
-            if (currentTab === 'builder' || currentTab === 'trainer' || currentTab === 'melody') {
-                // Chord Lab, Trainer, or Composition Studio: play the chord progression
+
+            if (currentTab === 'melody') {
+                // Composition Studio: use playAllMelody for seamless chord playback
+                if (window.playAllMelody) {
+                    window.playAllMelody();
+                }
+            } else if (currentTab === 'builder' || currentTab === 'trainer') {
+                // Chord Lab or Trainer: use handleAutoPlayback
                 if (window.handleAutoPlayback) {
                     window.handleAutoPlayback();
                 }
@@ -2192,20 +2198,38 @@ function actuallyLaunchLetItBeTutorial() {
             spotlight: '#melody-progression-visualization',
             targetElement: '#melody-progression-visualization',
             spotlightExtraHeight: 100,
-            callout: 'Each chord card has a "⋯" expand button. Click it on the G chord to see the inversion options.',
+            callout: 'Each chord card has a "⋯" expand button. Click it on the G chord to reveal the inversion options.',
             isActionStep: true,
             validation: { type: 'chord_card_expanded' },
-            successMessage: 'Card expanded! Now find the inversion buttons.'
+            successMessage: 'Card expanded! Now find the yellow INVERSION section.'
         },
         {
-            instruction: 'In the expanded G chord card, find the inversion buttons and click "1st" to change to 1st inversion.',
+            instruction: '🎹 LOOK FOR THE YELLOW BOX! In the expanded G card, find the yellow "🎹 Inversion" section and click the "1" button.',
             spotlight: '#melody-progression-visualization',
             targetElement: '#melody-progression-visualization',
             spotlightExtraHeight: 200,
-            callout: '1st inversion puts B (the 3rd) in the bass. Look for buttons labeled "Root", "1st", "2nd" in the expanded card.',
+            callout: '⬇️ LOOK DOWN IN THE CARD: The "🎹 Inversion" section has a YELLOW background. Click "1" to select 1st inversion (B in bass).',
             isActionStep: true,
             validation: { type: 'chord_card_edited', property: 'inversion' },
-            successMessage: 'G chord updated to 1st inversion! The bass line is smoother.'
+            successMessage: 'G chord is now 1st inversion! The bass line will be smoother.',
+            onEnter: () => {
+                // Add pulsing animation to inversion section
+                setTimeout(() => {
+                    const invSections = document.querySelectorAll('.chord-card-inversion-section');
+                    invSections.forEach(section => {
+                        section.classList.add('animate-pulse');
+                        section.style.boxShadow = '0 0 10px 3px rgba(234, 179, 8, 0.6)';
+                    });
+                }, 300);
+            },
+            onExit: () => {
+                // Remove pulsing animation
+                const invSections = document.querySelectorAll('.chord-card-inversion-section');
+                invSections.forEach(section => {
+                    section.classList.remove('animate-pulse');
+                    section.style.boxShadow = '';
+                });
+            }
         },
         // ========== EDIT Am INVERSION ==========
         {
@@ -2216,17 +2240,59 @@ function actuallyLaunchLetItBeTutorial() {
             callout: 'We\'ll change Am to 1st inversion to get C in the bass - creating a smooth half-step from C → B (G chord).',
             isActionStep: true,
             validation: { type: 'chord_card_expanded' },
-            successMessage: 'Card expanded! Now change the inversion.'
+            successMessage: 'Card expanded! Now find the yellow INVERSION section again.'
         },
         {
-            instruction: 'In the expanded Am chord card, click "1st" to change to 1st inversion.',
+            instruction: '🎹 In the yellow "🎹 Inversion" section, click the "1" button to change Am to 1st inversion.',
             spotlight: '#melody-progression-visualization',
             targetElement: '#melody-progression-visualization',
             spotlightExtraHeight: 200,
-            callout: 'Am/C (1st inversion) puts C in the bass, creating the classic bass line: C → B → F → C.',
+            callout: '⬇️ LOOK FOR YELLOW: The "🎹 Inversion" section has a yellow background. Am/C (1st inversion) puts C in the bass.',
             isActionStep: true,
             validation: { type: 'chord_card_edited', property: 'inversion' },
-            successMessage: 'Am is now in 1st inversion! Beautiful voice leading.'
+            successMessage: 'Am is now in 1st inversion! Beautiful voice leading.',
+            onEnter: () => {
+                // Add pulsing animation to inversion section
+                setTimeout(() => {
+                    const invSections = document.querySelectorAll('.chord-card-inversion-section');
+                    invSections.forEach(section => {
+                        section.classList.add('animate-pulse');
+                        section.style.boxShadow = '0 0 10px 3px rgba(234, 179, 8, 0.6)';
+                    });
+                }, 300);
+            },
+            onExit: () => {
+                // Remove pulsing animation
+                const invSections = document.querySelectorAll('.chord-card-inversion-section');
+                invSections.forEach(section => {
+                    section.classList.remove('animate-pulse');
+                    section.style.boxShadow = '';
+                });
+            }
+        },
+        // ========== COLLAPSE CHORD CARDS ==========
+        {
+            instruction: '✖️ Now collapse both expanded chord cards by clicking the "×" button in the top-right of each expanded card.',
+            spotlight: '#melody-progression-visualization',
+            targetElement: '#melody-progression-visualization',
+            spotlightExtraHeight: 200,
+            callout: 'You must collapse BOTH the G and Am expanded cards. Click the "×" on each card to shrink it back down.',
+            isActionStep: true,
+            validation: { type: 'all_cards_collapsed' },
+            successMessage: 'Cards collapsed! Now let\'s adjust the note durations.',
+            quickAdvance: true
+        },
+        // ========== CHANGE DURATION TO HALF NOTES ==========
+        {
+            instruction: '🎵 DURATION: The "Let It Be" chorus uses half notes (2 beats each). Look at the "Duration" row below each chord card and change ALL four chords to duration 2.',
+            spotlight: '#melody-progression-visualization',
+            targetElement: '#melody-progression-visualization',
+            spotlightExtraHeight: 50,
+            callout: 'Find the Duration dropdowns showing "4" (whole notes). Change each one to "2" for half notes. The chorus has 4 chords × 2 beats = 8 beats (2 measures).',
+            isActionStep: true,
+            validation: { type: 'all_chords_duration', beats: 2 },
+            successMessage: 'All chords set to half notes! Now the rhythm matches the original song.',
+            quickAdvance: true
         },
         // ========== FAB: Open and adjust BPM ==========
         {
@@ -2248,12 +2314,12 @@ function actuallyLaunchLetItBeTutorial() {
             successMessage: 'Settings expanded! Now adjust the BPM.'
         },
         {
-            instruction: 'Use the BPM slider to set the tempo to around 140 BPM for an upbeat feel.',
+            instruction: 'Use the BPM slider to set the tempo to around 70 BPM for the classic ballad feel.',
             spotlight: '#fab-bpm-slider',
             targetElement: '#fab-bpm-slider',
-            callout: 'Set the tempo between 135-145 BPM. Drag the slider to adjust.',
+            callout: '"Let It Be" is a ballad at ~70 BPM. Set the tempo between 65-75 BPM.',
             isActionStep: true,
-            validation: { type: 'bpm_changed', minBpm: 135, maxBpm: 145 },
+            validation: { type: 'bpm_changed', minBpm: 65, maxBpm: 75 },
             successMessage: 'Perfect tempo! The progression is ready to play.'
         },
         // ========== CLOSE FAB FIRST ==========
@@ -2280,7 +2346,7 @@ function actuallyLaunchLetItBeTutorial() {
         // ========== COMPLETION ==========
         {
             instruction: '🎉 Congratulations! You\'ve completed the "Let It Be" tutorial!',
-            callout: '📚 You learned: Adding chords in Chord Lab, Reordering with drag & drop, Quick Add for missing chords, Editing inversions on chord cards, Adjusting BPM, and Playing your progression!',
+            callout: '📚 You learned: Adding chords in Chord Lab, Reordering with drag & drop, Quick Add, Editing inversions, Changing chord duration (half notes), Adjusting BPM (~70 for ballads), and Playing your progression!',
             validation: null,
             successMessage: null,
             allowFreeExplore: true
@@ -3425,6 +3491,7 @@ window.stopPlayAllMelody = stopPlayAllMelody;
 window.playMeasure = playMeasure;
 window.playSelectedMeasure = playSelectedMeasure;
 window.playFromSelectedMeasure = playFromSelectedMeasure;
+window.playProgressionOnly = playProgressionOnly;
 
 /**
  * Clear all treble clef (melody) notes
@@ -4101,11 +4168,11 @@ window.onload = () => {
         });
     }
 
-    // Play Chords Only (progression without melody)
+    // Play Chords Only (progression without melody) - uses gapless approach
     if (actionPlayProgression) {
         actionPlayProgression.addEventListener('click', () => {
-            if (window.handleAutoPlayback) {
-                window.handleAutoPlayback();
+            if (window.playProgressionOnly) {
+                window.playProgressionOnly();
             }
         });
     }

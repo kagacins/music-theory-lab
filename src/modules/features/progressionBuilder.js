@@ -6622,9 +6622,9 @@ function createDetailedCardHTML(chord, index, key) {
                     </div>
 
                     <!-- RH Inversion -->
-                    <div>
-                        <label class="block text-[9px] font-semibold text-gray-700 mb-0.5">Inversion</label>
-                        <div class="flex gap-0.5">
+                    <div class="chord-card-inversion-section bg-yellow-50 border border-yellow-300 rounded p-1">
+                        <label class="block text-[9px] font-semibold text-gray-700 mb-0.5">🎹 Inversion</label>
+                        <div class="flex gap-0.5 inversion-btn-group">
                             ${inversionButtons.join('')}
                         </div>
                     </div>
@@ -7553,6 +7553,9 @@ function collapseChordCard(index) {
         // Force layout by reading dimensions
         wrapper.getBoundingClientRect();
     });
+
+    // Dispatch event AFTER DOM updates so validation can check DOM state correctly
+    dispatchBuilderEvent('chordCardCollapsed', { chordIndex: index });
 
     // Update shifts for all cards after layout is applied
     requestAnimationFrame(() => {
@@ -13005,7 +13008,7 @@ function playProgressionChord(index, advance = true) {
                 const chordBeats = chord.beats !== undefined ? chord.beats : 4;
                 const secondsPerBeat = speedValue / 4;
                 const chordDurationSeconds = chordBeats * secondsPerBeat;
-                const chordDuration = `${chordDurationSeconds * 0.9}s`; // 90% to prevent overlap
+                const chordDuration = `${chordDurationSeconds * 0.98}s`; // 98% to minimize gap while preventing overlap
 
 
 

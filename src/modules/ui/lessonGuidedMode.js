@@ -1591,9 +1591,11 @@ function setupActionListeners() {
     // Listen for tab navigation
     window.addEventListener('tabSelected', handleBuilderAction);
 
-    // Listen for chord card editing, expanding, and reordering (site tutorial support)
+    // Listen for chord card editing, expanding, collapsing, and reordering (site tutorial support)
     window.addEventListener('chordCardEdited', handleBuilderAction);
     window.addEventListener('chordCardExpanded', handleBuilderAction);
+    window.addEventListener('chordCardCollapsed', handleBuilderAction);
+    window.addEventListener('chordDurationChanged', handleBuilderAction);
     window.addEventListener('chordReordered', handleBuilderAction);
 
     // Listen for FAB/BPM events (site tutorial support)
@@ -1620,6 +1622,8 @@ function cleanupActionListeners() {
     window.removeEventListener('tabSelected', handleBuilderAction);
     window.removeEventListener('chordCardEdited', handleBuilderAction);
     window.removeEventListener('chordCardExpanded', handleBuilderAction);
+    window.removeEventListener('chordCardCollapsed', handleBuilderAction);
+    window.removeEventListener('chordDurationChanged', handleBuilderAction);
     window.removeEventListener('chordReordered', handleBuilderAction);
     window.removeEventListener('fabOpened', handleBuilderAction);
     window.removeEventListener('fabClosed', handleBuilderAction);
@@ -1779,6 +1783,40 @@ function validateAction(action, validation) {
         // Notation/melody note added
         case 'melody_note_added':
             return action.type === 'melodyNoteAdded';
+
+        // Chord card collapsed (single card)
+        case 'chord_card_collapsed':
+            return action.type === 'chordCardCollapsed';
+
+        // All chord cards collapsed (checks DOM state)
+        case 'all_cards_collapsed':
+            // Check if any expanded cards exist in the DOM
+            const expandedCards = document.querySelectorAll('.expanded-card-wrapper');
+            return expandedCards.length === 0;
+
+        // Chord duration changed
+        case 'chord_duration_changed':
+            if (action.type !== 'chordDurationChanged') return false;
+            // Optionally validate specific index or beats value
+            if (validation.chordIndex !== undefined && action.detail?.index !== validation.chordIndex) return false;
+            if (validation.beats !== undefined && action.detail?.beats !== validation.beats) return false;
+            return true;
+
+        // All chords have specific duration
+        case 'all_chords_duration':
+            if (action.type !== 'chordDurationChanged') return false;
+            // Check if all chords now have the target duration
+            const targetBeats = validation.beats;
+            if (targetBeats === undefined) return false;
+            // Use the imported getProgressionData function
+            const progressionDataForDuration = getProgressionData() || [];
+            if (progressionDataForDuration.length === 0) return false;
+            // Check all chords have the target duration
+            const allMatch = progressionDataForDuration.every(chord => {
+                const chordBeats = chord.beats !== undefined ? chord.beats : 4;
+                return chordBeats === targetBeats;
+            });
+            return allMatch;
 
         default:
             console.warn('[GuidedMode] Unknown validation type:', type);
