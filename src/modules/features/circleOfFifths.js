@@ -4,8 +4,10 @@
  */
 
 import { SHARP_NOTES, FLAT_NOTES } from '../../data/music-data.js';
-import { setCurrentKey, getTrainerState } from '../state/trainerState.js';
+import { setCurrentKey, getTrainerState, getProgressionData, getCurrentKey } from '../state/trainerState.js';
 import { dispatchBuilderEvent } from '../ui/lessonGuidedMode.js';
+import { showKeyChangeDialog } from '../ui/modals.js';
+import { getCompositionState } from '../state/compositionState.js';
 
 // Circle of Fifths data - clockwise from C
 // For enharmonic positions, we store both options and track which is currently selected
@@ -469,30 +471,111 @@ function handleKeyClick(event) {
 
     // The data-key attribute already reflects the current enharmonic preference
     const actualKey = key;
+    const currentKey = getCurrentKey();
+    const progressionData = getProgressionData();
+
+    // Format key names for display
+    const formatKeyDisplay = (k) => {
+        if (k.endsWith('m')) {
+            return `${k.slice(0, -1)} minor`;
+        }
+        return `${k} Major`;
+    };
+
+    // If same key or no chords, just apply the change directly
+    if (actualKey === currentKey || !progressionData || progressionData.length === 0) {
+        applyKeyChange(actualKey, type);
+        return;
+    }
+
+    // Close the Circle of Fifths panel first so dialog is visible
+    closeCircleOfFifthsPanel();
+
+    // Check for melody notes
+    const compositionState = getCompositionState();
+    const hasMelody = compositionState ? compositionState.hasMelodyNotes() : false;
+
+    // Detect mode change (major ↔ minor)
+    const oldIsMinor = currentKey.endsWith('m');
+    const newIsMinor = actualKey.endsWith('m');
+    const modeChange = oldIsMinor !== newIsMinor;
+
+    // Show dialog to ask how to handle existing content
+    showKeyChangeDialog({
+        oldKey: formatKeyDisplay(currentKey),
+        newKey: formatKeyDisplay(actualKey),
+        chords: progressionData,
+        hasMelody: hasMelody,
+        modeChange: modeChange,
+        onChoice: (choice) => {
+            if (!choice) {
+                // Cancelled - do nothing
+                return;
+            }
+
+            // Handle bass clef (chords)
+            if (choice.bass === 'transpose') {
+                // Transpose chords to new key (keep Roman numerals, change notes)
+                if (window.transposeProgression) {
+                    window.transposeProgression(currentKey, actualKey);
+                }
+            } else if (choice.bass === 'keep') {
+                // Keep same chords but update Roman numerals
+                if (window.updateRomanNumerals) {
+                    window.updateRomanNumerals(actualKey);
+                }
+            }
+
+            // Handle treble clef (melody)
+            if (choice.treble === 'transpose') {
+                // Transpose melody by interval
+                if (window.transposeTreble) {
+                    window.transposeTreble(currentKey, actualKey);
+                }
+            } else if (choice.treble === 'adjust') {
+                // Transpose AND adjust for mode change
+                if (window.transposeTrebleWithModeAdjust) {
+                    window.transposeTrebleWithModeAdjust(currentKey, actualKey);
+                }
+            }
+            // 'keep' = do nothing, melody stays as-is
+
+            applyKeyChange(actualKey, type);
+        }
+    });
+}
+
+/**
+ * Apply the key change after user confirms (or when no dialog needed)
+ * @param {string} actualKey - The new key to set
+ * @param {string} type - 'major' or 'minor'
+ */
+function applyKeyChange(actualKey, type) {
     currentSelectedKey = actualKey;
 
     // Use the helper function that properly handles enharmonic dropdown repopulation
-    // This solves the chicken-and-egg problem where the dropdown might be populated with
-    // sharps but the key being set uses flats (e.g., "Bb")
-    // IMPORTANT: Do NOT trigger loadProgression - changing the key should just update
-    // the key context (for Roman numerals, etc.), not reload a different progression
     if (window.setKeyDropdownValue) {
         window.setKeyDropdownValue(actualKey, false); // false = don't reload progression
     } else {
-        // Fallback if helper not available
         const keySelect = document.getElementById('trainer-key-select');
         if (keySelect) {
             keySelect.value = actualKey;
         }
         setCurrentKey(actualKey);
-        // Don't call loadProgression - just update the key
     }
 
     // Re-render the progression display with the new key context
-    // This updates Roman numerals without changing the actual chords
     if (window.renderProgressionDisplay) {
         window.renderProgressionDisplay('melody-progression-visualization', true);
         window.renderProgressionDisplay('melody-progression-visualization', false);
+    }
+
+    // Also re-render chord cards to show updated Roman numerals
+    if (window.renderProgressionCards) {
+        const container = document.getElementById('chord-cards-container');
+        if (container) {
+            window.renderProgressionCards(container, false);
+        }
     }
 
     // Update key display in melody tab header
@@ -503,8 +586,14 @@ function handleKeyClick(event) {
     const melodyWorkbenchKeyDisplay = document.getElementById('melody-workbench-key-display');
     if (melodyWorkbenchKeyDisplay) melodyWorkbenchKeyDisplay.textContent = actualKey;
 
-    // Close the modal after key is set
-    closeCircleOfFifthsPanel();
+    // Update keyboard labels and key signature display
+    if (window.updateKeyboardLabels) window.updateKeyboardLabels();
+    if (window.updateKeySignatureDisplay) window.updateKeySignatureDisplay(actualKey);
+
+    // Sync to composition state
+    if (window.syncProgressionToCompositionState) {
+        window.syncProgressionToCompositionState();
+    }
 
     // Switch to Composition Studio if not already there
     if (window.currentTab !== 'melody' && window.switchTab) {

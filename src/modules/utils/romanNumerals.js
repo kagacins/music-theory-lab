@@ -223,13 +223,14 @@ export function noteToRomanNumeral(noteName, key, chordType) {
     if (scaleDegreeIndex === -1) {
         // Find the closest diatonic degree and determine if it's sharp or flat
         // Major scale intervals: [0, 2, 4, 5, 7, 9, 11]
+        // Scale degree indices:   0   1   2   3   4   5   6  (I, II, III, IV, V, VI, VII)
         // Chromatic intervals that are NOT in major scale: 1, 3, 6, 8, 10
         const chromaticMapping = {
-            1: { degree: 1, prefix: '♭' },  // ♭II (e.g., Db in C)
-            3: { degree: 2, prefix: '♭' },  // ♭III (e.g., Eb in C) - could also be ♯II
-            6: { degree: 3, prefix: '♯' },  // ♯IV (e.g., F# in C) - could also be ♭V
-            8: { degree: 4, prefix: '♭' },  // ♭VI (e.g., Ab in C) - could also be ♯V
-            10: { degree: 5, prefix: '♭' }  // ♭VII (e.g., Bb in C)
+            1: { degree: 1, prefix: '♭' },  // ♭II (e.g., Db in C) - Neapolitan
+            3: { degree: 2, prefix: '♭' },  // ♭III (e.g., Eb in C) - borrowed from parallel minor
+            6: { degree: 3, prefix: '♯' },  // ♯IV (e.g., F# in C) - common passing chord, also used in Lydian mode
+            8: { degree: 5, prefix: '♭' },  // ♭VI (e.g., Ab in C) - borrowed from parallel minor
+            10: { degree: 6, prefix: '♭' }  // ♭VII (e.g., Bb in C) - borrowed from Mixolydian/parallel minor
         };
 
         const mapping = chromaticMapping[interval];
@@ -385,6 +386,11 @@ function getChordQualitySuffix(chordType, baseRoman) {
     }
     if (chordType === '7#9') {
         return '7#9';
+    }
+
+    // Lydian chord
+    if (chordType === 'Major 7th #11') {
+        return 'maj7#11';
     }
 
     return '';

@@ -227,3 +227,32 @@ chord.notes = newNotes.specificNotes;  // Keep notes in sync!
 - **VexFlow** - Music notation rendering (CDN)
 - **SortableJS** - Drag-and-drop reordering (CDN)
 - **Tailwind CSS** - Styling (built locally)
+
+---
+
+## CRITICAL: CSS Text Color Override Issue
+
+**When setting text colors via inline styles or Tailwind classes, you MUST also set `-webkit-text-fill-color`.**
+
+This project has CSS (likely from Tailwind or custom styles) that sets `-webkit-text-fill-color`, which **overrides** the standard `color` property. Even `color: white !important` will be ignored if `-webkit-text-fill-color` is set to something else.
+
+### Symptom:
+- You set `style="color: white;"` or `class="text-white"`
+- Text still appears dark/wrong color
+- Dev tools Computed tab shows `color: rgb(255,255,255)` but `-webkit-text-fill-color: rgba(0,0,0,0)`
+
+### Solution - Always set both properties:
+```html
+<!-- WRONG - color alone won't work -->
+<span style="color: white;">Text</span>
+
+<!-- CORRECT - set both color and -webkit-text-fill-color -->
+<span style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">Text</span>
+```
+
+### Debugging:
+When text color isn't working:
+1. Right-click the element → Inspect
+2. Go to "Computed" tab (not Styles)
+3. Filter for "color"
+4. Check both `color` AND `-webkit-text-fill-color` values

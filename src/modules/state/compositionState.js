@@ -1589,7 +1589,17 @@ export class CompositionState {
                 // Use block's full duration if this is a single note at beat 0
                 // (indicating it's a simple chord voicing, possibly split across measures)
                 const useFullBlockDuration = allNotes.length === 1 && startUnit === 0;
-                const durationUnits = useFullBlockDuration ? totalUnits : durationToUnits(note.duration);
+                // FIX: Account for dotted flag when computing duration units
+                let durationUnits;
+                if (useFullBlockDuration) {
+                    durationUnits = totalUnits;
+                } else {
+                    const baseDuration = note.duration || '4n';
+                    durationUnits = durationToUnits(baseDuration);
+                    if (note.dotted && !baseDuration.includes('.')) {
+                        durationUnits = Math.round(durationUnits * 1.5);
+                    }
+                }
 
                 if (startUnit >= 0 && startUnit < totalUnits) {
                     block.setNote(startUnit, durationUnits, note.pitches, {
@@ -2066,7 +2076,15 @@ export class CompositionState {
                 for (const note of voiceNotes) {
                     const absoluteBeat = measureStartBeat + (note.beat || 0);
                     const startUnit = Math.round(absoluteBeat * UNITS_PER_BEAT);
-                    const durationUnits = durationToUnits(note.duration || '4n');
+                    // FIX: Account for dotted flag when computing duration units
+                    // Notes can be stored with duration: '4n' and dotted: true separately,
+                    // or with duration: '4n.' combined. Handle both cases.
+                    const baseDuration = note.duration || '4n';
+                    let durationUnits = durationToUnits(baseDuration);
+                    if (note.dotted && !baseDuration.includes('.')) {
+                        // Dotted flag is set but duration string doesn't include dot - apply 1.5x multiplier
+                        durationUnits = Math.round(durationUnits * 1.5);
+                    }
                     const pitches = note.pitches || (note.pitch ? [note.pitch] : []);
 
                     allNotes.push({
@@ -2596,12 +2614,25 @@ export class CompositionState {
                         const origMeasureStartUnit = origMeasureIndex * beatsPerMeasure * UNITS_PER_BEAT;
                         let origUnit = origMeasureStartUnit;
                         for (let i = 0; i < prevNotes.length - 1; i++) {
-                            origUnit += durationToUnits(prevNotes[i].duration || '4n');
+                            // FIX: Account for dotted flag
+                            const pn = prevNotes[i];
+                            const pnBaseDuration = pn.duration || '4n';
+                            let pnDurationUnits = durationToUnits(pnBaseDuration);
+                            if (pn.dotted && !pnBaseDuration.includes('.')) {
+                                pnDurationUnits = Math.round(pnDurationUnits * 1.5);
+                            }
+                            origUnit += pnDurationUnits;
+                        }
+                        // FIX: Account for dotted flag for last note
+                        const lastBaseDuration = lastNote.duration || '4n';
+                        let lastDurationUnits = durationToUnits(lastBaseDuration);
+                        if (lastNote.dotted && !lastBaseDuration.includes('.')) {
+                            lastDurationUnits = Math.round(lastDurationUnits * 1.5);
                         }
                         // Return info about the original note, not the tied continuation
                         return {
                             startUnit: origUnit,
-                            durationUnits: durationToUnits(lastNote.duration || '4n'),
+                            durationUnits: lastDurationUnits,
                             note: lastNote,
                             isTiedContinuation: true,
                             originalMeasureIndex: origMeasureIndex,
@@ -2612,9 +2643,15 @@ export class CompositionState {
                 origMeasureIndex--;
             }
             // Couldn't find original - return position within this measure
+            // FIX: Account for dotted flag when computing duration units
+            const baseDuration = note.duration || '4n';
+            let fallbackDurationUnits = durationToUnits(baseDuration);
+            if (note.dotted && !baseDuration.includes('.')) {
+                fallbackDurationUnits = Math.round(fallbackDurationUnits * 1.5);
+            }
             return {
                 startUnit: measureStartUnit,
-                durationUnits: durationToUnits(note.duration || '4n'),
+                durationUnits: fallbackDurationUnits,
                 note,
                 isTiedContinuation: true,
             };
@@ -2627,10 +2664,21 @@ export class CompositionState {
             // Tied notes at the start of a measure DO take up space visually,
             // but they don't represent new notes in the block sequence.
             // We still need to add their duration to find the position of later notes.
-            currentUnit += durationToUnits(prevNote.duration || '4n');
+            // FIX: Account for dotted flag
+            const prevBaseDuration = prevNote.duration || '4n';
+            let prevDurationUnits = durationToUnits(prevBaseDuration);
+            if (prevNote.dotted && !prevBaseDuration.includes('.')) {
+                prevDurationUnits = Math.round(prevDurationUnits * 1.5);
+            }
+            currentUnit += prevDurationUnits;
         }
 
-        const durationUnits = durationToUnits(note.duration || '4n');
+        // FIX: Account for dotted flag when computing duration units
+        const baseDuration = note.duration || '4n';
+        let durationUnits = durationToUnits(baseDuration);
+        if (note.dotted && !baseDuration.includes('.')) {
+            durationUnits = Math.round(durationUnits * 1.5);
+        }
 
         return {
             startUnit: currentUnit,
@@ -2676,7 +2724,12 @@ export class CompositionState {
         // Calculate unit position
         const absoluteBeat = measureIndex * beatsPerMeasure + beat;
         const insertUnit = Math.round(absoluteBeat * UNITS_PER_BEAT);
-        const durationUnits = durationToUnits(noteData.duration || '4n');
+        // FIX: Account for dotted flag when computing duration units
+        const baseDuration = noteData.duration || '4n';
+        let durationUnits = durationToUnits(baseDuration);
+        if (noteData.dotted && !baseDuration.includes('.')) {
+            durationUnits = Math.round(durationUnits * 1.5);
+        }
         const pitches = noteData.pitches || (noteData.pitch ? [noteData.pitch] : []);
         const isRest = noteData.isRest || noteData.type === 'rest' || pitches.length === 0;
 

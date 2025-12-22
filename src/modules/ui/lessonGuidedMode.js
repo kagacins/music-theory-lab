@@ -1617,6 +1617,15 @@ function setupActionListeners() {
     // Listen for Circle of Fifths and Quick Add events
     window.addEventListener('circleOfFifthsOpened', handleBuilderAction);
     window.addEventListener('quickAddFormOpened', handleBuilderAction);
+
+    // Listen for multi-select and grouping events (site tutorial support)
+    window.addEventListener('chordsSelectionChanged', handleBuilderAction);
+    window.addEventListener('addSectionMenuOpened', handleBuilderAction);
+    window.addEventListener('chordsGrouped', handleBuilderAction);
+    window.addEventListener('groupDuplicated', handleBuilderAction);
+    window.addEventListener('chordDeleted', handleBuilderAction);
+    window.addEventListener('sectionMenuOpened', handleBuilderAction);
+    window.addEventListener('duplicateDialogOpened', handleBuilderAction);
 }
 
 function cleanupActionListeners() {
@@ -1641,6 +1650,15 @@ function cleanupActionListeners() {
     window.removeEventListener('settingsSectionClicked', handleBuilderAction);
     window.removeEventListener('circleOfFifthsOpened', handleBuilderAction);
     window.removeEventListener('quickAddFormOpened', handleBuilderAction);
+
+    // Remove multi-select and grouping event listeners
+    window.removeEventListener('chordsSelectionChanged', handleBuilderAction);
+    window.removeEventListener('addSectionMenuOpened', handleBuilderAction);
+    window.removeEventListener('chordsGrouped', handleBuilderAction);
+    window.removeEventListener('groupDuplicated', handleBuilderAction);
+    window.removeEventListener('chordDeleted', handleBuilderAction);
+    window.removeEventListener('sectionMenuOpened', handleBuilderAction);
+    window.removeEventListener('duplicateDialogOpened', handleBuilderAction);
 }
 
 function handleBuilderAction(event) {
@@ -1830,6 +1848,46 @@ function validateAction(action, validation) {
                 return chordBeats === targetBeats;
             });
             return allMatch;
+
+        // Chords grouped into a section
+        case 'chords_grouped':
+            if (action.type !== 'chordsGrouped') return false;
+            // Optionally validate specific group name
+            if (validation.groupName && action.detail?.groupName !== validation.groupName) return false;
+            return true;
+
+        // Group duplicated
+        case 'group_duplicated':
+            return action.type === 'groupDuplicated';
+
+        // Chords selected (for multi-select) - validates expected number of chords are selected
+        case 'all_chords_selected':
+            if (action.type !== 'chordsSelectionChanged') return false;
+            const expectedCount = validation.expectedCount || 4;
+            // Just check if the expected number of chords are selected (not necessarily ALL chords)
+            return action.detail?.selectedCount === expectedCount;
+
+        // Add Section menu opened
+        case 'add_section_menu_opened':
+            return action.type === 'addSectionMenuOpened';
+
+        // Section context menu (kebab menu) opened
+        case 'section_menu_opened':
+            return action.type === 'sectionMenuOpened';
+
+        // Duplicate dialog opened
+        case 'duplicate_dialog_opened':
+            return action.type === 'duplicateDialogOpened';
+
+        // Chord deleted
+        case 'chord_deleted':
+            return action.type === 'chordDeleted';
+
+        // Single chord duration changed
+        case 'single_chord_duration':
+            if (action.type !== 'chordDurationChanged') return false;
+            const singleTargetBeats = validation.beats;
+            return action.detail?.beats === singleTargetBeats;
 
         default:
             console.warn('[GuidedMode] Unknown validation type:', type);

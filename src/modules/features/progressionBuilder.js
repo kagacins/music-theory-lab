@@ -89,6 +89,9 @@ import {
 // Import auto-save for dirty marking
 import { markDirty as markAutoSaveDirty } from '../storage/autoSave.js';
 
+// Import compositionState for treble transposition
+import { getCompositionState } from '../state/compositionState.js';
+
 // Track last step time to determine if we're in a stepping sequence
 let lastStepTime = 0;
 
@@ -354,6 +357,9 @@ import { showChordSuggestionModal } from '../ui/chordSuggestionModal.js';
 
 // Import unified recommendation modal (new consolidated UI)
 import { showUnifiedRecommendationModal } from '../ui/recommendations/UnifiedRecommendationModal.js';
+
+// Import key change dialog
+import { showKeyChangeDialog } from '../ui/modals.js';
 
 // Import template browser modal (Phase 3.1)
 import { showTemplateBrowser } from '../ui/templateBrowserModal.js';
@@ -3138,7 +3144,7 @@ function renderSimplifiedChordSequence(container, progressionData, key, options 
                 +Add Chord
             </button>
             <button onclick="window.showAddSectionMenu && window.showAddSectionMenu(event, '${containerId}')"
-                    class="w-full px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    class="add-section-btn w-full px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
                     title="Select adjacent chords, then add to a section">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
@@ -3490,7 +3496,7 @@ function renderFlatCards(gridContainer, progressionData, key, options = {}) {
                 +Add Chord
             </button>
             <button onclick="window.showAddSectionMenu && window.showAddSectionMenu(event, '${containerId}')"
-                    class="w-full px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    class="add-section-btn w-full px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
                     title="Select adjacent chords, then add to a section">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
@@ -3567,7 +3573,7 @@ function createActionButtonsToolbar(containerId) {
             +Add Chord
         </button>
         <button onclick="window.showAddSectionMenu && window.showAddSectionMenu(event, '${containerId}')"
-                class="px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center gap-1.5"
+                class="add-section-btn px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center gap-1.5"
                 title="Select adjacent chords, then add to a section">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
@@ -4741,7 +4747,7 @@ function renderSectionAwareCardsScroll(gridContainer, progressionData, key, opti
                 +Add Chord
             </button>
             <button onclick="window.showAddSectionMenu && window.showAddSectionMenu(event, '${containerId}')"
-                    class="w-full px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    class="add-section-btn w-full px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
                     title="Select adjacent chords, then add to a section">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
@@ -4833,7 +4839,7 @@ function renderFlatCardsScroll(gridContainer, progressionData, key, options = {}
                 +Add Chord
             </button>
             <button onclick="window.showAddSectionMenu && window.showAddSectionMenu(event, '${containerId}')"
-                    class="w-full px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    class="add-section-btn w-full px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
                     title="Select adjacent chords, then add to a section">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
@@ -4922,7 +4928,7 @@ function renderSectionAwareCards(gridContainer, progressionData, key, options = 
                 +Add Chord
             </button>
             <button onclick="window.showAddSectionMenu && window.showAddSectionMenu(event, '${containerId}')"
-                    class="w-full px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    class="add-section-btn w-full px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
                     title="Select adjacent chords, then add to a section">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
@@ -5336,7 +5342,7 @@ function createUngroupedSection(ungroupedIndices, progressionData, key, showActi
                 +Add Chord
             </button>
             <button onclick="window.showAddSectionMenu && window.showAddSectionMenu(event, 'ungrouped-cards-container')"
-                    class="w-full px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
+                    class="add-section-btn w-full px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg shadow transition flex items-center justify-center gap-1.5"
                     title="Select adjacent chords, then add to a section">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
@@ -5650,6 +5656,9 @@ window.showAddSectionMenu = function(event, containerId) {
 
     document.body.appendChild(menu);
 
+    // Dispatch event for tutorial system
+    dispatchBuilderEvent('addSectionMenuOpened', { containerId });
+
     // Close menu on outside click
     const closeMenu = (e) => {
         if (!menu.contains(e.target)) {
@@ -5700,6 +5709,8 @@ function createNewSection(type, containerId) {
                 clearSelection();
                 renderProgressionDisplay('melody-progression-visualization', true);
                 renderProgressionDisplay('melody-progression-visualization', false);
+                // Dispatch event for tutorial validation
+                dispatchBuilderEvent('chordsGrouped', { groupName: type, chordIndices: contiguousRange });
                 return;
             }
         }
@@ -5714,6 +5725,9 @@ function createNewSection(type, containerId) {
     // Re-render
     renderProgressionDisplay('melody-progression-visualization', true);
     renderProgressionDisplay('melody-progression-visualization', false);
+
+    // Dispatch event for tutorial validation
+    dispatchBuilderEvent('chordsGrouped', { groupName: type, chordIndices: selectedIndices });
 }
 
 /**
@@ -5901,6 +5915,9 @@ window.showSectionMenu = function(event, sectionId) {
     });
 
     document.body.appendChild(menu);
+
+    // Dispatch event for tutorial system
+    dispatchBuilderEvent('sectionMenuOpened', { sectionId });
 
     // Close menu on outside click
     const closeMenu = (e) => {
@@ -6131,6 +6148,9 @@ window.showDuplicateSectionDialog = function(sectionId, sectionLabel, compositio
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
 
+    // Dispatch event for tutorial system
+    dispatchBuilderEvent('duplicateDialogOpened', { sectionId, sectionLabel });
+
     // Handle cancel
     const cancelBtn = dialog.querySelector('.cancel-btn');
     cancelBtn.onclick = () => overlay.remove();
@@ -6163,6 +6183,9 @@ window.showDuplicateSectionDialog = function(sectionId, sectionLabel, compositio
 
         renderProgressionDisplay('melody-progression-visualization', true);
         renderProgressionDisplay('melody-progression-visualization', false);
+
+        // Dispatch event for tutorial validation
+        dispatchBuilderEvent('groupDuplicated', { sectionId, mode });
     };
 };
 
@@ -8129,6 +8152,9 @@ function finalizeDurationChange(index, totalBeats) {
         detail: { index, beats: totalBeats }
     }));
 
+    // Dispatch for tutorial system
+    dispatchBuilderEvent('chordDurationChanged', { index, beats: totalBeats });
+
     // Update unified suggestions if available
     if (window.updateUnifiedSuggestions) {
         window.updateUnifiedSuggestions();
@@ -9652,6 +9678,19 @@ function updateMultiSelectVisuals() {
             updateBassSelectionUI();
         }
     }, 0);
+
+    // Dispatch event for tutorial validation
+    const totalChords = document.querySelectorAll('.chord-card-wrapper').length;
+    console.log('[ProgressionBuilder] Dispatching chordsSelectionChanged:', {
+        selectedCount: selectedIndices.length,
+        totalChords,
+        selectedIndices
+    });
+    dispatchBuilderEvent('chordsSelectionChanged', {
+        selectedCount: selectedIndices.length,
+        totalChords,
+        selectedIndices
+    });
 }
 
 /**
@@ -14032,6 +14071,9 @@ export function removeChordFromProgression(index) {
     if (window.refreshNotationFromProgression) {
         window.refreshNotationFromProgression();
     }
+
+    // Dispatch event for tutorial system
+    dispatchBuilderEvent('chordDeleted', { deletedIndex: index, remainingChords: progressionLength });
 }
 
 /**
@@ -14796,6 +14838,486 @@ if (typeof window !== 'undefined') {
 }
 
 /**
+ * Transpose all chords in the progression to a new key.
+ * Keeps Roman numerals the same but changes chord roots and notes.
+ * Also adjusts chord quality when transposing between major and minor modes.
+ * Example: I in C Major (C major) → I in G Major (G major)
+ * Example: I in E Major (E major) → i in E minor (E minor)
+ * @param {string} oldKey - Original key (e.g., "C", "Am")
+ * @param {string} newKey - Target key (e.g., "G", "Em")
+ */
+export function transposeProgression(oldKey, newKey) {
+    const progressionData = getProgressionData();
+    if (!progressionData || progressionData.length === 0) return;
+
+    // Determine if keys are major or minor
+    const oldIsMinor = oldKey.endsWith('m');
+    const newIsMinor = newKey.endsWith('m');
+    const modeChanged = oldIsMinor !== newIsMinor;
+
+    // Extract root notes from key strings (remove "m" suffix for minor keys)
+    const oldKeyRoot = oldKey.replace(/m$/, '');
+    const newKeyRoot = newKey.replace(/m$/, '');
+
+    // Normalize to find indices (handle enharmonics like Bb/A#)
+    const normalizedOldRoot = ENHARMONIC_MAP[oldKeyRoot] || oldKeyRoot;
+    const normalizedNewRoot = ENHARMONIC_MAP[newKeyRoot] || newKeyRoot;
+
+    const oldIndex = ALL_NOTES.indexOf(normalizedOldRoot);
+    const newIndex = ALL_NOTES.indexOf(normalizedNewRoot);
+
+    if (oldIndex === -1 || newIndex === -1) {
+        console.warn('[transposeProgression] Could not find key indices:', oldKeyRoot, newKeyRoot);
+        return;
+    }
+
+    // Calculate semitone shift
+    const semitones = (newIndex - oldIndex + 12) % 12;
+
+    // If same root AND same mode, nothing to do
+    if (semitones === 0 && !modeChanged) return;
+
+    // Determine enharmonic preference for the new key
+    const enharmonicPref = getEnharmonicPreferenceForKey(newKey);
+    const noteArray = enharmonicPref === 'flat' ? FLAT_NOTES : SHARP_NOTES;
+
+    console.log(`[transposeProgression] Transposing from ${oldKey} to ${newKey} (${semitones} semitones, mode changed: ${modeChanged}, ${enharmonicPref} spelling)`);
+
+    // Diatonic chord qualities by scale degree (1-7)
+    // Major key: I=Major, ii=Minor, iii=Minor, IV=Major, V=Major, vi=Minor, vii°=Diminished
+    // Minor key: i=Minor, ii°=Diminished, III=Major, iv=Minor, v=Minor, VI=Major, VII=Major
+    const majorKeyQualities = {
+        1: 'Major', 2: 'Minor', 3: 'Minor', 4: 'Major', 5: 'Major', 6: 'Minor', 7: 'Diminished'
+    };
+    const minorKeyQualities = {
+        1: 'Minor', 2: 'Diminished', 3: 'Major', 4: 'Minor', 5: 'Minor', 6: 'Major', 7: 'Major'
+    };
+
+    // Transpose each chord
+    progressionData.forEach((chord, index) => {
+        if (!chord.root) return;
+
+        // Get current root index
+        const normalizedRoot = ENHARMONIC_MAP[chord.root] || chord.root;
+        const rootIndex = ALL_NOTES.indexOf(normalizedRoot);
+        if (rootIndex === -1) {
+            console.warn(`[transposeProgression] Could not find root index for chord ${index}:`, chord.root);
+            return;
+        }
+
+        // Calculate new root
+        const newRootIndex = (rootIndex + semitones) % 12;
+        const newRoot = noteArray[newRootIndex];
+
+        // Determine if we need to change chord quality due to mode change
+        let newType = chord.type;
+        if (modeChanged && chord.roman) {
+            // Extract the scale degree from the Roman numeral
+            const romanClean = chord.roman.replace(/[^IViv]/g, '').toUpperCase();
+            const degreeMap = { 'I': 1, 'II': 2, 'III': 3, 'IV': 4, 'V': 5, 'VI': 6, 'VII': 7 };
+            const degree = degreeMap[romanClean];
+
+            if (degree) {
+                const targetQualities = newIsMinor ? minorKeyQualities : majorKeyQualities;
+                const expectedQuality = targetQualities[degree];
+
+                // Only change basic triads (Major ↔ Minor ↔ Diminished)
+                // Don't change extended chords (7ths, 9ths, etc.) - just their base quality
+                const basicTriads = ['Major', 'Minor', 'Diminished', 'Augmented'];
+
+                if (basicTriads.includes(chord.type)) {
+                    // Simple triad - just change the quality
+                    newType = expectedQuality;
+                    console.log(`[transposeProgression] Mode change: ${chord.type} → ${newType} for degree ${degree}`);
+                } else if (chord.type.includes('7') || chord.type.includes('9') || chord.type.includes('11') || chord.type.includes('13')) {
+                    // Extended chord - try to update the base quality
+                    // e.g., "Major 7th" → "Minor 7th", "Dominant 7th" stays as is (V7 is common in minor)
+                    if (chord.type === 'Major 7th' && expectedQuality === 'Minor') {
+                        newType = 'Minor 7th';
+                    } else if (chord.type === 'Minor 7th' && expectedQuality === 'Major') {
+                        newType = 'Major 7th';
+                    } else if (chord.type === 'Minor 7th' && expectedQuality === 'Diminished') {
+                        newType = 'Half-Diminished 7th';
+                    }
+                    // Keep Dominant 7th as is - it's used in both modes
+                    console.log(`[transposeProgression] Extended chord mode change: ${chord.type} → ${newType} for degree ${degree}`);
+                }
+            }
+        }
+
+        // Update Roman numeral case to match new mode
+        let newRoman = chord.roman;
+        if (modeChanged && chord.roman) {
+            // Update case: Major chords = uppercase, Minor/Dim chords = lowercase
+            const isNewChordMajor = newType === 'Major' || newType === 'Major 7th' || newType === 'Dominant 7th' || newType === 'Augmented';
+            const romanBase = chord.roman.replace(/[^IViv]/g, '');
+            const romanSuffix = chord.roman.replace(/[IViv]/g, '');
+
+            if (isNewChordMajor) {
+                newRoman = romanBase.toUpperCase() + romanSuffix;
+            } else {
+                newRoman = romanBase.toLowerCase() + romanSuffix;
+            }
+        }
+
+        // Update chord data
+        chord.root = newRoot;
+        chord.type = newType;
+        chord.roman = newRoman;
+        chord.name = `${newRoot} ${newType}`;
+        chord.simpleName = newRoot;
+
+        // Regenerate chord notes using existing helper
+        const chordNotesData = getProgressionChordNotes(
+            newKey,
+            newRoman,
+            newType,
+            chord.inversion || 0,
+            chord.octaveShift || 0
+        );
+
+        if (chordNotesData && chordNotesData.notes) {
+            chord.notes = chordNotesData.notes;
+        }
+
+        // Also update left-hand notes if present
+        if (chord.lhType && chord.lhType !== 'off') {
+            const lhNotesData = getLHNotes(
+                newRoot,
+                newType,
+                chord.lhInversion || 0,
+                chord.lhOctaveShift || 0,
+                newKey
+            );
+            if (lhNotesData) {
+                chord.lhNotes = lhNotesData;
+            }
+        }
+
+        console.log(`[transposeProgression] Chord ${index}: ${chord.roman} - ${normalizedRoot} ${chord.type} → ${newRoot} ${newType}`);
+    });
+
+    // Update the progression data
+    setProgressionData([...progressionData]);
+}
+
+/**
+ * Update Roman numerals for all chords to reflect a new key.
+ * Keeps chord notes the same but recalculates Roman numerals.
+ * Example: C major (I in C) → C major (IV in G)
+ * @param {string} newKey - The new key to analyze chords against
+ */
+export function updateRomanNumerals(newKey) {
+    const progressionData = getProgressionData();
+    if (!progressionData || progressionData.length === 0) return;
+
+    console.log(`[updateRomanNumerals] Updating Roman numerals for key: ${newKey}`);
+
+    // Recalculate Roman numeral for each chord
+    progressionData.forEach((chord, index) => {
+        if (!chord.root) return;
+
+        // Use noteToRomanNumeral to calculate the new Roman numeral
+        const newRoman = noteToRomanNumeral(chord.root, newKey, chord.type);
+
+        if (newRoman) {
+            console.log(`[updateRomanNumerals] Chord ${index}: ${chord.root} ${chord.type} - ${chord.roman} → ${newRoman}`);
+            chord.roman = newRoman;
+        } else {
+            console.warn(`[updateRomanNumerals] Could not calculate Roman numeral for chord ${index}:`, chord.root, chord.type);
+        }
+    });
+
+    // Update the progression data
+    setProgressionData([...progressionData]);
+}
+
+/**
+ * Transpose all treble clef (melody) notes by the interval between two keys.
+ * Shifts all pitches uniformly, keeping the melodic contour identical.
+ * @param {string} oldKey - The original key (e.g., 'C', 'Am')
+ * @param {string} newKey - The new key to transpose to
+ */
+export function transposeTreble(oldKey, newKey) {
+    const compositionState = getCompositionState();
+    if (!compositionState) {
+        console.warn('[transposeTreble] No compositionState available');
+        return;
+    }
+
+    // Extract root notes from key strings
+    const oldKeyRoot = oldKey.replace(/m$/, '');
+    const newKeyRoot = newKey.replace(/m$/, '');
+
+    // Normalize to find indices
+    const normalizedOldRoot = ENHARMONIC_MAP[oldKeyRoot] || oldKeyRoot;
+    const normalizedNewRoot = ENHARMONIC_MAP[newKeyRoot] || newKeyRoot;
+
+    const oldIndex = ALL_NOTES.indexOf(normalizedOldRoot);
+    const newIndex = ALL_NOTES.indexOf(normalizedNewRoot);
+
+    if (oldIndex === -1 || newIndex === -1) {
+        console.warn('[transposeTreble] Could not find key indices:', oldKeyRoot, newKeyRoot);
+        return;
+    }
+
+    // Calculate semitone shift
+    const semitones = (newIndex - oldIndex + 12) % 12;
+    if (semitones === 0) return; // No transposition needed
+
+    // Determine enharmonic preference for the new key
+    const enharmonicPref = getEnharmonicPreferenceForKey(newKey);
+    const noteArray = enharmonicPref === 'flat' ? FLAT_NOTES : SHARP_NOTES;
+
+    console.log(`[transposeTreble] Transposing melody by ${semitones} semitones (${enharmonicPref} spelling)`);
+
+    // Get all measures and transpose treble notes
+    const measures = compositionState.measures;
+    let notesTransposed = 0;
+
+    measures.forEach((measure, measureIndex) => {
+        const voices = measure.notation?.treble?.voices || [];
+        voices.forEach((voice, voiceIndex) => {
+            const notes = voice.notes || [];
+            notes.forEach((note, noteIndex) => {
+                if (note.isRest || !note.pitches || note.pitches.length === 0) return;
+
+                // Transpose each pitch in the note
+                note.pitches = note.pitches.map(pitch => {
+                    return transposePitch(pitch, semitones, noteArray);
+                });
+
+                notesTransposed++;
+            });
+        });
+    });
+
+    console.log(`[transposeTreble] Transposed ${notesTransposed} notes`);
+
+    // Sync the changes back to the treble block sequence
+    if (compositionState.trebleBlockSequence?.blocks?.length > 0) {
+        compositionState.syncMeasuresToTrebleBlock();
+    }
+
+    // Emit event to trigger re-render
+    compositionState.events.emit('measuresChanged', { source: 'transposeTreble' });
+}
+
+/**
+ * Transpose treble notes AND adjust for mode change (major ↔ minor).
+ * This shifts pitches by the interval AND adjusts scale degrees 3, 6, 7
+ * to match the new mode's scale.
+ * @param {string} oldKey - The original key (e.g., 'C', 'Am')
+ * @param {string} newKey - The new key to transpose to
+ */
+export function transposeTrebleWithModeAdjust(oldKey, newKey) {
+    const compositionState = getCompositionState();
+    if (!compositionState) {
+        console.warn('[transposeTrebleWithModeAdjust] No compositionState available');
+        return;
+    }
+
+    // Determine mode change
+    const oldIsMinor = oldKey.endsWith('m');
+    const newIsMinor = newKey.endsWith('m');
+    const modeChanged = oldIsMinor !== newIsMinor;
+
+    // Extract root notes from key strings
+    const oldKeyRoot = oldKey.replace(/m$/, '');
+    const newKeyRoot = newKey.replace(/m$/, '');
+
+    // Normalize to find indices
+    const normalizedOldRoot = ENHARMONIC_MAP[oldKeyRoot] || oldKeyRoot;
+    const normalizedNewRoot = ENHARMONIC_MAP[newKeyRoot] || newKeyRoot;
+
+    const oldIndex = ALL_NOTES.indexOf(normalizedOldRoot);
+    const newIndex = ALL_NOTES.indexOf(normalizedNewRoot);
+
+    if (oldIndex === -1 || newIndex === -1) {
+        console.warn('[transposeTrebleWithModeAdjust] Could not find key indices:', oldKeyRoot, newKeyRoot);
+        return;
+    }
+
+    // Calculate semitone shift
+    const semitones = (newIndex - oldIndex + 12) % 12;
+
+    // Determine enharmonic preference for the new key
+    const enharmonicPref = getEnharmonicPreferenceForKey(newKey);
+    const noteArray = enharmonicPref === 'flat' ? FLAT_NOTES : SHARP_NOTES;
+
+    // Scale degree adjustments for mode change
+    // Major scale: W-W-H-W-W-W-H (0, 2, 4, 5, 7, 9, 11)
+    // Minor scale: W-H-W-W-H-W-W (0, 2, 3, 5, 7, 8, 10)
+    // Differences: 3rd (4→3, -1), 6th (9→8, -1), 7th (11→10, -1) when going major→minor
+    // Reverse for minor→major: +1 for those degrees
+
+    console.log(`[transposeTrebleWithModeAdjust] Transposing melody by ${semitones} semitones, mode change: ${modeChanged ? (oldIsMinor ? 'minor→major' : 'major→minor') : 'none'}`);
+
+    // Get all measures and transpose treble notes
+    const measures = compositionState.measures;
+    let notesTransposed = 0;
+    let notesAdjusted = 0;
+
+    measures.forEach((measure, measureIndex) => {
+        const voices = measure.notation?.treble?.voices || [];
+        voices.forEach((voice, voiceIndex) => {
+            const notes = voice.notes || [];
+            notes.forEach((note, noteIndex) => {
+                if (note.isRest || !note.pitches || note.pitches.length === 0) return;
+
+                // Transpose each pitch in the note
+                note.pitches = note.pitches.map(pitch => {
+                    // First, do the basic interval transposition
+                    let transposedPitch = transposePitch(pitch, semitones, noteArray);
+
+                    // Then, if mode changed, check if this is scale degree 3, 6, or 7 and adjust
+                    if (modeChanged) {
+                        const adjustedPitch = adjustPitchForModeChange(
+                            transposedPitch,
+                            newKeyRoot,
+                            newIsMinor,
+                            noteArray
+                        );
+                        if (adjustedPitch !== transposedPitch) {
+                            notesAdjusted++;
+                            transposedPitch = adjustedPitch;
+                        }
+                    }
+
+                    return transposedPitch;
+                });
+
+                notesTransposed++;
+            });
+        });
+    });
+
+    console.log(`[transposeTrebleWithModeAdjust] Transposed ${notesTransposed} notes, adjusted ${notesAdjusted} for mode`);
+
+    // Sync the changes back to the treble block sequence
+    if (compositionState.trebleBlockSequence?.blocks?.length > 0) {
+        compositionState.syncMeasuresToTrebleBlock();
+    }
+
+    // Emit event to trigger re-render
+    compositionState.events.emit('measuresChanged', { source: 'transposeTrebleWithModeAdjust' });
+}
+
+/**
+ * Transpose a single pitch by a number of semitones.
+ * @param {string} pitch - The pitch to transpose (e.g., 'C4', 'F#5')
+ * @param {number} semitones - Number of semitones to shift (can be negative)
+ * @param {Array} noteArray - Array of note names to use for spelling
+ * @returns {string} The transposed pitch
+ */
+function transposePitch(pitch, semitones, noteArray) {
+    // Parse pitch into note name and octave
+    const match = pitch.match(/^([A-Ga-g][#b]?)(\d+)$/);
+    if (!match) {
+        console.warn('[transposePitch] Could not parse pitch:', pitch);
+        return pitch;
+    }
+
+    const noteName = match[1].toUpperCase();
+    let octave = parseInt(match[2], 10);
+
+    // Normalize note name
+    const normalizedNote = ENHARMONIC_MAP[noteName] || noteName;
+    const noteIndex = ALL_NOTES.indexOf(normalizedNote);
+
+    if (noteIndex === -1) {
+        console.warn('[transposePitch] Could not find note index:', noteName);
+        return pitch;
+    }
+
+    // Calculate new index and octave
+    let newIndex = noteIndex + semitones;
+    while (newIndex >= 12) {
+        newIndex -= 12;
+        octave++;
+    }
+    while (newIndex < 0) {
+        newIndex += 12;
+        octave--;
+    }
+
+    const newNoteName = noteArray[newIndex];
+    return `${newNoteName}${octave}`;
+}
+
+/**
+ * Adjust a pitch for mode change (major ↔ minor).
+ * Checks if the pitch is scale degree 3, 6, or 7 and adjusts it.
+ * @param {string} pitch - The pitch to potentially adjust (already transposed)
+ * @param {string} keyRoot - The root note of the new key
+ * @param {boolean} isMinor - Whether the new key is minor
+ * @param {Array} noteArray - Array of note names to use for spelling
+ * @returns {string} The adjusted pitch (or original if no adjustment needed)
+ */
+function adjustPitchForModeChange(pitch, keyRoot, isMinor, noteArray) {
+    // Parse pitch
+    const match = pitch.match(/^([A-Ga-g][#b]?)(\d+)$/);
+    if (!match) return pitch;
+
+    const noteName = match[1].toUpperCase();
+    const octave = parseInt(match[2], 10);
+
+    // Normalize note names
+    const normalizedNote = ENHARMONIC_MAP[noteName] || noteName;
+    const normalizedKeyRoot = ENHARMONIC_MAP[keyRoot] || keyRoot;
+
+    const noteIndex = ALL_NOTES.indexOf(normalizedNote);
+    const keyIndex = ALL_NOTES.indexOf(normalizedKeyRoot);
+
+    if (noteIndex === -1 || keyIndex === -1) return pitch;
+
+    // Calculate scale degree (semitones from key root)
+    const semitoneFromRoot = (noteIndex - keyIndex + 12) % 12;
+
+    // Major scale degrees in semitones: 0(1), 2(2), 4(3), 5(4), 7(5), 9(6), 11(7)
+    // Minor scale degrees in semitones: 0(1), 2(2), 3(3), 5(4), 7(5), 8(6), 10(7)
+
+    // We need to check if this note is currently at a "major" position and should be "minor" (or vice versa)
+    // The adjustment depends on what we're targeting
+
+    if (isMinor) {
+        // We want minor scale - check if note is at major 3rd, 6th, or 7th and lower it
+        if (semitoneFromRoot === 4) {
+            // Currently at major 3rd (4 semitones), lower to minor 3rd (3 semitones)
+            return transposePitch(pitch, -1, noteArray);
+        } else if (semitoneFromRoot === 9) {
+            // Currently at major 6th (9 semitones), lower to minor 6th (8 semitones)
+            return transposePitch(pitch, -1, noteArray);
+        } else if (semitoneFromRoot === 11) {
+            // Currently at major 7th (11 semitones), lower to minor 7th (10 semitones)
+            return transposePitch(pitch, -1, noteArray);
+        }
+    } else {
+        // We want major scale - check if note is at minor 3rd, 6th, or 7th and raise it
+        if (semitoneFromRoot === 3) {
+            // Currently at minor 3rd (3 semitones), raise to major 3rd (4 semitones)
+            return transposePitch(pitch, 1, noteArray);
+        } else if (semitoneFromRoot === 8) {
+            // Currently at minor 6th (8 semitones), raise to major 6th (9 semitones)
+            return transposePitch(pitch, 1, noteArray);
+        } else if (semitoneFromRoot === 10) {
+            // Currently at minor 7th (10 semitones), raise to major 7th (11 semitones)
+            return transposePitch(pitch, 1, noteArray);
+        }
+    }
+
+    return pitch; // No adjustment needed for other scale degrees
+}
+
+// Make transpose and update functions available globally
+if (typeof window !== 'undefined') {
+    window.transposeProgression = transposeProgression;
+    window.updateRomanNumerals = updateRomanNumerals;
+    window.transposeTreble = transposeTreble;
+    window.transposeTrebleWithModeAdjust = transposeTrebleWithModeAdjust;
+}
+
+/**
  * Render progression controls (populate dropdowns)
  */
 export function renderProgressionControls() {
@@ -14903,7 +15425,92 @@ export function renderProgressionControls() {
     console.log(`Loaded random progression: ${selectedProgName} in ${selectedKey}`);
 
     // Add event listeners
-    keySelect.onchange = () => loadProgression();
+    keySelect.onchange = () => {
+        const progressionData = getProgressionData();
+        const currentKey = getCurrentKey();
+        const newKey = keySelect.value;
+
+        console.log('[KeyChange] Handler triggered:', { currentKey, newKey, chordCount: progressionData?.length || 0 });
+
+        // If same key selected or no chords, just proceed normally
+        if (newKey === currentKey || !progressionData || progressionData.length === 0) {
+            console.log('[KeyChange] No dialog needed - loading progression normally');
+            loadProgression();
+            return;
+        }
+
+        // Format key names for display (e.g., "C" → "C Major", "Am" → "A minor")
+        const formatKeyDisplay = (key) => {
+            if (key.endsWith('m')) {
+                return `${key.slice(0, -1)} minor`;
+            }
+            return `${key} Major`;
+        };
+
+        console.log('[KeyChange] Showing dialog for key change with', progressionData.length, 'chords');
+        console.log('[KeyChange] showKeyChangeDialog function available:', typeof showKeyChangeDialog);
+
+        // Check if dialog function is available
+        if (typeof showKeyChangeDialog !== 'function') {
+            console.error('[KeyChange] showKeyChangeDialog is not a function! Falling back to loadProgression');
+            loadProgression();
+            return;
+        }
+
+        // Show dialog to ask how to handle existing chords
+        showKeyChangeDialog({
+            oldKey: formatKeyDisplay(currentKey),
+            newKey: formatKeyDisplay(newKey),
+            chords: progressionData,
+            onChoice: (choice) => {
+                console.log('[KeyChange] Dialog choice:', choice);
+
+                // Handle null/cancelled
+                if (!choice) {
+                    keySelect.value = currentKey;
+                    return;
+                }
+
+                // Handle bass clef (chords) - choice is an object { bass: 'transpose'|'keep', treble: ... }
+                if (choice.bass === 'transpose') {
+                    console.log('[KeyChange] Transposing from', currentKey, 'to', newKey);
+                    // Transpose chords to new key (keep Roman numerals, change notes)
+                    transposeProgression(currentKey, newKey);
+                } else if (choice.bass === 'keep') {
+                    console.log('[KeyChange] Keeping chords, updating Roman numerals for', newKey);
+                    // Keep same chords but update Roman numerals
+                    updateRomanNumerals(newKey);
+                }
+
+                // Handle treble clef (melody) if applicable
+                if (choice.treble === 'transpose') {
+                    console.log('[KeyChange] Transposing melody from', currentKey, 'to', newKey);
+                    if (window.transposeTreble) {
+                        window.transposeTreble(currentKey, newKey);
+                    }
+                } else if (choice.treble === 'adjust') {
+                    console.log('[KeyChange] Transposing melody with mode adjustment');
+                    if (window.transposeTrebleWithModeAdjust) {
+                        window.transposeTrebleWithModeAdjust(currentKey, newKey);
+                    }
+                }
+                // 'keep' = do nothing for treble, melody stays as-is
+
+                // Update key and re-render
+                setCurrentKey(newKey);
+                renderProgressionCards(document.getElementById('chord-cards-container'), false);
+                renderProgressionDisplay('melody-progression-visualization', false);
+                if (window.updateKeyboardLabels) window.updateKeyboardLabels();
+                if (window.updateKeySignatureDisplay) window.updateKeySignatureDisplay(newKey);
+                updateCurrentKeyDisplay();
+
+                // Sync to composition state
+                if (window.syncProgressionToCompositionState) {
+                    window.syncProgressionToCompositionState();
+                }
+            }
+        });
+    };
     progressionSelect.onchange = () => loadProgression();
     
     // Update "Current Key" display text on initial render

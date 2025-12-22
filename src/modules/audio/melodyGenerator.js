@@ -4,7 +4,7 @@
  */
 
 import { getProgressionData, getCurrentKey } from '../state/trainerState.js';
-import { getInstrument, getAudioIsReady, initAudio, getPiano, getPianoReverb } from './audioEngine.js';
+import { getInstrument, getAudioIsReady, initAudio, getPiano, getPianoReverb, getMetronomeEnabled, startMetronome, stopMetronome } from './audioEngine.js';
 import { getNotationPreference } from '../state/globalState.js';
 import { getNoteKeyId, noteToMidi, getLHNotes, getNotePitches, hasPitch, getPrimaryPitch, getEnharmonicPreferenceForKey } from '../utils/noteUtils.js';
 import { CHORD_DEFINITIONS, ALL_NOTES, MAJOR_SCALE_STEPS, DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
@@ -3262,6 +3262,14 @@ export function playFromSelectedMeasure() {
     }
     chordPart.start(0);
 
+    // Calculate measures to play for metronome
+    const measuresToPlay = measureCountFromState - startMeasure;
+
+    // Start metronome if enabled
+    if (getMetronomeEnabled()) {
+        startMetronome(beatsPerMeasure, measuresToPlay);
+    }
+
     Tone.Transport.start();
 
     // Dispatch event for guided mode tutorials
@@ -3817,12 +3825,15 @@ export function stopPlayAllMelody() {
     
     // Clear tracked chord notes
     currentlyPlayingChordNotes = [];
-    
+
     // Stop transport
     Tone.Transport.stop();
     Tone.Transport.cancel();
     Tone.Transport.position = 0;
-    
+
+    // Stop metronome
+    stopMetronome();
+
     // Stop and dispose parts
     if (playAllParts.melodyPart) {
         playAllParts.melodyPart.stop().dispose();
@@ -4595,6 +4606,18 @@ export function playAllMelody() {
     chordPart.start(0);
     measureHighlightPart.start(0);
 
+    // Calculate total measures for metronome
+    let totalMeasuresForMetronome = progressionData.length;
+    if (window.getCompositionState) {
+        const compositionState = window.getCompositionState();
+        totalMeasuresForMetronome = compositionState.getMeasureCount();
+    }
+
+    // Start metronome if enabled
+    if (getMetronomeEnabled()) {
+        startMetronome(beatsPerMeasure, totalMeasuresForMetronome);
+    }
+
     // Start transport
     Tone.Transport.start();
 
@@ -4974,6 +4997,18 @@ export function playProgressionOnly() {
     // Start parts
     chordPart.start(0);
     measureHighlightPart.start(0);
+
+    // Calculate total measures for metronome
+    let totalMeasuresForMetronome = progressionData.length;
+    if (window.getCompositionState) {
+        const compositionState = window.getCompositionState();
+        totalMeasuresForMetronome = compositionState.getMeasureCount();
+    }
+
+    // Start metronome if enabled
+    if (getMetronomeEnabled()) {
+        startMetronome(beatsPerMeasure, totalMeasuresForMetronome);
+    }
 
     Tone.Transport.start();
 

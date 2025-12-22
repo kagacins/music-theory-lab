@@ -120,6 +120,10 @@ export class NotationToolbar {
     // Voice leading visualization
     this.isVoiceLeadingVisible = localStorage.getItem('voice-leading-overlay-visible') === 'true';
     this.onVoiceLeadingToggle = options.onVoiceLeadingToggle || (() => {});
+
+    // Metronome state
+    this.metronomeEnabled = localStorage.getItem('metronome-enabled') === 'true';
+    this.onMetronomeToggle = options.onMetronomeToggle || (() => {});
   }
 
   /**
@@ -356,6 +360,7 @@ export class NotationToolbar {
                   <option value="${m}" ${m === this.measuresPerLine ? 'selected' : ''}>${m} measures</option>
                 `).join('')}
               </select>
+              <button class="toolbar-btn metronome-btn ${this.metronomeEnabled ? 'active' : ''}" data-action="metronome" title="Toggle metronome click during playback">🔔</button>
             </div>
           </div>
         </div>
@@ -958,6 +963,11 @@ export class NotationToolbar {
       this.toggleVoiceLeading();
     });
 
+    // Metronome toggle button
+    this.container.querySelector('.metronome-btn')?.addEventListener('click', () => {
+      this.toggleMetronome();
+    });
+
     // Keyboard shortcuts
     document.addEventListener('keydown', this.handleKeyDown.bind(this));
   }
@@ -1251,6 +1261,44 @@ export class NotationToolbar {
       localStorage.setItem('voice-leading-overlay-visible', this.isVoiceLeadingVisible.toString());
       this.updateVoiceLeadingButton();
       this.onVoiceLeadingToggle(this.isVoiceLeadingVisible);
+    }
+  }
+
+  /**
+   * Toggle metronome on/off
+   */
+  toggleMetronome() {
+    this.metronomeEnabled = !this.metronomeEnabled;
+    localStorage.setItem('metronome-enabled', this.metronomeEnabled.toString());
+    this.updateMetronomeButton();
+    this.onMetronomeToggle(this.metronomeEnabled);
+
+    // Also update the global metronome state via audioEngine
+    if (window.setMetronomeEnabled) {
+      window.setMetronomeEnabled(this.metronomeEnabled);
+    }
+  }
+
+  /**
+   * Update metronome button state
+   */
+  updateMetronomeButton() {
+    const btn = this.container?.querySelector('.metronome-btn');
+    if (btn) {
+      btn.classList.toggle('active', this.metronomeEnabled);
+    }
+  }
+
+  /**
+   * Set metronome enabled state explicitly
+   * @param {boolean} enabled - Whether metronome should be enabled
+   */
+  setMetronomeEnabled(enabled) {
+    if (this.metronomeEnabled !== enabled) {
+      this.metronomeEnabled = enabled;
+      localStorage.setItem('metronome-enabled', this.metronomeEnabled.toString());
+      this.updateMetronomeButton();
+      this.onMetronomeToggle(this.metronomeEnabled);
     }
   }
 

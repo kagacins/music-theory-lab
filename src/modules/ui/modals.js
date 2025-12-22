@@ -126,6 +126,190 @@ export function showChoiceDialog(options) {
 }
 
 /**
+ * Show key change dialog when user changes key with existing content
+ * Allows separate options for bass clef (chords) and treble clef (melody)
+ * @param {Object} options - Options
+ * @param {string} options.oldKey - Current/old key (e.g., "C Major", "Am minor")
+ * @param {string} options.newKey - New key being changed to
+ * @param {Array} options.chords - Current chord progression (optional)
+ * @param {boolean} options.hasMelody - Whether there are melody notes in treble clef
+ * @param {boolean} options.modeChange - Whether the mode is changing (major ↔ minor)
+ * @param {Function} options.onChoice - Callback with { bass: 'transpose'|'keep', treble: 'transpose'|'keep'|'adjust' } or null
+ */
+export function showKeyChangeDialog(options) {
+    console.log('[showKeyChangeDialog] Called with options:', options);
+    const { oldKey, newKey, chords = [], hasMelody = false, modeChange = false, onChoice } = options;
+
+    // Remove any existing dialog
+    const existingDialog = document.getElementById('key-change-dialog-overlay');
+    if (existingDialog) {
+        existingDialog.remove();
+    }
+
+    // Create dialog overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'key-change-dialog-overlay';
+    overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center';
+    overlay.style.zIndex = '100000';
+
+    // Determine if we have content to transpose
+    const hasChords = chords && chords.length > 0;
+
+    // Create dialog container
+    const dialog = document.createElement('div');
+    dialog.className = 'bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full mx-4 overflow-hidden max-h-[90vh] overflow-y-auto';
+
+    // Build dialog HTML
+    let dialogHTML = `
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-800">
+            <h3 class="text-lg font-semibold"><span style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">Change Key: ${oldKey} → ${newKey}</span></h3>
+        </div>
+
+        <!-- Warning Banner -->
+        <div class="px-6 py-3 bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-700">
+            <div class="flex items-start gap-2">
+                <span class="text-amber-500 text-lg">⚠️</span>
+                <div class="text-sm text-amber-800 dark:text-amber-200">
+                    <strong>Tip:</strong> Consider saving your work before transposing, in case the result isn't what you expected.
+                </div>
+            </div>
+        </div>
+
+        <div class="px-6 py-4 space-y-6">
+    `;
+
+    // Bass Clef Section (Chords)
+    if (hasChords) {
+        dialogHTML += `
+            <div>
+                <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                    <span class="text-lg">𝄢</span> Bass Clef (Chords)
+                </h4>
+                <div class="space-y-2">
+                    <label class="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors">
+                        <input type="radio" name="bass-option" value="transpose" checked class="mt-1 text-blue-600">
+                        <div>
+                            <div class="font-medium text-gray-900 dark:text-white">Transpose Chords <span class="text-xs text-blue-600 dark:text-blue-400">(Recommended)</span></div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">Keep harmonic function (I → I, V → V). Chord names change to match new key.</div>
+                        </div>
+                    </label>
+                    <label class="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors">
+                        <input type="radio" name="bass-option" value="keep" class="mt-1 text-blue-600">
+                        <div>
+                            <div class="font-medium text-gray-900 dark:text-white">Keep Current Chords</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">Same chord notes, Roman numerals update to show function in new key.</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        `;
+    }
+
+    // Treble Clef Section (Melody)
+    if (hasMelody) {
+        dialogHTML += `
+            <div>
+                <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                    <span class="text-lg">𝄞</span> Treble Clef (Melody)
+                </h4>
+                <div class="space-y-2">
+                    <label class="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors">
+                        <input type="radio" name="treble-option" value="transpose" checked class="mt-1 text-blue-600">
+                        <div>
+                            <div class="font-medium text-gray-900 dark:text-white">Transpose Melody <span class="text-xs text-blue-600 dark:text-blue-400">(Recommended)</span></div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">Shift all notes by the interval. Melody keeps its shape and contour.</div>
+                        </div>
+                    </label>
+                    <label class="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors">
+                        <input type="radio" name="treble-option" value="keep" class="mt-1 text-blue-600">
+                        <div>
+                            <div class="font-medium text-gray-900 dark:text-white">Keep Current Notes</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">Melody stays exactly the same (may sound different against new chords).</div>
+                        </div>
+                    </label>
+                    ${modeChange ? `
+                    <label class="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors">
+                        <input type="radio" name="treble-option" value="adjust" class="mt-1 text-blue-600">
+                        <div>
+                            <div class="font-medium text-gray-900 dark:text-white">Transpose + Adjust for Mode</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">Shift notes AND adjust scale degrees (3rd, 6th, 7th) for major↔minor change.</div>
+                        </div>
+                    </label>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    // If no content, show simple message
+    if (!hasChords && !hasMelody) {
+        dialogHTML += `
+            <div class="text-center text-gray-500 dark:text-gray-400 py-4">
+                No chords or melody to transpose. The key will be updated.
+            </div>
+        `;
+    }
+
+    dialogHTML += `
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-end gap-3">
+            <button id="key-change-cancel" class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+                Cancel
+            </button>
+            <button id="key-change-apply" class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                Apply Changes
+            </button>
+        </div>
+    `;
+
+    dialog.innerHTML = dialogHTML;
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    // Event handlers
+    const applyBtn = dialog.querySelector('#key-change-apply');
+    const cancelBtn = dialog.querySelector('#key-change-cancel');
+
+    applyBtn.addEventListener('click', () => {
+        const bassOption = hasChords ? dialog.querySelector('input[name="bass-option"]:checked')?.value : null;
+        const trebleOption = hasMelody ? dialog.querySelector('input[name="treble-option"]:checked')?.value : null;
+
+        overlay.remove();
+        onChoice({
+            bass: bassOption,
+            treble: trebleOption
+        });
+    });
+
+    cancelBtn.addEventListener('click', () => {
+        overlay.remove();
+        onChoice(null);
+    });
+
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            overlay.remove();
+            onChoice(null);
+        }
+    });
+
+    // Close on Escape
+    const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+            overlay.remove();
+            document.removeEventListener('keydown', handleEscape);
+            onChoice(null);
+        }
+    };
+    document.addEventListener('keydown', handleEscape);
+
+    return overlay;
+}
+
+/**
  * Show overflow choice dialog for note addition
  * @param {Object} options - Options
  * @param {number} options.overflowBeats - How many beats overflow the measure

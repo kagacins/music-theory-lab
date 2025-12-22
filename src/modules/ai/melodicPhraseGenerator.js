@@ -127,6 +127,93 @@ function scoreMoodForPhrase(noteMidi, notePc, chord, chordTones, prevMidi, mood)
 import { getEnharmonicPreferenceForKey } from '../utils/noteUtils.js';
 
 // -----------------------------------------------------------------------------
+// Beat Strength Utilities - For rhythm-aware pitch selection
+// -----------------------------------------------------------------------------
+
+/**
+ * Determine the metric strength of a beat position
+ * @param {number} beat - Beat position within measure (0-indexed)
+ * @param {number} beatsPerMeasure - Number of beats in the measure
+ * @returns {string} 'downbeat' | 'secondary' | 'beat' | 'offbeat' | 'weak'
+ */
+function getBeatStrength(beat, beatsPerMeasure = 4) {
+    // Normalize to handle fractional beats
+    const normalizedBeat = beat % beatsPerMeasure;
+    const isOnBeat = Math.abs(normalizedBeat - Math.round(normalizedBeat)) < 0.01;
+    const roundedBeat = Math.round(normalizedBeat);
+
+    if (Math.abs(normalizedBeat) < 0.01) {
+        return 'downbeat'; // Beat 1 - strongest
+    }
+
+    if (beatsPerMeasure === 4) {
+        // 4/4 time
+        if (Math.abs(normalizedBeat - 2) < 0.01) return 'secondary'; // Beat 3
+        if (isOnBeat && (roundedBeat === 1 || roundedBeat === 3)) return 'beat'; // Beats 2, 4
+    } else if (beatsPerMeasure === 3) {
+        // 3/4 time
+        if (isOnBeat) return 'beat'; // Beats 2, 3
+    } else if (beatsPerMeasure === 2) {
+        // 2/4 time
+        if (Math.abs(normalizedBeat - 1) < 0.01) return 'beat'; // Beat 2
+    } else if (beatsPerMeasure === 6) {
+        // 6/8 time (compound duple)
+        if (Math.abs(normalizedBeat - 3) < 0.01) return 'secondary'; // Beat 4 (second strong beat)
+        if (isOnBeat) return 'beat';
+    }
+
+    // Check for "and" of the beat (0.5)
+    const fractionalPart = normalizedBeat - Math.floor(normalizedBeat);
+    if (Math.abs(fractionalPart - 0.5) < 0.01) {
+        return 'offbeat'; // The "and" of any beat
+    }
+
+    // Everything else (16th notes, etc.)
+    return 'weak';
+}
+
+/**
+ * Get a score modifier based on beat strength and note type
+ * @param {string} beatStrength - 'downbeat' | 'secondary' | 'beat' | 'offbeat' | 'weak'
+ * @param {boolean} isChordTone - Whether the note is a chord tone
+ * @param {boolean} isScaleTone - Whether the note is a scale tone
+ * @param {boolean} isApproachTone - Whether the note is a chromatic approach tone
+ * @returns {number} Score modifier to add
+ */
+function getBeatStrengthScoreModifier(beatStrength, isChordTone, isScaleTone, isApproachTone) {
+    switch (beatStrength) {
+        case 'downbeat':
+            // Strongly prefer chord tones on downbeats
+            if (isChordTone) return 20;
+            if (isScaleTone) return 5;
+            return -15; // Penalize non-scale tones on downbeat
+        case 'secondary':
+            // Prefer chord tones, but less strictly
+            if (isChordTone) return 12;
+            if (isScaleTone) return 5;
+            return -8;
+        case 'beat':
+            // Moderate preference for chord tones
+            if (isChordTone) return 8;
+            if (isScaleTone) return 3;
+            return -5;
+        case 'offbeat':
+            // Approach tones and passing tones are fine here
+            if (isApproachTone) return 10;
+            if (isChordTone) return 5;
+            if (isScaleTone) return 5;
+            return 0; // Non-diatonic OK on offbeats
+        case 'weak':
+            // Anything goes on weak beats - passing tones, approach tones encouraged
+            if (isApproachTone) return 12;
+            if (isScaleTone) return 3;
+            return 2; // Even chromatic tones OK
+        default:
+            return 0;
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Contour Shape Definitions
 // -----------------------------------------------------------------------------
 
@@ -312,8 +399,290 @@ export const RHYTHM_PATTERNS = {
             }
             return pattern;
         }
+    },
+    // =========================================================================
+    // NEW RHYTHM PATTERNS - Added for improved variety and musicality
+    // =========================================================================
+    dottedQuarterEighth: {
+        id: 'dottedQuarterEighth',
+        label: 'Dotted Quarter-Eighth',
+        description: 'Classic dotted rhythm - very singable and memorable',
+        getPattern: (length) => {
+            // Alternating dotted quarter (1.5) and eighth (0.5)
+            const pattern = [];
+            for (let i = 0; i < length; i++) {
+                pattern.push(i % 2 === 0 ? 1.5 : 0.5);
+            }
+            return pattern;
+        }
+    },
+    dottedEighthSixteenth: {
+        id: 'dottedEighthSixteenth',
+        label: 'Dotted Eighth-Sixteenth',
+        description: 'Bouncy dotted rhythm - energetic feel',
+        getPattern: (length) => {
+            // Alternating dotted eighth (0.75) and sixteenth (0.25)
+            const pattern = [];
+            for (let i = 0; i < length; i++) {
+                pattern.push(i % 2 === 0 ? 0.75 : 0.25);
+            }
+            return pattern;
+        }
+    },
+    backbeat: {
+        id: 'backbeat',
+        label: 'Backbeat',
+        description: 'Emphasis on beats 2 and 4 - rock/pop feel',
+        getPattern: (length) => {
+            // Short pickup, long on backbeats
+            const pattern = [];
+            for (let i = 0; i < length; i++) {
+                // Creates: short-LONG-short-LONG pattern
+                pattern.push(i % 2 === 0 ? 0.5 : 1.5);
+            }
+            return pattern;
+        }
+    },
+    anacrusis: {
+        id: 'anacrusis',
+        label: 'Pickup Notes',
+        description: 'Starts with pickup notes leading to downbeat',
+        getPattern: (length) => {
+            if (length < 3) return Array(length).fill(1);
+            // Start with short pickups, land on longer downbeat
+            const pattern = [0.5, 0.5]; // Two pickup eighth notes
+            pattern.push(2); // Land on half note
+            // Fill remaining with quarters
+            for (let i = 3; i < length; i++) {
+                pattern.push(1);
+            }
+            return pattern;
+        }
+    },
+    tripletFeel: {
+        id: 'tripletFeel',
+        label: 'Triplet Feel',
+        description: 'Groups of three - waltz-like or jazz feel',
+        getPattern: (length) => {
+            // Each "beat" divided into 3 parts (approximated with standard durations)
+            // Using 2/3 beat per note (closest standard is 0.67, we'll use pattern scaling)
+            const pattern = [];
+            for (let i = 0; i < length; i++) {
+                // Create groups of 3 with slight accent on first
+                pattern.push(i % 3 === 0 ? 1.2 : 0.9);
+            }
+            return pattern;
+        }
+    },
+    marchlike: {
+        id: 'marchlike',
+        label: 'March-like',
+        description: 'Strong downbeats with even subdivision',
+        getPattern: (length) => {
+            // Long-short-short pattern (like a march or gallop)
+            const pattern = [];
+            for (let i = 0; i < length; i++) {
+                const pos = i % 3;
+                if (pos === 0) pattern.push(2);      // Long downbeat
+                else pattern.push(1);                 // Short follow-ups
+            }
+            return pattern;
+        }
+    },
+    cadential: {
+        id: 'cadential',
+        label: 'Cadential',
+        description: 'Slows down at phrase endings - natural resolution',
+        getPattern: (length) => {
+            // Start faster, end slower
+            const pattern = [];
+            for (let i = 0; i < length; i++) {
+                const position = i / (length - 1); // 0 to 1
+                // Gradually increase note length: 0.5 -> 2
+                pattern.push(0.5 + position * 1.5);
+            }
+            return pattern;
+        }
+    },
+    hemiola: {
+        id: 'hemiola',
+        label: 'Hemiola',
+        description: '3 against 2 feel - creates rhythmic tension',
+        getPattern: (length) => {
+            // Groups of 3 over groups of 2
+            const pattern = [];
+            for (let i = 0; i < length; i++) {
+                // Alternating 3-beat and 2-beat groupings
+                const group = Math.floor(i / 2) % 2;
+                pattern.push(group === 0 ? 1.5 : 1);
+            }
+            return pattern;
+        }
+    },
+    restful: {
+        id: 'restful',
+        label: 'Spacious',
+        description: 'Longer notes with breathing room',
+        getPattern: (length) => {
+            // Longer notes create a relaxed, spacious feel
+            const pattern = [];
+            for (let i = 0; i < length; i++) {
+                // Alternate between half notes and quarters with variety
+                pattern.push(i % 3 === 0 ? 2 : 1.5);
+            }
+            return pattern;
+        }
+    },
+    driving: {
+        id: 'driving',
+        label: 'Driving',
+        description: 'Consistent eighth notes with occasional longer notes',
+        getPattern: (length) => {
+            const pattern = [];
+            for (let i = 0; i < length; i++) {
+                // Mostly eighths with occasional quarters for breathing
+                pattern.push(i % 4 === 3 ? 1 : 0.5);
+            }
+            return pattern;
+        }
     }
 };
+
+// -----------------------------------------------------------------------------
+// Rhythmic Variation Modes - Add human-like imperfection and expression
+// -----------------------------------------------------------------------------
+
+/**
+ * Rhythmic variation modes allow for controlled imperfection in rhythm
+ * This makes melodies sound more natural and less mechanical
+ */
+export const RHYTHMIC_VARIATION_MODES = {
+    none: {
+        id: 'none',
+        label: 'Exact',
+        description: 'Use rhythm pattern exactly as generated',
+        variationRange: 0
+    },
+    subtle: {
+        id: 'subtle',
+        label: 'Subtle',
+        description: 'Very slight variations - almost imperceptible',
+        variationRange: 0.15
+    },
+    moderate: {
+        id: 'moderate',
+        label: 'Moderate',
+        description: 'Noticeable but tasteful variations',
+        variationRange: 0.3
+    },
+    expressive: {
+        id: 'expressive',
+        label: 'Expressive',
+        description: 'Significant rubato-style variations',
+        variationRange: 0.5
+    },
+    free: {
+        id: 'free',
+        label: 'Free',
+        description: 'Very loose interpretation of rhythm',
+        variationRange: 0.7
+    }
+};
+
+/**
+ * Apply rhythmic variation to a rhythm array
+ * @param {Array<number>} rhythm - Array of beat durations
+ * @param {string} variationMode - Variation mode id
+ * @param {Array<number>} standardDurations - Available standard durations to snap to
+ * @returns {Array<number>} Modified rhythm array
+ */
+function applyRhythmicVariation(rhythm, variationMode, standardDurations) {
+    const mode = RHYTHMIC_VARIATION_MODES[variationMode] || RHYTHMIC_VARIATION_MODES.none;
+    if (mode.variationRange === 0) return rhythm;
+
+    const snapToNearest = (value) => {
+        let closest = value;
+        let minDiff = Infinity;
+        for (const std of standardDurations) {
+            const diff = Math.abs(value - std);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closest = std;
+            }
+        }
+        return closest;
+    };
+
+    return rhythm.map((duration, i) => {
+        // Don't vary first and last notes as much (phrase boundaries should be stable)
+        const positionFactor = (i === 0 || i === rhythm.length - 1) ? 0.3 : 1;
+
+        // Random variation within range
+        const variation = (Math.random() - 0.5) * 2 * mode.variationRange * positionFactor;
+
+        // Apply variation and snap to standard duration
+        const varied = duration * (1 + variation);
+
+        // Ensure we don't go below 16th note or above whole note
+        const clamped = Math.max(0.25, Math.min(4, varied));
+
+        return snapToNearest(clamped);
+    });
+}
+
+/**
+ * Apply intelligent phrase-aware variation
+ * This variation considers musical context like phrase endings and climaxes
+ * @param {Array<number>} rhythm - Array of beat durations
+ * @param {Array<Object>} noteDetails - Note details for context
+ * @param {string} variationMode - Variation mode id
+ * @param {Array<number>} standardDurations - Available standard durations
+ * @returns {Array<number>} Modified rhythm array
+ */
+function applyContextualVariation(rhythm, noteDetails, variationMode, standardDurations) {
+    const mode = RHYTHMIC_VARIATION_MODES[variationMode] || RHYTHMIC_VARIATION_MODES.none;
+    if (mode.variationRange === 0) return rhythm;
+
+    const snapToNearest = (value) => {
+        let closest = value;
+        let minDiff = Infinity;
+        for (const std of standardDurations) {
+            const diff = Math.abs(value - std);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closest = std;
+            }
+        }
+        return closest;
+    };
+
+    return rhythm.map((duration, i) => {
+        let variationFactor = 1;
+
+        // Phrase boundaries: more stable
+        if (i === 0 || i === rhythm.length - 1) {
+            variationFactor *= 0.2;
+        }
+
+        // Chord tones: slightly more stable (they're "landing points")
+        if (noteDetails[i]?.isChordTone) {
+            variationFactor *= 0.7;
+        }
+
+        // High notes (potential climax): can stretch slightly
+        const isHighPoint = noteDetails[i]?.midi > 72; // Above C5
+        if (isHighPoint) {
+            variationFactor *= 1.2;
+        }
+
+        // Apply variation
+        const variation = (Math.random() - 0.5) * 2 * mode.variationRange * variationFactor;
+        const varied = duration * (1 + variation);
+        const clamped = Math.max(0.25, Math.min(4, varied));
+
+        return snapToNearest(clamped);
+    });
+}
 
 // -----------------------------------------------------------------------------
 // Section Type Profiles for Melody Generation
@@ -514,7 +883,9 @@ export function generatePhrase({
     // If provided, this overrides the beats from phraseLength
     targetBeats = null,
     // Optional: context for section-aware generation
-    sectionContext = null // { previousMelody, nextChords, sectionType }
+    sectionContext = null, // { previousMelody, nextChords, sectionType, timeSignature, startBeat }
+    // Optional: rhythmic variation mode ('none', 'subtle', 'moderate', 'expressive', 'free')
+    rhythmicVariation = 'none'
 } = {}) {
     const contour = CONTOUR_SHAPES[contourId] || CONTOUR_SHAPES.arch;
     const phraseLength = PHRASE_LENGTHS[lengthId] || PHRASE_LENGTHS.medium;
@@ -791,6 +1162,29 @@ export function generatePhrase({
                 if (intervalFromRoot === 6 && !noteChordTones.includes(notePc)) {
                     score -= 20; // Tritone not in chord
                 }
+            }
+
+            // === BEAT STRENGTH SCORING ===
+            // Estimate where this note will land rhythmically and score accordingly
+            // Chord tones on strong beats, passing/approach tones on weak beats
+            {
+                const tsInfo = sectionContext?.timeSignature || { num: 4, denom: 4 };
+                const beatsPerMeasureForStrength = tsInfo.num * (4 / tsInfo.denom);
+                const phraseStart = sectionContext?.startBeat || 0;
+
+                // Estimate this note's beat position based on note index
+                // Assumes relatively even distribution (actual rhythm generated later)
+                const estimatedBeat = phraseStart + (i / Math.max(1, noteCount - 1)) * effectiveTargetBeats;
+                const beatStrength = getBeatStrength(estimatedBeat, beatsPerMeasureForStrength);
+
+                // Apply beat-strength-aware scoring
+                const beatStrengthModifier = getBeatStrengthScoreModifier(
+                    beatStrength,
+                    isChordToneOfNoteChord,
+                    candidate.isScaleTone,
+                    isApproachTone
+                );
+                score += beatStrengthModifier;
             }
 
             // Voice leading from previous note
@@ -1080,6 +1474,138 @@ export function generatePhrase({
         }
     }
 
+    // ==========================================================================
+    // MEASURE-BOUNDARY AWARENESS - Prevent tiny tied note fragments
+    // ==========================================================================
+    // When notes cross measure boundaries, they get split with ties.
+    // A note ending at beat 4.125 creates a tied 16th note at the start of the
+    // next measure, which sounds unnatural. This adjusts rhythms to avoid that.
+
+    const timeSignature = sectionContext?.timeSignature || { num: 4, denom: 4 };
+    const beatsPerMeasure = timeSignature.num * (4 / timeSignature.denom);
+    const MIN_TIE_FRAGMENT = 0.5; // Don't create ties smaller than 8th note
+
+    // Calculate where this phrase starts (default to beat 0 if unknown)
+    const phraseStartBeat = sectionContext?.startBeat || 0;
+
+    // Walk through the rhythm and adjust notes that would create tiny tie fragments
+    let currentBeat = phraseStartBeat;
+    for (let i = 0; i < rhythm.length; i++) {
+        const noteDuration = rhythm[i];
+        const noteEndBeat = currentBeat + noteDuration;
+
+        // Find the next measure boundary after the note starts
+        const measureNumber = Math.floor(currentBeat / beatsPerMeasure);
+        const nextMeasureBoundary = (measureNumber + 1) * beatsPerMeasure;
+
+        // Check if this note crosses the measure boundary
+        if (noteEndBeat > nextMeasureBoundary && currentBeat < nextMeasureBoundary) {
+            const distanceToBarline = nextMeasureBoundary - currentBeat;
+            const overhang = noteEndBeat - nextMeasureBoundary;
+
+            // Case 1: The overhang is tiny (would create a small tied fragment)
+            if (overhang > 0 && overhang < MIN_TIE_FRAGMENT) {
+                // Try to extend to fill the next measure fragment
+                // But only if the extension is reasonable (not doubling the note)
+                if (overhang < noteDuration * 0.5) {
+                    // Find next standard duration that fills to barline or slightly past
+                    const targetDuration = distanceToBarline;
+                    let bestDuration = noteDuration;
+                    let bestDiff = overhang;
+
+                    for (const std of standardDurations) {
+                        if (std >= distanceToBarline - 0.01 && std <= distanceToBarline + 0.01) {
+                            // Perfect: ends exactly at barline
+                            bestDuration = std;
+                            bestDiff = 0;
+                            break;
+                        }
+                        // Or find one that ends at a reasonable point past the barline
+                        const wouldOverhang = (currentBeat + std) - nextMeasureBoundary;
+                        if (wouldOverhang >= MIN_TIE_FRAGMENT && wouldOverhang < bestDiff) {
+                            bestDuration = std;
+                            bestDiff = wouldOverhang;
+                        }
+                    }
+
+                    if (bestDiff < overhang) {
+                        rhythm[i] = bestDuration;
+                    }
+                }
+            }
+
+            // Case 2: The part before barline is tiny (note barely starts before barline)
+            if (distanceToBarline > 0 && distanceToBarline < MIN_TIE_FRAGMENT) {
+                // Try to shrink the note to end before barline, or extend to start at barline
+                // Shrink is usually better musically
+                const targetDuration = noteDuration - distanceToBarline;
+                if (targetDuration >= 0.25) {
+                    // Find standard duration close to target
+                    let bestDuration = noteDuration;
+                    let bestDiff = Infinity;
+
+                    for (const std of standardDurations) {
+                        const diff = Math.abs(std - targetDuration);
+                        if (diff < bestDiff && std >= 0.25) {
+                            bestDuration = std;
+                            bestDiff = diff;
+                        }
+                    }
+
+                    // Shift this note to start at the barline instead
+                    // This means we need to extend the previous note or add a rest
+                    if (i > 0 && distanceToBarline < 0.5) {
+                        // Extend previous note to fill the gap
+                        rhythm[i - 1] += distanceToBarline;
+                        rhythm[i] = bestDuration;
+                    }
+                }
+            }
+        }
+
+        currentBeat += rhythm[i];
+    }
+
+    // Recalculate total after adjustments
+    totalBeats = rhythm.reduce((sum, r) => sum + r, 0);
+
+    // Final cleanup: ensure we still hit target beats after boundary adjustments
+    if (Math.abs(totalBeats - effectiveTargetBeats) > 0.1) {
+        // Adjust last note to compensate
+        const diff = effectiveTargetBeats - totalBeats;
+        const lastIdx = rhythm.length - 1;
+        const newLast = rhythm[lastIdx] + diff;
+        if (newLast >= 0.25 && newLast <= 4) {
+            rhythm[lastIdx] = newLast;
+        }
+    }
+
+    // ==========================================================================
+    // RHYTHMIC VARIATION - Apply human-like imperfection if requested
+    // ==========================================================================
+    if (rhythmicVariation && rhythmicVariation !== 'none') {
+        // Use contextual variation which considers note details for smarter variations
+        const variedRhythm = applyContextualVariation(rhythm, noteDetails, rhythmicVariation, standardDurations);
+
+        // Copy varied rhythm back (in place to preserve reference)
+        for (let i = 0; i < rhythm.length; i++) {
+            rhythm[i] = variedRhythm[i];
+        }
+
+        // Recalculate total after variation
+        totalBeats = rhythm.reduce((sum, r) => sum + r, 0);
+
+        // Adjust last note to hit target if we drifted too much
+        if (Math.abs(totalBeats - effectiveTargetBeats) > 0.1) {
+            const diff = effectiveTargetBeats - totalBeats;
+            const lastIdx = rhythm.length - 1;
+            const newLast = rhythm[lastIdx] + diff;
+            if (newLast >= 0.25 && newLast <= 4) {
+                rhythm[lastIdx] = newLast;
+            }
+        }
+    }
+
     // Calculate overall phrase score
     const phraseScore = calculatePhraseScore(noteDetails, contour, chord, key);
 
@@ -1095,6 +1621,7 @@ export function generatePhrase({
         contour: contourId,
         length: lengthId,
         rhythmPattern: rhythmId,
+        rhythmicVariation, // Include variation mode used
         phraseScore,
         chordsUsed,
         noteCount,
@@ -1108,6 +1635,7 @@ export function generatePhrase({
             octave,
             range,
             densityMultiplier,
+            rhythmicVariation,
             chordSequence: chordSequence || null
         }
     };
@@ -1392,6 +1920,242 @@ export function createPhraseVariation(phrase, variationType = 'embellish') {
 }
 
 // -----------------------------------------------------------------------------
+// Rhythmic Motif Development - Extract, develop, and reuse rhythmic patterns
+// -----------------------------------------------------------------------------
+
+/**
+ * Extract a rhythmic motif from a phrase
+ * A motif is a short, memorable rhythmic pattern (typically 2-4 notes)
+ * @param {Array<number>} rhythm - Full rhythm array
+ * @param {number} startIndex - Starting index for motif extraction
+ * @param {number} length - Number of notes in motif (default 3)
+ * @returns {Object} Motif object with pattern and metadata
+ */
+export function extractRhythmicMotif(rhythm, startIndex = 0, length = 3) {
+    const actualLength = Math.min(length, rhythm.length - startIndex);
+    const pattern = rhythm.slice(startIndex, startIndex + actualLength);
+
+    // Calculate relative pattern (normalized to first note)
+    const baseValue = pattern[0] || 1;
+    const relativePattern = pattern.map(d => d / baseValue);
+
+    // Calculate total duration
+    const totalDuration = pattern.reduce((sum, d) => sum + d, 0);
+
+    return {
+        pattern,
+        relativePattern,
+        length: actualLength,
+        totalDuration,
+        startIndex
+    };
+}
+
+/**
+ * Develop variations of a rhythmic motif
+ * @param {Object} motif - Original motif from extractRhythmicMotif
+ * @param {string} developmentType - Type of development
+ * @returns {Object} Developed motif
+ */
+export function developMotif(motif, developmentType = 'augment') {
+    const { pattern, relativePattern } = motif;
+
+    switch (developmentType) {
+        case 'augment':
+            // Double all values (slower version)
+            return {
+                ...motif,
+                pattern: pattern.map(d => d * 2),
+                developmentType
+            };
+
+        case 'diminish':
+            // Halve all values (faster version, minimum 0.25)
+            return {
+                ...motif,
+                pattern: pattern.map(d => Math.max(0.25, d / 2)),
+                developmentType
+            };
+
+        case 'retrograde':
+            // Reverse the pattern
+            return {
+                ...motif,
+                pattern: [...pattern].reverse(),
+                developmentType
+            };
+
+        case 'extend':
+            // Add repetition of last note
+            return {
+                ...motif,
+                pattern: [...pattern, pattern[pattern.length - 1]],
+                developmentType
+            };
+
+        case 'truncate':
+            // Remove last note
+            return {
+                ...motif,
+                pattern: pattern.slice(0, -1),
+                developmentType
+            };
+
+        case 'syncopate':
+            // Shift emphasis by adding short note at start
+            return {
+                ...motif,
+                pattern: [0.25, ...pattern.map(d => Math.max(0.25, d - 0.0625))],
+                developmentType
+            };
+
+        case 'stretch':
+            // Add slight extensions to create rubato feel
+            return {
+                ...motif,
+                pattern: pattern.map((d, i) =>
+                    i === pattern.length - 1 ? d * 1.5 : d
+                ),
+                developmentType
+            };
+
+        case 'compress':
+            // Shorten all but the last note
+            return {
+                ...motif,
+                pattern: pattern.map((d, i) =>
+                    i === pattern.length - 1 ? d : d * 0.75
+                ),
+                developmentType
+            };
+
+        default:
+            return motif;
+    }
+}
+
+/**
+ * Apply a rhythmic motif to a phrase, replacing or augmenting its rhythm
+ * @param {Object} phrase - Original phrase
+ * @param {Object} motif - Motif to apply
+ * @param {string} applicationMode - 'replace' | 'repeat' | 'interleave'
+ * @returns {Object} Phrase with motif applied
+ */
+export function applyMotifToPhrase(phrase, motif, applicationMode = 'repeat') {
+    const { pattern } = motif;
+    const originalRhythm = phrase.rhythm;
+    let newRhythm;
+
+    switch (applicationMode) {
+        case 'replace':
+            // Replace entire rhythm with motif (repeated to fill)
+            newRhythm = [];
+            let totalDuration = 0;
+            const targetDuration = originalRhythm.reduce((sum, d) => sum + d, 0);
+            while (totalDuration < targetDuration && newRhythm.length < originalRhythm.length) {
+                for (const d of pattern) {
+                    if (newRhythm.length >= originalRhythm.length) break;
+                    newRhythm.push(d);
+                    totalDuration += d;
+                }
+            }
+            break;
+
+        case 'repeat':
+            // Repeat the motif for each group of notes
+            newRhythm = [];
+            for (let i = 0; i < originalRhythm.length; i++) {
+                newRhythm.push(pattern[i % pattern.length]);
+            }
+            break;
+
+        case 'interleave':
+            // Alternate between original rhythm and motif
+            newRhythm = originalRhythm.map((d, i) =>
+                i % 2 === 0 ? d : pattern[i % pattern.length]
+            );
+            break;
+
+        default:
+            newRhythm = originalRhythm;
+    }
+
+    return {
+        ...phrase,
+        rhythm: newRhythm,
+        appliedMotif: motif,
+        motifApplicationMode: applicationMode
+    };
+}
+
+/**
+ * Generate a phrase that develops a motif from a previous phrase
+ * This creates thematic unity between phrases
+ * @param {Object} options - Standard generatePhrase options
+ * @param {Object} sourcePhrase - Previous phrase to extract motif from
+ * @param {string} motifDevelopment - How to develop the motif
+ * @returns {Object} New phrase with developed motif
+ */
+export function generatePhraseWithMotifDevelopment(options, sourcePhrase, motifDevelopment = 'augment') {
+    // Extract the most prominent rhythmic motif from source
+    const sourceMotif = extractRhythmicMotif(sourcePhrase.rhythm, 0, 3);
+
+    // Develop the motif
+    const developedMotif = developMotif(sourceMotif, motifDevelopment);
+
+    // Generate a new phrase
+    const newPhrase = generatePhrase(options);
+
+    // Apply the developed motif to create thematic connection
+    return applyMotifToPhrase(newPhrase, developedMotif, 'repeat');
+}
+
+/**
+ * Analyze rhythmic similarity between two phrases
+ * Useful for ensuring variety or thematic unity
+ * @param {Object} phrase1 - First phrase
+ * @param {Object} phrase2 - Second phrase
+ * @returns {Object} Similarity analysis
+ */
+export function analyzeRhythmicSimilarity(phrase1, phrase2) {
+    const r1 = phrase1.rhythm;
+    const r2 = phrase2.rhythm;
+
+    // Normalize to same length for comparison
+    const minLen = Math.min(r1.length, r2.length);
+
+    // Calculate average difference in durations
+    let totalDiff = 0;
+    for (let i = 0; i < minLen; i++) {
+        totalDiff += Math.abs(r1[i] - r2[i]);
+    }
+    const avgDifference = totalDiff / minLen;
+
+    // Calculate pattern correlation
+    // High correlation = similar patterns
+    const normalize = arr => {
+        const sum = arr.reduce((a, b) => a + b, 0);
+        return arr.map(v => v / sum);
+    };
+
+    const norm1 = normalize(r1.slice(0, minLen));
+    const norm2 = normalize(r2.slice(0, minLen));
+
+    let correlation = 0;
+    for (let i = 0; i < minLen; i++) {
+        correlation += norm1[i] * norm2[i];
+    }
+
+    return {
+        averageDifference: avgDifference,
+        correlation: correlation,
+        similarityScore: Math.max(0, 100 - avgDifference * 20), // 0-100 scale
+        isHighlySimilar: correlation > 0.8,
+        isDissimilar: correlation < 0.3
+    };
+}
+
+// -----------------------------------------------------------------------------
 // Export contour shape list for UI
 // -----------------------------------------------------------------------------
 
@@ -1413,3 +2177,21 @@ export const RHYTHM_PATTERN_LIST = Object.values(RHYTHM_PATTERNS).map(r => ({
     label: r.label,
     description: r.description
 }));
+
+export const RHYTHMIC_VARIATION_LIST = Object.values(RHYTHMIC_VARIATION_MODES).map(v => ({
+    id: v.id,
+    label: v.label,
+    description: v.description,
+    variationRange: v.variationRange
+}));
+
+export const MOTIF_DEVELOPMENT_TYPES = [
+    { id: 'augment', label: 'Augmentation', description: 'Slow down the motif (double durations)' },
+    { id: 'diminish', label: 'Diminution', description: 'Speed up the motif (halve durations)' },
+    { id: 'retrograde', label: 'Retrograde', description: 'Reverse the rhythmic pattern' },
+    { id: 'extend', label: 'Extension', description: 'Add a note to lengthen the motif' },
+    { id: 'truncate', label: 'Truncation', description: 'Remove a note to shorten the motif' },
+    { id: 'syncopate', label: 'Syncopation', description: 'Add off-beat emphasis' },
+    { id: 'stretch', label: 'Stretch', description: 'Lengthen the final note for emphasis' },
+    { id: 'compress', label: 'Compression', description: 'Shorten notes to create urgency' }
+];

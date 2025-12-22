@@ -24,6 +24,11 @@ let audioIsReady = false;
 let cameraShutter = null;
 let pendingAudioCallbacks = [];
 
+// Metronome state
+let metronomeSynth = null;
+let metronomeEnabled = localStorage.getItem('metronome-enabled') === 'true';
+let metronomePart = null;
+
 // ============================================================================
 // Audio Initialization
 // ============================================================================
@@ -500,4 +505,174 @@ export function initAudioContextKeepAlive() {
     document.addEventListener('mousedown', resumeOnFirstInteraction, { once: true });
     document.addEventListener('touchstart', resumeOnFirstInteraction, { once: true, passive: true });
     document.addEventListener('keydown', resumeOnFirstInteraction, { once: true });
+}
+
+// ============================================================================
+// Metronome Functions
+// ============================================================================
+
+/**
+ * Initialize the metronome synth (creates lazily on first use)
+ * Uses a simple, clean click sound suitable for practice
+ */
+function initMetronomeSynth() {
+    if (metronomeSynth) return metronomeSynth;
+
+    // Ensure audio context is running
+    if (Tone && Tone.context && Tone.context.state !== 'running') {
+        Tone.context.resume().catch(err => {
+            console.warn("Could not resume audio context for metronome:", err);
+        });
+    }
+
+    // Create a classic metronome click using simple synths
+    // High frequency + very short envelope = clean "tick" sound
+    metronomeSynth = {
+        // Downbeat: slightly lower pitch, more prominent
+        downbeat: new Tone.Synth({
+            oscillator: { type: 'sine' },
+            envelope: {
+                attack: 0.001,
+                decay: 0.05,
+                sustain: 0,
+                release: 0.01
+            }
+        }).toDestination(),
+        // Regular beat: higher pitch, shorter
+        beat: new Tone.Synth({
+            oscillator: { type: 'sine' },
+            envelope: {
+                attack: 0.001,
+                decay: 0.03,
+                sustain: 0,
+                release: 0.01
+            }
+        }).toDestination()
+    };
+
+    // Set volumes
+    metronomeSynth.downbeat.volume.value = -6;
+    metronomeSynth.beat.volume.value = -9;
+
+    return metronomeSynth;
+}
+
+/**
+ * Get the metronome synth (creates lazily if needed)
+ * @returns {Object} Object with downbeat and beat synths
+ */
+export function getMetronomeSynth() {
+    if (!metronomeSynth) {
+        initMetronomeSynth();
+    }
+    return metronomeSynth;
+}
+
+/**
+ * Check if metronome is enabled
+ * @returns {boolean} True if metronome is enabled
+ */
+export function getMetronomeEnabled() {
+    return metronomeEnabled;
+}
+
+/**
+ * Set metronome enabled state
+ * @param {boolean} enabled - Whether metronome should be enabled
+ */
+export function setMetronomeEnabled(enabled) {
+    metronomeEnabled = enabled;
+    localStorage.setItem('metronome-enabled', enabled ? 'true' : 'false');
+
+    // Update UI toggle if it exists
+    const toggle = document.getElementById('metronome-toggle');
+    if (toggle) {
+        toggle.checked = enabled;
+    }
+    const toggleBtn = document.querySelector('.metronome-btn');
+    if (toggleBtn) {
+        toggleBtn.classList.toggle('active', enabled);
+    }
+
+    // Dispatch event for other components to react
+    window.dispatchEvent(new CustomEvent('metronome-state-changed', { detail: { enabled } }));
+}
+
+/**
+ * Toggle metronome enabled state
+ * @returns {boolean} New enabled state
+ */
+export function toggleMetronome() {
+    setMetronomeEnabled(!metronomeEnabled);
+    return metronomeEnabled;
+}
+
+/**
+ * Start metronome playback with the transport
+ * Call this when starting audio playback if metronome is enabled
+ * @param {number} beatsPerMeasure - Number of beats per measure (e.g., 4 for 4/4)
+ * @param {number} totalMeasures - Total number of measures to play
+ */
+export function startMetronome(beatsPerMeasure = 4, totalMeasures = 1) {
+    if (!metronomeEnabled) return;
+
+    // Stop any existing metronome
+    stopMetronome();
+
+    // Get or create the metronome synth
+    const synth = getMetronomeSynth();
+    if (!synth) return;
+
+    // Create a Part that will play the metronome clicks
+    const events = [];
+    for (let measure = 0; measure < totalMeasures; measure++) {
+        for (let beat = 0; beat < beatsPerMeasure; beat++) {
+            const time = `${measure}:${beat}:0`;
+            const isDownbeat = beat === 0;
+            events.push({ time, isDownbeat });
+        }
+    }
+
+    metronomePart = new Tone.Part((time, event) => {
+        if (event.isDownbeat) {
+            // Downbeat: lower pitch (A5 = 880Hz) for emphasis
+            synth.downbeat.triggerAttackRelease('A5', '32n', time);
+        } else {
+            // Regular beat: higher pitch (E6 = 1318Hz) for lighter click
+            synth.beat.triggerAttackRelease('E6', '32n', time);
+        }
+    }, events);
+
+    metronomePart.start(0);
+}
+
+/**
+ * Stop metronome playback
+ * Call this when stopping audio playback
+ */
+export function stopMetronome() {
+    if (metronomePart) {
+        metronomePart.stop();
+        metronomePart.dispose();
+        metronomePart = null;
+    }
+}
+
+/**
+ * Schedule a single metronome click at a specific time
+ * For manual scheduling in playback functions
+ * @param {number|string} time - Tone.js time value
+ * @param {boolean} isDownbeat - Whether this is a downbeat (beat 1)
+ */
+export function scheduleMetronomeClick(time, isDownbeat = false) {
+    if (!metronomeEnabled) return;
+
+    const synth = getMetronomeSynth();
+    if (!synth) return;
+
+    if (isDownbeat) {
+        synth.downbeat.triggerAttackRelease('A5', '32n', time);
+    } else {
+        synth.beat.triggerAttackRelease('E6', '32n', time);
+    }
 }
