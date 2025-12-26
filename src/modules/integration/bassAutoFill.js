@@ -195,7 +195,7 @@ function getBassNoteForChord(chord, bassFollowsInversion, octave = 2) {
 
 /**
  * Convert note name to MIDI number (standalone implementation)
- * @param {string} note - Note name with octave (e.g., 'C4', 'D#3')
+ * @param {string} note - Note name with octave (e.g., 'C4', 'D#3', 'F##4', 'Bbb3')
  * @returns {number} MIDI number (0-127)
  */
 function noteToMidi(note) {
@@ -205,25 +205,26 @@ function noteToMidi(note) {
     }
 
     // Fallback: standalone implementation
+    // Includes double sharps and double flats
     const noteMap = {
-        'C': 0, 'C#': 1, 'Db': 1,
-        'D': 2, 'D#': 3, 'Eb': 3,
-        'E': 4,
-        'F': 5, 'F#': 6, 'Gb': 6,
-        'G': 7, 'G#': 8, 'Ab': 8,
-        'A': 9, 'A#': 10, 'Bb': 10,
-        'B': 11
+        'C': 0, 'C#': 1, 'C##': 2, 'Db': 1, 'Dbb': 0,
+        'D': 2, 'D#': 3, 'D##': 4, 'Eb': 3, 'Ebb': 2,
+        'E': 4, 'E#': 5, 'E##': 6, 'Fb': 4, 'Fbb': 3,
+        'F': 5, 'F#': 6, 'F##': 7, 'Gb': 6, 'Gbb': 5,
+        'G': 7, 'G#': 8, 'G##': 9, 'Ab': 8, 'Abb': 7,
+        'A': 9, 'A#': 10, 'A##': 11, 'Bb': 10, 'Bbb': 9,
+        'B': 11, 'B#': 0, 'B##': 1, 'Cb': 11, 'Cbb': 10
     };
 
-    // Extract note name and octave
-    const match = note.match(/^([A-G][#b]?)(-?\d+)$/);
+    // Extract note name and octave - support double sharps (##) and double flats (bb)
+    const match = note.match(/^([A-G])(##|bb|[#b]?)(-?\d+)$/);
     if (!match) {
         console.warn('Invalid note format:', note);
         return 60; // Default to middle C
     }
 
-    const noteName = match[1];
-    const octave = parseInt(match[2]);
+    const noteName = match[1] + match[2];
+    const octave = parseInt(match[3]);
 
     const noteOffset = noteMap[noteName];
     if (noteOffset === undefined) {
@@ -232,7 +233,15 @@ function noteToMidi(note) {
     }
 
     // MIDI number formula: (octave + 1) * 12 + noteOffset
-    return (octave + 1) * 12 + noteOffset;
+    // Handle octave adjustment for B#/B## (wraps to next octave) and Cb/Cbb (wraps to previous)
+    let adjustedOctave = octave;
+    if (noteName === 'B#' || noteName === 'B##') {
+        adjustedOctave = octave + 1;
+    } else if (noteName === 'Cb' || noteName === 'Cbb') {
+        adjustedOctave = octave - 1;
+    }
+
+    return (adjustedOctave + 1) * 12 + noteOffset;
 }
 
 /**

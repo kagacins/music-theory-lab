@@ -7,6 +7,7 @@
  */
 
 import { TIME_SIGNATURES, DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
+import { dispatchBuilderEvent } from '../ui/lessonGuidedMode.js';
 
 // ============================================================================
 // CONSTANTS
@@ -325,7 +326,7 @@ export class NotationToolbar {
               <button class="toolbar-btn copy-btn" data-action="copy" title="Copy selected notes (Ctrl+C)">📋</button>
               <button class="toolbar-btn paste-btn" data-action="paste" title="Paste notes (Ctrl+V)">📥</button>
               <button class="toolbar-btn copy-block-btn" data-action="copyBlock" title="Copy entire block/measure">📦</button>
-              <button class="toolbar-btn delete-btn" data-action="delete" title="Delete selected (Del/Backspace)">🗑</button>
+              <button class="toolbar-btn delete-btn" data-action="delete" title="Delete selected (Del = replace with rest, Ctrl+Del = shift notes left)">🗑</button>
             </div>
           </div>
         </div>
@@ -1007,11 +1008,15 @@ export class NotationToolbar {
     }
 
     // Duration shortcuts (Shift+1-6) - Use Shift to avoid conflicts with chord/melody suggestion shortcuts (1-5)
-    if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.key >= '1' && e.key <= '6') {
-      const index = parseInt(e.key, 10) - 1;
-      if (index < DURATIONS.length) {
-        e.preventDefault();
-        this.setDuration(DURATIONS[index].id);
+    // Note: We use e.code (e.g., 'Digit1') instead of e.key because e.key returns shifted characters ('!', '@', etc.)
+    if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const digitMatch = e.code?.match(/^Digit([1-6])$/);
+      if (digitMatch) {
+        const index = parseInt(digitMatch[1], 10) - 1;
+        if (index < DURATIONS.length) {
+          e.preventDefault();
+          this.setDuration(DURATIONS[index].id);
+        }
       }
     }
 
@@ -1045,10 +1050,12 @@ export class NotationToolbar {
       }
     }
 
-    // Delete
+    // Delete - Ctrl+Delete/Backspace = shift delete (removes note and shifts others left)
+    //          Delete/Backspace alone = replace with rest (preserves rhythm)
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
-      this.onDelete();
+      const shiftDelete = e.ctrlKey || e.metaKey;
+      this.onDelete(shiftDelete);
     }
 
     // Tie (T)
@@ -1084,6 +1091,9 @@ export class NotationToolbar {
     this.currentDuration = duration;
     this.updateDurationButtons();
     this.onDurationChange(duration);
+
+    // Dispatch event for tutorial validation
+    dispatchBuilderEvent('notationDurationSelected', { duration });
   }
 
   /**
@@ -1104,6 +1114,9 @@ export class NotationToolbar {
     localStorage.setItem('notation-interaction-mode', mode);
     this.updateInteractionModeButtons();
     this.onInteractionModeChange(mode);
+
+    // Dispatch event for tutorial validation
+    dispatchBuilderEvent('notationInteractionModeSet', { mode });
   }
 
   /**
@@ -1220,6 +1233,9 @@ export class NotationToolbar {
     this.isRestMode = !this.isRestMode;
     this.updateRestButton();
     this.onRestModeChange(this.isRestMode);
+
+    // Dispatch event for tutorial validation
+    dispatchBuilderEvent('notationRestModeToggled', { isRestMode: this.isRestMode });
   }
 
   /**

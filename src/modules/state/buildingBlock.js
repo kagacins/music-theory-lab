@@ -344,6 +344,14 @@ export class Unit {
 
         // Lyric syllable attached to this note
         this.lyric = options.lyric || null; // { text: string, syllabic: 'single' | 'begin' | 'middle' | 'end' }
+
+        // =====================================================================
+        // TIE FLAGS (for shift-delete operations)
+        // =====================================================================
+
+        // Forward tie - this note ties TO the next note
+        // Critical for preserving tied note chains during shift operations
+        this.tied = options.tied || false;
     }
 
     /**
@@ -407,6 +415,8 @@ export class Unit {
             beam: this.beam ? { ...this.beam } : null,
             // Lyric
             lyric: this.lyric ? { ...this.lyric } : null,
+            // Tie flags
+            tied: this.tied,
         });
     }
 
@@ -733,6 +743,8 @@ export class BuildingBlock {
                     beam: unit.beam,
                     // Lyric
                     lyric: unit.lyric,
+                    // Tie forward (for preserving cross-note ties during shift operations)
+                    tied: unit.tied || false,
                 };
 
                 notes.push(note);

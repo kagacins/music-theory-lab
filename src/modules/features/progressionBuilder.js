@@ -811,8 +811,8 @@ function addSuggestedChordToProgression(suggestion) {
     );
 
     if (!chordData) {
-        if (window.showModal) {
-            window.showModal(`Unable to generate chord for ${suggestion.roman}.`, true);
+        if (window.showToast) {
+            window.showToast(`Unable to generate chord for ${suggestion.roman}`, { type: 'error' });
         }
         return;
     }
@@ -990,17 +990,12 @@ function generateQuickAddChordHTML(formId) {
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-gray-700 mb-1">Chord/Interval Type <span class="text-gray-500">(type to filter)</span></label>
-                    <input
-                        type="text"
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Chord/Interval Type</label>
+                    <select
                         id="${formId}-type-input"
-                        list="${datalistId}"
                         class="w-full p-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                        placeholder="Start typing or click dropdown arrow..."
-                        value=""
                     >
-                    <datalist id="${datalistId}">
-                        <optgroup label="─── TRIADS ───">
+                        <optgroup label="Triads">
                             <option value="Major">Major</option>
                             <option value="Minor">Minor</option>
                             <option value="Augmented">Augmented</option>
@@ -1009,7 +1004,7 @@ function generateQuickAddChordHTML(formId) {
                             <option value="Sus4">Sus4</option>
                             <option value="Power Chord">Power Chord</option>
                         </optgroup>
-                        <optgroup label="─── SEVENTHS ───">
+                        <optgroup label="Sevenths">
                             <option value="Dominant 7th">Dominant 7th</option>
                             <option value="Major 7th">Major 7th</option>
                             <option value="Minor 7th">Minor 7th</option>
@@ -1017,28 +1012,28 @@ function generateQuickAddChordHTML(formId) {
                             <option value="Diminished 7th">Diminished 7th</option>
                             <option value="Minor-Major 7th">Minor-Major 7th</option>
                         </optgroup>
-                        <optgroup label="─── NINTHS ───">
+                        <optgroup label="Ninths">
                             <option value="Major 9th">Major 9th</option>
                             <option value="Dominant 9th">Dominant 9th</option>
                             <option value="Minor 9th">Minor 9th</option>
                             <option value="6/9">6/9</option>
                             <option value="Add9">Add9</option>
                         </optgroup>
-                        <optgroup label="─── EXTENDED ───">
+                        <optgroup label="Extended">
                             <option value="Dominant 11th">Dominant 11th</option>
                             <option value="Minor 11th">Minor 11th</option>
                             <option value="Dominant 13th">Dominant 13th</option>
                             <option value="Major 6th">Major 6th</option>
                             <option value="Minor 6th">Minor 6th</option>
                         </optgroup>
-                        <optgroup label="─── ALTERED ───">
+                        <optgroup label="Altered">
                             <option value="Augmented 7th">Augmented 7th</option>
                             <option value="7b5">7b5</option>
                             <option value="7#5">7#5</option>
                             <option value="7b9">7b9</option>
                             <option value="7#9">7#9</option>
                         </optgroup>
-                        <optgroup label="─── INTERVALS ───">
+                        <optgroup label="Intervals">
                             <option value="Major 2nd">Major 2nd</option>
                             <option value="Minor 2nd">Minor 2nd</option>
                             <option value="Major 3rd">Major 3rd</option>
@@ -1052,7 +1047,7 @@ function generateQuickAddChordHTML(formId) {
                             <option value="Minor 7th">Minor 7th (interval)</option>
                             <option value="Octave">Octave</option>
                         </optgroup>
-                    </datalist>
+                    </select>
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Inversion</label>
@@ -1149,23 +1144,11 @@ export function quickAddChordFromForm(formId = 'quick-add-chord-form') {
     const chordType = typeInput.value?.trim() || '';
     const inversion = parseInt(inversionSelect.value || '0');
 
-    // Validate that a chord/interval was selected
+    // Validate that a chord/interval was selected (select always has a value, but check anyway)
     if (!chordType) {
         alert('Please select a chord or interval from the list.');
         typeInput.focus();
         return;
-    }
-
-    // Get the datalist to validate the selection
-    const datalistId = `chord-type-datalist-${formId}`;
-    const datalist = document.getElementById(datalistId);
-    if (datalist) {
-        const validOptions = Array.from(datalist.querySelectorAll('option')).map(opt => opt.value);
-        if (!validOptions.includes(chordType)) {
-            alert('Please select a valid chord or interval from the dropdown list.');
-            typeInput.focus();
-            return;
-        }
     }
 
     // Validate chord during guided mode (before adding)
@@ -1203,8 +1186,8 @@ export function quickAddChordFromForm(formId = 'quick-add-chord-form') {
             // Add the chord without triggering playback
             window.addChordToProgression(false); // false = don't switch to trainer tab
 
-            // Clear the input for next chord
-            typeInput.value = '';
+            // Keep the chord type selected so user can quickly add multiple chords of the same type
+            // (Don't clear typeInput.value)
 
             // Show success feedback
             const form = document.getElementById(formId);
@@ -5601,10 +5584,8 @@ window.showAddSectionMenu = function(event, containerId) {
     const selectedIndices = getSelectedIndicesArray ? getSelectedIndicesArray() : [];
     if (selectedIndices.length === 0) {
         // Show a message to the user
-        if (window.showModal) {
-            window.showModal('Please select one or more chords to create a Section', true);
-        } else {
-            alert('Please select one or more chords to create a Section');
+        if (window.showToast) {
+            window.showToast('Please select one or more chords to create a Section', { type: 'warning' });
         }
         return;
     }
@@ -6429,13 +6410,11 @@ function createSimplifiedCardHTML(chord, index, key) {
     return `
         <div class="relative inline-block">
             <div class="simplified-card bg-gradient-to-br from-gray-800 to-gray-900 border-2 rounded-xl overflow-hidden hover:shadow-xl transition-all shadow-lg relative" style="min-height: 80px; ${functionBorderStyle}">
-                <!-- Function color indicator bar at top -->
-                <div class="absolute top-0 left-0 right-0 h-1" style="${functionTopBorderStyle}"></div>
                 <!-- Inversion indicator (top-left corner) -->
                 ${inversionText ? `<div class="absolute top-2 left-1 text-xl text-red-400 font-bold">${inversionText}</div>` : ''}
 
                 <!-- Info icon (bottom-left corner) for touchscreen devices -->
-                <button class="info-tooltip-btn absolute bottom-1 left-1 w-5 h-5 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold transition" title="Show chord info">
+                <button class="info-tooltip-btn absolute bottom-1 left-1 w-4 h-4 bg-transparent border border-white hover:bg-white/20 rounded-full flex items-center justify-center text-white text-[10px] font-bold transition" title="Show chord info">
                     i
                 </button>
 
@@ -11695,8 +11674,9 @@ export function loadProgression() {
         const displayRoman = isMinorKey ? convertToMinorCase(roman) : roman;
         
         // Handle roman numerals with accidental prefixes (bVII, #IV, etc.)
+        // Check both ASCII (b, #) and Unicode (♭, ♯) symbols
         let baseRoman = roman;
-        if (roman.startsWith('b') || roman.startsWith('#') || roman.startsWith('♯')) {
+        if (roman.startsWith('b') || roman.startsWith('♭') || roman.startsWith('#') || roman.startsWith('♯')) {
             baseRoman = roman.substring(1); // Remove accidental prefix
         }
         
@@ -11970,6 +11950,13 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
         return null;
     }
 
+    // Use key-specific enharmonic preference, not global getCurrentKey()
+    // This is critical during transposition when the current key hasn't been updated yet
+    const keyEnharmonicPref = getEnharmonicPreferenceForKey(key);
+
+    // Extract just the root note from the key (e.g., "Cm" -> "C", "F# minor" -> "F#")
+    const keyRoot = key.replace(/\s*(major|minor|min|m)$/i, '').trim();
+
     let mapEntry = ROMAN_MAP_BASE[romanNumeral];
     let chordRootNote = '';
 
@@ -11985,8 +11972,8 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
         // Find the root of the target chord
         const targetEntry = ROMAN_MAP_BASE[targetRoman] || ROMAN_MAP_BASE[targetRoman.replace(/[°7]/g, '')];
         if (targetEntry) {
-            let scaleRootIndex = ALL_NOTES.indexOf(key);
-            if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
+            let scaleRootIndex = ALL_NOTES.indexOf(keyRoot);
+            if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[keyRoot]);
 
             const targetStep = MAJOR_SCALE_STEPS[targetEntry.index];
             const targetRootIndex = (scaleRootIndex + targetStep) % 12;
@@ -11994,7 +11981,7 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
             // The secondary dominant is a perfect 5th above the target
             // V/x means the dominant of x, which is 7 semitones above x
             const secondaryDomIndex = (targetRootIndex + 7) % 12;
-            chordRootNote = (getKeyBasedEnharmonic() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[secondaryDomIndex];
+            chordRootNote = (keyEnharmonicPref === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[secondaryDomIndex];
 
             // Return early with the resolved chord
             if (chordRootNote) {
@@ -12004,7 +11991,7 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
                     selectedInversion,
                     key,
                     octaveShift,
-                    getKeyBasedEnharmonic(),
+                    keyEnharmonicPref,
                     getNotationPreference()
                 );
 
@@ -12036,10 +12023,10 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
         ''
     );
 
-    // Check for flat or sharp prefix
-    if (cleanRoman.startsWith('b')) {
+    // Check for flat or sharp prefix (both ASCII and Unicode)
+    if (cleanRoman.startsWith('b') || cleanRoman.startsWith('♭')) {
         accidental = 'flat';
-        baseRoman = cleanRoman.substring(1); // Remove 'b' prefix
+        baseRoman = cleanRoman.substring(1); // Remove 'b' or '♭' prefix
     } else if (cleanRoman.startsWith('#') || cleanRoman.startsWith('♯')) {
         accidental = 'sharp';
         baseRoman = cleanRoman.substring(1); // Remove '#' or '♯' prefix
@@ -12066,8 +12053,8 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
             const scaleDegreeIndex = romanToIndex[baseForLookup];
             
             if (scaleDegreeIndex !== undefined) {
-                let scaleRootIndex = ALL_NOTES.indexOf(key);
-                if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
+                let scaleRootIndex = ALL_NOTES.indexOf(keyRoot);
+                if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[keyRoot]);
 
                 // Get the diatonic scale step
                 const scaleStep = MAJOR_SCALE_STEPS[scaleDegreeIndex];
@@ -12080,7 +12067,7 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
                     chordRootIndex = (chordRootIndex + 1) % 12;
                 }
 
-                chordRootNote = (getKeyBasedEnharmonic() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[chordRootIndex];
+                chordRootNote = (keyEnharmonicPref === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[chordRootIndex];
             } else {
                 chordRootNote = cleanRoman; // Fall back to treating as note name (use cleaned version)
             }
@@ -12088,20 +12075,20 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
             chordRootNote = cleanRoman; // The 'romanNumeral' is actually the root note (use cleaned version)
         }
     } else {
-        let scaleRootIndex = ALL_NOTES.indexOf(key);
-        if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
+        let scaleRootIndex = ALL_NOTES.indexOf(keyRoot);
+        if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[keyRoot]);
 
         const scaleStep = MAJOR_SCALE_STEPS[mapEntry.index];
         let chordRootIndex = (scaleRootIndex + scaleStep) % 12;
-        
+
         // Apply accidental if present
         if (accidental === 'flat') {
             chordRootIndex = (chordRootIndex - 1 + 12) % 12;
         } else if (accidental === 'sharp') {
             chordRootIndex = (chordRootIndex + 1) % 12;
         }
-        
-        chordRootNote = (getKeyBasedEnharmonic() === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[chordRootIndex];
+
+        chordRootNote = (keyEnharmonicPref === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[chordRootIndex];
     }
 
     if (!chordRootNote) {
@@ -12114,7 +12101,7 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
         selectedInversion,
         key,
         octaveShift,
-        getKeyBasedEnharmonic(),
+        keyEnharmonicPref,
         getNotationPreference()
     );
 
@@ -13646,6 +13633,9 @@ export function addChordToProgressionByParams(chordType, root, inversion = 0, oc
         }
     }));
 
+    // Note: chordAddedForTheory event is dispatched by addToProgressionData()
+    // to ensure it fires for all chord addition paths (Quick Add, recommendations, etc.)
+
     // Dispatch event for guided lesson mode
     if (isGuidedModeActive()) {
         dispatchBuilderEvent('progressionChordAdded', {
@@ -14541,8 +14531,8 @@ export function toggleRecording() {
         recordIcon.innerHTML = '<rect x="7" y="7" width="6" height="6"></rect>'; // Square icon
         saveBtn.disabled = true;
 
-        if (window.showModal) {
-            window.showModal("Recording started. Play chords on the keyboard.", true);
+        if (window.showToast) {
+            window.showToast("Recording started. Play chords on the keyboard.", { type: 'info' });
         }
     } else {
         // Stop recording
@@ -14551,8 +14541,8 @@ export function toggleRecording() {
         recordIcon.innerHTML = '<circle cx="10" cy="10" r="7"></circle>'; // Circle icon
         saveBtn.disabled = trainerState.recordedProgression.length === 0;
 
-        if (trainerState.recordedProgression.length > 0 && window.showModal) {
-            window.showModal("Recording stopped. Press 'Save' to keep the progression.", true);
+        if (trainerState.recordedProgression.length > 0 && window.showToast) {
+            window.showToast("Recording stopped. Press 'Save' to keep it.", { type: 'info' });
         }
     }
 }
@@ -14562,8 +14552,8 @@ export function toggleRecording() {
  */
 export function saveRecording() {
     document.getElementById('save-recording-btn').disabled = true;
-    if (window.showModal) {
-        window.showModal("Progression saved!", true);
+    if (window.showToast) {
+        window.showToast("Progression saved!", { type: 'success' });
     }
     // The progression is already in trainerState.progressionData, so we just need to finalize it
 }
@@ -14583,6 +14573,7 @@ export function addToProgressionData(chordData, options = {}) {
     const trainerState = getTrainerState();
 
     // Auto-respell chord root to match key's enharmonic preference
+    // BUT: Don't respell borrowed chords - they need their flat/sharp for theory identification
     if (chordData.root) {
         const keyPref = getKeyBasedEnharmonic();
         const originalRoot = chordData.root;
@@ -14591,14 +14582,48 @@ export function addToProgressionData(chordData, options = {}) {
         const rootHasSharp = originalRoot.includes('#');
         const rootHasFlat = originalRoot.includes('b');
 
-        if ((keyPref === 'flat' && rootHasSharp) || (keyPref === 'sharp' && rootHasFlat)) {
+        // Check if this is a borrowed chord (starts with ♭ or b like bVII, ♭VII, bVI, etc.)
+        // Borrowed chords should keep their flat spelling for proper theory analysis
+        // Calculate the proper roman numeral if not already set correctly
+        let romanNumeral = chordData.romanNumeral || chordData.roman || '';
+
+        // If roman is just the note name (e.g., "Bb" instead of "♭VII"), calculate properly
+        if (!romanNumeral || romanNumeral === originalRoot || !romanNumeral.match(/^[♭♯b#]?[IViv]+/)) {
+            const currentKey = getCurrentKey() || 'C';
+            romanNumeral = noteToRomanNumeral(originalRoot, currentKey, chordData.type || 'Major') || '';
+        }
+
+        const isFlatBorrowedChord = romanNumeral.startsWith('♭') || romanNumeral.startsWith('b');
+        const isSharpBorrowedChord = romanNumeral.startsWith('♯') || romanNumeral.startsWith('#');
+        const isBorrowedChord = isFlatBorrowedChord || isSharpBorrowedChord;
+
+        // For borrowed chords, ensure spelling matches the roman numeral:
+        // - ♭VII should use Bb (flat), not A# (sharp)
+        // - ♯IV should use F# (sharp), not Gb (flat)
+        let shouldRespell = false;
+        let targetSpelling = keyPref;
+
+        if (isFlatBorrowedChord && rootHasSharp) {
+            // Borrowed flat chord (like ♭VII) but root has sharp - respell to flat
+            shouldRespell = true;
+            targetSpelling = 'flat';
+        } else if (isSharpBorrowedChord && rootHasFlat) {
+            // Borrowed sharp chord (like ♯IV) but root has flat - respell to sharp
+            shouldRespell = true;
+            targetSpelling = 'sharp';
+        } else if (!isBorrowedChord && ((keyPref === 'flat' && rootHasSharp) || (keyPref === 'sharp' && rootHasFlat))) {
+            // Regular diatonic chord with wrong spelling for key
+            shouldRespell = true;
+        }
+
+        if (shouldRespell) {
             // Need to respell - find the enharmonic equivalent
             const sharpIndex = SHARP_NOTES.indexOf(originalRoot);
             const flatIndex = FLAT_NOTES.indexOf(originalRoot);
             const noteIndex = sharpIndex !== -1 ? sharpIndex : flatIndex;
 
             if (noteIndex !== -1) {
-                const newRoot = keyPref === 'flat' ? FLAT_NOTES[noteIndex] : SHARP_NOTES[noteIndex];
+                const newRoot = targetSpelling === 'flat' ? FLAT_NOTES[noteIndex] : SHARP_NOTES[noteIndex];
 
                 // Only respell if the new root is different
                 if (newRoot !== originalRoot) {
@@ -14612,40 +14637,43 @@ export function addToProgressionData(chordData, options = {}) {
                         chordData.name = newRoot + chordData.name.slice(originalRoot.length);
                     }
 
-                    // Also respell the notes array to match the key
-                    if (chordData.notes && Array.isArray(chordData.notes)) {
-                        chordData.notes = chordData.notes.map(note => {
-                            // Extract the note name without octave
-                            const match = note.match(/^([A-G][#b]?)(\d+)?$/);
-                            if (!match) return note;
+                    // Regenerate notes array using the new root
+                    // This ensures proper note spelling (e.g., Bb-D-F instead of A#-C##-E#)
+                    if (chordData.type) {
+                        const currentKey = getCurrentKey() || 'C';
+                        const inversion = chordData.inversion || 0;
+                        const octaveShift = chordData.octaveShift || 0;
 
-                            const noteName = match[1];
-                            const octave = match[2] || '';
+                        const result = getInvertedChordNotes(
+                            newRoot,
+                            chordData.type,
+                            inversion,
+                            currentKey,
+                            octaveShift,
+                            targetSpelling,
+                            getNotationPreference()
+                        );
 
-                            // Check if this note needs respelling
-                            const noteHasSharp = noteName.includes('#');
-                            const noteHasFlat = noteName.includes('b');
-
-                            if ((keyPref === 'flat' && noteHasSharp) || (keyPref === 'sharp' && noteHasFlat)) {
-                                const noteSharpIdx = SHARP_NOTES.indexOf(noteName);
-                                const noteFlatIdx = FLAT_NOTES.indexOf(noteName);
-                                const noteIdx = noteSharpIdx !== -1 ? noteSharpIdx : noteFlatIdx;
-
-                                if (noteIdx !== -1) {
-                                    const newNoteName = keyPref === 'flat' ? FLAT_NOTES[noteIdx] : SHARP_NOTES[noteIdx];
-                                    return newNoteName + octave;
-                                }
-                            }
-                            return note;
-                        });
+                        if (result && result.specificNotes && result.specificNotes.length > 0) {
+                            chordData.notes = result.specificNotes;
+                            // Also update the name and simpleName from the result
+                            if (result.name) chordData.name = result.name;
+                            if (result.simpleName) chordData.simpleName = result.simpleName;
+                        }
                     }
 
-                    // Show toast notification about the respelling
-                    if (window.showToast) {
+                    // Don't show toast for borrowed chord respelling (it's expected behavior)
+                    // Only show for regular diatonic respelling
+                    if (!isBorrowedChord && window.showToast) {
                         window.showToast(`Respelled ${originalRoot} as ${newRoot} to match key of ${getCurrentKey()}`, 'info', 3000);
                     }
                 }
             }
+        }
+
+        // Update the roman numeral in chord data if we calculated it
+        if (romanNumeral && romanNumeral !== chordData.roman && romanNumeral !== chordData.romanNumeral) {
+            chordData.roman = romanNumeral;
         }
     }
 
@@ -14710,6 +14738,23 @@ export function addToProgressionData(chordData, options = {}) {
             key: trainerState.currentKey
         });
     }
+
+    // Dispatch event for Theory Moments (teaching integration)
+    const chordIndex = trainerState.progressionData.length - 1;
+    console.log('[addToProgressionData] Dispatching chordAddedForTheory event:', {
+        chord: chordData.root + ' ' + chordData.type,
+        roman: chordData.roman,
+        index: chordIndex,
+        key: trainerState.currentKey
+    });
+    window.dispatchEvent(new CustomEvent('chordAddedForTheory', {
+        detail: {
+            chord: chordData,
+            index: chordIndex,
+            key: trainerState.currentKey,
+            progression: trainerState.progressionData
+        }
+    }));
 
     // Skip all rendering if in batch mode
     if (options.skipRender) {
@@ -14859,12 +14904,18 @@ export function transposeProgression(oldKey, newKey) {
     const oldKeyRoot = oldKey.replace(/m$/, '');
     const newKeyRoot = newKey.replace(/m$/, '');
 
-    // Normalize to find indices (handle enharmonics like Bb/A#)
-    const normalizedOldRoot = ENHARMONIC_MAP[oldKeyRoot] || oldKeyRoot;
-    const normalizedNewRoot = ENHARMONIC_MAP[newKeyRoot] || newKeyRoot;
+    // Find key indices - first try directly in ALL_NOTES, then use enharmonic equivalent
+    let oldIndex = ALL_NOTES.indexOf(oldKeyRoot);
+    if (oldIndex === -1) {
+        const enharmonicOld = ENHARMONIC_MAP[oldKeyRoot];
+        if (enharmonicOld) oldIndex = ALL_NOTES.indexOf(enharmonicOld);
+    }
 
-    const oldIndex = ALL_NOTES.indexOf(normalizedOldRoot);
-    const newIndex = ALL_NOTES.indexOf(normalizedNewRoot);
+    let newIndex = ALL_NOTES.indexOf(newKeyRoot);
+    if (newIndex === -1) {
+        const enharmonicNew = ENHARMONIC_MAP[newKeyRoot];
+        if (enharmonicNew) newIndex = ALL_NOTES.indexOf(enharmonicNew);
+    }
 
     if (oldIndex === -1 || newIndex === -1) {
         console.warn('[transposeProgression] Could not find key indices:', oldKeyRoot, newKeyRoot);
@@ -14895,11 +14946,34 @@ export function transposeProgression(oldKey, newKey) {
 
     // Transpose each chord
     progressionData.forEach((chord, index) => {
-        if (!chord.root) return;
+        console.log(`[transposeProgression] Processing chord ${index}:`, {
+            root: chord.root,
+            type: chord.type,
+            roman: chord.roman,
+            simpleName: chord.simpleName,
+            name: chord.name
+        });
+
+        if (!chord.root) {
+            console.warn(`[transposeProgression] Chord ${index} has no root, skipping`);
+            return;
+        }
+
+        // Save original values for logging
+        const originalRoot = chord.root;
+        const originalType = chord.type;
 
         // Get current root index
-        const normalizedRoot = ENHARMONIC_MAP[chord.root] || chord.root;
-        const rootIndex = ALL_NOTES.indexOf(normalizedRoot);
+        // First try to find the root directly in ALL_NOTES (which uses sharps)
+        // Only use ENHARMONIC_MAP if not found (for flat notes like Db, Eb, Gb, Ab, Bb)
+        let rootIndex = ALL_NOTES.indexOf(chord.root);
+        if (rootIndex === -1) {
+            // Root not found directly - try enharmonic equivalent
+            const enharmonicRoot = ENHARMONIC_MAP[chord.root];
+            if (enharmonicRoot) {
+                rootIndex = ALL_NOTES.indexOf(enharmonicRoot);
+            }
+        }
         if (rootIndex === -1) {
             console.warn(`[transposeProgression] Could not find root index for chord ${index}:`, chord.root);
             return;
@@ -14994,7 +15068,7 @@ export function transposeProgression(oldKey, newKey) {
             }
         }
 
-        console.log(`[transposeProgression] Chord ${index}: ${chord.roman} - ${normalizedRoot} ${chord.type} → ${newRoot} ${newType}`);
+        console.log(`[transposeProgression] Chord ${index}: ${chord.roman} - ${originalRoot} ${originalType} → ${newRoot} ${newType}`);
     });
 
     // Update the progression data
@@ -15049,12 +15123,18 @@ export function transposeTreble(oldKey, newKey) {
     const oldKeyRoot = oldKey.replace(/m$/, '');
     const newKeyRoot = newKey.replace(/m$/, '');
 
-    // Normalize to find indices
-    const normalizedOldRoot = ENHARMONIC_MAP[oldKeyRoot] || oldKeyRoot;
-    const normalizedNewRoot = ENHARMONIC_MAP[newKeyRoot] || newKeyRoot;
+    // Find key indices - first try directly in ALL_NOTES, then use enharmonic equivalent
+    let oldIndex = ALL_NOTES.indexOf(oldKeyRoot);
+    if (oldIndex === -1) {
+        const enharmonicOld = ENHARMONIC_MAP[oldKeyRoot];
+        if (enharmonicOld) oldIndex = ALL_NOTES.indexOf(enharmonicOld);
+    }
 
-    const oldIndex = ALL_NOTES.indexOf(normalizedOldRoot);
-    const newIndex = ALL_NOTES.indexOf(normalizedNewRoot);
+    let newIndex = ALL_NOTES.indexOf(newKeyRoot);
+    if (newIndex === -1) {
+        const enharmonicNew = ENHARMONIC_MAP[newKeyRoot];
+        if (enharmonicNew) newIndex = ALL_NOTES.indexOf(enharmonicNew);
+    }
 
     if (oldIndex === -1 || newIndex === -1) {
         console.warn('[transposeTreble] Could not find key indices:', oldKeyRoot, newKeyRoot);
@@ -15126,12 +15206,18 @@ export function transposeTrebleWithModeAdjust(oldKey, newKey) {
     const oldKeyRoot = oldKey.replace(/m$/, '');
     const newKeyRoot = newKey.replace(/m$/, '');
 
-    // Normalize to find indices
-    const normalizedOldRoot = ENHARMONIC_MAP[oldKeyRoot] || oldKeyRoot;
-    const normalizedNewRoot = ENHARMONIC_MAP[newKeyRoot] || newKeyRoot;
+    // Find key indices - first try directly in ALL_NOTES, then use enharmonic equivalent
+    let oldIndex = ALL_NOTES.indexOf(oldKeyRoot);
+    if (oldIndex === -1) {
+        const enharmonicOld = ENHARMONIC_MAP[oldKeyRoot];
+        if (enharmonicOld) oldIndex = ALL_NOTES.indexOf(enharmonicOld);
+    }
 
-    const oldIndex = ALL_NOTES.indexOf(normalizedOldRoot);
-    const newIndex = ALL_NOTES.indexOf(normalizedNewRoot);
+    let newIndex = ALL_NOTES.indexOf(newKeyRoot);
+    if (newIndex === -1) {
+        const enharmonicNew = ENHARMONIC_MAP[newKeyRoot];
+        if (enharmonicNew) newIndex = ALL_NOTES.indexOf(enharmonicNew);
+    }
 
     if (oldIndex === -1 || newIndex === -1) {
         console.warn('[transposeTrebleWithModeAdjust] Could not find key indices:', oldKeyRoot, newKeyRoot);
@@ -15221,9 +15307,14 @@ function transposePitch(pitch, semitones, noteArray) {
     const noteName = match[1].toUpperCase();
     let octave = parseInt(match[2], 10);
 
-    // Normalize note name
-    const normalizedNote = ENHARMONIC_MAP[noteName] || noteName;
-    const noteIndex = ALL_NOTES.indexOf(normalizedNote);
+    // Find note index - first try directly, then use enharmonic equivalent
+    let noteIndex = ALL_NOTES.indexOf(noteName);
+    if (noteIndex === -1) {
+        const enharmonicNote = ENHARMONIC_MAP[noteName];
+        if (enharmonicNote) {
+            noteIndex = ALL_NOTES.indexOf(enharmonicNote);
+        }
+    }
 
     if (noteIndex === -1) {
         console.warn('[transposePitch] Could not find note index:', noteName);
@@ -15262,12 +15353,23 @@ function adjustPitchForModeChange(pitch, keyRoot, isMinor, noteArray) {
     const noteName = match[1].toUpperCase();
     const octave = parseInt(match[2], 10);
 
-    // Normalize note names
-    const normalizedNote = ENHARMONIC_MAP[noteName] || noteName;
-    const normalizedKeyRoot = ENHARMONIC_MAP[keyRoot] || keyRoot;
+    // Find note index - first try directly, then use enharmonic equivalent
+    let noteIndex = ALL_NOTES.indexOf(noteName);
+    if (noteIndex === -1) {
+        const enharmonicNote = ENHARMONIC_MAP[noteName];
+        if (enharmonicNote) {
+            noteIndex = ALL_NOTES.indexOf(enharmonicNote);
+        }
+    }
 
-    const noteIndex = ALL_NOTES.indexOf(normalizedNote);
-    const keyIndex = ALL_NOTES.indexOf(normalizedKeyRoot);
+    // Find key root index - first try directly, then use enharmonic equivalent
+    let keyIndex = ALL_NOTES.indexOf(keyRoot);
+    if (keyIndex === -1) {
+        const enharmonicKey = ENHARMONIC_MAP[keyRoot];
+        if (enharmonicKey) {
+            keyIndex = ALL_NOTES.indexOf(enharmonicKey);
+        }
+    }
 
     if (noteIndex === -1 || keyIndex === -1) return pitch;
 
@@ -15981,17 +16083,17 @@ export function importChordList(mode = 'replace') {
     
     const chordListString = input.value.trim();
     if (!chordListString) {
-        if (window.showModal) {
-            window.showModal('Please enter a chord list to import.', true);
+        if (window.showToast) {
+            window.showToast('Please enter a chord list to import', { type: 'warning' });
         }
         return;
     }
-    
+
     // Parse the chord list
     const chordSymbols = parseChordList(chordListString);
     if (chordSymbols.length === 0) {
-        if (window.showModal) {
-            window.showModal('No valid chords found in the input. Please check the format.', true);
+        if (window.showToast) {
+            window.showToast('No valid chords found. Check the format.', { type: 'error' });
         }
         return;
     }
@@ -16085,41 +16187,116 @@ export function importChordList(mode = 'replace') {
         }
         
         const interval = (addedChordRootIndex - trainerKeyRootIndex + 12) % 12;
-        const scaleDegreeIndex = MAJOR_SCALE_STEPS.indexOf(interval);
-        
+
+        // Use appropriate scale for major vs minor keys
+        const MINOR_SCALE_STEPS = [0, 2, 3, 5, 7, 8, 10];
+        const isMinorKey = currentKey && currentKey.endsWith('m');
+        const scaleSteps = isMinorKey ? MINOR_SCALE_STEPS : MAJOR_SCALE_STEPS;
+        let scaleDegreeIndex = scaleSteps.indexOf(interval);
+        let chromaticPrefix = '';
+
+        // Handle chromatic (non-diatonic) intervals
+        // Note: degree is 0-indexed (0=I, 1=II, 2=III, 3=IV, 4=V, 5=VI, 6=VII)
+        if (scaleDegreeIndex === -1) {
+            let chromaticMapping;
+            if (isMinorKey) {
+                // Chromatic intervals NOT in natural minor: 1, 4, 6, 9, 11
+                chromaticMapping = {
+                    1: { degree: 1, prefix: '♭' },   // ♭II
+                    4: { degree: 2, prefix: '♯' },   // ♯III (major 3rd from root)
+                    6: { degree: 3, prefix: '♯' },   // ♯IV (tritone)
+                    9: { degree: 5, prefix: '♯' },   // ♯VI
+                    11: { degree: 6, prefix: '♯' }   // ♯VII (leading tone)
+                };
+            } else {
+                // Chromatic intervals NOT in major scale: 1, 3, 6, 8, 10
+                chromaticMapping = {
+                    1: { degree: 1, prefix: '♭' },   // ♭II (Neapolitan)
+                    3: { degree: 2, prefix: '♭' },   // ♭III (modal interchange)
+                    6: { degree: 3, prefix: '♯' },   // ♯IV (tritone)
+                    8: { degree: 5, prefix: '♭' },   // ♭VI (modal interchange)
+                    10: { degree: 6, prefix: '♭' }   // ♭VII (modal interchange)
+                };
+            }
+
+            if (chromaticMapping[interval]) {
+                scaleDegreeIndex = chromaticMapping[interval].degree;
+                chromaticPrefix = chromaticMapping[interval].prefix;
+            }
+        }
+
         let romanNumeral = '?';
         if (scaleDegreeIndex !== -1) {
             const romanKeys = Object.keys(ROMAN_MAP_BASE);
-            // First try to find exact match (for basic triads)
+
+            // Determine base quality for extended chords
+            let baseQuality = parsed.type;
+            if (parsed.type.includes('Major') || parsed.type === 'Dominant 7th' || parsed.type === 'Add9' ||
+                (parsed.type.includes('6th') && !parsed.type.includes('Minor')) ||
+                parsed.type === 'Sus2' || parsed.type === 'Sus4' || parsed.type === 'Power Chord') {
+                baseQuality = 'Major';
+            } else if (parsed.type.includes('Minor') || parsed.type === 'Half-Diminished 7th') {
+                baseQuality = 'Minor';
+            } else if (parsed.type.includes('Diminished')) {
+                baseQuality = 'Diminished';
+            } else if (parsed.type.includes('Augmented')) {
+                baseQuality = 'Augmented';
+            }
+
+            // Find match by scale degree AND base quality
             let foundKey = romanKeys.find(key =>
                 ROMAN_MAP_BASE[key].index === scaleDegreeIndex &&
-                ROMAN_MAP_BASE[key].quality === parsed.type
+                ROMAN_MAP_BASE[key].quality === baseQuality
             );
-            
-            // If no exact match, find by scale degree index only (for extended chords)
+
+            // If no match found, construct the roman numeral manually
             if (!foundKey) {
-                foundKey = romanKeys.find(key => ROMAN_MAP_BASE[key].index === scaleDegreeIndex);
+                const romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+                const baseNumeral = romanNumerals[scaleDegreeIndex];
+                if (baseQuality === 'Major') {
+                    foundKey = baseNumeral;
+                } else if (baseQuality === 'Minor') {
+                    foundKey = baseNumeral.toLowerCase();
+                } else if (baseQuality === 'Diminished') {
+                    foundKey = baseNumeral.toLowerCase() + '°';
+                } else if (baseQuality === 'Augmented') {
+                    foundKey = baseNumeral + '+';
+                }
             }
-            
+
             romanNumeral = foundKey || '?';
-            
-            // For extended chords, append the extension to the Roman numeral
-            if (foundKey && parsed.type !== 'Major' && parsed.type !== 'Minor') {
-                // Add extension suffix (e.g., "I7" for "I Dominant 7th")
+
+            // Add chromatic prefix if present (e.g., ♭II, ♯IV)
+            if (chromaticPrefix && romanNumeral && romanNumeral !== '?') {
+                romanNumeral = chromaticPrefix + romanNumeral;
+            }
+
+            // For extended/modified chords, append the extension to the Roman numeral
+            if (foundKey && parsed.type !== 'Major' && parsed.type !== 'Minor' && parsed.type !== 'Diminished' && parsed.type !== 'Augmented') {
+                // Add extension suffix (e.g., "I7" for "I Dominant 7th", "Isus2" for "I Sus2")
                 if (parsed.type.includes('7th')) {
                     romanNumeral = romanNumeral + '7';
                 } else if (parsed.type.includes('9th')) {
                     romanNumeral = romanNumeral + '9';
+                } else if (parsed.type === 'Sus2') {
+                    romanNumeral = romanNumeral + 'sus2';
+                } else if (parsed.type === 'Sus4') {
+                    romanNumeral = romanNumeral + 'sus4';
+                } else if (parsed.type === 'Add9') {
+                    romanNumeral = romanNumeral + 'add9';
+                } else if (parsed.type === 'Power Chord') {
+                    romanNumeral = romanNumeral + '5';
                 }
             }
         } else {
             // Non-diatonic chord - use root note as identifier
             romanNumeral = root;
         }
-        
-        // Convert Roman numeral to minor case if the key is minor
-        const isMinorKey = currentKey && currentKey.endsWith('m');
-        if (isMinorKey && romanNumeral && romanNumeral !== '?') {
+
+        // Convert Roman numeral to natural minor scale degrees if the key is minor
+        // (isMinorKey already defined above)
+        if (isMinorKey && romanNumeral && romanNumeral !== '?' && !chromaticPrefix) {
+            // Only apply to diatonic chords (no chromatic prefix)
             const minorMap = {
                 'I': 'i',
                 'ii': 'ii°',
@@ -16204,23 +16381,23 @@ export function importChordList(mode = 'replace') {
         // Clear the input
         input.value = '';
         
-        // Show success message
-        const message = mode === 'replace' 
-            ? `Replaced progression with ${successCount} chord${successCount !== 1 ? 's' : ''}.`
-            : `Appended ${successCount} chord${successCount !== 1 ? 's' : ''} to progression.`;
-        
+        // Show success message as toast
+        const message = mode === 'replace'
+            ? `Replaced progression with ${successCount} chord${successCount !== 1 ? 's' : ''}`
+            : `Appended ${successCount} chord${successCount !== 1 ? 's' : ''} to progression`;
+
         if (errorCount > 0) {
-            if (window.showModal) {
-                window.showModal(`${message}\n\n${errorCount} chord${errorCount !== 1 ? 's' : ''} could not be parsed.`, false);
+            if (window.showToast) {
+                window.showToast(`${message} (${errorCount} could not be parsed)`, { type: 'warning', duration: 4000 });
             }
         } else {
-            if (window.showModal) {
-                window.showModal(message, false);
+            if (window.showToast) {
+                window.showToast(message, { type: 'success', duration: 3000 });
             }
         }
     } else {
-        if (window.showModal) {
-            window.showModal('No valid chords could be imported. Please check the format.', true);
+        if (window.showToast) {
+            window.showToast('No valid chords could be imported. Check the format.', { type: 'error', duration: 4000 });
         }
     }
 }
@@ -16546,15 +16723,9 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
     const actionText = baseAction === 'append' ? 'Appended' : 'Loaded';
     const voiceLeadingText = applyVoiceLeading ? ' (voice-leading optimized)' : '';
     const patternName = pattern ? ` with ${pattern.name} rhythm` : '';
-    const message = `${actionText} template: "${template.name}"${voiceLeadingText}${patternName}\n${progressionData.length} total chords in ${currentKey}`;
-    if (window.showModal) {
-        setTimeout(() => {
-            window.showModal(message, false);
-            // Auto-hide after 2 seconds
-            setTimeout(() => {
-                if (window.hideModal) window.hideModal();
-            }, 2000);
-        }, 100);
+    const message = `${actionText} "${template.name}"${voiceLeadingText}${patternName} (${progressionData.length} chords)`;
+    if (window.showToast) {
+        window.showToast(message, { type: 'success', duration: 3000 });
     }
 
 }
@@ -16937,11 +17108,11 @@ export function showRhythmPatternModal() {
         const inputs = Array.from(gridEl.querySelectorAll('input[data-beat-index]'));
         const beats = inputs.map(inp => snapToQuarter(inp.value));
         if (!name) {
-            if (window.showModal) window.showModal('Please name your custom pattern.', false);
+            if (window.showToast) window.showToast('Please name your custom pattern', { type: 'warning' });
             return;
         }
         if (beats.length !== chords.length) {
-            if (window.showModal) window.showModal('Beat count must match chord count.', false);
+            if (window.showToast) window.showToast('Beat count must match chord count', { type: 'warning' });
             return;
         }
         const saved = saveCustomPattern({
@@ -16955,9 +17126,8 @@ export function showRhythmPatternModal() {
             patternSelectEl.value = saved.id;
             updatePreview();
             customNameInput.value = '';
-            if (window.showModal) {
-                window.showModal(`Saved "${saved.name}"`, false);
-                setTimeout(() => window.hideModal && window.hideModal(), 1200);
+            if (window.showToast) {
+                window.showToast(`Saved "${saved.name}"`, { type: 'success' });
             }
         }
     });
@@ -16965,13 +17135,13 @@ export function showRhythmPatternModal() {
     modal.querySelectorAll('#rhythm-modal-apply-btn').forEach(btn => btn.addEventListener('click', () => {
         const chords = getTargetChordsDynamic();
         if (chords.length === 0) {
-            if (window.showModal) window.showModal('No chords in selected section', false);
+            if (window.showToast) window.showToast('No chords in selected section', { type: 'warning' });
             return;
         }
         const inputs = Array.from(gridEl.querySelectorAll('input[data-beat-index]'));
         const beats = inputs.map(inp => snapToQuarter(inp.value));
         if (beats.length !== chords.length) {
-            if (window.showModal) window.showModal('Beat count must match chord count.', false);
+            if (window.showToast) window.showToast('Beat count must match chord count', { type: 'warning' });
             return;
         }
         const targetIndices = getTargetIndices();
@@ -16980,7 +17150,7 @@ export function showRhythmPatternModal() {
         // Apply beats to target chords
         const updated = applyBeatsToProgression(progressionData, beats, targetIndices);
         if (!updated) {
-            if (window.showModal) window.showModal('Pattern does not match the selected chords.', false);
+            if (window.showToast) window.showToast('Pattern does not match the selected chords', { type: 'error' });
             return;
         }
 
@@ -17013,9 +17183,8 @@ export function showRhythmPatternModal() {
         const patternName = pattern ? pattern.name : 'Custom beats';
         const selectedSection = allSectionsWithPseudo.find(s => s.id === selectedSectionId);
         const sectionName = selectedSection ? (selectedSection.label || selectedSection.name) : 'all chords';
-        if (window.showModal) {
-            window.showModal(`Applied "${patternName}" to ${sectionName}`, false);
-            setTimeout(() => window.hideModal && window.hideModal(), 1500);
+        if (window.showToast) {
+            window.showToast(`Applied "${patternName}" to ${sectionName}`, { type: 'success' });
         }
 
         // Update builder panel
@@ -17030,9 +17199,8 @@ export function showRhythmPatternModal() {
         const patternId = patternSelectEl.value;
         const pattern = getAnyPatternById(patternId);
         if (!pattern || !pattern.isCustom) {
-            if (window.showModal) {
-                window.showModal('Select a custom pattern to delete.', false);
-                setTimeout(() => window.hideModal && window.hideModal(), 1200);
+            if (window.showToast) {
+                window.showToast('Select a custom pattern to delete', { type: 'warning' });
             }
             return;
         }
@@ -17040,9 +17208,8 @@ export function showRhythmPatternModal() {
         populatePatternOptions();
         renderCustomList();
         updatePreview();
-        if (window.showModal) {
-            window.showModal(`Deleted "${pattern.name}"`, false);
-            setTimeout(() => window.hideModal && window.hideModal(), 1200);
+        if (window.showToast) {
+            window.showToast(`Deleted "${pattern.name}"`, { type: 'success' });
         }
     });
 
@@ -17060,9 +17227,8 @@ export function showRhythmPatternModal() {
             deleteCustomPattern(id);
             populatePatternOptions();
             renderCustomList();
-            if (pattern && window.showModal) {
-                window.showModal(`Deleted "${pattern.name}"`, false);
-                setTimeout(() => window.hideModal && window.hideModal(), 1200);
+            if (pattern && window.showToast) {
+                window.showToast(`Deleted "${pattern.name}"`, { type: 'success' });
             }
         }
     });
@@ -17160,9 +17326,8 @@ export function applyRhythmPatternToProgression(patternId, options = {}) {
 
     if (!updated) {
         console.warn('[applyRhythmPatternToProgression] Failed to apply pattern:', patternId, 'target:', targetIndices);
-        if (window.showModal) {
-            window.showModal('Pattern does not match the selected chords. Beat count must equal target chord count.', false);
-            setTimeout(() => window.hideModal && window.hideModal(), 1800);
+        if (window.showToast) {
+            window.showToast('Pattern does not match the selected chords', { type: 'error' });
         }
         return;
     }
@@ -17187,11 +17352,8 @@ export function applyRhythmPatternToProgression(patternId, options = {}) {
 
     // Show confirmation
     const patternName = pattern ? pattern.name : 'Custom beats';
-    if (window.showModal) {
-        window.showModal(`Applied "${patternName}"`, false);
-        setTimeout(() => {
-            if (window.hideModal) window.hideModal();
-        }, 1500);
+    if (window.showToast) {
+        window.showToast(`Applied "${patternName}"`, { type: 'success' });
     }
 
     // Update builder panel

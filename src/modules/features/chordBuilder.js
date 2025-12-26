@@ -56,6 +56,9 @@ import { dispatchBuilderEvent, isGuidedModeActive } from '../ui/lessonGuidedMode
 // Import comprehensive chord recommendation engine (evaluates all roots, types, inversions)
 import { generateComprehensiveRecommendations } from './comprehensiveChordRecommendations.js';
 
+// Import roman numeral utilities for proper borrowed chord handling
+import { noteToRomanNumeral } from '../utils/romanNumerals.js';
+
 // Import chord explorer for detailed 3D visualization
 import { showChordExplorerModal } from '../ui/chordExplorerModal.js';
 
@@ -3057,8 +3060,13 @@ export function addChordToProgression(switchToCompositionStudio = false, playShu
     const scaleDegreeIndex = MAJOR_SCALE_STEPS.indexOf(interval);
 
     let romanNumeral = '?';
-    if (scaleDegreeIndex !== -1) {
-        if (newChordData.selectionMode === 'chord') {
+    if (newChordData.selectionMode === 'chord') {
+        // Use noteToRomanNumeral for proper handling of borrowed chords (bVII, bVI, etc.)
+        const calculatedRoman = noteToRomanNumeral(rootNote, trainerState.currentKey, newChordData.type);
+        if (calculatedRoman) {
+            romanNumeral = calculatedRoman;
+        } else if (scaleDegreeIndex !== -1) {
+            // Fallback to diatonic lookup
             const romanKeys = Object.keys(ROMAN_MAP_BASE);
             const foundKey = romanKeys.find(key =>
                 ROMAN_MAP_BASE[key].index === scaleDegreeIndex &&
@@ -3066,11 +3074,9 @@ export function addChordToProgression(switchToCompositionStudio = false, playShu
             );
             const fallbackKey = romanKeys.find(key => ROMAN_MAP_BASE[key].index === scaleDegreeIndex);
             romanNumeral = foundKey || fallbackKey || '?';
-        } else {
-            romanNumeral = rootNote; // Just use the note name for intervals
         }
     } else {
-        romanNumeral = rootNote;
+        romanNumeral = rootNote; // Just use the note name for intervals
     }
 
     // Convert Roman numeral to minor case if the key is minor

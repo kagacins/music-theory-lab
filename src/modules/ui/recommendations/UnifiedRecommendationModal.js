@@ -929,6 +929,9 @@ export function showUnifiedRecommendationModal(options = {}) {
  * Close the unified recommendation modal
  */
 export function closeUnifiedRecommendationModal() {
+    // Hide any open tooltips before closing
+    hideAllScoreTooltips();
+
     const modal = document.getElementById(MODAL_ID);
     if (modal) {
         // Save state
@@ -1827,6 +1830,8 @@ function createWeightsButton() {
         btn.style.borderColor = '#d1d5db';
     });
     btn.addEventListener('click', () => {
+        // Hide any open score tooltips before opening weights modal
+        hideAllScoreTooltips();
         // Open existing chord weights modal
         if (window.showChordWeightsModal) {
             window.showChordWeightsModal();
@@ -3500,20 +3505,35 @@ function renderCompareIntent(container) {
         const whyBtn = card.querySelector('.compare-why-btn');
         whyBtn.addEventListener('click', (e) => {
             e.stopPropagation();
+            // Hide any open score tooltips before opening Why This Works modal
+            hideAllScoreTooltips();
             if (typeof window.showWhyThisWorks === 'function') {
+                // IMPORTANT: Include inversion/notes and use spelled roots for enharmonic consistency
                 window.showWhyThisWorks({
                     romanNumeral: altRoman,
                     chord: altSpelled,
                     type: altType,
                     reason: alt.reason || alt.explanation,
                     key: key,
-                    root: alt.root,
+                    root: altSpelled,  // Use spelled version for enharmonic consistency
+                    inversion: alt.inversion || 0,
+                    notes: alt.notes,
                     // Backward context: what chord comes BEFORE this position
                     prevChord: currentChord ? noteToRomanNumeral(currentChord.root, key, currentChord.type) : null,
-                    prevChordData: currentChord,
+                    prevChordData: currentChord ? {
+                        root: spellNoteInKey(currentChord.root, key),
+                        type: currentChord.type,
+                        inversion: currentChord.inversion || 0,
+                        notes: currentChord.notes
+                    } : null,
                     // Forward context: what chord comes AFTER this position
                     nextChord: nextChord ? noteToRomanNumeral(nextChord.root, key, nextChord.type) : null,
-                    nextChordData: nextChord
+                    nextChordData: nextChord ? {
+                        root: spellNoteInKey(nextChord.root, key),
+                        type: nextChord.type,
+                        inversion: nextChord.inversion || 0,
+                        notes: nextChord.notes
+                    } : null
                 });
             }
         });
@@ -3603,6 +3623,11 @@ function applyCompareReplacement(chordIndex, currentChord, newRoot, newType, new
     document.dispatchEvent(new CustomEvent('progression-changed', {
         detail: { action: 'replace', index: chordIndex, chord: newChord }
     }));
+
+    // Toast notification
+    if (window.showToast) {
+        window.showToast(`Replaced with ${newRoot} ${newType}`, { type: 'success' });
+    }
 
     // Use requestAnimationFrame to ensure the state update is complete
     // before triggering the UI refresh. This helps prevent stale data issues.
@@ -5198,6 +5223,12 @@ function showTransformPreview(container, original, transformed, transformation, 
             window.refreshNotationFromProgression();
         }
 
+        // Toast notification
+        const changeCount = Array.from(chordToggles.values()).filter(v => v).length;
+        if (window.showToast) {
+            window.showToast(`Applied ${changeCount} transformation${changeCount !== 1 ? 's' : ''}`, { type: 'success' });
+        }
+
         // Show success and go back
         renderTransformIntent(container);
     });
@@ -5709,6 +5740,8 @@ function attachTensionEventListeners(container, progressionData, key, sections, 
     const openFullOptimizerBtn = container.querySelector('#open-full-optimizer-btn');
     if (openFullOptimizerBtn) {
         openFullOptimizerBtn.addEventListener('click', () => {
+            // Hide any open score tooltips before opening another modal
+            hideAllScoreTooltips();
             closeUnifiedRecommendationModal();
             if (window.showTensionOptimizerModal) {
                 window.showTensionOptimizerModal();
@@ -6397,6 +6430,9 @@ function createAdvancedSection(rec) {
  * Show detailed explanation modal for advanced harmonic techniques
  */
 function showAdvancedExplanationModal(item) {
+    // Hide any open score tooltips before opening this modal
+    hideAllScoreTooltips();
+
     // Remove existing modal if present
     const existingModal = document.getElementById('advanced-explanation-modal');
     if (existingModal) existingModal.remove();
@@ -6903,6 +6939,9 @@ function createRecommendationCard(rec, index, rhythmicContext) {
 
 
         // Show the Why This Works panel with full context
+        // Hide any open score tooltips before opening Why This Works modal
+        hideAllScoreTooltips();
+        // IMPORTANT: Always include inversion and notes for accurate playback/display
         if (typeof window.showWhyThisWorks === 'function') {
             window.showWhyThisWorks({
                 romanNumeral: numeral,
@@ -6912,11 +6951,23 @@ function createRecommendationCard(rec, index, rhythmicContext) {
                 // Enhanced context for key-aware explanations
                 key: currentKey,
                 prevChord: prevRomanNumeral,
-                prevChordData: prevChordData,
+                prevChordData: prevChordData ? {
+                    root: spellNoteInKey(prevChordData.root, currentKey),
+                    type: prevChordData.type,
+                    inversion: prevChordData.inversion || 0,
+                    notes: prevChordData.notes
+                } : null,
                 nextChord: nextRomanNumeral,
-                nextChordData: nextChordData,
-                // For building note-specific explanations
-                root: rec.root
+                nextChordData: nextChordData ? {
+                    root: spellNoteInKey(nextChordData.root, currentKey),
+                    type: nextChordData.type,
+                    inversion: nextChordData.inversion || 0,
+                    notes: nextChordData.notes
+                } : null,
+                // For building note-specific explanations (use spelled version for enharmonic consistency)
+                root: spelledRoot,
+                inversion: rec.inversion || 0,
+                notes: rec.notes
             });
         } else {
             // Fallback if function not available - show basic alert
@@ -7525,15 +7576,49 @@ function renderExplorerView(container) {
                 font-weight: bold;
             `;
             whyBtn.addEventListener('click', () => {
+                // Hide any open score tooltips before opening Why This Works modal
+                hideAllScoreTooltips();
+
                 const numeral = noteToRomanNumeral(rec.root, currentKey, rec.type);
                 const spelledRoot = spellNoteInKey(rec.root, currentKey);
+
+                // Get prev/next chord context from progression
+                const progressionData = getProgressionData() || [];
+                const selectedIndex = getSelectedChordIndex();
+                let prevChordData = null;
+                let nextChordData = null;
+
+                if (selectedIndex >= 0 && progressionData.length > 0) {
+                    prevChordData = progressionData[selectedIndex];
+                    if (selectedIndex + 1 < progressionData.length) {
+                        nextChordData = progressionData[selectedIndex + 1];
+                    }
+                }
+
+                // IMPORTANT: Include inversion/notes and use spelled roots
                 window.showWhyThisWorks({
                     romanNumeral: numeral,
                     chord: spelledRoot,
                     type: rec.type,
                     reason: rec.reason,
                     key: currentKey,
-                    root: rec.root
+                    root: spelledRoot,  // Use spelled version for enharmonic consistency
+                    inversion: rec.inversion || 0,
+                    notes: rec.notes,
+                    prevChord: prevChordData ? noteToRomanNumeral(prevChordData.root, currentKey, prevChordData.type) : null,
+                    prevChordData: prevChordData ? {
+                        root: spellNoteInKey(prevChordData.root, currentKey),
+                        type: prevChordData.type,
+                        inversion: prevChordData.inversion || 0,
+                        notes: prevChordData.notes
+                    } : null,
+                    nextChord: nextChordData ? noteToRomanNumeral(nextChordData.root, currentKey, nextChordData.type) : null,
+                    nextChordData: nextChordData ? {
+                        root: spellNoteInKey(nextChordData.root, currentKey),
+                        type: nextChordData.type,
+                        inversion: nextChordData.inversion || 0,
+                        notes: nextChordData.notes
+                    } : null
                 });
             });
             tdActions.appendChild(whyBtn);
@@ -8109,17 +8194,32 @@ function renderSequenceCards(container, sequences, currentChord, currentSymbol, 
             whyBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 e.preventDefault();
+                // Hide any open score tooltips before opening Why This Works modal
+                hideAllScoreTooltips();
                 if (typeof window.showWhyThisWorks === 'function') {
+                    // IMPORTANT: Include inversion/notes and use spelled roots for enharmonic consistency
                     window.showWhyThisWorks({
                         romanNumeral: chordRoman,
                         chord: spelledChordRoot,
                         type: chord.type,
                         key: key,
-                        root: chord.root,
+                        root: spelledChordRoot,  // Use spelled version for enharmonic consistency
+                        inversion: chord.inversion || 0,
+                        notes: chord.notes,
                         prevChord: prevChordInSeq ? noteToRomanNumeral(prevChordInSeq.root, key, prevChordInSeq.type) : null,
-                        prevChordData: prevChordInSeq,
+                        prevChordData: prevChordInSeq ? {
+                            root: spellNoteInKey(prevChordInSeq.root, key),
+                            type: prevChordInSeq.type,
+                            inversion: prevChordInSeq.inversion || 0,
+                            notes: prevChordInSeq.notes
+                        } : null,
                         nextChord: nextChordInSeq ? noteToRomanNumeral(nextChordInSeq.root, key, nextChordInSeq.type) : null,
-                        nextChordData: nextChordInSeq
+                        nextChordData: nextChordInSeq ? {
+                            root: spellNoteInKey(nextChordInSeq.root, key),
+                            type: nextChordInSeq.type,
+                            inversion: nextChordInSeq.inversion || 0,
+                            notes: nextChordInSeq.notes
+                        } : null
                     });
                 }
             });
@@ -10223,6 +10323,11 @@ function applyPhrase(phrase) {
         const totalBeats = rhythm.reduce((sum, r) => sum + r, 0);
         console.log(`Applied phrase: ${addedCount}/${notes.length} notes (${totalBeats.toFixed(1)} beats)`);
 
+        // Toast notification
+        if (window.showToast) {
+            window.showToast(`Applied melody phrase (${addedCount} notes)`, { type: 'success' });
+        }
+
         // Visual feedback on the apply button
         const cards = document.querySelectorAll('.phrase-card');
         cards.forEach((card, i) => {
@@ -12308,8 +12413,15 @@ function renderHarmonizeTab(container) {
             if (window.switchTab) {
                 window.switchTab('melody');
             }
+            // Toast notification
+            if (window.showToast) {
+                window.showToast(`Applied harmonization (${chordProgression.length} chords)`, { type: 'success' });
+            }
         } catch (err) {
             console.error('Failed to apply harmonization:', err);
+            if (window.showToast) {
+                window.showToast('Failed to apply harmonization', { type: 'error' });
+            }
         }
 
         closeUnifiedRecommendationModal();
@@ -13269,6 +13381,11 @@ function applyBassPattern() {
             // Refresh notation
             if (window.refreshNotationFromProgression) {
                 window.refreshNotationFromProgression();
+            }
+
+            // Toast notification
+            if (window.showToast) {
+                window.showToast(`Applied bass pattern (${notes.length} notes)`, { type: 'success' });
             }
 
             // Show success feedback
@@ -14718,6 +14835,10 @@ function showChordScoreTooltip(event, element) {
     if (melodyTooltip) melodyTooltip.classList.remove('show');
 
     setTimeout(() => tooltip.classList.add('show'), 10);
+
+    // Auto-hide after 3 seconds as a safeguard
+    clearTimeout(tooltip._autoHideTimer);
+    tooltip._autoHideTimer = setTimeout(() => hideChordScoreTooltip(), 3000);
 }
 
 /**
@@ -14726,6 +14847,7 @@ function showChordScoreTooltip(event, element) {
 function hideChordScoreTooltip() {
     const tooltip = document.getElementById('modal-score-tooltip');
     if (tooltip) {
+        clearTimeout(tooltip._autoHideTimer);
         tooltip.classList.remove('show');
         // Force hide after transition
         setTimeout(() => {
@@ -14853,8 +14975,13 @@ function showMelodyScoreTooltip(event, element) {
     tooltip.style.left = `${left}px`;
     tooltip.style.top = `${top}px`;
     tooltip.style.transform = 'translateY(-100%)';
+    tooltip.style.visibility = 'visible';
 
     setTimeout(() => tooltip.classList.add('show'), 10);
+
+    // Auto-hide after 3 seconds as a safeguard
+    clearTimeout(tooltip._autoHideTimer);
+    tooltip._autoHideTimer = setTimeout(() => hideMelodyScoreTooltip(), 3000);
 }
 
 /**
@@ -14862,7 +14989,15 @@ function showMelodyScoreTooltip(event, element) {
  */
 function hideMelodyScoreTooltip() {
     const tooltip = document.getElementById('modal-melody-tooltip');
-    if (tooltip) tooltip.classList.remove('show');
+    if (tooltip) {
+        clearTimeout(tooltip._autoHideTimer);
+        tooltip.classList.remove('show');
+        setTimeout(() => {
+            if (!tooltip.classList.contains('show')) {
+                tooltip.style.visibility = 'hidden';
+            }
+        }, 200);
+    }
 }
 
 /**
@@ -14941,6 +15076,10 @@ function showSequenceScoreTooltip(event, element) {
     if (melodyTooltip) melodyTooltip.classList.remove('show');
 
     setTimeout(() => tooltip.classList.add('show'), 10);
+
+    // Auto-hide after 3 seconds as a safeguard
+    clearTimeout(tooltip._autoHideTimer);
+    tooltip._autoHideTimer = setTimeout(() => hideSequenceScoreTooltip(), 3000);
 }
 
 /**
@@ -14949,6 +15088,7 @@ function showSequenceScoreTooltip(event, element) {
 function hideSequenceScoreTooltip() {
     const tooltip = document.getElementById('modal-sequence-tooltip');
     if (tooltip) {
+        clearTimeout(tooltip._autoHideTimer);
         tooltip.classList.remove('show');
         // Force hide after transition
         setTimeout(() => {

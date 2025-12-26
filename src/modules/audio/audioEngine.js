@@ -84,7 +84,9 @@ export function initAudio() {
         onerror: (e) => {
             console.error("Error loading piano samples:", e);
             audioIsLoading = false;
-            showModal("Error loading audio. Please refresh.", true);
+            if (window.showToast) {
+                window.showToast("Error loading audio. Please refresh.", { type: 'error', duration: 5000 });
+            }
         }
     });
     

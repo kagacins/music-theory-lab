@@ -193,6 +193,75 @@ chord.notes = newNotes.specificNotes;  // Keep notes in sync!
 
 ---
 
+## CRITICAL: Always Include Inversion Data AND Use Correct Enharmonic Spelling
+
+**When passing chord data between modules (modals, playback, displays), ALWAYS include the `inversion` property AND use correctly spelled note names for the key.**
+
+### Common Issues to Avoid:
+
+1. **Missing inversions** - Frequently missed when:
+   - Creating chord comparison/playback buttons
+   - Passing chord context to modals (Why This Works, recommendations)
+   - Playing chord sequences
+   - Displaying chord labels/symbols
+
+2. **Wrong enharmonic spelling** - A chord recommended as Bb may show as A# in playback buttons if you pass the raw `chord.root` instead of the spelled version. Always use `spellNoteInKey(chord.root, key)` for display and data passing.
+
+### Chord Data Must Include Inversion AND Correct Spelling
+```javascript
+// WRONG - Missing inversion and using raw root
+const chordData = { root: chord.root, type: 'Dominant 7th' };
+
+// CORRECT - Include inversion AND use spelled root for enharmonic consistency
+const chordData = {
+    root: spellNoteInKey(chord.root, currentKey),  // Bb not A#
+    type: 'Dominant 7th',
+    inversion: chord.inversion || 0,
+    notes: chord.notes  // Pre-computed notes respect inversion voicing
+};
+```
+
+### When Passing Chord Context to Modals
+```javascript
+// WRONG - Passing raw chord data
+prevChordData: prevChord,
+nextChordData: nextChord,
+
+// CORRECT - Spell roots and include inversions
+prevChordData: prevChord ? {
+    root: spellNoteInKey(prevChord.root, key),
+    type: prevChord.type,
+    inversion: prevChord.inversion || 0,
+    notes: prevChord.notes
+} : null,
+```
+
+### Display Chord Symbols with Inversion
+Use superscript notation for inversions: C¹, Dm⁷², G⁷³
+```javascript
+function getChordSymbol(root, type, inversion = 0) {
+    const symbol = root + getTypeSymbol(type);
+    const invLabel = { 1: '¹', 2: '²', 3: '³', 4: '⁴' }[inversion] || '';
+    return symbol + invLabel;
+}
+```
+
+### Playback with Inversions
+```javascript
+// Use getInvertedChordNotes for inversions, or prefer pre-computed notes
+if (chord.notes && chord.notes.length > 0) {
+    notes = [...chord.notes];  // Pre-computed notes already have correct voicing
+} else if (chord.inversion > 0) {
+    const result = getInvertedChordNotes(chord.root, chord.type, chord.inversion);
+    notes = result?.specificNotes || [];
+} else {
+    const result = getChordNotes(chord.root, chord.type);
+    notes = result?.specificNotes || [];
+}
+```
+
+---
+
 ## Key Patterns
 
 ### Chord Data Structure
@@ -256,3 +325,124 @@ When text color isn't working:
 2. Go to "Computed" tab (not Styles)
 3. Filter for "color"
 4. Check both `color` AND `-webkit-text-fill-color` values
+
+---
+
+## CRITICAL: Collapsible Card Header Patterns
+
+**When adding buttons or toggles to collapsible card headers, follow the established pattern exactly.**
+
+### Header Element Must Be a `<div>`, NOT a `<button>`
+
+Card headers that contain interactive elements (buttons, toggles) MUST use a `<div>` element, not a `<button>`. You cannot nest `<button>` elements inside a `<button>` - this is invalid HTML and will break the layout.
+
+### Working Pattern (from `chord-progression-card-toggle`):
+
+```html
+<div id="[card]-card-toggle"
+     onclick="if (!event.target.closest('.drag-handle') && !event.target.closest('button')) { window.toggleMelodySection && window.toggleMelodySection('[card]-card'); }"
+     class="w-full px-4 py-2 bg-gradient-to-r from-[color1] to-[color2] text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-between cursor-pointer">
+    <span class="flex items-center gap-2 flex-wrap">
+        <!-- Drag handle SVG -->
+        <!-- Icon SVG -->
+        Card Title
+        <!-- Buttons and toggles go HERE, inside the span -->
+        <div class="flex items-center gap-1" onclick="event.stopPropagation()">
+            <!-- Your buttons/toggles -->
+        </div>
+    </span>
+    <!-- Chevron SVG -->
+</div>
+```
+
+### Key Requirements:
+
+1. **Use `<div>` not `<button>`** for the card toggle element
+2. **Add `cursor-pointer`** to the class since divs don't have pointer cursor by default
+3. **Exclude `button` in onclick**: `!event.target.closest('button')` prevents card collapse when clicking buttons
+4. **Wrap interactive elements** in a div with `onclick="event.stopPropagation()"`
+5. **All content inside the `<span>`** before the chevron
+
+### Toggle Switch Pattern (matching project style):
+
+```html
+<div class="flex items-center gap-1 px-2 py-0.5 bg-white/20 rounded-full" onclick="event.stopPropagation()" title="Toggle description">
+    <span class="text-[9px] font-semibold text-white/80">Label</span>
+    <label class="relative inline-flex items-center cursor-pointer mx-1">
+        <input type="checkbox" id="[toggle]-checkbox" class="sr-only peer" checked
+               onchange="window.toggleFunction && window.toggleFunction(this.checked)">
+        <div class="w-8 h-4 bg-gray-400 peer-focus:outline-none rounded-full peer
+                    peer-checked:after:translate-x-full peer-checked:after:border-white
+                    after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                    after:bg-white after:border-gray-300 after:border after:rounded-full
+                    after:h-3 after:w-3 after:transition-all peer-checked:bg-[accent-color]"></div>
+    </label>
+    <span class="text-[9px] font-semibold text-white/80" id="[toggle]-status">On</span>
+</div>
+```
+
+Use `peer-checked:bg-emerald-500` for green headers, `peer-checked:bg-cyan-500` for blue headers.
+
+### Styled Button Pattern (like DNA button):
+
+```html
+<button id="[action]-btn" onclick="window.actionFunction && window.actionFunction()"
+        title="Button description"
+        class="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600
+               rounded-full text-[9px] font-bold text-white shadow-sm transition-all flex items-center gap-1">
+    <svg class="w-3 h-3" ...></svg>
+    Label
+</button>
+```
+
+---
+
+## KNOWN ISSUE: Dotted Duration Conversion Limitations
+
+**The `beatsToDurationString()` function has precision limitations when converting arbitrary beat values to duration strings.**
+
+### The Problem
+
+When notes are split across measure boundaries or merged after shift-delete operations, the beat values may not align perfectly with standard musical durations. The current conversion uses `>=` comparisons that can lead to duration loss:
+
+```javascript
+// Current implementation in noteEditor.js:beatsToDurationString()
+beatsToDurationString(beats) {
+  if (beats >= 4) return '1n';
+  if (beats >= 3) return '2n.';  // 3.5 beats → '2n.' (3 beats) - loses 0.5!
+  if (beats >= 2) return '2n';   // 2.5 beats → '2n' (2 beats) - loses 0.5!
+  if (beats >= 1.5) return '4n.';
+  if (beats >= 1) return '4n';
+  // ...etc
+}
+```
+
+### Symptoms
+
+1. **Beat loss during operations**: After shift-delete or note splitting, total beats in measure may not match original
+2. **Dotted rests don't render well**: VexFlow has issues with dotted rests, so we split them into non-dotted rests
+3. **Non-standard beat values**: Values like 2.5 or 3.5 beats don't have standard duration strings
+
+### Areas Affected
+
+- `shiftNotesBackward()` - Shift-delete operations
+- `mergeTiedNotes()` - Merging notes that no longer cross measure boundaries
+- Note splitting when notes cross measure boundaries
+- `splitDottedDuration()` in `notationInit.js` - When replacing notes with rests
+
+### Future Improvements Needed
+
+1. **Compound duration support**: Break non-standard beat values into multiple notes (e.g., 2.5 beats → half note tied to eighth note)
+2. **Beat tracking validation**: After operations, verify total beats in measure equals expected value
+3. **Improved duration mapping**: Instead of `>=`, use exact comparisons with compound duration fallback
+
+### Current Workarounds
+
+- The system splits dotted durations into base + half when creating rests
+- Tied note merging only occurs when the combined duration fits a standard value
+- Shift-delete attempts to preserve note integrity but may lose fractional beats in edge cases
+
+### Related Files
+
+- `src/modules/notation/noteEditor.js` - `beatsToDurationString()`, `shiftNotesBackward()`, `mergeTiedNotes()`
+- `src/modules/notation/notationInit.js` - `splitDottedDuration()`, `durationToBeats()`

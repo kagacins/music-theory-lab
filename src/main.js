@@ -39,6 +39,11 @@ import { initChordFunctionLegend, showLegend as showChordFunctionLegend, hideLeg
 // Phase 3: Guided Learning Journeys
 import { initLearnTab } from './modules/ui/learnTabController.js';
 import { dispatchBuilderEvent } from './modules/ui/lessonGuidedMode.js';
+// Tier 1: Teaching-Composition Integration
+import { initTheoryMoments, toggleTheoryMoments } from './modules/teaching/theoryMoments.js';
+import { initWhyThisWorksEnhanced } from './modules/teaching/whyThisWorksEnhanced.js';
+import { initTheoryOverlay, toggleTheoryOverlay } from './modules/teaching/theoryOverlay.js';
+import { initCompositionInsights, showInsightsDashboard, trackProgression } from './modules/teaching/compositionInsights.js';
 import { initCircleOfFifths, toggleCircleOfFifthsPanel, openCircleOfFifthsPanel, closeCircleOfFifthsPanel } from './modules/features/circleOfFifths.js';
 import { initGuitarFretboard, toggleGuitarFretboardPanel, openGuitarFretboardPanel, closeGuitarFretboardPanel, updateGuitarFretboard } from './modules/features/guitarFretboard.js';
 import {
@@ -2063,6 +2068,9 @@ function showTutorialStartModal(onConfirmVerse, onConfirmChorus, onConfirmMelody
 function actuallyLaunchLetItBeVerseTutorial() {
     console.log('[LetItBeVerseTutorial] Starting verse tutorial, clearing progression...');
 
+    // Set flag to suppress Theory Moments during tutorial setup
+    window.isTutorialSetupInProgress = true;
+
     // Clear the progression first
     clearProgression(true);
 
@@ -2680,6 +2688,9 @@ function actuallyLaunchLetItBeVerseTutorial() {
         }
     ];
 
+    // Clear setup flag now that guided mode is starting
+    window.isTutorialSetupInProgress = false;
+
     // Start the guided mode
     window.startGuidedMode({
         lessonId: 'let-it-be-verse-tutorial',
@@ -2709,6 +2720,9 @@ function actuallyLaunchLetItBeVerseTutorial() {
  */
 function actuallyLaunchLetItBeTutorial() {
     console.log('[LetItBeTutorial] Starting tutorial, clearing progression...');
+
+    // Set flag to suppress Theory Moments during tutorial setup
+    window.isTutorialSetupInProgress = true;
 
     // Clear the progression first (user already confirmed in the modal)
     clearProgression(true); // true = skip confirmation dialog
@@ -3038,6 +3052,9 @@ function actuallyLaunchLetItBeTutorial() {
         }
     ];
 
+    // Clear setup flag now that guided mode is starting
+    window.isTutorialSetupInProgress = false;
+
     // Start the guided mode
     window.startGuidedMode({
         lessonId: 'let-it-be-chords-tutorial',
@@ -3070,6 +3087,9 @@ function actuallyLaunchLetItBeTutorial() {
  */
 function actuallyLaunchLetItBeMelodyTutorial() {
     console.log('[LetItBeMelodyTutorial] Starting melody tutorial, setting up progression...');
+
+    // Set flag to suppress Theory Moments during tutorial setup
+    window.isTutorialSetupInProgress = true;
 
     // Clear the progression first
     clearProgression(true); // true = skip confirmation dialog
@@ -3145,10 +3165,10 @@ function actuallyLaunchLetItBeMelodyTutorial() {
         if (bpmDisplay) bpmDisplay.textContent = '72';
 
         // Add the chord progression with pickup measure:
-        // C (pickup) - Am (1st inv) - G (1st inv) - F - C
-        // Each chord is a half note (2 beats)
+        // C (pickup with dotted half rest, melody starts beat 4) - Am - G - F - C
+        // Each chord is 2 beats (half note), inversions for smooth voice leading
         const chordsToAdd = [
-            { root: 'C', type: 'Major', inversion: 0, beats: 2 },      // Pickup measure
+            { root: 'C', type: 'Major', inversion: 0, beats: 2 },      // Pickup measure (dotted half rest + beat 4 melody)
             { root: 'A', type: 'Minor', inversion: 1, beats: 2 },      // Am 1st inv
             { root: 'G', type: 'Major', inversion: 1, beats: 2 },      // G 1st inv
             { root: 'F', type: 'Major', inversion: 0, beats: 2 },      // F root
@@ -3282,127 +3302,1083 @@ function launchLetItBeMelodyTutorialSteps() {
         }
     }
 
+    // Helper function to scroll the notation toolbar into view
+    function scrollToolbarIntoView() {
+        const toolbar = document.getElementById('notation-toolbar-container');
+        if (toolbar) {
+            toolbar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    // Helper function to scroll the notation panel into view (below virtual keyboard)
+    function scrollNotationIntoView() {
+        const notationPanel = document.getElementById('staff-notation-card-panel');
+        if (notationPanel) {
+            notationPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
     // Define the melody tutorial steps
-    // "Let It Be" melody for the chorus:
-    // Pickup (beat 4): "Let it" = eighth note G, eighth note A
-    // Measure 2 (Am): "be" = quarter note A tied over, "let it" = eighth G, eighth A
-    // etc.
+    // "Let It Be" chorus melody: "Let it be, let it be..."
+    // This tutorial teaches Note Entry Mode vs Select Mode, durations, ties, and rests
     const letItBeMelodySteps = [
-        // ========== INTRODUCTION ==========
+        // ========== PART 1: INTRODUCTION ==========
         {
-            instruction: 'Welcome to the "Let It Be" Melody Tutorial! 🎵 We\'ve set up the chord progression for you with inversions for smooth voice leading.',
-            callout: '🎸 Notice we added an extra C chord at the beginning as a "pickup measure." This is where the words "Let it" start - before the main Am chord!',
+            instruction: 'Welcome to the "Let It Be" Melody Tutorial! We\'ll learn melody notation by entering the famous chorus melody.\n\n🎯 ASSISTED PLACEMENT MODE: This tutorial focuses on teaching you the notation toolbar. If you click at the wrong pitch, we\'ll automatically place the note in the correct position. Outside of tutorials, notes go exactly where you click!',
+            callout: 'The chords are C - G - Am - F. The melody "Let it be, let it be..." starts on beat 4 of the first measure!',
             validation: null,
             successMessage: null
         },
         {
-            instruction: 'Look at the Musical Notation below. We\'ve added a dotted half rest (3 beats) in the pickup measure, leaving beat 4 free for "Let it".',
+            instruction: 'Look at the Musical Notation card. This is where we\'ll enter the melody in the treble clef (top staff).',
             spotlight: '#staff-notation-card-panel',
             targetElement: '#staff-notation-card-panel',
             spotlightExtraHeight: 100,
-            callout: '💡 The dotted half rest fills beats 1-3. Beat 4 is where you\'ll add the pickup notes "Let it" (two eighth notes: G and A).',
+            callout: 'The grand staff shows treble (melody) and bass clefs. The chords have already filled in some bass notes!',
             validation: null,
             successMessage: null,
             onEnter: expandStaffNotationPanel
         },
-        // ========== NOTATION TOOLBAR INTRODUCTION ==========
         {
-            instruction: '🎹 Let\'s look at the Notation Toolbar. This is where you select note durations before clicking on the staff to add notes.',
+            instruction: 'This is the Notation Toolbar. It has everything you need to enter notes, rests, and more.',
             spotlight: '#notation-toolbar-container',
             targetElement: '#notation-toolbar-container',
             spotlightExtraHeight: 20,
-            callout: 'The toolbar shows duration buttons (whole, half, quarter, eighth, sixteenth), plus rest, dot, tie, and accidental controls.',
+            callout: 'The toolbar has sections for: Input Mode, Duration, Modifiers (rests, dots, ties), and Edit functions.',
             validation: null,
             successMessage: null,
             onEnter: expandStaffNotationPanel
         },
-        // ========== SELECT EIGHTH NOTE DURATION ==========
+        // ========== PART 2: TWO MODES EXPLAINED ==========
         {
-            instruction: '🎵 First, let\'s set the duration to EIGHTH NOTE. Click the eighth note button (♪ with the flag) in the toolbar.',
-            spotlight: '#notation-toolbar-container',
-            targetElement: '#notation-toolbar-container',
-            spotlightExtraHeight: 20,
-            callout: 'The "Let it" pickup uses two eighth notes. An eighth note = 0.5 beats, so two eighth notes fill beat 4.',
-            validation: null, // For now info-only, could add validation later
-            successMessage: null,
-            onEnter: expandStaffNotationPanel
-        },
-        // ========== ADD FIRST NOTE (G) ==========
-        {
-            instruction: '🎤 Now click on the staff in Measure 1 to add the first note "Let" - which is a G4 (on the second line from bottom).',
-            spotlight: '#staff-notation-card-panel',
-            targetElement: '#staff-notation-card-panel',
-            spotlightExtraHeight: 100,
-            callout: '💡 TIP: You can also click a key on the keyboard at the bottom of the screen to add a note! The note will be added to the currently selected measure.',
-            validation: null,
-            successMessage: null,
-            onEnter: expandStaffNotationPanel
-        },
-        // ========== ADD SECOND NOTE (A) ==========
-        {
-            instruction: '🎤 Add the second pickup note "it" - which is an A4 (in the second space from bottom, one step up from G).',
-            spotlight: '#staff-notation-card-panel',
-            targetElement: '#staff-notation-card-panel',
-            spotlightExtraHeight: 100,
-            callout: '🎵 After this, the pickup measure will have: dotted half rest (beats 1-3) + eighth G + eighth A (beat 4) = "Let it"',
-            validation: null,
-            successMessage: null,
-            onEnter: expandStaffNotationPanel
-        },
-        // ========== MEASURE 2 - "BE" ==========
-        {
-            instruction: '📍 Click on Measure 2 (the Am chord) to select it. This is where "be" lands on the downbeat.',
-            spotlight: '#staff-notation-card-panel',
-            targetElement: '#staff-notation-card-panel',
-            spotlightExtraHeight: 100,
-            callout: 'Click anywhere in measure 2 in the staff notation to select it. The measure will highlight when selected.',
+            instruction: 'There are TWO ways to work with notation. Let\'s learn both!',
+            callout: '✏ NOTE ENTRY MODE: Click anywhere on the staff to ADD a note at that pitch.\n⎀ SELECT MODE: Click to SELECT existing notes, then edit them.',
             validation: null,
             successMessage: null,
             onEnter: expandStaffNotationPanel
         },
         {
-            instruction: '🎵 Change the duration to QUARTER NOTE, then add an A4 for "be" on beat 1 of measure 2.',
-            spotlight: '#notation-toolbar-container',
-            targetElement: '#notation-toolbar-container',
-            spotlightExtraHeight: 20,
-            callout: '"be" is held longer than the pickup notes. A quarter note = 1 beat. Click the quarter note button (♩) then click A4.',
+            instruction: 'NOTE ENTRY MODE (✏) is for adding new notes. You click on the staff where you want the note, and it appears!',
+            spotlight: '[data-interaction-mode="noteEntry"]',
+            targetElement: '[data-interaction-mode="noteEntry"]',
+            callout: 'In Note Entry Mode:\n• Click on staff = add note at that pitch\n• The duration button you\'ve selected determines the note length\n• Notes are added in sequence',
             validation: null,
             successMessage: null,
             onEnter: expandStaffNotationPanel
         },
-        // ========== CONTINUE THE MELODY ==========
         {
-            instruction: '🎤 Continue with "let it" in measure 2 - add two more eighth notes: G4 and A4.',
-            spotlight: '#staff-notation-card-panel',
-            targetElement: '#staff-notation-card-panel',
-            spotlightExtraHeight: 100,
-            callout: 'Switch back to eighth notes, then add G and A. The pattern repeats: "Let it BE, let it BE..."',
+            instruction: 'SELECT MODE (⎀) is for editing. Click to select notes, then transpose, delete, or modify them.',
+            spotlight: '[data-interaction-mode="select"]',
+            targetElement: '[data-interaction-mode="select"]',
+            callout: 'In Select Mode:\n• Click a note = select it\n• Shift+Click = select multiple notes\n• Alt+Click = add a note (without switching modes!)\n• Alt+Click on selected note = add polyphony (stack another note)\n• Esc = unselect note\n• Use toolbar to transpose or delete',
             validation: null,
             successMessage: null,
             onEnter: expandStaffNotationPanel
         },
-        // ========== PLAY BACK ==========
+        // ========== PART 3: ADDING NOTES ==========
         {
-            instruction: '▶️ Let\'s hear what you\'ve created! Click the Play button (▶️) in the floating action menu (bottom right).',
-            spotlight: '#mobile-fab-main',
-            targetElement: '#mobile-fab-main',
-            callout: 'The purple floating button opens playback controls. You can play just the chords, just the melody, or both together!',
-            validation: null,
-            successMessage: null
+            instruction: 'Let\'s start adding the melody! First, click the Note Entry Mode button (✏).',
+            spotlight: '[data-interaction-mode="noteEntry"]',
+            targetElement: '[data-interaction-mode="noteEntry"]',
+            callout: 'This mode lets you click anywhere on the treble staff to add notes.',
+            isActionStep: true,
+            validation: { type: 'interaction_mode_set', value: 'noteEntry' },
+            successMessage: 'Note Entry Mode activated!',
+            quickAdvance: true,
+            onEnter: expandStaffNotationPanel
         },
-        // ========== EXPLORATION ==========
         {
-            instruction: '🎉 Great start! Now continue adding the melody. The full "Let It Be" chorus melody follows the pattern: G-A-A-G-A (Let it be, let it be).',
-            spotlight: '#staff-notation-card-panel',
-            targetElement: '#staff-notation-card-panel',
-            spotlightExtraHeight: 100,
-            callout: '💡 Experiment with the notation tools! Try the tie button (⌒) to connect notes across measures, or the dot button (•) for dotted rhythms.',
+            instruction: 'The melody starts with a quick 16th note. Click the 16th note button.',
+            spotlight: '[data-duration="16n"]',
+            targetElement: '[data-duration="16n"]',
+            callout: 'Duration buttons: Whole, Half, Quarter (♩), Eighth (♪), 16th, 32nd\nKeyboard shortcut: Shift+5 for 16th notes',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '16n' },
+            successMessage: '16th note duration selected!',
+            quickAdvance: true,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Click in MEASURE 1 (first measure) at the E5 position to add the first note. While moving your mouse, you can hold the Alt key to see where the note will be placed.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'E5 is in the 1st SPACE from the top in the treble clef (just below the top line).\n\n💡 Your mouse pointer\'s horizontal position within a measure doesn\'t matter - notes are added after the last note in that measure!\n\n💡 Hold Alt to see a "ghost note" preview showing exactly where your note will be placed!',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'E5',
+            successMessage: 'E5 added! The melody has begun!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'The next note is an 8th note. Click the 8th note button (♪).',
+            spotlight: '[data-duration="8n"]',
+            targetElement: '[data-duration="8n"]',
+            callout: 'Keyboard shortcut: Shift+4 for 8th notes',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '8n' },
+            successMessage: 'Eighth note duration selected!',
+            quickAdvance: true,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Click in MEASURE 1 on D5 (the 4th line - 2nd line from the top).',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'D5 is on the 4th LINE of the treble staff (2nd line from top).\nClick in MEASURE 1 - your mouse pointer\'s horizontal position within the measure doesn\'t matter. The new note will be added after the last note in the measure.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'D5',
+            successMessage: 'D5 added!',
+            quickAdvance: true,
+            onEnter: expandStaffNotationPanel
+        },
+        // ========== PART 4: CREATING TIED NOTES ==========
+        {
+            instruction: 'Now let\'s learn about TIES! A tie connects two notes of the same pitch, making them ring as one.',
+            callout: 'The next part has C5 (16th) TIED to C5 (quarter) - they\'ll ring together as one long note.\nTies are used for rhythms that can\'t be written as a single note.',
             validation: null,
             successMessage: null,
+            onEnter: expandStaffNotationPanel
+        },
+        {
+            instruction: 'Select 16th note duration for the first C5.',
+            spotlight: '[data-duration="16n"]',
+            targetElement: '[data-duration="16n"]',
+            callout: 'We\'ll add a short C5 first, then tie it to a longer C5.',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '16n' },
+            successMessage: '16th note selected!',
+            quickAdvance: true,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Click in MEASURE 1 on C5 (3rd space from bottom / 2nd space from top) to add the first note of the tie.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'C5 is in the 3rd SPACE of the treble staff (2nd space from top).\nYour mouse pointer\'s horizontal position within the measure doesn\'t matter.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'C5',
+            successMessage: 'First C5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Now select quarter note duration (♩) for the second part of the tie.',
+            spotlight: '[data-duration="4n"]',
+            targetElement: '[data-duration="4n"]',
+            callout: 'The tied quarter note will sustain the C5.',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '4n' },
+            successMessage: 'Quarter note selected!',
+            quickAdvance: true,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Add another C5 at the same pitch (3rd space). Click anywhere in MEASURE 2.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'This C5 will be tied to the previous one.\nYour mouse pointer\'s horizontal position within the measure doesn\'t matter.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'C5',
+            successMessage: 'Second C5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Now switch to SELECT MODE (⎀) so we can select the notes to tie them.',
+            spotlight: '[data-interaction-mode="select"]',
+            targetElement: '[data-interaction-mode="select"]',
+            callout: 'Select Mode lets us click on existing notes to select them.\nRemember: Alt+Click adds notes, Esc unselects.',
+            isActionStep: true,
+            validation: { type: 'interaction_mode_set', value: 'select' },
+            successMessage: 'Select Mode activated!',
+            quickAdvance: true,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Click on the first C5 (16th note) to select it.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'When selected, the note will be highlighted. You can Shift+Click to select additional notes.',
+            isActionStep: true,
+            validation: { type: 'notes_selected' },
+            successMessage: 'Note selected!',
+            quickAdvance: true,
+            onEnter: expandStaffNotationPanel
+        },
+        {
+            instruction: 'Hold Shift and click the second C5 (quarter note) to add it to the selection.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'Both C5 notes should now be highlighted.',
+            isActionStep: true,
+            validation: { type: 'multiple_notes_selected' },
+            successMessage: 'Both notes selected!',
+            quickAdvance: false,
+            onEnter: expandStaffNotationPanel
+        },
+        {
+            instruction: 'Click the Tie button (⁀) in the toolbar to connect the two notes!',
+            spotlight: '.tie-btn',
+            targetElement: '.tie-btn',
+            callout: 'The tie creates a curved line connecting the notes.\nKeyboard shortcut: T',
+            isActionStep: true,
+            validation: { type: 'tie_created' },
+            successMessage: 'Tie created! The two C5s now ring as one long note!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Press Esc to unselect the notes before continuing.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'Pressing Esc clears your selection. This is important before adding more notes!',
+            isActionStep: true,
+            validation: { type: 'notes_deselected' },
+            successMessage: 'Selection cleared!',
+            quickAdvance: false,
+            onEnter: expandStaffNotationPanel
+        },
+        // ========== PART 5: CONTINUING THE MELODY ==========
+        {
+            instruction: 'Now let\'s continue the melody! Make sure you\'re in Note Entry Mode (✏).',
+            spotlight: '[data-interaction-mode="noteEntry"]',
+            targetElement: '[data-interaction-mode="noteEntry"]',
+            callout: 'We\'ll add: E5-G5-A5, rest, G5-G5-E5-D5-C5, A4-G4, tied E5s, and more!',
+            isActionStep: true,
+            validation: { type: 'interaction_mode_set', value: 'noteEntry' },
+            successMessage: 'Note Entry Mode activated!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Select 16th note duration.',
+            spotlight: '[data-duration="16n"]',
+            targetElement: '[data-duration="16n"]',
+            callout: 'Keyboard shortcut: Shift+5',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '16n' },
+            successMessage: '16th note selected!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Add E5 (1st space from top) to the second measure.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'E5 is in the 1st space from the top of the treble clef.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'E5',
+            successMessage: 'E5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Select 8th note duration (♪).',
+            spotlight: '[data-duration="8n"]',
+            targetElement: '[data-duration="8n"]',
+            callout: 'Keyboard shortcut: Shift+4',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '8n' },
+            successMessage: '8th note selected!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Add G5 (1st ledger line above the staff) to the second measure.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'G5 is on the 1st ledger line ABOVE the treble staff.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'G5',
+            successMessage: 'G5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Select 16th note duration.',
+            spotlight: '[data-duration="16n"]',
+            targetElement: '[data-duration="16n"]',
+            callout: 'Back to 16th notes.',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '16n' },
+            successMessage: '16th note selected!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Add A5 (1st space above the staff - immediately above the G you just added) to the second measure.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'A5 is in the 1st SPACE above the staff (immediately above the G5 ledger line).',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'A5',
+            successMessage: 'A5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Now add a quarter rest. Select quarter note duration.',
+            spotlight: '[data-duration="4n"]',
+            targetElement: '[data-duration="4n"]',
+            callout: 'Quarter duration for the rest.',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '4n' },
+            successMessage: 'Quarter selected!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Turn on Rest mode (𝄽).',
+            spotlight: '[data-action="rest"]',
+            targetElement: '[data-action="rest"]',
+            callout: 'Keyboard shortcut: R',
+            isActionStep: true,
+            validation: { type: 'rest_mode_activated' },
+            successMessage: 'Rest mode on!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Click to add the quarter rest.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'Click anywhere in the current measure.',
+            isActionStep: true,
+            validation: { type: 'rest_added_to_treble' },
+            successMessage: 'Quarter rest added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Turn off Rest mode.',
+            spotlight: '[data-action="rest"]',
+            targetElement: '[data-action="rest"]',
+            callout: 'Back to note entry.',
+            isActionStep: true,
+            validation: { type: 'rest_mode_deactivated' },
+            successMessage: 'Rest mode off!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Select 16th note duration for the next phrase.',
+            spotlight: '[data-duration="16n"]',
+            targetElement: '[data-duration="16n"]',
+            callout: 'We\'ll add G5-G5-E5-D5.',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '16n' },
+            successMessage: '16th note selected!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Add G5 (1st ledger line above).',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'First of two G5s.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'G5',
+            successMessage: 'G5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Add another G5 (same position).',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'Second G5.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'G5',
+            successMessage: 'G5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Add E5 (1st space from top).',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'E5 is in the 1st space from the top.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'E5',
+            successMessage: 'E5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Add D5 (4th line - 2nd line from top).',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'D5 is on the 4th line of the treble clef.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'D5',
+            successMessage: 'D5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Select quarter note duration (♩).',
+            spotlight: '[data-duration="4n"]',
+            targetElement: '[data-duration="4n"]',
+            callout: 'For the C5 quarter note.',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '4n' },
+            successMessage: 'Quarter selected!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Add C5 (3rd space - 2nd space from top).',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'C5 is in the 3rd space of the treble clef.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'C5',
+            successMessage: 'C5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Select 16th note duration.',
+            spotlight: '[data-duration="16n"]',
+            targetElement: '[data-duration="16n"]',
+            callout: 'For A4.',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '16n' },
+            successMessage: '16th selected!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Add A4 (2nd space from bottom).',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'A4 is in the 2nd space from the BOTTOM.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'A4',
+            successMessage: 'A4 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Select 8th note duration (♪).',
+            spotlight: '[data-duration="8n"]',
+            targetElement: '[data-duration="8n"]',
+            callout: 'For G4.',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '8n' },
+            successMessage: '8th selected!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Add G4 (2nd line from bottom).',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'G4 is on the 2nd line from the BOTTOM.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'G4',
+            successMessage: 'G4 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        // ========== TIED E5s ==========
+        {
+            instruction: 'Now another tied pair! Select 16th note.',
+            spotlight: '[data-duration="16n"]',
+            targetElement: '[data-duration="16n"]',
+            callout: 'First E5 will be a 16th note.',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '16n' },
+            successMessage: '16th selected!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Add E5 (1st space from top).',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'First E5 of the tied pair.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'E5',
+            successMessage: 'E5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Select quarter note duration.',
+            spotlight: '[data-duration="4n"]',
+            targetElement: '[data-duration="4n"]',
+            callout: 'Second E5 will be a quarter.',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '4n' },
+            successMessage: 'Quarter selected!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Add E5 (same position).',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'Second E5 of the tied pair.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'E5',
+            successMessage: 'E5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Switch to Select Mode (⎀) to tie them.',
+            spotlight: '[data-interaction-mode="select"]',
+            targetElement: '[data-interaction-mode="select"]',
+            callout: 'We need to select both notes to tie them.',
+            isActionStep: true,
+            validation: { type: 'interaction_mode_set', value: 'select' },
+            successMessage: 'Select Mode!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Click the first E5 (16th) to select it.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'Select the shorter E5 first.',
+            isActionStep: true,
+            validation: { type: 'notes_selected' },
+            successMessage: 'Note selected!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Shift+Click the second E5 (quarter).',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'Add to selection with Shift+Click.',
+            isActionStep: true,
+            validation: { type: 'multiple_notes_selected' },
+            successMessage: 'Both selected!',
+            quickAdvance: false,
+            onEnter: expandStaffNotationPanel
+        },
+        {
+            instruction: 'Click the Tie button (⁀).',
+            spotlight: '.tie-btn',
+            targetElement: '.tie-btn',
+            callout: 'Keyboard shortcut: T',
+            isActionStep: true,
+            validation: { type: 'tie_created' },
+            successMessage: 'Tied!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Press Esc to deselect.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'Clear selection before continuing.',
+            isActionStep: true,
+            validation: { type: 'notes_deselected' },
+            successMessage: 'Deselected!',
+            quickAdvance: false,
+            onEnter: expandStaffNotationPanel
+        },
+        // ========== RESTS ==========
+        {
+            instruction: 'Add a quarter rest. Switch to Note Entry Mode.',
+            spotlight: '[data-interaction-mode="noteEntry"]',
+            targetElement: '[data-interaction-mode="noteEntry"]',
+            callout: 'Back to Note Entry for the rest.',
+            isActionStep: true,
+            validation: { type: 'interaction_mode_set', value: 'noteEntry' },
+            successMessage: 'Note Entry Mode!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Select quarter duration.',
+            spotlight: '[data-duration="4n"]',
+            targetElement: '[data-duration="4n"]',
+            callout: 'Quarter rest.',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '4n' },
+            successMessage: 'Quarter selected!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Turn on Rest mode.',
+            spotlight: '[data-action="rest"]',
+            targetElement: '[data-action="rest"]',
+            callout: 'Keyboard: R',
+            isActionStep: true,
+            validation: { type: 'rest_mode_activated' },
+            successMessage: 'Rest mode on!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Click to add the quarter rest.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'Add the quarter rest.',
+            isActionStep: true,
+            validation: { type: 'rest_added_to_treble' },
+            successMessage: 'Quarter rest!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Now add a 16th rest. Select 16th duration.',
+            spotlight: '[data-duration="16n"]',
+            targetElement: '[data-duration="16n"]',
+            callout: '16th rest.',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '16n' },
+            successMessage: '16th selected!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Click to add the 16th rest.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'Add the short rest.',
+            isActionStep: true,
+            validation: { type: 'rest_added_to_treble' },
+            successMessage: '16th rest!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Turn off Rest mode.',
+            spotlight: '[data-action="rest"]',
+            targetElement: '[data-action="rest"]',
+            callout: 'Back to notes.',
+            isActionStep: true,
+            validation: { type: 'rest_mode_deactivated' },
+            successMessage: 'Rest mode off!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        // ========== FINAL PHRASE ==========
+        {
+            instruction: 'Add three E5 16th notes. Duration should be 16th.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'First E5 of three.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'E5',
+            successMessage: 'E5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Add second E5.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'Second E5.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'E5',
+            successMessage: 'E5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Add third E5.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'Third E5.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'E5',
+            successMessage: 'E5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Select 8th note duration.',
+            spotlight: '[data-duration="8n"]',
+            targetElement: '[data-duration="8n"]',
+            callout: 'F5 is an 8th note.',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '8n' },
+            successMessage: '8th selected!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Add F5 (top line of the staff).',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'F5 is on the TOP LINE of the treble clef.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'F5',
+            successMessage: 'F5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Select 16th note duration.',
+            spotlight: '[data-duration="16n"]',
+            targetElement: '[data-duration="16n"]',
+            callout: 'Two more E5s.',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '16n' },
+            successMessage: '16th selected!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Add E5.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'E5 (1st space from top).',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'E5',
+            successMessage: 'E5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Add another E5.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'Second E5.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'E5',
+            successMessage: 'E5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Select quarter note duration.',
+            spotlight: '[data-duration="4n"]',
+            targetElement: '[data-duration="4n"]',
+            callout: 'D5 is a quarter note.',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '4n' },
+            successMessage: 'Quarter selected!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Add D5 (4th line).',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'D5 is on the 4th line (2nd line from top).',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'D5',
+            successMessage: 'D5 quarter added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Add a 16th rest. Select 16th duration.',
+            spotlight: '[data-duration="16n"]',
+            targetElement: '[data-duration="16n"]',
+            callout: '16th rest coming up.',
+            isActionStep: true,
+            validation: { type: 'duration_selected', value: '16n' },
+            successMessage: '16th selected!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Turn on Rest mode.',
+            spotlight: '[data-action="rest"]',
+            targetElement: '[data-action="rest"]',
+            callout: 'For the 16th rest.',
+            isActionStep: true,
+            validation: { type: 'rest_mode_activated' },
+            successMessage: 'Rest mode on!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Click to add the 16th rest.',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'Add the rest.',
+            isActionStep: true,
+            validation: { type: 'rest_added_to_treble' },
+            successMessage: '16th rest!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Turn off Rest mode.',
+            spotlight: '[data-action="rest"]',
+            targetElement: '[data-action="rest"]',
+            callout: 'Back to notes for the ending.',
+            isActionStep: true,
+            validation: { type: 'rest_mode_deactivated' },
+            successMessage: 'Rest mode off!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollToolbarIntoView();
+            }
+        },
+        {
+            instruction: 'Add E5 (16th note, 1st space from top).',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'E5 for the final phrase.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'E5',
+            successMessage: 'E5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Add D5 (4th line).',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'D5.',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'D5',
+            successMessage: 'D5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        {
+            instruction: 'Add final C5 (3rd space).',
+            spotlight: '#notation-pages-container',
+            targetElement: '#notation-pages-container',
+            callout: 'Last note of the chorus!',
+            isActionStep: true,
+            validation: { type: 'note_added_to_treble' },
+            expectedNote: 'C5',
+            successMessage: 'Final C5 added!',
+            quickAdvance: false,
+            onEnter: () => {
+                expandStaffNotationPanel();
+                scrollNotationIntoView();
+            }
+        },
+        // ========== SUMMARY ==========
+        {
+            instruction: '🎉 Congratulations! You\'ve entered the complete "Let It Be" chorus melody!',
+            callout: 'You\'ve mastered:\n• Note Entry Mode & Select Mode\n• Duration selection\n• Adding rests\n• Creating ties\n• Staff positions (lines vs spaces)',
+            validation: null,
+            successMessage: null,
+            onEnter: expandStaffNotationPanel
+        },
+        {
+            instruction: 'You\'re ready to create your own melodies!',
+            callout: 'KEYBOARD SHORTCUTS:\n• Shift+1-6: Duration (1=whole, 6=32nd)\n• R: Toggle rest mode\n• T: Create tie\n• Delete: Delete selected\n• Ctrl+Z: Undo\n• Alt: Show ghost note preview',
+            validation: null,
+            successMessage: 'You\'ve mastered melody notation entry!',
             allowFreeExplore: true,
             onEnter: expandStaffNotationPanel
         }
     ];
+
+    // Clear setup flag now that guided mode is starting
+    window.isTutorialSetupInProgress = false;
 
     // Start the guided mode
     window.startGuidedMode({
@@ -4072,6 +5048,10 @@ window.importDetectedChords = importDetectedChords;
 
 // Theory Tools functions
 window.toggleTheoryPanel = toggleTheoryPanel;
+window.toggleTheoryMoments = toggleTheoryMoments;
+window.toggleTheoryOverlay = toggleTheoryOverlay;
+window.showCompositionInsights = showInsightsDashboard;
+window.trackComposition = trackProgression;
 window.insertSecondaryDominant = insertSecondaryDominant;
 window.showModalInterchangeChords = showModalInterchangeChords;
 window.insertBorrowedChord = insertBorrowedChord;
@@ -5873,6 +6853,11 @@ window.onload = () => {
     // Initialize Theory Tools
     initTheoryTools();
 
+    // Initialize Teaching Integration (Tier 1)
+    initTheoryMoments();
+    initTheoryOverlay();
+    initCompositionInsights();
+
     // Initialize Song Analyzer (for audio chord detection)
     initSongAnalyzer();
 
@@ -5881,6 +6866,8 @@ window.onload = () => {
         initUnifiedSuggestionsPanel();
         // Initialize Why This Works panel (educational explanations)
         initWhyThisWorksPanel();
+        // Initialize Enhanced Why This Works (Tier 1 - overrides standard panel)
+        initWhyThisWorksEnhanced();
         // Phase 1.3: Initialize Chord Function Color Legend
         initChordFunctionLegend();
     }, 200);

@@ -72,7 +72,14 @@ This guide shows all keyboard shortcuts for editing musical notation in the Musi
 
 | Action | Shortcut | Notes |
 |--------|----------|-------|
-| Delete selected | Delete or Backspace | Removes all selected notes |
+| Delete selected (preserve rhythm) | Delete or Backspace | Replaces notes with rests of same duration |
+| Shift-delete (compact timeline) | Ctrl + Delete/Backspace | Removes notes and shifts subsequent notes left |
+
+> **Two Delete Behaviors** (like professional music software):
+> - **Delete/Backspace**: Replaces notes with rests, preserving rhythmic structure. This is the safe default that keeps your measure timing intact.
+> - **Ctrl+Delete**: Removes notes completely and shifts all following notes backward to fill the gap. Use this when you want to truly remove content and compact the timeline.
+
+> **Note**: Shift-delete can merge tied notes that no longer cross measure boundaries, and will split notes that now cross boundaries after shifting.
 
 ### **Playback**
 
@@ -248,5 +255,5 @@ These features are planned for future updates:
 
 ---
 
-**Last Updated**: 2025-01-23
-**Version**: Phase 1 - Interactive Editing
+**Last Updated**: 2025-12-24
+**Version**: Phase 1.5 - Interactive Editing with Shift-Delete

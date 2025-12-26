@@ -189,6 +189,140 @@ export function getExplanationAtLevel(type, id, level = 'simple') {
   return undefined;
 }
 
+// Note name constants for key-aware substitution
+const ALL_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const NOTE_DISPLAY = {
+  'C': 'C', 'C#': 'C♯', 'Db': 'D♭', 'D': 'D', 'D#': 'D♯', 'Eb': 'E♭',
+  'E': 'E', 'F': 'F', 'F#': 'F♯', 'Gb': 'G♭', 'G': 'G', 'G#': 'G♯',
+  'Ab': 'A♭', 'A': 'A', 'A#': 'A♯', 'Bb': 'B♭', 'B': 'B'
+};
+
+// Major scale intervals in semitones
+const MAJOR_SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11];
+
+/**
+ * Get the note name for a scale degree in a given key
+ * @param {string} key - The key (e.g., 'C', 'G', 'D', 'Dm')
+ * @param {number} degree - Scale degree (1-7)
+ * @param {boolean} useFlat - Whether to prefer flat notation
+ * @returns {string} The note name
+ */
+function getNoteForDegree(key, degree, useFlat = false) {
+  // Handle minor keys
+  const isMinor = key.endsWith('m') && !key.endsWith('dim');
+  const keyRoot = isMinor ? key.slice(0, -1) : key;
+
+  // Normalize key root
+  let keyIndex = ALL_NOTES.indexOf(keyRoot);
+  if (keyIndex === -1) {
+    // Try with sharp/flat normalization
+    const normalized = keyRoot.replace('♯', '#').replace('♭', 'b');
+    if (normalized.endsWith('b')) {
+      const baseNote = normalized.slice(0, -1);
+      const baseIndex = ALL_NOTES.indexOf(baseNote);
+      keyIndex = baseIndex >= 0 ? (baseIndex - 1 + 12) % 12 : -1;
+    } else {
+      keyIndex = ALL_NOTES.indexOf(normalized);
+    }
+  }
+
+  if (keyIndex === -1) return '?';
+
+  // Get semitone offset for this degree
+  const interval = MAJOR_SCALE_INTERVALS[(degree - 1) % 7];
+  const noteIndex = (keyIndex + interval) % 12;
+
+  return ALL_NOTES[noteIndex];
+}
+
+/**
+ * Convert a Roman numeral to an actual chord name in a given key
+ * @param {string} numeral - Roman numeral (e.g., 'II', 'V', 'iv', 'bVII')
+ * @param {string} key - The key
+ * @returns {string} The chord name (e.g., 'D major', 'G', 'F minor')
+ */
+function romanToChordName(numeral, key) {
+  if (!key) return numeral;
+
+  // Parse the numeral
+  let flatSharp = '';
+  let baseNumeral = numeral;
+  let suffix = '';
+
+  // Check for flat/sharp prefix
+  if (numeral.startsWith('b') || numeral.startsWith('♭')) {
+    flatSharp = 'b';
+    baseNumeral = numeral.slice(1);
+  } else if (numeral.startsWith('#') || numeral.startsWith('♯')) {
+    flatSharp = '#';
+    baseNumeral = numeral.slice(1);
+  }
+
+  // Extract suffix (7, maj7, etc.)
+  const suffixMatch = baseNumeral.match(/(maj7|m7|7|°7|ø7|°|dim|aug|sus[24]|add9|6)$/i);
+  if (suffixMatch) {
+    suffix = suffixMatch[1];
+    baseNumeral = baseNumeral.slice(0, -suffix.length);
+  }
+
+  // Map numeral to degree
+  const numeralMap = {
+    'i': 1, 'I': 1,
+    'ii': 2, 'II': 2,
+    'iii': 3, 'III': 3,
+    'iv': 4, 'IV': 4,
+    'v': 5, 'V': 5,
+    'vi': 6, 'VI': 6,
+    'vii': 7, 'VII': 7
+  };
+
+  const degree = numeralMap[baseNumeral];
+  if (!degree) return numeral;
+
+  // Get the note
+  let note = getNoteForDegree(key, degree);
+
+  // Apply flat/sharp modification
+  if (flatSharp === 'b') {
+    const noteIndex = ALL_NOTES.indexOf(note);
+    note = ALL_NOTES[(noteIndex - 1 + 12) % 12];
+  } else if (flatSharp === '#') {
+    const noteIndex = ALL_NOTES.indexOf(note);
+    note = ALL_NOTES[(noteIndex + 1) % 12];
+  }
+
+  // Determine quality based on case
+  const isMinor = baseNumeral === baseNumeral.toLowerCase();
+  const quality = isMinor ? ' minor' : ' major';
+
+  // Build the chord name
+  let chordName = note;
+  if (suffix) {
+    // Add suffix without quality for 7th chords etc.
+    chordName += suffix;
+  } else {
+    chordName += quality;
+  }
+
+  return chordName;
+}
+
+/**
+ * Replace Roman numeral placeholders in text with actual chord names
+ * Placeholders are in the format {I}, {ii}, {V7}, {bVII}, etc.
+ * @param {string} text - Text with placeholders
+ * @param {string} key - The key to use for substitution
+ * @returns {string} Text with placeholders replaced
+ */
+function substituteChordNames(text, key) {
+  if (!text || !key) return text;
+
+  // Match placeholders like {I}, {ii}, {V7}, {bVII}, {IV}, etc.
+  return text.replace(/\{([b#♭♯]?[iIvV]+[^\}]*)\}/g, (match, numeral) => {
+    return romanToChordName(numeral, key);
+  });
+}
+
 /**
  * Get a "Why This Works" explanation for a chord in context
  *
@@ -196,9 +330,10 @@ export function getExplanationAtLevel(type, id, level = 'simple') {
  * @param {string} prevChord - Previous chord's Roman numeral (optional)
  * @param {string} nextChord - Next chord's Roman numeral (optional)
  * @param {string} level - Skill level
+ * @param {string} key - Musical key for chord name substitution (optional)
  * @returns {Object} Explanation object with title, explanation, and suggestions
  */
-export function getWhyThisWorks(chordNumeral, prevChord = null, nextChord = null, level = 'simple') {
+export function getWhyThisWorks(chordNumeral, prevChord = null, nextChord = null, level = 'simple', key = null) {
   // Try exact match first (e.g., "ii7", "V7", "II", "Imaj7")
   let chord = chordFunctions[chordNumeral];
   let usedNumeral = chordNumeral;
@@ -292,16 +427,24 @@ export function getWhyThisWorks(chordNumeral, prevChord = null, nextChord = null
     }
   }
 
+  // Apply key-aware substitution to text fields if key is provided
+  const title = key ? substituteChordNames(explanation.title, key) : explanation.title;
+  const explanationText = key ? substituteChordNames(explanation.explanation, key) : explanation.explanation;
+  const feeling = key ? substituteChordNames(explanation.feeling || chord.simple.feeling, key) : (explanation.feeling || chord.simple.feeling);
+  const whenToUse = key ? substituteChordNames(explanation.whenToUse, key) : explanation.whenToUse;
+  const contextInfo = key ? substituteChordNames(contextualInfo, key) : contextualInfo;
+  const forwardInfo = key ? substituteChordNames(forwardContextInfo, key) : forwardContextInfo;
+
   return {
-    title: explanation.title,
-    explanation: explanation.explanation,
-    feeling: explanation.feeling || chord.simple.feeling,
+    title,
+    explanation: explanationText,
+    feeling,
     function: chord.function,
     color: chord.color,
-    contextualInfo,
-    forwardContextInfo,  // NEW: Forward-looking context
+    contextualInfo: contextInfo,
+    forwardContextInfo: forwardInfo,
     suggestions: chord.commonNextChords || [],
-    whenToUse: explanation.whenToUse
+    whenToUse
   };
 }
 

@@ -203,9 +203,19 @@ export function getProgressionChordNotes(key, romanNumeral, selectedType, select
  * @returns {string|null} Roman numeral or null if not in the diatonic scale
  */
 export function noteToRomanNumeral(noteName, key, chordType) {
+    // Detect if key is minor
+    const isMinorKey = key && (key.endsWith('m') || key.toLowerCase().includes('minor'));
+
+    // Extract key root from key string (handle "C Major", "Cm", "C minor", etc.)
+    let keyRoot = key;
+    if (key) {
+        // Remove " Major", " minor", "m" suffix to get just the root
+        keyRoot = key.replace(/\s*(major|minor|min|m)$/i, '').trim();
+    }
+
     // Find the scale degree of the note in the given key
-    let keyRootIndex = ALL_NOTES.indexOf(key);
-    if (keyRootIndex === -1) keyRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[key]);
+    let keyRootIndex = ALL_NOTES.indexOf(keyRoot);
+    if (keyRootIndex === -1) keyRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[keyRoot]);
 
     let noteIndex = ALL_NOTES.indexOf(noteName);
     if (noteIndex === -1) noteIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[noteName]);
@@ -215,23 +225,38 @@ export function noteToRomanNumeral(noteName, key, chordType) {
     // Calculate the interval from the key root
     const interval = (noteIndex - keyRootIndex + 12) % 12;
 
-    // Find the scale degree in the major scale
-    let scaleDegreeIndex = MAJOR_SCALE_STEPS.indexOf(interval);
+    // Use appropriate scale for major vs minor keys
+    // Major scale intervals: [0, 2, 4, 5, 7, 9, 11] (I, II, III, IV, V, VI, VII)
+    // Natural minor scale intervals: [0, 2, 3, 5, 7, 8, 10] (i, ii°, III, iv, v, VI, VII)
+    const MINOR_SCALE_STEPS = [0, 2, 3, 5, 7, 8, 10];
+    const scaleSteps = isMinorKey ? MINOR_SCALE_STEPS : MAJOR_SCALE_STEPS;
+
+    let scaleDegreeIndex = scaleSteps.indexOf(interval);
     let chromaticPrefix = '';
 
     // Handle chromatic/out-of-key notes
     if (scaleDegreeIndex === -1) {
-        // Find the closest diatonic degree and determine if it's sharp or flat
-        // Major scale intervals: [0, 2, 4, 5, 7, 9, 11]
-        // Scale degree indices:   0   1   2   3   4   5   6  (I, II, III, IV, V, VI, VII)
-        // Chromatic intervals that are NOT in major scale: 1, 3, 6, 8, 10
-        const chromaticMapping = {
-            1: { degree: 1, prefix: '♭' },  // ♭II (e.g., Db in C) - Neapolitan
-            3: { degree: 2, prefix: '♭' },  // ♭III (e.g., Eb in C) - borrowed from parallel minor
-            6: { degree: 3, prefix: '♯' },  // ♯IV (e.g., F# in C) - common passing chord, also used in Lydian mode
-            8: { degree: 5, prefix: '♭' },  // ♭VI (e.g., Ab in C) - borrowed from parallel minor
-            10: { degree: 6, prefix: '♭' }  // ♭VII (e.g., Bb in C) - borrowed from Mixolydian/parallel minor
-        };
+        let chromaticMapping;
+
+        if (isMinorKey) {
+            // Chromatic intervals NOT in natural minor: 1, 4, 6, 9, 11
+            chromaticMapping = {
+                1: { degree: 1, prefix: '♭' },   // ♭II (Neapolitan)
+                4: { degree: 2, prefix: '♯' },   // ♯II or major III (raised 3rd)
+                6: { degree: 3, prefix: '♯' },   // ♯IV (tritone)
+                9: { degree: 5, prefix: '♯' },   // ♯V or major VI
+                11: { degree: 6, prefix: '♯' }   // ♯VI or major VII (leading tone)
+            };
+        } else {
+            // Chromatic intervals NOT in major scale: 1, 3, 6, 8, 10
+            chromaticMapping = {
+                1: { degree: 1, prefix: '♭' },  // ♭II (Neapolitan)
+                3: { degree: 2, prefix: '♭' },  // ♭III (borrowed from parallel minor)
+                6: { degree: 3, prefix: '♯' },  // ♯IV (Lydian)
+                8: { degree: 5, prefix: '♭' },  // ♭VI (borrowed from parallel minor)
+                10: { degree: 6, prefix: '♭' }  // ♭VII (Mixolydian/parallel minor)
+            };
+        }
 
         const mapping = chromaticMapping[interval];
         if (mapping) {
@@ -287,7 +312,9 @@ export function noteToRomanNumeral(noteName, key, chordType) {
         }
     }
 
-    if (!baseRoman) return null;
+    if (!baseRoman) {
+        return null;
+    }
 
     // Add chord quality suffix for extended chords
     const qualitySuffix = getChordQualitySuffix(chordType, baseRoman);

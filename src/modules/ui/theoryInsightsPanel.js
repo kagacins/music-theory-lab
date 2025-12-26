@@ -1045,7 +1045,8 @@ export class TheoryInsightsPanel {
         const rootIndex = (keyIndex + offset) % 12;
 
         // Flat numerals (bVI, bVII, bIII, bII) should always use flat spelling
-        const isFlattedNumeral = cleanNumeral.startsWith('b');
+        // Check both ASCII 'b' and Unicode '♭'
+        const isFlattedNumeral = cleanNumeral.startsWith('b') || cleanNumeral.startsWith('♭');
         const useFlats = isFlattedNumeral || key.includes('b') || ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb'].includes(keyRoot);
 
         return useFlats ? flatNoteOrder[rootIndex] : noteOrder[rootIndex];

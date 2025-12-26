@@ -761,8 +761,9 @@ export function renderMelodyNotation(canvasElement, melody, key) {
 
         // Convert melody notes to VexFlow format with octave shift detection
         const vexNotesData = melody.notes.map((note, index) => {
-            // Parse note (e.g., "C4", "F#5", "Bb3")
-            const match = note.match(/^([A-G][#b]?)(\d+)$/);
+            // Parse note (e.g., "C4", "F#5", "Bb3", "F##4", "Bbb3")
+            // Support double sharps (## or x) and double flats (bb)
+            const match = note.match(/^([A-G])(##|x|bb|[#b]?)(\d+)$/);
             if (!match) {
                 console.warn('Invalid note format:', note);
                 return null;
@@ -774,11 +775,15 @@ export function renderMelodyNotation(canvasElement, melody, key) {
             const octaveInfo = getOctaveShift(note);
             const displayNote = transposeNoteForDisplay(note, octaveInfo.shift);
 
-            const displayMatch = displayNote.match(/^([A-G][#b]?)(\d+)$/);
+            const displayMatch = displayNote.match(/^([A-G])(##|x|bb|[#b]?)(\d+)$/);
             if (!displayMatch) return null;
 
-            const noteName = displayMatch[1];
-            const octave = displayMatch[2];
+            const baseNote = displayMatch[1];
+            let accidental = displayMatch[2];
+            // Normalize 'x' to '##' for consistency
+            if (accidental === 'x') accidental = '##';
+            const noteName = baseNote + accidental;
+            const octave = displayMatch[3];
 
             // Create VexFlow note (using transposed display note)
             const durationValue = duration.replace('n', ''); // Remove 'n' suffix
@@ -791,9 +796,13 @@ export function renderMelodyNotation(canvasElement, melody, key) {
             });
 
             // Add accidentals if needed
-            if (noteName.includes('#')) {
+            if (accidental === '##') {
+                vexNote.addModifier(new Accidental('##'), 0);
+            } else if (accidental === 'bb') {
+                vexNote.addModifier(new Accidental('bb'), 0);
+            } else if (accidental === '#') {
                 vexNote.addModifier(new Accidental('#'), 0);
-            } else if (noteName.includes('b')) {
+            } else if (accidental === 'b') {
                 vexNote.addModifier(new Accidental('b'), 0);
             }
 

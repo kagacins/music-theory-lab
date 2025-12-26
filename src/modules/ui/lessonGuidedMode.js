@@ -270,6 +270,9 @@ export function endGuidedMode(completed = false) {
     // Clean up listeners
     cleanupActionListeners();
 
+    // Clear tutorial expected note (used for assisted placement)
+    window.tutorialExpectedNote = null;
+
     // Re-enable chord card tooltips (they may have been disabled during site tutorial)
     document.body.classList.remove('progression-tooltips-disabled');
 
@@ -564,6 +567,9 @@ function returnToLesson() {
     // Clean up listeners
     cleanupActionListeners();
 
+    // Clear tutorial expected note (used for assisted placement)
+    window.tutorialExpectedNote = null;
+
     // Re-enable chord card tooltips (they may have been disabled during site tutorial)
     document.body.classList.remove('progression-tooltips-disabled');
 
@@ -679,6 +685,14 @@ function showCurrentStep() {
         } catch (e) {
             console.warn('[GuidedMode] onEnter callback error:', e);
         }
+    }
+
+    // Set or clear the tutorial expected note for assisted placement
+    // This allows noteEditor to automatically place notes at the correct pitch during tutorials
+    if (currentStep.expectedNote) {
+        window.tutorialExpectedNote = currentStep.expectedNote;
+    } else {
+        window.tutorialExpectedNote = null;
     }
 
     // Update banner
@@ -1626,6 +1640,15 @@ function setupActionListeners() {
     window.addEventListener('chordDeleted', handleBuilderAction);
     window.addEventListener('sectionMenuOpened', handleBuilderAction);
     window.addEventListener('duplicateDialogOpened', handleBuilderAction);
+
+    // Listen for notation/melody tutorial events
+    window.addEventListener('notationInteractionModeSet', handleBuilderAction);
+    window.addEventListener('notationDurationSelected', handleBuilderAction);
+    window.addEventListener('notationNoteAdded', handleBuilderAction);
+    window.addEventListener('notationNoteSelected', handleBuilderAction);
+    window.addEventListener('notationNotesDeselected', handleBuilderAction);
+    window.addEventListener('notationTieCreated', handleBuilderAction);
+    window.addEventListener('notationRestModeToggled', handleBuilderAction);
 }
 
 function cleanupActionListeners() {
@@ -1659,6 +1682,15 @@ function cleanupActionListeners() {
     window.removeEventListener('chordDeleted', handleBuilderAction);
     window.removeEventListener('sectionMenuOpened', handleBuilderAction);
     window.removeEventListener('duplicateDialogOpened', handleBuilderAction);
+
+    // Remove notation/melody tutorial event listeners
+    window.removeEventListener('notationInteractionModeSet', handleBuilderAction);
+    window.removeEventListener('notationDurationSelected', handleBuilderAction);
+    window.removeEventListener('notationNoteAdded', handleBuilderAction);
+    window.removeEventListener('notationNoteSelected', handleBuilderAction);
+    window.removeEventListener('notationNotesDeselected', handleBuilderAction);
+    window.removeEventListener('notationTieCreated', handleBuilderAction);
+    window.removeEventListener('notationRestModeToggled', handleBuilderAction);
 }
 
 function handleBuilderAction(event) {
@@ -1888,6 +1920,58 @@ function validateAction(action, validation) {
             if (action.type !== 'chordDurationChanged') return false;
             const singleTargetBeats = validation.beats;
             return action.detail?.beats === singleTargetBeats;
+
+        // ========== Notation Tutorial Validation Types ==========
+
+        // Notation interaction mode set (noteEntry or select)
+        case 'interaction_mode_set':
+            return action.type === 'notationInteractionModeSet' &&
+                   action.detail?.mode === value;
+
+        // Notation duration selected
+        case 'duration_selected':
+            return action.type === 'notationDurationSelected' &&
+                   action.detail?.duration === value;
+
+        // Note added to treble staff
+        case 'note_added_to_treble':
+            return action.type === 'notationNoteAdded' &&
+                   action.detail?.staff === 'treble';
+
+        // Rest added to treble staff
+        case 'rest_added_to_treble':
+            return action.type === 'notationNoteAdded' &&
+                   action.detail?.staff === 'treble' &&
+                   action.detail?.note?.isRest === true;
+
+        // Notes selected
+        case 'notes_selected':
+            return action.type === 'notationNoteSelected' &&
+                   action.detail?.selectedNotes?.length > 0;
+
+        // Multiple notes selected (2 or more)
+        case 'multiple_notes_selected':
+            return action.type === 'notationNoteSelected' &&
+                   action.detail?.selectedNotes?.length >= 2;
+
+        // Notes deselected (selection cleared, e.g., Esc pressed)
+        case 'notes_deselected':
+            return action.type === 'notationNotesDeselected';
+
+        // Tie created
+        case 'tie_created':
+            return action.type === 'notationTieCreated' &&
+                   action.detail?.changedCount > 0;
+
+        // Rest mode activated
+        case 'rest_mode_activated':
+            return action.type === 'notationRestModeToggled' &&
+                   action.detail?.isRestMode === true;
+
+        // Rest mode deactivated
+        case 'rest_mode_deactivated':
+            return action.type === 'notationRestModeToggled' &&
+                   action.detail?.isRestMode === false;
 
         default:
             console.warn('[GuidedMode] Unknown validation type:', type);

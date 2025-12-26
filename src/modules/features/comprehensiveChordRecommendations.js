@@ -908,6 +908,45 @@ export function generateComprehensiveRecommendations(
                     // 'maintain' direction: no adjustment, suspended chords are neutral
                 }
 
+                // Apply simplicity bonus for basic triads vs. extended chords
+                // This helps simple Major/Minor triads compete against 7th chords
+                // which often score equally or higher due to more voice leading options
+                const isSimpleTriad = nextType === 'Major' || nextType === 'Minor';
+                const is7thChord = nextType.includes('7th') || nextType.includes('9th') || nextType.includes('11th') || nextType.includes('13th');
+
+                if (isSimpleTriad) {
+                    // Bonus for simple triads, scaled by style appropriateness
+                    let simplicityBonus = 0;
+                    if (style === 'pop') {
+                        simplicityBonus = 12; // Strong preference for triads in pop
+                    } else if (style === 'rock') {
+                        simplicityBonus = 15; // Very strong preference for triads in rock
+                    } else if (style === 'classical') {
+                        simplicityBonus = 8;  // Moderate preference in classical
+                    } else if (style === 'indie') {
+                        simplicityBonus = 6;  // Slight preference in indie
+                    } else if (style === 'jazz') {
+                        simplicityBonus = 0;  // No preference in jazz - 7ths are idiomatic
+                    } else {
+                        simplicityBonus = 5;  // Small preference in balanced mode
+                    }
+                    totalScore += simplicityBonus;
+                } else if (is7thChord && style !== 'jazz') {
+                    // Small penalty for 7th chords in non-jazz styles
+                    // This helps prevent 7th chord dominance in pop/rock/etc.
+                    let extendedPenalty = 0;
+                    if (style === 'pop') {
+                        extendedPenalty = 6;  // 7ths are less common in pop
+                    } else if (style === 'rock') {
+                        extendedPenalty = 8;  // 7ths are less common in rock
+                    } else if (style === 'classical') {
+                        extendedPenalty = 3;  // 7ths are used but less frequent
+                    } else if (style === 'balanced') {
+                        extendedPenalty = 3;  // Small penalty to maintain variety
+                    }
+                    totalScore -= extendedPenalty;
+                }
+
                 // Check if this is a borrowed chord
                 const borrowedInfo = getBorrowedChordInfo(nextRoot, nextType, key);
 

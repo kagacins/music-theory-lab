@@ -187,7 +187,8 @@ const NOTE_NAMES_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', '
 // ============================================================================
 
 /**
- * Parse a note string like "C4", "F#5", "Bb3" into components
+ * Parse a note string like "C4", "F#5", "Bb3", "F##4", "Bbb3" into components
+ * Supports double sharps (## or x) and double flats (bb)
  * @param {string} noteStr - Note string with octave
  * @returns {Object} - { noteName: string, octave: number, accidental: string|null }
  */
@@ -196,14 +197,19 @@ export function parseNote(noteStr) {
     return { noteName: 'C', octave: 4, accidental: null };
   }
 
-  const match = noteStr.match(/^([A-Ga-g])([#b]?)(\d+)?$/);
+  // Match note name, optional accidental (##, x, bb, #, b, or n for natural), optional octave
+  const match = noteStr.match(/^([A-Ga-g])(##|x|bb|[#bn]?)(\d+)?$/);
   if (!match) {
     console.warn(`Invalid note format: ${noteStr}`);
     return { noteName: 'C', octave: 4, accidental: null };
   }
 
   const noteName = match[1].toUpperCase();
-  const accidental = match[2] || null;
+  let accidental = match[2] || null;
+  // Normalize 'x' to '##' for consistency
+  if (accidental === 'x') {
+    accidental = '##';
+  }
   const octave = match[3] ? parseInt(match[3], 10) : 4;
 
   return { noteName, octave, accidental };

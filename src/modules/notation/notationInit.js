@@ -784,14 +784,374 @@ export function initEnhancedNotation(options = {}) {
         }
       }
 
-      // If it's already a rest, do nothing - rests maintain rhythmic structure
+      // If it's already a rest and NOT shift-delete, do nothing - rests maintain rhythmic structure
       // Users who want to "fill" a rest should add a note there instead
-      if (isAlreadyRest) {
+      // But for shift-delete, we CAN remove rests to compact the timeline
+      if (isAlreadyRest && !deletion.shiftDelete) {
         notationComposer.render(); // Re-render to clear selection highlighting
         return;
       }
 
-      // 1. Handle in compositionState
+      // SHIFT DELETE: Remove note/rest and shift subsequent notes left (doesn't preserve rhythmic structure)
+      if (deletion.shiftDelete && notationComposer.compositionState) {
+        const timeSignature = notationComposer.compositionState.metadata?.timeSignature || { num: 4, denom: 4 };
+        const beatsPerMeasure = timeSignature.num * (4 / timeSignature.denom);
+
+        // DEBUG: Log initial state of measures 1 and 2
+        console.log('[SHIFT-DELETE] === Starting shift-delete operation ===');
+        console.log('[SHIFT-DELETE] beatsPerMeasure:', beatsPerMeasure);
+        for (let m = 0; m < Math.min(3, notationComposer.compositionState.measures.length); m++) {
+          const meas = notationComposer.compositionState.getMeasure(m);
+          if (meas) {
+            const trebleNotes = meas.notation?.treble?.voices?.[0]?.notes || [];
+            console.log(`[SHIFT-DELETE] Measure ${m + 1} BEFORE:`, trebleNotes.map(n => ({
+              pitch: n.pitch || n.pitches,
+              beat: n.beat,
+              duration: n.duration,
+              beats: durationToBeats(n.duration || '4n'),
+              isRest: n.isRest
+            })));
+          }
+        }
+
+        // Handle batch deletions (multiple selections deleted at once)
+        if (deletion.batchDeletions && deletion.batchDeletions.length > 1) {
+          const batchDeletions = deletion.batchDeletions;
+          console.log('[SHIFT-DELETE] Batch deletions count:', batchDeletions.length);
+
+          // All deletions in a batch are from the same staff/voice
+          const staff = batchDeletions[0].staff;
+          const batchVoiceIndex = batchDeletions[0].voiceIndex ?? 0;
+          const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+
+          // TREBLE STAFF with Voice 0: Use block sequence approach
+          if (staff === 'treble' && batchVoiceIndex === 0) {
+            const compositionState = notationComposer.compositionState;
+
+            // Step 1: Sync measures to block FIRST
+            if (compositionState.trebleBlockSequence?.blocks?.length > 0) {
+              compositionState.syncMeasuresToTrebleBlock();
+            } else {
+              compositionState.initializeTrebleBlockSequence();
+            }
+
+            // Step 2: Collect unit positions for all notes to delete
+            const unitsToDelete = [];
+            for (const del of batchDeletions) {
+              const noteInfo = compositionState.getTrebleNoteUnit(del.measureIndex, del.noteIndex);
+              if (noteInfo) {
+                unitsToDelete.push({
+                  startUnit: noteInfo.startUnit,
+                  durationUnits: noteInfo.durationUnits,
+                  measureIndex: del.measureIndex,
+                  noteIndex: del.noteIndex
+                });
+              }
+            }
+
+            console.log('[SHIFT-DELETE] Using block sequence approach for batch treble deletion');
+            console.log('[SHIFT-DELETE] Units to delete:', unitsToDelete.map(u => ({
+              startUnit: u.startUnit,
+              durationUnits: u.durationUnits
+            })));
+
+            // Sort by startUnit DESCENDING so we delete from end first
+            // This prevents earlier deletions from invalidating later positions
+            unitsToDelete.sort((a, b) => b.startUnit - a.startUnit);
+
+            // Step 3: Delete each note using block sequence approach
+            for (const unitInfo of unitsToDelete) {
+              compositionState.deleteTrebleNoteWithShift(unitInfo.startUnit, true);
+            }
+
+            // Log final state
+            console.log('[SHIFT-DELETE] === After batch shift-delete complete ===');
+            for (let m = 0; m < Math.min(3, compositionState.measures.length); m++) {
+              const meas = compositionState.getMeasure(m);
+              if (meas) {
+                const notesLog = meas.notation?.treble?.voices?.[0]?.notes || [];
+                let totalBeats = 0;
+                const details = notesLog.map(n => {
+                  const beats = durationToBeats(n.duration || '4n');
+                  totalBeats += beats;
+                  return {
+                    beat: n.beat,
+                    duration: n.duration,
+                    beats: beats,
+                    pitch: n.pitch || n.pitches,
+                    tied: n.tied || false,
+                    isTied: n.isTied || false
+                  };
+                });
+                console.log(`[SHIFT-DELETE] Measure ${m + 1} AFTER: totalBeats=${totalBeats}`, details);
+              }
+            }
+
+            notationComposer.render();
+            return;
+          }
+
+          // BASS STAFF or VOICE 2+: Use old measure-based approach
+          // Collect all notes to delete with their absolute positions
+          const notesToDelete = [];
+          for (const del of batchDeletions) {
+            const measure = notationComposer.compositionState.getMeasure(del.measureIndex);
+            if (!measure) continue;
+            const notes = measure.notation[voiceKey]?.voices[batchVoiceIndex]?.notes;
+            if (!notes || del.noteIndex >= notes.length) continue;
+
+            const note = notes[del.noteIndex];
+            const absoluteBeat = del.measureIndex * beatsPerMeasure + (note.beat || 0);
+            notesToDelete.push({
+              measureIndex: del.measureIndex,
+              noteIndex: del.noteIndex,
+              beat: note.beat || 0,
+              absoluteBeat,
+              duration: note.duration || '4n',
+              beats: durationToBeats(note.duration || '4n')
+            });
+          }
+
+          console.log('[SHIFT-DELETE] Using measure-based approach for batch bass/voice2+ deletion');
+          console.log('[SHIFT-DELETE] Notes to delete:', notesToDelete.map(n => ({
+            measure: n.measureIndex + 1,
+            beat: n.beat,
+            duration: n.duration,
+            beats: n.beats,
+            absoluteBeat: n.absoluteBeat
+          })));
+
+          // Sort by absolute beat descending so we can remove from end first (preserves indices)
+          notesToDelete.sort((a, b) => b.absoluteBeat - a.absoluteBeat);
+
+          // Track total beats removed for shifting
+          let totalShiftBeats = 0;
+          let earliestAbsoluteBeat = Infinity;
+          let earliestMeasureIndex = Infinity;
+          let earliestBeat = 0;
+
+          // Remove notes from end to beginning (preserves indices)
+          for (const noteInfo of notesToDelete) {
+            const measure = notationComposer.compositionState.getMeasure(noteInfo.measureIndex);
+            if (!measure) continue;
+            const notes = measure.notation[voiceKey]?.voices[batchVoiceIndex]?.notes;
+            if (!notes) continue;
+
+            // Find the note by beat position (indices may have changed due to earlier deletions)
+            const actualIndex = notes.findIndex(n =>
+              Math.abs((n.beat || 0) - noteInfo.beat) < 0.001
+            );
+
+            console.log(`[SHIFT-DELETE] Removing note at measure ${noteInfo.measureIndex + 1}, beat ${noteInfo.beat}, found at index ${actualIndex}`);
+
+            if (actualIndex >= 0) {
+              // Clear tie on next note
+              clearTieOnNextNote(noteInfo.measureIndex, staff, batchVoiceIndex, actualIndex);
+
+              // Remove the note
+              notes.splice(actualIndex, 1);
+              totalShiftBeats += noteInfo.beats;
+
+              // Track the earliest position for shifting
+              if (noteInfo.absoluteBeat < earliestAbsoluteBeat) {
+                earliestAbsoluteBeat = noteInfo.absoluteBeat;
+                earliestMeasureIndex = noteInfo.measureIndex;
+                earliestBeat = noteInfo.beat;
+              }
+            }
+          }
+
+          console.log('[SHIFT-DELETE] Total beats to shift:', totalShiftBeats);
+          console.log('[SHIFT-DELETE] Earliest position - measure:', earliestMeasureIndex + 1, 'beat:', earliestBeat);
+
+          // Shift all subsequent notes backward by total beats removed
+          if (noteEditor && totalShiftBeats > 0 && earliestMeasureIndex < Infinity) {
+            noteEditor.shiftNotesBackward(
+              earliestMeasureIndex,
+              earliestBeat,
+              totalShiftBeats,
+              staff,
+              batchVoiceIndex,
+              notationComposer.compositionState,
+              beatsPerMeasure
+            );
+          }
+
+          // DEBUG: Log final state after shift
+          console.log('[SHIFT-DELETE] === After shift (final state) ===');
+          for (let m = 0; m < Math.min(3, notationComposer.compositionState.measures.length); m++) {
+            const meas = notationComposer.compositionState.getMeasure(m);
+            if (meas) {
+              const trebleNotes = meas.notation?.treble?.voices?.[0]?.notes || [];
+              console.log(`[SHIFT-DELETE] Measure ${m + 1}:`, trebleNotes.map(n => ({
+                pitch: n.pitch || n.pitches,
+                beat: n.beat,
+                duration: n.duration,
+                beats: durationToBeats(n.duration || '4n'),
+                isRest: n.isRest
+              })));
+            }
+          }
+
+          if (staff === 'bass') {
+            notationComposer.compositionState.saveEditedBassNotesForMeasure(earliestMeasureIndex);
+          }
+
+          notationComposer.render();
+          return;
+        }
+
+        // Single deletion (original logic)
+        console.log('[SINGLE-SHIFT-DELETE] === Starting single note shift-delete ===');
+        console.log('[SINGLE-SHIFT-DELETE] Deleting from measure:', deletion.measureIndex + 1, 'noteIndex:', deletion.noteIndex);
+
+        // Log FULL state of first 3 measures BEFORE deletion
+        for (let m = 0; m < Math.min(3, notationComposer.compositionState.measures.length); m++) {
+          const meas = notationComposer.compositionState.getMeasure(m);
+          if (meas) {
+            const voiceKeyLog = deletion.staff === 'treble' ? 'treble' : 'bass';
+            const notesLog = meas.notation?.[voiceKeyLog]?.voices?.[voiceIndex]?.notes || [];
+            console.log(`[SINGLE-SHIFT-DELETE] Measure ${m + 1} BEFORE:`, notesLog.map(n => ({
+              beat: n.beat,
+              duration: n.duration,
+              beats: durationToBeats(n.duration || '4n'),
+              pitch: n.pitch || n.pitches,
+              tied: n.tied || false,
+              isTied: n.isTied || false
+            })));
+          }
+        }
+
+        // TREBLE STAFF with Voice 0: Use block sequence approach (correct architecture)
+        // This avoids the buggy shiftNotesBackward and uses the working deleteTrebleNoteWithShift
+        if (deletion.staff === 'treble' && voiceIndex === 0) {
+          const compositionState = notationComposer.compositionState;
+
+          // Step 1: Sync measures to block FIRST (before any modifications)
+          // This combines tied notes into single logical notes in the block
+          if (compositionState.trebleBlockSequence?.blocks?.length > 0) {
+            compositionState.syncMeasuresToTrebleBlock();
+          } else {
+            compositionState.initializeTrebleBlockSequence();
+          }
+
+          // Step 2: Get the unit position of the note to delete
+          const noteInfo = compositionState.getTrebleNoteUnit(deletion.measureIndex, deletion.noteIndex);
+
+          if (noteInfo) {
+            console.log('[SINGLE-SHIFT-DELETE] Using block sequence approach for treble');
+            console.log('[SINGLE-SHIFT-DELETE] Note info:', {
+              startUnit: noteInfo.startUnit,
+              durationUnits: noteInfo.durationUnits,
+              isTiedContinuation: noteInfo.isTiedContinuation || false
+            });
+
+            // Step 3: Call deleteTrebleNoteWithShift - this handles:
+            // - Shifting all subsequent units backward
+            // - Truncating the block
+            // - Re-rendering to measures with correct ties
+            compositionState.deleteTrebleNoteWithShift(noteInfo.startUnit, true);
+
+            // Log FULL state AFTER shift
+            console.log('[SINGLE-SHIFT-DELETE] === After shift-delete complete ===');
+            for (let m = 0; m < Math.min(3, compositionState.measures.length); m++) {
+              const meas = compositionState.getMeasure(m);
+              if (meas) {
+                const notesLog = meas.notation?.treble?.voices?.[0]?.notes || [];
+                let totalBeats = 0;
+                const details = notesLog.map(n => {
+                  const beats = durationToBeats(n.duration || '4n');
+                  totalBeats += beats;
+                  return {
+                    beat: n.beat,
+                    duration: n.duration,
+                    beats: beats,
+                    pitch: n.pitch || n.pitches,
+                    tied: n.tied || false,
+                    isTied: n.isTied || false
+                  };
+                });
+                console.log(`[SINGLE-SHIFT-DELETE] Measure ${m + 1} AFTER: totalBeats=${totalBeats}`, details);
+              }
+            }
+          }
+
+          notationComposer.render();
+          return;
+        }
+
+        // BASS STAFF or VOICE 2+: Use the old measure-based approach
+        // (Block sequence doesn't handle bass or multiple voices)
+        const measure = notationComposer.compositionState.getMeasure(deletion.measureIndex);
+        if (measure) {
+          const voiceKey = deletion.staff === 'treble' ? 'treble' : 'bass';
+          const notes = measure.notation[voiceKey]?.voices[voiceIndex]?.notes;
+          if (notes && deletion.noteIndex < notes.length) {
+            const originalNote = notes[deletion.noteIndex];
+            const duration = originalNote.duration || '4n';
+            const startBeat = originalNote.beat || 0;
+            const shiftBeats = durationToBeats(duration);
+
+            console.log('[SINGLE-SHIFT-DELETE] Using measure-based approach for bass/voice2+');
+            console.log('[SINGLE-SHIFT-DELETE] Note being deleted:', {
+              beat: startBeat,
+              duration: duration,
+              beats: shiftBeats,
+              pitch: originalNote.pitch || originalNote.pitches,
+              tied: originalNote.tied || false,
+              isTied: originalNote.isTied || false
+            });
+
+            // Remove the note
+            notes.splice(deletion.noteIndex, 1);
+
+            // Shift all subsequent notes backward
+            if (noteEditor) {
+              noteEditor.shiftNotesBackward(
+                deletion.measureIndex,
+                startBeat,
+                shiftBeats,
+                deletion.staff,
+                voiceIndex,
+                notationComposer.compositionState,
+                beatsPerMeasure
+              );
+            }
+
+            // Log FULL state AFTER shift
+            console.log('[SINGLE-SHIFT-DELETE] === After shift-delete complete ===');
+            for (let m = 0; m < Math.min(3, notationComposer.compositionState.measures.length); m++) {
+              const meas = notationComposer.compositionState.getMeasure(m);
+              if (meas) {
+                const voiceKeyLog = deletion.staff === 'treble' ? 'treble' : 'bass';
+                const notesLog = meas.notation?.[voiceKeyLog]?.voices?.[voiceIndex]?.notes || [];
+                let totalBeats = 0;
+                const details = notesLog.map(n => {
+                  const beats = durationToBeats(n.duration || '4n');
+                  totalBeats += beats;
+                  return {
+                    beat: n.beat,
+                    duration: n.duration,
+                    beats: beats,
+                    pitch: n.pitch || n.pitches,
+                    tied: n.tied || false,
+                    isTied: n.isTied || false
+                  };
+                });
+                console.log(`[SINGLE-SHIFT-DELETE] Measure ${m + 1} AFTER: totalBeats=${totalBeats}`, details);
+              }
+            }
+
+            if (deletion.staff === 'bass') {
+              notationComposer.compositionState.saveEditedBassNotesForMeasure(deletion.measureIndex);
+            }
+          }
+        }
+        notationComposer.render();
+        return;
+      }
+
+      // 1. Handle in compositionState (normal delete - replace with rest)
       if (notationComposer.compositionState) {
         const measure = notationComposer.compositionState.getMeasure(deletion.measureIndex);
         if (measure) {
@@ -1653,7 +2013,8 @@ export const KEYBOARD_SHORTCUTS = {
       { key: 'Ctrl/⌘ + V', action: 'Paste notes', detail: 'Pastes copied notes after the current selection. If no selection, pastes at the current cursor position.' },
       { key: 'Ctrl/⌘ + Shift + V', action: 'Paste at beginning', detail: 'Pastes copied notes at the very beginning of the composition, before all existing notes.' },
       { key: 'Ctrl/⌘ + Alt + V', action: 'Paste at end', detail: 'Pastes copied notes at the end of the composition, after all existing notes.' },
-      { key: 'Delete / Backspace', action: 'Delete selected', detail: 'Removes all currently selected notes from the composition. Cannot delete auto-generated bass notes.' },
+      { key: 'Delete / Backspace', action: 'Delete (replace with rest)', detail: 'Replaces selected notes with rests of the same duration, preserving rhythmic structure.' },
+      { key: 'Ctrl + Delete', action: 'Shift delete', detail: 'Removes notes completely and shifts subsequent notes left to fill the gap. Tied notes are automatically merged or split as needed.' },
       { key: 'Escape', action: 'Clear selection', detail: 'Deselects all notes and exits any special modes (tuplet insert mode, etc.).' },
     ]
   },

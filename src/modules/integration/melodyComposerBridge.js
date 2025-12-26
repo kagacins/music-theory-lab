@@ -173,18 +173,29 @@ function durationToBeats(duration, dotted = false) {
         sextuplet: { actual: 6, normal: 4 },
     };
 
+    // Handle dotted suffix in duration string (e.g., '2n.' -> '2n' with dotted=true)
+    let cleanDuration = duration;
+    let hasDotSuffix = false;
+    if (duration && typeof duration === 'string' && duration.includes('.')) {
+        cleanDuration = duration.replace('.', '');
+        hasDotSuffix = true;
+    }
+
+    // Use dotted flag OR dot in duration string
+    const isDotted = dotted || hasDotSuffix;
+
     // Check for tuplet duration suffix (t=triplet, q=quintuplet, x=sextuplet)
-    let baseDuration = duration;
+    let baseDuration = cleanDuration;
     let tupletType = null;
-    if (duration && typeof duration === 'string') {
-        if (duration.endsWith('t') && /^\d+t$/.test(duration)) {
-            baseDuration = duration.replace('t', 'n');
+    if (cleanDuration && typeof cleanDuration === 'string') {
+        if (cleanDuration.endsWith('t') && /^\d+t$/.test(cleanDuration)) {
+            baseDuration = cleanDuration.replace('t', 'n');
             tupletType = 'triplet';
-        } else if (duration.endsWith('q') && /^\d+q$/.test(duration)) {
-            baseDuration = duration.replace('q', 'n');
+        } else if (cleanDuration.endsWith('q') && /^\d+q$/.test(cleanDuration)) {
+            baseDuration = cleanDuration.replace('q', 'n');
             tupletType = 'quintuplet';
-        } else if (duration.endsWith('x') && /^\d+x$/.test(duration)) {
-            baseDuration = duration.replace('x', 'n');
+        } else if (cleanDuration.endsWith('x') && /^\d+x$/.test(cleanDuration)) {
+            baseDuration = cleanDuration.replace('x', 'n');
             tupletType = 'sextuplet';
         }
     }
@@ -197,7 +208,7 @@ function durationToBeats(duration, dotted = false) {
         beats = beats * (ratio.normal / ratio.actual);
     }
 
-    return dotted ? beats * 1.5 : beats;
+    return isDotted ? beats * 1.5 : beats;
 }
 
 /**

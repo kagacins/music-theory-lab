@@ -5035,6 +5035,421 @@ export const extendedChordsTutorial = defineTutorial({
 });
 
 // ===========================================
+// LET IT BE MELODY TUTORIAL
+// ===========================================
+
+/**
+ * "Let It Be Melody" Tutorial
+ * Teaches notation entry by building the famous melody step-by-step.
+ * Covers Note Entry Mode vs Select Mode, duration selection, rests, and ties.
+ */
+export const letItBeMelodyTutorial = defineTutorial({
+    id: 'let-it-be-melody',
+    title: 'Learn Melody Entry: "Let It Be"',
+    lessonId: 'lesson-let-it-be-melody',
+    steps: [
+        // Part 1: Introduction and Setup
+        {
+            type: 'guided_builder',
+            title: 'Enter the "Let It Be" Melody',
+            instruction: 'Learn to enter melodies using the notation toolbar by recreating the iconic "Let It Be" melody.',
+            targetTab: 'trainer',
+            guidedSteps: [
+                // Step 1: Introduction
+                {
+                    instruction: 'Welcome! We\'ll learn melody notation by entering the famous "Let It Be" melody by The Beatles. First, let\'s load the chord progression.',
+                    callout: 'The chords are C - G - Am - F - C (the I - V - vi - IV - I progression). We\'ll add the melody on top!',
+                    validation: null,
+                    successMessage: null,
+                    onEnter: () => {
+                        // Load the Let It Be progression
+                        if (window.clearProgression) {
+                            window.clearProgression();
+                        }
+                        // Add the 5 chords
+                        setTimeout(() => {
+                            if (window.addChordToProgressionByParams) {
+                                window.addChordToProgressionByParams('C', 'Major', 0);
+                                setTimeout(() => window.addChordToProgressionByParams('G', 'Major', 0), 100);
+                                setTimeout(() => window.addChordToProgressionByParams('A', 'Minor', 0), 200);
+                                setTimeout(() => window.addChordToProgressionByParams('F', 'Major', 0), 300);
+                                setTimeout(() => window.addChordToProgressionByParams('C', 'Major', 0), 400);
+                            }
+                        }, 200);
+                    }
+                },
+                // Step 2: Locate the Musical Notation card
+                {
+                    instruction: 'Look for the "Musical Notation" card. This is where we\'ll enter the melody in the treble clef (top staff).',
+                    spotlight: '#staff-notation-card-toggle',
+                    targetElement: '#staff-notation-card-toggle',
+                    callout: 'The grand staff shows treble (melody) and bass clefs. The chords have already filled in some bass notes!',
+                    validation: null,
+                    successMessage: null,
+                    onEnter: () => {
+                        // Ensure the notation card is expanded
+                        const panel = document.getElementById('staff-notation-card-panel');
+                        if (panel && panel.classList.contains('hidden')) {
+                            const toggle = document.getElementById('staff-notation-card-toggle');
+                            if (toggle) toggle.click();
+                        }
+                    }
+                },
+                // Step 3: Introduce the Notation Toolbar
+                {
+                    instruction: 'This is the Notation Toolbar. It has everything you need to enter notes, rests, and more.',
+                    spotlight: '#notation-toolbar-container',
+                    targetElement: '#notation-toolbar-container',
+                    callout: 'The toolbar has sections for: Input Mode, Duration, Modifiers (rests, dots, ties), and Edit functions.',
+                    validation: null,
+                    successMessage: null
+                },
+                // Step 4: Explain the two modes
+                {
+                    instruction: 'There are TWO ways to work with notation: Note Entry Mode (✏) and Select Mode (⎀). Let\'s understand both!',
+                    spotlight: '.interaction-mode-section',
+                    targetElement: '.interaction-mode-section',
+                    callout: '✏ Note Entry Mode: Click anywhere on the staff to ADD a note at that pitch.\n⎀ Select Mode: Click to SELECT existing notes, then edit them.',
+                    validation: null,
+                    successMessage: null
+                },
+                // Step 5: Note Entry Mode explanation
+                {
+                    instruction: 'NOTE ENTRY MODE (✏) is for adding new notes. You click on the staff where you want the note, and it appears!',
+                    spotlight: '[data-interaction-mode="noteEntry"]',
+                    targetElement: '[data-interaction-mode="noteEntry"]',
+                    callout: 'In Note Entry Mode:\n• Click on staff = add note at that pitch\n• The duration you\'ve selected determines the note length\n• Notes are added in sequence on the timeline',
+                    validation: null,
+                    successMessage: null
+                },
+                // Step 6: Select Mode explanation
+                {
+                    instruction: 'SELECT MODE (⎀) is for editing. Click to select notes, then transpose, delete, or modify them.',
+                    spotlight: '[data-interaction-mode="select"]',
+                    targetElement: '[data-interaction-mode="select"]',
+                    callout: 'In Select Mode:\n• Click a note = select it\n• Shift+Click = select multiple notes\n• Alt+Click = add a note (shortcut!)\n• Use toolbar to transpose or delete selected notes',
+                    validation: null,
+                    successMessage: null
+                }
+            ]
+        },
+        // Part 2: Adding the first notes with Note Entry Mode
+        {
+            type: 'guided_builder',
+            title: 'Enter Notes with Note Entry Mode',
+            instruction: 'Let\'s start adding the melody! The song begins with "When I find myself in times of trouble..."',
+            targetTab: 'trainer',
+            guidedSteps: [
+                // Step 1: Activate Note Entry Mode
+                {
+                    instruction: 'Click the Note Entry Mode button (✏) to start adding notes.',
+                    spotlight: '[data-interaction-mode="noteEntry"]',
+                    targetElement: '[data-interaction-mode="noteEntry"]',
+                    callout: 'This mode lets you click anywhere on the treble staff to add notes.',
+                    validation: { type: 'interaction_mode_set', value: 'noteEntry' },
+                    successMessage: 'Note Entry Mode activated!'
+                },
+                // Step 2: Select 16th note duration
+                {
+                    instruction: 'The melody starts with a quick 16th note. Click the 16th note button (𝅘𝅥𝅯).',
+                    spotlight: '[data-duration="16n"]',
+                    targetElement: '[data-duration="16n"]',
+                    callout: 'Duration buttons: 𝅝 Whole, 𝅗𝅥 Half, ♩ Quarter, ♪ Eighth, 𝅘𝅥𝅯 16th, 𝅘𝅥𝅰 32nd\nKeyboard shortcut: Shift+5 for 16th notes',
+                    validation: { type: 'duration_selected', value: '16n' },
+                    successMessage: '16th note duration selected!'
+                },
+                // Step 3: Add E5
+                {
+                    instruction: 'Now click on the treble staff at the E5 position (top line of the staff) to add the first note.',
+                    spotlight: '#notation-pages-container',
+                    targetElement: '#notation-pages-container',
+                    callout: 'E5 is on the top line of the treble staff. The melody starts on beat 4, so click near the end of measure 1.',
+                    validation: { type: 'note_added_to_treble' },
+                    successMessage: 'First note added! E5 - the melody has begun!'
+                },
+                // Step 4: Select 8th note duration
+                {
+                    instruction: 'The next note is an 8th note. Click the 8th note button (♪).',
+                    spotlight: '[data-duration="8n"]',
+                    targetElement: '[data-duration="8n"]',
+                    callout: 'Keyboard shortcut: Shift+4 for 8th notes',
+                    validation: { type: 'duration_selected', value: '8n' },
+                    successMessage: 'Eighth note duration selected!'
+                },
+                // Step 5: Add D5
+                {
+                    instruction: 'Click on D5 (just below the top line, in the 4th space from bottom) to add the next note.',
+                    spotlight: '#notation-pages-container',
+                    targetElement: '#notation-pages-container',
+                    callout: 'D5 is in the space just below E5. It will be added right after your first note.',
+                    validation: { type: 'note_added_to_treble' },
+                    successMessage: 'D5 added!'
+                }
+            ]
+        },
+        // Part 3: Creating a tied note
+        {
+            type: 'guided_builder',
+            title: 'Create Tied Notes',
+            instruction: 'The next part has a tied note - where two notes of the same pitch are connected and ring together.',
+            targetTab: 'trainer',
+            guidedSteps: [
+                // Step 1: Explain ties
+                {
+                    instruction: 'A TIE connects two notes of the same pitch, making them ring as one longer note. We\'ll add C5 (16th) tied to C5 (quarter).',
+                    callout: 'Ties are used when a note crosses a bar line, or when you need a duration that\'s not a single note value (like 5 beats).',
+                    validation: null,
+                    successMessage: null
+                },
+                // Step 2: Select 16th note
+                {
+                    instruction: 'First, select 16th note duration for the first part of the tie.',
+                    spotlight: '[data-duration="16n"]',
+                    targetElement: '[data-duration="16n"]',
+                    callout: 'We\'ll add a short C5 first, then tie it to a longer C5.',
+                    validation: { type: 'duration_selected', value: '16n' },
+                    successMessage: '16th note selected!'
+                },
+                // Step 3: Add C5 (16th)
+                {
+                    instruction: 'Click on C5 (middle line of the treble staff) to add the first note of the tie.',
+                    spotlight: '#notation-pages-container',
+                    targetElement: '#notation-pages-container',
+                    callout: 'C5 is on the middle line (3rd line from bottom). This will be the first half of our tie.',
+                    validation: { type: 'note_added_to_treble' },
+                    successMessage: 'First C5 added!'
+                },
+                // Step 4: Select quarter note
+                {
+                    instruction: 'Now select quarter note duration (♩) for the second part.',
+                    spotlight: '[data-duration="4n"]',
+                    targetElement: '[data-duration="4n"]',
+                    callout: 'The tied quarter note will sustain the C5 through the next beat.',
+                    validation: { type: 'duration_selected', value: '4n' },
+                    successMessage: 'Quarter note selected!'
+                },
+                // Step 5: Add C5 (quarter)
+                {
+                    instruction: 'Add another C5 - click on the same pitch (middle line).',
+                    spotlight: '#notation-pages-container',
+                    targetElement: '#notation-pages-container',
+                    callout: 'This C5 will be tied to the previous one.',
+                    validation: { type: 'note_added_to_treble' },
+                    successMessage: 'Second C5 added!'
+                },
+                // Step 6: Switch to Select Mode
+                {
+                    instruction: 'Now let\'s create the tie! First, switch to Select Mode (⎀) so we can select the notes.',
+                    spotlight: '[data-interaction-mode="select"]',
+                    targetElement: '[data-interaction-mode="select"]',
+                    callout: 'Select Mode lets us click on existing notes to select them.',
+                    validation: { type: 'interaction_mode_set', value: 'select' },
+                    successMessage: 'Select Mode activated!'
+                },
+                // Step 7: Select the first C5
+                {
+                    instruction: 'Click on the first C5 (16th note) to select it. It should highlight.',
+                    spotlight: '#notation-pages-container',
+                    targetElement: '#notation-pages-container',
+                    callout: 'When selected, the note will be highlighted. You can Shift+Click to select additional notes.',
+                    validation: { type: 'notes_selected' },
+                    successMessage: 'Note selected!'
+                },
+                // Step 8: Shift-click second C5
+                {
+                    instruction: 'Hold Shift and click the second C5 (quarter note) to add it to the selection.',
+                    spotlight: '#notation-pages-container',
+                    targetElement: '#notation-pages-container',
+                    callout: 'Both C5 notes should now be highlighted.',
+                    validation: null,
+                    successMessage: null
+                },
+                // Step 9: Click the Tie button
+                {
+                    instruction: 'Click the Tie button (⁀) in the toolbar to connect the two notes.',
+                    spotlight: '.tie-btn',
+                    targetElement: '.tie-btn',
+                    callout: 'The tie creates a curved line connecting the notes. Keyboard shortcut: T',
+                    validation: { type: 'tie_created' },
+                    successMessage: 'Tie created! The two C5s now ring as one long note!'
+                }
+            ]
+        },
+        // Part 4: Adding a rest
+        {
+            type: 'guided_builder',
+            title: 'Add Rests',
+            instruction: 'After a few more notes, there\'s a quarter rest (silence). Let\'s learn to add rests.',
+            targetTab: 'trainer',
+            guidedSteps: [
+                // Step 1: Explain rests
+                {
+                    instruction: 'RESTS represent silence. They have the same duration values as notes (whole, half, quarter, etc.).',
+                    callout: 'In "Let It Be," there\'s a quarter rest between phrases. Rests give the melody breathing room!',
+                    validation: null,
+                    successMessage: null
+                },
+                // Step 2: Switch back to Note Entry Mode
+                {
+                    instruction: 'Switch back to Note Entry Mode (✏) to add the rest.',
+                    spotlight: '[data-interaction-mode="noteEntry"]',
+                    targetElement: '[data-interaction-mode="noteEntry"]',
+                    callout: 'We\'ll use Note Entry Mode to add the rest, just like adding a note.',
+                    validation: { type: 'interaction_mode_set', value: 'noteEntry' },
+                    successMessage: 'Note Entry Mode activated!'
+                },
+                // Step 3: Select quarter note duration
+                {
+                    instruction: 'Select quarter note duration (♩) for a quarter rest.',
+                    spotlight: '[data-duration="4n"]',
+                    targetElement: '[data-duration="4n"]',
+                    callout: 'The duration applies to both notes AND rests.',
+                    validation: { type: 'duration_selected', value: '4n' },
+                    successMessage: 'Quarter duration selected!'
+                },
+                // Step 4: Activate Rest mode
+                {
+                    instruction: 'Click the Rest button (𝄽) to switch to rest entry mode.',
+                    spotlight: '.rest-btn',
+                    targetElement: '.rest-btn',
+                    callout: 'When Rest mode is active, clicking on the staff adds a rest instead of a note.\nKeyboard shortcut: R',
+                    validation: { type: 'rest_mode_activated' },
+                    successMessage: 'Rest mode activated!'
+                },
+                // Step 5: Add the rest
+                {
+                    instruction: 'Now click anywhere on the treble staff to add the quarter rest.',
+                    spotlight: '#notation-pages-container',
+                    targetElement: '#notation-pages-container',
+                    callout: 'For rests, the vertical position doesn\'t matter - just click to add it at the current timeline position.',
+                    validation: { type: 'rest_added_to_treble' },
+                    successMessage: 'Quarter rest added! One beat of silence.'
+                },
+                // Step 6: Deactivate Rest mode
+                {
+                    instruction: 'Click the Rest button again to turn off rest mode and go back to adding notes.',
+                    spotlight: '.rest-btn',
+                    targetElement: '.rest-btn',
+                    callout: 'Toggle rest mode off when you\'re ready to add more notes.',
+                    validation: { type: 'rest_mode_deactivated' },
+                    successMessage: 'Rest mode off - ready to add more notes!'
+                }
+            ]
+        },
+        // Part 5: Using Select Mode to edit
+        {
+            type: 'guided_builder',
+            title: 'Edit Notes with Select Mode',
+            instruction: 'Let\'s learn to use Select Mode to edit existing notes - transpose, delete, or modify.',
+            targetTab: 'trainer',
+            guidedSteps: [
+                // Step 1: Intro to editing
+                {
+                    instruction: 'SELECT MODE isn\'t just for selecting - it\'s also for editing! Let\'s try the Alt+Click shortcut to add a note.',
+                    callout: 'In Select Mode, you can:\n• Alt+Click to add a note (same as Note Entry Mode)\n• Click to select, then use toolbar to edit',
+                    validation: null,
+                    successMessage: null
+                },
+                // Step 2: Make sure we're in Select Mode
+                {
+                    instruction: 'Make sure you\'re in Select Mode (⎀).',
+                    spotlight: '[data-interaction-mode="select"]',
+                    targetElement: '[data-interaction-mode="select"]',
+                    callout: 'Select Mode is great when you need to both add and edit notes.',
+                    validation: { type: 'interaction_mode_set', value: 'select' },
+                    successMessage: 'Select Mode activated!'
+                },
+                // Step 3: Select 16th duration
+                {
+                    instruction: 'Select 16th note duration - we\'ll add a few quick notes.',
+                    spotlight: '[data-duration="16n"]',
+                    targetElement: '[data-duration="16n"]',
+                    validation: { type: 'duration_selected', value: '16n' },
+                    successMessage: '16th note selected!'
+                },
+                // Step 4: Alt+Click to add
+                {
+                    instruction: 'Now hold Alt and click on G5 (second line from top) to add a note while in Select Mode.',
+                    spotlight: '#notation-pages-container',
+                    targetElement: '#notation-pages-container',
+                    callout: 'Alt+Click is a shortcut to add notes without switching modes. Very useful when editing!',
+                    validation: { type: 'note_added_to_treble' },
+                    successMessage: 'Note added with Alt+Click! This shortcut is very handy.'
+                },
+                // Step 5: Select a note to transpose
+                {
+                    instruction: 'Now click on any note (without Alt) to select it.',
+                    spotlight: '#notation-pages-container',
+                    targetElement: '#notation-pages-container',
+                    callout: 'Once selected, you can use the transpose buttons to move the note up or down.',
+                    validation: { type: 'notes_selected' },
+                    successMessage: 'Note selected!'
+                },
+                // Step 6: Show transpose tools
+                {
+                    instruction: 'Look at the transpose buttons that appeared! You can move the note up/down by semitone or octave.',
+                    spotlight: '.transpose-tools',
+                    targetElement: '.transpose-tools',
+                    callout: '−/+ moves by semitone, ⬇8va/⬆8va moves by octave. This is great for quick corrections!',
+                    validation: null,
+                    successMessage: null
+                },
+                // Step 7: Try transposing
+                {
+                    instruction: 'Try clicking the "+" button to transpose the selected note up by one semitone.',
+                    spotlight: '[data-transpose="1"]',
+                    targetElement: '[data-transpose="1"]',
+                    callout: 'The note will move up by a half step. You can click multiple times!',
+                    validation: { type: 'note_transposed' },
+                    successMessage: 'Note transposed! Easy pitch editing.'
+                }
+            ]
+        },
+        // Part 6: Summary and completion
+        {
+            type: 'guided_builder',
+            title: 'Continue the Melody!',
+            instruction: 'You now know all the basics of melody entry! Here\'s a summary and the rest of the melody.',
+            targetTab: 'trainer',
+            guidedSteps: [
+                // Step 1: Summary
+                {
+                    instruction: 'Excellent work! You\'ve learned the fundamentals of melody notation.',
+                    callout: 'SUMMARY:\n✏ Note Entry Mode - Click to add notes\n⎀ Select Mode - Click to select, Alt+Click to add\nDuration buttons - Set note/rest length\n𝄽 Rest button - Toggle rest entry\n⁀ Tie button - Connect same-pitch notes',
+                    validation: null,
+                    successMessage: null
+                },
+                // Step 2: The full melody
+                {
+                    instruction: 'Here\'s the complete melody for "Let It Be" (first phrase). Try entering it yourself!',
+                    callout: 'Beat 4: E5(16th) D5(8th) [C5(16th)-C5(quarter)] E5(16th) G5(8th) A5(16th)\nThen: rest(quarter) G5(16th) G5(16th) E5(16th) D5(16th) C5(quarter)\nA4(16th) G4(8th) [E5(16th)-E5(quarter)] rest(quarter) rest(16th)\nE5(16th) E5(16th) E5(16th) F5(8th) E5(16th) E5(16th) D5(quarter)\nrest(16th) E5(16th) D5(16th) D5(16th)',
+                    validation: null,
+                    successMessage: null
+                },
+                // Step 3: Tips
+                {
+                    instruction: 'Some tips for efficient entry:',
+                    callout: 'KEYBOARD SHORTCUTS:\n• Shift+1-6 - Select duration (1=whole through 6=32nd)\n• R - Toggle rest mode\n• T - Create tie\n• Delete/Backspace - Delete selected notes\n• Ctrl+Z - Undo',
+                    validation: null,
+                    successMessage: null
+                },
+                // Step 4: Completion
+                {
+                    instruction: 'You\'re ready to create your own melodies! The notation toolbar is your creative instrument.',
+                    callout: 'Try completing the "Let It Be" melody, or start fresh with your own composition. Click the notes, hear them play, and have fun!',
+                    validation: null,
+                    successMessage: 'You\'ve mastered melody notation entry!',
+                    allowFreeExplore: true
+                }
+            ]
+        }
+    ],
+    onComplete: () => {
+        console.log('Let It Be Melody tutorial completed!');
+    }
+});
+
+// ===========================================
 // EXPORTS
 // ===========================================
 
@@ -5066,5 +5481,6 @@ export default {
     modesIntroTutorial,
     modalHarmonyTutorial,
     advancedVoiceLeadingTutorial,
-    extendedChordsTutorial
+    extendedChordsTutorial,
+    letItBeMelodyTutorial
 };

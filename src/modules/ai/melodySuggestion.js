@@ -158,6 +158,9 @@ export const STYLE_RULES = {
         stepwiseBoost: 1.0,
         approachToneBoost: 1.0,
         tensionPenalty: 1.0,
+        chromaticPenalty: 1.2,           // Penalty multiplier for out-of-key notes
+        chromaticApproachPenalty: 0.6,   // Reduce chromatic approach tones (vs diatonic)
+        chordClashPenalty: 25,           // Penalty for notes a semitone from chord tones
         preferredIntervals: [0, 2, 3, 4, 5, 7], // Unison, 2nds, 3rds, 4ths, 5ths
         avoidIntervals: [6, 10, 11] // Tritone, 7ths
     },
@@ -168,6 +171,9 @@ export const STYLE_RULES = {
         stepwiseBoost: 1.0,
         approachToneBoost: 1.0,
         tensionPenalty: 1.0,
+        chromaticPenalty: 1.2,
+        chromaticApproachPenalty: 0.6,
+        chordClashPenalty: 25,
         preferredIntervals: [0, 2, 3, 4, 5, 7],
         avoidIntervals: [6, 10, 11]
     },
@@ -178,6 +184,9 @@ export const STYLE_RULES = {
         stepwiseBoost: 0.8,
         approachToneBoost: 1.2,
         tensionPenalty: 0.7, // More tolerant of tension
+        chromaticPenalty: 0.8,           // More tolerant of chromatic notes
+        chromaticApproachPenalty: 0.9,   // Chromatic approaches more acceptable
+        chordClashPenalty: 15,
         preferredIntervals: [0, 2, 3, 4, 5, 7, 9], // Allows 6ths
         avoidIntervals: [6] // Only avoid tritone
     },
@@ -187,6 +196,9 @@ export const STYLE_RULES = {
         stepwiseBoost: 1.2,
         approachToneBoost: 0.7,
         tensionPenalty: 1.4,
+        chromaticPenalty: 1.8,           // Pop strongly prefers diatonic
+        chromaticApproachPenalty: 0.4,   // Chromatic approaches rare in pop
+        chordClashPenalty: 35,
         preferredIntervals: [0, 2, 4, 5, 7], // Simple intervals
         avoidIntervals: [1, 6, 10, 11] // Chromatic, tritone, 7ths
     },
@@ -196,6 +208,9 @@ export const STYLE_RULES = {
         stepwiseBoost: 1.0,
         approachToneBoost: 1.4,
         tensionPenalty: 0.6, // Jazz loves tension
+        chromaticPenalty: 0.5,           // Jazz embraces chromatic notes
+        chromaticApproachPenalty: 1.2,   // Chromatic approaches are a FEATURE in jazz
+        chordClashPenalty: 5,            // Jazz tolerates "clashes" as color
         preferredIntervals: [0, 1, 2, 3, 4, 5, 7], // All close intervals including chromatic
         avoidIntervals: [] // Jazz allows everything
     },
@@ -205,6 +220,9 @@ export const STYLE_RULES = {
         stepwiseBoost: 1.5,
         approachToneBoost: 0.8,
         tensionPenalty: 1.2,
+        chromaticPenalty: 1.5,           // Classical prefers diatonic
+        chromaticApproachPenalty: 0.5,   // Chromatic approaches used sparingly
+        chordClashPenalty: 30,
         preferredIntervals: [0, 2, 3, 4, 5], // Stepwise and thirds
         avoidIntervals: [6, 10, 11] // Tritone, 7ths
     },
@@ -214,6 +232,9 @@ export const STYLE_RULES = {
         stepwiseBoost: 0.9,
         approachToneBoost: 0.6,
         tensionPenalty: 0.8,
+        chromaticPenalty: 1.0,           // Rock is moderate
+        chromaticApproachPenalty: 0.5,
+        chordClashPenalty: 20,
         preferredIntervals: [0, 3, 4, 5, 7], // Pentatonic-friendly
         avoidIntervals: [1, 6], // Chromatic, tritone (unless blue note)
         useBlueNotes: true
@@ -261,11 +282,15 @@ export const MOOD_RULES = {
         stepwisePenalty: -8
     },
     calm: {
-        // Calm/Peaceful - favor stepwise motion, consonance
+        // Calm/Peaceful - favor stepwise motion, consonance, avoid chromatic tension
         stepwiseBonus: 15,
         wideLeapPenalty: -12,
         consonanceBonus: 10,
-        dissonancePenalty: -15
+        dissonancePenalty: -15,
+        chromaticPenalty: -20,           // Calm melodies should avoid chromatic notes
+        chromaticApproachPenalty: -25,   // Chromatic approaches create tension, not calm
+        chordClashPenalty: -30,          // Clashing notes are not peaceful
+        chordToneBonus: 12               // Prefer stable chord tones for calm
     },
     energetic: {
         // Energetic/Driving - favor rhythmic patterns, strong beats
@@ -539,25 +564,702 @@ function scoreVoiceLeading(note, previousNote, styleRules) {
 }
 
 /**
- * Score approach tones (chromatic notes leading to chord tones)
+ * Score approach tones (notes leading to chord tones)
+ * Now distinguishes between diatonic and chromatic approach tones
+ * @param {string} note - Note to score
+ * @param {Object} chord - Current chord
+ * @param {string} previousNote - Previous note (unused but kept for API consistency)
+ * @param {Object} styleRules - Style-specific rules
+ * @param {string} keyRoot - Root of the current key
+ * @param {string} scaleType - Scale type ('major' or 'minor')
  */
-function scoreApproachTone(note, chord, previousNote, styleRules) {
+function scoreApproachTone(note, chord, previousNote, styleRules, keyRoot = 'C', scaleType = 'major') {
     const notePc = getPitchClass(note);
     const chordTones = getChordTones(chord);
+    const scaleNotes = getScaleNotes(keyRoot, scaleType);
+    const isInScale = scaleNotes.includes(notePc);
 
     // Check if this note is a half-step away from a chord tone
     for (const chordTone of chordTones) {
         if ((notePc + 1) % 12 === chordTone || (notePc + 11) % 12 === chordTone) {
+            // This is an approach tone - but is it diatonic or chromatic?
+            const chromaticMultiplier = isInScale ? 1.0 : (styleRules.chromaticApproachPenalty || 0.6);
+            const baseScore = NOTE_CATEGORIES.approachTone.baseScore * styleRules.approachToneBoost * chromaticMultiplier;
+
             return {
-                score: NOTE_CATEGORIES.approachTone.baseScore * styleRules.approachToneBoost,
+                score: baseScore,
                 category: 'approachTone',
-                detail: 'Chromatic approach'
+                detail: isInScale ? 'Diatonic approach' : 'Chromatic approach',
+                isChromatic: !isInScale
             };
         }
     }
 
     return null;
 }
+
+/**
+ * Score chord clash - penalize notes that are a semitone away from chord tones
+ * These create dissonance when played against the chord
+ * @param {string} note - Note to score
+ * @param {Object} chord - Current chord
+ * @param {Object} styleRules - Style-specific rules
+ * @param {string} keyRoot - Root of the current key
+ * @param {string} scaleType - Scale type
+ * @returns {Object|null} Penalty score if clashing, null otherwise
+ */
+function scoreChordClash(note, chord, styleRules, keyRoot = 'C', scaleType = 'major') {
+    const notePc = getPitchClass(note);
+    const chordTones = getChordTones(chord);
+    const scaleNotes = getScaleNotes(keyRoot, scaleType);
+    const isInScale = scaleNotes.includes(notePc);
+
+    // If the note is a chord tone, no clash
+    if (chordTones.includes(notePc)) {
+        return null;
+    }
+
+    // Check if this note is a semitone away from any chord tone
+    for (const chordTone of chordTones) {
+        const distance = Math.min(
+            Math.abs(notePc - chordTone),
+            12 - Math.abs(notePc - chordTone)
+        );
+
+        if (distance === 1) {
+            // This note clashes with a chord tone
+            // Worse if it's also outside the key
+            const clashPenalty = styleRules.chordClashPenalty || 25;
+            const outOfKeyMultiplier = isInScale ? 1.0 : 1.5;
+
+            return {
+                penalty: clashPenalty * outOfKeyMultiplier,
+                category: 'avoid',
+                detail: isInScale ? 'Clashes with chord tone' : 'Chromatic clash with chord',
+                isChromatic: !isInScale
+            };
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Score out-of-key penalty for notes not in the scale
+ * @param {string} note - Note to score
+ * @param {string} keyRoot - Root of the current key
+ * @param {string} scaleType - Scale type
+ * @param {Object} styleRules - Style-specific rules
+ * @returns {Object|null} Penalty score if out of key, null otherwise
+ */
+function scoreOutOfKey(note, keyRoot, scaleType, styleRules) {
+    const notePc = getPitchClass(note);
+    const scaleNotes = getScaleNotes(keyRoot, scaleType);
+
+    if (!scaleNotes.includes(notePc)) {
+        const penalty = (styleRules.chromaticPenalty || 1.0) * 15;
+        return {
+            penalty: penalty,
+            category: 'chromatic',
+            detail: 'Outside key signature'
+        };
+    }
+
+    return null;
+}
+
+// -----------------------------------------------------------------------------
+// PHASE 1: Harmonic Function Awareness
+// Understanding if current chord is Tonic/Subdominant/Dominant
+// -----------------------------------------------------------------------------
+
+const HARMONIC_FUNCTIONS = {
+    TONIC: 'tonic',
+    SUBDOMINANT: 'subdominant',
+    DOMINANT: 'dominant'
+};
+
+const DEGREE_TO_FUNCTION = {
+    1: HARMONIC_FUNCTIONS.TONIC,      // I - stable, home
+    2: HARMONIC_FUNCTIONS.SUBDOMINANT, // ii - moving away
+    3: HARMONIC_FUNCTIONS.TONIC,       // iii - tonic substitute
+    4: HARMONIC_FUNCTIONS.SUBDOMINANT, // IV - subdominant
+    5: HARMONIC_FUNCTIONS.DOMINANT,    // V - tension, wants resolution
+    6: HARMONIC_FUNCTIONS.TONIC,       // vi - tonic substitute
+    7: HARMONIC_FUNCTIONS.DOMINANT     // vii° - dominant function
+};
+
+/**
+ * Get the scale degree of a chord root in a key
+ * @param {string} chordRoot - Root note of the chord
+ * @param {string} key - Musical key
+ * @returns {number|null} Scale degree 1-7, or null if chromatic
+ */
+function getScaleDegreeForChord(chordRoot, key) {
+    const keyPc = getPitchClass(key);
+    const chordPc = getPitchClass(chordRoot);
+    if (keyPc === null || chordPc === null) return null;
+
+    const interval = (chordPc - keyPc + 12) % 12;
+
+    // Major scale intervals: 0, 2, 4, 5, 7, 9, 11
+    const majorDegreeMap = {
+        0: 1,   // Root (I)
+        2: 2,   // 2nd (ii)
+        4: 3,   // 3rd (iii)
+        5: 4,   // 4th (IV)
+        7: 5,   // 5th (V)
+        9: 6,   // 6th (vi)
+        11: 7   // 7th (vii°)
+    };
+
+    return majorDegreeMap[interval] || null;
+}
+
+/**
+ * Get the harmonic function of a chord
+ * @param {Object} chord - Chord object with root and type
+ * @param {string} key - Musical key
+ * @returns {Object} { degree, function, isBorrowed }
+ */
+function getHarmonicFunction(chord, key) {
+    const degree = getScaleDegreeForChord(chord.root, key);
+    return {
+        degree: degree,
+        function: degree ? DEGREE_TO_FUNCTION[degree] : null,
+        isBorrowed: degree === null
+    };
+}
+
+/**
+ * Score a note based on harmonic function of current chord
+ * @param {string} note - Candidate note
+ * @param {Object} chord - Current chord
+ * @param {string} key - Musical key
+ * @param {Object} styleRules - Style-specific rules
+ * @returns {Object|null} Score adjustment
+ */
+function scoreHarmonicFunctionFit(note, chord, key, styleRules) {
+    const { degree, function: harmonicFn } = getHarmonicFunction(chord, key);
+    const notePc = getPitchClass(note);
+    const keyPc = getPitchClass(key);
+    if (notePc === null || keyPc === null) return null;
+
+    let score = 0;
+    let reasons = [];
+
+    if (harmonicFn === HARMONIC_FUNCTIONS.DOMINANT) {
+        // On dominant chords, leading tone (7th scale degree) is VERY important
+        const leadingTone = (keyPc + 11) % 12;
+        if (notePc === leadingTone) {
+            score += 25;
+            reasons.push('Leading tone on dominant - strong resolution potential');
+        }
+        // The 4th scale degree (often the 7th of V7) creates pull to tonic
+        const fourthDegree = (keyPc + 5) % 12;
+        if (notePc === fourthDegree) {
+            score += 18;
+            reasons.push('Scale degree 4 on dominant - creates pull to 3');
+        }
+        // Root of V is strong
+        const chordRootPc = getPitchClass(chord.root);
+        if (notePc === chordRootPc) {
+            score += 10;
+            reasons.push('Dominant root - emphasizes tension');
+        }
+    }
+
+    if (harmonicFn === HARMONIC_FUNCTIONS.TONIC) {
+        // On tonic, root and 5th are most stable
+        if (notePc === keyPc) {
+            score += 15;
+            reasons.push('Tonic note over tonic chord - very stable');
+        }
+        const fifth = (keyPc + 7) % 12;
+        if (notePc === fifth) {
+            score += 10;
+            reasons.push('Fifth over tonic - stable');
+        }
+        // The 4th degree over tonic creates a suspension feel - may or may not be desired
+        const fourthDegree = (keyPc + 5) % 12;
+        if (notePc === fourthDegree) {
+            // Only penalize in non-jazz styles
+            if (styleRules.tensionPenalty > 1.0) {
+                score -= 8;
+                reasons.push('4th over tonic - suspension (less stable)');
+            }
+        }
+    }
+
+    if (harmonicFn === HARMONIC_FUNCTIONS.SUBDOMINANT) {
+        // Subdominant is transitional - scale tones all work reasonably
+        const scaleNotes = getScaleNotes(key, 'major');
+        if (scaleNotes.includes(notePc)) {
+            score += 5;
+            reasons.push('Scale tone over subdominant');
+        }
+    }
+
+    if (score === 0) return null;
+    return { score, reasons, harmonicFunction: harmonicFn };
+}
+
+// -----------------------------------------------------------------------------
+// PHASE 2: Tendency Tone Resolution
+// Track melodic tension and suggest proper resolutions
+// -----------------------------------------------------------------------------
+
+/**
+ * Score based on tendency tone resolution rules
+ * @param {string} note - Candidate note
+ * @param {string} previousNote - Previous melody note
+ * @param {Object} chord - Current chord
+ * @param {string} key - Musical key
+ * @param {Object} styleRules - Style rules
+ * @returns {Object|null} Score adjustment
+ */
+function scoreTendencyToneResolution(note, previousNote, chord, key, styleRules) {
+    if (!previousNote) return null;
+
+    const prevPc = getPitchClass(previousNote);
+    const notePc = getPitchClass(note);
+    const keyPc = getPitchClass(key);
+    if (prevPc === null || notePc === null || keyPc === null) return null;
+
+    let score = 0;
+    let reason = null;
+
+    // Leading tone (scale degree 7) should resolve UP to tonic
+    const leadingTone = (keyPc + 11) % 12;
+    if (prevPc === leadingTone) {
+        if (notePc === keyPc) {
+            score = 30;
+            reason = 'Leading tone resolves to tonic ✓';
+        } else if (notePc !== leadingTone) {
+            // Penalize leaving leading tone unresolved (except repetition)
+            score = -20 * (styleRules.tensionPenalty || 1.0);
+            reason = 'Leading tone left unresolved';
+        }
+    }
+
+    // Scale degree 4 tends to resolve DOWN to 3
+    const fourth = (keyPc + 5) % 12;
+    const third = (keyPc + 4) % 12;
+    if (prevPc === fourth) {
+        if (notePc === third) {
+            score = 20;
+            reason = 'Scale degree 4 resolves down to 3 ✓';
+        }
+    }
+
+    // Raised scale degrees resolve up, lowered resolve down
+    const scaleNotes = getScaleNotes(key, 'major');
+    if (!scaleNotes.includes(prevPc)) {
+        // Previous note was chromatic - check if we're resolving by half-step
+        const resolveUp = (prevPc + 1) % 12;
+        const resolveDown = (prevPc + 11) % 12;
+        if (notePc === resolveUp || notePc === resolveDown) {
+            score = 25;
+            reason = 'Chromatic note resolved by half-step ✓';
+        } else if (Math.abs(noteToMidi(note) - noteToMidi(previousNote)) > 2) {
+            // Jumped away from chromatic note without resolving
+            score = -15 * (styleRules.chromaticPenalty || 1.0);
+            reason = 'Chromatic note should resolve by step';
+        }
+    }
+
+    if (score === 0) return null;
+    return { score, reason };
+}
+
+// -----------------------------------------------------------------------------
+// PHASE 3: Modal/Borrowed Chord Awareness
+// When chord is borrowed, suggest notes from appropriate mode
+// -----------------------------------------------------------------------------
+
+/**
+ * Detect if a chord is borrowed and from which mode
+ * @param {Object} chord - Chord object
+ * @param {string} key - Musical key
+ * @returns {Object} { isBorrowed, mode, scale }
+ */
+function detectBorrowedChordMode(chord, key) {
+    const keyPc = getPitchClass(key);
+    const chordPc = getPitchClass(chord.root);
+    if (keyPc === null || chordPc === null) {
+        return { isBorrowed: false, mode: 'major', scale: getScaleNotes(key, 'major') };
+    }
+
+    const interval = (chordPc - keyPc + 12) % 12;
+    const chordType = chord.type || 'Major';
+
+    // Check for common borrowed chords in major keys
+    // bVII (interval 10) - from Mixolydian
+    if (interval === 10 && (chordType === 'Major' || chordType === 'Dominant 7th')) {
+        return {
+            isBorrowed: true,
+            mode: 'mixolydian',
+            scale: getScaleNotes(key, 'mixolydian'),
+            reason: 'bVII from Mixolydian'
+        };
+    }
+
+    // iv (interval 5, minor) - from parallel minor
+    if (interval === 5 && (chordType === 'Minor' || chordType === 'Minor 7th')) {
+        return {
+            isBorrowed: true,
+            mode: 'minor',
+            scale: getScaleNotes(key, 'minor'),
+            reason: 'iv borrowed from parallel minor'
+        };
+    }
+
+    // bVI (interval 8, major) - from parallel minor
+    if (interval === 8 && chordType === 'Major') {
+        return {
+            isBorrowed: true,
+            mode: 'minor',
+            scale: getScaleNotes(key, 'minor'),
+            reason: 'bVI borrowed from parallel minor'
+        };
+    }
+
+    // bIII (interval 3, major) - from parallel minor
+    if (interval === 3 && chordType === 'Major') {
+        return {
+            isBorrowed: true,
+            mode: 'minor',
+            scale: getScaleNotes(key, 'minor'),
+            reason: 'bIII borrowed from parallel minor'
+        };
+    }
+
+    // ii° or ii half-dim (interval 2, diminished) - could be from minor
+    if (interval === 2 && (chordType === 'Diminished' || chordType === 'Half-Diminished 7th')) {
+        return {
+            isBorrowed: true,
+            mode: 'minor',
+            scale: getScaleNotes(key, 'minor'),
+            reason: 'ii° from natural minor'
+        };
+    }
+
+    // Not a recognized borrowed chord - use major scale
+    return { isBorrowed: false, mode: 'major', scale: getScaleNotes(key, 'major') };
+}
+
+/**
+ * Score based on modal fit for borrowed chords
+ * @param {string} note - Candidate note
+ * @param {Object} chord - Current chord
+ * @param {string} key - Musical key
+ * @returns {Object|null} Score adjustment
+ */
+function scoreModalFit(note, chord, key) {
+    const { isBorrowed, mode, scale, reason } = detectBorrowedChordMode(chord, key);
+    if (!isBorrowed) return null;
+
+    const notePc = getPitchClass(note);
+    if (notePc === null) return null;
+
+    if (scale.includes(notePc)) {
+        return {
+            score: 12,
+            reason: `Fits ${mode} mode (${reason})`
+        };
+    } else {
+        return {
+            score: -18,
+            reason: `Outside ${mode} mode for borrowed chord`
+        };
+    }
+}
+
+// -----------------------------------------------------------------------------
+// PHASE 4: Bass Clef Awareness / Counterpoint
+// Consider the bass note when suggesting melody
+// -----------------------------------------------------------------------------
+
+/**
+ * Score melody note based on its relationship to the bass
+ * @param {string} melodyNote - Candidate melody note
+ * @param {Object} chord - Current chord
+ * @param {string} bassNote - Bass note (if available)
+ * @param {Object} styleRules - Style rules
+ * @returns {Object|null} Score adjustment
+ */
+function scoreBassRelationship(melodyNote, chord, bassNote, styleRules) {
+    // If no explicit bass note, use chord root (or inversion bass)
+    const effectiveBass = bassNote || chord.root;
+    if (!effectiveBass) return null;
+
+    const melodyPc = getPitchClass(melodyNote);
+    const bassPc = getPitchClass(effectiveBass);
+    if (melodyPc === null || bassPc === null) return null;
+
+    const interval = (melodyPc - bassPc + 12) % 12;
+
+    // For classical/traditional styles, apply stricter counterpoint rules
+    const isStrict = (styleRules.stepwiseBoost || 1.0) > 1.2;
+
+    // Unison/octave with bass - less melodic independence
+    if (interval === 0) {
+        return {
+            score: isStrict ? -12 : -5,
+            reason: 'Doubles bass note (reduces independence)',
+            interval: 'unison/octave'
+        };
+    }
+
+    // Perfect 5th with bass - can sound hollow/open
+    if (interval === 7) {
+        return {
+            score: isStrict ? -8 : -2,
+            reason: 'Perfect 5th with bass (open/hollow)',
+            interval: 'P5'
+        };
+    }
+
+    // 3rds and 6ths with bass - excellent counterpoint!
+    if (interval === 3 || interval === 4) {
+        return {
+            score: 12,
+            reason: 'Third with bass - rich harmony',
+            interval: interval === 3 ? 'm3' : 'M3'
+        };
+    }
+    if (interval === 8 || interval === 9) {
+        return {
+            score: 10,
+            reason: 'Sixth with bass - good counterpoint',
+            interval: interval === 8 ? 'm6' : 'M6'
+        };
+    }
+
+    // 2nds/7ths with bass - dissonant (style-dependent)
+    if (interval === 1 || interval === 2 || interval === 10 || interval === 11) {
+        const penalty = (styleRules.tensionPenalty || 1.0) * -8;
+        return {
+            score: penalty,
+            reason: 'Dissonant interval with bass',
+            interval: interval <= 2 ? '2nd' : '7th'
+        };
+    }
+
+    // Perfect 4th - context dependent
+    if (interval === 5) {
+        return {
+            score: isStrict ? -5 : 2,
+            reason: isStrict ? 'Perfect 4th with bass (traditionally dissonant)' : 'Perfect 4th with bass',
+            interval: 'P4'
+        };
+    }
+
+    // Tritone with bass - very tense
+    if (interval === 6) {
+        return {
+            score: (styleRules.tensionPenalty || 1.0) * -10,
+            reason: 'Tritone with bass - maximum tension',
+            interval: 'tritone'
+        };
+    }
+
+    return null;
+}
+
+// -----------------------------------------------------------------------------
+// PHASE 5: Phrase Position & Cadential Patterns
+// Different note preferences based on position in phrase
+// -----------------------------------------------------------------------------
+
+/**
+ * Score based on phrase position (beginning, middle, cadence)
+ * @param {string} note - Candidate note
+ * @param {Object} chord - Current chord
+ * @param {string} key - Musical key
+ * @param {Object} phraseContext - { position: 'beginning'|'middle'|'approaching-cadence'|'cadence', beatInPhrase, totalBeats }
+ * @param {Object} nextChord - Next chord (if known)
+ * @returns {Object|null} Score adjustment
+ */
+function scorePhrasePosition(note, chord, key, phraseContext, nextChord) {
+    if (!phraseContext || !phraseContext.position) return null;
+
+    const notePc = getPitchClass(note);
+    const keyPc = getPitchClass(key);
+    if (notePc === null || keyPc === null) return null;
+
+    const position = phraseContext.position;
+    let score = 0;
+    let reason = null;
+
+    // Calculate scale degrees
+    const tonic = keyPc;
+    const third = (keyPc + 4) % 12;
+    const fifth = (keyPc + 7) % 12;
+
+    if (position === 'cadence') {
+        // At cadences, strongly prefer notes that create resolution
+        if (notePc === tonic) {
+            score = 30;
+            reason = 'Tonic at cadence - strong resolution';
+        } else if (notePc === third) {
+            score = 20;
+            reason = 'Third at cadence - satisfying resolution';
+        } else if (notePc === fifth) {
+            score = 12;
+            reason = 'Fifth at cadence - open but resolved';
+        } else {
+            // Non-chord tones at cadence are weak
+            score = -15;
+            reason = 'Non-resolution tone at cadence';
+        }
+    } else if (position === 'approaching-cadence') {
+        // Approaching cadence - leading tones and tendency tones are great
+        const leadingTone = (keyPc + 11) % 12;
+        const secondDegree = (keyPc + 2) % 12;
+        if (notePc === leadingTone) {
+            score = 25;
+            reason = 'Leading tone before cadence - builds expectation';
+        } else if (notePc === secondDegree) {
+            score = 15;
+            reason = 'Scale degree 2 before cadence - can resolve to 1 or 3';
+        }
+    } else if (position === 'beginning') {
+        // At phrase beginnings, tonic and fifth are strong starters
+        if (notePc === tonic) {
+            score = 18;
+            reason = 'Tonic at phrase start - establishes key';
+        } else if (notePc === fifth) {
+            score = 15;
+            reason = 'Fifth at phrase start - strong opening';
+        } else if (notePc === third) {
+            score = 10;
+            reason = 'Third at phrase start - melodic opening';
+        }
+    }
+    // 'middle' position - no special adjustments
+
+    if (score === 0) return null;
+    return { score, reason };
+}
+
+// -----------------------------------------------------------------------------
+// PHASE 6: Resolution Expectation Tracking
+// Track what the melody "owes" harmonically
+// -----------------------------------------------------------------------------
+
+/**
+ * Resolution expectation tracker - tracks unresolved melodic tensions
+ * This is instantiated per-suggestion-request to track recent notes
+ */
+class MelodyResolutionTracker {
+    constructor(key) {
+        this.key = key;
+        this.keyPc = getPitchClass(key);
+        this.pendingResolutions = [];
+        this.scaleNotes = getScaleNotes(key, 'major');
+    }
+
+    /**
+     * Record a note that was played/suggested and track any resolution expectations
+     * @param {string} note - Note that was played
+     */
+    recordNote(note) {
+        const notePc = getPitchClass(note);
+        if (notePc === null) return;
+
+        // Leading tone creates strong expectation to resolve to tonic
+        const leadingTone = (this.keyPc + 11) % 12;
+        if (notePc === leadingTone) {
+            this.pendingResolutions.push({
+                type: 'leading-tone',
+                expectedResolutions: [this.keyPc],
+                urgency: 0.95,
+                description: 'Leading tone expects tonic'
+            });
+        }
+
+        // Scale degree 4 expects to resolve to 3
+        const fourth = (this.keyPc + 5) % 12;
+        const third = (this.keyPc + 4) % 12;
+        if (notePc === fourth) {
+            this.pendingResolutions.push({
+                type: 'fourth-degree',
+                expectedResolutions: [third],
+                urgency: 0.7,
+                description: '4th degree expects 3rd'
+            });
+        }
+
+        // Chromatic notes expect to resolve by half-step
+        if (!this.scaleNotes.includes(notePc)) {
+            this.pendingResolutions.push({
+                type: 'chromatic',
+                expectedResolutions: [(notePc + 1) % 12, (notePc + 11) % 12],
+                urgency: 0.8,
+                description: 'Chromatic note expects half-step resolution'
+            });
+        }
+
+        // 7th of a dominant chord expects downward resolution
+        // (This would need chord context to detect properly)
+    }
+
+    /**
+     * Score how well a candidate note resolves pending expectations
+     * @param {string} note - Candidate note
+     * @returns {Object} { score, reasons, resolvedCount }
+     */
+    scoreResolution(note) {
+        const notePc = getPitchClass(note);
+        if (notePc === null) return { score: 0, reasons: [], resolvedCount: 0 };
+
+        let totalScore = 0;
+        const reasons = [];
+        let resolvedCount = 0;
+
+        // Check each pending resolution
+        this.pendingResolutions = this.pendingResolutions.filter(res => {
+            if (res.expectedResolutions.includes(notePc)) {
+                // This note resolves the expectation!
+                const points = 20 * res.urgency;
+                totalScore += points;
+                reasons.push(`${res.description} - resolved! (+${Math.round(points)})`);
+                resolvedCount++;
+                return false; // Remove this expectation
+            }
+
+            // Decay urgency over time
+            res.urgency *= 0.6;
+            return res.urgency > 0.15; // Keep if still urgent enough
+        });
+
+        // Penalty for having too many unresolved expectations
+        if (this.pendingResolutions.length > 2) {
+            const penalty = -5 * (this.pendingResolutions.length - 2);
+            totalScore += penalty;
+            reasons.push(`${this.pendingResolutions.length} unresolved tensions (${penalty})`);
+        }
+
+        return { score: totalScore, reasons, resolvedCount };
+    }
+
+    /**
+     * Get current pending resolutions for debugging/display
+     */
+    getPendingResolutions() {
+        return [...this.pendingResolutions];
+    }
+}
+
+// Factory function to create tracker
+function createResolutionTracker(key) {
+    return new MelodyResolutionTracker(key);
+}
+
+// -----------------------------------------------------------------------------
+// Original scoring functions continue below
+// -----------------------------------------------------------------------------
 
 /**
  * Score tension notes (notes that create harmonic tension)
@@ -1026,13 +1728,20 @@ export function generateMelodySuggestions({
                 }
             }
 
-            // Score approach tone potential
+            // Score approach tone potential (with key-awareness)
             if (!chordScore) {
-                const approachScore = scoreApproachTone(noteName, chord, previousNote, styleRules);
+                const approachScore = scoreApproachTone(noteName, chord, previousNote, styleRules, keyRoot, scaleType);
                 if (approachScore) {
                     scores.push(approachScore.score);
                     reasons.push(approachScore.detail);
                     categories.push(approachScore.category);
+
+                    // Apply mood-based chromatic approach penalty
+                    const moodRules = MOOD_RULES[mood];
+                    if (approachScore.isChromatic && moodRules?.chromaticApproachPenalty) {
+                        scores.push(moodRules.chromaticApproachPenalty);
+                        reasons.push('Chromatic approach (mood penalty)');
+                    }
                 }
             }
 
@@ -1045,6 +1754,102 @@ export function generateMelodySuggestions({
                     categories.push(tensionScore.category);
                 }
             }
+
+            // Score chord clash penalty (notes a semitone from chord tones)
+            const clashResult = scoreChordClash(noteName, chord, styleRules, keyRoot, scaleType);
+            if (clashResult) {
+                scores.push(-clashResult.penalty);
+                reasons.push(clashResult.detail);
+                if (clashResult.isChromatic) {
+                    categories.push('avoid');
+                }
+
+                // Apply additional mood-based chord clash penalty
+                const moodRules = MOOD_RULES[mood];
+                if (moodRules?.chordClashPenalty) {
+                    scores.push(moodRules.chordClashPenalty);
+                }
+            }
+
+            // Score out-of-key penalty (chromatic notes get penalized except in jazz)
+            if (!chordScore) {
+                const outOfKeyResult = scoreOutOfKey(noteName, keyRoot, scaleType, styleRules);
+                if (outOfKeyResult) {
+                    scores.push(-outOfKeyResult.penalty);
+                    reasons.push(outOfKeyResult.detail);
+
+                    // Apply additional mood-based chromatic penalty
+                    const moodRules = MOOD_RULES[mood];
+                    if (moodRules?.chromaticPenalty) {
+                        scores.push(moodRules.chromaticPenalty);
+                    }
+                }
+            }
+
+            // =================================================================
+            // HARMONIC AWARENESS SCORING (Phases 1-6)
+            // =================================================================
+
+            // Phase 1: Harmonic function awareness
+            // Boost notes that fit the harmonic function (T/SD/D)
+            const harmonicFnResult = scoreHarmonicFunctionFit(noteName, chord, keyRoot, styleRules);
+            if (harmonicFnResult) {
+                scores.push(harmonicFnResult.score);
+                harmonicFnResult.reasons.forEach(r => reasons.push(r));
+            }
+
+            // Phase 2: Tendency tone resolution
+            // Reward proper resolution of leading tones, 4ths, chromatic notes
+            const tendencyResult = scoreTendencyToneResolution(noteName, previousNote, chord, keyRoot, styleRules);
+            if (tendencyResult) {
+                scores.push(tendencyResult.score);
+                reasons.push(tendencyResult.reason);
+            }
+
+            // Phase 3: Modal/borrowed chord awareness
+            // When chord is borrowed (bVII, iv, etc.), use appropriate mode
+            const modalFitResult = scoreModalFit(noteName, chord, keyRoot);
+            if (modalFitResult) {
+                scores.push(modalFitResult.score);
+                reasons.push(modalFitResult.reason);
+            }
+
+            // Phase 4: Bass clef awareness / counterpoint
+            // Score based on interval relationship with bass note
+            const bassNote = chord.bassNote || (chord.inversion > 0 ? chord.notes?.[0]?.replace(/\d+$/, '') : null);
+            const bassResult = scoreBassRelationship(noteName, chord, bassNote, styleRules);
+            if (bassResult) {
+                scores.push(bassResult.score);
+                reasons.push(bassResult.reason);
+            }
+
+            // Phase 5: Phrase position awareness
+            // Different preferences for phrase beginning/middle/cadence
+            // Infer phrase position from section intent if available
+            let phraseContext = null;
+            if (sectionIntent) {
+                if (sectionIntent.subMode === 'final') {
+                    phraseContext = { position: 'cadence' };
+                } else if (sectionIntent.subMode === 'concluding') {
+                    phraseContext = { position: 'approaching-cadence' };
+                } else if (sectionIntent.subMode === 'starting') {
+                    phraseContext = { position: 'beginning' };
+                } else {
+                    phraseContext = { position: 'middle' };
+                }
+            }
+            const phraseResult = scorePhrasePosition(noteName, chord, keyRoot, phraseContext, nextChord);
+            if (phraseResult) {
+                scores.push(phraseResult.score);
+                reasons.push(phraseResult.reason);
+            }
+
+            // Phase 6: Resolution expectation tracking is handled at a higher level
+            // (requires tracking across multiple suggestion calls)
+
+            // =================================================================
+            // END HARMONIC AWARENESS SCORING
+            // =================================================================
 
             // Score anticipation (how well note leads into next chord)
             let anticipationBonus = 0;

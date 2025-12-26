@@ -262,6 +262,15 @@ export function getCurrentKey() {
 
 export function setCurrentKey(value) {
     trainerState.currentKey = value;
+
+    // CRITICAL: Also sync to compositionState.metadata.key
+    // This ensures notes added via staff clicking use the correct key signature
+    if (typeof window !== 'undefined' && window.getCompositionState) {
+        const compositionState = window.getCompositionState();
+        if (compositionState && compositionState.metadata) {
+            compositionState.metadata.key = value;
+        }
+    }
 }
 
 // Getters and Setters for progressionRomans

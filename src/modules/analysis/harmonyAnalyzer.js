@@ -532,7 +532,13 @@ export class HarmonyAnalyzer {
         }
 
         const index = degree - 1;
-        const isMinorChord = chord.type && (chord.type === 'Minor' || chord.type === 'Diminished');
+        // Check if chord quality is minor (includes Minor 7th, Minor 9th, etc.) or diminished
+        const isMinorChord = chord.type && (
+            chord.type.startsWith('Minor') ||
+            chord.type === 'Diminished' ||
+            chord.type.includes('Diminished') ||
+            chord.type === 'Half-Diminished 7th'
+        );
 
         let numeral = isMinorChord ? minorRomanNumerals[index] : romanNumerals[index];
 

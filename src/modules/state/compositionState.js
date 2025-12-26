@@ -16,7 +16,7 @@
 import { EventEmitter } from '../utils/eventEmitter.js';
 import { generateBassVoicing, generateBuildingBlockBass, splitBlockBassIntoMeasures } from '../integration/bassAutoFill.js';
 import { getChordNotes } from '../utils/noteUtils.js';
-import { BuildingBlockSequence, BuildingBlock, durationToUnits, unitsToDuration, UNITS_PER_BEAT } from './buildingBlock.js';
+import { BuildingBlockSequence, BuildingBlock, Unit, durationToUnits, unitsToDuration, UNITS_PER_BEAT } from './buildingBlock.js';
 import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
 import { SONG_STRUCTURE_TEMPLATES, getTemplate } from '../../data/songStructureTemplates.js';
 
@@ -2091,6 +2091,7 @@ export class CompositionState {
                         startUnit,
                         durationUnits,
                         pitches,
+                        tied: note.tied || false,  // CRITICAL: Preserve forward tie flag
                         isTied: note.isTied || false,
                         isRest: note.isRest || note.type === 'rest' || pitches.length === 0,
                         voiceIndex, // Track which voice this note belongs to
@@ -2166,6 +2167,7 @@ export class CompositionState {
                 startUnit: note.startUnit,
                 durationUnits: note.durationUnits,
                 pitches: note.pitches,
+                tied: note.tied || false,  // CRITICAL: Preserve forward tie flag
                 isRest: note.isRest,
                 voiceIndex: note.voiceIndex,
                 attributes: note.attributes,
@@ -2175,7 +2177,9 @@ export class CompositionState {
         // Now write the combined notes to the block
         for (const note of combinedNotes) {
             if (note.startUnit >= 0 && note.startUnit < totalUnits) {
-                block.setNote(note.startUnit, note.durationUnits, note.isRest ? [] : note.pitches, note.attributes);
+                // Include tied flag in attributes for preservation through render cycles
+                const attributes = { ...note.attributes, tied: note.tied };
+                block.setNote(note.startUnit, note.durationUnits, note.isRest ? [] : note.pitches, attributes);
             }
         }
     }
@@ -2279,9 +2283,25 @@ export class CompositionState {
             }
         });
 
+        // Find the "content end" - position after the last actual non-rest note
+        // We don't want to render placeholder rests that just fill the block
+        const actualNotes = notes.filter(n => !n.isRest);
+        let contentEndUnit = 0;
+        for (const note of actualNotes) {
+            const noteEnd = note.startUnit + note.durationUnits;
+            if (noteEnd > contentEndUnit) {
+                contentEndUnit = noteEnd;
+            }
+        }
+
         // Walk through notes and place them in measures
         // Handle cross-measure splitting with ties
         for (const note of notes) {
+            // Skip rests that come at or after the content end (they're just placeholder space)
+            if (note.isRest && note.startUnit >= contentEndUnit) {
+                continue;
+            }
+
             let remainingUnits = note.durationUnits;
             let currentUnit = note.startUnit;
             let isFirstPart = true;
@@ -2310,6 +2330,13 @@ export class CompositionState {
                 }
 
                 // Create note for this measure
+                // For tied flag:
+                // - If not last part, always true (ties to next part of same split note)
+                // - If last part, preserve note.tied from block (may tie to a different note)
+                const tiedValue = !isLastPart
+                    ? (!note.isRest)  // Always tie to next part if not last
+                    : (note.tied || false);  // Preserve block's tied flag for last part
+
                 const measureNote = {
                     type: note.isRest ? 'rest' : 'note',
                     pitches: note.pitches,
@@ -2318,7 +2345,7 @@ export class CompositionState {
                     beat: beat,
                     dotted: duration.includes('.'),
                     isTied: !isFirstPart, // True if this is a continuation FROM the previous note
-                    tied: !isLastPart && !note.isRest, // True if this note ties TO the next part (for rendering)
+                    tied: tiedValue,
                     isRest: note.isRest,
                     voiceIndex: voiceIndex, // Include 0-based voice index for rendering
                     // Musical attributes - only on first part
@@ -2398,6 +2425,8 @@ export class CompositionState {
      * @param {Object} attributes - Musical attributes
      */
     insertTrebleNoteWithShift(insertUnit, durationUnits, pitches, attributes = {}) {
+        console.log('[SHIFT-INSERT] insertTrebleNoteWithShift called:', { insertUnit, durationUnits, pitches, attributes });
+
         // ALWAYS sync from measures before modifying the block sequence
         // This ensures we have the latest notes, even if they were added via keyboard
         if (this.trebleBlockSequence.blocks.length === 0) {
@@ -2410,42 +2439,91 @@ export class CompositionState {
         const block = this.trebleBlockSequence.blocks[0];
         const totalUnits = block.units.length;
 
-        // Debug: log existing notes before modification
+        // Find the "content end" - the position after the last actual non-rest note
+        // We only want to shift actual content, not placeholder empty space
         const notesBefore = block.getNotes();
-        console.log(`[insertTrebleNoteWithShift] BEFORE: ${notesBefore.length} notes in block:`,
-            notesBefore.map(n => `${n.pitches.join(',')} at unit ${n.startUnit} (${n.durationUnits} units)`));
-
-        // Step 1: Extend the block by the duration of the new note
-        const newTotalUnits = totalUnits + durationUnits;
-        const newTotalBeats = Math.ceil(newTotalUnits / UNITS_PER_BEAT);
-        block.setDuration(newTotalBeats);
-
-        // Step 2: Shift all units at and after insertUnit forward by durationUnits
-        // Work backwards to avoid overwriting
-        for (let i = block.units.length - 1; i >= insertUnit + durationUnits; i--) {
-            const sourceIndex = i - durationUnits;
-            if (sourceIndex >= insertUnit && sourceIndex < totalUnits) {
-                const sourceUnit = block.units[sourceIndex];
-                block.units[i] = sourceUnit.clone();
-
-                // Adjust parentIndex if it pointed to something in the shifted region
-                if (block.units[i].parentIndex !== null && block.units[i].parentIndex >= insertUnit) {
-                    block.units[i].parentIndex += durationUnits;
-                }
+        const actualNotes = notesBefore.filter(n => !n.isRest);
+        let contentEndUnit = 0;
+        for (const note of actualNotes) {
+            const noteEnd = note.startUnit + note.durationUnits;
+            if (noteEnd > contentEndUnit) {
+                contentEndUnit = noteEnd;
             }
         }
 
-        // Step 3: Insert the new note at insertUnit
-        block.setNote(insertUnit, durationUnits, pitches, attributes);
+        console.log(`[insertTrebleNoteWithShift] BEFORE: ${notesBefore.length} notes (${actualNotes.length} non-rest), contentEndUnit=${contentEndUnit}`);
+        console.log(`[insertTrebleNoteWithShift] Notes:`, actualNotes.map(n => `${n.pitches.join(',')} at unit ${n.startUnit} (${n.durationUnits} units)`));
+
+        // If inserting at or after the content end, no shifting is needed
+        // Just add the note at the position (possibly extending the block)
+        if (insertUnit >= contentEndUnit) {
+            console.log(`[insertTrebleNoteWithShift] Insert at/after content end - no shift needed`);
+
+            // Ensure block is long enough for the new note
+            const requiredUnits = insertUnit + durationUnits;
+            if (requiredUnits > totalUnits) {
+                const requiredBeats = Math.ceil(requiredUnits / UNITS_PER_BEAT);
+                block.setDuration(requiredBeats);
+            }
+
+            // Just add the note at the position
+            block.setNote(insertUnit, durationUnits, pitches, attributes);
+        } else {
+            // Inserting in the middle of content - need to shift
+            console.log(`[insertTrebleNoteWithShift] Insert in middle of content - shifting units ${insertUnit} to ${contentEndUnit}`);
+
+            // Step 1: Extend the block by the duration of the new note
+            const newTotalUnits = Math.max(totalUnits, contentEndUnit) + durationUnits;
+            const newTotalBeats = Math.ceil(newTotalUnits / UNITS_PER_BEAT);
+            block.setDuration(newTotalBeats);
+
+            // Step 2: Only shift units from insertUnit to contentEndUnit (actual content)
+            // Work backwards to avoid overwriting
+            for (let i = contentEndUnit + durationUnits - 1; i >= insertUnit + durationUnits; i--) {
+                const sourceIndex = i - durationUnits;
+                if (sourceIndex >= insertUnit && sourceIndex < contentEndUnit) {
+                    const sourceUnit = block.units[sourceIndex];
+                    block.units[i] = sourceUnit.clone();
+
+                    // Adjust parentIndex if it pointed to something in the shifted region
+                    if (block.units[i].parentIndex !== null && block.units[i].parentIndex >= insertUnit) {
+                        block.units[i].parentIndex += durationUnits;
+                    }
+                }
+            }
+
+            // Step 2b: Clear any units after the shifted content (they were created by setDuration
+            // with stale parentIndex values pointing to the old note positions)
+            const newContentEnd = contentEndUnit + durationUnits;
+            if (newContentEnd < block.units.length) {
+                // First cleared unit is the "rest start"
+                block.units[newContentEnd] = new Unit({
+                    pitches: [],
+                    parentIndex: null,
+                });
+                // Remaining units point back to the rest start
+                for (let i = newContentEnd + 1; i < block.units.length; i++) {
+                    block.units[i] = new Unit({
+                        pitches: [],
+                        parentIndex: newContentEnd,
+                    });
+                }
+            }
+
+            // Step 3: Insert the new note at insertUnit
+            block.setNote(insertUnit, durationUnits, pitches, attributes);
+        }
 
         // Debug: log notes after modification
         const notesAfter = block.getNotes();
-        console.log(`[insertTrebleNoteWithShift] AFTER: ${notesAfter.length} notes in block:`,
-            notesAfter.map(n => `${n.pitches.join(',')||'rest'} at unit ${n.startUnit} (${n.durationUnits} units)`));
+        const actualNotesAfter = notesAfter.filter(n => !n.isRest);
+        console.log(`[insertTrebleNoteWithShift] AFTER: ${notesAfter.length} notes (${actualNotesAfter.length} non-rest)`);
+        console.log(`[insertTrebleNoteWithShift] Notes:`, actualNotesAfter.map(n => `${n.pitches.join(',')} at unit ${n.startUnit} (${n.durationUnits} units)`));
 
         // Step 4: Ensure we have enough measures
         const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
-        const requiredMeasures = Math.ceil(newTotalBeats / beatsPerMeasure);
+        const newContentEnd = actualNotesAfter.reduce((max, n) => Math.max(max, n.startUnit + n.durationUnits), 0);
+        const requiredMeasures = Math.ceil(newContentEnd / (beatsPerMeasure * UNITS_PER_BEAT));
         while (this.measures.length < requiredMeasures) {
             this.addMeasure({});
         }

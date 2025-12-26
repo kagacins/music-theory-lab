@@ -11,6 +11,7 @@
 
 import { StaffLayoutManager, pitchToLine as layoutPitchToLine } from './staffLayouter.js';
 import { noteToMidi, midiToNote, applyKeySignatureToPitch } from './vexFlowRenderer.js';
+import { dispatchBuilderEvent } from '../ui/lessonGuidedMode.js';
 import { analyzeChordTone, CHORD_TONE_COLORS } from '../analysis/chordToneAnalyzer.js';
 import { getPiano } from '../audio/audioEngine.js';
 import { showNoteOverflowDialog } from '../ui/modals.js';
@@ -310,6 +311,13 @@ export class NoteEditor {
       staffPosition = this.hoveredPosition;
     }
 
+    // TUTORIAL ASSISTED PLACEMENT: If a tutorial has specified an expected note,
+    // override the clicked pitch to ensure the note is placed correctly.
+    // This helps users learn the toolbar mechanics without getting frustrated by pitch accuracy.
+    if (window.tutorialExpectedNote && staffPosition && staffPosition.pitch) {
+      staffPosition.pitch = window.tutorialExpectedNote;
+    }
+
     // Check interaction mode from toolbar
     // In 'noteEntry' mode with Alt held (or on touch devices), skip note selection and go directly to note addition
     const interactionMode = this.composerIntegration?.toolbar?.getInteractionMode?.() || 'select';
@@ -574,10 +582,13 @@ export class NoteEditor {
     if (!this.isEnabled) return;
 
     // Delete selected notes
+    // Ctrl+Delete/Backspace = shift delete (removes note and shifts others left)
+    // Delete/Backspace alone = replace with rest (preserves rhythm)
     if (e.key === 'Delete' || e.key === 'Backspace') {
       if (this.selectedNotes.size > 0) {
         e.preventDefault();
-        this.deleteSelectedNotes();
+        const shiftDelete = e.ctrlKey || e.metaKey;
+        this.deleteSelectedNotes(shiftDelete);
       }
     }
 
@@ -647,6 +658,9 @@ export class NoteEditor {
         if (this.onNoteSelect) {
           this.onNoteSelect([]);
         }
+
+        // Dispatch event for tutorial validation
+        dispatchBuilderEvent('notationNotesDeselected', {});
       }
     }
 
@@ -1320,11 +1334,6 @@ export class NoteEditor {
       window.saveStateBeforeChange();
     }
 
-    // DEBUG: Track progressionData state at start of note addition
-    if (window.getCompositionState) {
-      const compositionState = window.getCompositionState();
-    }
-
     // CRITICAL: Always use the CLICKED/HOVERED measure, not the selected measure
     // The measure where the mouse is hovering is what the user expects the note to be added to
     // SECTION VIEW FIX: Apply filter offset to convert local index to global
@@ -1337,9 +1346,6 @@ export class NoteEditor {
     // Calculate beats for this note
     const noteBeats = this.durationToBeats(this.currentDuration, this.isDotted);
     const remainingBeats = this.getRemainingBeats(targetMeasureIndex, staff);
-
-    // DEBUG: Early trace
-    const earlyVoiceIdx = this.getVoiceIndexForStaff(staff);
 
     // NEW: Check if we should insert at a specific position (between existing notes)
     // Look for existing notes at the clicked X position
@@ -1642,6 +1648,7 @@ export class NoteEditor {
       // Apply key signature to pitch when no explicit accidental is selected
       const normalCompositionState = window.getCompositionState?.();
       const effectivePitch = this.getEffectivePitch(staffPosition.pitch, normalCompositionState);
+
       const noteData = {
         type: this.isRestMode ? 'rest' : 'note',
         pitch: effectivePitch,
@@ -1783,6 +1790,12 @@ export class NoteEditor {
    * @param {Object} compositionState - CompositionState instance
    */
   insertTrebleNoteWithShiftAtPosition(measureIndex, insertionPoint, noteData, compositionState) {
+    console.log('[SHIFT-INSERT] insertTrebleNoteWithShiftAtPosition called:', {
+      measureIndex,
+      insertionPoint,
+      noteData,
+    });
+
     const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
     const UNITS_PER_BEAT = 48;
 
@@ -1843,8 +1856,10 @@ export class NoteEditor {
       } else {
         // "after" a tied note - we need to insert after the tied note ends
         // The tied note takes up some beats in this measure
-        let beats = this.durationToBeats(targetNote.duration || '4n');
-        if (targetNote.dotted) beats *= 1.5;
+        const tiedDur = targetNote.duration || '4n';
+        const tiedHasDot = tiedDur.includes('.');
+        let beats = this.durationToBeats(tiedDur);
+        if (targetNote.dotted && !tiedHasDot) beats *= 1.5;
         beatPosition = beats; // Insert after the tied note's portion in this measure
       }
     } else {
@@ -1852,17 +1867,25 @@ export class NoteEditor {
       const targetIndex = insertionPoint.action === 'before' ? insertionPoint.noteIndex : insertionPoint.noteIndex + 1;
       for (let i = 0; i < targetIndex && i < voice.notes.length; i++) {
         const note = voice.notes[i];
-        let beats = this.durationToBeats(note.duration || '4n');
-        if (note.dotted) beats *= 1.5;
+        const dur = note.duration || '4n';
+        const hasDot = dur.includes('.');
+        let beats = this.durationToBeats(dur);
+        if (note.dotted && !hasDot) beats *= 1.5;
         beatPosition += beats;
       }
     }
 
+    console.log('[SHIFT-INSERT] Calculated beatPosition:', beatPosition, 'hasMultipleVoices:', hasMultipleVoices);
+
     // MULTI-VOICE: Use direct voice-based shifting to preserve voice separation
     if (hasMultipleVoices) {
       // Calculate note duration in beats
-      let durationBeats = this.durationToBeats(noteData.duration);
-      if (noteData.dotted) durationBeats *= 1.5;
+      const noteDur = noteData.duration || '4n';
+      const noteHasDot = noteDur.includes('.');
+      let durationBeats = this.durationToBeats(noteDur);
+      if (noteData.dotted && !noteHasDot) durationBeats *= 1.5;
+
+      console.log('[SHIFT-INSERT] MULTI-VOICE path: shifting notes forward by', durationBeats, 'beats at beat', beatPosition);
 
       // Shift notes forward in ALL voices from the insertion point
       this.shiftNotesForward(measureIndex, beatPosition, durationBeats, 'treble', compositionState, beatsPerMeasure);
@@ -1896,12 +1919,16 @@ export class NoteEditor {
     const insertUnit = Math.round(absoluteBeat * UNITS_PER_BEAT);
 
     // Calculate duration in units
-    let durationBeats = this.durationToBeats(noteData.duration);
-    if (noteData.dotted) durationBeats *= 1.5;
+    const singleNoteDur = noteData.duration || '4n';
+    const singleNoteHasDot = singleNoteDur.includes('.');
+    let durationBeats = this.durationToBeats(singleNoteDur);
+    if (noteData.dotted && !singleNoteHasDot) durationBeats *= 1.5;
     const durationUnits = Math.round(durationBeats * UNITS_PER_BEAT);
 
     // Get pitches array
     const pitches = noteData.isRest ? [] : (noteData.pitches || [noteData.pitch]);
+
+    console.log('[SHIFT-INSERT] SINGLE-VOICE path: insertUnit=', insertUnit, 'durationUnits=', durationUnits, 'pitches=', pitches);
 
     // Use the compositionState method to insert with shift
     compositionState.insertTrebleNoteWithShift(insertUnit, durationUnits, pitches, {
@@ -1937,8 +1964,10 @@ export class NoteEditor {
     // MULTI-VOICE: Use direct voice-based shifting to preserve voice separation
     if (hasMultipleVoices) {
       // Calculate note duration in beats
-      let durationBeats = this.durationToBeats(noteData.duration);
-      if (noteData.dotted) durationBeats *= 1.5;
+      const multiNoteDur = noteData.duration || '4n';
+      const multiNoteHasDot = multiNoteDur.includes('.');
+      let durationBeats = this.durationToBeats(multiNoteDur);
+      if (noteData.dotted && !multiNoteHasDot) durationBeats *= 1.5;
 
       // Shift notes forward in ALL voices from the end of this measure
       this.shiftNotesForward(measureIndex, usedBeats, durationBeats, 'treble', compositionState, beatsPerMeasure);
@@ -1974,8 +2003,10 @@ export class NoteEditor {
     const insertUnit = Math.round(absoluteBeat * UNITS_PER_BEAT);
 
     // Calculate duration in units
-    let durationBeats = this.durationToBeats(noteData.duration);
-    if (noteData.dotted) durationBeats *= 1.5;
+    const endNoteDur = noteData.duration || '4n';
+    const endNoteHasDot = endNoteDur.includes('.');
+    let durationBeats = this.durationToBeats(endNoteDur);
+    if (noteData.dotted && !endNoteHasDot) durationBeats *= 1.5;
     const durationUnits = Math.round(durationBeats * UNITS_PER_BEAT);
 
     // Get pitches array
@@ -1988,6 +2019,83 @@ export class NoteEditor {
       dynamic: noteData.dynamic,
       velocity: noteData.velocity,
     });
+
+    // Render the changes
+    this.composerIntegration.render();
+  }
+
+  /**
+   * Insert a bass note with shift at a specific position
+   * Uses shiftNotesForward to push downstream notes forward
+   * @param {number} measureIndex - Target measure index
+   * @param {Object} insertionPoint - { action, noteIndex, voiceIndex }
+   * @param {Object} noteData - Note data to insert
+   * @param {Object} compositionState - CompositionState instance
+   * @param {number} beatsPerMeasure - Beats per measure from time signature
+   */
+  insertBassNoteWithShiftAtPosition(measureIndex, insertionPoint, noteData, compositionState, beatsPerMeasure) {
+    const measure = compositionState.measures[measureIndex];
+    if (!measure) {
+      console.warn('[NoteEditor] Could not find measure for bass insert with shift');
+      return;
+    }
+
+    const voiceIndex = insertionPoint.voiceIndex ?? this.getVoiceIndexForStaff('bass');
+
+    // Ensure voice exists
+    if (!measure.notation?.bass?.voices) {
+      measure.notation = measure.notation || {};
+      measure.notation.bass = measure.notation.bass || {};
+      measure.notation.bass.voices = [{ notes: [] }];
+    }
+    while (measure.notation.bass.voices.length <= voiceIndex) {
+      measure.notation.bass.voices.push({ notes: [] });
+    }
+    const voice = measure.notation.bass.voices[voiceIndex];
+
+    // Calculate beat position for insertion
+    let beatPosition = 0;
+    const targetIndex = insertionPoint.action === 'before' ? insertionPoint.noteIndex : insertionPoint.noteIndex + 1;
+    for (let i = 0; i < targetIndex && i < voice.notes.length; i++) {
+      const note = voice.notes[i];
+      const dur = note.duration || '4n';
+      const hasDot = dur.includes('.');
+      let beats = this.durationToBeats(dur);
+      if (note.dotted && !hasDot) beats *= 1.5;
+      beatPosition += beats;
+    }
+
+    // Calculate note duration in beats
+    const noteDur = noteData.duration || '4n';
+    const noteHasDot = noteDur.includes('.');
+    let durationBeats = this.durationToBeats(noteDur);
+    if (noteData.dotted && !noteHasDot) durationBeats *= 1.5;
+
+    // Shift notes forward in the bass staff from the insertion point
+    this.shiftNotesForward(measureIndex, beatPosition, durationBeats, 'bass', compositionState, beatsPerMeasure);
+
+    // Insert the new note at the insertion point
+    const newNote = {
+      type: noteData.isRest ? 'rest' : 'note',
+      pitches: noteData.pitches || [noteData.pitch],
+      pitch: noteData.pitch,
+      duration: noteData.duration,
+      beat: beatPosition,
+      dotted: noteData.dotted || false,
+      isRest: noteData.isRest || false,
+      articulation: noteData.articulation,
+      accidental: noteData.accidental,
+      dynamic: noteData.dynamic,
+      velocity: noteData.velocity,
+      voiceIndex: voiceIndex,
+    };
+
+    voice.notes.push(newNote);
+    voice.notes.sort((a, b) => (a.beat || 0) - (b.beat || 0));
+
+    // Mark bass as edited and save
+    measure.notation.bass.autoGenerated = false;
+    compositionState.saveEditedBassNotesForMeasure(measureIndex);
 
     // Render the changes
     this.composerIntegration.render();
@@ -2049,8 +2157,9 @@ export class NoteEditor {
 
   /**
    * Delete selected notes (supports individual pitch deletion from chords)
+   * @param {boolean} shiftDelete - If true, shift subsequent notes left instead of replacing with rests
    */
-  deleteSelectedNotes() {
+  deleteSelectedNotes(shiftDelete = false) {
     // Only save state if there are notes to delete
     if (this.selectedNotes.size > 0 && typeof window.saveStateBeforeChange === 'function') {
       window.saveStateBeforeChange();
@@ -2058,6 +2167,10 @@ export class NoteEditor {
 
     const fullDeletions = [];
     const pitchDeletions = [];
+
+    const compositionState = window.getCompositionState?.();
+    const beatsPerMeasure = compositionState ?
+      getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature) : 4;
 
     for (const noteId of this.selectedNotes) {
       const [measureIndex, staff, voiceIndex, noteIndex, pitchIndex] = this.parseNoteId(noteId);
@@ -2067,7 +2180,7 @@ export class NoteEditor {
         pitchDeletions.push({ measureIndex, staff, voiceIndex, noteIndex, pitchIndex, noteId });
       } else {
         // Full note deletion
-        const deletion = { measureIndex, staff, voiceIndex, noteIndex };
+        const deletion = { measureIndex, staff, voiceIndex, noteIndex, shiftDelete };
 
         // For auto-generated rests (noteIndex === -1), include beat/duration from stored info
         if (noteIndex === -1 && this.autoGeneratedRestInfo?.has(noteId)) {
@@ -2075,8 +2188,19 @@ export class NoteEditor {
           deletion.beat = restInfo.beat;
           deletion.duration = restInfo.duration;
           deletion.isAutoGenerated = true;
+        } else if (compositionState) {
+          // Get beat info for proper sorting in shift-delete mode
+          const measure = compositionState.measures[measureIndex];
+          const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+          const notes = measure?.notation?.[voiceKey]?.voices?.[voiceIndex]?.notes;
+          if (notes && noteIndex < notes.length) {
+            deletion.beat = notes[noteIndex].beat || 0;
+            deletion.duration = notes[noteIndex].duration || '4n';
+          }
         }
 
+        // Calculate absolute beat for proper sorting
+        deletion.absoluteBeat = measureIndex * beatsPerMeasure + (deletion.beat || 0);
         fullDeletions.push(deletion);
       }
     }
@@ -2086,11 +2210,39 @@ export class NoteEditor {
       this.deletePitchesFromChords(pitchDeletions);
     }
 
-    // Sort full deletions by noteIndex descending so we delete from end first
-    fullDeletions.sort((a, b) => b.noteIndex - a.noteIndex);
+    if (shiftDelete) {
+      // For shift delete, sort by absolute beat ASCENDING (earliest first)
+      // and calculate total beats to shift, then do one combined shift
+      fullDeletions.sort((a, b) => a.absoluteBeat - b.absoluteBeat);
 
-    for (const deletion of fullDeletions) {
-      this.onNoteDelete(deletion);
+      // Group deletions by staff and voice for combined processing
+      const groupedDeletions = new Map();
+      for (const deletion of fullDeletions) {
+        const key = `${deletion.staff}-${deletion.voiceIndex}`;
+        if (!groupedDeletions.has(key)) {
+          groupedDeletions.set(key, []);
+        }
+        groupedDeletions.get(key).push(deletion);
+      }
+
+      // Process each staff/voice group
+      for (const [key, deletions] of groupedDeletions) {
+        // Mark as batch operation - only the first one triggers the shift
+        // The shift will handle all deletions in this group
+        if (deletions.length > 0) {
+          const firstDeletion = deletions[0];
+          firstDeletion.batchDeletions = deletions;
+          this.onNoteDelete(firstDeletion);
+        }
+      }
+    } else {
+      // For normal delete (replace with rest), sort by noteIndex descending
+      // so we delete from end first (indices don't shift when replacing with rest)
+      fullDeletions.sort((a, b) => b.noteIndex - a.noteIndex);
+
+      for (const deletion of fullDeletions) {
+        this.onNoteDelete(deletion);
+      }
     }
 
     this.clearSelection();
@@ -2338,6 +2490,7 @@ export class NoteEditor {
    * Insert a note before the first selected note
    */
   insertNoteBeforeSelected() {
+    console.log('[SHIFT-INSERT] insertNoteBeforeSelected called, selectedNotes:', Array.from(this.selectedNotes));
 
     if (this.selectedNotes.size === 0) {
       console.warn('[NoteEditor] No notes selected for insert before');
@@ -2346,7 +2499,9 @@ export class NoteEditor {
 
     // Get the first selected note
     const firstNoteId = Array.from(this.selectedNotes)[0];
+    console.log('[SHIFT-INSERT] First note ID:', firstNoteId);
     const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(firstNoteId);
+    console.log('[SHIFT-INSERT] Parsed: measureIndex=', measureIndex, 'staff=', staff, 'voiceIndex=', voiceIndex, 'noteIndex=', noteIndex);
 
     // Get beats per measure from time signature
     const compositionStateCheck = window.getCompositionState?.();
@@ -2367,6 +2522,8 @@ export class NoteEditor {
     }
 
     // Create new note with current toolbar settings
+    // DEBUG: Log articulation state to trace unexpected staccato
+    console.log('[SHIFT-INSERT-BEFORE] Creating noteData with articulation:', this.currentArticulation);
     const noteData = {
       pitch: 'C4', // Default pitch, user can change it
       pitches: ['C4'],
@@ -2390,8 +2547,10 @@ export class NoteEditor {
     // Calculate current beats used in measure
     let usedBeats = 0;
     for (const note of voice.notes) {
-      let beats = this.durationToBeats(note.duration || '4n');
-      if (note.dotted) beats *= 1.5;
+      const duration = note.duration || '4n';
+      const hasDotInString = duration.includes('.');
+      let beats = this.durationToBeats(duration);
+      if (note.dotted && !hasDotInString) beats *= 1.5;
       // Account for tuplet notes (e.g., triplet quarter notes take 0.667 beats, not 1)
       if (note.tuplet && note.tuplet.type && TUPLET_RATIOS[note.tuplet.type]) {
         const ratio = TUPLET_RATIOS[note.tuplet.type];
@@ -2408,29 +2567,38 @@ export class NoteEditor {
       requestedBeats = requestedBeats * (ratio.normal / ratio.actual);
     }
     const availableBeats = maxBeats - usedBeats;
+    console.log('[SHIFT-INSERT] Overflow check: usedBeats=', usedBeats, 'requestedBeats=', requestedBeats, 'availableBeats=', availableBeats);
 
-    // Check for overflow - for treble clef, show dialog; for bass, just block
-    if (requestedBeats > availableBeats) {
-      if (staff === 'treble') {
-        const overflowBeats = requestedBeats - availableBeats;
+    // Shift+Arrow should ALWAYS shift downstream notes
+    // Only show dialog if there would be overflow (notes pushed past measure end)
+    const wouldOverflow = (usedBeats + requestedBeats) > maxBeats;
+    console.log('[SHIFT-INSERT] wouldOverflow=', wouldOverflow);
 
-        showNoteOverflowDialog({
-          overflowBeats,
-          noteDuration: this.currentDuration,
-          onChoice: (choice) => {
-            if (choice === null) {
-              return;
+    if (wouldOverflow) {
+      const overflowBeats = (usedBeats + requestedBeats) - maxBeats;
+      console.log('[SHIFT-INSERT] Overflow detected! Showing dialog. overflowBeats=', overflowBeats);
+
+      showNoteOverflowDialog({
+        overflowBeats,
+        noteDuration: this.currentDuration,
+        onChoice: (choice) => {
+          console.log('[SHIFT-INSERT] insertNoteBeforeSelected dialog choice:', choice);
+          if (choice === null) {
+            return;
+          }
+
+          if (choice === 'truncate') {
+            console.log('[SHIFT-INSERT] Taking TRUNCATE path');
+            // Truncate: Insert the note at the position and remove any notes that overflow
+            // Calculate the beat position where we're inserting
+            let insertBeat = 0;
+            for (let i = 0; i < noteIndex; i++) {
+              const dur = voice.notes[i].duration || '4n';
+              const hasDot = dur.includes('.');
+              let beats = this.durationToBeats(dur);
+              if (voice.notes[i].dotted && !hasDot) beats *= 1.5;
+              insertBeat += beats;
             }
-
-            if (choice === 'truncate') {
-              // Truncate: Insert the note at the position and remove any notes that overflow
-              // Calculate the beat position where we're inserting
-              let insertBeat = 0;
-              for (let i = 0; i < noteIndex; i++) {
-                let beats = this.durationToBeats(voice.notes[i].duration || '4n');
-                if (voice.notes[i].dotted) beats *= 1.5;
-                insertBeat += beats;
-              }
 
               const maxBeats = beatsPerMeasure; // Use time signature
               const spaceAfterInsertPoint = maxBeats - insertBeat;
@@ -2469,27 +2637,52 @@ export class NoteEditor {
 
               this.composerIntegration.render();
             } else if (choice === 'shift') {
-              // Shift: use treble block sequence
-              this.insertTrebleNoteWithShiftAtPosition(
-                measureIndex,
-                { action: 'before', noteIndex },
-                noteData,
-                compositionState
-              );
+              console.log('[SHIFT-INSERT] Taking SHIFT path, staff=', staff);
+              // Shift: use appropriate method based on staff
+              if (staff === 'treble') {
+                console.log('[SHIFT-INSERT] Calling insertTrebleNoteWithShiftAtPosition');
+                this.insertTrebleNoteWithShiftAtPosition(
+                  measureIndex,
+                  { action: 'before', noteIndex, voiceIndex },
+                  noteData,
+                  compositionState
+                );
+              } else {
+                console.log('[SHIFT-INSERT] Calling insertBassNoteWithShiftAtPosition');
+                // Bass clef: use shiftNotesForward approach
+                this.insertBassNoteWithShiftAtPosition(
+                  measureIndex,
+                  { action: 'before', noteIndex, voiceIndex },
+                  noteData,
+                  compositionState,
+                  beatsPerMeasure
+                );
+              }
             }
           },
         });
         return;
-      } else {
-        // Bass clef - just block the insertion
-        console.warn('[NoteEditor] Measure is full, cannot insert note');
-        return;
       }
-    }
 
-    // No overflow - insert directly
-    voice.notes.splice(noteIndex, 0, noteData);
-    this.composerIntegration.render();
+    // No overflow - but Shift+Arrow should still shift downstream notes
+    // Use the shift method directly
+    console.log('[SHIFT-INSERT] No overflow - using shift insert at noteIndex=', noteIndex);
+    if (staff === 'treble') {
+      this.insertTrebleNoteWithShiftAtPosition(
+        measureIndex,
+        { action: 'before', noteIndex, voiceIndex },
+        noteData,
+        compositionState
+      );
+    } else {
+      this.insertBassNoteWithShiftAtPosition(
+        measureIndex,
+        { action: 'before', noteIndex, voiceIndex },
+        noteData,
+        compositionState,
+        beatsPerMeasure
+      );
+    }
   }
 
   /**
@@ -2504,6 +2697,8 @@ export class NoteEditor {
     const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(lastNoteId);
 
     // Create new note with current toolbar settings
+    // DEBUG: Log articulation state to trace unexpected staccato
+    console.log('[SHIFT-INSERT-AFTER] Creating noteData with articulation:', this.currentArticulation);
     const noteData = {
       pitch: 'C4', // Default pitch, user can change it
       pitches: ['C4'],
@@ -2537,8 +2732,10 @@ export class NoteEditor {
     // Calculate current beats used in measure
     let usedBeats = 0;
     for (const note of voice.notes) {
-      let beats = this.durationToBeats(note.duration || '4n');
-      if (note.dotted) beats *= 1.5;
+      const duration = note.duration || '4n';
+      const hasDotInString = duration.includes('.');
+      let beats = this.durationToBeats(duration);
+      if (note.dotted && !hasDotInString) beats *= 1.5;
       // Account for tuplet notes (e.g., triplet quarter notes take 0.667 beats, not 1)
       if (note.tuplet && note.tuplet.type && TUPLET_RATIOS[note.tuplet.type]) {
         const ratio = TUPLET_RATIOS[note.tuplet.type];
@@ -2568,108 +2765,135 @@ export class NoteEditor {
       return;
     }
 
-    // Check for overflow - for treble clef, show dialog; for bass, just block
-    if (requestedBeats > availableBeats) {
-      if (staff === 'treble') {
-        const overflowBeats = requestedBeats - availableBeats;
+    // Shift+Arrow should ALWAYS shift downstream notes
+    // Only show dialog if there would be overflow (notes pushed past measure end)
+    const wouldOverflow = (usedBeats + requestedBeats) > maxBeats;
 
-        showNoteOverflowDialog({
-          overflowBeats,
-          noteDuration: this.currentDuration,
-          onChoice: (choice) => {
-            if (choice === null) {
+    if (wouldOverflow) {
+      const overflowBeats = (usedBeats + requestedBeats) - maxBeats;
+
+      showNoteOverflowDialog({
+        overflowBeats,
+        noteDuration: this.currentDuration,
+        onChoice: (choice) => {
+          if (choice === null) {
+            return;
+          }
+
+          if (choice === 'truncate') {
+            // Truncate: Insert the note after the selected and remove any notes that overflow
+            // Calculate the beat position after the selected note
+            let insertBeat = 0;
+            for (let i = 0; i <= noteIndex; i++) {
+              const dur = voice.notes[i].duration || '4n';
+              const hasDot = dur.includes('.');
+              let beats = this.durationToBeats(dur);
+              if (voice.notes[i].dotted && !hasDot) beats *= 1.5;
+              insertBeat += beats;
+            }
+
+            const maxBeats = beatsPerMeasure; // Use time signature
+            const spaceAfterInsertPoint = maxBeats - insertBeat;
+
+            if (spaceAfterInsertPoint <= 0) {
+              console.warn('[NoteEditor] No space at insert position');
               return;
             }
 
-            if (choice === 'truncate') {
-              // Truncate: Insert the note after the selected and remove any notes that overflow
-              // Calculate the beat position after the selected note
-              let insertBeat = 0;
-              for (let i = 0; i <= noteIndex; i++) {
-                let beats = this.durationToBeats(voice.notes[i].duration || '4n');
-                if (voice.notes[i].dotted) beats *= 1.5;
-                insertBeat += beats;
+            // Determine the duration for the new note (truncate if needed)
+            let newNoteBeats = requestedBeats;
+            if (newNoteBeats > spaceAfterInsertPoint) {
+              newNoteBeats = spaceAfterInsertPoint;
+            }
+            const fitDuration = this.beatsToDuration(newNoteBeats);
+
+            // Calculate which notes need to be removed to make room for the new note
+            // Only remove notes that would overlap with the new note's duration
+            const insertPosition = noteIndex + 1;
+            const newNoteEndBeat = insertBeat + newNoteBeats;
+
+            // Find which notes to keep after the new note
+            let currentBeat = insertBeat;
+            let notesToRemove = 0;
+            for (let i = insertPosition; i < voice.notes.length; i++) {
+              const dur = voice.notes[i].duration || '4n';
+              const hasDot = dur.includes('.');
+              let noteBeats = this.durationToBeats(dur);
+              if (voice.notes[i].dotted && !hasDot) noteBeats *= 1.5;
+
+              // If this note starts before the new note would end, it needs to be removed
+              if (currentBeat < newNoteEndBeat) {
+                notesToRemove++;
+                currentBeat += noteBeats;
+              } else {
+                break;
               }
+            }
 
-              const maxBeats = beatsPerMeasure; // Use time signature
-              const spaceAfterInsertPoint = maxBeats - insertBeat;
+            // Remove only the notes that overlap with the new note
+            voice.notes.splice(insertPosition, notesToRemove);
 
-              if (spaceAfterInsertPoint <= 0) {
-                console.warn('[NoteEditor] No space at insert position');
-                return;
-              }
+            // Insert the new note at the correct position
+            const truncatedNote = {
+              ...noteData,
+              duration: fitDuration.duration,
+              dotted: fitDuration.dotted,
+              beat: insertBeat,
+            };
+            voice.notes.splice(insertPosition, 0, truncatedNote);
 
-              // Determine the duration for the new note (truncate if needed)
-              let newNoteBeats = requestedBeats;
-              if (newNoteBeats > spaceAfterInsertPoint) {
-                newNoteBeats = spaceAfterInsertPoint;
-              }
-              const fitDuration = this.beatsToDuration(newNoteBeats);
+            // Recalculate beat positions
+            this.recalculateBeatPositions(voice.notes);
 
-              // Calculate which notes need to be removed to make room for the new note
-              // Only remove notes that would overlap with the new note's duration
-              const insertPosition = noteIndex + 1;
-              const newNoteEndBeat = insertBeat + newNoteBeats;
+            // Sync to treble block sequence if needed
+            if (staff === 'treble' && compositionState.trebleBlockSequence?.blocks?.length > 0) {
+              compositionState.syncMeasuresToTrebleBlock();
+            }
 
-              // Find which notes to keep after the new note
-              let currentBeat = insertBeat;
-              let notesToRemove = 0;
-              for (let i = insertPosition; i < voice.notes.length; i++) {
-                let noteBeats = this.durationToBeats(voice.notes[i].duration || '4n');
-                if (voice.notes[i].dotted) noteBeats *= 1.5;
-
-                // If this note starts before the new note would end, it needs to be removed
-                if (currentBeat < newNoteEndBeat) {
-                  notesToRemove++;
-                  currentBeat += noteBeats;
-                } else {
-                  break;
-                }
-              }
-
-              // Remove only the notes that overlap with the new note
-              voice.notes.splice(insertPosition, notesToRemove);
-
-              // Insert the new note at the correct position
-              const truncatedNote = {
-                ...noteData,
-                duration: fitDuration.duration,
-                dotted: fitDuration.dotted,
-                beat: insertBeat,
-              };
-              voice.notes.splice(insertPosition, 0, truncatedNote);
-
-              // Recalculate beat positions
-              this.recalculateBeatPositions(voice.notes);
-
-              // Sync to treble block sequence if needed
-              if (staff === 'treble' && compositionState.trebleBlockSequence?.blocks?.length > 0) {
-                compositionState.syncMeasuresToTrebleBlock();
-              }
-
-              this.composerIntegration.render();
-            } else if (choice === 'shift') {
-              // Shift: use treble block sequence
+            this.composerIntegration.render();
+          } else if (choice === 'shift') {
+            // Shift: use appropriate method based on staff
+            if (staff === 'treble') {
               this.insertTrebleNoteWithShiftAtPosition(
                 measureIndex,
-                { action: 'after', noteIndex },
+                { action: 'after', noteIndex, voiceIndex },
                 noteData,
                 compositionState
               );
+            } else {
+              // Bass clef: use shiftNotesForward approach
+              this.insertBassNoteWithShiftAtPosition(
+                measureIndex,
+                { action: 'after', noteIndex, voiceIndex },
+                noteData,
+                compositionState,
+                beatsPerMeasure
+              );
             }
-          },
-        });
-        return;
-      } else {
-        // Bass clef - just block the insertion
-        console.warn('[NoteEditor] Measure is full, cannot insert note');
-        return;
-      }
+          }
+        },
+      });
+      return;
     }
 
-    // No overflow - insert directly
-    voice.notes.splice(noteIndex + 1, 0, noteData);
-    this.composerIntegration.render();
+    // No overflow - but Shift+Arrow should still shift downstream notes
+    // Use the shift method directly
+    if (staff === 'treble') {
+      this.insertTrebleNoteWithShiftAtPosition(
+        measureIndex,
+        { action: 'after', noteIndex, voiceIndex },
+        noteData,
+        compositionState
+      );
+    } else {
+      this.insertBassNoteWithShiftAtPosition(
+        measureIndex,
+        { action: 'after', noteIndex, voiceIndex },
+        noteData,
+        compositionState,
+        beatsPerMeasure
+      );
+    }
   }
 
   /**
@@ -2810,8 +3034,10 @@ export class NoteEditor {
           let usedBeats = 0;
           for (let i = 0; i < voice.notes.length; i++) {
             if (i !== noteIndex) {
-              let beats = this.durationToBeats(voice.notes[i].duration || '4n');
-              if (voice.notes[i].dotted) beats *= 1.5;
+              const dur = voice.notes[i].duration || '4n';
+              const hasDot = dur.includes('.');
+              let beats = this.durationToBeats(dur);
+              if (voice.notes[i].dotted && !hasDot) beats *= 1.5;
               usedBeats += beats;
             }
           }
@@ -3175,8 +3401,10 @@ export class NoteEditor {
     let noteBeatInMeasure = 0;
     for (let i = 0; i < noteIndex; i++) {
       const prevNote = voice.notes[i];
-      let prevBeats = this.durationToBeats(prevNote.duration || '4n');
-      if (prevNote.dotted) prevBeats *= 1.5;
+      const prevDur = prevNote.duration || '4n';
+      const prevHasDot = prevDur.includes('.');
+      let prevBeats = this.durationToBeats(prevDur);
+      if (prevNote.dotted && !prevHasDot) prevBeats *= 1.5;
       noteBeatInMeasure += prevBeats;
     }
 
@@ -3483,6 +3711,9 @@ export class NoteEditor {
       }
 
       this.composerIntegration.render(true); // Force immediate render
+
+      // Dispatch event for tutorial validation
+      dispatchBuilderEvent('notationTieCreated', { changedCount, selectedNotes: Array.from(this.selectedNotes) });
     }
   }
 
@@ -4385,6 +4616,9 @@ export class NoteEditor {
     this.hideSelectionHighlight = false; // Show highlight when selecting
     this.onNoteSelect(Array.from(this.selectedNotes));
     this.renderOverlay();
+
+    // Dispatch event for tutorial validation
+    dispatchBuilderEvent('notationNoteSelected', { noteId, selectedNotes: Array.from(this.selectedNotes) });
   }
 
   /**
@@ -4400,6 +4634,9 @@ export class NoteEditor {
     this.hideSelectionHighlight = false; // Show highlight when toggling
     this.onNoteSelect(Array.from(this.selectedNotes));
     this.renderOverlay();
+
+    // Dispatch event for tutorial validation
+    dispatchBuilderEvent('notationNoteSelected', { noteId, selectedNotes: Array.from(this.selectedNotes) });
   }
 
   /**
@@ -4596,8 +4833,12 @@ export class NoteEditor {
         if (voice && voice.notes) {
           let usedBeats = 0;
           for (const note of voice.notes) {
-            let beats = this.durationToBeats(note.duration || '4n');
-            if (note.dotted) beats *= 1.5;
+            const duration = note.duration || '4n';
+            // durationToBeats handles dotted suffix in string (e.g., '2n.'),
+            // so only apply note.dotted if duration doesn't already have a dot
+            const hasDotInString = duration.includes('.');
+            let beats = this.durationToBeats(duration);
+            if (note.dotted && !hasDotInString) beats *= 1.5;
             // Account for tuplet notes (e.g., triplet quarter notes take 0.667 beats, not 1)
             if (note.tuplet && note.tuplet.type && TUPLET_RATIOS[note.tuplet.type]) {
               const ratio = TUPLET_RATIOS[note.tuplet.type];
@@ -4868,8 +5109,10 @@ export class NoteEditor {
         const noteBeat = (note.beat || 0) + measureStartBeat;
         // Only count notes that fall within this segment's beat range
         if (noteBeat >= overlapStart && noteBeat < overlapEnd) {
-          let noteBeats = this.durationToBeats(note.duration || '4n');
-          if (note.dotted) noteBeats *= 1.5;
+          const dur = note.duration || '4n';
+          const hasDot = dur.includes('.');
+          let noteBeats = this.durationToBeats(dur);
+          if (note.dotted && !hasDot) noteBeats *= 1.5;
           // Account for tuplet notes (e.g., triplet quarter notes take 0.667 beats, not 1)
           if (note.tuplet && note.tuplet.type && TUPLET_RATIOS[note.tuplet.type]) {
             const ratio = TUPLET_RATIOS[note.tuplet.type];
@@ -5967,6 +6210,452 @@ export class NoteEditor {
   }
 
   /**
+   * Clear any notes/rests at a specific beat position that would conflict with a new note
+   * @param {Object} voice - The voice object containing notes array
+   * @param {number} beat - The beat position to clear
+   * @param {number} duration - Duration in beats of the note being inserted
+   * @param {number} beatsPerMeasure - Beats per measure for validation
+   */
+  clearConflictingNotesAtBeat(voice, beat, duration, beatsPerMeasure) {
+    if (!voice.notes) return;
+
+    const noteEnd = beat + duration;
+
+    // Remove any notes that overlap with the beat range [beat, beat+duration)
+    voice.notes = voice.notes.filter(note => {
+      const noteBeat = note.beat || 0;
+      const noteDuration = this.getDurationInBeats(note.duration || '4n');
+      const noteEndBeat = noteBeat + noteDuration;
+
+      // Check for overlap: notes overlap if their ranges intersect
+      const overlaps = noteBeat < noteEnd && noteEndBeat > beat;
+
+      if (overlaps) {
+        console.log(`[clearConflictingNotesAtBeat] Removing overlapping note at beat ${noteBeat}, duration ${note.duration}`);
+      }
+
+      return !overlaps;
+    });
+  }
+
+  /**
+   * Validate that a measure doesn't exceed beatsPerMeasure
+   * @param {Object} measure - The measure object
+   * @param {string} staff - 'treble' or 'bass'
+   * @param {number} voiceIndex - Voice index
+   * @param {number} beatsPerMeasure - Expected beats per measure
+   * @param {number} measureIndex - For logging
+   * @returns {boolean} - True if valid
+   */
+  validateMeasureDuration(measure, staff, voiceIndex, beatsPerMeasure, measureIndex) {
+    if (!measure) return true;
+
+    const voices = staff === 'treble' ? measure.notation.treble?.voices : measure.notation.bass?.voices;
+    if (!voices || !voices[voiceIndex]) return true;
+
+    const notes = voices[voiceIndex].notes || [];
+    let maxEndBeat = 0;
+
+    for (const note of notes) {
+      const noteBeat = note.beat || 0;
+      const noteDuration = this.getDurationInBeats(note.duration || '4n');
+      const noteEndBeat = noteBeat + noteDuration;
+
+      if (noteEndBeat > beatsPerMeasure) {
+        console.error(`[validateMeasureDuration] VIOLATION: Measure ${measureIndex + 1} has note ending at beat ${noteEndBeat} (max: ${beatsPerMeasure})`);
+        return false;
+      }
+
+      maxEndBeat = Math.max(maxEndBeat, noteEndBeat);
+    }
+
+    return true;
+  }
+
+  /**
+   * Shift notes backward by a given number of beats (used for shift-delete)
+   * Handles merging tied notes that no longer cross measure boundaries
+   * and splitting notes that now cross boundaries
+   */
+  shiftNotesBackward(fromMeasure, fromBeat, shiftBeats, staff, voiceIndex, compositionState, beatsPerMeasure) {
+    console.log('[shiftNotesBackward] === Starting shift ===');
+    console.log('[shiftNotesBackward] fromMeasure:', fromMeasure + 1, 'fromBeat:', fromBeat, 'shiftBeats:', shiftBeats);
+
+    // Collect all notes that need to be shifted from the specific voice
+    const notesToShift = [];
+
+    for (let m = fromMeasure; m < compositionState.measures.length; m++) {
+      const measure = compositionState.measures[m];
+      if (!measure) continue;
+
+      const voices = staff === 'treble' ? measure.notation.treble?.voices : measure.notation.bass?.voices;
+      if (!voices || !voices[voiceIndex]) continue;
+
+      const voice = voices[voiceIndex];
+      if (!voice.notes) continue;
+
+      for (let i = voice.notes.length - 1; i >= 0; i--) {
+        const note = voice.notes[i];
+        const noteBeat = note.beat || 0;
+
+        // Check if this note should be shifted (after the deletion point)
+        if (m > fromMeasure || (m === fromMeasure && noteBeat >= fromBeat)) {
+          console.log(`[shiftNotesBackward] Collecting note for shift: measure ${m + 1}, beat ${noteBeat}, duration ${note.duration}, pitch ${note.pitch || note.pitches}`);
+          notesToShift.push({
+            measureIndex: m,
+            noteIndex: i,
+            voiceIndex: voiceIndex,
+            note: JSON.parse(JSON.stringify(note)),
+          });
+          // Remove from current position
+          voice.notes.splice(i, 1);
+        }
+      }
+    }
+
+    console.log('[shiftNotesBackward] Notes collected for shifting:', notesToShift.length);
+
+    // Check if we need to merge tied notes that were split across measures
+    // First, identify pairs of tied notes in the collected notes
+    const mergedNotes = this.mergeTiedNotes(notesToShift, beatsPerMeasure, shiftBeats);
+    console.log('[shiftNotesBackward] After mergeTiedNotes:', mergedNotes.length, 'notes');
+
+    // Re-insert notes at shifted positions
+    for (const item of mergedNotes) {
+      const oldAbsoluteBeat = item.measureIndex * beatsPerMeasure + (item.note.beat || 0);
+      const newAbsoluteBeat = oldAbsoluteBeat - shiftBeats;
+
+      console.log(`[shiftNotesBackward] Processing note: oldAbsoluteBeat=${oldAbsoluteBeat}, newAbsoluteBeat=${newAbsoluteBeat}`);
+
+      // Skip if would go before the start of composition
+      if (newAbsoluteBeat < 0) {
+        console.log('[shiftNotesBackward] SKIPPING - would be negative beat');
+        continue;
+      }
+
+      const newMeasure = Math.floor(newAbsoluteBeat / beatsPerMeasure);
+      const newBeat = newAbsoluteBeat % beatsPerMeasure;
+
+      console.log(`[shiftNotesBackward] New position: measure ${newMeasure + 1}, beat ${newBeat}`);
+
+      if (newMeasure >= compositionState.measures.length) {
+        console.log('[shiftNotesBackward] SKIPPING - measure out of range');
+        continue;
+      }
+
+      const measure = compositionState.measures[newMeasure];
+      if (!measure) continue;
+
+      const voices = staff === 'treble' ? measure.notation.treble?.voices : measure.notation.bass?.voices;
+      if (!voices) continue;
+
+      while (voices.length <= voiceIndex) {
+        voices.push({ notes: [] });
+      }
+      const voice = voices[voiceIndex];
+
+      // Check if note needs to be split across measure boundary
+      const noteDuration = this.getDurationInBeats(item.note.duration || '4n');
+      const noteEndBeat = newBeat + noteDuration;
+
+      console.log(`[shiftNotesBackward] Note duration: ${item.note.duration} = ${noteDuration} beats, endBeat: ${noteEndBeat}, beatsPerMeasure: ${beatsPerMeasure}`);
+
+      if (noteEndBeat > beatsPerMeasure) {
+        // Split note across measure boundary
+        const firstPartBeats = beatsPerMeasure - newBeat;
+        const secondPartBeats = noteEndBeat - beatsPerMeasure;
+
+        console.log(`[shiftNotesBackward] SPLITTING: firstPartBeats=${firstPartBeats} -> ${this.beatsToDurationString(firstPartBeats)}, secondPartBeats=${secondPartBeats} -> ${this.beatsToDurationString(secondPartBeats)}`);
+
+        // Check if original note had forward tie (to preserve chain)
+        const originalHadForwardTie = item.note.tied === true;
+        console.log(`[shiftNotesBackward] SPLIT: originalHadForwardTie=${originalHadForwardTie}, item.note.tied=${item.note.tied}, item.note.isTied=${item.note.isTied}`);
+
+        // First part (tied forward to second part)
+        const firstNote = {
+          ...item.note,
+          beat: newBeat,
+          duration: this.beatsToDurationString(firstPartBeats),
+          tied: true,  // Always ties forward to the second part
+        };
+        // Keep isTied if original had it (was tied FROM a previous note)
+        // NOTE: Use explicit false instead of delete to survive serialization
+        if (!item.note.isTied) {
+          firstNote.isTied = false;
+        }
+        console.log(`[shiftNotesBackward] SPLIT firstNote: beat=${firstNote.beat}, duration=${firstNote.duration}, tied=${firstNote.tied}, isTied=${firstNote.isTied}`);
+        // Clear any conflicting notes before inserting
+        this.clearConflictingNotesAtBeat(voice, newBeat, firstPartBeats, beatsPerMeasure);
+        voice.notes.push(firstNote);
+
+        // Second part in next measure
+        const nextMeasureIndex = newMeasure + 1;
+        if (nextMeasureIndex < compositionState.measures.length) {
+          const nextMeasure = compositionState.measures[nextMeasureIndex];
+          const nextVoices = staff === 'treble' ? nextMeasure.notation.treble?.voices : nextMeasure.notation.bass?.voices;
+          if (nextVoices) {
+            while (nextVoices.length <= voiceIndex) {
+              nextVoices.push({ notes: [] });
+            }
+            const secondNote = {
+              ...item.note,
+              beat: 0,
+              duration: this.beatsToDurationString(secondPartBeats),
+              isTied: true,  // Always tied FROM the first part
+            };
+            // PRESERVE the forward tie if original had one (maintains chain to next note)
+            // NOTE: Use explicit false instead of delete to survive serialization
+            if (!originalHadForwardTie) {
+              secondNote.tied = false;
+            }
+            console.log(`[shiftNotesBackward] SPLIT secondNote: beat=${secondNote.beat}, duration=${secondNote.duration}, tied=${secondNote.tied}, isTied=${secondNote.isTied}`);
+            // Clear any conflicting notes before inserting
+            this.clearConflictingNotesAtBeat(nextVoices[voiceIndex], 0, secondPartBeats, beatsPerMeasure);
+            nextVoices[voiceIndex].notes.push(secondNote);
+          }
+        }
+      } else {
+        // Note fits in measure
+        const newNote = { ...item.note, beat: newBeat };
+        // CRITICAL: Ensure tied and isTied are always booleans (not undefined) to survive serialization
+        if (newNote.tied === undefined) {
+          newNote.tied = false;
+        }
+        if (newNote.isTied === undefined) {
+          newNote.isTied = false;
+        }
+        if (item.wasMerged) {
+          // Only clear isTied - the merged note absorbed what it was tied FROM
+          // But PRESERVE tied if the merged note should still tie FORWARD to another note
+          // NOTE: Use explicit false instead of delete to survive serialization
+          newNote.isTied = false;
+          // Note: tied flag was already correctly set/unset in mergeTiedNotes based on continuation.note.tied
+        }
+        console.log(`[shiftNotesBackward] Inserting note at measure ${newMeasure + 1}, beat ${newBeat}, duration ${newNote.duration}, tied=${newNote.tied}, isTied=${newNote.isTied}`);
+        // Clear any conflicting notes before inserting
+        const noteDurationBeats = this.getDurationInBeats(newNote.duration || '4n');
+        this.clearConflictingNotesAtBeat(voice, newBeat, noteDurationBeats, beatsPerMeasure);
+        voice.notes.push(newNote);
+      }
+
+      // Sort notes by beat
+      voice.notes.sort((a, b) => (a.beat || 0) - (b.beat || 0));
+    }
+
+    console.log('[shiftNotesBackward] === Shift complete ===');
+
+    // VALIDATION: Check all affected measures for duration violations
+    console.log('[shiftNotesBackward] === Validating measure durations ===');
+    for (let m = 0; m < compositionState.measures.length; m++) {
+      const isValid = this.validateMeasureDuration(compositionState.measures[m], staff, voiceIndex, beatsPerMeasure, m);
+      if (!isValid) {
+        console.error(`[shiftNotesBackward] Measure ${m + 1} failed validation!`);
+      }
+    }
+
+    // DEBUG: Log final state of affected measures
+    console.log('[shiftNotesBackward] === Final State Debug ===');
+    for (let m = 0; m < Math.min(3, compositionState.measures.length); m++) {
+      const measure = compositionState.measures[m];
+      if (!measure) continue;
+      const voices = staff === 'treble' ? measure.notation.treble?.voices : measure.notation.bass?.voices;
+      if (!voices || !voices[voiceIndex]) continue;
+      const voice = voices[voiceIndex];
+      let totalBeats = 0;
+      const noteDetails = voice.notes.map(n => {
+        const beats = this.getDurationInBeats(n.duration || '4n');
+        totalBeats += beats;
+        return {
+          beat: n.beat,
+          duration: n.duration,
+          beats: beats,
+          pitch: n.pitch || n.pitches,
+          tied: n.tied || false,
+          isTied: n.isTied || false
+        };
+      });
+      console.log(`[shiftNotesBackward] Measure ${m + 1}: totalBeats=${totalBeats}, notes=`, noteDetails);
+    }
+  }
+
+  /**
+   * Merge tied notes that will now fit in a single measure after shifting
+   * @param {Array} notesToShift - Notes being shifted
+   * @param {number} beatsPerMeasure - Beats per measure
+   * @param {number} shiftBeats - How many beats we're shifting backward
+   * @returns {Array} - Notes with merged tied pairs combined
+   */
+  mergeTiedNotes(notesToShift, beatsPerMeasure, shiftBeats) {
+    console.log('[mergeTiedNotes] === Starting merge check ===');
+    console.log('[mergeTiedNotes] Input notes:', notesToShift.length, 'shiftBeats:', shiftBeats);
+
+    // Sort notes by their absolute position
+    notesToShift.sort((a, b) => {
+      const aAbs = a.measureIndex * beatsPerMeasure + (a.note.beat || 0);
+      const bAbs = b.measureIndex * beatsPerMeasure + (b.note.beat || 0);
+      return aAbs - bAbs;
+    });
+
+    // Log each note to be processed
+    for (const item of notesToShift) {
+      console.log('[mergeTiedNotes] Note:', {
+        measure: item.measureIndex + 1,
+        beat: item.note.beat,
+        duration: item.note.duration,
+        pitch: item.note.pitch || item.note.pitches,
+        tied: item.note.tied,
+        isTied: item.note.isTied
+      });
+    }
+
+    // Run merge passes until no more merges happen
+    let workingList = [...notesToShift];
+    let mergeHappened = true;
+    let passCount = 0;
+
+    while (mergeHappened && passCount < 10) { // Safety limit
+      passCount++;
+      mergeHappened = false;
+      const result = [];
+      const processed = new Set();
+
+      console.log(`[mergeTiedNotes] === Merge pass ${passCount}, ${workingList.length} notes ===`);
+
+      for (let i = 0; i < workingList.length; i++) {
+        if (processed.has(i)) continue;
+
+        const item = workingList[i];
+        const note = item.note;
+
+        // Check if this note is tied forward (has a following tied note)
+        if (note.tied) {
+          console.log(`[mergeTiedNotes] Note ${i} has tied=true, looking for continuation...`);
+
+          // Calculate where this note ends (absolute beat)
+          const noteAbsoluteBeat = item.measureIndex * beatsPerMeasure + (note.beat || 0);
+          const noteDuration = this.getDurationInBeats(note.duration || '4n');
+          const noteEndAbsoluteBeat = noteAbsoluteBeat + noteDuration;
+
+          // Look for a continuation note that starts where this note ends
+          // Check for isTied=true OR same pitch at adjacent beat (for cases where isTied wasn't set properly)
+          const continuationIdx = workingList.findIndex((other, idx) => {
+            if (idx === i || processed.has(idx)) return false;
+
+            const otherAbsoluteBeat = other.measureIndex * beatsPerMeasure + (other.note.beat || 0);
+
+            // Check if this note ends where the other begins (with small tolerance for floating point)
+            const isAdjacent = Math.abs(noteEndAbsoluteBeat - otherAbsoluteBeat) < 0.001;
+            if (!isAdjacent) return false;
+
+            // Check pitch match (for single notes) or both are rests
+            const pitchMatch = note.pitch === other.note.pitch ||
+                              (note.isRest && other.note.isRest) ||
+                              (Array.isArray(note.pitches) && Array.isArray(other.note.pitches) &&
+                               JSON.stringify(note.pitches.sort()) === JSON.stringify(other.note.pitches.sort()));
+
+            if (!pitchMatch) return false;
+
+            // CRITICAL FIX: Only merge if the continuation note is ACTUALLY tied (isTied=true)
+            // Previous bug: merged notes just because they had same pitch and were adjacent
+            // This caused incorrect duration calculations and measure overflow
+            return other.note.isTied === true;
+          });
+
+          console.log(`[mergeTiedNotes] Looking for continuation at absoluteBeat ${noteEndAbsoluteBeat}, found at index: ${continuationIdx}`);
+
+          if (continuationIdx !== -1) {
+            const continuation = workingList[continuationIdx];
+
+            // Calculate where this merged note would end up
+            const oldAbsoluteBeat = item.measureIndex * beatsPerMeasure + (note.beat || 0);
+            const newAbsoluteBeat = oldAbsoluteBeat - shiftBeats;
+            const newMeasure = Math.floor(newAbsoluteBeat / beatsPerMeasure);
+            const newBeat = newAbsoluteBeat % beatsPerMeasure;
+
+            // Calculate combined duration
+            const firstDuration = this.getDurationInBeats(note.duration || '4n');
+            const secondDuration = this.getDurationInBeats(continuation.note.duration || '4n');
+            const combinedDuration = firstDuration + secondDuration;
+
+            console.log(`[mergeTiedNotes] Merge candidate: firstDuration=${firstDuration}, secondDuration=${secondDuration}, combined=${combinedDuration}`);
+            console.log(`[mergeTiedNotes] New position would be: measure ${newMeasure + 1}, beat ${newBeat}`);
+
+            // ALWAYS merge tied note chains - the reinsertion code will split again if needed
+            // This ensures the total duration is preserved correctly through the shift
+            {
+              // Merge the notes!
+              const mergedDurationStr = this.beatsToDurationString(combinedDuration);
+              console.log(`[mergeTiedNotes] MERGING! Combined ${combinedDuration} beats -> duration string: "${mergedDurationStr}"`);
+              console.log(`[mergeTiedNotes] First note isTied: ${note.isTied}, Continuation tied: ${continuation.note.tied}`);
+
+              const mergedNote = {
+                ...note,
+                duration: mergedDurationStr,
+              };
+
+              // PRESERVE the tie chain:
+              // - If the first note was tied FROM something (isTied), keep that
+              // - If the continuation was tied TO something (tied), keep that
+              // NOTE: Use explicit false instead of delete to survive serialization
+              if (!note.isTied) {
+                mergedNote.isTied = false;
+              }
+              // If continuation had tied=true (pointing to next note), preserve it
+              if (continuation.note.tied) {
+                mergedNote.tied = true;
+                console.log('[mergeTiedNotes] Preserving forward tie from continuation');
+              } else {
+                mergedNote.tied = false;
+              }
+
+              result.push({
+                ...item,
+                note: mergedNote,
+                wasMerged: true,
+              });
+
+              processed.add(i);
+              processed.add(continuationIdx);
+              mergeHappened = true; // A merge occurred, need another pass
+              continue;
+            }
+          }
+        }
+
+        // Not merged - add as-is
+        if (!processed.has(i)) {
+          console.log(`[mergeTiedNotes] Note ${i} not merged, passing through as-is`);
+          result.push(item);
+          processed.add(i);
+        }
+      } // end for loop
+
+      // Update working list for next pass
+      workingList = result;
+
+      // Re-sort for next pass
+      workingList.sort((a, b) => {
+        const aAbs = a.measureIndex * beatsPerMeasure + (a.note.beat || 0);
+        const bAbs = b.measureIndex * beatsPerMeasure + (b.note.beat || 0);
+        return aAbs - bAbs;
+      });
+    } // end while loop
+
+    console.log(`[mergeTiedNotes] Completed after ${passCount} passes, returning ${workingList.length} notes`);
+    console.log('[mergeTiedNotes] Final workingList:', workingList.map(item => ({
+      measureIndex: item.measureIndex,
+      beat: item.note.beat,
+      duration: item.note.duration,
+      beats: this.getDurationInBeats(item.note.duration || '4n'),
+      pitch: item.note.pitch || item.note.pitches,
+      tied: item.note.tied || false,
+      isTied: item.note.isTied || false,
+      wasMerged: item.wasMerged || false
+    })));
+    return workingList;
+  }
+
+  /**
    * Execute paste by deleting notes after position
    */
   executePasteWithDelete(startMeasure, startBeat, staff) {
@@ -6107,15 +6796,19 @@ export class NoteEditor {
    * Convert beats to duration string
    */
   beatsToDurationString(beats) {
-    if (beats >= 4) return '1n';
-    if (beats >= 3) return '2n.';
-    if (beats >= 2) return '2n';
-    if (beats >= 1.5) return '4n.';
-    if (beats >= 1) return '4n';
-    if (beats >= 0.75) return '8n.';
-    if (beats >= 0.5) return '8n';
-    if (beats >= 0.25) return '16n';
-    return '32n';
+    let result;
+    if (beats >= 4) result = '1n';
+    else if (beats >= 3) result = '2n.';
+    else if (beats >= 2) result = '2n';
+    else if (beats >= 1.5) result = '4n.';
+    else if (beats >= 1) result = '4n';
+    else if (beats >= 0.75) result = '8n.';
+    else if (beats >= 0.5) result = '8n';
+    else if (beats >= 0.25) result = '16n';
+    else result = '32n';
+
+    console.log(`[beatsToDurationString] ${beats} beats -> "${result}"`);
+    return result;
   }
 
   /**

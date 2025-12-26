@@ -11,6 +11,7 @@
 
 import { getCompositionState } from '../state/compositionState.js';
 import { getProgressionData, getCurrentKey } from '../state/trainerState.js';
+import { dispatchBuilderEvent } from '../ui/lessonGuidedMode.js';
 import { analyzeChordTone, CHORD_TONE_COLORS } from '../analysis/chordToneAnalyzer.js';
 import { StaffLayoutManager } from './staffLayouter.js';
 import { NotationToolbar } from './notationToolbar.js';
@@ -193,9 +194,9 @@ export class NotationComposer {
             window.handleRedo();
           }
         },
-        onDelete: () => {
+        onDelete: (shiftDelete = false) => {
           if (this.noteEditor) {
-            this.noteEditor.deleteSelectedNotes();
+            this.noteEditor.deleteSelectedNotes(shiftDelete);
           }
         },
         onTie: () => {
@@ -292,8 +293,10 @@ export class NotationComposer {
     // NOTE: We do NOT listen to chordChanged - it causes cascading sync issues
     // Instead, chord update functions call window.syncNotationFromProgression() directly
     if (this.compositionState) {
-      this.compositionState.events.on('noteAdded', () => {
+      this.compositionState.events.on('noteAdded', (measureIndex, staff, voiceIndex, note) => {
         this.render();
+        // Dispatch event for tutorial validation
+        dispatchBuilderEvent('notationNoteAdded', { measureIndex, staff, voiceIndex, note });
       });
       this.compositionState.events.on('noteRemoved', () => {
         this.render();
