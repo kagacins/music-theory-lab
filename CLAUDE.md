@@ -2,9 +2,35 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+---
+
+## 📚 NAVIGATION DOCUMENTS (READ THESE FIRST!)
+
+**Before exploring the codebase, consult these guides to avoid unnecessary context usage:**
+
+1. **[MODULE_INDEX.md](docs/MODULE_INDEX.md)** - Quick module navigation guide
+   - Find which module handles what functionality
+   - Locate files by feature area
+   - Understand module dependencies
+   - **Use this to find the right files without reading everything**
+
+2. **[API_REFERENCE.md](docs/API_REFERENCE.md)** - Key function signatures
+   - Quick lookup for function parameters and return types
+   - Critical data structures (Chord, Note, Measure objects)
+   - **Use this to understand APIs without reading full implementations**
+
+3. **[STATE_MANAGEMENT.md](docs/STATE_MANAGEMENT.md)** - State flow diagrams
+   - Data flow patterns (progression → compositionState → notation)
+   - Event synchronization sequences
+   - **Use this to understand state changes without tracing code**
+
+**Workflow:** When starting a task, check MODULE_INDEX.md first to find relevant files, then use API_REFERENCE.md for function signatures, and finally read specific files only as needed.
+
+---
+
 ## Project Overview
 
-Music Theory Lab is an interactive web application for music theory education and chord progression composition. It uses a **chord-first composition workflow** where users build chord progressions first, then the system auto-generates bass accompaniment and suggests melody notes based on harmonic context.
+Music Theory Lab is an interactive web application for music theory education and chord progression composition. It uses a **chord-first composition workflow** where users build chord progressions first, then the system auto-generate1s bass accompaniment and suggests melody notes based on harmonic context.
 
 ## Build Commands
 
@@ -573,3 +599,472 @@ For non-standard beat values, a compound duration system could be added that ret
 - `src/modules/notation/durationUtils.js` - Centralized duration utilities
 - `src/modules/notation/noteEditor.js` - Shift operations
 - `src/modules/notation/notationInit.js` - Note initialization
+
+---
+
+## 🚀 QUICK START GUIDES
+
+**These task-specific guides help you quickly implement common features without reading the entire codebase.**
+
+---
+
+### Quick Start: Adding a New Chord Type
+
+**Files to modify:** [src/data/music-data.js](src/data/music-data.js)
+
+1. **Add chord definition to `CHORD_DEFINITIONS`:**
+   ```javascript
+   'My New Chord': {
+     symbol: 'mynew',           // Display symbol (e.g., Cmynew)
+     intervals: [0, 4, 7, 11],  // Semitone intervals from root
+     group: 'Extended',         // CHORD_GROUPS category
+     commonInversions: [0, 1]   // Which inversions are common
+   }
+   ```
+
+2. **Test the chord:**
+   - Open Chord Builder tab
+   - Select your chord type from dropdown
+   - Verify symbol displays correctly
+   - Test playback
+   - Test in progressions
+
+3. **Add to `CHORD_GROUPS` (optional):**
+   ```javascript
+   Extended: [
+     'Dominant 9th',
+     'My New Chord',  // Add here
+     // ...
+   ]
+   ```
+
+**That's it!** The chord will automatically appear in all dropdowns and recommendation systems.
+
+---
+
+### Quick Start: Adding UI to Progression Builder
+
+**Files to modify:**
+- [index.html](index.html) - Add HTML
+- [src/modules/features/progressionBuilder.js](src/modules/features/progressionBuilder.js) - Add handler
+- [src/main.js](src/main.js) - Export to window
+
+**Steps:**
+
+1. **Add HTML in `index.html`:**
+   ```html
+   <!-- Find the #progression-builder-tab section -->
+   <button id="my-new-button" onclick="window.myNewFeature && window.myNewFeature()">
+     My Feature
+   </button>
+   ```
+
+2. **Add handler in `progressionBuilder.js`:**
+   ```javascript
+   export function myNewFeature() {
+     // Get composition state
+     const compState = getCompositionState();
+
+     // Modify progression
+     compState.updateChord(0, { root: 'D' });
+
+     // Sync (ALWAYS call both!)
+     syncProgressionToMelodyComposer();
+     refreshNotationFromProgression();
+   }
+   ```
+
+3. **Export in `main.js`:**
+   ```javascript
+   import { myNewFeature } from './modules/features/progressionBuilder.js';
+   window.myNewFeature = myNewFeature;
+   ```
+
+4. **Test:**
+   - Click your button
+   - Verify functionality works
+   - Check that notation updates
+
+---
+
+### Quick Start: Adding a Recommendation Engine
+
+**Files to create/modify:**
+- Create: `src/modules/features/myRecommendationEngine.js`
+- Modify: [src/modules/features/comprehensiveChordRecommendations.js](src/modules/features/comprehensiveChordRecommendations.js)
+
+**Steps:**
+
+1. **Create your recommendation engine:**
+   ```javascript
+   // src/modules/features/myRecommendationEngine.js
+   export function generateMyRecommendations(currentChord, key, previousChords) {
+     const recommendations = [];
+
+     // Your recommendation logic here
+     recommendations.push({
+       root: 'C',
+       type: 'Major',
+       inversion: 0,
+       score: 0.9,
+       reason: 'Why this works'
+     });
+
+     return recommendations;
+   }
+   ```
+
+2. **Integrate into comprehensive recommendations:**
+   ```javascript
+   // In comprehensiveChordRecommendations.js
+   import { generateMyRecommendations } from './myRecommendationEngine.js';
+
+   // Inside generateComprehensiveRecommendations():
+   const myRecs = generateMyRecommendations(currentChord, key, prevChords);
+   allRecommendations.push(...myRecs);
+   ```
+
+3. **Test:**
+   - Open Progression Builder
+   - Click "Suggestions" on a chord
+   - Verify your recommendations appear
+
+**See Also:** [docs/MODULE_INDEX.md](docs/MODULE_INDEX.md) - Recommendation engines section
+
+---
+
+### Quick Start: Modifying Chord Card Display
+
+**Files to modify:** [src/modules/features/progressionBuilder.js](src/modules/features/progressionBuilder.js)
+
+**Find the chord card HTML generation** (search for `createChordCard` or `updateSingleCard`):
+
+1. **Locate card HTML template:**
+   ```javascript
+   // Search for: "chord-card" or "progression-card"
+   // Around line ~2000-3000
+   ```
+
+2. **Add your custom HTML:**
+   ```javascript
+   cardHTML += `
+     <div class="my-custom-section">
+       ${chord.root} - ${chord.type}
+     </div>
+   `;
+   ```
+
+3. **Add event handlers if needed:**
+   ```javascript
+   // Add onclick handler
+   <button onclick="window.myCardAction && window.myCardAction(${index})">
+     Action
+   </button>
+   ```
+
+4. **Style with Tailwind classes:**
+   ```javascript
+   <div class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg">
+     Custom content
+   </div>
+   ```
+
+5. **Update all three card locations:**
+   - `#progression-visualization` (Progression Builder)
+   - `#melody-progression-visualization` (Melody Composer)
+   - `#builder-progression-visualization` (Chord Builder)
+
+**Tip:** Use `updateSingleCard(index)` to update all three cards at once.
+
+---
+
+### Quick Start: Adding a Modal Dialog
+
+**Files to create/modify:**
+- Create: `src/modules/ui/myCustomModal.js`
+- Modify: [src/main.js](src/main.js)
+- Modify: [index.html](index.html)
+
+**Steps:**
+
+1. **Create modal HTML in `index.html`:**
+   ```html
+   <!-- Add before closing </body> -->
+   <div id="my-custom-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+     <div class="bg-white rounded-lg p-6 max-w-2xl w-full">
+       <h2>My Custom Modal</h2>
+       <div id="my-modal-content"></div>
+       <button onclick="window.closeMyModal && window.closeMyModal()">Close</button>
+     </div>
+   </div>
+   ```
+
+2. **Create modal controller:**
+   ```javascript
+   // src/modules/ui/myCustomModal.js
+   export function showMyModal(data) {
+     const modal = document.getElementById('my-custom-modal');
+     const content = document.getElementById('my-modal-content');
+
+     // Populate content
+     content.innerHTML = `<p>${data.message}</p>`;
+
+     // Show modal
+     modal.classList.remove('hidden');
+   }
+
+   export function closeMyModal() {
+     const modal = document.getElementById('my-custom-modal');
+     modal.classList.add('hidden');
+   }
+   ```
+
+3. **Export in `main.js`:**
+   ```javascript
+   import { showMyModal, closeMyModal } from './modules/ui/myCustomModal.js';
+   window.showMyModal = showMyModal;
+   window.closeMyModal = closeMyModal;
+   ```
+
+4. **Open from anywhere:**
+   ```javascript
+   window.showMyModal({ message: 'Hello!' });
+   ```
+
+---
+
+### Quick Start: Adding a New State Property
+
+**Files to modify:** [src/modules/state/compositionState.js](src/modules/state/compositionState.js)
+
+**Steps:**
+
+1. **Add to CompositionState constructor:**
+   ```javascript
+   constructor() {
+     // ... existing properties
+     this.myNewProperty = initialValue;
+   }
+   ```
+
+2. **Add getter:**
+   ```javascript
+   getMyNewProperty() {
+     return this.myNewProperty;
+   }
+   ```
+
+3. **Add setter with event emission:**
+   ```javascript
+   setMyNewProperty(value) {
+     this.myNewProperty = value;
+     this.emit('myPropertyChanged', value);
+   }
+   ```
+
+4. **Listen for changes:**
+   ```javascript
+   const compState = getCompositionState();
+   compState.on('myPropertyChanged', (value) => {
+     console.log('Property changed:', value);
+   });
+   ```
+
+5. **Include in export/import:**
+   ```javascript
+   // In exportToProgressionData():
+   return {
+     // ... existing exports
+     myNewProperty: this.myNewProperty
+   };
+
+   // In importFromProgressionData():
+   this.myNewProperty = data.myNewProperty || defaultValue;
+   ```
+
+---
+
+### Quick Start: Modifying VexFlow Notation Display
+
+**Files to modify:**
+- [src/modules/notation/grandStaff.js](src/modules/notation/grandStaff.js) - Staff rendering
+- [src/modules/notation/vexFlowRenderer.js](src/modules/notation/vexFlowRenderer.js) - Low-level VexFlow
+
+**Common Tasks:**
+
+**1. Change staff appearance:**
+```javascript
+// In grandStaff.js, find stave creation:
+const stave = new Vex.Flow.Stave(x, y, width);
+stave.setContext(context);
+stave.setConfigForLines(5, { visible: true }); // Modify staff lines
+```
+
+**2. Add custom annotations:**
+```javascript
+// In vexFlowRenderer.js, when creating StaveNote:
+const staveNote = new Vex.Flow.StaveNote({
+  clef: 'treble',
+  keys: ['c/4'],
+  duration: 'q'
+});
+
+// Add annotation
+staveNote.addAnnotation(0, new Vex.Flow.Annotation('text')
+  .setFont('Arial', 10)
+  .setVerticalJustification(Vex.Flow.Annotation.VerticalJustify.TOP));
+```
+
+**3. Change note styling:**
+```javascript
+// In vexFlowRenderer.js:
+staveNote.setStyle({
+  fillStyle: 'blue',
+  strokeStyle: 'blue'
+});
+```
+
+**4. Refresh notation after changes:**
+```javascript
+refreshNotationFromProgression();
+```
+
+---
+
+### Quick Start: Adding Audio Playback
+
+**Files to use:**
+- [src/modules/audio/audioEngine.js](src/modules/audio/audioEngine.js) - Get instrument
+- [src/modules/audio/melodyGenerator.js](src/modules/audio/melodyGenerator.js) - Scheduling
+
+**Play a chord:**
+```javascript
+import { getPiano } from './modules/audio/audioEngine.js';
+
+async function playMyChord() {
+  const piano = getPiano();
+  if (!piano) {
+    console.error('Piano not ready');
+    return;
+  }
+
+  const notes = ['C4', 'E4', 'G4'];
+  const duration = '2n'; // Half note
+
+  // Trigger attack
+  piano.triggerAttackRelease(notes, duration);
+}
+```
+
+**Play a melody sequence:**
+```javascript
+import { getPiano } from './modules/audio/audioEngine.js';
+import Tone from 'tone';
+
+async function playMyMelody() {
+  const piano = getPiano();
+  const melody = [
+    { notes: ['C4'], duration: '4n', time: 0 },
+    { notes: ['E4'], duration: '4n', time: 0.5 },
+    { notes: ['G4'], duration: '4n', time: 1.0 }
+  ];
+
+  // Start Tone.js transport
+  Tone.Transport.cancel(); // Clear existing events
+
+  melody.forEach(note => {
+    Tone.Transport.schedule((time) => {
+      piano.triggerAttackRelease(note.notes, note.duration, time);
+    }, note.time);
+  });
+
+  Tone.Transport.start();
+}
+```
+
+**See Also:** [docs/API_REFERENCE.md](docs/API_REFERENCE.md#-audio-engine) - Audio functions
+
+---
+
+### Quick Start: Debugging State Issues
+
+**Useful console commands:**
+
+```javascript
+// View entire composition state
+window.getCompositionState().getMeasures();
+
+// View specific measure
+window.getCompositionState().getMeasure(0);
+
+// View chord segments (bass alignment)
+window.getCompositionState().getChordSegments();
+
+// Export to progression format
+window.getCompositionState().exportToProgressionData();
+
+// View settings
+window.getCompositionState().getSettings();
+
+// View current progression (legacy format)
+window.progressionData;
+
+// Force notation refresh
+window.refreshNotationFromProgression();
+
+// Force sync
+window.syncProgressionToMelodyComposer();
+```
+
+**See Also:** [docs/STATE_MANAGEMENT.md](docs/STATE_MANAGEMENT.md#-state-debugging)
+
+---
+
+### Quick Start: Running Tests
+
+**This project currently has no formal test suite.**
+
+**To manually test changes:**
+
+1. **Test Progression Builder:**
+   - Add chords
+   - Remove chords
+   - Swap chords (drag-and-drop)
+   - Change chord properties
+   - Play progression
+
+2. **Test Melody Composer:**
+   - Add notes to staff
+   - Edit notes
+   - Delete notes
+   - Generate melody suggestions
+
+3. **Test Chord Builder:**
+   - Build custom chord
+   - Preview chord
+   - Add to progression
+
+4. **Test Sync:**
+   - Make changes in progression → verify notation updates
+   - Make changes in notation → verify progression updates
+   - Change key → verify all chords respell correctly
+
+5. **Test Save/Load:**
+   - Save project
+   - Refresh page
+   - Load project
+   - Verify all data restored
+
+---
+
+## 📚 Additional Resources
+
+- [docs/MODULE_INDEX.md](docs/MODULE_INDEX.md) - Find modules by functionality
+- [docs/API_REFERENCE.md](docs/API_REFERENCE.md) - Function signatures and data structures
+- [docs/STATE_MANAGEMENT.md](docs/STATE_MANAGEMENT.md) - State flow and sync patterns
+- [docs/DEAD_CODE_AUDIT.md](docs/DEAD_CODE_AUDIT.md) - Known dead code (safe to ignore)
+- [docs/REFACTORING_PLAN.md](docs/REFACTORING_PLAN.md) - Future refactoring plans
+
+---
+
+**Last Updated:** 2025-12-26
