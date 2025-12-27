@@ -8,6 +8,7 @@
 
 import { TIME_SIGNATURES, DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
 import { dispatchBuilderEvent } from '../ui/lessonGuidedMode.js';
+import { getBaseDuration, isDotted as checkIsDotted } from './durationUtils.js';
 
 // ============================================================================
 // CONSTANTS
@@ -1552,15 +1553,12 @@ export class NotationToolbar {
 
     selectedNotes.forEach(note => {
       if (note.duration) {
-        // Normalize duration: strip the '.' suffix for comparison with toolbar buttons
-        // The dotted state is tracked separately via dottedStates
-        const baseDuration = note.duration.replace('.', '');
-        durations.add(baseDuration);
+        // Use centralized getBaseDuration to normalize (strips '.' suffix)
+        durations.add(getBaseDuration(note.duration));
       }
       articulations.add(note.articulation || 'none');
-      // Check both the dotted property AND if duration ends with '.'
-      const isDotted = note.dotted || (note.duration && note.duration.endsWith('.'));
-      dottedStates.add(isDotted || false);
+      // Use centralized checkIsDotted - handles all formats consistently
+      dottedStates.add(checkIsDotted(note));
       restStates.add(note.isRest || note.type === 'rest' || false);
       accidentals.add(note.accidental || 'none');
       tiedStates.add(note.tied || note.isTied || false);

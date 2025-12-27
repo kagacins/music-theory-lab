@@ -13,6 +13,9 @@ function getVF() {
   return window.VexFlow || (window.Vex ? window.Vex.Flow : null);
 }
 
+// Import centralized duration utilities for consistent dotted note handling
+import { isDotted as checkIsDotted, getBaseDuration, toVexFlowDuration } from './durationUtils.js';
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -759,8 +762,9 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
   // Convert duration if needed
   let vexDuration = DURATION_MAP[duration] || duration || 'q';
 
-  // Check if the duration is dotted (either from dotted flag OR from duration string like '2n.')
-  const isDotted = dotted || (duration && duration.endsWith('.')) || vexDuration.endsWith('d');
+  // Use centralized checkIsDotted for consistent dotted note detection
+  // This handles: note.dotted flag, duration ending with '.', and VexFlow 'd' suffix
+  const isDotted = checkIsDotted({ dotted, duration }) || vexDuration.endsWith('d');
 
   // Add 'r' suffix for rests
   if (isRest) {
@@ -919,8 +923,8 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
   });
 
   // Add dot modifier for each note in the chord
-  // Check dotted parameter, duration ending with '.', or VexFlow duration ending with 'd'
-  const isDotted = dotted || (duration && duration.endsWith('.')) || vexDuration.endsWith('d');
+  // Use centralized checkIsDotted for consistent detection across all formats
+  const isDotted = checkIsDotted({ dotted, duration }) || vexDuration.endsWith('d');
   if (isDotted) {
     // Use VexFlow Dot modifier
     pitches.forEach((_, index) => {

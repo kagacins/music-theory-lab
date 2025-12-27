@@ -19,6 +19,13 @@ import { getChordNotes } from '../utils/noteUtils.js';
 import { BuildingBlockSequence, BuildingBlock, Unit, durationToUnits, unitsToDuration, UNITS_PER_BEAT } from './buildingBlock.js';
 import { DEFAULT_TIME_SIGNATURE } from '../../data/music-data.js';
 import { SONG_STRUCTURE_TEMPLATES, getTemplate } from '../../data/songStructureTemplates.js';
+import {
+  isDotted as checkIsDotted,
+  getBaseDuration,
+  beatsToDuration as beatsToDurationCanonical,
+  durationToBeats as durationToBeatsCanonical,
+  normalizeDottedState,
+} from '../notation/durationUtils.js';
 
 // ============================================================================
 // BASS NOTE STORE - Single Source of Truth for Bass Notes
@@ -389,9 +396,10 @@ function beatsToDurationString(beats) {
 /**
  * Get the duration in beats from a duration string
  * @param {string} duration - Duration string like '4n', '2n.', etc.
+ * @param {boolean} [dotted=false] - Whether the note is dotted (for canonical format)
  * @returns {number} - Duration in beats
  */
-function durationToBeats(duration) {
+function durationToBeats(duration, dotted = false) {
     const map = {
         '1n': 4,
         '2n.': 3,
@@ -404,7 +412,12 @@ function durationToBeats(duration) {
         '16n': 0.25,
         '32n': 0.125,
     };
-    return map[duration] || 1;
+    const baseBeats = map[duration] || 1;
+    // CANONICAL FORMAT: If dotted flag set but duration doesn't have '.', multiply by 1.5
+    if (dotted && !duration?.includes('.')) {
+        return baseBeats * 1.5;
+    }
+    return baseBeats;
 }
 
 /**
@@ -442,7 +455,7 @@ export function collectAllNotesWithAbsolutePositions(measures, staff, timeSignat
 
                 const noteBeat = note.beat || 0;
                 const absoluteBeat = measureStartBeat + noteBeat;
-                const noteDuration = durationToBeats(note.duration);
+                const noteDuration = durationToBeats(note.duration, note.dotted);
 
                 // If this note has tied=true, it ties to the next note
                 // We need to combine tied notes into a single logical note with full duration
@@ -502,7 +515,7 @@ function collectTiedDuration(measures, staff, voiceIndex, startMeasureIndex, sta
         );
 
         if (continuation) {
-            const contDuration = durationToBeats(continuation.duration);
+            const contDuration = durationToBeats(continuation.duration, continuation.dotted);
             totalDuration += contDuration;
             expectedBeat += contDuration;
 
@@ -647,9 +660,11 @@ function fillGapsWithRests(compositionState, staff, timeSignature) {
             const notes = voice.notes || [];
             if (notes.length === 0) {
                 // Empty voice - fill with a single rest
+                const restDuration = beatsToDurationString(beatsPerMeasure);
                 voice.notes = [{
                     type: 'rest',
-                    duration: beatsToDurationString(beatsPerMeasure),
+                    duration: restDuration,
+                    dotted: restDuration.includes('.'),  // Canonical format: separate dotted flag
                     beat: 0,
                     isRest: true,
                     voiceIndex: voiceIndex,
@@ -670,9 +685,11 @@ function fillGapsWithRests(compositionState, staff, timeSignature) {
                 // If there's a gap before this note, fill with rest
                 if (noteBeat > currentBeat + 0.001) {
                     const gapDuration = noteBeat - currentBeat;
+                    const gapRestDuration = beatsToDurationString(gapDuration);
                     newNotes.push({
                         type: 'rest',
-                        duration: beatsToDurationString(gapDuration),
+                        duration: gapRestDuration,
+                        dotted: gapRestDuration.includes('.'),  // Canonical format: separate dotted flag
                         beat: currentBeat,
                         isRest: true,
                         voiceIndex: voiceIndex,
@@ -680,15 +697,17 @@ function fillGapsWithRests(compositionState, staff, timeSignature) {
                 }
 
                 newNotes.push(note);
-                currentBeat = noteBeat + durationToBeats(note.duration);
+                currentBeat = noteBeat + durationToBeats(note.duration, note.dotted);
             }
 
             // Fill remaining space with rest
             if (currentBeat < beatsPerMeasure - 0.001) {
                 const remainingDuration = beatsPerMeasure - currentBeat;
+                const trailingRestDuration = beatsToDurationString(remainingDuration);
                 newNotes.push({
                     type: 'rest',
-                    duration: beatsToDurationString(remainingDuration),
+                    duration: trailingRestDuration,
+                    dotted: trailingRestDuration.includes('.'),  // Canonical format: separate dotted flag
                     beat: currentBeat,
                     isRest: true,
                     voiceIndex: voiceIndex,
@@ -736,15 +755,18 @@ const BEATS_TO_DURATION = {
 /**
  * Get duration in beats from duration string
  * @param {string} duration - Duration string like '4n', '2n.'
+ * @param {boolean} [dotted=false] - Whether the note is dotted (for canonical format)
  * @returns {number} - Duration in beats
  */
-function getDurationInBeats(duration) {
+function getDurationInBeats(duration, dotted = false) {
     if (!duration) return 1;
-    // Handle dotted separately if not in map
-    const isDotted = duration.includes('.');
+    // Handle dotted: check both duration string AND dotted parameter (canonical format)
+    const hasDotInString = duration.includes('.');
+    const isDotted = hasDotInString || dotted;
     const baseDuration = duration.replace('.', '');
-    const baseBeats = DURATION_TO_BEATS[baseDuration] || DURATION_TO_BEATS[duration] || 1;
-    return isDotted && !DURATION_TO_BEATS[duration] ? baseBeats * 1.5 : (DURATION_TO_BEATS[duration] || baseBeats);
+    const baseBeats = DURATION_TO_BEATS[baseDuration] || 1;
+    // Apply 1.5x multiplier if dotted (from either source)
+    return isDotted ? baseBeats * 1.5 : baseBeats;
 }
 
 /**
@@ -1054,7 +1076,7 @@ export class CompositionState {
     calculateSegmentBassBeats(segment) {
         let totalBeats = 0;
         for (const note of segment.bassNotes) {
-            totalBeats += getDurationInBeats(note.duration);
+            totalBeats += getDurationInBeats(note.duration, note.dotted);
         }
         return totalBeats;
     }
@@ -1079,7 +1101,7 @@ export class CompositionState {
         let adjustedNote = null;
 
         for (const note of notes) {
-            const noteDuration = getDurationInBeats(note.duration);
+            const noteDuration = getDurationInBeats(note.duration, note.dotted);
             const noteEndBeat = currentBeat + noteDuration;
 
             if (noteEndBeat <= newDurationBeats) {
@@ -1210,7 +1232,7 @@ export class CompositionState {
             const currentNote = { ...bassNotes[i] }; // Clone to avoid mutating original
 
             // Try to combine with subsequent tied notes
-            let combinedBeats = getDurationInBeats(currentNote.duration);
+            let combinedBeats = getDurationInBeats(currentNote.duration, currentNote.dotted);
             let j = i + 1;
 
             while (j < bassNotes.length) {
@@ -1218,7 +1240,7 @@ export class CompositionState {
 
                 // Check if next note is tied and has the same pitches
                 if (nextNote.isTied && this.notesHaveSamePitches(currentNote, nextNote)) {
-                    const nextBeats = getDurationInBeats(nextNote.duration);
+                    const nextBeats = getDurationInBeats(nextNote.duration, nextNote.dotted);
                     const potentialCombinedBeats = combinedBeats + nextBeats;
 
                     // Check if we can represent the combined duration with a standard note
@@ -1648,12 +1670,12 @@ export class CompositionState {
         } else {
             // For multiple notes, we need more complex logic
             // For now, truncate or extend the last note
-            const totalBeats = notes.reduce((sum, n) => sum + getDurationInBeats(n.duration), 0);
+            const totalBeats = notes.reduce((sum, n) => sum + getDurationInBeats(n.duration, n.dotted), 0);
             const delta = newBeats - totalBeats;
 
             if (delta !== 0) {
                 const lastNote = notes[notes.length - 1];
-                const lastNoteBeats = getDurationInBeats(lastNote.duration);
+                const lastNoteBeats = getDurationInBeats(lastNote.duration, lastNote.dotted);
                 const newLastNoteBeats = Math.max(0.25, lastNoteBeats + delta); // Min 16th note
                 lastNote.duration = beatsToDuration(newLastNoteBeats);
                 lastNote.dotted = lastNote.duration.includes('.');
@@ -1697,7 +1719,7 @@ export class CompositionState {
 
             // Get total duration for this chord from its notes
             const notes = this.bassNoteStore.getNotesForChord(chordIndex);
-            const chordBeats = notes.reduce((sum, n) => sum + getDurationInBeats(n.duration), 0);
+            const chordBeats = notes.reduce((sum, n) => sum + getDurationInBeats(n.duration, n.dotted), 0);
             currentBeat += chordBeats;
         }
 
@@ -1708,7 +1730,7 @@ export class CompositionState {
 
 
             for (const noteEntry of notes) {
-                const noteDuration = getDurationInBeats(noteEntry.duration);
+                const noteDuration = getDurationInBeats(noteEntry.duration, noteEntry.dotted);
                 const measureIndex = Math.floor(noteStartBeat / beatsPerMeasure);
                 const beatInMeasure = noteStartBeat % beatsPerMeasure;
                 const remainingInMeasure = beatsPerMeasure - beatInMeasure;
@@ -1865,8 +1887,8 @@ export class CompositionState {
         for (const note of notes) {
             if (note.isTied && currentNote) {
                 // This is a continuation - add its duration to the current note
-                const currentBeats = getDurationInBeats(currentNote.duration);
-                const addedBeats = getDurationInBeats(note.duration);
+                const currentBeats = getDurationInBeats(currentNote.duration, currentNote.dotted);
+                const addedBeats = getDurationInBeats(note.duration, note.dotted);
                 currentNote.duration = beatsToDuration(currentBeats + addedBeats);
                 currentNote.dotted = currentNote.duration.includes('.');
             } else {
@@ -1911,7 +1933,7 @@ export class CompositionState {
             const startMeasure = Math.floor(segment.startBeat / beatsPerMeasure);
 
             for (const note of segment.bassNotes) {
-                const noteDuration = getDurationInBeats(note.duration);
+                const noteDuration = getDurationInBeats(note.duration, note.dotted);
                 const measureIndex = Math.floor(currentBeat / beatsPerMeasure);
                 const beatInMeasure = currentBeat % beatsPerMeasure;
 
@@ -2644,7 +2666,7 @@ export class CompositionState {
             let currentNoteBeat = measureStartBeat;
 
             for (const note of voice1.notes) {
-                const noteDuration = getDurationInBeats(note.duration);
+                const noteDuration = getDurationInBeats(note.duration, note.dotted);
                 const noteEndBeat = currentNoteBeat + noteDuration;
 
                 // Check if this note overlaps with the range to clear
@@ -4907,7 +4929,7 @@ export class CompositionState {
                 const measureTrebleNotes = voice.notes || [];
 
                 for (const note of measureTrebleNotes) {
-                    const noteBeats = getDurationInBeats(note.duration);
+                    const noteBeats = getDurationInBeats(note.duration, note.dotted);
                     const noteBeat = currentBeat + (note.beat || 0);
 
                     if (noteBeat >= startBeat && noteBeat < endBeat) {

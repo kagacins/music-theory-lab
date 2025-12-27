@@ -14585,7 +14585,7 @@ function playPolyphonyPreview() {
 
             const noteBeat = note.beat || 0;
             const startTime = baseTime + noteBeat * beatDuration;
-            const durationBeats = getDurationInBeats(note.duration || 'q');
+            const durationBeats = getDurationInBeats(note.duration || 'q', note.dotted);
             const noteDuration = durationBeats * beatDuration * 0.9; // 90% for articulation
 
             try {
@@ -14600,12 +14600,30 @@ function playPolyphonyPreview() {
 }
 
 // Helper to get duration in beats
-function getDurationInBeats(duration) {
+// Supports both VexFlow format ('h', 'q', 'hd') and Tone.js format ('2n', '4n', '2n.')
+function getDurationInBeats(duration, dotted = false) {
     const durationMap = {
+        // VexFlow format
         'w': 4, 'h': 2, 'q': 1, '8': 0.5, '16': 0.25, '32': 0.125,
-        'hd': 3, 'qd': 1.5, '8d': 0.75, '16d': 0.375
+        'hd': 3, 'qd': 1.5, '8d': 0.75, '16d': 0.375,
+        // Tone.js format
+        '1n': 4, '2n': 2, '4n': 1, '8n': 0.5, '16n': 0.25, '32n': 0.125,
+        '1n.': 6, '2n.': 3, '4n.': 1.5, '8n.': 0.75, '16n.': 0.375
     };
-    return durationMap[duration] || 1;
+
+    // Check for dotted in string (both formats)
+    const hasDotInString = duration?.includes('.') || duration?.endsWith('d');
+    if (hasDotInString) {
+        return durationMap[duration] || 1;
+    }
+
+    // If separate dotted flag is true, multiply base duration by 1.5
+    const baseBeats = durationMap[duration] || 1;
+    if (dotted) {
+        return baseBeats * 1.5;
+    }
+
+    return baseBeats;
 }
 
 function applyPolyphonySuggestions() {

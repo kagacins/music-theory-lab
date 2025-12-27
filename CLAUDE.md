@@ -397,52 +397,179 @@ Use `peer-checked:bg-emerald-500` for green headers, `peer-checked:bg-cyan-500` 
 
 ---
 
-## KNOWN ISSUE: Dotted Duration Conversion Limitations
+## CRITICAL: Dotted Note Canonical Format
 
-**The `beatsToDurationString()` function has precision limitations when converting arbitrary beat values to duration strings.**
+**Dotted notes MUST use the canonical format with a SEPARATE `dotted` boolean property.**
 
-### The Problem
+### The Problem We Solved
 
-When notes are split across measure boundaries or merged after shift-delete operations, the beat values may not align perfectly with standard musical durations. The current conversion uses `>=` comparisons that can lead to duration loss:
+Dotted state was previously tracked in THREE inconsistent ways across the codebase:
+1. `note.dotted` boolean property
+2. `duration: '4n.'` (dot suffix in Tone.js string)
+3. VexFlow `'qd'` format (d suffix)
+
+This caused constant bugs where dotted notes would lose their dot when:
+- Split across measure boundaries
+- Selected in the UI (toolbar wouldn't update)
+- Converted between formats
+
+### The Solution: Centralized Utilities
+
+**ALL dotted note operations MUST use `src/modules/notation/durationUtils.js`**
 
 ```javascript
-// Current implementation in noteEditor.js:beatsToDurationString()
-beatsToDurationString(beats) {
-  if (beats >= 4) return '1n';
-  if (beats >= 3) return '2n.';  // 3.5 beats → '2n.' (3 beats) - loses 0.5!
-  if (beats >= 2) return '2n';   // 2.5 beats → '2n' (2 beats) - loses 0.5!
-  if (beats >= 1.5) return '4n.';
-  if (beats >= 1) return '4n';
-  // ...etc
+import {
+  normalizeDottedState,  // Ensure note has canonical format
+  isDotted,              // Check if note is dotted (handles all formats)
+  getBaseDuration,       // Strip '.' from duration string
+  beatsToDuration,       // Convert beats → { duration, dotted }
+  durationToBeats,       // Convert duration + dotted → beats
+  getNoteDurationInBeats,// Get beats for note object
+  createNote,            // Create properly formatted note
+} from './durationUtils.js';
+```
+
+### Canonical Format (REQUIRED)
+
+```javascript
+// CORRECT - Canonical format
+{
+  duration: '2n',     // Base duration WITHOUT dot suffix
+  dotted: true,       // Separate boolean property
+  // ... other properties
+}
+
+// WRONG - Do not use dot in duration string
+{
+  duration: '2n.',    // NO! Dot should not be in duration string
 }
 ```
 
-### Symptoms
+### When Creating Notes
 
-1. **Beat loss during operations**: After shift-delete or note splitting, total beats in measure may not match original
-2. **Dotted rests don't render well**: VexFlow has issues with dotted rests, so we split them into non-dotted rests
-3. **Non-standard beat values**: Values like 2.5 or 3.5 beats don't have standard duration strings
+```javascript
+// CORRECT - Use beatsToDuration() which returns canonical format
+const { duration, dotted } = beatsToDuration(3); // { duration: '2n', dotted: true }
+const note = {
+  pitches: ['C4'],
+  duration,  // '2n' (no dot)
+  dotted,    // true
+  beat: 0,
+};
 
-### Areas Affected
+// ALSO CORRECT - Use createNote() helper
+const note = createNote({
+  pitches: ['C4'],
+  beats: 3,  // Automatically converts to duration: '2n', dotted: true
+  beat: 0,
+});
+```
 
-- `shiftNotesBackward()` - Shift-delete operations
-- `mergeTiedNotes()` - Merging notes that no longer cross measure boundaries
-- Note splitting when notes cross measure boundaries
-- `splitDottedDuration()` in `notationInit.js` - When replacing notes with rests
+### When Checking Dotted State
 
-### Future Improvements Needed
+```javascript
+// CORRECT - Use centralized isDotted()
+import { isDotted } from './durationUtils.js';
+if (isDotted(note)) {
+  // This handles note.dotted flag AND duration ending with '.'
+}
 
-1. **Compound duration support**: Break non-standard beat values into multiple notes (e.g., 2.5 beats → half note tied to eighth note)
-2. **Beat tracking validation**: After operations, verify total beats in measure equals expected value
-3. **Improved duration mapping**: Instead of `>=`, use exact comparisons with compound duration fallback
+// WRONG - Don't check multiple conditions manually
+if (note.dotted || note.duration?.endsWith('.')) {  // NO!
+```
 
-### Current Workarounds
+### When Calculating Beats
 
-- The system splits dotted durations into base + half when creating rests
-- Tied note merging only occurs when the combined duration fits a standard value
-- Shift-delete attempts to preserve note integrity but may lose fractional beats in edge cases
+```javascript
+// CORRECT - Use durationToBeats() with both parameters
+import { durationToBeats, getNoteDurationInBeats } from './durationUtils.js';
+
+const beats = durationToBeats(note.duration, note.dotted);
+// OR for convenience:
+const beats = getNoteDurationInBeats(note);
+
+// WRONG - Don't calculate manually
+const beats = DURATION_TO_BEATS[note.duration] * (note.dotted ? 1.5 : 1); // NO!
+```
+
+### For VexFlow Rendering
+
+The `vexFlowRenderer.js` file handles conversion to VexFlow's 'd' suffix format internally. When passing notes to rendering functions:
+
+```javascript
+// Pass the canonical format - renderer handles VexFlow conversion
+createNote({
+  pitches: ['C4'],
+  duration: '2n',  // NOT '2n.'
+  dotted: true,
+});
+```
+
+### Key Files Updated
+
+- `src/modules/notation/durationUtils.js` - **THE SINGLE SOURCE OF TRUTH**
+- `src/modules/notation/noteEditor.js` - Uses centralized utilities
+- `src/modules/notation/notationToolbar.js` - Uses centralized utilities
+- `src/modules/notation/vexFlowRenderer.js` - Uses centralized utilities
+
+### Common Mistakes to AVOID
+
+1. **Creating duration strings with dots**
+   ```javascript
+   // WRONG
+   note.duration = '2n.';
+
+   // CORRECT
+   note.duration = '2n';
+   note.dotted = true;
+   ```
+
+2. **Manual dotted checks**
+   ```javascript
+   // WRONG
+   const isDotted = note.dotted || note.duration?.endsWith('.');
+
+   // CORRECT
+   import { isDotted } from './durationUtils.js';
+   const isDottedNote = isDotted(note);
+   ```
+
+3. **Creating custom beatsToDuration functions**
+   ```javascript
+   // WRONG - There are 6+ different implementations scattered across files
+   function myBeatsToDuration(beats) { ... }
+
+   // CORRECT - Use the ONE centralized function
+   import { beatsToDuration } from './durationUtils.js';
+   ```
+
+4. **Forgetting to set dotted when splitting notes**
+   ```javascript
+   // WRONG - Sets duration but forgets dotted flag
+   measureNote.duration = '2n.';
+
+   // CORRECT - Use beatsToDuration which returns both
+   const { duration, dotted } = beatsToDuration(beatsToPlace);
+   measureNote.duration = duration;
+   measureNote.dotted = dotted;
+   ```
+
+---
+
+## KNOWN ISSUE: Duration Conversion Edge Cases
+
+**Some edge cases exist when converting arbitrary beat values to durations.**
+
+### Non-Standard Beat Values
+
+Values like 2.5 or 3.5 beats don't have standard single-note duration representations. The `beatsToDuration()` function finds the closest match, which may result in slight beat loss.
+
+### Future Improvement
+
+For non-standard beat values, a compound duration system could be added that returns multiple notes (e.g., 2.5 beats → half note tied to eighth note).
 
 ### Related Files
 
-- `src/modules/notation/noteEditor.js` - `beatsToDurationString()`, `shiftNotesBackward()`, `mergeTiedNotes()`
-- `src/modules/notation/notationInit.js` - `splitDottedDuration()`, `durationToBeats()`
+- `src/modules/notation/durationUtils.js` - Centralized duration utilities
+- `src/modules/notation/noteEditor.js` - Shift operations
+- `src/modules/notation/notationInit.js` - Note initialization

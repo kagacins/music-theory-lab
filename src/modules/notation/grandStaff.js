@@ -190,10 +190,12 @@ export function fillGapsWithRests(notes, timeSignature = '4/4', clef = 'treble',
   const totalBeats = num || 4;
 
   // Duration string to beats mapping
-  const durationToBeats = (duration) => {
+  // Supports canonical format: duration='2n', dotted=true (separate parameter)
+  const durationToBeats = (duration, dotted = false) => {
     if (!duration) return 1;
     const baseDuration = duration.replace(/[dn.]/g, '');
-    const isDotted = duration.includes('d') || duration.includes('.');
+    // Check both: dot in string OR separate dotted flag (canonical format)
+    const isDotted = duration.includes('d') || duration.includes('.') || dotted;
     let beats = 1;
     switch (baseDuration) {
       case '1': case 'w': beats = 4; break;
@@ -233,7 +235,7 @@ export function fillGapsWithRests(notes, timeSignature = '4/4', clef = 'treble',
   const occupiedRanges = [];
   notes.forEach(note => {
     const start = note.beat ?? 0;
-    const duration = durationToBeats(note.duration);
+    const duration = durationToBeats(note.duration, note.dotted);
     occupiedRanges.push({ start, end: start + duration });
   });
 
@@ -2008,11 +2010,12 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
   };
 
   // Helper to get note duration in beats from note data or VexFlow duration string
-  const getDurationInBeats = (durationStr) => {
+  // CANONICAL FORMAT: accepts optional dotted parameter for notes with duration='2n' and dotted=true
+  const getDurationInBeats = (durationStr, dotted = false) => {
     if (!durationStr) return 1;
-    // Handle dotted notation with 'd' suffix (e.g., 'hd', 'qd', '8d')
+    // Handle dotted: check duration string ('d' suffix, '.' suffix) OR separate dotted flag
     const baseDuration = durationStr.replace(/[dn.]/g, '');
-    const isDotted = durationStr.includes('d') || durationStr.includes('.');
+    const isDotted = durationStr.includes('d') || durationStr.includes('.') || dotted;
     let beats = 1;
     switch (baseDuration) {
       case '1': case 'w': beats = 4; break;
@@ -2038,7 +2041,7 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     const map = new Map();
     notesArray.forEach((note, i) => {
       const beat = roundBeat(note.beat);
-      const duration = getDurationInBeats(note.duration);
+      const duration = getDurationInBeats(note.duration, note.dotted);
       map.set(beat, { note, index: i, vexNote: vexArray[i], duration, endBeat: beat + duration });
     });
     return map;

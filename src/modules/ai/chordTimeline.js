@@ -173,15 +173,18 @@ export function getAbsoluteBeat(measureIndex, beatInMeasure, beatsPerMeasure = 4
 export function getBeatFromNoteIndex(notes, noteIndex) {
     let beat = 0;
     for (let i = 0; i < noteIndex && i < notes.length; i++) {
-        beat += getDurationInBeats(notes[i].duration);
+        beat += getDurationInBeats(notes[i].duration, notes[i].dotted);
     }
     return beat;
 }
 
 /**
  * Convert duration string to beats
+ * @param {string} duration - Duration string (e.g., '4n', '2n.')
+ * @param {boolean} dotted - Separate dotted flag (canonical format)
+ * @returns {number} Duration in beats
  */
-function getDurationInBeats(duration) {
+function getDurationInBeats(duration, dotted = false) {
     const durationMap = {
         '1n': 4,      // whole note
         '2n': 2,      // half note
@@ -193,7 +196,20 @@ function getDurationInBeats(duration) {
         '16n': 0.25,  // sixteenth note
         '32n': 0.125  // thirty-second
     };
-    return durationMap[duration] || 1;
+
+    // Check for dotted in string OR separate dotted flag
+    const hasDotInString = duration?.includes('.');
+    if (hasDotInString) {
+        return durationMap[duration] || 1;
+    }
+
+    // If separate dotted flag is true, multiply base duration by 1.5
+    const baseBeats = durationMap[duration] || 1;
+    if (dotted) {
+        return baseBeats * 1.5;
+    }
+
+    return baseBeats;
 }
 
 // -----------------------------------------------------------------------------

@@ -266,20 +266,22 @@ export function initEnhancedNotation(options = {}) {
 
             if (voice) {
               // Calculate used beats in this voice
-              const durationToBeats = (dur) => {
+              // Supports canonical format: duration='2n', dotted=true
+              const localDurationToBeats = (dur, dotted = false) => {
                 const map = { '1n': 4, '2n': 2, '4n': 1, '8n': 0.5, '16n': 0.25, '32n': 0.125 };
-                return map[dur] || 1;
+                const hasDotInString = dur?.includes('.');
+                let beats = map[dur?.replace('.', '')] || 1;
+                if (hasDotInString || dotted) beats *= 1.5;
+                return beats;
               };
               let usedBeats = 0;
               for (const note of voice.notes) {
-                let beats = durationToBeats(note.duration || '4n');
-                if (note.dotted) beats *= 1.5;
+                let beats = localDurationToBeats(note.duration || '4n', note.dotted);
                 usedBeats += beats;
               }
 
               // Calculate beats for new note
-              let noteBeats = durationToBeats(data.note.duration || '4n');
-              if (data.note.dotted) noteBeats *= 1.5;
+              let noteBeats = localDurationToBeats(data.note.duration || '4n', data.note.dotted);
 
               // Get beats per measure from time signature
               const ts = notationComposer.compositionState?.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
@@ -663,7 +665,8 @@ export function initEnhancedNotation(options = {}) {
       // e.g., dotted half (3 beats) -> half rest + quarter rest
 
       // Helper to convert duration to beats (with tuplet support)
-      const durationToBeats = (dur) => {
+      // Supports canonical format: duration='2n', dotted=true
+      const durationToBeats = (dur, dotted = false) => {
         const map = {
           '1n': 4, '1n.': 6,
           '2n': 2, '2n.': 3,
@@ -696,12 +699,19 @@ export function initEnhancedNotation(options = {}) {
           }
         }
 
+        // Check for dotted in string format
+        const hasDotInString = dur?.includes('.');
         let beats = map[baseDuration] || 1;
 
         // Apply tuplet ratio if this is a tuplet note
         if (tupletType && tupletRatios[tupletType]) {
           const ratio = tupletRatios[tupletType];
           beats = beats * (ratio.normal / ratio.actual);
+        }
+
+        // Apply dotted multiplier if dotted flag is true and not already in string
+        if (dotted && !hasDotInString) {
+          beats = beats * 1.5;
         }
 
         return beats;
@@ -719,15 +729,21 @@ export function initEnhancedNotation(options = {}) {
 
       // Helper to split a dotted duration into multiple non-dotted rests
       // voiceIdx parameter ensures rests stay in the correct voice for multi-voice notation
-      const splitDottedDuration = (duration, startBeat, voiceIdx) => {
-        const totalBeats = durationToBeats(duration);
+      // dotted parameter supports canonical format { duration: '2n', dotted: true }
+      const splitDottedDuration = (duration, startBeat, voiceIdx, dotted = false) => {
+        const totalBeats = durationToBeats(duration, dotted);
         const rests = [];
+
+        // Check for dotted in BOTH formats: duration ending with '.' OR separate dotted flag
+        const hasDotInString = duration.endsWith('.');
+        const isDotted = hasDotInString || dotted;
 
         // For dotted durations, split into base + half of base
         // e.g., dotted half (3 beats) = half (2) + quarter (1)
         // e.g., dotted quarter (1.5 beats) = quarter (1) + eighth (0.5)
-        if (duration.endsWith('.')) {
-          const baseDuration = duration.slice(0, -1); // Remove the dot
+        if (isDotted) {
+          // Get base duration (remove dot from string if present, or use duration as-is for canonical format)
+          const baseDuration = hasDotInString ? duration.slice(0, -1) : duration;
           const baseBeats = durationToBeats(baseDuration);
           const dotBeats = baseBeats / 2;
           // For Voice 2 (voiceIdx === 1), mark as cue rest for multi-voice notation
@@ -1074,7 +1090,7 @@ export function initEnhancedNotation(options = {}) {
             const originalNote = notes[deletion.noteIndex];
             const duration = originalNote.duration || '4n';
             const startBeat = originalNote.beat || 0;
-            const shiftBeats = durationToBeats(duration);
+            const shiftBeats = durationToBeats(duration, originalNote.dotted);
 
             console.log('[SINGLE-SHIFT-DELETE] Using measure-based approach for bass/voice2+');
             console.log('[SINGLE-SHIFT-DELETE] Note being deleted:', {
@@ -1147,8 +1163,8 @@ export function initEnhancedNotation(options = {}) {
             const duration = originalNote.duration || '4n';
             const startBeat = originalNote.beat || 0;
 
-            // Get the replacement rests - pass voiceIndex to preserve voice for multi-voice notation
-            const replacementRests = splitDottedDuration(duration, startBeat, voiceIndex);
+            // Get the replacement rests - pass voiceIndex and dotted flag for canonical format support
+            const replacementRests = splitDottedDuration(duration, startBeat, voiceIndex, originalNote.dotted);
             console.log(`[onNoteDelete] Replacing note with ${replacementRests.length} rest(s):`, replacementRests.map(r => ({beat: r.beat, duration: r.duration, voiceIndex: r.voiceIndex})));
 
             // Replace the single note with possibly multiple rests
@@ -1171,8 +1187,8 @@ export function initEnhancedNotation(options = {}) {
             const duration = originalNote.duration || '4n';
             const startBeat = originalNote.beat || 0;
 
-            // Get the replacement rests
-            const replacementRests = splitDottedDuration(duration, startBeat);
+            // Get the replacement rests - pass dotted flag for canonical format support
+            const replacementRests = splitDottedDuration(duration, startBeat, undefined, originalNote.dotted);
 
             // Replace the single note with possibly multiple rests
             measure[notesArray].splice(deletion.noteIndex, 1, ...replacementRests);
