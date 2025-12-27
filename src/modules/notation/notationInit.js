@@ -1022,58 +1022,42 @@ export function initEnhancedNotation(options = {}) {
           }
         }
 
-        // TREBLE STAFF with Voice 0: Use block sequence approach (correct architecture)
-        // This avoids the buggy shiftNotesBackward and uses the working deleteTrebleNoteWithShift
-        if (deletion.staff === 'treble' && voiceIndex === 0) {
+        // Use new extract→rebuild approach for ALL staffs/voices (NO SYNC architecture)
+        if (noteEditor && noteEditor.deleteNoteWithShift) {
           const compositionState = notationComposer.compositionState;
+          const clef = deletion.staff === 'treble' ? 'treble' : 'bass';
 
-          // Step 1: Sync measures to block FIRST (before any modifications)
-          // This combines tied notes into single logical notes in the block
-          if (compositionState.trebleBlockSequence?.blocks?.length > 0) {
-            compositionState.syncMeasuresToTrebleBlock();
-          } else {
-            compositionState.initializeTrebleBlockSequence();
+          console.log('[SINGLE-SHIFT-DELETE] Using extract→rebuild approach');
+
+          // Call the new deleteNoteWithShift method
+          noteEditor.deleteNoteWithShift(clef, voiceIndex, deletion.measureIndex, deletion.noteIndex, compositionState);
+
+          // Log FULL state AFTER shift
+          console.log('[SINGLE-SHIFT-DELETE] === After shift-delete complete ===');
+          for (let m = 0; m < Math.min(3, compositionState.measures.length); m++) {
+            const meas = compositionState.getMeasure(m);
+            if (meas) {
+              const voiceKeyLog = deletion.staff === 'treble' ? 'treble' : 'bass';
+              const notesLog = meas.notation?.[voiceKeyLog]?.voices?.[voiceIndex]?.notes || [];
+              let totalBeats = 0;
+              const details = notesLog.map(n => {
+                const beats = durationToBeats(n.duration || '4n');
+                totalBeats += beats;
+                return {
+                  beat: n.beat,
+                  duration: n.duration,
+                  beats: beats,
+                  pitch: n.pitch || n.pitches,
+                  tied: n.tied || false,
+                  isTied: n.isTied || false
+                };
+              });
+              console.log(`[SINGLE-SHIFT-DELETE] Measure ${m + 1} AFTER: totalBeats=${totalBeats}`, details);
+            }
           }
 
-          // Step 2: Get the unit position of the note to delete
-          const noteInfo = compositionState.getTrebleNoteUnit(deletion.measureIndex, deletion.noteIndex);
-
-          if (noteInfo) {
-            console.log('[SINGLE-SHIFT-DELETE] Using block sequence approach for treble');
-            console.log('[SINGLE-SHIFT-DELETE] Note info:', {
-              startUnit: noteInfo.startUnit,
-              durationUnits: noteInfo.durationUnits,
-              isTiedContinuation: noteInfo.isTiedContinuation || false
-            });
-
-            // Step 3: Call deleteTrebleNoteWithShift - this handles:
-            // - Shifting all subsequent units backward
-            // - Truncating the block
-            // - Re-rendering to measures with correct ties
-            compositionState.deleteTrebleNoteWithShift(noteInfo.startUnit, true);
-
-            // Log FULL state AFTER shift
-            console.log('[SINGLE-SHIFT-DELETE] === After shift-delete complete ===');
-            for (let m = 0; m < Math.min(3, compositionState.measures.length); m++) {
-              const meas = compositionState.getMeasure(m);
-              if (meas) {
-                const notesLog = meas.notation?.treble?.voices?.[0]?.notes || [];
-                let totalBeats = 0;
-                const details = notesLog.map(n => {
-                  const beats = durationToBeats(n.duration || '4n');
-                  totalBeats += beats;
-                  return {
-                    beat: n.beat,
-                    duration: n.duration,
-                    beats: beats,
-                    pitch: n.pitch || n.pitches,
-                    tied: n.tied || false,
-                    isTied: n.isTied || false
-                  };
-                });
-                console.log(`[SINGLE-SHIFT-DELETE] Measure ${m + 1} AFTER: totalBeats=${totalBeats}`, details);
-              }
-            }
+          if (deletion.staff === 'bass') {
+            compositionState.saveEditedBassNotesForMeasure(deletion.measureIndex);
           }
 
           notationComposer.render();

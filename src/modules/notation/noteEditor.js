@@ -1877,7 +1877,7 @@ export class NoteEditor {
 
     console.log('[SHIFT-INSERT] Calculated beatPosition:', beatPosition, 'hasMultipleVoices:', hasMultipleVoices);
 
-    // MULTI-VOICE: Use direct voice-based shifting to preserve voice separation
+    // MULTI-VOICE: Use extract → insert → rebuild (NO SYNC algorithm)
     if (hasMultipleVoices) {
       // Calculate note duration in beats
       const noteDur = noteData.duration || '4n';
@@ -1885,58 +1885,68 @@ export class NoteEditor {
       let durationBeats = this.durationToBeats(noteDur);
       if (noteData.dotted && !noteHasDot) durationBeats *= 1.5;
 
-      console.log('[SHIFT-INSERT] MULTI-VOICE path: shifting notes forward by', durationBeats, 'beats at beat', beatPosition);
+      console.log('[SHIFT-INSERT] MULTI-VOICE path: using extract→rebuild algorithm');
+      console.log('[SHIFT-INSERT] Inserting at measure', measureIndex, 'beat', beatPosition, 'duration', durationBeats);
 
-      // Shift notes forward in ALL voices from the insertion point
-      this.shiftNotesForward(measureIndex, beatPosition, durationBeats, 'treble', compositionState, beatsPerMeasure);
+      // 1. Extract all notes from insertion point onward (this also removes them)
+      const logicalNotes = this.extractLogicalNotes('treble', voiceIndex, measureIndex, beatPosition, compositionState, beatsPerMeasure);
 
-      // Insert the new note at the insertion point in the CURRENT voice
-      const newNote = {
-        type: noteData.isRest ? 'rest' : 'note',
+      // 2. Create the new note as a logical note
+      const newLogical = {
         pitches: noteData.pitches || [noteData.pitch],
-        pitch: noteData.pitch,
-        duration: noteData.duration,
-        beat: beatPosition,
-        dotted: noteData.dotted || false,
-        isRest: noteData.isRest || false,
-        articulation: noteData.articulation,
-        accidental: noteData.accidental,
-        dynamic: noteData.dynamic,
-        velocity: noteData.velocity,
+        totalDuration: durationBeats,
+        tiedForward: false,
+        attributes: {
+          articulation: noteData.articulation,
+          accidental: noteData.accidental,
+          dynamic: noteData.dynamic,
+          velocity: noteData.velocity,
+          isRest: noteData.isRest || false,
+        }
       };
 
-      voice.notes.push(newNote);
-      voice.notes.sort((a, b) => (a.beat || 0) - (b.beat || 0));
+      // 3. Rebuild: new note first, then all extracted notes
+      this.rebuildNotesAfterShift('treble', voiceIndex, measureIndex, beatPosition, [newLogical, ...logicalNotes], compositionState, beatsPerMeasure);
+
+      // CRITICAL: Mark measures as manually edited to prevent overwrite from stale block sequence
+      compositionState._measuresManuallyEdited = true;
 
       // Render the changes
       this.composerIntegration.render();
       return;
     }
 
-    // SINGLE-VOICE: Use trebleBlockSequence (original approach)
-    // Calculate absolute beat and unit position
-    const absoluteBeat = measureIndex * beatsPerMeasure + beatPosition;
-    const insertUnit = Math.round(absoluteBeat * UNITS_PER_BEAT);
-
-    // Calculate duration in units
+    // SINGLE-VOICE: Also use extract → rebuild for consistency (NO SYNC)
     const singleNoteDur = noteData.duration || '4n';
     const singleNoteHasDot = singleNoteDur.includes('.');
     let durationBeats = this.durationToBeats(singleNoteDur);
     if (noteData.dotted && !singleNoteHasDot) durationBeats *= 1.5;
-    const durationUnits = Math.round(durationBeats * UNITS_PER_BEAT);
 
-    // Get pitches array
-    const pitches = noteData.isRest ? [] : (noteData.pitches || [noteData.pitch]);
+    console.log('[SHIFT-INSERT] SINGLE-VOICE path: using extract→rebuild algorithm');
+    console.log('[SHIFT-INSERT] Inserting at measure', measureIndex, 'beat', beatPosition, 'duration', durationBeats);
 
-    console.log('[SHIFT-INSERT] SINGLE-VOICE path: insertUnit=', insertUnit, 'durationUnits=', durationUnits, 'pitches=', pitches);
+    // 1. Extract all notes from insertion point onward (this also removes them)
+    const logicalNotes = this.extractLogicalNotes('treble', voiceIndex, measureIndex, beatPosition, compositionState, beatsPerMeasure);
 
-    // Use the compositionState method to insert with shift
-    compositionState.insertTrebleNoteWithShift(insertUnit, durationUnits, pitches, {
-      articulation: noteData.articulation,
-      accidental: noteData.accidental,
-      dynamic: noteData.dynamic,
-      velocity: noteData.velocity,
-    });
+    // 2. Create the new note as a logical note
+    const newLogical = {
+      pitches: noteData.pitches || [noteData.pitch],
+      totalDuration: durationBeats,
+      tiedForward: false,
+      attributes: {
+        articulation: noteData.articulation,
+        accidental: noteData.accidental,
+        dynamic: noteData.dynamic,
+        velocity: noteData.velocity,
+        isRest: noteData.isRest || false,
+      }
+    };
+
+    // 3. Rebuild: new note first, then all extracted notes
+    this.rebuildNotesAfterShift('treble', voiceIndex, measureIndex, beatPosition, [newLogical, ...logicalNotes], compositionState, beatsPerMeasure);
+
+    // CRITICAL: Mark measures as manually edited to prevent overwrite from stale block sequence
+    compositionState._measuresManuallyEdited = true;
 
     // Render the changes
     this.composerIntegration.render();
@@ -1950,75 +1960,42 @@ export class NoteEditor {
    */
   insertTrebleNoteWithShiftAtEnd(measureIndex, noteData, compositionState) {
     const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
-    const UNITS_PER_BEAT = 48;
 
     // Calculate the beat position (end of used beats in measure)
     const usedBeats = this.getMeasureBeatsUsed(measureIndex, 'treble');
+    const voiceIndex = this.getVoiceIndexForStaff('treble');
 
-    // MULTI-VOICE CHECK: Detect if Voice 2 has any notes across all measures
-    const hasMultipleVoices = compositionState.measures.some(m => {
-      const voices = m.notation?.treble?.voices || [];
-      return voices.length > 1 && voices[1]?.notes?.length > 0;
-    });
+    // Calculate note duration in beats
+    const noteDur = noteData.duration || '4n';
+    const noteHasDot = noteDur.includes('.');
+    let durationBeats = this.durationToBeats(noteDur);
+    if (noteData.dotted && !noteHasDot) durationBeats *= 1.5;
 
-    // MULTI-VOICE: Use direct voice-based shifting to preserve voice separation
-    if (hasMultipleVoices) {
-      // Calculate note duration in beats
-      const multiNoteDur = noteData.duration || '4n';
-      const multiNoteHasDot = multiNoteDur.includes('.');
-      let durationBeats = this.durationToBeats(multiNoteDur);
-      if (noteData.dotted && !multiNoteHasDot) durationBeats *= 1.5;
+    console.log('[SHIFT-INSERT-END] Using extract→rebuild algorithm');
+    console.log('[SHIFT-INSERT-END] Inserting at measure', measureIndex, 'beat', usedBeats, 'duration', durationBeats);
 
-      // Shift notes forward in ALL voices from the end of this measure
-      this.shiftNotesForward(measureIndex, usedBeats, durationBeats, 'treble', compositionState, beatsPerMeasure);
+    // 1. Extract all notes from insertion point onward (this also removes them)
+    const logicalNotes = this.extractLogicalNotes('treble', voiceIndex, measureIndex, usedBeats, compositionState, beatsPerMeasure);
 
-      // Insert the new note at the end in the CURRENT voice
-      const measure = compositionState.measures[measureIndex];
-      const voice = this.getVoice(measure, 'treble');
-
-      const newNote = {
-        type: noteData.isRest ? 'rest' : 'note',
-        pitches: noteData.pitches || [noteData.pitch],
-        pitch: noteData.pitch,
-        duration: noteData.duration,
-        beat: usedBeats,
-        dotted: noteData.dotted || false,
-        isRest: noteData.isRest || false,
+    // 2. Create the new note as a logical note
+    const newLogical = {
+      pitches: noteData.pitches || [noteData.pitch],
+      totalDuration: durationBeats,
+      tiedForward: false,
+      attributes: {
         articulation: noteData.articulation,
         accidental: noteData.accidental,
         dynamic: noteData.dynamic,
         velocity: noteData.velocity,
-      };
+        isRest: noteData.isRest || false,
+      }
+    };
 
-      voice.notes.push(newNote);
-      voice.notes.sort((a, b) => (a.beat || 0) - (b.beat || 0));
+    // 3. Rebuild: new note first, then all extracted notes
+    this.rebuildNotesAfterShift('treble', voiceIndex, measureIndex, usedBeats, [newLogical, ...logicalNotes], compositionState, beatsPerMeasure);
 
-      // Render the changes
-      this.composerIntegration.render();
-      return;
-    }
-
-    // SINGLE-VOICE: Use trebleBlockSequence (original approach)
-    const absoluteBeat = measureIndex * beatsPerMeasure + usedBeats;
-    const insertUnit = Math.round(absoluteBeat * UNITS_PER_BEAT);
-
-    // Calculate duration in units
-    const endNoteDur = noteData.duration || '4n';
-    const endNoteHasDot = endNoteDur.includes('.');
-    let durationBeats = this.durationToBeats(endNoteDur);
-    if (noteData.dotted && !endNoteHasDot) durationBeats *= 1.5;
-    const durationUnits = Math.round(durationBeats * UNITS_PER_BEAT);
-
-    // Get pitches array
-    const pitches = noteData.isRest ? [] : (noteData.pitches || [noteData.pitch]);
-
-    // Use the compositionState method to insert with shift
-    compositionState.insertTrebleNoteWithShift(insertUnit, durationUnits, pitches, {
-      articulation: noteData.articulation,
-      accidental: noteData.accidental,
-      dynamic: noteData.dynamic,
-      velocity: noteData.velocity,
-    });
+    // CRITICAL: Mark measures as manually edited to prevent overwrite from stale block sequence
+    compositionState._measuresManuallyEdited = true;
 
     // Render the changes
     this.composerIntegration.render();
@@ -2071,27 +2048,28 @@ export class NoteEditor {
     let durationBeats = this.durationToBeats(noteDur);
     if (noteData.dotted && !noteHasDot) durationBeats *= 1.5;
 
-    // Shift notes forward in the bass staff from the insertion point
-    this.shiftNotesForward(measureIndex, beatPosition, durationBeats, 'bass', compositionState, beatsPerMeasure);
+    console.log('[SHIFT-INSERT-BASS] Using extract→rebuild algorithm');
+    console.log('[SHIFT-INSERT-BASS] Inserting at measure', measureIndex, 'beat', beatPosition, 'duration', durationBeats);
 
-    // Insert the new note at the insertion point
-    const newNote = {
-      type: noteData.isRest ? 'rest' : 'note',
+    // 1. Extract all notes from insertion point onward (this also removes them)
+    const logicalNotes = this.extractLogicalNotes('bass', voiceIndex, measureIndex, beatPosition, compositionState, beatsPerMeasure);
+
+    // 2. Create the new note as a logical note
+    const newLogical = {
       pitches: noteData.pitches || [noteData.pitch],
-      pitch: noteData.pitch,
-      duration: noteData.duration,
-      beat: beatPosition,
-      dotted: noteData.dotted || false,
-      isRest: noteData.isRest || false,
-      articulation: noteData.articulation,
-      accidental: noteData.accidental,
-      dynamic: noteData.dynamic,
-      velocity: noteData.velocity,
-      voiceIndex: voiceIndex,
+      totalDuration: durationBeats,
+      tiedForward: false,
+      attributes: {
+        articulation: noteData.articulation,
+        accidental: noteData.accidental,
+        dynamic: noteData.dynamic,
+        velocity: noteData.velocity,
+        isRest: noteData.isRest || false,
+      }
     };
 
-    voice.notes.push(newNote);
-    voice.notes.sort((a, b) => (a.beat || 0) - (b.beat || 0));
+    // 3. Rebuild: new note first, then all extracted notes
+    this.rebuildNotesAfterShift('bass', voiceIndex, measureIndex, beatPosition, [newLogical, ...logicalNotes], compositionState, beatsPerMeasure);
 
     // Mark bass as edited and save
     measure.notation.bass.autoGenerated = false;
@@ -2497,6 +2475,11 @@ export class NoteEditor {
       return;
     }
 
+    // Save state for undo BEFORE making changes
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
     // Get the first selected note
     const firstNoteId = Array.from(this.selectedNotes)[0];
     console.log('[SHIFT-INSERT] First note ID:', firstNoteId);
@@ -2521,17 +2504,17 @@ export class NoteEditor {
       }
     }
 
-    // Create new note with current toolbar settings
-    // DEBUG: Log articulation state to trace unexpected staccato
-    console.log('[SHIFT-INSERT-BEFORE] Creating noteData with articulation:', this.currentArticulation);
+    // SIMPLIFICATION: Always insert a quarter note (1 beat)
+    // User can change duration afterward if needed - this eliminates toolbar sync confusion
+    console.log('[SHIFT-INSERT-BEFORE] Inserting quarter note (default)');
     const noteData = {
       pitch: 'C4', // Default pitch, user can change it
       pitches: ['C4'],
-      duration: this.currentDuration,
-      dotted: this.isDotted,
-      isRest: this.isRestMode,
-      accidental: this.currentAccidental,
-      articulation: this.currentArticulation,
+      duration: '4n', // Always quarter note
+      dotted: false,
+      isRest: false,
+      accidental: null,
+      articulation: null,
     };
 
 
@@ -2691,22 +2674,27 @@ export class NoteEditor {
   insertNoteAfterSelected() {
     if (this.selectedNotes.size === 0) return;
 
+    // Save state for undo BEFORE making changes
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
     // Get the last selected note
     const noteIds = Array.from(this.selectedNotes);
     const lastNoteId = noteIds[noteIds.length - 1];
     const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(lastNoteId);
 
-    // Create new note with current toolbar settings
-    // DEBUG: Log articulation state to trace unexpected staccato
-    console.log('[SHIFT-INSERT-AFTER] Creating noteData with articulation:', this.currentArticulation);
+    // SIMPLIFICATION: Always insert a quarter note (1 beat)
+    // User can change duration afterward if needed - this eliminates toolbar sync confusion
+    console.log('[SHIFT-INSERT-AFTER] Inserting quarter note (default)');
     const noteData = {
       pitch: 'C4', // Default pitch, user can change it
       pitches: ['C4'],
-      duration: this.currentDuration,
-      dotted: this.isDotted,
-      isRest: this.isRestMode,
-      accidental: this.currentAccidental,
-      articulation: this.currentArticulation,
+      duration: '4n', // Always quarter note
+      dotted: false,
+      isRest: false,
+      accidental: null,
+      articulation: null,
     };
 
     const compositionState = window.getCompositionState?.();
@@ -3250,105 +3238,51 @@ export class NoteEditor {
    */
   applyDurationChangeWithShift(measureIndex, noteIndex, newDuration, isDotted, compositionState) {
     const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
-    const UNITS_PER_BEAT = 48;
+    const voiceIndex = this.getVoiceIndexForStaff('treble');
 
-    // CRITICAL: Sync measures to block FIRST to ensure block reflects current measure state
-    if (compositionState.trebleBlockSequence?.blocks?.length > 0) {
-      compositionState.syncMeasuresToTrebleBlock();
-    }
-
-    // Get the note's unit position AFTER sync
-    const noteUnit = compositionState.getTrebleNoteUnit(measureIndex, noteIndex);
-    if (!noteUnit) {
-      console.warn('[NoteEditor] Could not find note unit for duration change with shift');
+    // Get the note from the measure
+    const measure = compositionState.measures[measureIndex];
+    if (!measure) {
+      console.warn('[NoteEditor] Could not find measure for duration change with shift');
       return;
     }
 
-    // Calculate the duration difference
-    const currentBeats = this.durationToBeats(noteUnit.note.duration || '4n', noteUnit.note.dotted);
+    const voice = this.getVoice(measure, 'treble');
+    if (!voice || !voice.notes || noteIndex >= voice.notes.length) {
+      console.warn('[NoteEditor] Could not find voice/note for duration change with shift');
+      return;
+    }
+
+    const note = voice.notes[noteIndex];
+    const noteBeat = note.beat || 0;
+
+    // Calculate durations
+    const currentBeats = this.getDurationInBeats(note.duration || '4n');
     let newBeats = this.durationToBeats(newDuration);
     if (isDotted) newBeats *= 1.5;
 
-
+    // If reducing duration, just apply directly
     if (newBeats <= currentBeats) {
       this.applyDurationChange(newDuration, newDuration, isDotted, [`${measureIndex}-treble-${noteIndex}`]);
       return;
     }
 
-    const currentDurationUnits = Math.round(currentBeats * UNITS_PER_BEAT);
-    const newDurationUnits = Math.round(newBeats * UNITS_PER_BEAT);
-    const shiftUnits = newDurationUnits - currentDurationUnits;
+    console.log('[DURATION-SHIFT] Using extract→rebuild algorithm');
+    console.log('[DURATION-SHIFT] Changing note at measure', measureIndex, 'beat', noteBeat, 'from', currentBeats, 'to', newBeats, 'beats');
 
-    // SIMPLER APPROACH: Get all notes, modify positions, and rewrite
-    if (compositionState.trebleBlockSequence?.blocks?.length > 0) {
-      const block = compositionState.trebleBlockSequence.blocks[0];
+    // 1. Extract all notes from this note's position to end (this also removes them)
+    const logicalNotes = this.extractLogicalNotes('treble', voiceIndex, measureIndex, noteBeat, compositionState, beatsPerMeasure);
 
-      // Step 1: Get all current notes from the block
-      const currentNotes = block.getNotes();
-
-      // Step 2: Build new notes array with modified positions
-      const newNotes = [];
-      const targetStartUnit = noteUnit.startUnit;
-
-      for (const note of currentNotes) {
-        if (note.startUnit === targetStartUnit) {
-          // This is the note we're changing - use new duration
-          newNotes.push({
-            ...note,
-            durationUnits: newDurationUnits,
-            pitches: note.pitches || [],
-          });
-        } else if (note.startUnit > targetStartUnit) {
-          // Notes after the target - shift forward
-          newNotes.push({
-            ...note,
-            startUnit: note.startUnit + shiftUnits,
-          });
-        } else {
-          // Notes before the target - keep as is
-          newNotes.push({ ...note });
-        }
-      }
-
-      // Step 3: Calculate new total duration and resize block
-      let maxEndUnit = 0;
-      for (const note of newNotes) {
-        const endUnit = note.startUnit + note.durationUnits;
-        if (endUnit > maxEndUnit) maxEndUnit = endUnit;
-      }
-      const newTotalBeats = Math.ceil(maxEndUnit / UNITS_PER_BEAT);
-
-      block.setDuration(newTotalBeats);
-
-      // Step 4: Clear block and write all notes fresh
-      // First clear all units to rests
-      for (let i = 0; i < block.units.length; i++) {
-        block.units[i].pitches = [];
-        block.units[i].parentIndex = i === 0 ? null : 0;
-      }
-
-      // Then write each note
-      for (const note of newNotes) {
-        if (note.startUnit >= 0 && note.startUnit < block.units.length) {
-          const pitches = note.isRest ? [] : (note.pitches || []);
-          block.setNote(note.startUnit, note.durationUnits, pitches, {
-            articulation: note.articulation,
-            accidental: note.accidental,
-            accidentals: note.accidentals,
-            dynamic: note.dynamic,
-            velocity: note.velocity,
-          });
-        }
-      }
-
-      // Step 5: Ensure we have enough measures and render
-      const requiredMeasures = Math.ceil(newTotalBeats / beatsPerMeasure);
-      while (compositionState.measures.length < requiredMeasures) {
-        compositionState.addMeasure({});
-      }
-
-      compositionState.renderTrebleBlocksToMeasures();
+    // 2. Modify the first logical note's duration (this is the note being changed)
+    if (logicalNotes.length > 0) {
+      logicalNotes[0].totalDuration = newBeats;
     }
+
+    // 3. Rebuild from the note's position
+    this.rebuildNotesAfterShift('treble', voiceIndex, measureIndex, noteBeat, logicalNotes, compositionState, beatsPerMeasure);
+
+    // CRITICAL: Mark measures as manually edited to prevent overwrite from stale block sequence
+    compositionState._measuresManuallyEdited = true;
 
     this.composerIntegration.render(true);
 
@@ -3368,7 +3302,6 @@ export class NoteEditor {
    */
   applyDurationChangeWithShiftBass(measureIndex, noteIndex, voiceIndex, newDuration, isDotted, compositionState) {
     const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
-    const UNITS_PER_BEAT = 48;
 
     // Get the note from the measure
     const measure = compositionState.measures[measureIndex];
@@ -3384,175 +3317,34 @@ export class NoteEditor {
     }
 
     const note = voice.notes[noteIndex];
+    const noteBeat = note.beat || 0;
 
-    // Calculate durations in beats
-    const currentBeats = this.durationToBeats(note.duration || '4n', note.dotted);
+    // Calculate durations
+    const currentBeats = this.getDurationInBeats(note.duration || '4n');
     let newBeats = this.durationToBeats(newDuration);
     if (isDotted) newBeats *= 1.5;
-    const beatDelta = newBeats - currentBeats;
 
-    if (beatDelta <= 0) {
-      // Duration is being reduced - just apply it directly
+    // If reducing duration, just apply directly
+    if (newBeats <= currentBeats) {
       this.applyDurationChange(newDuration, newDuration, isDotted, [`${measureIndex}-bass-${voiceIndex}-${noteIndex}`]);
       return;
     }
 
-    // Calculate the beat position of this note within the measure
-    let noteBeatInMeasure = 0;
-    for (let i = 0; i < noteIndex; i++) {
-      const prevNote = voice.notes[i];
-      const prevDur = prevNote.duration || '4n';
-      const prevHasDot = prevDur.includes('.');
-      let prevBeats = this.durationToBeats(prevDur);
-      if (prevNote.dotted && !prevHasDot) prevBeats *= 1.5;
-      noteBeatInMeasure += prevBeats;
+    console.log('[DURATION-SHIFT-BASS] Using extract→rebuild algorithm');
+    console.log('[DURATION-SHIFT-BASS] Changing note at measure', measureIndex, 'beat', noteBeat, 'from', currentBeats, 'to', newBeats, 'beats');
+
+    // 1. Extract all notes from this note's position to end (this also removes them)
+    const logicalNotes = this.extractLogicalNotes('bass', voiceIndex, measureIndex, noteBeat, compositionState, beatsPerMeasure);
+
+    // 2. Modify the first logical note's duration (this is the note being changed)
+    if (logicalNotes.length > 0) {
+      logicalNotes[0].totalDuration = newBeats;
     }
 
-    // Calculate how much space is left in this measure after the note starts
-    const availableBeatsInMeasure = beatsPerMeasure - noteBeatInMeasure;
+    // 3. Rebuild from the note's position
+    this.rebuildNotesAfterShift('bass', voiceIndex, measureIndex, noteBeat, logicalNotes, compositionState, beatsPerMeasure);
 
-    // Collect all notes from this voice across all measures (for shifting)
-    const allNotes = [];
-    const absoluteBeatStart = measureIndex * beatsPerMeasure;
-    let absoluteBeat = absoluteBeatStart;
-
-    // Get notes before the target note in this measure
-    for (let i = 0; i < noteIndex; i++) {
-      const n = voice.notes[i];
-      let beats = this.durationToBeats(n.duration || '4n');
-      if (n.dotted) beats *= 1.5;
-      allNotes.push({
-        ...n,
-        absoluteBeat,
-        beats,
-      });
-      absoluteBeat += beats;
-    }
-
-    // The target note with new duration
-    const targetNoteAbsoluteBeat = absoluteBeat;
-    allNotes.push({
-      ...note,
-      absoluteBeat,
-      beats: newBeats,
-      duration: newDuration,
-      dotted: isDotted,
-    });
-    absoluteBeat += newBeats;
-
-    // Get notes after the target note in this measure (shifted)
-    for (let i = noteIndex + 1; i < voice.notes.length; i++) {
-      const n = voice.notes[i];
-      let beats = this.durationToBeats(n.duration || '4n');
-      if (n.dotted) beats *= 1.5;
-      allNotes.push({
-        ...n,
-        absoluteBeat,
-        beats,
-      });
-      absoluteBeat += beats;
-    }
-
-    // Get notes from subsequent measures in this voice and shift them
-    for (let m = measureIndex + 1; m < compositionState.measures.length; m++) {
-      const mVoice = compositionState.measures[m].notation?.bass?.voices?.[voiceIndex];
-      if (!mVoice || !mVoice.notes) continue;
-
-      for (const n of mVoice.notes) {
-        if (n.isTied) continue; // Skip tied continuations, they'll be recreated
-        let beats = this.durationToBeats(n.duration || '4n');
-        if (n.dotted) beats *= 1.5;
-        allNotes.push({
-          ...n,
-          absoluteBeat,
-          beats,
-        });
-        absoluteBeat += beats;
-      }
-    }
-
-
-    // Calculate required measures
-    const totalBeats = absoluteBeat - (measureIndex * beatsPerMeasure);
-    const requiredMeasuresFromThis = Math.ceil(totalBeats / beatsPerMeasure);
-    const totalRequiredMeasures = measureIndex + requiredMeasuresFromThis;
-
-    // Add measures if needed
-    while (compositionState.measures.length < totalRequiredMeasures) {
-      compositionState.addMeasure({});
-    }
-
-    // Clear notes from affected measures and voices
-    for (let m = measureIndex; m < compositionState.measures.length; m++) {
-      const mVoice = compositionState.measures[m].notation?.bass?.voices?.[voiceIndex];
-      if (mVoice) {
-        mVoice.notes = [];
-      }
-    }
-
-    // Redistribute notes to measures with proper splitting
-    for (const noteData of allNotes) {
-      let remainingBeats = noteData.beats;
-      let currentAbsoluteBeat = noteData.absoluteBeat;
-      let isFirstPart = true;
-
-      while (remainingBeats > 0) {
-        const currentMeasureIdx = Math.floor(currentAbsoluteBeat / beatsPerMeasure);
-        const beatInMeasure = currentAbsoluteBeat - (currentMeasureIdx * beatsPerMeasure);
-        const beatsAvailableInMeasure = beatsPerMeasure - beatInMeasure;
-        const beatsToPlace = Math.min(remainingBeats, beatsAvailableInMeasure);
-        const isLastPart = remainingBeats <= beatsAvailableInMeasure;
-
-        // Find duration for this portion
-        const durationInfo = this.beatsToDuration(beatsToPlace);
-
-        // Get or create measure voice
-        if (currentMeasureIdx >= compositionState.measures.length) {
-          compositionState.addMeasure({});
-        }
-        const mVoice = compositionState.measures[currentMeasureIdx].notation?.bass?.voices?.[voiceIndex];
-        if (!mVoice) {
-          compositionState.ensureVoiceExists(currentMeasureIdx, 'bass', voiceIndex);
-        }
-        const targetVoice = compositionState.measures[currentMeasureIdx].notation.bass.voices[voiceIndex];
-
-        // Create the note
-        const measureNote = {
-          type: noteData.isRest || noteData.type === 'rest' ? 'rest' : 'note',
-          pitch: noteData.pitch,
-          pitches: noteData.pitches || (noteData.pitch ? [noteData.pitch] : []),
-          duration: durationInfo.duration,
-          dotted: durationInfo.dotted,
-          beat: beatInMeasure,
-          isRest: noteData.isRest || noteData.type === 'rest',
-          isTied: !isFirstPart, // Continuation from previous
-          tied: !isLastPart && !(noteData.isRest || noteData.type === 'rest'), // Ties to next
-          voiceIndex: voiceIndex,
-          chordIndex: noteData.chordIndex,
-          // Preserve attributes on first part only
-          dynamic: isFirstPart ? noteData.dynamic : null,
-          articulation: isFirstPart ? noteData.articulation : null,
-          accidental: isFirstPart ? noteData.accidental : null,
-          accidentals: isFirstPart ? noteData.accidentals : null,
-        };
-
-        targetVoice.notes.push(measureNote);
-
-        currentAbsoluteBeat += beatsToPlace;
-        remainingBeats -= beatsToPlace;
-        isFirstPart = false;
-      }
-    }
-
-    // Sort notes in each measure by beat position
-    for (let m = measureIndex; m < compositionState.measures.length; m++) {
-      const mVoice = compositionState.measures[m].notation?.bass?.voices?.[voiceIndex];
-      if (mVoice && mVoice.notes) {
-        mVoice.notes.sort((a, b) => (a.beat || 0) - (b.beat || 0));
-      }
-    }
-
-    // Mark bass as edited and save
+    // Mark bass as edited and save for all affected measures
     for (let m = measureIndex; m < compositionState.measures.length; m++) {
       const mMeasure = compositionState.measures[m];
       if (mMeasure && mMeasure.notation?.bass) {
@@ -6653,6 +6445,343 @@ export class NoteEditor {
       wasMerged: item.wasMerged || false
     })));
     return workingList;
+  }
+
+  // ============================================================================
+  // SEQUENTIAL REBUILD ALGORITHM (NO-SYNC APPROACH)
+  // See docs/SHIFT_OPERATIONS_IMPLEMENTATION_GUIDE.md for full documentation
+  // ============================================================================
+
+  /**
+   * Extract logical notes from a position to end of composition.
+   * Combines tied note sequences into single logical notes with total duration.
+   * Also REMOVES the extracted notes from measures.
+   *
+   * @param {string} clef - 'treble' or 'bass'
+   * @param {number} voiceIndex - 0 or 1
+   * @param {number} fromMeasure - Starting measure index
+   * @param {number} fromBeat - Starting beat within that measure
+   * @param {Object} compositionState - The composition state object
+   * @param {number} beatsPerMeasure - Beats per measure from time signature
+   * @returns {Array} Array of logical note objects
+   */
+  extractLogicalNotes(clef, voiceIndex, fromMeasure, fromBeat, compositionState, beatsPerMeasure) {
+    console.log('[extractLogicalNotes] Starting extraction:', { clef, voiceIndex, fromMeasure, fromBeat });
+    const logicalNotes = [];
+
+    for (let m = fromMeasure; m < compositionState.measures.length; m++) {
+      const measure = compositionState.measures[m];
+      if (!measure) continue;
+
+      const voices = clef === 'treble'
+        ? measure.notation?.treble?.voices
+        : measure.notation?.bass?.voices;
+
+      if (!voices || !voices[voiceIndex]) continue;
+
+      const voice = voices[voiceIndex];
+      if (!voice.notes) continue;
+
+      const notesToRemove = [];
+
+      // Sort notes by beat to process in order
+      const sortedNotes = [...voice.notes].sort((a, b) => (a.beat || 0) - (b.beat || 0));
+
+      for (const note of sortedNotes) {
+        const noteBeat = note.beat || 0;
+
+        // Skip notes before extraction point in the first measure
+        if (m === fromMeasure && noteBeat < fromBeat) continue;
+
+        // Mark for removal
+        notesToRemove.push(note);
+
+        // Get duration in beats
+        const durationBeats = this.getDurationInBeats(note.duration || '4n');
+
+        if (note.isTied) {
+          // This is a continuation of a previous note - add to last logical note's duration
+          if (logicalNotes.length > 0) {
+            const lastLogical = logicalNotes[logicalNotes.length - 1];
+            lastLogical.totalDuration += durationBeats;
+            console.log('[extractLogicalNotes] Combined tied note, new total:', lastLogical.totalDuration);
+            // If this continuation was also tied forward, remember that
+            if (note.tied) {
+              lastLogical.tiedForward = true;
+            }
+          } else {
+            // Edge case: tied note with no preceding note (shouldn't happen normally)
+            console.warn('[extractLogicalNotes] Found isTied note with no preceding note');
+            logicalNotes.push({
+              pitches: note.pitches || [note.pitch],
+              totalDuration: durationBeats,
+              tiedForward: note.tied || false,
+              attributes: {
+                articulation: note.articulation,
+                accidental: note.accidental,
+                dynamic: note.dynamic,
+                velocity: note.velocity,
+                isRest: note.isRest || note.type === 'rest',
+              }
+            });
+          }
+        } else {
+          // New logical note (not a continuation)
+          logicalNotes.push({
+            pitches: note.pitches || [note.pitch],
+            totalDuration: durationBeats,
+            tiedForward: note.tied || false,
+            attributes: {
+              articulation: note.articulation,
+              accidental: note.accidental,
+              dynamic: note.dynamic,
+              velocity: note.velocity,
+              isRest: note.isRest || note.type === 'rest',
+            }
+          });
+          console.log('[extractLogicalNotes] New logical note:', {
+            pitches: note.pitches || [note.pitch],
+            duration: durationBeats,
+            isRest: note.isRest || note.type === 'rest'
+          });
+        }
+      }
+
+      // Remove extracted notes from the voice
+      const beforeCount = voice.notes.length;
+      voice.notes = voice.notes.filter(n => !notesToRemove.includes(n));
+      const afterCount = voice.notes.length;
+      console.log(`[extractLogicalNotes] Measure ${m}: removed ${beforeCount - afterCount} of ${beforeCount} notes, ${afterCount} remaining`);
+    }
+
+    console.log('[extractLogicalNotes] Extracted', logicalNotes.length, 'logical notes');
+
+    // DEBUG: Log the state of all measures after extraction
+    for (let m = fromMeasure; m < compositionState.measures.length; m++) {
+      const measure = compositionState.measures[m];
+      const voices = clef === 'treble' ? measure?.notation?.treble?.voices : measure?.notation?.bass?.voices;
+      const noteCount = voices?.[voiceIndex]?.notes?.length || 0;
+      console.log(`[extractLogicalNotes] After extraction - Measure ${m} has ${noteCount} notes in voice ${voiceIndex}`);
+    }
+
+    return logicalNotes;
+  }
+
+  /**
+   * Rebuild notes from a position, placing each logical note sequentially.
+   * Automatically splits notes that cross measure boundaries.
+   * Automatically combines notes that fit in one measure (no explicit combine needed).
+   *
+   * @param {string} clef - 'treble' or 'bass'
+   * @param {number} voiceIndex - 0 or 1
+   * @param {number} startMeasure - Starting measure index
+   * @param {number} startBeat - Starting beat within that measure
+   * @param {Array} logicalNotes - Array of logical note objects to place
+   * @param {Object} compositionState - The composition state object
+   * @param {number} beatsPerMeasure - Beats per measure from time signature
+   */
+  rebuildNotesAfterShift(clef, voiceIndex, startMeasure, startBeat, logicalNotes, compositionState, beatsPerMeasure) {
+    console.log('[rebuildNotesAfterShift] Starting rebuild:', { clef, voiceIndex, startMeasure, startBeat, noteCount: logicalNotes.length });
+    let currentMeasure = startMeasure;
+    let currentBeat = startBeat;
+
+    for (const logicalNote of logicalNotes) {
+      let remainingBeats = logicalNote.totalDuration;
+      let isFirstPart = true;
+
+      console.log('[rebuildNotesAfterShift] Placing note:', {
+        pitches: logicalNote.pitches,
+        totalDuration: remainingBeats,
+        startingAt: { measure: currentMeasure, beat: currentBeat }
+      });
+
+      while (remainingBeats > 0) {
+        // Ensure measure exists
+        while (currentMeasure >= compositionState.measures.length) {
+          compositionState.addMeasure({});
+        }
+
+        const measure = compositionState.measures[currentMeasure];
+        const voices = clef === 'treble'
+          ? measure.notation?.treble?.voices
+          : measure.notation?.bass?.voices;
+
+        if (!voices) {
+          console.error('[rebuildNotesAfterShift] No voices array in measure', currentMeasure);
+          break;
+        }
+
+        // Ensure voice exists
+        while (voices.length <= voiceIndex) {
+          voices.push({ notes: [] });
+        }
+        const voice = voices[voiceIndex];
+
+        // Calculate how much fits in this measure
+        const beatsAvailable = beatsPerMeasure - currentBeat;
+        const beatsToPlace = Math.min(remainingBeats, beatsAvailable);
+        const isLastPart = remainingBeats <= beatsAvailable;
+
+        // Create the measure note
+        const durationString = this.beatsToDurationString(beatsToPlace);
+        const isDotted = durationString.endsWith('.');
+        const measureNote = {
+          type: logicalNote.attributes.isRest ? 'rest' : 'note',
+          pitches: logicalNote.pitches,
+          duration: durationString,
+          beat: currentBeat,
+          // Tie flags
+          isTied: !isFirstPart,   // Tied FROM previous if not first part
+          tied: !isLastPart,      // Ties TO next if not last part
+          // Other properties
+          isRest: logicalNote.attributes.isRest || false,
+          // Set dotted flag based on duration string (for toolbar sync)
+          dotted: isDotted,
+        };
+
+        // Add attributes only on first part
+        if (isFirstPart) {
+          if (logicalNote.attributes.articulation) {
+            measureNote.articulation = logicalNote.attributes.articulation;
+          }
+          if (logicalNote.attributes.accidental) {
+            measureNote.accidental = logicalNote.attributes.accidental;
+          }
+          if (logicalNote.attributes.dynamic) {
+            measureNote.dynamic = logicalNote.attributes.dynamic;
+          }
+          if (logicalNote.attributes.velocity !== undefined) {
+            measureNote.velocity = logicalNote.attributes.velocity;
+          }
+        }
+
+        console.log('[rebuildNotesAfterShift] Created note:', {
+          measure: currentMeasure,
+          beat: currentBeat,
+          duration: measureNote.duration,
+          tied: measureNote.tied,
+          isTied: measureNote.isTied
+        });
+
+        // Add to voice and sort
+        voice.notes.push(measureNote);
+        voice.notes.sort((a, b) => (a.beat || 0) - (b.beat || 0));
+
+        // Advance position
+        currentBeat += beatsToPlace;
+        remainingBeats -= beatsToPlace;
+        isFirstPart = false;
+
+        // Move to next measure if current is full
+        if (currentBeat >= beatsPerMeasure) {
+          currentMeasure++;
+          currentBeat = 0;
+        }
+      }
+    }
+
+    console.log('[rebuildNotesAfterShift] Rebuild complete');
+
+    // DEBUG: Log final state of all affected measures
+    for (let m = startMeasure; m <= currentMeasure && m < compositionState.measures.length; m++) {
+      const measure = compositionState.measures[m];
+      const voices = clef === 'treble' ? measure?.notation?.treble?.voices : measure?.notation?.bass?.voices;
+      const notes = voices?.[voiceIndex]?.notes || [];
+      console.log(`[rebuildNotesAfterShift] Final state - Measure ${m}:`, notes.map(n => ({
+        beat: n.beat,
+        duration: n.duration,
+        tied: n.tied,
+        isTied: n.isTied
+      })));
+    }
+  }
+
+  /**
+   * Delete a note with shift using extract→rebuild pattern
+   * This is the NO SYNC approach - works directly on measures
+   * @param {string} clef - 'treble' or 'bass'
+   * @param {number} voiceIndex - Voice index (0 or 1)
+   * @param {number} measureIndex - Measure containing the note
+   * @param {number} noteIndex - Index of note to delete
+   * @param {Object} compositionState - CompositionState instance
+   */
+  deleteNoteWithShift(clef, voiceIndex, measureIndex, noteIndex, compositionState) {
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
+
+    console.log('[DELETE-WITH-SHIFT] Starting delete:', { clef, voiceIndex, measureIndex, noteIndex });
+
+    // Get the measure and voice
+    const measure = compositionState.measures[measureIndex];
+    if (!measure) {
+      console.error('[DELETE-WITH-SHIFT] Measure not found');
+      return;
+    }
+
+    const voices = clef === 'treble'
+      ? measure.notation?.treble?.voices
+      : measure.notation?.bass?.voices;
+
+    if (!voices || !voices[voiceIndex]) {
+      console.error('[DELETE-WITH-SHIFT] Voice not found');
+      return;
+    }
+
+    const voice = voices[voiceIndex];
+    const noteToDelete = voice.notes[noteIndex];
+    if (!noteToDelete) {
+      console.error('[DELETE-WITH-SHIFT] Note not found at index', noteIndex);
+      return;
+    }
+
+    const deleteBeat = noteToDelete.beat || 0;
+    const deleteDuration = this.getDurationInBeats(noteToDelete.duration || '4n');
+
+    console.log('[DELETE-WITH-SHIFT] Deleting note at beat', deleteBeat, 'with duration', deleteDuration);
+
+    // Calculate the beat AFTER the deleted note (where extraction should start)
+    const afterDeleteBeat = deleteBeat + deleteDuration;
+    const afterDeleteMeasure = measureIndex + Math.floor(afterDeleteBeat / beatsPerMeasure);
+    const afterDeleteBeatInMeasure = afterDeleteBeat % beatsPerMeasure;
+
+    // If the note is part of a tie chain (isTied=true), we need to find the start of the chain
+    // and delete the entire tied sequence
+    let actualDeleteBeat = deleteBeat;
+    let actualDeleteMeasure = measureIndex;
+
+    // Check if this note is a tie continuation
+    if (noteToDelete.isTied) {
+      // Walk backward to find the start of the tie chain
+      console.log('[DELETE-WITH-SHIFT] Note is tied continuation, finding chain start');
+      // For now, just delete this note and let the tie break
+    }
+
+    // Step 1: Remove the note being deleted from the measure
+    voice.notes.splice(noteIndex, 1);
+    console.log('[DELETE-WITH-SHIFT] Removed note from voice');
+
+    // Step 2: If the deleted note was tied forward, clear isTied on what was the next note
+    // (now at noteIndex position after splice)
+    if (noteToDelete.tied && noteIndex < voice.notes.length) {
+      const nextNote = voice.notes[noteIndex];
+      if (nextNote && nextNote.isTied) {
+        delete nextNote.isTied;
+        console.log('[DELETE-WITH-SHIFT] Cleared isTied on following note');
+      }
+    }
+
+    // Step 3: Extract all notes AFTER the deleted note's position
+    const logicalNotes = this.extractLogicalNotes(clef, voiceIndex, measureIndex, deleteBeat, compositionState, beatsPerMeasure);
+    console.log('[DELETE-WITH-SHIFT] Extracted', logicalNotes.length, 'logical notes after delete position');
+
+    // Step 4: Rebuild from the delete position (notes shift left into the gap)
+    if (logicalNotes.length > 0) {
+      this.rebuildNotesAfterShift(clef, voiceIndex, measureIndex, deleteBeat, logicalNotes, compositionState, beatsPerMeasure);
+    }
+
+    // CRITICAL: Mark measures as manually edited to prevent overwrite from stale block sequence
+    compositionState._measuresManuallyEdited = true;
+
+    console.log('[DELETE-WITH-SHIFT] Delete complete');
   }
 
   /**

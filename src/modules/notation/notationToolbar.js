@@ -1551,9 +1551,16 @@ export class NotationToolbar {
     const tupletTypes = new Set();
 
     selectedNotes.forEach(note => {
-      if (note.duration) durations.add(note.duration);
+      if (note.duration) {
+        // Normalize duration: strip the '.' suffix for comparison with toolbar buttons
+        // The dotted state is tracked separately via dottedStates
+        const baseDuration = note.duration.replace('.', '');
+        durations.add(baseDuration);
+      }
       articulations.add(note.articulation || 'none');
-      dottedStates.add(note.dotted || false);
+      // Check both the dotted property AND if duration ends with '.'
+      const isDotted = note.dotted || (note.duration && note.duration.endsWith('.'));
+      dottedStates.add(isDotted || false);
       restStates.add(note.isRest || note.type === 'rest' || false);
       accidentals.add(note.accidental || 'none');
       tiedStates.add(note.tied || note.isTied || false);

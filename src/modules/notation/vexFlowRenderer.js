@@ -919,7 +919,9 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
   });
 
   // Add dot modifier for each note in the chord
-  if (dotted) {
+  // Check dotted parameter, duration ending with '.', or VexFlow duration ending with 'd'
+  const isDotted = dotted || (duration && duration.endsWith('.')) || vexDuration.endsWith('d');
+  if (isDotted) {
     // Use VexFlow Dot modifier
     pitches.forEach((_, index) => {
       staveNote.addModifier(new VF.Dot(), index);

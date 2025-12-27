@@ -2247,6 +2247,13 @@ export class CompositionState {
             return;
         }
 
+        // CRITICAL: If measures have been manually edited via shift operations,
+        // DO NOT overwrite them from the (now stale) block sequence
+        if (this._measuresManuallyEdited) {
+            console.log('[renderTrebleBlocksToMeasures] Skipping - measures were manually edited');
+            return;
+        }
+
         // NOTE: We removed the blanket "skip if Voice 2 exists" check.
         // The code below already handles multiple voices properly by only
         // clearing voices that exist in the block. The previous check was
