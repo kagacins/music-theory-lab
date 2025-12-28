@@ -9685,6 +9685,9 @@ window.clearMultiSelection = clearMultiSelection;
 window.getChordSelectionCount = getSelectionCount;
 window.getSelectedChordIndicesArray = getSelectedIndicesArray;
 
+// Export with "Old" suffix for hybrid delegation during migration
+window.clearMultiSelectionOld = clearMultiSelection;
+
 /**
  * Update the bass selection UI based on current chord selection
  * Shows/hides the "Apply to Selected" controls and selection count
@@ -9740,6 +9743,10 @@ function updateCustomBassPatternInfo() {
 // Expose to window for external calls
 window.updateBassSelectionUI = updateBassSelectionUI;
 window.updateCustomBassPatternInfo = updateCustomBassPatternInfo;
+
+// Export with "Old" suffix for hybrid delegation during migration
+window.updateBassSelectionUIOld = updateBassSelectionUI;
+window.updateCustomBassPatternInfoOld = updateCustomBassPatternInfo;
 
 // ============================================================================
 // GLOBAL KEYBOARD SHORTCUTS FOR MULTI-SELECT AND SECTIONS
@@ -9960,6 +9967,11 @@ window.copySelectedChords = () => copySelectedChords(getSelectedIndicesArray());
 window.pasteChords = pasteChords;
 window.duplicateSelectedChords = () => duplicateSelectedChords(getSelectedIndicesArray());
 window.deleteSelectedChords = () => deleteSelectedChords(getSelectedIndicesArray());
+
+// Export with "Old" suffix for hybrid delegation during migration
+window.pasteChordsOld = pasteChords;
+window.duplicateSelectedChordsOld = duplicateSelectedChords;
+window.deleteSelectedChordsOld = deleteSelectedChords;
 
 /**
  * Remove highlighting from all tension curve points
@@ -17446,8 +17458,43 @@ export function getAnalysisViewState() {
 if (typeof window !== 'undefined') {
     window.highlightTensionPoint = highlightTensionPoint;
     window.unhighlightAllTensionPoints = unhighlightAllTensionPoints;
-    window.highlightChordCard = highlightChordCard;
-    window.unhighlightAllChordCards = unhighlightAllChordCards;
-    window.expandChordCard = expandChordCard;
-    window.collapseAllChordCards = collapseAllChordCards;
+
+    // Export with "Old" suffix for hybrid delegation during migration
+    window.selectChordCardOld = selectChordCard;
+    window.highlightChordCardOld = highlightChordCard;
+    window.unhighlightAllChordCardsOld = unhighlightAllChordCards;
+    window.expandChordCardOld = expandChordCard;
+    window.collapseAllChordCardsOld = collapseAllChordCards;
+
+    // Core CRUD operations
+    window.removeChordFromProgressionOld = removeChordFromProgression;
+    window.clearProgressionOld = clearProgression;
+    window.toggleProgressionNoteOld = toggleProgressionNote;
+    window.toggleProgressionLHNoteOld = toggleProgressionLHNote;
+
+    // Chord update operations
+    window.updateChordTypeOld = updateChordType;
+    window.updateChordRootOld = updateChordRoot;
+    window.updateChordInversionOld = updateChordInversion;
+    window.updateChordDurationOld = updateChordDuration;
+    window.addChordToProgressionByParamsOld = addChordToProgressionByParams;
+
+    // Data loading operations
+    window.loadProgressionOld = loadProgression;
+
+    // Key & Transposition operations
+    window.setKeyDropdownValueOld = setKeyDropdownValue;
+    window.transposeProgressionOld = transposeProgression;
+    window.updateRomanNumeralsOld = updateRomanNumerals;
+    window.updateProgressionEnharmonicsOld = updateProgressionEnharmonics;
+    window.getProgressionChordNotesOld = getProgressionChordNotes;
+
+    // Recording & History operations
+    window.toggleRecordingOld = toggleRecording;
+    window.saveRecordingOld = saveRecording;
+    window.handleUndoOld = handleUndo;
+    window.handleRedoOld = handleRedo;
+    window.saveStateBeforeChangeOld = saveStateBeforeChange;
+
+    window.highlightTrainer = highlightTrainer; // Keyboard highlighting for chord playback
 }

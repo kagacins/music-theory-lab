@@ -1,32 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dir:*)",
-      "Bash(powershell -Command:*)",
-      "Bash(mkdir:*)",
-      "Bash(test:*)",
-      "Bash(find:*)",
-      "Bash(python -m http.server:*)",
-      "Bash(where:*)",
-      "Bash(python3:*)",
-      "Bash(node --check:*)",
-      "Bash($null)",
-      "Bash(node --version:*)",
-      "Bash(node -e:*)",
-      "Bash(cd:*)",
-      "Bash(start index.html)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(tree:*)",
-      "Bash(nul)",
-      "Bash(python:*)",
-      "Bash(cat:*)",
-      "Bash(git restore:*)",
-      "Bash(node -c:*)",
-      "Bash(echo:*)",
-      "Bash(npm start)",
-      "Bash(git checkout:*)",
-      "Bash(npx http-server -p 8000)"
+      "Bash(timeout 10 npm run dev:*)",
+      "Bash(timeout 15 npm run dev:*)",
+      "Bash(timeout 5 npm run dev:*)",
+      "Bash(npm run build:*)",
+      "Bash(/tmp/handleCardDragWithinSection.txt)"
     ],
     "deny": [],
     "ask": []

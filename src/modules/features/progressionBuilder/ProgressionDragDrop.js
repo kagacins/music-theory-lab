@@ -1,0 +1,1107 @@
+/**
+ * ProgressionDragDrop.js
+ *
+ * Phase 1.5 of progressionBuilder.js refactoring (17,453 lines -> 7 focused modules)
+ * Extracted from progressionBuilder.js lines 4348-5569, 8589-9085
+ *
+ * This module handles all drag-and-drop functionality for the Progression Builder:
+ * - Section container reordering (drag sections by banner)
+ * - Chord card reordering within and between sections
+ * - Section chip/pill drag-and-drop reordering
+ * - Simplified sortable for flat view (no sections)
+ * - All event handlers and reordering logic
+ *
+ * Dependencies (to be imported when integrated):
+ * - UI: renderProgressionDisplay, updateNotationForSelectedSections (from ProgressionRenderer.js)
+ * - UI: createUnifiedSectionContainer, createPseudoSectionContainer (from ProgressionRenderer.js)
+ * - UI: createChordCardWrapper (from ProgressionRenderer.js)
+ * - UI: updateCardShifts (from ProgressionRenderer.js)
+ * - Undo: saveStateBeforeChange (from ProgressionController.js)
+ * - External: Sortable (from SortableJS CDN - loaded globally)
+ */
+
+// ============================================================================
+// IMPORTS
+// ============================================================================
+
+// State management
+import {
+    getTrainerState,
+    setProgressionData,
+    setProgressionRomans,
+    getSelectionCount,
+    getSelectedIndicesArray
+} from '../../state/trainerState.js';
+
+// Guided mode integration
+import { dispatchBuilderEvent } from '../../ui/lessonGuidedMode.js';
+
+// Note: The following dependencies will be imported from other modules once refactoring is complete:
+// - UI: renderProgressionDisplay (from ProgressionRenderer.js)
+// - UI: createUnifiedSectionContainer (from ProgressionRenderer.js)
+// - UI: createPseudoSectionContainer (from ProgressionRenderer.js)
+// - UI: createChordCardWrapper (from ProgressionRenderer.js)
+// - Undo: saveStateBeforeChange (from ProgressionController.js)
+
+// ============================================================================
+// SORTABLE INITIALIZATION FUNCTIONS
+// ============================================================================
+
+/**
+ * Initialize Sortable on the main container for section reordering
+ * Sections are dragged by their banner element
+ * @param {HTMLElement} container - Container with section-unified-containers
+ */
+export function initializeSectionContainerSortable(container) {
+    if (typeof Sortable === 'undefined') {
+        console.warn('[SectionView] Sortable not available');
+        return;
+    }
+
+    // Destroy existing sortable if any
+    if (container.sortableInstance) {
+        container.sortableInstance.destroy();
+    }
+
+    // Create a simple sortable for section containers only
+    container.sortableInstance = new Sortable(container, {
+        animation: 200,
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        dragClass: 'sortable-drag',
+        // Only drag by the section banner or drag handle icon
+        handle: '.section-banner',
+        // Only section containers are draggable
+        draggable: '.section-unified-container',
+        // Lower swap threshold for easier reordering
+        swapThreshold: 0.3,
+        // Allow sorting within this container
+        sort: true,
+        onEnd: function(evt) {
+            // Get all section containers in their new DOM order
+            const allContainers = Array.from(container.querySelectorAll(':scope > .section-unified-container'));
+
+            // Build the new order of section IDs
+            const newSectionOrder = allContainers
+                .map(el => el.getAttribute('data-section-id'))
+                .filter(Boolean);
+
+            // Update the user's preferred section order
+            // TODO: Import userSectionOrder state from progressionBuilder.js
+            // userSectionOrder = newSectionOrder;
+
+            // Re-render to apply the new order
+            // TODO: Import renderProgressionDisplay from ProgressionRenderer.js
+            // renderProgressionDisplay('melody-progression-visualization', true);
+
+            window.dispatchEvent(new CustomEvent('showNotification', {
+                detail: { message: 'Section order updated', type: 'success' }
+            }));
+        }
+    });
+}
+
+/**
+ * Initialize Sortable on each section-cards-area for dragging cards within and between sections
+ * @param {HTMLElement} container - The container with section-unified-containers
+ */
+export function initializeSectionCardsAreaSortables(container) {
+    if (typeof Sortable === 'undefined') {
+        console.warn('[SectionView] Sortable not available');
+        return;
+    }
+
+    const sectionContainers = container.querySelectorAll('.section-unified-container');
+
+    sectionContainers.forEach(sectionContainer => {
+        const cardsArea = sectionContainer.querySelector('.section-cards-area');
+        if (!cardsArea) return;
+
+        const sectionId = cardsArea.getAttribute('data-section-id');
+
+        // Destroy existing sortable if any
+        if (cardsArea.sortableInstance) {
+            cardsArea.sortableInstance.destroy();
+        }
+
+        // Create sortable for this section's cards area
+        cardsArea.sortableInstance = new Sortable(cardsArea, {
+            group: {
+                name: 'section-cards',
+                pull: true,
+                // Only accept chord cards, not section containers
+                put: function(to, from, dragEl) {
+                    // Only accept elements that are chord cards
+                    return dragEl.classList.contains('chord-card-wrapper') &&
+                           dragEl.hasAttribute('data-chord-index');
+                }
+            },
+            animation: 200,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            dragClass: 'sortable-drag',
+            handle: '.drag-handle',
+            // Exclude buttons from triggering drag - let them receive clicks
+            filter: 'button, select, input, .play-btn, .delete-btn, .expand-btn, .info-tooltip-btn, .no-drag',
+            preventOnFilter: false,
+            draggable: '.chord-card-wrapper[data-chord-index]',
+            swapThreshold: 0.65,
+            // Touch-specific options
+            delay: 150,
+            delayOnTouchOnly: true,
+            touchStartThreshold: 5,
+            onEnd: function(evt) {
+                // onEnd fires on source container - only handle same-section reordering here
+                if (evt.from === evt.to) {
+                    handleCardDragWithinSection(evt, sectionId);
+                }
+                // Cross-section moves are handled by onAdd on the destination
+            },
+            onAdd: function(evt) {
+                // Card was added from another section - handle cross-section move
+                // evt.to is this container (destination), evt.from is source
+                handleCardDragWithinSection(evt, evt.from.getAttribute('data-section-id'));
+            }
+        });
+    });
+}
+
+/**
+ * Initialize Sortable on section chips container for drag-drop reordering of sections
+ * Only real sections (not pseudo-sections) are draggable
+ * Dragging reorders sections AND their chords in the progression
+ * @param {HTMLElement} chipsContainer - The container holding section chip buttons
+ */
+export function initializeSectionChipsSortable(chipsContainer) {
+    if (typeof Sortable === 'undefined') {
+        console.warn('[SectionChips] Sortable not available');
+        return;
+    }
+
+    if (!chipsContainer) return;
+
+    // Destroy existing sortable if any
+    if (chipsContainer.sortableInstance) {
+        chipsContainer.sortableInstance.destroy();
+    }
+
+    chipsContainer.sortableInstance = new Sortable(chipsContainer, {
+        animation: 200,
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        dragClass: 'sortable-drag',
+        // Allow dragging all section chips including pseudo-sections (No Group)
+        draggable: '.section-chip',
+        // Use the drag handle to initiate drag (avoids conflict with click handler)
+        handle: '.section-pill-drag-handle',
+        // Touch support
+        delay: 100,
+        delayOnTouchOnly: true,
+        touchStartThreshold: 3,
+        onEnd: function(evt) {
+            // Get all chips in their new DOM order (after the drag)
+            const allChips = Array.from(chipsContainer.querySelectorAll('.section-chip'));
+
+            // Build the new order of section IDs (including pseudo-section IDs)
+            const newSectionOrder = allChips
+                .map(chip => chip.getAttribute('data-section-id'))
+                .filter(Boolean);
+
+            // Update the user's preferred section order
+            // TODO: Import userSectionOrder state from progressionBuilder.js
+            // userSectionOrder = newSectionOrder;
+
+            // Re-render to apply the new order
+            // TODO: Import renderProgressionDisplay from ProgressionRenderer.js
+            // renderProgressionDisplay('melody-progression-visualization', true);
+
+            window.dispatchEvent(new CustomEvent('showNotification', {
+                detail: { message: 'Section order updated', type: 'success' }
+            }));
+        }
+    });
+}
+
+/**
+ * Initialize Sortable for simplified/flat view (no sections or flat chord list)
+ * Handles both individual chord cards AND section containers in the same sortable
+ * @param {HTMLElement} container - The grid/flex container
+ */
+export function initializeSimplifiedSortable(container) {
+    if (typeof Sortable === 'undefined') return;
+
+    if (container.sortableInstance) {
+        container.sortableInstance.destroy();
+    }
+
+    // Check if we have section containers
+    const hasSections = container.querySelector('.section-unified-container') !== null;
+
+    // Main sortable for top-level items (individual cards OR section containers)
+    container.sortableInstance = new Sortable(container, {
+        group: {
+            name: 'progression-cards',
+            pull: true,
+            put: true  // Accept cards from other sortables (like section-cards-area)
+        },
+        animation: 200,
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        dragClass: 'sortable-drag',
+        // Use drag-handle class for cards, section-drag-handle or section-banner for sections
+        handle: '.drag-handle, .section-drag-handle, .section-banner',
+        // CRITICAL: Exclude buttons and interactive elements from triggering drag
+        // This allows play, delete, expand buttons inside drag-handle to work
+        filter: 'button, select, input, .play-btn, .delete-btn, .expand-btn, .info-tooltip-btn, .no-drag',
+        preventOnFilter: false, // Don't prevent default on filtered elements - let buttons work normally
+        // Allow dragging direct children that are cards or sections
+        draggable: '.chord-card-wrapper[data-chord-index], .section-unified-container',
+        // Lower threshold to make section reordering easier (default is 1 which equals 50%)
+        swapThreshold: 0.4,
+        // Touch-specific options
+        delay: 150,
+        delayOnTouchOnly: true,
+        touchStartThreshold: 5,
+        // Sort items within the same container - required for reordering
+        sort: true,
+        onStart: function(evt) {
+            // Add a class to indicate section drag is in progress
+            const draggedItem = evt.item;
+            if (draggedItem.classList.contains('section-unified-container')) {
+                container.classList.add('section-drag-in-progress');
+            }
+        },
+        // Prevent dropping sections into another section's cards-area (nesting)
+        // But allow section reordering at the container level
+        onMove: function(evt, originalEvent) {
+            const draggedItem = evt.dragged;
+            const targetEl = evt.related;
+
+            // Safety check - if no target element, allow the move
+            if (!targetEl) return true;
+
+            // Only apply restrictions when dragging a section container
+            if (draggedItem && draggedItem.classList.contains('section-unified-container')) {
+                // Get the target's parent section (if any)
+                const targetSection = targetEl.closest('.section-unified-container');
+
+                // If target is the dragged item itself or inside it, allow (internal movement)
+                if (targetSection === draggedItem) return true;
+
+                // If target is another section-unified-container (sibling reordering), allow
+                if (targetEl.classList.contains('section-unified-container')) return true;
+
+                // If target is a section-banner of another section, allow (reordering)
+                if (targetEl.classList.contains('section-banner')) return true;
+
+                // If target is inside a section-cards-area (not the dragged item's),
+                // still allow the move - Sortable will handle sibling positioning
+                // We just don't want the section to become a CHILD of another section
+                // This is controlled by the draggable option, not onMove
+                return true;
+            }
+
+            // For card dragging, allow all moves within this sortable
+            return true;
+        },
+        // Handle cards added FROM sections TO the main container (ungrouped)
+        onAdd: function(evt) {
+            // Use the unified handler which handles cross-container moves
+            handleCardDragWithinSection(evt, evt.from.getAttribute('data-section-id'));
+        },
+        onEnd: function(evt) {
+            // Remove section drag class
+            container.classList.remove('section-drag-in-progress');
+
+            // Cross-container moves are handled by onAdd
+            if (evt.from !== evt.to) return;
+
+            const draggedItem = evt.item;
+
+            // Check if we dragged a section container
+            if (draggedItem.classList.contains('section-unified-container')) {
+                // Section was dragged - need to reorder all chords within it
+                handleSectionDragEnd(container, draggedItem, evt);
+                return;
+            }
+
+            // For same-container moves (reordering ungrouped cards), use the unified handler
+            // This ensures section indices are properly updated
+            handleCardDragWithinSection(evt, null); // null because cards are ungrouped
+            return;
+
+            // DEPRECATED: Old per-card reorder logic below is no longer used
+            // Kept for reference but execution never reaches here
+            const oldChordIndex = parseInt(draggedItem.getAttribute('data-chord-index'), 10);
+
+            // After the drag, find the new position by looking at sibling order
+            // Need to account for cards inside sections vs standalone
+            // TODO: Import getAllChordWrappersInOrder helper
+            const allChordWrappers = getAllChordWrappersInOrder(container);
+            const newPosition = allChordWrappers.indexOf(draggedItem);
+
+
+            if (oldChordIndex !== newPosition && newPosition >= 0) {
+                const actualOldIndex = oldChordIndex;
+                const actualNewIndex = newPosition;
+
+
+                if (actualOldIndex < 0 || actualNewIndex < 0) return; // Shouldn't happen, but safety check
+
+                // Save state for undo BEFORE making changes
+                // TODO: Import saveStateBeforeChange from progressionBuilder.js
+                // saveStateBeforeChange();
+
+                // Use CompositionState's reorderChord which preserves edited bass notes
+                // TODO: Import getCompositionState from compositionState.js
+                const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+                if (compositionState && typeof compositionState.reorderChord === 'function') {
+
+                    // Call reorderChord FIRST - it handles everything internally
+                    compositionState.reorderChord(actualOldIndex, actualNewIndex);
+
+                    // AFTER reorderChord completes, sync trainerState from compositionState
+                    // This ensures progressionData matches the reordered state
+                    const updatedProgression = compositionState.exportToProgressionData();
+                    // TODO: Import setProgressionData from trainerState.js
+                    // setProgressionData(updatedProgression);
+                } else {
+                    // Fallback to old behavior if compositionState not available
+                    // TODO: Import getTrainerState from trainerState.js
+                    const trainerState = getTrainerState();
+                    const progressionData = [...trainerState.progressionData];
+                    const progressionRomans = [...trainerState.progressionRomans];
+
+                    // Move items
+                    const [movedChord] = progressionData.splice(actualOldIndex, 1);
+                    progressionData.splice(actualNewIndex, 0, movedChord);
+
+                    const [movedRoman] = progressionRomans.splice(actualOldIndex, 1);
+                    progressionRomans.splice(actualNewIndex, 0, movedRoman);
+
+                    // Update state
+                    // TODO: Import setProgressionData, setProgressionRomans from trainerState.js
+                    // setProgressionData(progressionData);
+                    // setProgressionRomans(progressionRomans);
+
+                    // Sync progression to compositionState
+                    if (window.syncProgressionToMelodyComposer) {
+                        window.syncProgressionToMelodyComposer();
+                    }
+                }
+
+                // Also update trainerState's progressionRomans to stay in sync
+                // TODO: Import getTrainerState, setProgressionRomans from trainerState.js
+                const trainerState = getTrainerState();
+                const progressionRomans = [...trainerState.progressionRomans];
+                const [movedRoman] = progressionRomans.splice(actualOldIndex, 1);
+                progressionRomans.splice(actualNewIndex, 0, movedRoman);
+                // setProgressionRomans(progressionRomans);
+
+                // Re-render both views (this will recalculate shifts properly)
+                // TODO: Import renderProgressionDisplay from ProgressionRenderer.js
+                // renderProgressionDisplay('melody-progression-visualization', true);
+                // renderProgressionDisplay('melody-progression-visualization', false);
+
+                // Update grand staff notation
+                if (window.refreshNotationFromProgression) {
+                    window.refreshNotationFromProgression();
+                } else if (window.getNotationComposer) {
+                    const notationComposer = window.getNotationComposer();
+                    if (notationComposer) {
+                        notationComposer.render();
+                    }
+                }
+            }
+        }
+    });
+}
+
+/**
+ * Initialize SortableJS for sections and their card containers (legacy function)
+ * @param {HTMLElement} container - Main container
+ */
+export function initializeSectionSortables(container) {
+    if (typeof Sortable === 'undefined') {
+        return;
+    }
+
+    // Initialize sortable for section reordering
+    const sectionsContainer = container.querySelector('.sections-container');
+    if (sectionsContainer) {
+        // Section-level sortable (reorder sections)
+        const sectionWrappers = sectionsContainer.querySelectorAll('.section-wrapper');
+        if (sectionWrappers.length > 1) {
+            if (sectionsContainer.sectionSortable) {
+                sectionsContainer.sectionSortable.destroy();
+            }
+            sectionsContainer.sectionSortable = new Sortable(sectionsContainer, {
+                animation: 200,
+                handle: '.section-drag-handle',
+                draggable: '.section-wrapper:not([data-pseudo-section])',
+                ghostClass: 'section-ghost',
+                // Exclude label and buttons from triggering drag (allow double-click rename)
+                filter: '.section-label, .section-menu-btn, .section-collapse-btn',
+                preventOnFilter: false, // Don't prevent events on filtered elements
+                // Touch-specific options
+                delay: 150,
+                delayOnTouchOnly: true,
+                touchStartThreshold: 5,
+                onEnd: function(evt) {
+                    // Get the section ID from the dragged element
+                    const draggedSection = evt.item;
+                    const sectionId = draggedSection.getAttribute('data-section-id');
+                    if (!sectionId) return;
+
+                    // TODO: Import getCompositionState from compositionState.js
+                    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+                    if (!compositionState) return;
+
+                    // Get real sections (not pseudo) from DOM in new order
+                    const realSectionWrappers = Array.from(sectionsContainer.querySelectorAll('.section-wrapper:not([data-pseudo-section])'));
+                    const newSectionOrder = realSectionWrappers.map(el => el.getAttribute('data-section-id')).filter(Boolean);
+
+                    // Get current section order from compositionState
+                    const currentSections = compositionState.getSections();
+                    const oldIndex = currentSections.findIndex(s => s.id === sectionId);
+                    const newIndex = newSectionOrder.indexOf(sectionId);
+
+                    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+
+                    // Use reorderSectionsWithChords for consistent behavior with pill reordering
+                    // TODO: Import saveStateBeforeChange from progressionBuilder.js
+                    // saveStateBeforeChange();
+                    reorderSectionsWithChords(currentSections, oldIndex, newIndex);
+
+                    // Re-render
+                    // TODO: Import renderProgressionDisplay, updateNotationForSelectedSections
+                    // renderProgressionDisplay('melody-progression-visualization', true);
+                    // updateNotationForSelectedSections();
+
+                    if (window.refreshNotationFromProgression) {
+                        window.refreshNotationFromProgression();
+                    }
+
+                    window.dispatchEvent(new CustomEvent('showNotification', {
+                        detail: { message: 'Section order updated', type: 'success' }
+                    }));
+                }
+            });
+        }
+    }
+
+    // Initialize sortable for each section's cards container
+    const cardContainers = container.querySelectorAll('.section-cards-container, .ungrouped-cards-container');
+    cardContainers.forEach(cardContainer => {
+        if (cardContainer.sortableInstance) {
+            cardContainer.sortableInstance.destroy();
+        }
+
+        cardContainer.sortableInstance = new Sortable(cardContainer, {
+            group: {
+                name: 'progression-cards',  // MUST match other sortables for cross-container drag
+                pull: true,
+                put: function(to, from, dragEl) {
+                    // Only accept chord cards, NOT section containers
+                    return dragEl.classList.contains('chord-card-wrapper') &&
+                           dragEl.hasAttribute('data-chord-index');
+                }
+            },
+            animation: 200,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            dragClass: 'sortable-drag',
+            handle: '.drag-handle',
+            filter: '.section-empty-indicator, .chord-card-wrapper:not([data-chord-index])',
+            // Touch-specific options
+            delay: 150,
+            delayOnTouchOnly: true,
+            touchStartThreshold: 5,
+            swapThreshold: 0.65,
+            onStart: function(evt) {
+                // Handle multi-select drag
+                // TODO: Import getSelectionCount from trainerState.js
+                const selectedCount = getSelectionCount();
+                if (selectedCount > 1) {
+                    evt.item.setAttribute('data-dragging-count', selectedCount);
+                }
+            },
+            // Handle cards added FROM outside INTO this container
+            onAdd: function(evt) {
+                handleChordMoveToSection(evt);
+            },
+            onEnd: function(evt) {
+                // Only handle reorders within this container
+                if (evt.from !== evt.to) {
+                    return;
+                }
+                handleChordMoveToSection(evt);
+            }
+        });
+    });
+}
+
+// ============================================================================
+// DRAG EVENT HANDLERS
+// ============================================================================
+
+/**
+ * Handle section reorder after drag
+ * @param {number} oldIndex - Original section index
+ * @param {number} newIndex - New section index
+ */
+export function handleSectionReorder(oldIndex, newIndex) {
+    if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+
+    // TODO: Import getCompositionState from compositionState.js
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    compositionState.reorderSections(oldIndex, newIndex);
+
+    // Re-render
+    // TODO: Import renderProgressionDisplay from ProgressionRenderer.js
+    // renderProgressionDisplay('melody-progression-visualization', true);
+    // renderProgressionDisplay('melody-progression-visualization', false);
+}
+
+/**
+ * Handle chord move between sections after drag (legacy function)
+ * @param {Object} evt - Sortable event
+ */
+export function handleChordMoveToSection(evt) {
+    const item = evt.item;
+    const chordIndex = parseInt(item.getAttribute('data-chord-index'), 10);
+    const fromSectionId = evt.from.getAttribute('data-section-id');
+    const toSectionId = evt.to.getAttribute('data-section-id');
+
+    if (isNaN(chordIndex)) return;
+
+    // TODO: Import getCompositionState from compositionState.js
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    // Get the new position within the target section
+    const siblings = Array.from(evt.to.querySelectorAll('.chord-card-wrapper[data-chord-index]'));
+    const newPosition = siblings.indexOf(item);
+
+    // Handle multi-select move
+    // TODO: Import getSelectedIndicesArray from trainerState.js
+    const selectedIndices = getSelectedIndicesArray();
+    if (selectedIndices.length > 1 && selectedIndices.includes(chordIndex)) {
+        // Move all selected chords
+        selectedIndices.forEach((idx, i) => {
+            if (toSectionId === 'ungrouped') {
+                compositionState.removeChordFromSection(idx);
+            } else {
+                compositionState.addChordToSection(idx, toSectionId, newPosition + i);
+            }
+        });
+    } else {
+        // Single chord move
+        if (toSectionId === 'ungrouped') {
+            compositionState.removeChordFromSection(chordIndex);
+        } else {
+            compositionState.addChordToSection(chordIndex, toSectionId, newPosition);
+        }
+    }
+
+    // Re-render
+    // TODO: Import renderProgressionDisplay from ProgressionRenderer.js
+    // renderProgressionDisplay('melody-progression-visualization', true);
+    // renderProgressionDisplay('melody-progression-visualization', false);
+}
+
+/**
+ * Handle card drag within or between sections
+ * This is the main unified handler for chord card reordering
+ * @param {Object} evt - Sortable event
+ * @param {string} originalSectionId - The section the card was originally in
+ */
+export function handleCardDragWithinSection(evt, originalSectionId) {
+    const draggedItem = evt.item;
+    const oldChordIndex = parseInt(draggedItem.getAttribute('data-chord-index'), 10);
+    const fromContainer = evt.from;
+    const toContainer = evt.to;
+
+    // TODO: Import getCompositionState from compositionState.js
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    // Find the parent grid container
+    let gridContainer = toContainer;
+    while (gridContainer && !gridContainer.id?.includes('-cards-grid')) {
+        gridContainer = gridContainer.parentElement;
+    }
+    if (!gridContainer) {
+        // May be at the top-level flex container
+        gridContainer = toContainer.closest('[id$="-cards-grid"]') ||
+                       toContainer.closest('.flex.flex-wrap') ||
+                       toContainer.closest('.section-filtered-cards');
+    }
+
+    // Get the visible chord order from the container
+    // TODO: Import getAllChordWrappersInOrder helper
+    const visibleChordWrappers = getAllChordWrappersInOrder(gridContainer || toContainer.parentElement);
+    const visibleChordOrder = visibleChordWrappers.map(el => parseInt(el.getAttribute('data-chord-index'), 10));
+
+    // Check if we're in a filtered view (Section View mode)
+    // In filtered view, we only see some chords, not all
+    // TODO: Import getTrainerState from trainerState.js
+    const trainerState = getTrainerState();
+    const totalChords = trainerState.progressionData.length;
+    const isFilteredView = visibleChordOrder.length < totalChords;
+
+    // Check if the card moved to a different section or out of a section
+    // In Section View (filtered), the container doesn't have data-section-id,
+    // but the cards have data-in-section attribute
+    let toSectionId = toContainer.getAttribute('data-section-id');
+    let fromSectionId = fromContainer.getAttribute('data-section-id');
+
+    // If container doesn't have section ID, check the dragged item's section
+    if (!fromSectionId) {
+        fromSectionId = draggedItem.getAttribute('data-in-section');
+    }
+    // For destination, check if there's a section context from nearby cards
+    if (!toSectionId && isFilteredView) {
+        // In filtered view, all visible cards might be from the same section(s)
+        // Get the section from the dragged item itself
+        toSectionId = draggedItem.getAttribute('data-in-section');
+    }
+
+    // Update section membership if changed
+    if (fromSectionId !== toSectionId) {
+        // Remove from old section
+        if (fromSectionId) {
+            compositionState.removeChordFromSection(oldChordIndex, fromSectionId);
+        }
+        // Add to new section (if dropping into a section, not to main container)
+        if (toSectionId) {
+            const section = compositionState.getSection(toSectionId);
+            if (section) {
+                // Find position within the new section
+                const sectionCards = toContainer.querySelectorAll('.chord-card-wrapper[data-chord-index]');
+                const positionInSection = Array.from(sectionCards).indexOf(draggedItem);
+                compositionState.addChordToSection(oldChordIndex, toSectionId, positionInSection);
+            }
+        }
+    }
+
+    // If dragging within the same section (or both ungrouped), reorder the actual chord data
+    if (fromSectionId === toSectionId) {
+        // Try to get real section - returns null for pseudo-sections like "No Group"
+        const section = fromSectionId ? compositionState.getSection(toSectionId) : null;
+
+        // Check if this is a pseudo-section (ungrouped chords) - ID starts with "no-group"
+        const isPseudoSection = fromSectionId && fromSectionId.startsWith('no-group');
+
+        if (section) {
+            // Get the new order of chord indices within this section from the DOM
+            const sectionCards = toContainer.querySelectorAll('.chord-card-wrapper[data-chord-index]');
+            const newSectionOrder = Array.from(sectionCards).map(card =>
+                parseInt(card.getAttribute('data-chord-index'), 10)
+            );
+
+            // Check if order actually changed within the section
+            if (JSON.stringify(newSectionOrder) !== JSON.stringify(section.chordIndices)) {
+                // TODO: Import saveStateBeforeChange from progressionBuilder.js
+                // saveStateBeforeChange();
+
+                const trainerState = getTrainerState();
+
+                // Get the sorted positions that this section occupies
+                const sectionPositions = [...section.chordIndices].sort((a, b) => a - b);
+
+                // Build full new order array: for each position in progression,
+                // determine which OLD index's data should go there
+                const fullNewOrder = [];
+                for (let i = 0; i < trainerState.progressionData.length; i++) {
+                    const posInSection = sectionPositions.indexOf(i);
+                    if (posInSection !== -1) {
+                        // This position is in the section - get data from reordered index
+                        fullNewOrder.push(newSectionOrder[posInSection]);
+                    } else {
+                        // Non-section position keeps its own data
+                        fullNewOrder.push(i);
+                    }
+                }
+
+                // Reorder the actual progression data
+                const newProgressionData = fullNewOrder.map(oldIdx => trainerState.progressionData[oldIdx]);
+                const newProgressionRomans = fullNewOrder.map(oldIdx => trainerState.progressionRomans[oldIdx]);
+
+                // Section indices stay the same - they still occupy the same positions,
+                // we just swapped the data at those positions
+                // No need to update section.chordIndices
+
+                // Update trainer state
+                // TODO: Import setProgressionData, setProgressionRomans from trainerState.js
+                // setProgressionData(newProgressionData);
+                // setProgressionRomans(newProgressionRomans);
+
+                // Dispatch event for guided mode tutorials
+                // TODO: Import dispatchBuilderEvent from lessonGuidedMode.js
+                // dispatchBuilderEvent('chordReordered', {
+                //     fromIndex: oldChordIndex,
+                //     toIndex: newSectionOrder.indexOf(oldChordIndex) !== -1 ?
+                //         sectionPositions[newSectionOrder.indexOf(oldChordIndex)] : oldChordIndex,
+                //     sectionId: toSectionId
+                // });
+            }
+        } else if (!fromSectionId || isPseudoSection) {
+            // Ungrouped chords being reordered within a pseudo-section
+            // For pseudo-sections, we reorder the actual progression data
+            const ungroupedCards = Array.from(toContainer.querySelectorAll('.chord-card-wrapper[data-chord-index]'));
+            const newVisualOrder = ungroupedCards.map(card =>
+                parseInt(card.getAttribute('data-chord-index'), 10)
+            );
+
+            // Get the indices that are in this pseudo-section (sorted for position mapping)
+            const indicesInSection = [...newVisualOrder].sort((a, b) => a - b);
+
+            // Check if visual order differs from sorted order (i.e., user reordered)
+            if (JSON.stringify(newVisualOrder) !== JSON.stringify(indicesInSection)) {
+                // TODO: Import saveStateBeforeChange from progressionBuilder.js
+                // saveStateBeforeChange();
+
+                const trainerState = getTrainerState();
+                const newProgressionData = [...trainerState.progressionData];
+                const newProgressionRomans = [...trainerState.progressionRomans];
+
+                // Simple approach: copy data from old positions to new positions
+                // Visual position i should show data from newVisualOrder[i]
+                // Put it at sorted position indicesInSection[i]
+                for (let i = 0; i < indicesInSection.length; i++) {
+                    const sourceIdx = newVisualOrder[i];
+                    const targetIdx = indicesInSection[i];
+                    newProgressionData[targetIdx] = trainerState.progressionData[sourceIdx];
+                    newProgressionRomans[targetIdx] = trainerState.progressionRomans[sourceIdx];
+                }
+
+                // TODO: Import setProgressionData, setProgressionRomans from trainerState.js
+                // setProgressionData(newProgressionData);
+                // setProgressionRomans(newProgressionRomans);
+
+                // Dispatch event for guided mode tutorials
+                const newPositionIdx = newVisualOrder.indexOf(oldChordIndex);
+                const newTargetIdx = newPositionIdx !== -1 ? indicesInSection[newPositionIdx] : oldChordIndex;
+                // TODO: Import dispatchBuilderEvent from lessonGuidedMode.js
+                // dispatchBuilderEvent('chordReordered', {
+                //     fromIndex: oldChordIndex,
+                //     toIndex: newTargetIdx,
+                //     sectionId: null
+                // });
+
+                // Sync to composition state before re-render
+                if (window.syncProgressionToMelodyComposer) {
+                    window.syncProgressionToMelodyComposer();
+                }
+
+                window.dispatchEvent(new CustomEvent('showNotification', {
+                    detail: { message: 'Cards reordered', type: 'success' }
+                }));
+            }
+            // Fall through to re-render below
+        }
+
+        // Re-render to update visuals (for real sections)
+        // TODO: Import renderProgressionDisplay from ProgressionRenderer.js
+        // renderProgressionDisplay('melody-progression-visualization', true);
+        // renderProgressionDisplay('melody-progression-visualization', false);
+
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
+        }
+        if (window.updateVoiceLeading) {
+            window.updateVoiceLeading();
+        }
+        return; // Exit early - don't do global reorder
+    }
+
+    // In filtered view (Section View mode), don't do global reorder
+    // Section reordering was already handled above
+    if (isFilteredView) {
+        // Re-render to update section visuals
+        // TODO: Import renderProgressionDisplay from ProgressionRenderer.js
+        // renderProgressionDisplay('melody-progression-visualization', true);
+        // renderProgressionDisplay('melody-progression-visualization', false);
+
+        // Update notation for filtered view
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
+        }
+        // Update voice leading analysis after reorder
+        if (window.updateVoiceLeading) {
+            window.updateVoiceLeading();
+        }
+        return;
+    }
+
+    // In full view (Scroll mode), do global reorder if order changed
+    const oldOrder = trainerState.progressionData.map((_, i) => i);
+
+    if (JSON.stringify(visibleChordOrder) === JSON.stringify(oldOrder)) {
+        // Still re-render to update section visuals
+        // TODO: Import renderProgressionDisplay from ProgressionRenderer.js
+        // renderProgressionDisplay('melody-progression-visualization', true);
+        // renderProgressionDisplay('melody-progression-visualization', false);
+        return;
+    }
+
+    // Save state for undo BEFORE making changes
+    // TODO: Import saveStateBeforeChange from progressionBuilder.js
+    // saveStateBeforeChange();
+
+    // Reorder progression data to match new order
+    const newProgressionData = visibleChordOrder.map(oldIdx => trainerState.progressionData[oldIdx]);
+    const newProgressionRomans = visibleChordOrder.map(oldIdx => trainerState.progressionRomans[oldIdx]);
+
+    // Update all section chord indices to reflect new positions
+    compositionState.getSections().forEach(section => {
+        const newIndices = section.chordIndices.map(oldIdx => visibleChordOrder.indexOf(oldIdx));
+        compositionState.updateSection(section.id, { chordIndices: newIndices.filter(idx => idx >= 0) });
+    });
+
+    // Update trainer state (setProgressionData internally calls syncWithProgressionData)
+    // TODO: Import setProgressionData, setProgressionRomans from trainerState.js
+    // setProgressionData(newProgressionData);
+    // setProgressionRomans(newProgressionRomans);
+
+    // Dispatch event for guided mode tutorials
+    const newPosition = visibleChordOrder.indexOf(oldChordIndex);
+    // TODO: Import dispatchBuilderEvent from lessonGuidedMode.js
+    // dispatchBuilderEvent('chordReordered', {
+    //     fromIndex: oldChordIndex,
+    //     toIndex: newPosition !== -1 ? newPosition : oldChordIndex,
+    //     sectionId: null
+    // });
+
+    // Re-render
+    // TODO: Import renderProgressionDisplay from ProgressionRenderer.js
+    // renderProgressionDisplay('melody-progression-visualization', true);
+    // renderProgressionDisplay('melody-progression-visualization', false);
+
+    // Update notation
+    if (window.refreshNotationFromProgression) {
+        window.refreshNotationFromProgression();
+    }
+
+    // Update voice leading analysis after reorder
+    if (window.updateVoiceLeading) {
+        window.updateVoiceLeading();
+    }
+}
+
+/**
+ * Handle section container drag end - reorder all chords in the section
+ * @param {HTMLElement} container - The grid/flex container
+ * @param {HTMLElement} sectionEl - The dragged section container
+ * @param {Object} evt - Sortable event
+ */
+export function handleSectionDragEnd(container, sectionEl, evt) {
+    // Get all section containers in their new DOM order
+    const allContainers = Array.from(container.querySelectorAll('.section-unified-container'));
+
+    // Build the new order of section IDs (including pseudo-section IDs)
+    const newSectionOrder = allContainers
+        .map(el => el.getAttribute('data-section-id'))
+        .filter(Boolean);
+
+    // Update the user's preferred section order
+    // TODO: Import userSectionOrder state from progressionBuilder.js
+    // userSectionOrder = newSectionOrder;
+
+    // Re-render to apply the new order
+    // TODO: Import renderProgressionDisplay from ProgressionRenderer.js
+    // renderProgressionDisplay('melody-progression-visualization', true);
+
+    window.dispatchEvent(new CustomEvent('showNotification', {
+        detail: { message: 'Section order updated', type: 'success' }
+    }));
+}
+
+// ============================================================================
+// REORDERING LOGIC FUNCTIONS
+// ============================================================================
+
+/**
+ * Reorder sections AND their chord cards in the progression
+ * When a section is moved, all its chords move with it
+ * @param {Array} sections - Array of section objects
+ * @param {number} fromIndex - Old section index
+ * @param {number} toIndex - New section index
+ */
+export function reorderSectionsWithChords(sections, fromIndex, toIndex) {
+    // TODO: Import getCompositionState from compositionState.js
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    if (!compositionState) return;
+
+    // TODO: Import getTrainerState from trainerState.js
+    const trainerState = getTrainerState();
+    const progressionData = trainerState.progressionData;
+    const progressionRomans = trainerState.progressionRomans || [];
+
+    if (!progressionData || progressionData.length === 0) return;
+
+    // Build the new section order
+    const newSectionOrder = [...sections];
+    const [movedSection] = newSectionOrder.splice(fromIndex, 1);
+    newSectionOrder.splice(toIndex, 0, movedSection);
+
+    // Build the new chord order based on new section order
+    // Collect all chord indices from sections in the new order
+    const newChordOrder = [];
+    newSectionOrder.forEach(section => {
+        // Sort chord indices within each section to preserve internal order
+        const sortedIndices = [...(section.chordIndices || [])].sort((a, b) => a - b);
+        newChordOrder.push(...sortedIndices);
+    });
+
+    // Add any ungrouped chords (not in any section) at the end
+    const sectionedIndices = new Set(newChordOrder);
+    for (let i = 0; i < progressionData.length; i++) {
+        if (!sectionedIndices.has(i)) {
+            newChordOrder.push(i);
+        }
+    }
+
+    // Reorder progression data
+    const newProgressionData = newChordOrder.map(oldIdx => progressionData[oldIdx]);
+    const newProgressionRomans = newChordOrder.map(oldIdx => progressionRomans[oldIdx]);
+
+    // Update all section chord indices to reflect new positions
+    // Create a mapping from old index to new index
+    const indexMap = new Map();
+    newChordOrder.forEach((oldIdx, newIdx) => {
+        indexMap.set(oldIdx, newIdx);
+    });
+
+    // Update each section's chord indices
+    newSectionOrder.forEach(section => {
+        const newIndices = (section.chordIndices || []).map(oldIdx => indexMap.get(oldIdx)).filter(idx => idx !== undefined);
+        compositionState.updateSection(section.id, { chordIndices: newIndices });
+    });
+
+    // Update the section order in compositionState
+    compositionState.reorderSections(fromIndex, toIndex);
+
+    // Update trainer state
+    // TODO: Import setProgressionData, setProgressionRomans from trainerState.js
+    // setProgressionData(newProgressionData);
+    // setProgressionRomans(newProgressionRomans);
+}
+
+/**
+ * Reorder the entire progression based on the new pill order
+ * This handles both real sections and pseudo-sections (ungrouped chords)
+ * @param {Array} newOrder - Array of {type: 'section', sectionId} or {type: 'ungrouped', chordIndices}
+ * @param {Object} compositionState - CompositionState instance
+ */
+export function reorderProgressionByPillOrder(newOrder, compositionState) {
+    if (!compositionState) return;
+
+    // TODO: Import getTrainerState from trainerState.js
+    const trainerState = getTrainerState();
+    const progressionData = trainerState.progressionData;
+    const progressionRomans = trainerState.progressionRomans || [];
+
+    if (!progressionData || progressionData.length === 0) return;
+
+    const sections = compositionState.getSections();
+
+    // Build the new chord order based on pill order
+    const newChordOrder = [];
+    const newSectionOrder = [];
+
+    newOrder.forEach(item => {
+        if (item.type === 'ungrouped') {
+            // Add ungrouped chord indices in their current internal order
+            const sortedIndices = [...item.chordIndices].sort((a, b) => a - b);
+            newChordOrder.push(...sortedIndices);
+        } else if (item.type === 'section') {
+            // Find the section and add its chord indices
+            const section = sections.find(s => s.id === item.sectionId);
+            if (section) {
+                newSectionOrder.push(section);
+                const sortedIndices = [...(section.chordIndices || [])].sort((a, b) => a - b);
+                newChordOrder.push(...sortedIndices);
+            }
+        }
+    });
+
+    // Make sure we haven't lost any chords (defensive check)
+    const includedIndices = new Set(newChordOrder);
+    for (let i = 0; i < progressionData.length; i++) {
+        if (!includedIndices.has(i)) {
+            newChordOrder.push(i);
+        }
+    }
+
+    // Reorder progression data
+    const newProgressionData = newChordOrder.map(oldIdx => progressionData[oldIdx]);
+    const newProgressionRomans = newChordOrder.map(oldIdx => progressionRomans[oldIdx]);
+
+    // Create mapping from old index to new index
+    const indexMap = new Map();
+    newChordOrder.forEach((oldIdx, newIdx) => {
+        indexMap.set(oldIdx, newIdx);
+    });
+
+    // Update each section's chord indices to reflect new positions
+    sections.forEach(section => {
+        const newIndices = (section.chordIndices || []).map(oldIdx => indexMap.get(oldIdx)).filter(idx => idx !== undefined);
+        compositionState.updateSection(section.id, { chordIndices: newIndices.sort((a, b) => a - b) });
+    });
+
+    // Reorder sections in compositionState to match new pill order
+    if (newSectionOrder.length > 0) {
+        // Get current section IDs in order
+        const currentSectionIds = sections.map(s => s.id);
+        const newSectionIds = newSectionOrder.map(s => s.id);
+
+        // Apply reorderings one at a time
+        newSectionIds.forEach((sectionId, targetIndex) => {
+            const currentSections = compositionState.getSections();
+            const currentIndex = currentSections.findIndex(s => s.id === sectionId);
+            if (currentIndex !== -1 && currentIndex !== targetIndex) {
+                compositionState.reorderSections(currentIndex, targetIndex);
+            }
+        });
+    }
+
+    // Update trainer state
+    // TODO: Import setProgressionData, setProgressionRomans from trainerState.js
+    // setProgressionData(newProgressionData);
+    // setProgressionRomans(newProgressionRomans);
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Get all chord card wrappers in visual order (including those inside section containers)
+ * @param {HTMLElement} container - The grid/flex container
+ * @returns {HTMLElement[]} Array of chord wrappers in visual order
+ */
+export function getAllChordWrappersInOrder(container) {
+    const result = [];
+    const topLevelItems = container.children;
+
+    for (const item of topLevelItems) {
+        if (item.classList.contains('section-unified-container')) {
+            // Section container - get cards inside it
+            const sectionCards = item.querySelectorAll('.chord-card-wrapper[data-chord-index]');
+            result.push(...Array.from(sectionCards));
+        } else if (item.classList.contains('ungrouped-drop-zone')) {
+            // Ungrouped zone - get cards inside ungrouped-cards-area
+            const ungroupedCards = item.querySelectorAll('.ungrouped-cards-area .chord-card-wrapper[data-chord-index]');
+            result.push(...Array.from(ungroupedCards));
+        } else if (item.classList.contains('chord-card-wrapper') && item.hasAttribute('data-chord-index')) {
+            // Individual chord card
+            result.push(item);
+        }
+    }
+
+    return result;
+}

@@ -48,7 +48,8 @@ import {
 import { getTrainerState, getCurrentKey } from '../state/trainerState.js';
 
 // Share chord card rendering (tooltips, inversion playback, presentation) with Composition Studio
-import { renderProgressionDisplayForBuilder } from './progressionBuilder.js';
+// Updated to use refactored module structure (Phase 1 - 2025-12-26)
+import { renderProgressionDisplayForBuilder } from './progressionBuilder/index.js';
 
 // Import guided mode event dispatcher for lesson integration
 import { dispatchBuilderEvent, isGuidedModeActive } from '../ui/lessonGuidedMode.js';

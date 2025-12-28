@@ -118,7 +118,14 @@ import {
     changeArpeggioSpeed,
     updateArpeggioSpeedUI
 } from './modules/audio/arpeggiator.js';
-import {
+// REFACTORED: progressionBuilder.js split into 7 modules (Phase 1 - 2025-12-26)
+// TEMPORARY: Load both old and new modules during migration
+// Old module provides unimplemented functions, new module overrides with fixed versions
+import * as progressionBuilderOld from './modules/features/progressionBuilder.js';
+import * as progressionBuilderNew from './modules/features/progressionBuilder/index.js';
+
+// Use old module functions as fallback, then override with new implementations
+const {
     renderProgressionDisplay,
     renderProgressionControls,
     loadProgression,
@@ -148,8 +155,9 @@ import {
     toggleSimplifiedView,
     toggleTensionCurve,
     selectChordCard,
-    renderProgressionDisplayForBuilder
-} from './modules/features/progressionBuilder.js';
+    renderProgressionDisplayForBuilder,
+    highlightTrainer // Add missing function for keyboard highlighting
+} = { ...progressionBuilderOld, ...progressionBuilderNew }; // New overrides old
 import {
     renderScaleSelectors,
     updateScaleDisplay,
@@ -4650,9 +4658,10 @@ window.stopStepChord = stopStepChord;
 window.stopTrainerChord = stopTrainerChord;
 window.startProgressionChord = startProgressionChord;
 window.renderChordStaffNotation = renderChordStaffNotation;
-window.addToProgressionData = addToProgressionData;
-window.renderProgressionDisplay = renderProgressionDisplay;
-window.renderProgressionControls = renderProgressionControls;
+// HYBRID MODE: Use new implementations where available, old module for placeholders
+window.addToProgressionData = addToProgressionData; // From new module (fixed)
+window.renderProgressionControls = renderProgressionControls; // From new module (fixed)
+window.renderProgressionDisplay = progressionBuilderOld.renderProgressionDisplay; // From old module (placeholder in new)
 window.toggleRecording = toggleRecording;
 window.saveRecording = saveRecording;
 window.removeChordFromProgression = removeChordFromProgression;
@@ -4676,6 +4685,7 @@ window.showRhythmPatternModal = showRhythmPatternModal;
 window.toggleSimplifiedView = toggleSimplifiedView;
 window.toggleTensionCurve = toggleTensionCurve;
 window.renderProgressionDisplayForBuilder = renderProgressionDisplayForBuilder;
+window.highlightTrainer = highlightTrainer; // Keyboard highlighting for chord playback
 
 // Debug: Verify function is available
 if (typeof window.importChordList !== 'function') {
