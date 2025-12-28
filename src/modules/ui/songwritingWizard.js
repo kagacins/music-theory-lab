@@ -17,7 +17,7 @@ import { getCompositionState } from '../state/compositionState.js';
 import { createSongBuilder, createSectionsFromWizardStructure, SECTION_TYPES } from './songBuilder.js';
 import { getAllTemplates, getTemplate } from '../../data/songStructureTemplates.js';
 import { getSectionProfile } from '../features/sectionProfiles.js';
-import { renderProgressionDisplay, setProgressionViewMode, clearSectionSelection } from '../features/progressionBuilder.js';
+import { renderProgressionDisplay, setProgressionViewMode, clearSectionSelection } from '../features/progressionBuilder/index.js';
 import { openNewSongwritingWizard } from './songwritingWizardModal.js';
 
 // ===========================================

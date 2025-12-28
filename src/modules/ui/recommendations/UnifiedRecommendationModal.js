@@ -72,7 +72,7 @@ import { getTensionArcPlanner, TensionArcPlanner, TENSION_ARC_TEMPLATES } from '
 import { showChoiceDialog } from '../modals.js';
 
 // Undo/redo support for melody additions
-import { saveStateBeforeChange } from '../../features/progressionBuilder.js';
+import { saveStateBeforeChange } from '../../features/progressionBuilder/index.js';
 
 // VexFlow renderer imports for polyphony preview
 import {

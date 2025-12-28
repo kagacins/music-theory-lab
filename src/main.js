@@ -118,14 +118,9 @@ import {
     changeArpeggioSpeed,
     updateArpeggioSpeedUI
 } from './modules/audio/arpeggiator.js';
-// REFACTORED: progressionBuilder.js split into 7 modules (Phase 1 - 2025-12-26)
-// TEMPORARY: Load both old and new modules during migration
-// Old module provides unimplemented functions, new module overrides with fixed versions
-import * as progressionBuilderOld from './modules/features/progressionBuilder.js';
-import * as progressionBuilderNew from './modules/features/progressionBuilder/index.js';
-
-// Use old module functions as fallback, then override with new implementations
-const {
+// REFACTORED: progressionBuilder.js split into 7 modules (Complete - 2025-12-28)
+// All functions now fully implemented in new modular structure
+import {
     renderProgressionDisplay,
     renderProgressionControls,
     loadProgression,
@@ -156,8 +151,8 @@ const {
     toggleTensionCurve,
     selectChordCard,
     renderProgressionDisplayForBuilder,
-    highlightTrainer // Add missing function for keyboard highlighting
-} = { ...progressionBuilderOld, ...progressionBuilderNew }; // New overrides old
+    highlightTrainer
+} from './modules/features/progressionBuilder/index.js';
 import {
     renderScaleSelectors,
     updateScaleDisplay,
@@ -4661,7 +4656,7 @@ window.renderChordStaffNotation = renderChordStaffNotation;
 // HYBRID MODE: Use new implementations where available, old module for placeholders
 window.addToProgressionData = addToProgressionData; // From new module (fixed)
 window.renderProgressionControls = renderProgressionControls; // From new module (fixed)
-window.renderProgressionDisplay = progressionBuilderOld.renderProgressionDisplay; // From old module (placeholder in new)
+window.renderProgressionDisplay = renderProgressionDisplay; // From new module (fully migrated)
 window.toggleRecording = toggleRecording;
 window.saveRecording = saveRecording;
 window.removeChordFromProgression = removeChordFromProgression;

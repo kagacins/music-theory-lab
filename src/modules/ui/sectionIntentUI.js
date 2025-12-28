@@ -24,7 +24,7 @@ let selectChordCardFn = null;
 async function getSelectChordCard() {
     if (!selectChordCardFn) {
         try {
-            const module = await import('../features/progressionBuilder.js');
+            const module = await import('../features/progressionBuilder/index.js');
             selectChordCardFn = module.selectChordCard;
         } catch (e) {
         }

@@ -11,7 +11,7 @@ import { getBuilderRootIndex } from '../state/builderState.js';
 import { getEnharmonicPreference } from '../state/globalState.js';
 import { SHARP_NOTES, FLAT_NOTES } from '../../data/music-data.js';
 import { updateKeySignatureDisplay } from './header.js';
-import { loadProgression, renderProgressionDisplay, renderProgressionControls, updateProgressionEnharmonics } from '../features/progressionBuilder.js';
+import { loadProgression, renderProgressionDisplay, renderProgressionControls, updateProgressionEnharmonics } from '../features/progressionBuilder/index.js';
 import { updateScaleDisplay, renderScaleSelectors } from '../features/scaleExplorer.js';
 import { updateButtonVisibility } from './presetUI.js';
 import { updateTabSidebarHeight } from './sectionSidebar.js';

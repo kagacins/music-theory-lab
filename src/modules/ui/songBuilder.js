@@ -17,7 +17,7 @@ import { getChordNotes, getInvertedChordNotes } from '../utils/noteUtils.js';
 import { getPiano } from '../audio/audioEngine.js';
 import { HarmonyAnalyzer } from '../analysis/harmonyAnalyzer.js';
 import { getAllTemplates, SONG_STRUCTURE_TEMPLATES } from '../../data/songStructureTemplates.js';
-import { clearSectionSelection, renderProgressionDisplay } from '../features/progressionBuilder.js';
+import { clearSectionSelection, renderProgressionDisplay } from '../features/progressionBuilder/index.js';
 import { generateComprehensiveRecommendations } from '../features/comprehensiveChordRecommendations.js';
 import { CONTINUE_SUBMODES } from '../state/sectionIntentState.js';
 import { getSavedWeights } from '../config/weightPresets.js';

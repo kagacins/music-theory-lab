@@ -146,7 +146,10 @@ import {
     // Analysis
     toggleSimplifiedView,
     toggleTensionCurve,
-    getAnalysisViewState
+    getAnalysisViewState,
+
+    // Keyboard Highlighting
+    highlightTrainer
 } from './ProgressionController.js';
 
 // ============================================================================
@@ -305,27 +308,18 @@ export {
     getAnalysisViewState
 };
 
+// Controller - Keyboard Highlighting
+export {
+    highlightTrainer
+};
+
 // ============================================================================
 // WINDOW EXPORTS - For HTML onclick handlers (legacy pattern)
 // ============================================================================
-// HYBRID MODE: Only export functions that have been fully implemented
-// Placeholder functions will use old module's window exports instead
+// WINDOW EXPORTS: All functions fully implemented in new module structure
+// Migration completed 2025-12-28 - No longer using hybrid delegation pattern
 
 if (typeof window !== 'undefined') {
-    // IMPLEMENTED FUNCTIONS - Override old module
-    window.addToProgressionData = addToProgressionData; // ✅ Full implementation
-    window.renderProgressionControls = renderProgressionControls; // ✅ Full implementation
-
-    // DELEGATED FUNCTIONS - New module calls old implementation temporarily
-    window.renderProgressionDisplay = renderProgressionDisplay; // ⏳ Delegates to old (3000+ lines to migrate)
-    window.renderProgressionDisplayForBuilder = renderProgressionDisplayForBuilder; // ⏳ Delegates to old
-    window.renderChordStaffNotation = renderChordStaffNotation; // ⏳ Delegates to old
-    window.toggleAllStaffNotation = toggleAllStaffNotation; // ⏳ Delegates to old
-
-    // All other functions use old module's exports (commented out below)
-}
-
-if (false && typeof window !== 'undefined') {
     // Playback
     window.handleAutoPlayback = handleAutoPlayback;
     window.startStepChord = startStepChord;

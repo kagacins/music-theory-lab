@@ -168,7 +168,11 @@ import {
     updateUndoRedoButtons
 } from '../../utils/undoRedo.js';
 
-// TEMPORARY imports removed - functions migrated in Batch 6
+// TEMPORARY: Import working implementations from old module for delegation
+import {
+    loadProgression as loadProgressionOld,
+    updateProgressionEnharmonics as updateProgressionEnharmonicsOld
+} from '../progressionBuilder.js';
 
 // ============================================================================
 // MODULE-LEVEL STATE
@@ -560,573 +564,64 @@ function adjustPitchForModeChange(pitch, keyRoot, isMinor, noteArray) {
 
 /**
  * Update chord type from simplified view
- * Changes the chord type while preserving the root note
  * @param {number} index - Chord index
- * @param {string} newType - New chord type (must match CHORD_DEFINITIONS key exactly)
+ * @param {string} newType - New chord type
+ * Delegates to old module implementation via window
  */
 export function updateChordType(index, newType) {
-    // Get compositionState directly - the single source of truth
-    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-    if (!compositionState) {
-        return;
+    // Use old module implementation
+    if (window.updateChordTypeOld) {
+        window.updateChordTypeOld(index, newType);
     }
-
-    const trainerState = getTrainerState();
-    const chord = compositionState.getChord(index);
-    if (!chord) {
-        return;
-    }
-
-    // Use the chord's root directly - this is more reliable for non-diatonic chords
-    // like secondary dominants (B7 in key of C) where the roman numeral might just be the note name
-    const chordRoot = chord.root;
-    if (!chordRoot) {
-        console.warn('[updateChordType] No root note available for chord');
-        return;
-    }
-
-    // Regenerate chord notes using getInvertedChordNotes directly with the chord's root
-    // This is more reliable than getProgressionChordNotes for non-diatonic chords
-    const chordResult = getInvertedChordNotes(
-        chordRoot,
-        newType,
-        chord.inversion || 0,
-        chord.key || trainerState.currentKey,
-        0, // Get base notes without octave shift
-        getKeyBasedEnharmonic(),
-        getNotationPreference()
-    );
-
-    if (!chordResult || !chordResult.specificNotes || chordResult.specificNotes.length === 0) {
-        console.warn('[updateChordType] Could not regenerate notes for chord:', chordRoot, newType);
-        return;
-    }
-
-    const chordInfo = {
-        notes: chordResult.specificNotes,
-        name: chordResult.name,
-        simpleName: chordResult.simpleName
-    };
-
-    // Prepare updates object
-    const updates = {
-        type: newType,
-        notes: chordInfo.notes,
-        lhNotes: chordInfo.lhNotes,
-        name: chordInfo.name,
-        simpleName: chordInfo.simpleName
-    };
-
-    // Reapply octave shift if it was previously set
-    if (chord.octaveShift && chord.octaveShift !== 0) {
-        updates.notes = updates.notes.map(note => {
-            const match = note.match(/^([A-G][#b]?)(\d+)$/);
-            if (!match) return note;
-            const noteName = match[1];
-            const octave = parseInt(match[2]);
-            const newOctave = octave + Math.floor(chord.octaveShift / 12);
-            // Clamp octave to valid MIDI range (0-8)
-            const clampedOctave = Math.max(0, Math.min(8, newOctave));
-            return `${noteName}${clampedOctave}`;
-        });
-    }
-
-    // Save state for undo BEFORE making changes
-    saveStateBeforeChange();
-
-    // Update chord in compositionState
-    compositionState.updateChordByIndex(index, updates);
-
-    // Also update trainerState.progressionData to keep in sync
-    if (trainerState.progressionData && trainerState.progressionData[index]) {
-        Object.assign(trainerState.progressionData[index], updates);
-    }
-
-    // Update only this card and tension curve (type changes affect tension)
-    if (window.updateSingleCard) {
-        window.updateSingleCard(index);
-    }
-    if (window.updateTensionCurveIfVisible) {
-        window.updateTensionCurveIfVisible();
-    }
-
-    // Update the grand staff notation
-    if (window.updateChordAndRenderPreservingTrebleNotes) {
-        window.updateChordAndRenderPreservingTrebleNotes(index);
-    }
-
-    // Play the chord with the new type
-    const voicedNotes = updates.notes.filter(n => !(chord.omittedNotes || []).includes(n));
-    const rhOctaveShift = chord.octaveShift || 0;
-    const lhRelativeShift = chord.lhOctaveShift || 0;
-    const absoluteLHOctaveShift = rhOctaveShift + lhRelativeShift;
-    const lhNotes = getLHNotes(
-        chord.root,
-        chord.lhType,
-        chord.lhInversion,
-        trainerState.currentKey,
-        absoluteLHOctaveShift,
-        newType,
-        getKeyBasedEnharmonic()
-    ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
-    const allNotes = voicedNotes.concat(lhNotes);
-    if (allNotes.length > 0 && window.playTrainerChordOnce) {
-        window.playTrainerChordOnce(allNotes);
-    }
-
-    // Dispatch event for guided mode tutorials
-    dispatchBuilderEvent('chordCardEdited', {
-        chordIndex: index,
-        property: 'type',
-        value: newType,
-        chord: `${chord.root} ${newType}`
-    });
 }
 
 /**
  * Update chord root note from simplified view
- * Changes the root note while preserving the chord type
  * @param {number} index - Chord index
  * @param {string} newRoot - New root note
+ * Delegates to old module implementation via window
  */
 export function updateChordRoot(index, newRoot) {
-    // Get compositionState directly - the single source of truth
-    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-    if (!compositionState) {
-        return;
+    // Use old module implementation
+    if (window.updateChordRootOld) {
+        window.updateChordRootOld(index, newRoot);
     }
-
-    const trainerState = getTrainerState();
-    const chord = compositionState.getChord(index);
-    if (!chord) {
-        return;
-    }
-
-    // Keep the same chord type, just change the root
-    const chordType = chord.type || 'Major';
-
-    // Regenerate chord notes using getInvertedChordNotes directly with the new root
-    // This is more reliable than getProgressionChordNotes for all chord types
-    const chordResult = getInvertedChordNotes(
-        newRoot,
-        chordType,
-        chord.inversion || 0,
-        chord.key || trainerState.currentKey,
-        0, // Get base notes without octave shift
-        getKeyBasedEnharmonic(),
-        getNotationPreference()
-    );
-
-    if (!chordResult || !chordResult.specificNotes || chordResult.specificNotes.length === 0) {
-        console.warn('[updateChordRoot] Could not regenerate notes for chord:', newRoot, chordType);
-        return;
-    }
-
-    // Prepare updates object
-    const updates = {
-        root: newRoot,
-        notes: chordResult.specificNotes,
-        name: chordResult.name,
-        simpleName: chordResult.simpleName,
-        roman: '' // Clear roman numeral since we're using absolute root
-    };
-
-    // Reapply octave shift if it was previously set
-    if (chord.octaveShift && chord.octaveShift !== 0) {
-        updates.notes = updates.notes.map(note => {
-            const match = note.match(/^([A-G][#b]?)(\d+)$/);
-            if (!match) return note;
-            const noteName = match[1];
-            const octave = parseInt(match[2]);
-            const newOctave = octave + Math.floor(chord.octaveShift / 12);
-            // Clamp octave to valid MIDI range (0-8)
-            const clampedOctave = Math.max(0, Math.min(8, newOctave));
-            return `${noteName}${clampedOctave}`;
-        });
-    }
-
-    // Save state for undo BEFORE making changes
-    saveStateBeforeChange();
-
-    // Update chord in compositionState
-    compositionState.updateChordByIndex(index, updates);
-
-    // Also update trainerState.progressionData to keep in sync
-    if (trainerState.progressionData && trainerState.progressionData[index]) {
-        Object.assign(trainerState.progressionData[index], updates);
-    }
-
-    // Update only this card and tension curve
-    if (window.updateSingleCard) {
-        window.updateSingleCard(index);
-    }
-    if (window.updateTensionCurveIfVisible) {
-        window.updateTensionCurveIfVisible();
-    }
-
-    // Update the grand staff notation
-    if (window.updateChordAndRenderPreservingTrebleNotes) {
-        window.updateChordAndRenderPreservingTrebleNotes(index);
-    }
-
-    // Play the chord with the new root
-    const voicedNotes = updates.notes.filter(n => !(chord.omittedNotes || []).includes(n));
-    const rhOctaveShift = chord.octaveShift || 0;
-    const lhRelativeShift = chord.lhOctaveShift || 0;
-    const absoluteLHOctaveShift = rhOctaveShift + lhRelativeShift;
-    const lhNotes = getLHNotes(
-        newRoot,
-        chord.lhType,
-        chord.lhInversion,
-        trainerState.currentKey,
-        absoluteLHOctaveShift,
-        chordType,
-        getKeyBasedEnharmonic()
-    ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
-    const allNotes = voicedNotes.concat(lhNotes);
-    if (allNotes.length > 0 && window.playTrainerChordOnce) {
-        window.playTrainerChordOnce(allNotes);
-    }
-
-    // Dispatch event for guided mode tutorials
-    dispatchBuilderEvent('chordCardEdited', {
-        chordIndex: index,
-        property: 'root',
-        value: newRoot,
-        chord: `${newRoot} ${chordType}`
-    });
 }
 
 /**
  * Update chord inversion from simplified view
- * Changes the chord inversion while preserving the root and type
  * @param {number} index - Chord index
- * @param {number} newInversion - New inversion (0 = root position, 1 = first inversion, etc.)
- * @param {boolean} shouldUpdateUI - Whether to update UI (default true)
- * @param {boolean} shouldSyncNotation - Whether to sync notation (default true)
+ * @param {number} newInversion - New inversion
+ * @param {boolean} shouldUpdateUI - Whether to update UI
+ * @param {boolean} shouldSyncNotation - Whether to sync notation
+ * Delegates to old module implementation via window
  */
 export function updateChordInversion(index, newInversion, shouldUpdateUI = true, shouldSyncNotation = true) {
-    // Get compositionState directly - the single source of truth
-    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-    if (!compositionState) {
-        return;
-    }
-
-    const trainerState = getTrainerState();
-    const chord = compositionState.getChord(index);
-    if (!chord) {
-        return;
-    }
-
-    // Use the chord's root directly - this is more reliable for non-diatonic chords
-    // like secondary dominants (B7 in key of C) where the roman numeral might just be the note name
-    const chordRoot = chord.root;
-    if (!chordRoot) {
-        console.warn('[updateChordInversion] No root note available for chord');
-        return;
-    }
-
-    // Regenerate chord notes using getInvertedChordNotes directly with the chord's root and type
-    // This is more reliable than getProgressionChordNotes for non-diatonic chords
-    const chordResult = getInvertedChordNotes(
-        chordRoot,
-        chord.type,
-        newInversion,
-        chord.key || trainerState.currentKey,
-        0, // Get base notes without octave shift
-        getKeyBasedEnharmonic(),
-        getNotationPreference()
-    );
-
-    if (!chordResult || !chordResult.specificNotes || chordResult.specificNotes.length === 0) {
-        console.warn('[updateChordInversion] Could not regenerate notes for chord:', chordRoot, chord.type);
-        return;
-    }
-
-    const chordInfo = { notes: chordResult.specificNotes };
-
-    // Prepare updates object
-    const updates = {
-        inversion: newInversion,
-        notes: chordInfo.notes,
-        lhNotes: chordInfo.lhNotes,
-        omittedNotes: [] // Clear omittedNotes since note names change with inversion
-    };
-
-    // Reapply octave shift if it was previously set
-    if (chord.octaveShift && chord.octaveShift !== 0) {
-        updates.notes = updates.notes.map(note => {
-            const match = note.match(/^([A-G][#b]?)(\d+)$/);
-            if (!match) return note;
-            const noteName = match[1];
-            const octave = parseInt(match[2]);
-            const newOctave = octave + Math.floor(chord.octaveShift / 12);
-            // Clamp octave to valid MIDI range (0-8)
-            const clampedOctave = Math.max(0, Math.min(8, newOctave));
-            return `${noteName}${clampedOctave}`;
-        });
-    }
-
-    // Save state for undo BEFORE making changes
-    saveStateBeforeChange();
-
-    // Update chord in compositionState
-    compositionState.updateChordByIndex(index, updates);
-
-    // Dispatch event for guided mode tutorials
-    dispatchBuilderEvent('chordCardEdited', {
-        chordIndex: index,
-        property: 'inversion',
-        value: newInversion,
-        chord: `${chord.root} ${chord.type}`
-    });
-
-    // Also update trainerState.progressionData to keep in sync
-    if (trainerState.progressionData && trainerState.progressionData[index]) {
-        Object.assign(trainerState.progressionData[index], updates);
-    }
-
-    // Update only this card and tension curve (inversions affect tension and voice leading)
-    // Skip UI update if called from tooltip to prevent closing the tooltip
-    if (shouldUpdateUI) {
-        if (window.updateSingleCard) {
-            window.updateSingleCard(index);
-        }
-        if (window.updateTensionCurveIfVisible) {
-            window.updateTensionCurveIfVisible();
-        }
-    }
-
-    // Update the grand staff notation - skip if called from tooltip buttons (will sync on mouseup)
-    if (shouldSyncNotation) {
-        // Use new helper function that preserves treble notes
-        if (window.updateChordAndRenderPreservingTrebleNotes) {
-            window.updateChordAndRenderPreservingTrebleNotes(index);
-        }
+    // Use old module implementation
+    if (window.updateChordInversionOld) {
+        window.updateChordInversionOld(index, newInversion, shouldUpdateUI, shouldSyncNotation);
     }
 }
 
 /**
  * Update chord duration from simplified view
- * Now supports confirmation dialog when truncation is needed
  * @param {number} index - Chord index
  * @param {HTMLElement} sourceElement - Source element triggering the change
+ * Delegates to old module implementation via window
  */
 export function updateChordDuration(index, sourceElement) {
-    // Get compositionState directly - the single source of truth
-    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
-    if (!compositionState) {
-        return;
+    // Use old module implementation
+    if (window.updateChordDurationOld) {
+        window.updateChordDurationOld(index, sourceElement);
     }
-
-    // Get the chord from compositionState
-    const chord = compositionState.getChord(index);
-    if (!chord) {
-        return;
-    }
-
-    // Find the duration selectors - they could be in either the event source's wrapper
-    // or we need to search for them
-    let durationWholeSelect, durationFracSelect;
-
-    if (sourceElement) {
-        // Find the closest wrapper containing the duration controls
-        const wrapper = sourceElement.closest('.chord-card-wrapper') ||
-                       sourceElement.closest('[data-chord-index]');
-        if (wrapper) {
-            durationWholeSelect = wrapper.querySelector('.duration-whole-select');
-            durationFracSelect = wrapper.querySelector('.duration-frac-select');
-        }
-    }
-
-    // If not found via sourceElement, search in all containers
-    if (!durationWholeSelect || !durationFracSelect) {
-        const wrappers = document.querySelectorAll(`[data-chord-index="${index}"]`);
-        for (const wrapper of wrappers) {
-            const wholeSelect = wrapper.querySelector('.duration-whole-select');
-            const fracSelect = wrapper.querySelector('.duration-frac-select');
-            if (wholeSelect && fracSelect) {
-                durationWholeSelect = wholeSelect;
-                durationFracSelect = fracSelect;
-                break;
-            }
-        }
-    }
-
-    if (!durationWholeSelect || !durationFracSelect) {
-        return;
-    }
-
-    // Parse the selected values
-    const wholeBeats = parseInt(durationWholeSelect.value) || 0;
-    const fracBeats = parseFloat(durationFracSelect.value) || 0;
-    const totalBeats = wholeBeats + fracBeats;
-
-    // Validation: minimum 0.25 beats (16th note)
-    if (totalBeats < 0.25) {
-        alert('Chord duration must be at least 0.25 beats (16th note)');
-        // Reset to previous value
-        const prevBeats = chord.beats || 4;
-        const prevWhole = Math.floor(prevBeats);
-        const prevFrac = prevBeats - prevWhole;
-        durationWholeSelect.value = prevWhole;
-        durationFracSelect.value = prevFrac;
-        return;
-    }
-
-    // Check if the value actually changed
-    if (chord.beats === totalBeats) {
-        return; // No change needed
-    }
-
-    // Save state for undo BEFORE making changes
-    saveStateBeforeChange();
-
-    // Update the chord duration using compositionState's dedicated method
-    // This now returns confirmation info if truncation is needed
-    const result = compositionState.updateChordDuration(index, totalBeats);
-
-    // Check if we need user confirmation for truncation
-    if (result && result.needsConfirmation) {
-        showTruncationWarningDialog(result.truncationInfo, () => {
-            // User confirmed - force apply the change
-            compositionState.forceApplyChordDuration(index, totalBeats);
-            finalizeDurationChange(index, totalBeats);
-        }, () => {
-            // User cancelled - revert the selectors
-            const prevBeats = chord.beats || 4;
-            const prevWhole = Math.floor(prevBeats);
-            const prevFrac = prevBeats - prevWhole;
-            durationWholeSelect.value = prevWhole;
-            durationFracSelect.value = prevFrac;
-        });
-        return;
-    }
-
-    // No confirmation needed - finalize the change
-    finalizeDurationChange(index, totalBeats);
 }
 
 /**
  * Finalize duration change after update (or after user confirmation)
- * @param {number} index - Chord index
- * @param {number} totalBeats - New duration in beats
  */
 export function finalizeDurationChange(index, totalBeats) {
-    // Update all card displays (both tabs)
-    if (window.updateSingleCard) {
-        window.updateSingleCard(index);
-    }
-
-    // Trigger re-render of the notation
-    if (window.getNotationComposer) {
-        const notationComposer = window.getNotationComposer();
-        if (notationComposer) {
-            notationComposer.render();
-        }
-    }
-
-    // Dispatch event for other components that may need to know
-    window.dispatchEvent(new CustomEvent('chordDurationChanged', {
-        detail: { index, beats: totalBeats }
-    }));
-
-    // Dispatch for tutorial system
-    dispatchBuilderEvent('chordDurationChanged', { index, beats: totalBeats });
-
-    // Update unified suggestions if available
-    if (window.updateUnifiedSuggestions) {
-        window.updateUnifiedSuggestions();
-    }
-}
-
-/**
- * Show warning dialog when reducing duration would truncate notes
- * @param {Object} truncationInfo - Info about what will be truncated
- * @param {Function} onConfirm - Callback when user confirms
- * @param {Function} onCancel - Callback when user cancels
- */
-function showTruncationWarningDialog(truncationInfo, onConfirm, onCancel) {
-    // Build description of what will be affected
-    let affectedDescription = '';
-
-    if (truncationInfo.truncatedNotes.length > 0) {
-        affectedDescription += `<li><strong>${truncationInfo.truncatedNotes.length} note(s)</strong> will be removed entirely</li>`;
-    }
-
-    if (truncationInfo.adjustedNote) {
-        const adj = truncationInfo.adjustedNote;
-        affectedDescription += `<li>The last note will be shortened from <strong>${adj.original.duration}</strong> to <strong>${adj.adjusted.duration}</strong></li>`;
-    }
-
-    const modalHTML = `
-        <div id="truncation-warning-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden">
-                <div class="bg-amber-500 px-6 py-4">
-                    <h3 class="text-xl font-bold text-white flex items-center gap-2">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                        </svg>
-                        Note Truncation Warning
-                    </h3>
-                </div>
-                <div class="p-6">
-                    <p class="text-gray-700 mb-4">
-                        Reducing the duration of <strong>${truncationInfo.chordName}</strong> from
-                        <strong>${truncationInfo.oldDuration}</strong> to <strong>${truncationInfo.newDuration}</strong> beats
-                        will affect edited bass notes:
-                    </p>
-                    <ul class="list-disc list-inside text-gray-600 mb-4 space-y-1">
-                        ${affectedDescription}
-                    </ul>
-                    <p class="text-gray-600 text-sm">
-                        This action cannot be undone. Do you want to continue?
-                    </p>
-                </div>
-                <div class="bg-gray-50 px-6 py-4 flex justify-end gap-3">
-                    <button id="truncation-cancel-btn" class="px-4 py-2 text-gray-700 bg-gray-200 rounded hover:bg-gray-300 transition-colors">
-                        Cancel
-                    </button>
-                    <button id="truncation-confirm-btn" class="px-4 py-2 text-white bg-amber-500 rounded hover:bg-amber-600 transition-colors">
-                        Truncate Notes
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-
-    // Remove existing modal if any
-    const existing = document.getElementById('truncation-warning-modal');
-    if (existing) existing.remove();
-
-    // Add modal to body
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-    // Get modal and buttons
-    const modal = document.getElementById('truncation-warning-modal');
-    const cancelBtn = document.getElementById('truncation-cancel-btn');
-    const confirmBtn = document.getElementById('truncation-confirm-btn');
-
-    // Handle cancel
-    const handleCancel = () => {
-        modal.remove();
-        if (onCancel) onCancel();
-    };
-
-    // Handle confirm
-    const handleConfirm = () => {
-        modal.remove();
-        if (onConfirm) onConfirm();
-    };
-
-    // Attach event listeners
-    cancelBtn.addEventListener('click', handleCancel);
-    confirmBtn.addEventListener('click', handleConfirm);
-
-    // Close on backdrop click
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) handleCancel();
-    });
+    // TODO: Extract implementation from progressionBuilder.js
+    console.log('[ProgressionController] finalizeDurationChange - placeholder');
 }
 
 /**
@@ -2561,501 +2056,42 @@ export function duplicateSelectedChords(indices) {
 // ============================================================================
 
 /**
- * Load a progression from the dropdown selector
- * Initializes progression data and scale highlighting
+ * Load progression from dropdown selections
+ * Delegates to old module implementation via window
  */
-export function loadProgression() {
-    const keySelect = document.getElementById('trainer-key-select');
-    const progressionSelect = document.getElementById('trainer-progression-select');
-
-    const trainerState = getTrainerState();
-
-    // Stop playback if currently playing - but only if we're not already stopping
-    // This prevents infinite recursion when handleAutoPlayback calls loadProgression
-    if (trainerState.isPlaying && window.handleAutoPlayback && !trainerState._isStopping) {
-        // Set a flag to prevent recursion
-        trainerState._isStopping = true;
-        window.handleAutoPlayback();
-        trainerState._isStopping = false;
-    }
-
-    setCurrentKey(keySelect.value);
-
-    // Automatically set enharmonic preference based on key signature
-    // Note: Enharmonic spelling in Composition Studio is now automatically
-    // determined by the key via getKeyBasedEnharmonic(), not the global toggle.
-    // Chord Lab's toggle remains independent for learning purposes.
-
-    setProgressionRomans(progressionSelect.value.split(','));
-    setCurrentIndex(0);
-    setIsPlaying(false);
-
-    // Set isReady using the setter function
-    setIsReady(true);
-
-    // Get fresh trainerState after setting everything
-    const freshTrainerState = getTrainerState();
-
-    // Update window.trainerState immediately so updateKeyboardLabels can use it
-    if (typeof window !== 'undefined') {
-        window.trainerState = freshTrainerState;
-    }
-
-
-    // Clear any existing card highlights
-    document.querySelectorAll('.active-progression-card').forEach(card => card.classList.remove('active-progression-card'));
-
-    // Calculate scale notes using fresh state
-    const scaleNotes = calculateScaleNotes(freshTrainerState.currentKey, 4, freshTrainerState.octaveShift);
-    setScaleNotes(scaleNotes);
-
-    // Generate progression data using fresh state
-    // Check if key is minor
-    const currentKey = freshTrainerState.currentKey;
-    const isMinorKey = currentKey && currentKey.endsWith('m');
-
-    // Convert Roman numerals to minor case if key is minor
-    const convertToMinorCase = (roman) => {
-        const minorMap = {
-            'I': 'i',
-            'ii': 'ii°',
-            'iii': 'III',
-            'IV': 'iv',
-            'V': 'v',
-            'vi': 'VI',
-            'vii°': 'VII'
-        };
-        return minorMap[roman] || roman;
-    };
-
-    const progressionData = freshTrainerState.progressionRomans.map(roman => {
-        // Convert Roman numeral to minor case if key is minor
-        const displayRoman = isMinorKey ? convertToMinorCase(roman) : roman;
-
-        // Handle roman numerals with accidental prefixes (bVII, #IV, etc.)
-        // Check both ASCII (b, #) and Unicode (♭, ♯) symbols
-        let baseRoman = roman;
-        if (roman.startsWith('b') || roman.startsWith('♭') || roman.startsWith('#') || roman.startsWith('♯')) {
-            baseRoman = roman.substring(1); // Remove accidental prefix
-        }
-
-        // Try to find the base roman numeral in the map
-        let baseInfo = ROMAN_MAP_BASE[roman] || ROMAN_MAP_BASE[baseRoman];
-
-        // For borrowed chords (with accidental), default quality based on common patterns
-        // bVII in rock is typically Major, #IV is typically Major, etc.
-        let chordType = 'Major'; // Default for borrowed chords
-        if (baseInfo) {
-            chordType = baseInfo.quality;
-        } else if (baseRoman === 'VII' || baseRoman === 'vii') {
-            // VII (without degree) is typically Major when borrowed
-            chordType = 'Major';
-        }
-
-        // Get key without 'm' suffix for calculation
-        const keyForCalculation = isMinorKey ? currentKey.replace(/m$/, '') : currentKey;
-        const chordData = getProgressionChordNotes(keyForCalculation, roman, chordType, 0, freshTrainerState.octaveShift);
-        if (chordData) {
-            // Validate and filter notes to ensure they're all valid strings
-            if (chordData.notes && Array.isArray(chordData.notes)) {
-                chordData.notes = chordData.notes.filter(note =>
-                    note != null && note !== '' && typeof note === 'string' && note !== 'NaN' && !note.includes('undefined') && !note.includes('NaN')
-                );
-            }
-            // Use the converted Roman numeral for display
-            chordData.roman = displayRoman;
-            // Set default LH settings for newly loaded progressions
-            chordData.lhType = 'off';
-            chordData.lhInversion = 0;
-            chordData.lhOctaveShift = 0;
-            chordData.lhOmittedNotes = [];
-            chordData.rhythmPattern = 'block';
-            chordData.selectionMode = 'chord';
-            chordData.omittedNotes = [];
-            chordData.octaveShift = 0;
-        }
-        return chordData;
-    }).filter(Boolean); // Remove any nulls if getProgressionChordNotes fails
-
-    setProgressionData(progressionData);
-
-    if (window.updateProgressionControlsUI) {
-        window.updateProgressionControlsUI();
-    }
-    if (window.renderProgressionDisplay) {
-        window.renderProgressionDisplay('melody-progression-visualization', true);
-        window.renderProgressionDisplay('melody-progression-visualization', false);
-    }
-    if (window.highlightTrainer) {
-        window.highlightTrainer(scaleNotes, null);
-    }
-
-    // Update keyboard labels (function to be imported from UI module)
-    // Always update to ensure Roman numerals are shown if enabled
-    // This must be called after window.trainerState is updated
-    // Use a small delay to ensure state is fully updated
-    if (window.updateKeyboardLabels) {
-        setTimeout(() => {
-            window.updateKeyboardLabels();
-        }, 10);
-    }
-
-    // Display key name with proper quality
-    const keyDisplayName = freshTrainerState.currentKey;
-    const isMinor = keyDisplayName && keyDisplayName.endsWith('m');
-    const keyQuality = isMinor ? ' minor' : ' Major';
-    const progressionChordNotesDisplay = document.getElementById('progression-chord-notes-display');
-    if (progressionChordNotesDisplay) {
-        progressionChordNotesDisplay.textContent = 'Ready: ' + keyDisplayName + keyQuality;
-    }
-
-    // Update key signature display (function to be imported from UI module)
-    if (window.updateKeySignatureDisplay) {
-        window.updateKeySignatureDisplay(freshTrainerState.currentKey);
-    }
-
-    // Update key signature text (function to be imported from UI module)
-    if (window.updateKeySignatureText) {
-        window.updateKeySignatureText(freshTrainerState.currentKey);
-    }
-
-    // Update unified suggestions (tension score, mood, etc.)
-    if (window.updateUnifiedSuggestions) {
-        window.updateUnifiedSuggestions();
-    }
-
-    // Update "Current Key" display text
-    if (window.updateCurrentKeyDisplay) {
-        window.updateCurrentKeyDisplay();
-    }
-
-    // Sync progression to compositionState first, then refresh notation
-    if (window.syncProgressionToMelodyComposer) {
-        window.syncProgressionToMelodyComposer();
-    }
-    if (window.refreshNotationFromProgression) {
-        window.refreshNotationFromProgression();
-    }
-
-    // Dispatch event for guided lesson mode
-    if (isGuidedModeActive()) {
-        dispatchBuilderEvent('progressionKeyChanged', {
-            key: freshTrainerState.currentKey
-        });
-    }
-
-    // Update key display in melody tab header
-    const melodyCurrentKeyDisplay = document.getElementById('melody-current-key-display');
-    if (melodyCurrentKeyDisplay && freshTrainerState.currentKey) {
-        melodyCurrentKeyDisplay.textContent = freshTrainerState.currentKey;
-    }
-
-    // Update key display in Song Workbench
-    const melodyWorkbenchKeyDisplay = document.getElementById('melody-workbench-key-display');
-    if (melodyWorkbenchKeyDisplay && freshTrainerState.currentKey) {
-        melodyWorkbenchKeyDisplay.textContent = freshTrainerState.currentKey;
+export function loadProgression(...args) {
+    // Use old module implementation
+    if (window.loadProgressionOld) {
+        return window.loadProgressionOld(...args);
     }
 }
 
 /**
- * Update enharmonic spellings for all chords in the progression without regenerating chord data
- * Called when the user changes the accidental preference (sharp/flat)
+ * Update enharmonic spellings for all chords in the progression
+ * Delegates to old module implementation via window
  */
-export function updateProgressionEnharmonics() {
-    const trainerState = getTrainerState();
-    const progressionData = trainerState.progressionData;
-
-    if (!progressionData || progressionData.length === 0) {
-        return;
-    }
-
-    const enharmonicPref = getKeyBasedEnharmonic();
-    const targetNotes = enharmonicPref === 'sharp' ? SHARP_NOTES : FLAT_NOTES;
-    const sourceNotes = enharmonicPref === 'sharp' ? FLAT_NOTES : SHARP_NOTES;
-
-    // Helper to convert a note name (without octave) to the target enharmonic
-    const convertNoteName = (noteName) => {
-        if (!noteName) return noteName;
-
-        // Check if it's already in the target array
-        if (targetNotes.includes(noteName)) {
-            return noteName;
-        }
-
-        // Find in source array and get equivalent from target
-        const sourceIndex = sourceNotes.indexOf(noteName);
-        if (sourceIndex !== -1) {
-            return targetNotes[sourceIndex];
-        }
-
-        // Handle special cases like double sharps/flats or unusual spellings
-        // Try ALL_NOTES as fallback
-        const allNotesIndex = ALL_NOTES.indexOf(noteName);
-        if (allNotesIndex !== -1) {
-            return targetNotes[allNotesIndex];
-        }
-
-        // If not found in any array, check ENHARMONIC_MAP
-        if (ENHARMONIC_MAP[noteName]) {
-            const mappedNote = ENHARMONIC_MAP[noteName];
-            const mappedIndex = sourceNotes.indexOf(mappedNote);
-            if (mappedIndex !== -1) {
-                return targetNotes[mappedIndex];
-            }
-            return mappedNote;
-        }
-
-        return noteName;
-    };
-
-    // Update each chord in the progression
-    progressionData.forEach(chord => {
-        if (!chord) return;
-
-        // Convert root note
-        const oldRoot = chord.root;
-        const newRoot = convertNoteName(oldRoot);
-        chord.root = newRoot;
-
-        // Convert notes array (notes with octaves)
-        if (chord.notes && Array.isArray(chord.notes)) {
-            chord.notes = chord.notes.map(noteWithOctave => {
-                if (!noteWithOctave || typeof noteWithOctave !== 'string') return noteWithOctave;
-                return resolveEnharmonic(noteWithOctave, trainerState.currentKey, enharmonicPref);
-            });
-        }
-
-        // Update simpleName with new root
-        if (chord.simpleName && oldRoot !== newRoot) {
-            chord.simpleName = chord.simpleName.replace(new RegExp('^' + escapeRegex(oldRoot)), newRoot);
-        }
-
-        // Update name with new root
-        if (chord.name && oldRoot !== newRoot) {
-            chord.name = chord.name.replace(new RegExp('^' + escapeRegex(oldRoot)), newRoot);
-        }
-
-        // Convert lhNotes if present
-        if (chord.lhNotes && Array.isArray(chord.lhNotes)) {
-            chord.lhNotes = chord.lhNotes.map(noteWithOctave => {
-                if (!noteWithOctave || typeof noteWithOctave !== 'string') return noteWithOctave;
-                return resolveEnharmonic(noteWithOctave, trainerState.currentKey, enharmonicPref);
-            });
-        }
-    });
-
-    // Update the state with modified data
-    setProgressionData(progressionData);
-
-    // Re-render the display
-    if (window.renderProgressionDisplay) {
-        window.renderProgressionDisplay('melody-progression-visualization', true);
-        window.renderProgressionDisplay('melody-progression-visualization', false);
-    }
-
-    // Update keyboard labels
-    if (window.updateKeyboardLabels) {
-        setTimeout(() => {
-            window.updateKeyboardLabels();
-        }, 10);
+export function updateProgressionEnharmonics(...args) {
+    // Use old module implementation
+    if (window.updateProgressionEnharmonicsOld) {
+        return window.updateProgressionEnharmonicsOld(...args);
     }
 }
 
 /**
  * Get chord notes for a progression chord
  * @param {string} key - Key signature
- * @param {string} romanNumeral - Roman numeral or note name
+ * @param {string} romanNumeral - Roman numeral
  * @param {string} selectedType - Chord type
  * @param {number} selectedInversion - Inversion
- * @param {number} octaveShift - Octave shift
- * @returns {Object|null} Chord data object
+ * @param {number} octaveShift - Octave shift (default 0)
+ * Delegates to old module implementation via window
  */
 export function getProgressionChordNotes(key, romanNumeral, selectedType, selectedInversion, octaveShift = 0) {
-    // Guard against null/undefined romanNumeral
-    if (!romanNumeral) {
-        console.warn('[getProgressionChordNotes] romanNumeral is null or undefined');
-        return null;
+    // Use old module implementation
+    if (window.getProgressionChordNotesOld) {
+        return window.getProgressionChordNotesOld(key, romanNumeral, selectedType, selectedInversion, octaveShift);
     }
-
-    // Use key-specific enharmonic preference, not global getCurrentKey()
-    // This is critical during transposition when the current key hasn't been updated yet
-    const keyEnharmonicPref = getEnharmonicPreferenceForKey(key);
-
-    // Extract just the root note from the key (e.g., "Cm" -> "C", "F# minor" -> "F#")
-    const keyRoot = key.replace(/\s*(major|minor|min|m)$/i, '').trim();
-
-    let mapEntry = ROMAN_MAP_BASE[romanNumeral];
-    let chordRootNote = '';
-
-    // Handle roman numerals with flat (#) or flat (b) prefixes (e.g., bVII, #IV)
-    let accidental = '';
-    let baseRoman = romanNumeral;
-
-    // Handle secondary dominants (e.g., V/iii, V/vi, V/V)
-    if (romanNumeral.includes('/')) {
-        const parts = romanNumeral.split('/');
-        const targetRoman = parts[1]; // The chord we're targeting (e.g., 'iii' in 'V/iii')
-
-        // Find the root of the target chord
-        const targetEntry = ROMAN_MAP_BASE[targetRoman] || ROMAN_MAP_BASE[targetRoman.replace(/[°7]/g, '')];
-        if (targetEntry) {
-            let scaleRootIndex = ALL_NOTES.indexOf(keyRoot);
-            if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[keyRoot]);
-
-            const targetStep = MAJOR_SCALE_STEPS[targetEntry.index];
-            const targetRootIndex = (scaleRootIndex + targetStep) % 12;
-
-            // The secondary dominant is a perfect 5th above the target
-            // V/x means the dominant of x, which is 7 semitones above x
-            const secondaryDomIndex = (targetRootIndex + 7) % 12;
-            chordRootNote = (keyEnharmonicPref === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[secondaryDomIndex];
-
-            // Return early with the resolved chord
-            if (chordRootNote) {
-                const chordResult = getInvertedChordNotes(
-                    chordRootNote,
-                    selectedType,
-                    selectedInversion,
-                    key,
-                    octaveShift,
-                    keyEnharmonicPref,
-                    getNotationPreference()
-                );
-
-                if (chordResult && chordResult.specificNotes) {
-                    const validNotes = (chordResult.specificNotes || []).filter(note =>
-                        note != null && note !== '' && typeof note === 'string' && note !== 'NaN' && !note.includes('undefined') && !note.includes('NaN')
-                    );
-
-                    if (validNotes.length > 0) {
-                        return {
-                            roman: romanNumeral,
-                            name: chordResult.name || 'N/A',
-                            simpleName: chordResult.simpleName || 'N/A',
-                            notes: validNotes,
-                            root: chordRootNote,
-                            type: selectedType,
-                            inversion: selectedInversion
-                        };
-                    }
-                }
-            }
-        }
-    }
-
-    // Strip chord quality suffixes from roman numeral before lookup (e.g., ii7 -> ii, Imaj7 -> I)
-    // This handles cases like ii7, V7, Imaj7, viio7, IVmaj9, Vsus4, vi6, etc.
-    const cleanRoman = romanNumeral.replace(
-        /maj13|min13|maj11|min11|maj9|min9|maj7|min7|dim7|aug7|add13|add11|add9|sus4|sus2|13|11|9|7|6|°|ø|\+/gi,
-        ''
-    );
-
-    // Check for flat or sharp prefix (both ASCII and Unicode)
-    if (cleanRoman.startsWith('b') || cleanRoman.startsWith('♭')) {
-        accidental = 'flat';
-        baseRoman = cleanRoman.substring(1); // Remove 'b' or '♭' prefix
-    } else if (cleanRoman.startsWith('#') || cleanRoman.startsWith('♯')) {
-        accidental = 'sharp';
-        baseRoman = cleanRoman.substring(1); // Remove '#' or '♯' prefix
-    } else {
-        baseRoman = cleanRoman;
-    }
-
-    // Try to find the base roman numeral in the map
-    mapEntry = ROMAN_MAP_BASE[baseRoman];
-
-    // If the roman numeral isn't standard (e.g., it's a note name like 'Db'),
-    // we handle it as a non-diatonic chord.
-    if (!mapEntry) {
-        // If it has an accidental prefix, it's likely a borrowed chord - try to parse it
-        if (accidental && baseRoman) {
-            // Try common roman numeral patterns
-            const romanToIndex = {
-                'I': 0, 'II': 1, 'III': 2, 'IV': 3, 'V': 4, 'VI': 5, 'VII': 6,
-                'i': 0, 'ii': 1, 'iii': 2, 'iv': 3, 'v': 4, 'vi': 5, 'vii': 6
-            };
-
-            // Handle 'VII' without the degree symbol
-            const baseForLookup = baseRoman.replace('°', '').replace('°', '');
-            const scaleDegreeIndex = romanToIndex[baseForLookup];
-
-            if (scaleDegreeIndex !== undefined) {
-                let scaleRootIndex = ALL_NOTES.indexOf(keyRoot);
-                if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[keyRoot]);
-
-                // Get the diatonic scale step
-                const scaleStep = MAJOR_SCALE_STEPS[scaleDegreeIndex];
-                let chordRootIndex = (scaleRootIndex + scaleStep) % 12;
-
-                // Apply accidental (flat lowers by 1 semitone, sharp raises by 1 semitone)
-                if (accidental === 'flat') {
-                    chordRootIndex = (chordRootIndex - 1 + 12) % 12;
-                } else if (accidental === 'sharp') {
-                    chordRootIndex = (chordRootIndex + 1) % 12;
-                }
-
-                chordRootNote = (keyEnharmonicPref === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[chordRootIndex];
-            } else {
-                chordRootNote = cleanRoman; // Fall back to treating as note name (use cleaned version)
-            }
-        } else {
-            chordRootNote = cleanRoman; // The 'romanNumeral' is actually the root note (use cleaned version)
-        }
-    } else {
-        let scaleRootIndex = ALL_NOTES.indexOf(keyRoot);
-        if (scaleRootIndex === -1) scaleRootIndex = ALL_NOTES.indexOf(ENHARMONIC_MAP[keyRoot]);
-
-        const scaleStep = MAJOR_SCALE_STEPS[mapEntry.index];
-        let chordRootIndex = (scaleRootIndex + scaleStep) % 12;
-
-        // Apply accidental if present
-        if (accidental === 'flat') {
-            chordRootIndex = (chordRootIndex - 1 + 12) % 12;
-        } else if (accidental === 'sharp') {
-            chordRootIndex = (chordRootIndex + 1) % 12;
-        }
-
-        chordRootNote = (keyEnharmonicPref === 'sharp' ? SHARP_NOTES : FLAT_NOTES)[chordRootIndex];
-    }
-
-    if (!chordRootNote) {
-        return null; // Could not determine root note
-    }
-
-    const chordResult = getInvertedChordNotes(
-        chordRootNote,
-        selectedType,
-        selectedInversion,
-        key,
-        octaveShift,
-        keyEnharmonicPref,
-        getNotationPreference()
-    );
-
-    // Validate chordResult
-    if (!chordResult || !chordResult.specificNotes) {
-        return null;
-    }
-
-    // Validate and filter notes to ensure they're all valid strings
-    const validNotes = (chordResult.specificNotes || []).filter(note =>
-        note != null && note !== '' && typeof note === 'string' && note !== 'NaN' && !note.includes('undefined') && !note.includes('NaN')
-    );
-
-    // If no valid notes, return null
-    if (validNotes.length === 0) {
-        return null;
-    }
-
-    return {
-        roman: romanNumeral,
-        name: chordResult.name || 'N/A',
-        simpleName: chordResult.simpleName || 'N/A',
-        notes: validNotes,
-        root: chordRootNote,
-        type: selectedType,
-        inversion: selectedInversion
-    };
+    return null;
 }
 
 // ============================================================================
@@ -3772,37 +2808,6 @@ export function getAnalysisViewState() {
         simplifiedViewVisible,
         tensionCurveVisible
     };
-}
-
-// ============================================================================
-// KEYBOARD HIGHLIGHTING
-// ============================================================================
-
-/**
- * Highlights piano keys for scale and chord notes
- * Used for visual feedback during chord playback
- */
-export function highlightTrainer(scaleNotes, chordNotes) {
-    // Clear highlights (function to be imported from UI module)
-    if (window.clearHighlights) {
-        window.clearHighlights();
-    }
-
-    if (getCurrentTab() !== 'trainer' || !scaleNotes) return;
-
-    scaleNotes.forEach(note => {
-        const keyId = getNoteKeyId(note);
-        const keyElement = document.getElementById(keyId);
-        if (keyElement) keyElement.classList.add('active-scale');
-    });
-
-    if (chordNotes) {
-        chordNotes.forEach(note => {
-            const keyId = getNoteKeyId(note);
-            const keyElement = document.getElementById(keyId);
-            if (keyElement) keyElement.classList.add('active-progression');
-        });
-    }
 }
 
 // ============================================================================

@@ -13,7 +13,7 @@ import { getCompositionState } from '../state/compositionState.js';
 import { getCurrentKey, setCurrentKey, setProgressionData, setProgressionRomans } from '../state/trainerState.js';
 import { getChordNotes } from '../utils/noteUtils.js';
 import { getPiano } from '../audio/audioEngine.js';
-import { renderProgressionDisplay, setProgressionViewMode } from '../features/progressionBuilder.js';
+import { renderProgressionDisplay, setProgressionViewMode } from '../features/progressionBuilder/index.js';
 
 // Section type colors
 const SECTION_COLORS = {

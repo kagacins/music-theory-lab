@@ -16,7 +16,7 @@
 import { switchTab } from './tabs.js';
 import { renderLessonViewer } from './lessonViewer.js';
 import { getProgressionData, setProgressionData, getCurrentKey, setCurrentKey } from '../state/trainerState.js';
-import { renderProgressionDisplay, loadProgression } from '../features/progressionBuilder.js';
+import { renderProgressionDisplay, loadProgression } from '../features/progressionBuilder/index.js';
 
 // Enharmonic equivalents for chord validation
 const ENHARMONIC_MAP = {

@@ -67,12 +67,6 @@ import { getLHNotes, getInvertedChordNotes, noteToMidi } from '../../utils/noteU
 import { initAudio, getAudioIsReady, getPiano } from '../../audio/audioEngine.js';
 import { highlightTrainer } from '../../ui/keyboard.js';
 
-// TEMPORARY: Import working implementation from old module
-// TODO: Migrate this function's implementation (~3500 lines total)
-import {
-    renderProgressionDisplay as renderProgressionDisplayOld
-} from '../progressionBuilder.js';
-
 // TODO: Import chord generation functions when ChordGeneration module is created
 // import { getInvertedChordNotes, getChordNotes, getLHNotes } from './ChordGeneration.js';
 

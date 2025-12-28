@@ -17459,6 +17459,20 @@ if (typeof window !== 'undefined') {
     window.highlightTensionPoint = highlightTensionPoint;
     window.unhighlightAllTensionPoints = unhighlightAllTensionPoints;
 
+    // Export helper functions for chord card rendering (used by ProgressionController)
+    window.createDetailedCardHTML = createDetailedCardHTML;
+    window.createSimplifiedCardStructure = createSimplifiedCardStructure;
+    window.attachCardEventListeners = attachCardEventListeners;
+    window.renderChordNotation = renderChordNotation;
+    window.calculateCanvasDimensions = calculateCanvasDimensions;
+    window.updateCardShifts = updateCardShifts;
+
+    // Export helper functions needed by migrated chord update functions
+    window.updateSingleCard = updateSingleCard;
+    window.updateTensionCurveIfVisible = updateTensionCurveIfVisible;
+    window.playTrainerChordOnce = playTrainerChordOnce;
+    window.updateChordAndRenderPreservingTrebleNotes = updateChordAndRenderPreservingTrebleNotes;
+
     // Export with "Old" suffix for hybrid delegation during migration
     window.selectChordCardOld = selectChordCard;
     window.highlightChordCardOld = highlightChordCard;
@@ -17472,11 +17486,13 @@ if (typeof window !== 'undefined') {
     window.toggleProgressionNoteOld = toggleProgressionNote;
     window.toggleProgressionLHNoteOld = toggleProgressionLHNote;
 
-    // Chord update operations
-    window.updateChordTypeOld = updateChordType;
-    window.updateChordRootOld = updateChordRoot;
-    window.updateChordInversionOld = updateChordInversion;
-    window.updateChordDurationOld = updateChordDuration;
+    // Chord update operations - MIGRATED to ProgressionController.js
+    // These are no longer needed as the new module handles these directly
+    // Keeping old implementations available for backward compatibility during transition
+    // window.updateChordTypeOld = updateChordType;
+    // window.updateChordRootOld = updateChordRoot;
+    // window.updateChordInversionOld = updateChordInversion;
+    // window.updateChordDurationOld = updateChordDuration;
     window.addChordToProgressionByParamsOld = addChordToProgressionByParams;
 
     // Data loading operations

@@ -22,7 +22,7 @@ import {
 
 import { getRecommendationService } from '../integration/recommendationService.js';
 import { getProgressionData, getCurrentKey, getSelectedChordIndex } from '../state/trainerState.js';
-import { addChordToProgressionByParams } from '../features/progressionBuilder.js';
+import { addChordToProgressionByParams } from '../features/progressionBuilder/index.js';
 
 /**
  * RecommendationsSidebarController Class
