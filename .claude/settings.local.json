@@ -5,7 +5,8 @@
       "Bash(timeout 15 npm run dev:*)",
       "Bash(timeout 5 npm run dev:*)",
       "Bash(npm run build:*)",
-      "Bash(/tmp/handleCardDragWithinSection.txt)"
+      "Bash(/tmp/handleCardDragWithinSection.txt)",
+      "Bash(/tmp/renderProgressionDisplay_full.txt)"
     ],
     "deny": [],
     "ask": []
