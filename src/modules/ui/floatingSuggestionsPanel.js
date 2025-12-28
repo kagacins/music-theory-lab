@@ -9,7 +9,7 @@
 
 import { initSectionIntentUI, refreshUI as refreshSectionIntentUI } from './sectionIntentUI.js';
 import { initGenerateTabUI, refreshUI as refreshGenerateTabUI } from './generateTabUI.js';
-import { showUnifiedRecommendationModal, closeUnifiedRecommendationModal } from './recommendations/UnifiedRecommendationModal.js';
+import { showUnifiedRecommendationModal, closeUnifiedRecommendationModal } from './recommendations/UnifiedRecommendationModal/index.js';
 
 let panel = null;
 let isVisible = false;

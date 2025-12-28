@@ -64,7 +64,7 @@ import { noteToRomanNumeral } from '../utils/romanNumerals.js';
 import { showChordExplorerModal } from '../ui/chordExplorerModal.js';
 
 // Import unified recommendation modal
-import { showUnifiedRecommendationModal } from '../ui/recommendations/UnifiedRecommendationModal.js';
+import { showUnifiedRecommendationModal } from '../ui/recommendations/UnifiedRecommendationModal/index.js';
 
 // =========================================================================
 // Helper Function: Generate Context-Aware Chord Description

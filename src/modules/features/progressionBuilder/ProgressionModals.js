@@ -84,7 +84,7 @@ import {
 // IMPORTS - UI Components
 // ============================================================================
 
-import { showUnifiedRecommendationModal } from '../../ui/recommendations/UnifiedRecommendationModal.js';
+import { showUnifiedRecommendationModal } from '../../ui/recommendations/UnifiedRecommendationModal/index.js';
 
 import { dispatchBuilderEvent, isGuidedModeActive } from '../../ui/lessonGuidedMode.js';
 
