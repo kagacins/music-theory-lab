@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "build-css": "tailwindcss -i ./src/input.css -o ./dist/output.css --minify",
-    "watch-css": "tailwindcss -i ./src/input.css -o ./dist/output.css --watch"
+    "watch-css": "tailwindcss -i ./src/input.css -o ./dist/output.css --watch",
+    "check-imports": "node scripts/check-imports.js",
+    "validate": "npm run check-imports && npm run build"
   },
   "dependencies": {
     "@spotify/basic-pitch": "^1.0.1",

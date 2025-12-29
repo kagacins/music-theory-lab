@@ -1,0 +1,303 @@
+/**
+ * globalEventHandlers.js
+ *
+ * Global event handlers and keyboard shortcuts.
+ * This module handles:
+ * - Document-level event listeners
+ * - Keyboard shortcuts (Alt+R, Alt+S, Ctrl+Z, Ctrl+Y, Tab, ?, number keys)
+ * - Click-outside handlers for dropdowns and menus
+ * - Custom event listeners (applyGeneratedSection)
+ *
+ * Extracted from main.js Phase 3.4 refactoring.
+ *
+ * CRITICAL: This should be called LAST in initialization sequence
+ * (after window exports, app setup, and module initialization).
+ */
+
+import { ALL_NOTES } from '../data/music-data.js';
+import { getCompositionState, resetCompositionState, CompositionState } from '../modules/state/compositionState.js';
+import { getProgressionData } from '../modules/state/trainerState.js';
+
+/**
+ * Setup all global event handlers
+ * Call this AFTER all modules are initialized
+ */
+export function setupGlobalEventHandlers() {
+    // Setup keyboard shortcuts
+    setupKeyboardShortcuts();
+
+    // Setup click-outside handlers
+    setupClickOutsideHandlers();
+
+    // Setup custom event listeners
+    setupCustomEventListeners();
+}
+
+/**
+ * Setup keyboard shortcuts
+ */
+function setupKeyboardShortcuts() {
+    // Alt+R / Alt+S shortcuts for refreshDragDrop / shockDragDrop
+    document.addEventListener('keydown', (e) => {
+        if (e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+            if (e.key === 'r' || e.key === 'R') {
+                e.preventDefault();
+                if (window.refreshDragDrop) {
+                    window.refreshDragDrop();
+                }
+            } else if (e.key === 's' || e.key === 'S') {
+                e.preventDefault();
+                if (window.shockDragDrop) {
+                    window.shockDragDrop();
+                }
+            }
+        }
+    });
+
+    // Undo/Redo keyboard shortcuts (Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y)
+    document.addEventListener('keydown', (event) => {
+        // Check which tab we're in - undo/redo works on builder, trainer, and melody tabs
+        const currentTab = document.querySelector('[id^="tab-"]:not(.hidden)');
+        const tabId = currentTab ? currentTab.id : '';
+        const isUndoRedoTab = tabId === 'tab-builder' || tabId === 'tab-trainer' || tabId === 'tab-melody';
+
+        // Only handle undo/redo in tabs that support it
+        if (!isUndoRedoTab) return;
+
+        // Check if user is typing in an input or select element
+        const activeElement = document.activeElement;
+        if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'SELECT')) {
+            return; // Don't interfere with typing
+        }
+
+        // Ctrl+Z or Cmd+Z (Mac) for Undo
+        if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
+            event.preventDefault();
+            if (window.handleUndo) {
+                window.handleUndo();
+            }
+        }
+
+        // Ctrl+Shift+Z or Cmd+Shift+Z (Mac) for Redo
+        if ((event.ctrlKey || event.metaKey) && event.key === 'z' && event.shiftKey) {
+            event.preventDefault();
+            if (window.handleRedo) {
+                window.handleRedo();
+            }
+        }
+
+        // Alternative: Ctrl+Y or Cmd+Y (Mac) for Redo
+        if ((event.ctrlKey || event.metaKey) && event.key === 'y') {
+            event.preventDefault();
+            if (window.handleRedo) {
+                window.handleRedo();
+            }
+        }
+    });
+
+    // Melody suggestions keyboard shortcuts (1-5, R, Escape)
+    document.addEventListener('keydown', function(e) {
+        // Only handle shortcuts when in Melody Composer tab
+        if (window.currentTab !== 'melody') return;
+
+        // Don't handle if typing in an input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+
+        // Get current suggestion mode from window global
+        const currentSuggestionMode = window.getCurrentSuggestionMode ? window.getCurrentSuggestionMode() : null;
+
+        // Handle number keys 1-5 for inserting suggestions
+        // Only handle melody mode here - chords mode is handled by RecommendationsSidebarController
+        if (e.key >= '1' && e.key <= '5') {
+            if (currentSuggestionMode === 'melody') {
+                const index = parseInt(e.key) - 1;
+                // Insert melody note suggestion
+                const items = document.querySelectorAll('#melody-suggestions-list .melody-suggestion-item');
+                if (items[index]) {
+                    // Add pulse animation
+                    items[index].classList.add('shortcut-pulse');
+                    setTimeout(() => items[index].classList.remove('shortcut-pulse'), 500);
+
+                    items[index].click();
+                    // Refresh is handled by handleNoteSelected after insertion
+                }
+            }
+            // Chords mode handled by RecommendationsSidebarController
+            return;
+        }
+
+        // Handle R key for refresh
+        // Only handle melody mode here - chords mode is handled by RecommendationsSidebarController
+        if (e.key === 'r' || e.key === 'R') {
+            if (currentSuggestionMode === 'melody') {
+                const refreshBtn = document.getElementById('refresh-melody-suggestions-btn');
+                if (refreshBtn) refreshBtn.click();
+            }
+            // Chords mode handled by RecommendationsSidebarController
+            return;
+        }
+
+        // Handle Escape for deselect
+        // Only handle melody mode here - chords mode is handled by RecommendationsSidebarController
+        if (e.key === 'Escape') {
+            if (currentSuggestionMode === 'melody') {
+                const selected = document.querySelector('#melody-suggestions-list .melody-suggestion-item.selected');
+                if (selected) selected.classList.remove('selected');
+            }
+            // Chords mode handled by Recommendations Modal
+            return;
+        }
+    });
+
+    // Global ? key handler for keyboard shortcuts help
+    document.addEventListener('keydown', function(e) {
+        // Don't trigger in input fields
+        const tagName = e.target.tagName.toLowerCase();
+        if (tagName === 'input' || tagName === 'textarea' || tagName === 'select' || e.target.isContentEditable) {
+            return;
+        }
+
+        // ? key (with or without shift) - show keyboard shortcuts
+        if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+            e.preventDefault();
+            if (window.showNotationShortcuts) {
+                window.showNotationShortcuts();
+            }
+        }
+    });
+
+    // Tab keyboard shortcut for Recommendations Modal
+    document.addEventListener('keydown', function(e) {
+        // Helper to check if element is an input
+        const isInputElement = (element) => {
+            const tagName = element.tagName.toLowerCase();
+            return tagName === 'input' ||
+                   tagName === 'textarea' ||
+                   tagName === 'select' ||
+                   element.isContentEditable;
+        };
+
+        // Tab key - open/close unified recommendation modal
+        if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+            if (!isInputElement(e.target)) {
+                e.preventDefault();
+                const existingModal = document.getElementById('unified-recommendation-modal');
+                if (existingModal) {
+                    window.closeUnifiedRecommendationModal && window.closeUnifiedRecommendationModal();
+                } else {
+                    // Open modal based on current tab
+                    if (window.currentTab === 'melody') {
+                        // In Melody Composer - show melody recommendations
+                        window.showUnifiedRecommendationModal && window.showUnifiedRecommendationModal('melody');
+                    } else if (window.currentTab === 'trainer' || window.currentTab === 'builder') {
+                        // In Progression Builder or Chord Builder - show chord recommendations
+                        window.showUnifiedRecommendationModal && window.showUnifiedRecommendationModal('chord');
+                    }
+                }
+            }
+        }
+    });
+}
+
+/**
+ * Setup click-outside handlers for dropdowns and menus
+ */
+function setupClickOutsideHandlers() {
+    // Close FAB when clicking outside (but not when clicking on FAB elements or during action handling)
+    document.addEventListener('click', (e) => {
+        // FAB menu should have its own state management, accessed via window
+        if (window._fabIsOpen && !window._fabIsHandlingAction && !e.target.closest('#mobile-fab')) {
+            if (window._closeFab) {
+                window._closeFab();
+            }
+        }
+    });
+
+    // Close help dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        const dropdown = document.getElementById('help-dropdown');
+        const container = document.getElementById('help-menu-container');
+        if (dropdown && container && !container.contains(e.target)) {
+            dropdown.classList.add('hidden');
+        }
+    });
+}
+
+/**
+ * Setup custom event listeners
+ */
+function setupCustomEventListeners() {
+    /**
+     * Handle applying a generated section to the composition
+     * Listens for the 'applyGeneratedSection' event from generateTabUI
+     */
+    window.addEventListener('applyGeneratedSection', async (event) => {
+        const { progression, sectionType, style } = event.detail;
+
+        if (!progression || !Array.isArray(progression) || progression.length === 0) {
+            return;
+        }
+
+        // Get current progression length before adding (to know indices of new chords)
+        let startIndex = 0;
+        try {
+            const compositionState = getCompositionState();
+            if (compositionState) {
+                const currentChords = compositionState.exportToProgressionData();
+                startIndex = currentChords ? currentChords.length : 0;
+            }
+        } catch (e) {
+            // Fall back to trainer state
+            const trainerProgression = getProgressionData();
+            startIndex = trainerProgression ? trainerProgression.length : 0;
+        }
+
+        // Import the chordBuilder module to add chords
+        const chordBuilder = await import('../modules/features/chordBuilder.js');
+
+        // Add each chord in the progression
+        for (let i = 0; i < progression.length; i++) {
+            const chord = progression[i];
+            const root = chord.root;
+            const type = chord.type || 'Major';
+            const inversion = chord.inversion || 0;
+
+            // Set the builder root note first
+            const rootIndex = ALL_NOTES.indexOf(root);
+            if (rootIndex !== -1) {
+                chordBuilder.selectBuilderRootNote(rootIndex, false); // Don't play audio
+            }
+
+            // Add the chord (no shutter sound for batch operations except first)
+            const playSound = (i === 0);
+            chordBuilder.addSpecificChordToProgression(type, inversion, playSound, root);
+        }
+
+        // Create a section group for the newly added chords
+        try {
+            const compositionState = getCompositionState();
+
+            if (compositionState && sectionType) {
+                // Calculate indices of the newly added chords
+                const newChordIndices = [];
+                for (let i = 0; i < progression.length; i++) {
+                    newChordIndices.push(startIndex + i);
+                }
+
+                // Create the section with the new chord indices
+                compositionState.createSection(sectionType, newChordIndices);
+            }
+        } catch (e) {
+            console.warn('Could not create section group:', e);
+        }
+
+        // Dispatch event to notify other components
+        window.dispatchEvent(new CustomEvent('progressionUpdated'));
+
+        // Refresh the progression display to show the new section grouping
+        if (window.renderProgressionDisplay) {
+            window.renderProgressionDisplay('progression-visualization', true);
+            window.renderProgressionDisplay('melody-progression-visualization', false);
+        }
+    });
+}

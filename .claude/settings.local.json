@@ -12,7 +12,13 @@
       "Bash(/tmp/chord_tab_part2.txt)",
       "Bash(/tmp/chord_tab_part3.txt)",
       "Bash(\"c:\\Users\\agaci\\Documents\\Github\\Music Theory Lab\\src\\modules\\ui\\recommendations\\UnifiedRecommendationModal\\chord_tab_extracted.txt\")",
-      "Bash(\"c:\\Users\\agaci\\Documents\\Github\\Music Theory Lab\\src\\modules\\ui\\recommendations\\UnifiedRecommendationModal\\ChordTab.js\")"
+      "Bash(\"c:\\Users\\agaci\\Documents\\Github\\Music Theory Lab\\src\\modules\\ui\\recommendations\\UnifiedRecommendationModal\\ChordTab.js\")",
+      "Bash(awk:*)",
+      "Bash(git log:*)",
+      "Bash(timeout 5 tail:*)",
+      "Bash(/tmp/old_main.js)",
+      "Bash(/tmp/old_main_check.js)",
+      "Bash(node scripts/check-imports.js:*)"
     ],
     "deny": [],
     "ask": []

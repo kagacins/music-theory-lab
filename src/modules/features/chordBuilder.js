@@ -1374,7 +1374,7 @@ import {
 } from '../../data/music-data.js';
 
 // Import UI utilities (to be defined when needed)
-// import { clearHighlights, updateKeySignatureDisplay } from '../ui/displays.js';
+// (Removed dead import: clearHighlights, updateKeySignatureDisplay - functions not used)
 
 // ============================================================================
 // Chord Playback Functions

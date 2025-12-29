@@ -67,16 +67,8 @@ import { getLHNotes, getInvertedChordNotes, noteToMidi } from '../../utils/noteU
 import { initAudio, getAudioIsReady, getPiano } from '../../audio/audioEngine.js';
 import { highlightTrainer } from '../../ui/keyboard.js';
 
-// TODO: Import chord generation functions when ChordGeneration module is created
-// import { getInvertedChordNotes, getChordNotes, getLHNotes } from './ChordGeneration.js';
-
-// TODO: Import helper functions when HelperFunctions module is created
-// import {
-//     getScaleNotesForKey,
-//     getRootNoteOptions,
-//     getChordTypeOptions,
-//     noteToMidi
-// } from './HelperFunctions.js';
+// Note: ChordGeneration and HelperFunctions modules were planned for future refactoring
+// but are not currently needed as functions are imported from other modules
 
 // ============================================================================
 // MODULE-LEVEL STATE

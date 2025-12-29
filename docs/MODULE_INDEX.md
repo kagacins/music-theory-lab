@@ -2,7 +2,7 @@
 
 **Purpose:** Quick navigation guide for Claude Code to find the right code without reading entire files.
 
-**Last Updated:** 2025-12-28 (Updated for Phase 1 progressionBuilder refactoring completion)
+**Last Updated:** 2025-12-28 (Updated for Phase 1 & Phase 3 refactoring completion)
 
 ---
 
@@ -10,13 +10,43 @@
 
 | File | Lines | Purpose | When to Use |
 |------|-------|---------|-------------|
-| [src/main.js](../src/main.js) | 8,407 | Window exports registry | Finding HTML event handlers, global function lookup |
+| [src/main.js](../src/main.js) | ~400 | **App entry point** - orchestrates initialization via init/ modules | Starting point for understanding app boot sequence (✅ REFACTORED Phase 3) |
 | [src/modules/state/compositionState.js](../src/modules/state/compositionState.js) | 6,474 | **Single source of truth** for all composition data | Any chord/measure/note state questions |
 | [src/modules/features/progressionBuilder/index.js](../src/modules/features/progressionBuilder/index.js) | ~390 | Main progression coordinator | Progression builder tab features (✅ REFACTORED into 7 modules) |
 
 ---
 
 ## 📁 Module Directory
+
+### INIT - Application Initialization (4 files) ✅ Phase 3 Complete
+**Location:** `src/init/`
+
+**Purpose:** Orchestrates app initialization sequence. Extracted from main.js during Phase 3 refactoring.
+
+**CRITICAL INITIALIZATION ORDER (DO NOT CHANGE):**
+1. `setupWindowExports()` - Called BEFORE DOMContentLoaded for HTML onclick handlers
+2. `setupApp()` - UI state, dark mode, saved state (in DOMContentLoaded)
+3. `await initializeModules()` - Audio FIRST, then other modules (in DOMContentLoaded)
+4. `setupGlobalEventHandlers()` - Event listeners LAST (in DOMContentLoaded)
+
+| File | Lines | Purpose | Key Functions |
+|------|-------|---------|--------------|
+| `windowExports.js` | ~3,500 | All 386 window.* assignments for HTML event handlers | `setupWindowExports()` |
+| `appSetup.js` | ~1,000 | Dark mode, saved state, UI initialization | `setupApp()` |
+| `moduleInitialization.js` | ~220 | All init*() calls, panel restoration | `initializeModules()` (async) |
+| `globalEventHandlers.js` | ~300 | Keyboard shortcuts, click-outside, custom events | `setupGlobalEventHandlers()` |
+
+**When to Read:**
+- App initialization issues → `main.js` then trace through init/ modules in order
+- Window export debugging → `windowExports.js`
+- Dark mode or saved state → `appSetup.js`
+- Module initialization order → `moduleInitialization.js`
+- Keyboard shortcuts or event handlers → `globalEventHandlers.js`
+
+**Migration Stats:** 386 window exports, 14 init calls, 8 event listeners - zero runtime errors
+**Old File:** main.js was 8,407 lines → now ~400 lines (95% reduction)
+
+---
 
 ### STATE - Data Management (6 files)
 **Location:** `src/modules/state/`

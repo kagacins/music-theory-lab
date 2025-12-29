@@ -42,8 +42,6 @@ export function initTheoryMoments() {
     window.isTheoryMomentsEnabled = () => isEnabled;
     window.recallTheoryMoment = recallTheoryMoment;
     window.canRecallMoment = canRecallMoment;
-
-    console.log('[TheoryMoments] Initialized');
 }
 
 /**

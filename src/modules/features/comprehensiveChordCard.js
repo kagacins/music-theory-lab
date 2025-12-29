@@ -12,7 +12,7 @@
  * - Staff notation (collapsible)
  */
 
-import { CHORD_DEFINITIONS } from '../data/music-data.js';
+import { CHORD_DEFINITIONS } from '../../data/music-data.js';
 import { getChordNotes } from '../utils/noteUtils.js';
 
 /**
