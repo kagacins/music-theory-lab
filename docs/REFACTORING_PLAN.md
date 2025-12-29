@@ -2,7 +2,7 @@
 
 **Purpose:** Proposed refactoring plan for large, monolithic files to improve maintainability.
 
-**Last Updated:** 2025-12-28 (Phase 1 Complete)
+**Last Updated:** 2025-12-28 (Phase 1 & 2 Complete, Phase 3 Planning Complete)
 
 ---
 
@@ -139,13 +139,17 @@ features/progressionBuilder/
 
 ---
 
-## 🔴 PRIORITY 2: UnifiedRecommendationModal.js (15,489 lines)
+## ✅ PRIORITY 2: UnifiedRecommendationModal.js ~~(15,489 lines)~~ - **COMPLETE**
 
-**File:** [src/modules/ui/recommendations/UnifiedRecommendationModal.js](../src/modules/ui/recommendations/UnifiedRecommendationModal.js)
+**Status:** ✅ **COMPLETED 2025-12-28** - Refactored into 18 modules (~15,500 lines total)
 
-### Current Responsibilities
+**Old File:** ~~[src/modules/ui/recommendations/UnifiedRecommendationModal.js](../src/modules/ui/recommendations/UnifiedRecommendationModal.js)~~ - Deleted (migration complete)
 
-This massive modal handles:
+**New Structure:** [src/modules/ui/recommendations/UnifiedRecommendationModal/](../src/modules/ui/recommendations/UnifiedRecommendationModal/)
+
+### Original Responsibilities (Successfully Modularized!)
+
+This massive modal handled:
 1. **Recommendation Display** - Grid/list of chord suggestions
 2. **Filtering** - By function, tension, color, style
 3. **Sorting** - By score, voice leading, etc.
@@ -157,183 +161,204 @@ This massive modal handles:
 9. **Tension Arc Visualization** - Harmonic tension graphs
 10. **Multiple Recommendation Engines** - Coordinates 3+ engines
 
-### Proposed Refactoring
+### ✅ Completed Refactoring
 
-**Split into UI components + logic modules:**
+**Successfully split into 18 focused modules:**
 
 ```
-ui/recommendations/
-├── UnifiedRecommendationModal.js (1,500 lines)
-│   - Main modal shell
-│   - Component coordination
-│   - EXPORTS: showRecommendationModal(), hideRecommendationModal()
+ui/recommendations/UnifiedRecommendationModal/
+├── index.js (~600 lines) ✅
+│   - Main entry point
+│   - Modal coordination
+│   - EXPORTS: showUnifiedRecommendationModal(), closeUnifiedRecommendationModal()
 │
-├── components/
-│   ├── RecommendationGrid.js (2,000 lines)
-│   │   - Grid display of suggestions
-│   │   - Card rendering
-│   │
-│   ├── RecommendationFilters.js (1,500 lines)
-│   │   - Filter UI (function, tension, color, style)
-│   │   - Filter state management
-│   │
-│   ├── RecommendationSort.js (800 lines)
-│   │   - Sort controls
-│   │   - Sort algorithms
-│   │
-│   ├── ChordPreviewPlayer.js (1,000 lines)
-│   │   - Audio preview playback
-│   │   - Progression playback
-│   │
-│   ├── TheoryExplanationPanel.js (2,000 lines)
-│   │   - "Why This Works" display
-│   │   - Contextual theory
-│   │
-│   ├── VoiceLeadingVisualizer.js (1,500 lines)
-│   │   - Voice leading graphs
-│   │   - Visual indicators
-│   │
-│   └── TensionArcDisplay.js (1,200 lines)
-│       - Tension graph rendering
-│       - Arc visualization
+├── ModalState.js (53 state items) ✅
+│   - State management
+│   - Modal state persistence
 │
-└── logic/
-    ├── RecommendationAggregator.js (1,500 lines)
-    │   - Coordinates multiple engines
-    │   - Merges results
-    │
-    ├── RecommendationScorer.js (1,000 lines)
-    │   - Scoring algorithms
-    │   - Ranking logic
-    │
-    └── RecommendationFilter.js (1,000 lines)
-        - Filter application
-        - Search logic
+├── MusicUtils.js (44 functions) ✅
+│   - Music theory utilities
+│   - Interval calculations
+│
+├── AudioPlayback.js (11 functions) ✅
+│   - Audio preview playback
+│   - Progression playback
+│
+├── UIHelpers.js (2 functions) ✅
+│   - UI utility functions
+│
+├── DataFormatters.js (3 functions) ✅
+│   - Data formatting utilities
+│
+├── VisualizationHelpers.js (2 functions) ✅
+│   - SVG visualization helpers
+│
+├── ChordHelpers.js (4 functions) ✅
+│   - Chord-specific utilities
+│
+├── ProgressionHelpers.js (1 function) ✅
+│   - Progression utilities
+│
+├── Constants.js (9 constants) ✅
+│   - Configuration constants
+│
+├── TabNavigation.js (3 functions) ✅
+│   - Tab switching logic
+│
+├── ModalHelpers.js (5 functions) ✅
+│   - Modal UI helpers
+│
+├── StructureBuilders.js (10 functions) ✅
+│   - DOM structure builders
+│
+├── ChordTab.js (48 functions, ~7K lines) ✅
+│   - Chord recommendations renderer
+│   - Intent-based suggestions
+│
+├── MelodyTab.js (26 functions, ~2.3K lines) ✅
+│   - Melody generation tab
+│
+├── SectionTab.js (11 functions, ~1K lines) ✅
+│   - Section planning tab
+│
+├── HarmonizeTab.js (1 function, ~600 lines) ✅
+│   - Auto-harmonization tab
+│
+└── PolyphonyTab.js (13 functions, ~2.3K lines) ✅
+    - Texture generation tab
 ```
 
-### Migration Strategy
+**Total:** 201 items migrated (192 functions + 9 constants), ~15,500 lines across 18 modules
 
-**Phase 1:** Extract RecommendationAggregator (logic layer)
-- Move engine coordination to separate file
-- Test recommendation generation
-- **Risk:** Medium
+### ✅ Completed Migration Strategy
 
-**Phase 2:** Extract smaller components (low coupling)
-- ChordPreviewPlayer
-- TensionArcDisplay
-- **Risk:** Low
+**Actual Migration Approach Used:** Bottom-up dependency migration with hybrid delegation pattern (learned from Phase 1)
 
-**Phase 3:** Extract larger components
-- RecommendationGrid
-- RecommendationFilters
-- **Risk:** Medium
+**Phase 1:** Extracted utility modules ✅
+- Created 9 utility modules (ModalState, MusicUtils, AudioPlayback, etc.)
+- Established foundation for larger components
+- Zero errors maintained
 
-**Phase 4:** Extract theory components
-- TheoryExplanationPanel
-- VoiceLeadingVisualizer
-- **Risk:** Medium
+**Phase 2:** Extracted tab renderer modules ✅
+- Extracted ChordTab.js (~7K lines)
+- Extracted MelodyTab.js (~2.3K lines)
+- Extracted SectionTab.js (~1K lines)
+- Extracted HarmonizeTab.js (~600 lines)
+- Extracted PolyphonyTab.js (~2.3K lines)
 
-**Phase 5:** Refactor main modal to coordinate components
-- Wire components together
-- Test full modal flow
-- **Risk:** High
+**Phase 3:** Implemented main modal functions ✅
+- Implemented showUnifiedRecommendationModal() in index.js
+- Implemented closeUnifiedRecommendationModal() in index.js
+- Removed delegation to old module
 
-### Expected Benefits
+**Phase 4:** Cleanup ✅
+- Deleted original UnifiedRecommendationModal.js
+- Verified all imports using new structure
+- Build verified successful (zero errors)
 
-- **Component Reusability:** Components could be used in other UIs
-- **Faster Development:** Smaller files easier to modify
-- **Better Testing:** Test each component independently
-- **Performance:** Could lazy-load components
+### ✅ Achieved Benefits
+
+- ✅ **Maintainability:** Each module has single, clear purpose
+- ✅ **Debuggability:** Easy to locate bugs in specific modules
+- ✅ **Testability:** Modules can be tested independently
+- ✅ **Collaboration:** Multiple developers can work on different modules
+- ✅ **Performance:** Tree-shaking can remove unused code
+- ✅ **Documentation:** Each module is self-documenting with clear exports
+
+**See [MODAL_MIGRATION_PLAN.md](MODAL_MIGRATION_PLAN.md) for comprehensive migration details.**
 
 ---
 
-## 🟡 PRIORITY 3: main.js (8,407 lines)
+## 🔄 PRIORITY 3: main.js (8,412 lines) - **PLANNING COMPLETE**
+
+**Status:** 🔄 **PLANNING COMPLETE - Ready for Execution**
 
 **File:** [src/main.js](../src/main.js)
+
+**Planning Completed:** 2025-12-28
+**Ready for Execution:** Next Session
 
 ### Current Responsibilities
 
 This file is the "catch-all" for:
-1. **Window Exports** - 100+ functions exported to window
+1. **Window Exports** - 386 functions exported to window
 2. **Initialization** - App startup logic
 3. **Event Handlers** - Global event listeners
 4. **Module Imports** - Imports from 50+ modules
 
-### Proposed Refactoring
+### ✅ Planned Refactoring (Ready for Execution)
 
-**Split into focused initialization modules:**
+**Split into 5 focused initialization modules:**
 
 ```
 src/
-├── main.js (500 lines)
+├── main.js (~400 lines)
 │   - Minimal entry point
-│   - Calls initialization modules
-│   - DOMContentLoaded handler
+│   - Import init modules
+│   - DOMContentLoaded orchestration
+│   - Google Search API config
 │
-├── init/
-│   ├── windowExports.js (3,000 lines)
-│   │   - All window.* assignments
-│   │   - Organized by module
-│   │   - GOAL: Reduce over time
-│   │
-│   ├── globalEventHandlers.js (1,500 lines)
-│   │   - Document-level event listeners
-│   │   - Keyboard shortcuts
-│   │
-│   ├── moduleInitialization.js (2,000 lines)
-│   │   - Initialize audio
-│   │   - Initialize notation
-│   │   - Initialize state
-│   │
-│   └── appSetup.js (1,000 lines)
-│       - Dark mode
-│       - Load saved state
-│       - Set initial UI state
-│
-└── modules/
-    (existing modules)
+└── init/
+    ├── windowExports.js (~3,500 lines)
+    │   - All 386 window.* assignments
+    │   - All necessary imports
+    │   - EXPORTS: setupWindowExports()
+    │   - CRITICAL: Must run FIRST (HTML onclick handlers need it)
+    │
+    ├── appSetup.js (~1,000 lines)
+    │   - Dark mode initialization
+    │   - Saved state loading
+    │   - Initial UI state setup
+    │   - Responsive title setup
+    │   - EXPORTS: setupApp()
+    │
+    ├── moduleInitialization.js (~2,000 lines)
+    │   - All init*() function calls
+    │   - Panel state restoration
+    │   - CRITICAL: Audio must initialize first
+    │   - EXPORTS: initializeModules() (async)
+    │
+    ├── globalEventHandlers.js (~1,500 lines)
+    │   - Document-level event listeners
+    │   - Keyboard shortcuts (Alt+R, Alt+S, etc.)
+    │   - Global click handlers
+    │   - EXPORTS: setupGlobalEventHandlers()
+    │
+    └── (Total: ~8,400 lines organized into 5 modules)
 ```
 
-### Migration Strategy
+### ✅ Detailed Execution Plan Created
 
-**Phase 1:** Extract windowExports.js
-- Move all window.* assignments
-- Group by module
-- **Risk:** Low (just moving code)
+**Planning Documents:**
+- ✅ **PHASE3_MAIN_JS_PLAN.md** - High-level strategy and structure
+- ✅ **PHASE3_EXECUTION_CHECKLIST.md** - Detailed step-by-step execution plan
+- ✅ **src/init/** directory created and ready
 
-**Phase 2:** Extract moduleInitialization.js
-- Move init calls
-- **Risk:** Low
+**Execution Phases (Next Session):**
+- **Phase 3.1:** Extract windowExports.js (CRITICAL - HTML depends on this)
+- **Phase 3.2:** Extract appSetup.js
+- **Phase 3.3:** Extract moduleInitialization.js (initialization order matters!)
+- **Phase 3.4:** Extract globalEventHandlers.js
+- **Phase 3.5:** Slim down main.js to ~400 lines
 
-**Phase 3:** Extract globalEventHandlers.js
-- Move event listeners
-- **Risk:** Medium (event timing matters)
-
-**Phase 4:** Extract appSetup.js
-- Move setup logic
-- **Risk:** Low
-
-**Phase 5:** Slim down main.js to minimal entry point
-- Call initialization modules
-- **Risk:** Low
-
-### Long-Term Goal: Eliminate Window Exports
-
-**Strategy:** Gradually migrate from `window.*` to proper imports
-
-**Example:**
+**Critical Initialization Order Documented:**
 ```javascript
-// CURRENT (bad):
-// HTML: onclick="window.addChord()"
-window.addChord = addChord;
-
-// FUTURE (good):
-// HTML: data-action="addChord"
-document.addEventListener('click', (e) => {
-  const action = e.target.dataset.action;
-  if (action === 'addChord') addChord();
-});
+// MUST BE IN THIS ORDER:
+1. setupWindowExports() - FIRST (HTML needs window.*)
+2. setupApp() - UI initialization
+3. await initializeModules() - Module initialization (audio FIRST)
+4. setupGlobalEventHandlers() - Event registration
 ```
+
+**See [PHASE3_MAIN_JS_PLAN.md](PHASE3_MAIN_JS_PLAN.md) and [PHASE3_EXECUTION_CHECKLIST.md](PHASE3_EXECUTION_CHECKLIST.md) for comprehensive execution details.**
+
+### Expected Benefits
+
+- ✅ **Maintainability:** Clear separation of concerns
+- ✅ **Debuggability:** Easy to find initialization code
+- ✅ **Testability:** Each init module can be tested independently
+- ✅ **Documentation:** Self-documenting structure
+- ✅ **Future Refactoring:** Path to eliminate window exports over time
 
 ---
 
@@ -483,8 +508,8 @@ state/compositionState/
 | File | Current Lines | Status | Result | Priority |
 |------|---------------|--------|--------|----------|
 | ~~progressionBuilder.js~~ | ~~17,453~~ | ✅ **COMPLETE** | 7 modules (~8,050 lines) | ~~HIGH~~ DONE |
-| UnifiedRecommendationModal.js | 15,489 | 🔴 Not Started | 12 modules (800-2,000 each) | HIGH |
-| main.js | 8,407 | 🔴 Not Started | 5 modules (500-3,000 each) | MEDIUM |
+| ~~UnifiedRecommendationModal.js~~ | ~~15,489~~ | ✅ **COMPLETE** | 18 modules (~15,500 lines) | ~~HIGH~~ DONE |
+| main.js | 8,412 | 🔄 **PLANNING COMPLETE** | 5 modules (ready for execution) | HIGH |
 | noteEditor.js | 7,387 | 🔴 Not Started | 7 modules (300-1,500 each) | MEDIUM |
 | compositionState.js | 6,474 | ⚪ Low Priority | Keep as-is (or 4 modules) | LOW |
 
@@ -506,82 +531,67 @@ state/compositionState/
 
 ---
 
-### Phase 2: UnifiedRecommendationModal.js - **NEXT PRIORITY**
+### ✅ Phase 2: UnifiedRecommendationModal.js - **COMPLETED 2025-12-28**
 
-**Recommended Approach (based on Phase 1 lessons):**
-- Use hybrid delegation pattern
-- Extract components in batches
-- Test after each batch
-- Expected timeline: Similar to Phase 1
+**Completed in single comprehensive session:**
+- ✅ Created 18 module structure with hybrid delegation
+- ✅ Migrated 201 items (192 functions + 9 constants) in batches
+- ✅ Implemented main modal functions (showUnifiedRecommendationModal, closeUnifiedRecommendationModal)
+- ✅ Removed delegation to old module
+- ✅ Deleted original file
+- ✅ Zero errors maintained throughout
+- ✅ Full documentation created (MODAL_MIGRATION_PLAN.md)
 
-**Month 1:**
+**See [MODAL_MIGRATION_PLAN.md](MODAL_MIGRATION_PLAN.md) for comprehensive migration details.**
 
-**Week 1-2:** Create module structure + extract logic layer
-- Extract RecommendationAggregator.js
-- Extract RecommendationScorer.js
-- Extract RecommendationFilter.js
-- Test recommendation generation
+---
 
-**Week 3-4:** Extract smaller components
-- Extract ChordPreviewPlayer.js
-- Extract TensionArcDisplay.js
-- Extract RecommendationSort.js
-- Test playback and visualization
+### 🔄 Phase 3: main.js - **PLANNING COMPLETE - NEXT PRIORITY**
 
-### Phase 3: Continue UnifiedRecommendationModal.js
+**Status:** Ready for execution in next session
 
-**Month 2:**
+**Planning Completed:** 2025-12-28
+- ✅ Created comprehensive execution plan (PHASE3_MAIN_JS_PLAN.md)
+- ✅ Created detailed checklist (PHASE3_EXECUTION_CHECKLIST.md)
+- ✅ Created src/init/ directory structure
+- ✅ Analyzed main.js structure (8,412 lines, 386 window exports)
+- ✅ Identified critical initialization order requirements
 
-**Week 1-2:** Extract larger components
-- Extract RecommendationGrid.js
-- Extract RecommendationFilters.js
-- Test grid display and filtering
+**Execution Phases (Next Session):**
+- **Phase 3.1:** Extract windowExports.js (~3,500 lines, 386 window.* assignments)
+- **Phase 3.2:** Extract appSetup.js (~1,000 lines)
+- **Phase 3.3:** Extract moduleInitialization.js (~2,000 lines)
+- **Phase 3.4:** Extract globalEventHandlers.js (~1,500 lines)
+- **Phase 3.5:** Slim down main.js to ~400 lines
 
-**Week 3-4:** Extract theory components
-- Extract TheoryExplanationPanel.js
-- Extract VoiceLeadingVisualizer.js
-- Test theory integration
+**Target Result:** 8,412 lines → 5 focused modules with clear responsibilities
 
-**Week 5:** Finalize
-- Refactor main modal to coordinate components
-- Remove hybrid loading
-- Full regression test
+**See [PHASE3_MAIN_JS_PLAN.md](PHASE3_MAIN_JS_PLAN.md) and [PHASE3_EXECUTION_CHECKLIST.md](PHASE3_EXECUTION_CHECKLIST.md) for full execution details.**
 
-### Phase 4: main.js
+---
 
-**Month 3:**
+### Phase 4: noteEditor.js - **PENDING**
 
-**Week 1-2:**
-- Extract windowExports.js
-- Extract moduleInitialization.js
-- Test initialization
+**Status:** Not started
 
-**Week 3-4:**
-- Extract globalEventHandlers.js
-- Extract appSetup.js
-- Slim down main.js
-- Test
+**Target:** 7,387 lines → 7 modules
 
-### Phase 5: noteEditor.js
-
-**Month 4:**
-
-**Week 1-2:**
+**Planned Execution (After Phase 3):**
 - Extract KeyboardInput.js
 - Extract ShiftOperations.js
 - Extract MeasureOperations.js
-- Test
-
-**Week 3-4:**
 - Extract NoteModification.js
 - Extract NotePlacement.js
 - Extract NoteSelection.js
 - Create index.js coordinator
-- Test
 
-### Phase 6: Final Polish
+---
 
-**Week 1-2:**
+### Phase 5: Final Polish - **PENDING**
+
+**Status:** After Phase 4 complete
+
+**Tasks:**
 - Update all documentation
 - Performance testing
 - Code cleanup
@@ -593,7 +603,7 @@ state/compositionState/
 
 For each file refactor:
 
-### ✅ Phase 1 (progressionBuilder.js) - COMPLETED
+### ✅ Phase 1 (progressionBuilder.js) - COMPLETED 2025-12-28
 
 **Before Refactoring:**
 - ✅ Created feature branch (dev)
@@ -612,10 +622,35 @@ For each file refactor:
 - ✅ Performance comparison (zero regression)
 - ✅ Updated MODULE_INDEX.md
 - ✅ Created PHASE1_LESSONS_LEARNED.md
-- ⏳ Code review pending
-- ⏳ Merge to main pending
+- ✅ Updated REFACTORING_PLAN.md
+- ✅ Updated REFACTORING_TRACKING.md
 
-### For Future Phases (2-6)
+---
+
+### ✅ Phase 2 (UnifiedRecommendationModal.js) - COMPLETED 2025-12-28
+
+**Before Refactoring:**
+- ✅ Reviewed PHASE1_LESSONS_LEARNED.md for best practices
+- ✅ Created MODAL_MIGRATION_PLAN.md
+
+**During Refactoring:**
+- ✅ Used hybrid delegation pattern (proven successful in Phase 1)
+- ✅ Extracted in batches (utility modules first, then tab renderers)
+- ✅ Updated imports as you go
+- ✅ Build tested after each batch (maintained zero errors)
+- ✅ Documented progress in MODAL_MIGRATION_PLAN.md
+
+**After Refactoring:**
+- ✅ Full regression test (zero errors)
+- ✅ Deleted original file
+- ✅ Updated MODAL_MIGRATION_PLAN.md
+- ✅ Updated REFACTORING_PLAN.md
+- ✅ Updated REFACTORING_TRACKING.md
+- ⏳ Updated MODULE_INDEX.md (pending)
+
+---
+
+### For Future Phases (3-5)
 
 **Before Refactoring:**
 - [ ] Create feature branch

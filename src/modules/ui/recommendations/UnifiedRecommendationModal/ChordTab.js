@@ -72,7 +72,8 @@ import {
     hideAllScoreTooltips,
     showChordScoreTooltip,
     hideChordScoreTooltip,
-    getMaxInversion
+    getMaxInversion,
+    SCORE_DESCRIPTIONS
 } from './MusicUtils.js';
 import { setupHoldToPlay, playChord, stopChord } from './AudioPlayback.js';
 import { updatePersistentProgressionBar } from './StructureBuilders.js';

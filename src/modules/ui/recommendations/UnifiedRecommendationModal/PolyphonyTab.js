@@ -24,7 +24,8 @@ import { modalState } from './ModalState.js';
 import { HARMONY_STYLES } from './Constants.js';
 
 // VexFlow rendering utilities
-const { createRenderer, renderGrandStaffMeasure } = window;
+import { createRenderer } from '../../../notation/vexFlowRenderer.js';
+import { renderGrandStaffMeasure } from '../../../notation/grandStaff.js';
 
 // ============================================================================
 // TEXTURE TYPES

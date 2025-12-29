@@ -406,7 +406,8 @@ export function updatePersistentProgressionBar(bar) {
                 const chordDef = CHORD_DEFINITIONS[chord.type];
                 const symbol = chordDef?.symbol || '';
                 const invLabel = getInversionLabel(chord.inversion);
-                const spelledRoot = spellNoteInKey(chord.root, key);
+                // Use chord.root directly - it's already correctly spelled in the progression data
+                const spelledRoot = chord.root;
 
                 // Check if this chord is in selection range
                 const selStart = modalState.selectedProgressionStart;
