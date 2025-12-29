@@ -1123,7 +1123,7 @@ function highlightPatternChordsByPositions(positions) {
  * Updates cards in all containers with matching data-chord-index
  * @param {number} index - Chord index
  */
-function updateSingleCard(index) {
+export function updateSingleCard(index) {
     const trainerState = getTrainerState();
     const chord = trainerState.progressionData[index];
     const key = trainerState.currentKey || 'C';
@@ -1516,13 +1516,14 @@ function getMaxInversionForLhType(lhType) {
  */
 export function renderProgressionDisplay(containerId = 'progression-visualization', syncBothTabs = true) {
     // DEBUGGING: Uncomment to trace when render is called
-    // console.log('[renderProgressionDisplay] Rendering', containerId);
+    console.log('[renderProgressionDisplay] Rendering', containerId);
 
     // Capture staff notation states before clearing DOM (always capture from both tabs)
     captureStaffNotationStates();
 
     const container = document.getElementById(containerId);
     if (!container) {
+        console.log('[renderProgressionDisplay] Container not found:', containerId);
         return;
     }
 
@@ -1564,12 +1565,19 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
     container.innerHTML = '';
 
     const trainerState = getTrainerState();
+    console.log('[renderProgressionDisplay] Progression data length:', trainerState.progressionData?.length);
+    console.log('[renderProgressionDisplay] Condition check:', {
+        containerId,
+        match: containerId === 'progression-visualization',
+        hasData: trainerState.progressionData.length > 0
+    });
 
     // DEPRECATED: This block handles the old "Progression Workshop" tab which has been removed.
     // The container 'progression-visualization' no longer exists in the UI.
     // This code is kept for reference but will never execute.
     // TODO: Remove this entire block in a future cleanup pass.
     if (containerId === 'progression-visualization' && trainerState.progressionData.length > 0) {
+        console.log('[renderProgressionDisplay] RENDERING CARDS for progression-visualization');
         // Get parent panel to render pattern badges and tension curve outside the grid
         const panel = container.parentElement;
 
@@ -3552,7 +3560,8 @@ export function renderProgressionControls() {
  * @param {Array} sections - Array of section objects
  */
 function renderSectionViewMode(container, progressionData, key, sections) {
-    // TODO: Implementation from lines 4133-4341
+    // Delegate to the builder implementation
+    renderSectionViewModeForBuilder(container, progressionData, key, sections, true);
 }
 
 /**
@@ -3587,7 +3596,8 @@ function createSectionChip(section, isSelected, onClick) {
  * @param {Object} options - Rendering options
  */
 function renderScrollViewMode(gridContainer, progressionData, key, options = {}) {
-    // TODO: Implementation from lines 4667-4686
+    // Delegate to flat cards scroll implementation
+    renderFlatCardsScroll(gridContainer, progressionData, key, options);
 }
 
 // ============================================================================
@@ -3602,7 +3612,8 @@ function renderScrollViewMode(gridContainer, progressionData, key, options = {})
  * @param {Object} options - Rendering options
  */
 function renderSectionAwareCards(gridContainer, progressionData, key, options = {}) {
-    // TODO: Implementation from lines 4873-4972
+    // Delegate to the scroll implementation
+    renderSectionAwareCardsScroll(gridContainer, progressionData, key, options);
 }
 
 /**
@@ -3624,7 +3635,8 @@ function renderSectionAwareCards(gridContainer, progressionData, key, options = 
  * @param {Object} options - Rendering options
  */
 function renderFlatCards(gridContainer, progressionData, key, options = {}) {
-    // TODO: Implementation from lines 3459-3529
+    // Delegate to the scroll implementation
+    renderFlatCardsScroll(gridContainer, progressionData, key, options);
 }
 
 // ============================================================================

@@ -89,24 +89,19 @@ import { showUnifiedRecommendationModal } from '../../ui/recommendations/Unified
 import { dispatchBuilderEvent, isGuidedModeActive } from '../../ui/lessonGuidedMode.js';
 
 // ============================================================================
-// IMPORTS - Cross-module dependencies (TODO: will be imported from other modules)
+// IMPORTS - Cross-module dependencies
 // ============================================================================
 
-// TODO: These functions will be imported from other progressionBuilder modules once extracted:
-// - getKeyBasedEnharmonic() - from ProgressionUtils or ProgressionCore
-// - getChordFunction() - from ProgressionUtils
-// - addToProgressionData() - from ProgressionCore
-// - renderProgressionDisplay() - from ProgressionDisplay
-// - updateProgressionControlsUI() - from ProgressionControls
-// - updateSingleCard() - from ProgressionDisplay
-// - captureProgressionState() - from ProgressionState
-// - selectChordCard() - from ProgressionSelection
-// - getProgressionChordNotes() - from ProgressionChordUtils
-
-// Temporary placeholders - these need to be imported or passed as parameters
-let getKeyBasedEnharmonic, getChordFunction, addToProgressionData, renderProgressionDisplay;
-let updateProgressionControlsUI, updateSingleCard, captureProgressionState, selectChordCard;
-let getProgressionChordNotes;
+import { renderProgressionDisplay, updateSingleCard } from './ProgressionRenderer.js';
+import {
+    getKeyBasedEnharmonic,
+    addToProgressionData,
+    getProgressionChordNotes,
+    selectChordCard,
+    captureProgressionState,
+    updateProgressionControlsUI
+} from './ProgressionController.js';
+import { getChordFunction } from '../../../data/theoryExplanations/chordFunctions.js';
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -555,11 +550,15 @@ export function toggleStyleMoodInsightsPanel() {
  * @param {string} containerId - Container ID
  */
 export function showAddSectionMenu(event, containerId) {
+    console.log('[Section] showAddSectionMenu called', { containerId });
     event.stopPropagation();
 
     // Check if any chords are selected
     const selectedIndices = getSelectedIndicesArray ? getSelectedIndicesArray() : [];
+    console.log('[Section] Selected indices:', selectedIndices);
+
     if (selectedIndices.length === 0) {
+        console.log('[Section] No chords selected - showing warning');
         // Show a message to the user
         if (window.showToast) {
             window.showToast('Please select one or more chords to create a Section', { type: 'warning' });
@@ -568,9 +567,11 @@ export function showAddSectionMenu(event, containerId) {
     }
 
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    console.log('[Section] CompositionState:', compositionState ? 'found' : 'NOT FOUND');
     if (!compositionState) return;
 
     const sectionTypes = compositionState.constructor.SECTION_TYPES;
+    console.log('[Section] Section types:', Object.keys(sectionTypes));
 
     // Remove existing menu if any
     const existingMenu = document.querySelector('.section-type-menu');
@@ -634,17 +635,23 @@ export function showAddSectionMenu(event, containerId) {
  * @param {string} containerId - Container ID
  */
 function createNewSection(type, containerId) {
+    console.log('[Section] createNewSection called', { type, containerId });
+
     const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    console.log('[Section] CompositionState in createNewSection:', compositionState ? 'found' : 'NOT FOUND');
     if (!compositionState) return;
 
     // Get selected chord indices (already sorted)
     const selectedIndices = getSelectedIndicesArray();
+    console.log('[Section] Selected indices for new section:', selectedIndices);
 
     // If we have selected indices, validate they are adjacent
     if (selectedIndices.length > 1) {
+        console.log('[Section] Checking adjacency for multiple selections');
         // Check for adjacency - each index should be exactly 1 more than the previous
         for (let i = 1; i < selectedIndices.length; i++) {
             if (selectedIndices[i] !== selectedIndices[i - 1] + 1) {
+                console.log('[Section] Non-adjacent selection detected');
                 // Non-adjacent selection - show warning and only use the first contiguous range
 
                 // Find first contiguous range
@@ -656,6 +663,7 @@ function createNewSection(type, containerId) {
                         break;
                     }
                 }
+                console.log('[Section] Using contiguous range:', contiguousRange);
 
                 // Show a toast/notification to the user
                 if (window.showNotification) {
@@ -663,35 +671,39 @@ function createNewSection(type, containerId) {
                 }
 
                 // Use only the contiguous range
+                console.log('[Section] Calling compositionState.createSection with contiguous range');
                 compositionState.createSection(type, contiguousRange);
                 clearSelection();
-                // TODO: renderProgressionDisplay needs to be imported
-                if (renderProgressionDisplay) {
-                    renderProgressionDisplay('melody-progression-visualization', true);
-                    renderProgressionDisplay('melody-progression-visualization', false);
-                }
+
+                // Re-render to show the new section
+                renderProgressionDisplay('melody-progression-visualization', true);
+                renderProgressionDisplay('melody-progression-visualization', false);
+
                 // Dispatch event for tutorial validation
                 dispatchBuilderEvent('chordsGrouped', { groupName: type, chordIndices: contiguousRange });
+                console.log('[Section] Section created (non-adjacent case)');
                 return;
             }
         }
     }
 
     // All indices are adjacent (or single/empty) - create section
+    console.log('[Section] All indices adjacent or single - creating section');
+    console.log('[Section] Calling compositionState.createSection');
     compositionState.createSection(type, selectedIndices);
 
     // Clear selection
+    console.log('[Section] Clearing selection');
     clearSelection();
 
-    // Re-render
-    // TODO: renderProgressionDisplay needs to be imported
-    if (renderProgressionDisplay) {
-        renderProgressionDisplay('melody-progression-visualization', true);
-        renderProgressionDisplay('melody-progression-visualization', false);
-    }
+    // Re-render to show the new section
+    console.log('[Section] Re-rendering progression display');
+    renderProgressionDisplay('melody-progression-visualization', true);
+    renderProgressionDisplay('melody-progression-visualization', false);
 
     // Dispatch event for tutorial validation
     dispatchBuilderEvent('chordsGrouped', { groupName: type, chordIndices: selectedIndices });
+    console.log('[Section] Section creation complete!');
 }
 
 /**

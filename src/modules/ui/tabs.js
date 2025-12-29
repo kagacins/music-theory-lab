@@ -248,6 +248,8 @@ export function switchTab(tabId, options = {}) {
 
     if (tabId === 'builder') {
         updateBuilderDisplay();
+        // Render progression display in Chord Lab (like we do for melody tab)
+        renderProgressionDisplay('progression-visualization');
         // Update the Chord Lab progression panel to reflect any changes made in other tabs
         if (window.renderBuilderProgressionCards) {
             window.renderBuilderProgressionCards();

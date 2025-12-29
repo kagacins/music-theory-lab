@@ -2302,8 +2302,7 @@ export function collapseAllChordCards() {
  */
 export function handleMultiSelectToggle(index) {
     toggleSelection(index);
-    // TODO: Extract remaining implementation
-    console.log('[ProgressionController] handleMultiSelectToggle - partial implementation');
+    updateMultiSelectVisuals();
 }
 
 /**
@@ -2316,8 +2315,7 @@ export function handleMultiSelectRange(index) {
     } else {
         selectRange(lastIndex, index);
     }
-    // TODO: Extract remaining implementation
-    console.log('[ProgressionController] handleMultiSelectRange - partial implementation');
+    updateMultiSelectVisuals();
 }
 
 /**
@@ -3433,7 +3431,7 @@ export function saveRecording() {
 /**
  * Capture progression state snapshot
  */
-function captureProgressionState() {
+export function captureProgressionState() {
     const trainerState = getTrainerState();
     const state = {
         progressionData: JSON.parse(JSON.stringify(trainerState.progressionData)),
@@ -3473,6 +3471,41 @@ function captureProgressionState() {
     }
 
     return state;
+}
+
+/**
+ * Update progression control UI buttons (play/step)
+ * Updates button states and styling based on playback state
+ */
+export function updateProgressionControlsUI() {
+    // Always get fresh state to ensure accuracy
+    const trainerState = getTrainerState();
+    // Also check window.trainerState for consistency
+    const isPlaying = trainerState.isPlaying || (window.trainerState && window.trainerState.isPlaying);
+    const isReady = trainerState.isReady;
+
+    const playBtn = document.getElementById('play-progression-btn');
+    const stepBtn = document.getElementById('step-chord-btn');
+
+    if (!stepBtn || !playBtn) return;
+
+    // Update Step button - disabled when not ready OR when playing
+    stepBtn.disabled = !isReady || isPlaying;
+
+    // Always use pointer cursor - remove any cursor-not-allowed classes
+    stepBtn.classList.remove('cursor-not-allowed');
+    stepBtn.classList.add('cursor-pointer');
+
+    const playText = document.getElementById('play-text');
+    if (isPlaying) {
+        if (playText) playText.textContent = 'Stop';
+        playBtn.classList.remove('bg-teal-600', 'hover:bg-teal-700');
+        playBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+    } else {
+        if (playText) playText.textContent = 'Auto Play';
+        playBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+        playBtn.classList.add('bg-teal-600', 'hover:bg-teal-700');
+    }
 }
 
 /**

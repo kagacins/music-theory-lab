@@ -79,6 +79,9 @@ import {
     initializeSimplifiedSortable
 } from './ProgressionDragDrop.js';
 
+// State imports
+import { clearSelection } from '../../state/trainerState.js';
+
 // Controller Functions (LARGE EXPORT LIST)
 import {
     // View Mode & Section Management
@@ -102,6 +105,8 @@ import {
 
     // Multi-Select
     clearMultiSelection,
+    handleMultiSelectToggle,
+    handleMultiSelectRange,
     updateBassSelectionUI,
     updateCustomBassPatternInfo,
     copySelectedChords,
@@ -138,6 +143,9 @@ import {
     handleUndo,
     handleRedo,
     saveStateBeforeChange,
+
+    // UI Updates
+    updateProgressionControlsUI,
 
     // Panel Toggles
     toggleProgressionControlsPanel,
@@ -247,6 +255,9 @@ export {
     expandChordCard,
     collapseAllChordCards,
     clearMultiSelection,
+    clearSelection,
+    handleMultiSelectToggle,
+    handleMultiSelectRange,
     updateBassSelectionUI,
     updateCustomBassPatternInfo,
     copySelectedChords,
@@ -293,6 +304,11 @@ export {
     handleUndo,
     handleRedo,
     saveStateBeforeChange
+};
+
+// Controller - UI Updates
+export {
+    updateProgressionControlsUI
 };
 
 // Controller - Panels
@@ -360,6 +376,9 @@ if (typeof window !== 'undefined') {
 
     // Selection
     window.clearMultiSelection = clearMultiSelection;
+    window.clearSelection = clearSelection;
+    window.handleMultiSelectToggle = handleMultiSelectToggle;
+    window.handleMultiSelectRange = handleMultiSelectRange;
     window.updateBassSelectionUI = updateBassSelectionUI;
     window.updateCustomBassPatternInfo = updateCustomBassPatternInfo;
     window.copySelectedChords = copySelectedChords;
@@ -380,4 +399,7 @@ if (typeof window !== 'undefined') {
     // Undo/Redo
     window.handleUndo = handleUndo;
     window.handleRedo = handleRedo;
+
+    // UI Updates
+    window.updateProgressionControlsUI = updateProgressionControlsUI;
 }
