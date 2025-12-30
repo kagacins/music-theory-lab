@@ -75,8 +75,22 @@ export function updateKeySignatureDisplay(key) {
         const newSrc = `/key_signatures/${imageInfo.treble}`;
 
         // Only update if the src is actually different to avoid unnecessary reloads
-        if (trebleImg.src !== newSrc && !trebleImg.src.endsWith(imageInfo.treble)) {
-            trebleImg.style.opacity = '1'; // Reset opacity in case of previous error
+        // Note: trebleImg.src is a full URL, so we check the filename
+        if (!trebleImg.src.endsWith(imageInfo.treble)) {
+            // Reset opacity and set up proper load/error handlers
+            trebleImg.style.opacity = '0.3'; // Start faded until loaded
+
+            // Set up load handler to show image when it loads successfully
+            trebleImg.onload = () => {
+                trebleImg.style.opacity = '1';
+            };
+
+            // Set up error handler (backup for HTML onerror)
+            trebleImg.onerror = () => {
+                trebleImg.style.opacity = '0.3';
+                console.warn(`Failed to load key signature image: ${newSrc}`);
+            };
+
             trebleImg.src = newSrc;
         }
     }

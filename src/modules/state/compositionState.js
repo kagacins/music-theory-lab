@@ -984,8 +984,6 @@ export class CompositionState {
     buildSectionView() {
         const progressionData = this.exportToProgressionData();
         const totalChords = progressionData.length;
-        console.log('[buildSectionView] totalChords:', totalChords, 'progression:', progressionData.map(c => `${c.root}${c.type?.charAt(0) || ''}`));
-        console.log('[buildSectionView] this.sections:', this.sections.map(s => ({ id: s.id, type: s.type, startIndex: s.startIndex, chordCount: s.chordCount, isPlaceholder: s.isPlaceholder })));
 
         // Clean up empty sections first (but preserve placeholders)
         this._cleanupEmptySections();
@@ -1020,8 +1018,6 @@ export class CompositionState {
             chordIndices: this._getSectionChordIndices(section),
             isPseudoSection: false  // All sections are now real
         }));
-
-        console.log('[buildSectionView] result:', result.map(s => ({ id: s.id, type: s.type, startIndex: s.startIndex, chordCount: s.chordCount })));
 
         return result;
     }

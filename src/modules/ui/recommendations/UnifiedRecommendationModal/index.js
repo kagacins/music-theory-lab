@@ -213,6 +213,9 @@ import {
 } from '../../../state/sectionIntentState.js';
 import { getCompositionState } from '../../../state/compositionState.js';
 
+// Performance optimization
+import { clearRecommendationCache } from '../../../features/comprehensiveChordRecommendations.js';
+
 // ============================================================================
 // MAIN MODAL FUNCTIONS
 // ============================================================================
@@ -233,6 +236,11 @@ import { getCompositionState } from '../../../state/compositionState.js';
  * @param {Function} options.onStopChord - Callback when chord playback stops
  */
 export function showUnifiedRecommendationModal(options = {}) {
+    // Clear recommendation cache for fresh results
+    // This ensures new modal opens get fresh computations while
+    // sequence generation within the same session benefits from caching
+    clearRecommendationCache();
+
     // Remove existing modal
     const existing = document.getElementById(MODAL_ID);
     if (existing) existing.remove();

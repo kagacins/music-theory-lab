@@ -57,6 +57,64 @@ import {
     DEFAULT_DURATION
 } from './rhythmicContextAnalyzer.js';
 
+// ============================================================================
+// PERFORMANCE OPTIMIZATION: Memoization Cache for Sequence Generation
+// ============================================================================
+// During sequence generation, generateComprehensiveRecommendations is called
+// 100-300+ times with many duplicate parameter combinations. This cache stores
+// results keyed by a hash of the parameters, dramatically reducing computation.
+
+const recommendationCache = new Map();
+const CACHE_MAX_SIZE = 500; // Max entries before pruning
+const CACHE_TTL_MS = 30000; // 30 seconds - cache expires for fresh modal opens
+
+/**
+ * Generate a cache key from recommendation parameters.
+ * Only includes parameters that affect the scoring outcome.
+ */
+function generateCacheKey(
+    currentRoot, currentChordType, currentInversion,
+    key, style, mood, tensionDirection, limit,
+    progressionData, contextMode, lookbackDepth,
+    useEnhancedScoring, sectionInfo
+) {
+    // Create a simplified representation of progression for cache key
+    // Only use last N chords as that's what affects scoring
+    const relevantProgression = progressionData?.slice(-lookbackDepth) || [];
+    const progressionKey = relevantProgression.map(c =>
+        c ? `${c.root}|${c.type}|${c.inversion || 0}` : 'null'
+    ).join(',');
+
+    // Section info key (only relevant parts)
+    const sectionKey = sectionInfo ?
+        `${sectionInfo.sectionType || ''}|${sectionInfo.position || ''}|${sectionInfo.totalChords || ''}` :
+        'null';
+
+    return `${currentRoot}|${currentChordType}|${currentInversion}|${key}|${style}|${mood}|${tensionDirection}|${limit}|${progressionKey}|${contextMode}|${lookbackDepth}|${useEnhancedScoring}|${sectionKey}`;
+}
+
+/**
+ * Clear the recommendation cache.
+ * Call this when the modal opens to ensure fresh results.
+ */
+export function clearRecommendationCache() {
+    recommendationCache.clear();
+}
+
+/**
+ * Prune old entries if cache is too large.
+ */
+function pruneCache() {
+    if (recommendationCache.size <= CACHE_MAX_SIZE) return;
+
+    // Remove oldest entries (first half)
+    const entriesToRemove = Math.floor(CACHE_MAX_SIZE / 2);
+    const keys = Array.from(recommendationCache.keys());
+    for (let i = 0; i < entriesToRemove && i < keys.length; i++) {
+        recommendationCache.delete(keys[i]);
+    }
+}
+
 // Harmonic function definitions
 const HARMONIC_FUNCTIONS = {
     TONIC: 'tonic',           // I, iii, vi
@@ -461,8 +519,6 @@ export function generateComprehensiveRecommendations(
     rhythmInfo = null,          // Rhythmic context for duration suggestions
     forwardContextInfo = null   // Phase 4: Forward-looking context (for Compare mode)
 ) {
-    const recommendations = [];
-
     // Safety check for required parameters
     if (!currentRoot || !currentChordType) {
         return getDefaultRecommendations(key || 'C');
@@ -472,6 +528,35 @@ export function generateComprehensiveRecommendations(
     if (!Array.isArray(progressionData)) {
         progressionData = [];
     }
+
+    // ==========================================================================
+    // CACHE CHECK: Return cached results if available
+    // ==========================================================================
+    // Note: We only cache when customWeights, tensionArcInfo, rhythmInfo, and
+    // forwardContextInfo are null (the common case in sequence generation).
+    // These parameters change the scoring in ways that would require more complex
+    // cache key generation.
+    const canUseCache = !customWeights && !tensionArcInfo && !rhythmInfo && !forwardContextInfo;
+
+    if (canUseCache) {
+        const cacheKey = generateCacheKey(
+            currentRoot, currentChordType, currentInversion,
+            key, style, mood, tensionDirection, limit,
+            progressionData, contextMode, lookbackDepth,
+            useEnhancedScoring, sectionInfo
+        );
+
+        const cached = recommendationCache.get(cacheKey);
+        if (cached) {
+            // Return a shallow copy of cached results to prevent mutation
+            return cached.map(r => ({ ...r }));
+        }
+
+        // Store cache key for later storage
+        var _cacheKey = cacheKey;
+    }
+
+    const recommendations = [];
 
     // Get current chord's MIDI notes for voice leading analysis
     const currentMidi = getChordMidi(currentRoot, currentChordType, currentInversion);
@@ -1058,10 +1143,18 @@ export function generateComprehensiveRecommendations(
     }
 
     // Return limited results (or all if limit is 0/null)
-    if (limit && limit > 0) {
-        return recommendations.slice(0, limit);
+    const result = (limit && limit > 0) ? recommendations.slice(0, limit) : recommendations;
+
+    // ==========================================================================
+    // CACHE STORE: Save results for future calls with same parameters
+    // ==========================================================================
+    if (canUseCache && _cacheKey) {
+        pruneCache();
+        // Store a copy to prevent mutation issues
+        recommendationCache.set(_cacheKey, result.map(r => ({ ...r })));
     }
-    return recommendations; // Return all
+
+    return result;
 }
 
 /**

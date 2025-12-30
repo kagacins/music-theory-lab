@@ -215,13 +215,17 @@ export function renderKeyboard() {
     const keyboardEl = document.getElementById('piano-keyboard');
     keyboardEl.innerHTML = '';
     g_KeyboardKeys = [];
-    
+
     // Clear multitouch state when re-rendering keyboard
     activeKeyNoteNames.clear();
     activeTouches.clear();
     activeKeyNoteName = null;
     isPointerDown = false;
-    
+
+    // CRITICAL: Set touch-action on container to prevent browser gesture handling
+    // This ensures simultaneous touches are not interpreted as pinch-zoom
+    keyboardEl.style.touchAction = 'none';
+
     // Apply modern keyboard class by default (unless classic is enabled)
     const isClassicKeyboardOn = window.isClassicKeyboardOn || false;
     if (!isClassicKeyboardOn) {
@@ -336,10 +340,19 @@ export function renderKeyboard() {
         }
         
         if (initAudio) initAudio();
+
+        // Ensure audio context is running (might have been suspended)
+        if (typeof Tone !== 'undefined' && Tone.context && Tone.context.state !== 'running') {
+            Tone.context.resume();
+        }
+
         const instrument = window.getInstrument ? window.getInstrument() : (window.getPiano ? window.getPiano() : null);
         const audioIsReady = window.getAudioIsReady ? window.getAudioIsReady() : false;
-        if (!audioIsReady || !instrument) return;
-        
+
+        if (!audioIsReady || !instrument) {
+            return;
+        }
+
         try {
             instrument.triggerAttack(noteName, Tone.now());
             
@@ -389,6 +402,11 @@ export function renderKeyboard() {
         const keyEl = document.createElement('div');
         keyEl.id = getNoteKeyId(keyData.name);
 
+        // CRITICAL: Set touch-action to none to prevent browser from treating
+        // simultaneous touches as gestures (pinch-zoom, etc.)
+        // This ensures touchstart events fire even for simultaneous multi-touch
+        keyEl.style.touchAction = 'none';
+
         if (keyData.type === 'white') {
             keyEl.className = 'key white-key';
             keyEl.style.width = `${whiteKeyWidth}%`;
@@ -422,9 +440,48 @@ export function renderKeyboard() {
             isPointerDown = true;
             pressThisKey(e);
         });
-        
-        // Touch events are handled at the keyboard level for multitouch support
-        // Individual key touchstart is not needed - we'll handle all touches at the keyboard container level
+
+        // Pointer Events for multi-touch support - fires separately per finger
+        // Note: Truly simultaneous touches (exact same moment) may not fire events due to browser/hardware limitations
+        keyEl.addEventListener('pointerdown', (e) => {
+            if (e.pointerType !== 'touch') return;
+
+            e.preventDefault();
+            e.stopPropagation();
+            lastTouchTime = Date.now();
+
+            // Resume audio context if needed
+            if (typeof Tone !== 'undefined' && Tone.context && Tone.context.state !== 'running') {
+                Tone.context.resume();
+            }
+
+            pressKeyByName(keyData.name, e.pointerId);
+        }, { passive: false });
+
+        keyEl.addEventListener('pointerup', (e) => {
+            if (e.pointerType !== 'touch') return;
+
+            const noteName = activeTouches.get(e.pointerId);
+            if (noteName) {
+                releaseActiveKey(noteName);
+                activeTouches.delete(e.pointerId);
+            }
+        }, { passive: false });
+
+        keyEl.addEventListener('pointercancel', (e) => {
+            if (e.pointerType !== 'touch') return;
+
+            const noteName = activeTouches.get(e.pointerId);
+            if (noteName) {
+                releaseActiveKey(noteName);
+                activeTouches.delete(e.pointerId);
+            }
+        }, { passive: false });
+
+        // Release pointer capture so other keys can receive events
+        keyEl.addEventListener('gotpointercapture', (e) => {
+            keyEl.releasePointerCapture(e.pointerId);
+        });
 
         keyEl.addEventListener('mouseenter', (e) => {
             if (isPointerDown) {
@@ -443,19 +500,24 @@ export function renderKeyboard() {
         releaseActiveKey(); // Release all keys for mouse (backward compatibility)
     });
 
-    // Multitouch support: Handle all touches at the keyboard container level
+    // Touch events as fallback - handles multi-touch when pointer events don't fire
     keyboardEl.addEventListener('touchstart', (e) => {
         lastTouchTime = Date.now();
         e.preventDefault();
-        
-        // Process all touches in the event
+
+        // Resume audio context if needed
+        if (typeof Tone !== 'undefined' && Tone.context && Tone.context.state !== 'running') {
+            Tone.context.resume();
+        }
+
+        // Collect and press all touched keys
         Array.from(e.changedTouches).forEach(touch => {
             const touchId = touch.identifier;
-            const touchX = touch.clientX;
-            const touchY = touch.clientY;
-            
-            // Find the key element at this touch point
-            const keyElement = document.elementFromPoint(touchX, touchY);
+            let keyElement = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (keyElement && !keyElement.classList.contains('key')) {
+                keyElement = keyElement.closest('.key');
+            }
+
             if (keyElement && keyElement.classList.contains('key')) {
                 const noteName = g_KeyboardKeys.find(k => getNoteKeyId(k.name) === keyElement.id)?.name;
                 if (noteName) {
@@ -467,7 +529,7 @@ export function renderKeyboard() {
 
     keyboardEl.addEventListener('touchend', (e) => {
         e.preventDefault();
-        
+
         // Release keys for all ended touches
         Array.from(e.changedTouches).forEach(touch => {
             const touchId = touch.identifier;
@@ -477,8 +539,7 @@ export function renderKeyboard() {
                 activeTouches.delete(touchId);
             }
         });
-        
-        // Update isPointerDown flag (true if any touches remain)
+
         if (activeTouches.size === 0) {
             isPointerDown = false;
         }
@@ -518,15 +579,20 @@ export function renderKeyboard() {
 
     keyboardEl.addEventListener('touchmove', (e) => {
         e.preventDefault();
-        
+
         // Handle all active touches
         Array.from(e.touches).forEach(touch => {
             const touchId = touch.identifier;
             const touchX = touch.clientX;
             const touchY = touch.clientY;
-            
+
             // Find the key element at this touch point
-            const keyElement = document.elementFromPoint(touchX, touchY);
+            // Use closest('.key') to handle touches on child elements (labels)
+            let keyElement = document.elementFromPoint(touchX, touchY);
+            if (keyElement && !keyElement.classList.contains('key')) {
+                keyElement = keyElement.closest('.key');
+            }
+
             if (keyElement && keyElement.classList.contains('key')) {
                 const newNoteName = g_KeyboardKeys.find(k => getNoteKeyId(k.name) === keyElement.id)?.name;
                 if (newNoteName) {

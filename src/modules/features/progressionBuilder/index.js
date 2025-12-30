@@ -64,6 +64,7 @@ import {
 // Rendering Functions
 import {
     renderProgressionDisplay,
+    flushPendingRenders,
     renderProgressionDisplayForBuilder,
     renderProgressionControls,
     renderChordStaffNotation,
@@ -242,6 +243,7 @@ export {
 // Rendering
 export {
     renderProgressionDisplay,
+    flushPendingRenders,
     renderProgressionDisplayForBuilder,
     renderProgressionControls,
     renderChordStaffNotation,
@@ -411,6 +413,7 @@ if (typeof window !== 'undefined') {
 
     // Rendering
     window.renderProgressionDisplay = renderProgressionDisplay;
+    window.flushPendingRenders = flushPendingRenders;
     window.toggleAllStaffNotation = toggleAllStaffNotation;
     window.createCompactViewModeToggle = createCompactViewModeToggle;
     window.createDetailedCardHTML = createDetailedCardHTML;

@@ -101,6 +101,133 @@ import { highlightTrainer } from '../../ui/keyboard.js';
  */
 const staffNotationStates = new Map();
 
+// ============================================================================
+// DEBOUNCED RENDER SYSTEM
+// ============================================================================
+
+/**
+ * Pending render requests - tracks which containers need rendering
+ * Format: { containerId: { syncBothTabs: boolean, timestamp: number } }
+ */
+const pendingRenders = new Map();
+
+/**
+ * Debounce timer ID
+ */
+let renderDebounceTimer = null;
+
+/**
+ * Debounce delay in milliseconds
+ * Short enough to feel responsive, long enough to coalesce rapid calls
+ */
+const RENDER_DEBOUNCE_MS = 16; // ~1 frame at 60fps
+
+/**
+ * Debug mode for render debouncing
+ * Set window.DEBUG_RENDER_DEBOUNCE = true in console to enable
+ */
+const isDebugMode = () => typeof window !== 'undefined' && window.DEBUG_RENDER_DEBOUNCE;
+
+/**
+ * Execute all pending renders in a single batch
+ * Optimizes by rendering each container only once
+ */
+function executePendingRenders() {
+    if (pendingRenders.size === 0) return;
+
+    // Copy and clear pending renders to avoid re-entrancy issues
+    const toRender = new Map(pendingRenders);
+    pendingRenders.clear();
+    renderDebounceTimer = null;
+
+    if (isDebugMode()) {
+        console.log(`[RenderDebounce] Executing batch render for ${toRender.size} container(s):`, Array.from(toRender.keys()));
+    }
+
+    // Determine which containers to render
+    const containers = Array.from(toRender.keys());
+
+    // If both main containers are pending, render them efficiently
+    const hasProgViz = containers.includes('progression-visualization');
+    const hasMelodyViz = containers.includes('melody-progression-visualization');
+    const hasBuilderViz = containers.includes('builder-progression-visualization');
+
+    // Render each unique container once
+    // Use syncBothTabs=false to prevent recursive renders
+    if (hasProgViz) {
+        renderProgressionDisplayImmediate('progression-visualization', false);
+    }
+    if (hasMelodyViz) {
+        renderProgressionDisplayImmediate('melody-progression-visualization', false);
+    }
+    if (hasBuilderViz) {
+        renderProgressionDisplayImmediate('builder-progression-visualization', false);
+    }
+
+    // Handle any other containers
+    containers.forEach(containerId => {
+        if (containerId !== 'progression-visualization' &&
+            containerId !== 'melody-progression-visualization' &&
+            containerId !== 'builder-progression-visualization') {
+            renderProgressionDisplayImmediate(containerId, false);
+        }
+    });
+}
+
+/**
+ * Schedule a render request with debouncing
+ * Multiple rapid calls are coalesced into a single render
+ * @param {string} containerId - Container to render
+ * @param {boolean} syncBothTabs - Whether to sync both tabs (adds other container to queue)
+ */
+function scheduleRender(containerId, syncBothTabs) {
+    const wasEmpty = pendingRenders.size === 0;
+
+    // Add this container to pending renders
+    pendingRenders.set(containerId, {
+        syncBothTabs,
+        timestamp: Date.now()
+    });
+
+    if (isDebugMode()) {
+        console.log(`[RenderDebounce] Scheduled: ${containerId} (syncBothTabs=${syncBothTabs}), pending=${pendingRenders.size}`);
+    }
+
+    // If syncBothTabs is true, also queue the other main container
+    if (syncBothTabs) {
+        if (containerId === 'progression-visualization') {
+            pendingRenders.set('melody-progression-visualization', {
+                syncBothTabs: false,
+                timestamp: Date.now()
+            });
+        } else if (containerId === 'melody-progression-visualization') {
+            pendingRenders.set('progression-visualization', {
+                syncBothTabs: false,
+                timestamp: Date.now()
+            });
+        }
+    }
+
+    // Clear existing timer and set a new one
+    if (renderDebounceTimer) {
+        clearTimeout(renderDebounceTimer);
+    }
+
+    renderDebounceTimer = setTimeout(executePendingRenders, RENDER_DEBOUNCE_MS);
+}
+
+/**
+ * Force immediate execution of any pending renders
+ * Use when you need renders to complete before continuing
+ */
+export function flushPendingRenders() {
+    if (renderDebounceTimer) {
+        clearTimeout(renderDebounceTimer);
+        renderDebounceTimer = null;
+    }
+    executePendingRenders();
+}
+
 // Note: expandedChords state is managed in ProgressionController.js
 // Use isChordExpanded(index) to check if a chord is expanded
 
@@ -1867,11 +1994,31 @@ function getMaxInversionForLhType(lhType) {
 }
 
 /**
- * Render progression display (main exported function)
+ * Render progression display (debounced public API)
+ * Multiple rapid calls are coalesced into a single render for better performance.
+ * Use flushPendingRenders() if you need to ensure renders complete immediately,
+ * or pass immediate=true to bypass debouncing entirely.
+ * @param {string} containerId - Container ID
+ * @param {boolean} syncBothTabs - Whether to sync both tabs
+ * @param {boolean} immediate - If true, bypass debouncing and render immediately
+ */
+export function renderProgressionDisplay(containerId = 'progression-visualization', syncBothTabs = true, immediate = false) {
+    if (immediate) {
+        // Flush any pending renders first to avoid stale state
+        flushPendingRenders();
+        renderProgressionDisplayImmediate(containerId, syncBothTabs);
+    } else {
+        scheduleRender(containerId, syncBothTabs);
+    }
+}
+
+/**
+ * Render progression display immediately (bypasses debouncing)
+ * This is the actual rendering implementation.
  * @param {string} containerId - Container ID
  * @param {boolean} syncBothTabs - Whether to sync both tabs
  */
-export function renderProgressionDisplay(containerId = 'progression-visualization', syncBothTabs = true) {
+function renderProgressionDisplayImmediate(containerId = 'progression-visualization', syncBothTabs = true) {
     // Render progression cards to the specified container
 
     // Capture staff notation states before clearing DOM (always capture from both tabs)
@@ -3283,10 +3430,11 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
                     }
 
                     // Re-render the other tab to keep them in sync
+                    // Use immediate render to avoid re-debouncing during drag-drop
                     const otherContainerId = containerId === 'progression-visualization'
                         ? 'melody-progression-visualization'
                         : 'progression-visualization';
-                    renderProgressionDisplay(otherContainerId, false);
+                    renderProgressionDisplayImmediate(otherContainerId, false);
 
                     // Update grand staff notation (chord order affects rendering)
                     // Always update regardless of active tab so it's ready when user switches

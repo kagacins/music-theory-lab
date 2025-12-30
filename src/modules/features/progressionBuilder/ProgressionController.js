@@ -317,15 +317,12 @@ export function deselectSectionInView(sectionId) {
  * @param {Array<string>} order - Array of section IDs in desired order
  */
 export function setUserSectionOrder(order) {
-    console.log('[Section Order] Setting order:', order);
     userSectionOrder = order;
     // Persist to localStorage
     if (order && order.length > 0) {
         localStorage.setItem(SECTION_ORDER_STORAGE_KEY, JSON.stringify(order));
-        console.log('[Section Order] Saved to localStorage');
     } else {
         localStorage.removeItem(SECTION_ORDER_STORAGE_KEY);
-        console.log('[Section Order] Cleared from localStorage');
     }
 }
 
@@ -340,14 +337,12 @@ export function getUserSectionOrder() {
         if (stored) {
             try {
                 userSectionOrder = JSON.parse(stored);
-                console.log('[Section Order] Loaded from localStorage:', userSectionOrder);
             } catch (e) {
                 console.warn('Failed to parse stored section order:', e);
                 userSectionOrder = null;
             }
         }
     }
-    console.log('[Section Order] Getting order:', userSectionOrder);
     return userSectionOrder;
 }
 
