@@ -919,6 +919,17 @@ export class CompositionState {
         this.trebleBlockSequence = new BuildingBlockSequence();
 
         // ====================================================================
+        // EDITING STATE - Track which staff/block is being edited
+        // ====================================================================
+        // This state helps provide visual feedback about what's being edited,
+        // especially for bass clef where each chord has its own isolated block.
+        this.editingState = {
+            activeStaff: 'treble',          // 'treble' | 'bass' - which staff is being edited
+            activeBassBlockIndex: null,     // Index of the bass block currently being edited (null if none/treble)
+            staffSelectionMode: 'auto',     // 'treble' | 'bass' | 'auto' - how to determine target staff
+        };
+
+        // ====================================================================
         // SONG SECTIONS - Grouping chords into song structure
         // ====================================================================
         // Sections allow organizing chord cards into named groups like
@@ -1790,6 +1801,7 @@ export class CompositionState {
                 chordNotes.get(noteChordIndex).push({
                     pitches: pitchesToSave,
                     duration: note.duration || '4n',
+                    dotted: note.dotted || false,  // CRITICAL: Preserve dotted flag for undo/redo
                     beat: beatInChord,
                     isRest: note.isRest || note.type === 'rest',
                     // Carry forward all musical attributes
@@ -1823,7 +1835,6 @@ export class CompositionState {
             if (!block) {
                 continue;
             }
-
 
             // Rebuild the block's units from these notes
             // First, clear the block by reinitializing with empty pitches
@@ -2847,6 +2858,504 @@ export class CompositionState {
         this.renderTrebleBlocksToMeasures();
     }
 
+    // ========================================================================
+    // BASS BLOCK SHIFT OPERATIONS - Isolated Per-Chord Block Editing
+    // ========================================================================
+    // Unlike treble (single continuous block), bass has one block per chord.
+    // Shift operations are ISOLATED to the active chord's block - they cannot
+    // push content into adjacent chord blocks. This prevents cross-chord corruption.
+    // ========================================================================
+
+    /**
+     * Get the bass block that contains the given absolute beat position
+     * @param {number} absoluteBeat - Beat position from start of composition
+     * @returns {Object|null} - { chordIndex, block, beatInBlock, remainingBeats, totalBeats, startUnit, totalUnits }
+     */
+    getBassBlockForBeat(absoluteBeat) {
+        if (this.bassBlockSequence.blocks.length === 0) {
+            return null;
+        }
+
+        let currentBeat = 0;
+
+        for (let i = 0; i < this.bassBlockSequence.blocks.length; i++) {
+            const block = this.bassBlockSequence.blocks[i];
+            const blockEndBeat = currentBeat + block.beats;
+
+            if (absoluteBeat >= currentBeat && absoluteBeat < blockEndBeat) {
+                const beatInBlock = absoluteBeat - currentBeat;
+                return {
+                    chordIndex: i,
+                    block: block,
+                    beatInBlock: beatInBlock,
+                    remainingBeats: blockEndBeat - absoluteBeat,
+                    totalBeats: block.beats,
+                    startUnit: Math.round(beatInBlock * UNITS_PER_BEAT),
+                    totalUnits: block.beats * UNITS_PER_BEAT,
+                    blockStartBeat: currentBeat,
+                };
+            }
+
+            currentBeat = blockEndBeat;
+        }
+
+        return null; // Beat is past end of all blocks
+    }
+
+    /**
+     * Get the bass block for a specific chord index
+     * @param {number} chordIndex - The chord index (0-based)
+     * @returns {Object|null} - { chordIndex, block, totalBeats, totalUnits, blockStartBeat }
+     */
+    getBassBlockByIndex(chordIndex) {
+        if (!this.bassBlockSequence.blocks[chordIndex]) {
+            return null;
+        }
+
+        const block = this.bassBlockSequence.blocks[chordIndex];
+
+        // Calculate the start beat of this block
+        let blockStartBeat = 0;
+        for (let i = 0; i < chordIndex; i++) {
+            blockStartBeat += this.bassBlockSequence.blocks[i].beats;
+        }
+
+        return {
+            chordIndex,
+            block,
+            totalBeats: block.beats,
+            totalUnits: block.beats * UNITS_PER_BEAT,
+            blockStartBeat,
+        };
+    }
+
+    /**
+     * Check if a bass shift operation would overflow the block boundary
+     * @param {number} chordIndex - Which bass block (0-indexed)
+     * @param {number} insertUnit - Position within block to insert
+     * @param {number} durationUnits - Duration of the new note in units
+     * @returns {Object} - { overflow: boolean, contentEndUnit, maxDuration, truncatedUnits }
+     */
+    checkBassShiftOverflow(chordIndex, insertUnit, durationUnits) {
+        const block = this.bassBlockSequence.blocks[chordIndex];
+        if (!block) {
+            return { overflow: true, contentEndUnit: 0, maxDuration: 0, truncatedUnits: durationUnits };
+        }
+
+        const totalUnits = block.beats * UNITS_PER_BEAT;
+
+        // Find the content end - position after the last actual non-rest note
+        const notes = block.getNotes();
+        const actualNotes = notes.filter(n => !n.isRest);
+        let contentEndUnit = 0;
+        for (const note of actualNotes) {
+            const noteEnd = note.startUnit + note.durationUnits;
+            if (noteEnd > contentEndUnit) {
+                contentEndUnit = noteEnd;
+            }
+        }
+
+        // Calculate where content would end after the shift
+        const shiftedContentEnd = Math.max(contentEndUnit, insertUnit) + durationUnits;
+
+        // Check if shifted content would overflow the block
+        const overflow = shiftedContentEnd > totalUnits;
+        const maxDuration = overflow ? Math.max(0, totalUnits - insertUnit) : durationUnits;
+
+        return {
+            overflow,
+            contentEndUnit,
+            maxDuration,
+            truncatedUnits: durationUnits - maxDuration,
+        };
+    }
+
+    /**
+     * Insert a bass note with shift within the specified chord block (ISOLATED)
+     *
+     * This is the bass equivalent of insertTrebleNoteWithShift, but with
+     * BLOCK ISOLATION: the shift only affects notes within this chord's block.
+     * Notes CANNOT be pushed into adjacent chord blocks.
+     *
+     * When existing notes are shifted and would overflow the block boundary,
+     * they are TRUNCATED to fit (not the new note). This preserves as much of
+     * the shifted note's duration as possible within the block.
+     *
+     * @param {number} chordIndex - Which bass block (0-indexed)
+     * @param {number} unitPosition - Position within block (0 to totalUnits-1)
+     * @param {number} durationUnits - Duration in units (48 units per beat)
+     * @param {string[]} pitches - Array of pitch strings e.g. ['C2', 'G2']
+     * @param {Object} options - Additional note properties (articulation, accidental, etc.)
+     * @returns {Object} - { success: boolean, truncated: boolean, message: string }
+     */
+    insertBassNoteWithShift(chordIndex, unitPosition, durationUnits, pitches, options = {}) {
+        console.log('[SHIFT-INSERT-BASS] insertBassNoteWithShift called:', { chordIndex, unitPosition, durationUnits, pitches, options });
+
+        const block = this.bassBlockSequence.blocks[chordIndex];
+        if (!block) {
+            console.warn('[SHIFT-INSERT-BASS] Invalid block index:', chordIndex);
+            return { success: false, truncated: false, message: 'Invalid block index' };
+        }
+
+        // Sync measures to blocks first to ensure we have the latest state
+        this.syncMeasuresToBuildingBlocks();
+
+        const totalUnits = block.beats * UNITS_PER_BEAT;
+
+        // Find the content end within this block
+        const notesBefore = block.getNotes();
+        const actualNotes = notesBefore.filter(n => !n.isRest);
+        let contentEndUnit = 0;
+        for (const note of actualNotes) {
+            const noteEnd = note.startUnit + note.durationUnits;
+            if (noteEnd > contentEndUnit) {
+                contentEndUnit = noteEnd;
+            }
+        }
+
+        console.log(`[insertBassNoteWithShift] Block ${chordIndex}: ${notesBefore.length} notes (${actualNotes.length} non-rest), contentEndUnit=${contentEndUnit}, totalUnits=${totalUnits}`);
+
+        let truncated = false;
+        let message = '';
+
+        if (unitPosition >= contentEndUnit) {
+            // Inserting at or after content end - no shift needed, but check bounds
+            let actualDuration = durationUnits;
+            const requiredUnits = unitPosition + durationUnits;
+            if (requiredUnits > totalUnits) {
+                // Would overflow - truncate NEW note to fit
+                actualDuration = Math.max(0, totalUnits - unitPosition);
+                truncated = true;
+                message = `Note truncated from ${durationUnits} to ${actualDuration} units to fit block`;
+                console.log(`[insertBassNoteWithShift] ${message}`);
+            }
+
+            if (actualDuration > 0) {
+                block.setNote(unitPosition, actualDuration, pitches, options);
+            }
+        } else {
+            // Inserting in middle of content - need to shift existing notes
+            // The NEW note keeps its full duration; EXISTING notes are truncated if they overflow
+
+            // Check if there's room to insert (at least 1 unit of the new note must fit)
+            if (unitPosition + durationUnits > totalUnits) {
+                // Even the new note wouldn't fit - truncate it
+                const availableForNew = totalUnits - unitPosition;
+                if (availableForNew <= 0) {
+                    console.log('[insertBassNoteWithShift] No room to insert at this position');
+                    return {
+                        success: false,
+                        truncated: false,
+                        message: 'No room to insert at this position.',
+                    };
+                }
+                durationUnits = availableForNew;
+                truncated = true;
+                message = `New note truncated to ${durationUnits} units to fit block`;
+            }
+
+            console.log(`[insertBassNoteWithShift] Shifting content from unit ${unitPosition} forward by ${durationUnits}`);
+
+            // Calculate how much of the shifted content will fit
+            // Content currently at [unitPosition, contentEndUnit) will move to [unitPosition + durationUnits, contentEndUnit + durationUnits)
+            // But we can only keep content up to totalUnits
+            const shiftedContentStart = unitPosition + durationUnits;
+            const shiftedContentEnd = contentEndUnit + durationUnits;
+            const truncatedContentEnd = Math.min(shiftedContentEnd, totalUnits);
+
+            // How many units of existing content will survive after shift?
+            const survivingUnits = truncatedContentEnd - shiftedContentStart;
+            const truncatedUnits = shiftedContentEnd - truncatedContentEnd;
+
+            console.log(`[insertBassNoteWithShift] shiftedContentStart=${shiftedContentStart}, truncatedContentEnd=${truncatedContentEnd}, survivingUnits=${survivingUnits}, truncatedUnits=${truncatedUnits}`);
+
+            if (truncatedUnits > 0) {
+                truncated = true;
+                message = `Shifted content truncated by ${truncatedUnits} units at block boundary`;
+                console.log(`[insertBassNoteWithShift] ${message}`);
+            }
+
+            // Step 1: Shift existing content forward (work backwards to avoid overwriting)
+            // We copy from source range [unitPosition, unitPosition + survivingUnits)
+            // to target range [shiftedContentStart, truncatedContentEnd)
+            console.log(`[insertBassNoteWithShift] Copying ${survivingUnits} units: source [${unitPosition}, ${unitPosition + survivingUnits}) -> target [${shiftedContentStart}, ${truncatedContentEnd})`);
+
+            let copiedCount = 0;
+            for (let targetIdx = truncatedContentEnd - 1; targetIdx >= shiftedContentStart; targetIdx--) {
+                const sourceIdx = targetIdx - durationUnits;
+                if (sourceIdx >= unitPosition && sourceIdx < contentEndUnit) {
+                    const sourceUnit = block.units[sourceIdx];
+                    if (!sourceUnit) {
+                        console.warn(`[insertBassNoteWithShift] Source unit ${sourceIdx} is undefined!`);
+                        continue;
+                    }
+
+                    block.units[targetIdx] = sourceUnit.clone();
+                    copiedCount++;
+
+                    // Adjust parentIndex if it pointed to something in the original region
+                    if (block.units[targetIdx].parentIndex !== null && block.units[targetIdx].parentIndex >= unitPosition) {
+                        const newParentIdx = block.units[targetIdx].parentIndex + durationUnits;
+                        // Only update if the new parent is still within bounds
+                        if (newParentIdx < totalUnits) {
+                            block.units[targetIdx].parentIndex = newParentIdx;
+                        } else {
+                            // Parent is now out of bounds - this unit becomes a note start
+                            // But preserve the pitches (this is part of a truncated note)
+                            block.units[targetIdx].parentIndex = null;
+                        }
+                    }
+                }
+            }
+            console.log(`[insertBassNoteWithShift] Copied ${copiedCount} units`);
+
+            // Debug: Check what we have after shifting
+            const notesAfterShift = block.getNotes();
+            console.log(`[insertBassNoteWithShift] After shift (before insert), block has ${notesAfterShift.length} notes:`,
+                notesAfterShift.map(n => `${n.isRest ? 'REST' : n.pitches.join(',')} at ${n.startUnit} (${n.durationUnits} units)`));
+
+            // Step 2: Insert the new note at the insertion position
+            // This will overwrite units [unitPosition, unitPosition + durationUnits)
+            console.log(`[insertBassNoteWithShift] Now inserting new note at units [${unitPosition}, ${unitPosition + durationUnits})`);
+            block.setNote(unitPosition, durationUnits, pitches, options);
+
+            // Debug: Check final state
+            const notesAfterInsert = block.getNotes();
+            console.log(`[insertBassNoteWithShift] After insert, block has ${notesAfterInsert.length} notes:`,
+                notesAfterInsert.map(n => `${n.isRest ? 'REST' : n.pitches.join(',')} at ${n.startUnit} (${n.durationUnits} units)`));
+        }
+
+        // Mark as manually edited
+        block.autoGenerated = false;
+
+        // Re-render to measures
+        this.renderBassBlocksToMeasures();
+
+        // Debug: Verify block state after render
+        const notesAfterRender = block.getNotes();
+        console.log(`[insertBassNoteWithShift] After renderBassBlocksToMeasures, block still has ${notesAfterRender.length} notes:`,
+            notesAfterRender.map(n => `${n.isRest ? 'REST' : n.pitches.join(',')} at ${n.startUnit} (${n.durationUnits} units)`));
+
+        // Also mark the measure as edited
+        const blockInfo = this.getBassBlockByIndex(chordIndex);
+        if (blockInfo) {
+            const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
+            const measureIndex = Math.floor(blockInfo.blockStartBeat / beatsPerMeasure);
+            if (this.measures[measureIndex]) {
+                this.measures[measureIndex].notation.bass.autoGenerated = false;
+                this.saveEditedBassNotesForMeasure(measureIndex);
+            }
+        }
+
+        const notesAfter = block.getNotes();
+        console.log(`[insertBassNoteWithShift] AFTER: ${notesAfter.length} notes`);
+
+        return {
+            success: true,
+            truncated,
+            message,
+        };
+    }
+
+    /**
+     * Delete a bass note with optional shift within the specified chord block (ISOLATED)
+     *
+     * If shiftBack is true, downstream notes within the same block are pulled back.
+     * Notes from adjacent blocks are NOT affected.
+     *
+     * @param {number} chordIndex - Which bass block (0-indexed)
+     * @param {number} noteStartUnit - Start unit of the note to delete (relative to block start)
+     * @param {boolean} shiftBack - If true, shift downstream notes back to fill the gap
+     * @returns {Object} - { success: boolean, message: string }
+     */
+    deleteBassNoteWithShift(chordIndex, noteStartUnit, shiftBack = false) {
+        console.log('[SHIFT-DELETE-BASS] deleteBassNoteWithShift called:', { chordIndex, noteStartUnit, shiftBack });
+
+        const block = this.bassBlockSequence.blocks[chordIndex];
+        if (!block) {
+            console.warn('[SHIFT-DELETE-BASS] Invalid block index:', chordIndex);
+            return { success: false, message: 'Invalid block index' };
+        }
+
+        // Sync measures to blocks first
+        this.syncMeasuresToBuildingBlocks();
+
+        const notes = block.getNotes();
+
+        // Find the note at this position
+        const noteToDelete = notes.find(n => n.startUnit === noteStartUnit);
+        if (!noteToDelete) {
+            console.warn('[SHIFT-DELETE-BASS] No note found at position:', noteStartUnit);
+            return { success: false, message: 'No note found at position' };
+        }
+
+        const deleteDurationUnits = noteToDelete.durationUnits;
+        console.log(`[deleteBassNoteWithShift] Deleting note at unit ${noteStartUnit}, duration ${deleteDurationUnits}`);
+
+        if (shiftBack) {
+            // Shift downstream notes back to fill the gap (within block only)
+            const shiftStart = noteStartUnit + deleteDurationUnits;
+            const totalUnits = block.beats * UNITS_PER_BEAT;
+
+            for (let i = noteStartUnit; i < totalUnits - deleteDurationUnits; i++) {
+                const sourceIndex = i + deleteDurationUnits;
+                if (sourceIndex < totalUnits) {
+                    const sourceUnit = block.units[sourceIndex];
+                    block.units[i] = sourceUnit.clone();
+
+                    // Adjust parentIndex if it pointed to something in the shifted region
+                    if (block.units[i].parentIndex !== null && block.units[i].parentIndex >= shiftStart) {
+                        block.units[i].parentIndex -= deleteDurationUnits;
+                    }
+                }
+            }
+
+            // Fill the end with rests
+            const restStart = totalUnits - deleteDurationUnits;
+            if (restStart < totalUnits) {
+                block.units[restStart] = new Unit({
+                    pitches: [],
+                    parentIndex: null,
+                });
+                for (let i = restStart + 1; i < totalUnits; i++) {
+                    block.units[i] = new Unit({
+                        pitches: [],
+                        parentIndex: restStart,
+                    });
+                }
+            }
+        } else {
+            // Replace with rest (no shift)
+            block.setRest(noteStartUnit, deleteDurationUnits);
+        }
+
+        // Mark as manually edited
+        block.autoGenerated = false;
+
+        // Re-render to measures
+        this.renderBassBlocksToMeasures();
+
+        // Mark measure as edited
+        const blockInfo = this.getBassBlockByIndex(chordIndex);
+        if (blockInfo) {
+            const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
+            const measureIndex = Math.floor(blockInfo.blockStartBeat / beatsPerMeasure);
+            if (this.measures[measureIndex]) {
+                this.measures[measureIndex].notation.bass.autoGenerated = false;
+                this.saveEditedBassNotesForMeasure(measureIndex);
+            }
+        }
+
+        console.log('[deleteBassNoteWithShift] Delete complete');
+        return { success: true, message: '' };
+    }
+
+    /**
+     * Reset a bass block to its auto-generated default based on chord settings
+     * This allows users to "undo" manual edits and restore the default bass voicing.
+     *
+     * @param {number} chordIndex - Which bass block to reset
+     * @returns {boolean} - Success
+     */
+    resetBassBlockToDefault(chordIndex) {
+        console.log('[BASS-RESET] resetBassBlockToDefault called for chord:', chordIndex);
+
+        const block = this.bassBlockSequence.blocks[chordIndex];
+        if (!block) {
+            console.warn('[BASS-RESET] Invalid block index:', chordIndex);
+            return false;
+        }
+
+        // Get the chord data
+        const progressionData = this.exportToProgressionData();
+        const chord = progressionData[chordIndex];
+        if (!chord) {
+            console.warn('[BASS-RESET] No chord data for index:', chordIndex);
+            return false;
+        }
+
+        // Clear all units in the block
+        const totalUnits = block.beats * UNITS_PER_BEAT;
+        for (let i = 0; i < totalUnits; i++) {
+            block.units[i] = new Unit({
+                pitches: [],
+                parentIndex: i === 0 ? null : 0,
+            });
+        }
+
+        // Generate default bass notes based on chord settings
+        // Use lhNotes if available, otherwise generate from chord
+        const lhType = chord.lhType || 'off';
+        let pitches = [];
+
+        if (chord.lhNotes && chord.lhNotes.length > 0) {
+            pitches = [...chord.lhNotes];
+        } else if (lhType !== 'off' && chord.notes && chord.notes.length > 0) {
+            // Generate based on lhType setting
+            const rootNote = chord.notes[0];
+            const fifthNote = chord.notes.length > 2 ? chord.notes[2] : chord.notes[1];
+
+            switch (lhType) {
+                case 'root':
+                    pitches = [this._shiftPitchOctave(rootNote, -1)];
+                    break;
+                case 'fifth':
+                    pitches = [
+                        this._shiftPitchOctave(rootNote, -1),
+                        this._shiftPitchOctave(fifthNote, -1),
+                    ];
+                    break;
+                case 'octave':
+                    pitches = [
+                        this._shiftPitchOctave(rootNote, -2),
+                        this._shiftPitchOctave(rootNote, -1),
+                    ];
+                    break;
+                case 'chord':
+                    pitches = chord.notes.map(n => this._shiftPitchOctave(n, -1));
+                    break;
+                default:
+                    pitches = [];
+            }
+        }
+
+        // Set the note spanning the entire block
+        if (pitches.length > 0) {
+            block.setNote(0, totalUnits, pitches, {});
+        }
+
+        // Mark as auto-generated
+        block.autoGenerated = true;
+
+        // Re-render to measures
+        this.renderBassBlocksToMeasures();
+
+        // Clear the edited flag on the measure
+        const blockInfo = this.getBassBlockByIndex(chordIndex);
+        if (blockInfo) {
+            const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.metadata.timeSignature);
+            const measureIndex = Math.floor(blockInfo.blockStartBeat / beatsPerMeasure);
+            if (this.measures[measureIndex]) {
+                this.measures[measureIndex].notation.bass.autoGenerated = true;
+            }
+        }
+
+        console.log('[BASS-RESET] Reset complete for chord', chordIndex);
+        return true;
+    }
+
+    /**
+     * Helper: Shift a pitch by octaves
+     * @private
+     */
+    _shiftPitchOctave(pitch, octaveShift) {
+        const match = pitch.match(/^([A-Ga-g][#b]?)(\d+)$/);
+        if (!match) return pitch;
+        const noteName = match[1];
+        const octave = parseInt(match[2], 10) + octaveShift;
+        return `${noteName}${octave}`;
+    }
+
     /**
      * Clear treble notes in a beat range by replacing them with rests
      * @param {number} startBeat - Starting beat (absolute position from beginning)
@@ -3842,6 +4351,139 @@ export class CompositionState {
         const voiceIndex = Math.max(0, Math.min(1, voiceNumber - 1));
         this.cursor.bassVoice = voiceIndex;
         this.events.emit('activeBassVoiceChanged', voiceNumber);
+    }
+
+    // ========================================================================
+    // Editing State Methods - Track which staff/block is being edited
+    // ========================================================================
+
+    /**
+     * Get the currently active staff ('treble' or 'bass')
+     * @returns {string} - 'treble' or 'bass'
+     */
+    getActiveStaff() {
+        return this.editingState.activeStaff || 'treble';
+    }
+
+    /**
+     * Set the active staff being edited
+     * @param {string} staff - 'treble' or 'bass'
+     */
+    setActiveStaff(staff) {
+        const validStaff = staff === 'bass' ? 'bass' : 'treble';
+        const oldStaff = this.editingState.activeStaff;
+        this.editingState.activeStaff = validStaff;
+
+        // If switching away from bass, clear the active bass block
+        if (validStaff === 'treble') {
+            this.editingState.activeBassBlockIndex = null;
+        }
+
+        if (oldStaff !== validStaff) {
+            this.events.emit('activeStaffChanged', validStaff);
+        }
+    }
+
+    /**
+     * Get the index of the currently active bass block (null if treble is active)
+     * @returns {number|null} - Bass block index or null
+     */
+    getActiveBassBlockIndex() {
+        return this.editingState.activeBassBlockIndex;
+    }
+
+    /**
+     * Set the active bass block index (also sets active staff to 'bass')
+     * @param {number|null} blockIndex - Bass block index or null to clear
+     */
+    setActiveBassBlockIndex(blockIndex) {
+        const oldIndex = this.editingState.activeBassBlockIndex;
+
+        if (blockIndex !== null && blockIndex !== undefined) {
+            // Validate the block index
+            const maxIndex = this.bassBlockSequence?.blocks?.length || 0;
+            if (blockIndex >= 0 && blockIndex < maxIndex) {
+                this.editingState.activeBassBlockIndex = blockIndex;
+                this.editingState.activeStaff = 'bass';
+            }
+        } else {
+            this.editingState.activeBassBlockIndex = null;
+        }
+
+        if (oldIndex !== this.editingState.activeBassBlockIndex) {
+            this.events.emit('activeBassBlockChanged', this.editingState.activeBassBlockIndex);
+        }
+    }
+
+    /**
+     * Get the staff selection mode ('treble', 'bass', or 'auto')
+     * @returns {string} - Selection mode
+     */
+    getStaffSelectionMode() {
+        return this.editingState.staffSelectionMode || 'auto';
+    }
+
+    /**
+     * Set the staff selection mode
+     * @param {string} mode - 'treble' | 'bass' | 'auto'
+     */
+    setStaffSelectionMode(mode) {
+        const validMode = ['treble', 'bass', 'auto'].includes(mode) ? mode : 'auto';
+        this.editingState.staffSelectionMode = validMode;
+        this.events.emit('staffSelectionModeChanged', validMode);
+    }
+
+    /**
+     * Update the active bass block based on cursor position (absolute beat)
+     * This derives the block index from the cursor's current position
+     * @param {number} absoluteBeat - Absolute beat position in the composition
+     */
+    updateActiveBassBlockFromBeat(absoluteBeat) {
+        const blockInfo = this.getBassBlockForBeat(absoluteBeat);
+        if (blockInfo) {
+            this.setActiveBassBlockIndex(blockInfo.chordIndex);
+        } else {
+            this.setActiveBassBlockIndex(null);
+        }
+    }
+
+    /**
+     * Update the active bass block based on measure and beat position
+     * @param {number} measureIndex - Measure index
+     * @param {number} beatInMeasure - Beat position within the measure
+     */
+    updateActiveBassBlockFromPosition(measureIndex, beatInMeasure) {
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(
+            this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE
+        );
+        const absoluteBeat = measureIndex * beatsPerMeasure + beatInMeasure;
+        this.updateActiveBassBlockFromBeat(absoluteBeat);
+    }
+
+    /**
+     * Get info about the currently active bass block
+     * @returns {Object|null} - { chordIndex, block, chord, remainingBeats, totalBeats } or null
+     */
+    getActiveBassBlockInfo() {
+        const blockIndex = this.editingState.activeBassBlockIndex;
+        if (blockIndex === null || blockIndex === undefined) {
+            return null;
+        }
+
+        const block = this.bassBlockSequence?.blocks?.[blockIndex];
+        if (!block) {
+            return null;
+        }
+
+        const chord = this.storedProgressionData?.[blockIndex] || null;
+
+        return {
+            chordIndex: blockIndex,
+            block: block,
+            chord: chord,
+            totalBeats: block.beats,
+            chordName: chord ? `${chord.root}${chord.type === 'Major' ? '' : chord.type}` : `Block ${blockIndex}`,
+        };
     }
 
     /**

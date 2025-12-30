@@ -139,6 +139,17 @@ import {
 
 
 /**
+ * Helper function to update the toolbar editing context indicator
+ * Uses the toolbar's refreshEditingContext method to gather and display context
+ * @param {Object} compositionState - The composition state instance (unused, kept for API compatibility)
+ */
+function updateToolbarEditingContext(compositionState) {
+    const composer = window.getNotationComposer?.();
+    if (!composer?.toolbar?.refreshEditingContext) return;
+    composer.toolbar.refreshEditingContext();
+}
+
+/**
  * Initialize all application modules
  * This function orchestrates the initialization of all feature modules, UI components,
  * and teaching systems in the correct order.
@@ -259,6 +270,27 @@ export async function initializeModules() {
         compositionState.events.on('progressionSynced', () => invalidateProgressionDataCache());
         compositionState.events.on('progressionImported', () => invalidateProgressionDataCache());
         compositionState.events.on('cleared', () => invalidateProgressionDataCache());
+
+        // Sync chord card highlight and toolbar context indicator with active bass block selection
+        compositionState.events.on('activeBassBlockChanged', (blockIndex) => {
+            if (blockIndex !== null && blockIndex >= 0) {
+                window.highlightChordCard?.(blockIndex);
+            } else {
+                window.unhighlightAllChordCards?.();
+            }
+            // Update toolbar with full context
+            updateToolbarEditingContext(compositionState);
+        });
+
+        // Update toolbar when staff selection mode changes
+        compositionState.events.on('activeStaffChanged', () => {
+            updateToolbarEditingContext(compositionState);
+        });
+
+        // Update toolbar when selection changes
+        compositionState.events.on('selectionChanged', () => {
+            updateToolbarEditingContext(compositionState);
+        });
     }
 
     // ===========================

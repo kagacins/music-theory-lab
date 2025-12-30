@@ -2944,6 +2944,9 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     hideCueRests = false,           // If true, cue rests become GhostNotes (invisible)
     // Multi-page support: offset for global measure index (0-based)
     globalMeasureOffset = 0,     // First measure's global index (for page 2, this would be 8)
+    // Phase 2 Bass Block Isolation: active block highlighting
+    activeBassBlockIndex = -1,   // Index of the active bass block for highlighting (-1 = none)
+    chordSegments = [],          // Array of chord segments for block boundary visualization
   } = options;
 
   // Calculate dimensions
@@ -3234,10 +3237,15 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
 
       const ctx = context.context2D || context.vexFlowCanvasContext;
 
+      // Check if this is the active bass block - use highlighted styling
+      const isActiveBlock = chordIndex >= 0 && chordIndex === activeBassBlockIndex;
+      const bracketColor = isActiveBlock ? '#6366f1' : color;  // Indigo when active
+      const strokeWidth = isActiveBlock ? '3' : '2';
+
       if (context.svg) {
         // SVG rendering
         const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        group.setAttribute('class', 'chord-bracket-group');
+        group.setAttribute('class', 'chord-bracket-group' + (isActiveBlock ? ' active-block' : ''));
 
         // Horizontal line
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -3245,8 +3253,8 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
         line.setAttribute('y1', bracketY);
         line.setAttribute('x2', span.endX);
         line.setAttribute('y2', bracketY);
-        line.setAttribute('stroke', color);
-        line.setAttribute('stroke-width', '2');
+        line.setAttribute('stroke', bracketColor);
+        line.setAttribute('stroke-width', strokeWidth);
         group.appendChild(line);
 
         // Left vertical tick
@@ -3255,8 +3263,8 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
         leftTick.setAttribute('y1', bracketY - bracketHeight / 2);
         leftTick.setAttribute('x2', span.startX);
         leftTick.setAttribute('y2', bracketY + bracketHeight / 2);
-        leftTick.setAttribute('stroke', color);
-        leftTick.setAttribute('stroke-width', '2');
+        leftTick.setAttribute('stroke', bracketColor);
+        leftTick.setAttribute('stroke-width', strokeWidth);
         group.appendChild(leftTick);
 
         // Right vertical tick
@@ -3265,22 +3273,38 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
         rightTick.setAttribute('y1', bracketY - bracketHeight / 2);
         rightTick.setAttribute('x2', span.endX);
         rightTick.setAttribute('y2', bracketY + bracketHeight / 2);
-        rightTick.setAttribute('stroke', color);
-        rightTick.setAttribute('stroke-width', '2');
+        rightTick.setAttribute('stroke', bracketColor);
+        rightTick.setAttribute('stroke-width', strokeWidth);
         group.appendChild(rightTick);
 
         // Chord name text (only on the first span or if it's the only span)
         if (index === 0) {
-          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
           const textX = span.startX + (span.width / 2);
           const textY = bracketY + 25;
+          const estimatedTextWidth = chordName.length * 8;
+
+          // Add background pill when active
+          if (isActiveBlock) {
+            const bgPill = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            bgPill.setAttribute('x', textX - estimatedTextWidth / 2 - 8);
+            bgPill.setAttribute('y', textY - 13);
+            bgPill.setAttribute('width', estimatedTextWidth + 16);
+            bgPill.setAttribute('height', 20);
+            bgPill.setAttribute('rx', '10');
+            bgPill.setAttribute('ry', '10');
+            bgPill.setAttribute('fill', '#6366f1');
+            bgPill.setAttribute('class', 'active-block-label-bg');
+            group.appendChild(bgPill);
+          }
+
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
           text.setAttribute('x', textX);
           text.setAttribute('y', textY);
           text.setAttribute('text-anchor', 'middle');
           text.setAttribute('font-family', 'Arial, sans-serif');
           text.setAttribute('font-size', '13');
           text.setAttribute('font-weight', 'bold');
-          text.setAttribute('fill', '#333');
+          text.setAttribute('fill', isActiveBlock ? '#ffffff' : '#333');
           text.textContent = chordName;
           group.appendChild(text);
 
@@ -3309,8 +3333,8 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       } else if (ctx) {
         // Canvas rendering
         ctx.save();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = bracketColor;
+        ctx.lineWidth = isActiveBlock ? 3 : 2;
 
         // Horizontal line
         ctx.beginPath();
@@ -3332,12 +3356,37 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
 
         // Chord name text (only on the first span or if it's the only span)
         if (index === 0) {
-          ctx.font = 'bold 13px Arial, sans-serif';
-          ctx.fillStyle = '#333';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
           const textX = span.startX + (span.width / 2);
           const textY = bracketY + 5;
+          const estimatedTextWidth = chordName.length * 8;
+
+          // Draw background pill when active
+          if (isActiveBlock) {
+            ctx.fillStyle = '#6366f1';
+            ctx.beginPath();
+            const pillX = textX - estimatedTextWidth / 2 - 8;
+            const pillY = textY - 3;
+            const pillWidth = estimatedTextWidth + 16;
+            const pillHeight = 20;
+            const radius = 10;
+            // Rounded rectangle
+            ctx.moveTo(pillX + radius, pillY);
+            ctx.lineTo(pillX + pillWidth - radius, pillY);
+            ctx.quadraticCurveTo(pillX + pillWidth, pillY, pillX + pillWidth, pillY + radius);
+            ctx.lineTo(pillX + pillWidth, pillY + pillHeight - radius);
+            ctx.quadraticCurveTo(pillX + pillWidth, pillY + pillHeight, pillX + pillWidth - radius, pillY + pillHeight);
+            ctx.lineTo(pillX + radius, pillY + pillHeight);
+            ctx.quadraticCurveTo(pillX, pillY + pillHeight, pillX, pillY + pillHeight - radius);
+            ctx.lineTo(pillX, pillY + radius);
+            ctx.quadraticCurveTo(pillX, pillY, pillX + radius, pillY);
+            ctx.closePath();
+            ctx.fill();
+          }
+
+          ctx.font = 'bold 13px Arial, sans-serif';
+          ctx.fillStyle = isActiveBlock ? '#ffffff' : '#333';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
           ctx.fillText(chordName, textX, textY);
 
           // Register click region for the chord bracket label
@@ -3420,6 +3469,171 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       context.svg.appendChild(line);
     }
   }
+
+  // ========================================================================
+  // Phase 2 Bass Block Isolation: Draw active bass block highlight
+  // ========================================================================
+  // When a bass note is selected, highlight the corresponding chord block region
+  // to show the user which block they're editing
+  function drawActiveBassBlockHighlight() {
+    if (activeBassBlockIndex < 0 || !chordSegments || chordSegments.length === 0) {
+      return;
+    }
+
+    // Find the segment for the active block
+    const segment = chordSegments.find(s => s.chordIndex === activeBassBlockIndex);
+    if (!segment) {
+      return;
+    }
+
+    const startBeat = segment.startBeat;
+    const endBeat = startBeat + segment.durationBeats;
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
+
+    // Convert global beat positions to global measure indices
+    const globalStartMeasure = Math.floor(startBeat / beatsPerMeasure);
+    const globalEndMeasure = Math.floor(endBeat / beatsPerMeasure);
+
+    // Convert to local measure indices for this page
+    const localStartMeasure = globalStartMeasure - globalMeasureOffset;
+    const localEndMeasure = globalEndMeasure - globalMeasureOffset;
+
+    // Skip if this block is entirely outside this page's measures
+    if (localEndMeasure < 0 || localStartMeasure >= measures.length) {
+      return;
+    }
+
+    // Clamp to this page's measure range
+    const startMeasure = Math.max(0, localStartMeasure);
+    const endMeasure = Math.min(measures.length - 1, localEndMeasure);
+
+    // Calculate beat positions within measures
+    const startBeatInMeasure = localStartMeasure < 0 ? 0 : (startBeat % beatsPerMeasure);
+    const endBeatInMeasure = localEndMeasure >= measures.length ? beatsPerMeasure : (endBeat % beatsPerMeasure);
+
+    // Color for active block highlight (cyan/blue with transparency)
+    const highlightColor = 'rgba(59, 130, 246, 0.15)'; // Light blue
+    const borderColor = 'rgba(59, 130, 246, 0.6)';    // Stronger blue for border
+
+    // Draw the highlight across measures (BASS STAFF ONLY)
+    for (let m = startMeasure; m <= endMeasure; m++) {
+      if (m >= measures.length) break;
+
+      const systemIndex = Math.floor(m / measuresPerLine);
+      const measureInSystem = m % measuresPerLine;
+      const isFirstInSystem = measureInSystem === 0;
+
+      const measureX = dimensions.braceWidth + (measureInSystem * measureWidth) +
+        (isFirstInSystem ? 0 : dimensions.firstMeasureExtra);
+      const fullWidth = isFirstInSystem
+        ? measureWidth + dimensions.firstMeasureExtra
+        : measureWidth;
+
+      // Calculate Y position for BASS STAFF ONLY (not treble)
+      const bassY = dimensions.trebleY + (systemIndex * dimensions.systemHeight) + 80 + staffSpacing;
+      const bassHeight = 80; // Height of bass staff region
+
+      // Calculate horizontal position and width within this measure
+      let x, w;
+
+      if (m === startMeasure && m === endMeasure) {
+        const startFraction = startBeatInMeasure / beatsPerMeasure;
+        const endFraction = endBeatInMeasure / beatsPerMeasure;
+        x = measureX + (fullWidth * startFraction);
+        w = fullWidth * (endFraction - startFraction);
+      } else if (m === startMeasure) {
+        const startFraction = startBeatInMeasure / beatsPerMeasure;
+        x = measureX + (fullWidth * startFraction);
+        w = fullWidth * (1 - startFraction);
+      } else if (m === endMeasure) {
+        const endFraction = endBeatInMeasure === 0 ? 0 : endBeatInMeasure / beatsPerMeasure;
+        if (isFirstInSystem) {
+          x = measureX + dimensions.firstMeasureExtra;
+          w = measureWidth * endFraction;
+        } else {
+          x = measureX;
+          w = fullWidth * endFraction;
+        }
+      } else {
+        x = measureX;
+        w = fullWidth;
+      }
+
+      // Draw the highlight
+      if (context.svg) {
+        // Background fill
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', x);
+        rect.setAttribute('y', bassY);
+        rect.setAttribute('width', w);
+        rect.setAttribute('height', bassHeight);
+        rect.setAttribute('fill', highlightColor);
+        rect.setAttribute('stroke', 'none');
+        rect.setAttribute('class', 'active-bass-block-highlight');
+        context.svg.insertBefore(rect, context.svg.firstChild);
+
+        // Draw dashed boundary lines at block edges
+        if (m === startMeasure && startBeatInMeasure > 0.001) {
+          // Left boundary (only if block doesn't start at measure start)
+          const leftLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          leftLine.setAttribute('x1', x);
+          leftLine.setAttribute('y1', bassY);
+          leftLine.setAttribute('x2', x);
+          leftLine.setAttribute('y2', bassY + bassHeight);
+          leftLine.setAttribute('stroke', borderColor);
+          leftLine.setAttribute('stroke-width', '2');
+          leftLine.setAttribute('stroke-dasharray', '4,4');
+          leftLine.setAttribute('class', 'active-bass-block-boundary');
+          context.svg.appendChild(leftLine);
+        }
+
+        if (m === endMeasure && endBeatInMeasure > 0.001 && endBeatInMeasure < beatsPerMeasure - 0.001) {
+          // Right boundary (only if block doesn't end at measure end)
+          const rightLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          rightLine.setAttribute('x1', x + w);
+          rightLine.setAttribute('y1', bassY);
+          rightLine.setAttribute('x2', x + w);
+          rightLine.setAttribute('y2', bassY + bassHeight);
+          rightLine.setAttribute('stroke', borderColor);
+          rightLine.setAttribute('stroke-width', '2');
+          rightLine.setAttribute('stroke-dasharray', '4,4');
+          rightLine.setAttribute('class', 'active-bass-block-boundary');
+          context.svg.appendChild(rightLine);
+        }
+      } else if (context.context2D || context.vexFlowCanvasContext) {
+        const ctx = context.context2D || context.vexFlowCanvasContext;
+        if (ctx) {
+          ctx.save();
+          ctx.fillStyle = highlightColor;
+          ctx.fillRect(x, bassY, w, bassHeight);
+
+          // Draw dashed boundary lines
+          ctx.strokeStyle = borderColor;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 4]);
+
+          if (m === startMeasure && startBeatInMeasure > 0.001) {
+            ctx.beginPath();
+            ctx.moveTo(x, bassY);
+            ctx.lineTo(x, bassY + bassHeight);
+            ctx.stroke();
+          }
+
+          if (m === endMeasure && endBeatInMeasure > 0.001 && endBeatInMeasure < beatsPerMeasure - 0.001) {
+            ctx.beginPath();
+            ctx.moveTo(x + w, bassY);
+            ctx.lineTo(x + w, bassY + bassHeight);
+            ctx.stroke();
+          }
+
+          ctx.restore();
+        }
+      }
+    }
+  }
+
+  // Draw the active bass block highlight
+  drawActiveBassBlockHighlight();
 
   // Draw chord span shading and brackets - alternating colors for consecutive chords
   // Uses beat-based positioning to show exact horizontal spans, even within measures

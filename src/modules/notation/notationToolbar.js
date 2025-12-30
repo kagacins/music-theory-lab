@@ -126,6 +126,11 @@ export class NotationToolbar {
     // Metronome state
     this.metronomeEnabled = localStorage.getItem('metronome-enabled') === 'true';
     this.onMetronomeToggle = options.onMetronomeToggle || (() => {});
+
+    // Staff selection state (Phase 3: Bass Block Isolation)
+    // Always reset to 'auto' on page load for better UX - don't persist across sessions
+    this.staffSelectionMode = 'auto'; // 'treble', 'bass', or 'auto'
+    this.onStaffSelectionChange = options.onStaffSelectionChange || (() => {});
   }
 
   /**
@@ -353,6 +358,12 @@ export class NotationToolbar {
                   <option value="${ts.value}" ${this.timeSignature === ts.value ? 'selected' : ''}>${ts.value}</option>
                 `).join('')}
               </select>
+              <select class="staff-select" data-mode="${this.staffSelectionMode}" title="Select which staff to edit&#10;• Auto (A): Click position determines staff&#10;• Treble (G): Force edits to treble clef&#10;• Bass (B): Force edits to bass clef (use to edit bass blocks)">
+                <option value="auto" ${this.staffSelectionMode === 'auto' ? 'selected' : ''}>🎯 Auto</option>
+                <option value="treble" ${this.staffSelectionMode === 'treble' ? 'selected' : ''}>🎼 Treble</option>
+                <option value="bass" ${this.staffSelectionMode === 'bass' ? 'selected' : ''}>🎸 Bass</option>
+              </select>
+              <span class="editing-context-indicator" title="Current editing context"><span class="context-icon">📍</span><span class="context-text">Ready</span></span>
               <select class="voice-select" title="Select voice to edit (V to cycle, Alt+1/2 to switch)">
                 <option value="1" ${this.voiceNumber === 1 ? 'selected' : ''}>Voice 1</option>
                 <option value="2" ${this.voiceNumber === 2 ? 'selected' : ''}>Voice 2</option>
@@ -551,6 +562,94 @@ export class NotationToolbar {
 
       .measures-select {
         min-width: 55px;
+      }
+
+      .staff-select {
+        min-width: 90px;
+        font-size: 11px;
+        font-weight: bold;
+        border-radius: 4px;
+        padding: 3px 6px;
+        transition: all 0.2s ease;
+      }
+
+      .staff-select[data-mode="treble"] {
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        color: white;
+        border: 2px solid #60a5fa;
+      }
+
+      .staff-select[data-mode="bass"] {
+        background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+        color: white;
+        border: 2px solid #a78bfa;
+      }
+
+      .staff-select[data-mode="auto"] {
+        background: linear-gradient(135deg, #6b7280, #4b5563);
+        color: white;
+        border: 2px solid #9ca3af;
+      }
+
+      .staff-select option {
+        background: #1f2937;
+        color: white;
+      }
+
+      .editing-context-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 10px;
+        background: linear-gradient(135deg, #374151, #1f2937);
+        color: #d1d5db;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: 500;
+        white-space: nowrap;
+        border: 1px solid #4b5563;
+        transition: all 0.2s ease;
+      }
+
+      .editing-context-indicator .context-icon {
+        font-size: 11px;
+      }
+
+      .editing-context-indicator .context-text {
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* Treble mode styling */
+      .editing-context-indicator[data-mode="treble"] {
+        background: linear-gradient(135deg, #1e40af, #1e3a8a);
+        color: white;
+        border-color: #3b82f6;
+      }
+
+      /* Bass mode styling */
+      .editing-context-indicator[data-mode="bass"] {
+        background: linear-gradient(135deg, #6d28d9, #5b21b6);
+        color: white;
+        border-color: #8b5cf6;
+        animation: pulse-glow 2s ease-in-out infinite;
+      }
+
+      /* Selected note styling */
+      .editing-context-indicator[data-has-selection="true"] {
+        border-color: #fbbf24;
+        box-shadow: 0 0 6px rgba(251, 191, 36, 0.4);
+      }
+
+      .editing-context-indicator .highlight {
+        color: #fef08a;
+        font-weight: bold;
+      }
+
+      @keyframes pulse-glow {
+        0%, 100% { box-shadow: 0 0 4px rgba(139, 92, 246, 0.4); }
+        50% { box-shadow: 0 0 8px rgba(139, 92, 246, 0.8); }
       }
 
       .voice-select {
@@ -898,6 +997,11 @@ export class NotationToolbar {
       this.onOctaveShift(-1);
     });
 
+    // Staff select (Phase 3: Bass Block Isolation)
+    this.container.querySelector('.staff-select')?.addEventListener('change', (e) => {
+      this.setStaffSelectionMode(e.target.value);
+    });
+
     // Voice select
     this.container.querySelector('.voice-select')?.addEventListener('change', (e) => {
       this.voiceNumber = parseInt(e.target.value, 10);
@@ -1082,6 +1186,21 @@ export class NotationToolbar {
         this.setVoice(2);
       }
     }
+
+    // Staff selection shortcuts (G/B/A) - use G for treble since T is for Tie
+    // G = Treble (G clef), B = Bass, A = Auto
+    if (!hasModifier) {
+      if (e.key === 'g' || e.key === 'G') {
+        e.preventDefault();
+        this.setStaffSelectionMode('treble');
+      } else if (e.key === 'b' || e.key === 'B') {
+        e.preventDefault();
+        this.setStaffSelectionMode('bass');
+      } else if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        this.setStaffSelectionMode('auto');
+      }
+    }
   }
 
   /**
@@ -1126,6 +1245,267 @@ export class NotationToolbar {
    */
   getInteractionMode() {
     return this.interactionMode;
+  }
+
+  /**
+   * Set staff selection mode (Phase 3: Bass Block Isolation)
+   * @param {string} mode - 'treble', 'bass', or 'auto'
+   */
+  setStaffSelectionMode(mode) {
+    if (mode !== 'treble' && mode !== 'bass' && mode !== 'auto') return;
+    this.staffSelectionMode = mode;
+    // Don't persist to localStorage - always reset to 'auto' on page load
+    this.updateStaffSelectDropdown();
+    this.onStaffSelectionChange(mode);
+
+    // Also update compositionState if available
+    const compositionState = window.getCompositionState?.();
+    if (compositionState) {
+      compositionState.setStaffSelectionMode(mode);
+      // If explicitly selecting a staff, update the active staff
+      if (mode !== 'auto') {
+        compositionState.setActiveStaff(mode);
+      }
+    }
+
+    // Update the editing context indicator with full context
+    this.refreshEditingContext();
+
+    // Dispatch event for tutorial validation
+    dispatchBuilderEvent('notationStaffSelectionSet', { mode });
+  }
+
+  /**
+   * Get current staff selection mode
+   * @returns {string} - 'treble', 'bass', or 'auto'
+   */
+  getStaffSelectionMode() {
+    return this.staffSelectionMode;
+  }
+
+  /**
+   * Update staff selection dropdown to match current state
+   */
+  updateStaffSelectDropdown() {
+    if (!this.container) return;
+    const select = this.container.querySelector('.staff-select');
+    if (select) {
+      select.value = this.staffSelectionMode;
+      select.setAttribute('data-mode', this.staffSelectionMode);
+    }
+  }
+
+  /**
+   * Update the editing context indicator in the toolbar
+   * Shows context-aware information based on current staff mode and selection
+   * @param {Object} context - Context information
+   * @param {string} context.mode - 'treble', 'bass', or 'auto'
+   * @param {number|null} context.bassBlockIndex - Index of active bass block (bass mode)
+   * @param {string|null} context.chordName - Name of the chord for bass block
+   * @param {number|null} context.measureIndex - Current measure (0-indexed)
+   * @param {number|null} context.beat - Current beat position
+   * @param {boolean} context.hasSelection - Whether notes are selected
+   * @param {string|null} context.selectedStaff - Staff of selected note ('treble' or 'bass')
+   */
+  updateEditingContext(context = {}) {
+    if (!this.container) return;
+    const indicator = this.container.querySelector('.editing-context-indicator');
+    const iconSpan = this.container.querySelector('.context-icon');
+    const textSpan = this.container.querySelector('.context-text');
+    if (!indicator || !iconSpan || !textSpan) return;
+
+    const {
+      mode = this.staffSelectionMode,
+      bassBlockIndex = null,
+      chordName = null,
+      measureIndex = null,
+      beat = null,
+      hasSelection = false,
+      selectedStaff = null,
+      selectedPitches = [],
+      isRest = false
+    } = context;
+
+    // Set data attributes for CSS styling
+    indicator.setAttribute('data-mode', mode);
+    indicator.setAttribute('data-has-selection', hasSelection ? 'true' : 'false');
+
+    let icon = '📍';
+    let text = 'Ready';
+    let title = 'Current editing context';
+
+    // Format pitches for display (e.g., "C4" or "C4, E4, G4" for chords)
+    const formatPitches = (pitches) => {
+      if (!pitches || pitches.length === 0) return null;
+      if (pitches.length === 1) return pitches[0];
+      return pitches.join(', ');
+    };
+
+    if (hasSelection && selectedStaff) {
+      // Note is selected - show info about the selected note
+      icon = selectedStaff === 'bass' ? '🎸' : '🎼';
+      const pitchDisplay = isRest ? 'Rest' : formatPitches(selectedPitches);
+
+      if (selectedStaff === 'bass' && bassBlockIndex !== null && bassBlockIndex >= 0) {
+        // Bass note selected - show pitch, chord, and measure
+        if (pitchDisplay) {
+          text = `<span class="highlight">${pitchDisplay}</span>`;
+          title = `Selected: ${pitchDisplay}`;
+        } else {
+          text = `Selected: <span class="highlight">${chordName || `Block ${bassBlockIndex + 1}`}</span>`;
+          title = `Editing bass block for ${chordName || `chord ${bassBlockIndex + 1}`}`;
+        }
+        if (chordName && pitchDisplay) {
+          text += ` in ${chordName}`;
+          title += ` in ${chordName}`;
+        }
+        if (measureIndex !== null) {
+          text += ` (m${measureIndex + 1})`;
+          title += `, measure ${measureIndex + 1}`;
+        }
+      } else {
+        // Treble note selected - show pitch, chord context, and measure
+        if (pitchDisplay) {
+          text = `<span class="highlight">${pitchDisplay}</span>`;
+          title = `Selected: ${pitchDisplay}`;
+        } else {
+          text = `Selected: m${measureIndex !== null ? measureIndex + 1 : '?'}`;
+          title = `Editing treble note in measure ${measureIndex !== null ? measureIndex + 1 : '?'}`;
+        }
+        if (chordName) {
+          text += ` over ${chordName}`;
+          title += ` over ${chordName}`;
+        }
+        if (measureIndex !== null) {
+          text += ` (m${measureIndex + 1})`;
+          title += `, measure ${measureIndex + 1}`;
+        }
+      }
+    } else if (mode === 'bass') {
+      // Bass mode - show active block info
+      icon = '🎸';
+      if (bassBlockIndex !== null && bassBlockIndex >= 0) {
+        text = `Bass: <span class="highlight">${chordName || `Block ${bassBlockIndex + 1}`}</span>`;
+        title = `Editing bass block for ${chordName || `chord ${bassBlockIndex + 1}`}\nClick chord bracket to select different block`;
+      } else {
+        text = 'Bass: <span class="highlight">Click bracket</span>';
+        title = 'Click a chord bracket below the bass staff to select a block to edit';
+      }
+    } else if (mode === 'treble') {
+      // Treble mode - show measure info
+      icon = '🎼';
+      if (measureIndex !== null) {
+        text = `Treble: m${measureIndex + 1}`;
+        title = `Next note will be added to measure ${measureIndex + 1}`;
+        if (chordName) {
+          text += ` <span class="highlight">${chordName}</span>`;
+          title += ` (over ${chordName})`;
+        }
+      } else {
+        text = 'Treble: Ready';
+        title = 'Click on the treble staff to add notes';
+      }
+    } else {
+      // Auto mode
+      icon = '🎯';
+      text = 'Auto';
+      title = 'Click position determines treble or bass staff';
+    }
+
+    iconSpan.textContent = icon;
+    textSpan.innerHTML = text;
+    indicator.title = title;
+  }
+
+  /**
+   * Legacy method - redirects to updateEditingContext for backward compatibility
+   * @deprecated Use updateEditingContext instead
+   */
+  updateActiveBlockIndicator(blockIndex, chordName = null) {
+    this.updateEditingContext({
+      mode: 'bass',
+      bassBlockIndex: blockIndex,
+      chordName: chordName
+    });
+  }
+
+  /**
+   * Refresh the editing context indicator by gathering current state
+   * Call this when state changes and you need to update the indicator
+   */
+  refreshEditingContext() {
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) {
+      this.updateEditingContext({ mode: this.staffSelectionMode });
+      return;
+    }
+
+    const bassBlockIndex = compositionState.getActiveBassBlockIndex?.();
+    const chords = compositionState.getChords?.() || [];
+
+    // Get chord name for bass block
+    let chordName = null;
+    if (bassBlockIndex !== null && bassBlockIndex >= 0 && chords[bassBlockIndex]) {
+      const chord = chords[bassBlockIndex];
+      const symbol = window.CHORD_DEFINITIONS?.[chord.type]?.symbol || '';
+      chordName = `${chord.root}${symbol}`;
+    }
+
+    // Get selection info from noteEditor if available
+    let hasSelection = false;
+    let selectedStaff = null;
+    let measureIndex = null;
+    let selectedChordName = null;
+    let selectedPitches = [];
+    let isRest = false;
+
+    const composer = window.getNotationComposer?.();
+    const noteEditor = composer?.noteEditor;
+    if (noteEditor) {
+      const selectedNotes = noteEditor.getSelectedNotes?.() || [];
+      hasSelection = selectedNotes.length > 0;
+
+      if (hasSelection && selectedNotes[0]) {
+        const firstNote = selectedNotes[0];
+        selectedStaff = firstNote.staff || null;
+        measureIndex = firstNote.measureIndex ?? null;
+        selectedPitches = firstNote.pitches || [];
+        isRest = firstNote.isRest || false;
+
+        // Get chord name for the selected note's position
+        if (measureIndex !== null) {
+          const chordSegments = compositionState.getChordSegments?.() || [];
+          const beatsPerMeasure = compositionState.getBeatsPerMeasure?.() || 4;
+          const absoluteBeat = measureIndex * beatsPerMeasure + (firstNote.beat || 0);
+
+          for (const segment of chordSegments) {
+            if (absoluteBeat >= segment.startBeat && absoluteBeat < segment.startBeat + segment.durationBeats) {
+              const segChord = chords[segment.chordIndex];
+              if (segChord) {
+                const segSymbol = window.CHORD_DEFINITIONS?.[segChord.type]?.symbol || '';
+                selectedChordName = `${segChord.root}${segSymbol}`;
+              }
+              // Also update bassBlockIndex if a bass note is selected
+              if (selectedStaff === 'bass') {
+                chordName = selectedChordName;
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    this.updateEditingContext({
+      mode: this.staffSelectionMode,
+      bassBlockIndex: bassBlockIndex,
+      chordName: hasSelection ? selectedChordName : chordName,
+      measureIndex: measureIndex,
+      hasSelection: hasSelection,
+      selectedStaff: selectedStaff,
+      selectedPitches: selectedPitches,
+      isRest: isRest
+    });
   }
 
   /**

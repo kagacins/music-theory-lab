@@ -40,10 +40,11 @@ export function showChoiceDialog(options) {
     const dialog = document.createElement('div');
     dialog.className = 'bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden';
 
-    // Title
+    // Title - use inline styles to force white text (override any -webkit-text-fill-color)
     const titleEl = document.createElement('div');
     titleEl.className = 'px-6 py-4 border-b border-gray-200 dark:border-gray-700';
-    titleEl.innerHTML = `<h3 class="text-lg font-semibold text-gray-900 dark:text-white">${title}</h3>`;
+    // Force white text with inline styles - dialog has dark background
+    titleEl.innerHTML = `<h3 class="text-lg font-semibold" style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">${title}</h3>`;
     dialog.appendChild(titleEl);
 
     // Message
@@ -315,12 +316,32 @@ export function showKeyChangeDialog(options) {
  * @param {number} options.overflowBeats - How many beats overflow the measure
  * @param {string} options.noteDuration - The duration being added
  * @param {Function} options.onChoice - Callback with 'truncate', 'shift', or null
+ * @param {boolean} options.bassBlockIsolated - If true, only show "Truncate at Block End" option (no shift)
  */
 export function showNoteOverflowDialog(options) {
-    const { overflowBeats, noteDuration, onChoice } = options;
+    const { overflowBeats, noteDuration, onChoice, bassBlockIsolated = false } = options;
 
     const overflowText = overflowBeats === 1 ? '1 beat' : `${overflowBeats.toFixed(2)} beats`;
 
+    // For bass clef with block isolation, only offer truncate (no shift across blocks)
+    if (bassBlockIsolated) {
+        return showChoiceDialog({
+            title: 'Note Exceeds Chord Block',
+            message: `This note would overflow the chord block by <strong>${overflowText}</strong>. Notes in bass clef are isolated to their chord and cannot shift into adjacent chords.`,
+            choices: [
+                {
+                    id: 'truncate',
+                    label: 'Truncate at block end',
+                    description: 'Existing notes will be shortened to fit within this chord\'s block.',
+                    primary: true,
+                },
+            ],
+            onChoice,
+            allowCancel: true,
+        });
+    }
+
+    // Treble clef: offer both truncate and shift options
     return showChoiceDialog({
         title: 'Note Exceeds Measure',
         message: `This note would overflow the measure by <strong>${overflowText}</strong>. How would you like to handle this?`,

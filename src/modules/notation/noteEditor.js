@@ -305,8 +305,8 @@ export class NoteEditor {
 
     const position = this.getCanvasPosition(e);
 
-    // Check if clicking on a chord bracket label (for bass replacement)
-    if (this.composerIntegration && this.composerIntegration.checkChordBracketClick(position.x, position.y)) {
+    // Check if clicking on a chord bracket label (selects bass block, or Shift+click replaces bass)
+    if (this.composerIntegration && this.composerIntegration.checkChordBracketClick(position.x, position.y, e)) {
       e.stopPropagation();
       e.preventDefault();
       return;
@@ -319,6 +319,23 @@ export class NoteEditor {
     // When Alt is held, prefer the last hovered position (ghost note)
     if (e.altKey && this.hoveredPosition && this.hoveredPosition.pitch) {
       staffPosition = this.hoveredPosition;
+    }
+
+    // Phase 3: Apply staff selection mode override from toolbar
+    // If user has explicitly selected treble or bass, override the auto-detected staff
+    if (staffPosition && staffPosition.staff) {
+      const staffSelectionMode = this.composerIntegration?.toolbar?.getStaffSelectionMode?.() || 'auto';
+      if (staffSelectionMode !== 'auto') {
+        // Only override if a valid pitch can be mapped to the selected staff
+        // This prevents placing notes in impossible positions
+        const overrideStaff = staffSelectionMode; // 'treble' or 'bass'
+        if (overrideStaff !== staffPosition.staff) {
+          // Need to recalculate pitch for the different staff
+          // Use the same Y position but interpret for different staff
+          staffPosition = { ...staffPosition, staff: overrideStaff };
+          // The pitch will be adjusted in addNoteAtPosition based on staff
+        }
+      }
     }
 
     // TUTORIAL ASSISTED PLACEMENT: If a tutorial has specified an expected note,
@@ -523,7 +540,15 @@ export class NoteEditor {
     if (!this.isEnabled) return;
 
     const position = this.getCanvasPosition(e);
-    const staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
+    let staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
+
+    // Phase 3: Apply staff selection mode override from toolbar for ghost note
+    if (staffPosition && staffPosition.staff) {
+      const staffSelectionMode = this.composerIntegration?.toolbar?.getStaffSelectionMode?.() || 'auto';
+      if (staffSelectionMode !== 'auto') {
+        staffPosition = { ...staffPosition, staff: staffSelectionMode };
+      }
+    }
 
     // Track Shift key state
     this.isShiftHeld = e.shiftKey;
@@ -1912,6 +1937,13 @@ export class NoteEditor {
 
       // Render the changes
       this.composerIntegration.render();
+
+      // CRITICAL: Trigger toolbar update for the (now changed) selected note
+      if (this.selectedNotes.size > 0) {
+        setTimeout(() => {
+          this.onNoteSelect(Array.from(this.selectedNotes));
+        }, 50);
+      }
       return;
     }
 
@@ -1947,6 +1979,15 @@ export class NoteEditor {
 
     // Render the changes
     this.composerIntegration.render();
+
+    // CRITICAL: Trigger toolbar update for the (now changed) selected note
+    // The selection ID still points to the same index, but that index now contains the NEW note
+    // So we need to re-call onNoteSelect to refresh the toolbar with the new note's properties
+    if (this.selectedNotes.size > 0) {
+      setTimeout(() => {
+        this.onNoteSelect(Array.from(this.selectedNotes));
+      }, 50);
+    }
   }
 
   /**
@@ -1993,11 +2034,23 @@ export class NoteEditor {
 
     // Render the changes
     this.composerIntegration.render();
+
+    // CRITICAL: Trigger toolbar update for the (now changed) selected note
+    if (this.selectedNotes.size > 0) {
+      setTimeout(() => {
+        this.onNoteSelect(Array.from(this.selectedNotes));
+      }, 50);
+    }
   }
 
   /**
    * Insert a bass note with shift at a specific position
-   * Uses shiftNotesForward to push downstream notes forward
+   *
+   * NEW ARCHITECTURE (Phase 1 of Bass Block Isolation):
+   * This now delegates to compositionState.insertBassNoteWithShift() which operates
+   * on the bassBlockSequence blocks directly. Each chord's block is ISOLATED - shift
+   * operations cannot push notes into adjacent chord blocks.
+   *
    * @param {number} measureIndex - Target measure index
    * @param {Object} insertionPoint - { action, noteIndex, voiceIndex }
    * @param {Object} noteData - Note data to insert
@@ -2024,20 +2077,285 @@ export class NoteEditor {
     }
     const voice = measure.notation.bass.voices[voiceIndex];
 
-    // Calculate beat position for insertion
-    let beatPosition = 0;
+    // Calculate beat position for insertion (relative to measure start)
+    let beatPositionInMeasure = 0;
     const targetIndex = insertionPoint.action === 'before' ? insertionPoint.noteIndex : insertionPoint.noteIndex + 1;
     for (let i = 0; i < targetIndex && i < voice.notes.length; i++) {
       const note = voice.notes[i];
       let beats = this.durationToBeats(note.duration || '4n', note.dotted);
-      beatPosition += beats;
+      beatPositionInMeasure += beats;
     }
 
-    // Calculate note duration in beats
-    let durationBeats = this.durationToBeats(noteData.duration || '4n', noteData.dotted);
+    // Calculate absolute beat position
+    const absoluteBeat = measureIndex * beatsPerMeasure + beatPositionInMeasure;
 
-    console.log('[SHIFT-INSERT-BASS] Using extract→rebuild algorithm');
-    console.log('[SHIFT-INSERT-BASS] Inserting at measure', measureIndex, 'beat', beatPosition, 'duration', durationBeats);
+    // Get the bass block for this position
+    const blockInfo = compositionState.getBassBlockForBeat(absoluteBeat);
+    if (!blockInfo) {
+      console.warn('[NoteEditor] Could not find bass block for beat:', absoluteBeat);
+      // Fall back to legacy behavior (no block isolation)
+      this._legacyInsertBassNoteWithShift(measureIndex, insertionPoint, noteData, compositionState, beatsPerMeasure, voice, beatPositionInMeasure);
+      return;
+    }
+
+    // Use BLOCK-ISOLATED extract→rebuild approach
+    // This is the same proven pattern used for treble, but constrained to a single chord block
+    console.log('[SHIFT-INSERT-BASS] Using BLOCK-ISOLATED extract→rebuild approach');
+    console.log(`[SHIFT-INSERT-BASS] Block ${blockInfo.chordIndex}, blockStartBeat=${blockInfo.blockStartBeat}, blockBeats=${blockInfo.block.beats}`);
+
+    const blockStartBeat = blockInfo.blockStartBeat;
+    const blockEndBeat = blockStartBeat + blockInfo.block.beats;
+    const insertBeatInBlock = absoluteBeat - blockStartBeat;
+    const durationBeats = this.durationToBeats(noteData.duration || '4n', noteData.dotted);
+
+    console.log(`[SHIFT-INSERT-BASS] Insert at beat ${insertBeatInBlock} within block [0, ${blockInfo.block.beats})`);
+
+    // Step 1: Extract notes from this block only (from insertion point to block end)
+    const logicalNotes = this._extractLogicalNotesFromBlock(
+      'bass', voiceIndex, compositionState, beatsPerMeasure,
+      blockStartBeat, blockEndBeat, absoluteBeat
+    );
+    console.log(`[SHIFT-INSERT-BASS] Extracted ${logicalNotes.length} logical notes from block`);
+
+    // Step 2: Create the new note as a logical note
+    const newLogical = {
+      pitches: noteData.pitches || [noteData.pitch],
+      totalDuration: durationBeats,
+      tiedForward: false,
+      attributes: {
+        articulation: noteData.articulation,
+        accidental: noteData.accidental,
+        dynamic: noteData.dynamic,
+        velocity: noteData.velocity,
+        isRest: noteData.isRest || false,
+      }
+    };
+
+    // Step 3: Rebuild within block boundaries only
+    // The key difference: truncate notes that would overflow the block boundary
+    this._rebuildNotesInBlock(
+      'bass', voiceIndex, compositionState, beatsPerMeasure,
+      blockStartBeat, blockEndBeat, absoluteBeat,
+      [newLogical, ...logicalNotes]
+    );
+
+    // Mark bass as edited and save for affected measures
+    const startMeasure = Math.floor(blockStartBeat / beatsPerMeasure);
+    const endMeasure = Math.floor((blockEndBeat - 0.001) / beatsPerMeasure);
+    for (let m = startMeasure; m <= endMeasure && m < compositionState.measures.length; m++) {
+      if (compositionState.measures[m]?.notation?.bass) {
+        compositionState.measures[m].notation.bass.autoGenerated = false;
+        compositionState.saveEditedBassNotesForMeasure(m);
+      }
+    }
+
+    // Sync measures back to bass block sequence
+    compositionState.syncMeasuresToBuildingBlocks();
+
+    // Render the changes
+    this.composerIntegration.render();
+
+    // CRITICAL: Trigger toolbar update for the (now changed) selected note
+    // The selection ID still points to the same index, but that index now contains the NEW note
+    // So we need to re-call onNoteSelect to refresh the toolbar with the new note's properties
+    if (this.selectedNotes.size > 0) {
+      setTimeout(() => {
+        this.onNoteSelect(Array.from(this.selectedNotes));
+      }, 50);
+    }
+  }
+
+  /**
+   * Extract logical notes from a specific block range only
+   * Used for block-isolated bass shift operations
+   * @private
+   */
+  _extractLogicalNotesFromBlock(clef, voiceIndex, compositionState, beatsPerMeasure, blockStartBeat, blockEndBeat, fromAbsoluteBeat) {
+    console.log('[_extractLogicalNotesFromBlock] Extracting from block:', { blockStartBeat, blockEndBeat, fromAbsoluteBeat });
+    const logicalNotes = [];
+
+    // Determine which measures contain this block
+    const startMeasure = Math.floor(blockStartBeat / beatsPerMeasure);
+    const endMeasure = Math.floor((blockEndBeat - 0.001) / beatsPerMeasure);
+
+    for (let m = startMeasure; m <= endMeasure && m < compositionState.measures.length; m++) {
+      const measure = compositionState.measures[m];
+      if (!measure) continue;
+
+      const voices = clef === 'treble'
+        ? measure.notation?.treble?.voices
+        : measure.notation?.bass?.voices;
+
+      if (!voices || !voices[voiceIndex]) continue;
+
+      const voice = voices[voiceIndex];
+      if (!voice.notes) continue;
+
+      const measureStartBeat = m * beatsPerMeasure;
+      const notesToRemove = [];
+
+      for (const note of voice.notes) {
+        const noteBeatInMeasure = note.beat || 0;
+        const absoluteNoteBeat = measureStartBeat + noteBeatInMeasure;
+
+        // Skip notes outside this block
+        if (absoluteNoteBeat < blockStartBeat || absoluteNoteBeat >= blockEndBeat) continue;
+
+        // Skip notes before the extraction point
+        if (absoluteNoteBeat < fromAbsoluteBeat) continue;
+
+        // Mark for removal
+        notesToRemove.push(note);
+
+        const durationBeats = this.durationToBeats(note.duration || '4n', note.dotted);
+
+        if (note.isTied && logicalNotes.length > 0) {
+          // Continuation of previous note
+          const lastLogical = logicalNotes[logicalNotes.length - 1];
+          lastLogical.totalDuration += durationBeats;
+          if (note.tied) lastLogical.tiedForward = true;
+        } else {
+          // New logical note
+          logicalNotes.push({
+            pitches: note.pitches || [note.pitch],
+            totalDuration: durationBeats,
+            tiedForward: note.tied || false,
+            attributes: {
+              articulation: note.articulation,
+              accidental: note.accidental,
+              dynamic: note.dynamic,
+              velocity: note.velocity,
+              isRest: note.isRest || note.type === 'rest',
+            }
+          });
+        }
+      }
+
+      // Remove extracted notes
+      voice.notes = voice.notes.filter(n => !notesToRemove.includes(n));
+    }
+
+    console.log('[_extractLogicalNotesFromBlock] Extracted:', logicalNotes.map(n => ({
+      pitches: n.pitches,
+      duration: n.totalDuration
+    })));
+
+    return logicalNotes;
+  }
+
+  /**
+   * Rebuild notes within a specific block range only
+   * Notes that would overflow the block boundary are TRUNCATED
+   * @private
+   */
+  _rebuildNotesInBlock(clef, voiceIndex, compositionState, beatsPerMeasure, blockStartBeat, blockEndBeat, startAbsoluteBeat, logicalNotes) {
+    console.log('[_rebuildNotesInBlock] Rebuilding in block:', { blockStartBeat, blockEndBeat, startAbsoluteBeat, noteCount: logicalNotes.length });
+
+    let currentAbsoluteBeat = startAbsoluteBeat;
+    const blockDuration = blockEndBeat - blockStartBeat;
+
+    for (const logicalNote of logicalNotes) {
+      // Calculate how much of this note fits in the remaining block space
+      const beatInBlock = currentAbsoluteBeat - blockStartBeat;
+      const remainingBlockSpace = blockDuration - beatInBlock;
+
+      if (remainingBlockSpace <= 0) {
+        // No more room in block - truncate remaining notes
+        console.log('[_rebuildNotesInBlock] Block full, truncating remaining notes');
+        break;
+      }
+
+      // Truncate note duration if it would overflow
+      let noteBeats = logicalNote.totalDuration;
+      let wasTruncated = false;
+      if (noteBeats > remainingBlockSpace) {
+        console.log(`[_rebuildNotesInBlock] Truncating note from ${noteBeats} to ${remainingBlockSpace} beats`);
+        noteBeats = remainingBlockSpace;
+        wasTruncated = true;
+      }
+
+      // Place note across measures as needed (within block)
+      let remainingBeats = noteBeats;
+      let isFirstPart = true;
+
+      while (remainingBeats > 0 && currentAbsoluteBeat < blockEndBeat) {
+        const currentMeasure = Math.floor(currentAbsoluteBeat / beatsPerMeasure);
+        const beatInMeasure = currentAbsoluteBeat - (currentMeasure * beatsPerMeasure);
+        const beatsLeftInMeasure = beatsPerMeasure - beatInMeasure;
+
+        // Don't exceed block boundary
+        const beatsToBlockEnd = blockEndBeat - currentAbsoluteBeat;
+        const beatsToPlace = Math.min(remainingBeats, beatsLeftInMeasure, beatsToBlockEnd);
+        const isLastPart = (remainingBeats <= beatsToPlace) && !wasTruncated;
+
+        // Get or create measure
+        while (currentMeasure >= compositionState.measures.length) {
+          compositionState.addMeasure({});
+        }
+
+        const measure = compositionState.measures[currentMeasure];
+        const voices = clef === 'treble'
+          ? measure.notation?.treble?.voices
+          : measure.notation?.bass?.voices;
+
+        if (!voices) break;
+
+        while (voices.length <= voiceIndex) {
+          voices.push({ notes: [] });
+        }
+        const voice = voices[voiceIndex];
+
+        // Create the note
+        const { duration: noteDuration, dotted: noteDotted } = beatsToDuration(beatsToPlace);
+        const measureNote = {
+          type: logicalNote.attributes.isRest ? 'rest' : 'note',
+          pitches: logicalNote.pitches,
+          duration: noteDuration,
+          dotted: noteDotted,
+          beat: beatInMeasure,
+          isTied: !isFirstPart,
+          tied: !isLastPart || (remainingBeats > beatsToPlace),
+          isRest: logicalNote.attributes.isRest || false,
+        };
+
+        // Add attributes on first part only
+        if (isFirstPart) {
+          if (logicalNote.attributes.articulation) measureNote.articulation = logicalNote.attributes.articulation;
+          if (logicalNote.attributes.accidental) measureNote.accidental = logicalNote.attributes.accidental;
+          if (logicalNote.attributes.dynamic) measureNote.dynamic = logicalNote.attributes.dynamic;
+          if (logicalNote.attributes.velocity !== undefined) measureNote.velocity = logicalNote.attributes.velocity;
+        }
+
+        console.log('[_rebuildNotesInBlock] Created note:', {
+          measure: currentMeasure,
+          beat: beatInMeasure,
+          duration: noteDuration,
+          dotted: noteDotted,
+          beatsPlaced: beatsToPlace
+        });
+
+        voice.notes.push(measureNote);
+        voice.notes.sort((a, b) => (a.beat || 0) - (b.beat || 0));
+
+        currentAbsoluteBeat += beatsToPlace;
+        remainingBeats -= beatsToPlace;
+        isFirstPart = false;
+      }
+    }
+
+    console.log('[_rebuildNotesInBlock] Rebuild complete');
+  }
+
+  /**
+   * Legacy fallback for bass insert when block sequence isn't available
+   * @private
+   */
+  _legacyInsertBassNoteWithShift(measureIndex, insertionPoint, noteData, compositionState, beatsPerMeasure, voice, beatPosition) {
+    console.log('[SHIFT-INSERT-BASS] Using LEGACY extract→rebuild algorithm');
+    console.log('[SHIFT-INSERT-BASS] Inserting at measure', measureIndex, 'beat', beatPosition);
+
+    const voiceIndex = insertionPoint.voiceIndex ?? this.getVoiceIndexForStaff('bass');
+    let durationBeats = this.durationToBeats(noteData.duration || '4n', noteData.dotted);
 
     // 1. Extract all notes from insertion point onward (this also removes them)
     const logicalNotes = this.extractLogicalNotes('bass', voiceIndex, measureIndex, beatPosition, compositionState, beatsPerMeasure);
@@ -2060,11 +2378,19 @@ export class NoteEditor {
     this.rebuildNotesAfterShift('bass', voiceIndex, measureIndex, beatPosition, [newLogical, ...logicalNotes], compositionState, beatsPerMeasure);
 
     // Mark bass as edited and save
+    const measure = compositionState.measures[measureIndex];
     measure.notation.bass.autoGenerated = false;
     compositionState.saveEditedBassNotesForMeasure(measureIndex);
 
     // Render the changes
     this.composerIntegration.render();
+
+    // CRITICAL: Trigger toolbar update for the (now changed) selected note
+    if (this.selectedNotes.size > 0) {
+      setTimeout(() => {
+        this.onNoteSelect(Array.from(this.selectedNotes));
+      }, 50);
+    }
   }
 
   /**
@@ -2549,6 +2875,7 @@ export class NoteEditor {
       showNoteOverflowDialog({
         overflowBeats,
         noteDuration: this.currentDuration,
+        bassBlockIsolated: staff === 'bass', // Bass clef only gets truncate option (block-isolated)
         onChoice: (choice) => {
           console.log('[SHIFT-INSERT] insertNoteBeforeSelected dialog choice:', choice);
           if (choice === null) {
@@ -2556,8 +2883,25 @@ export class NoteEditor {
           }
 
           if (choice === 'truncate') {
-            console.log('[SHIFT-INSERT] Taking TRUNCATE path');
-            // Truncate: Insert the note at the position and remove any notes that overflow
+            console.log('[SHIFT-INSERT] Taking TRUNCATE path, staff=', staff);
+
+            // For bass clef with block isolation, "truncate" means:
+            // Insert the new note and shift existing notes, truncating any that overflow the block boundary
+            // This is the SAME as "shift" but with the understanding that overflow is expected and accepted
+            if (staff === 'bass') {
+              console.log('[SHIFT-INSERT] Bass truncate - using block-isolated shift with truncation');
+              // Use the same shift method - it will automatically truncate at block boundary
+              this.insertBassNoteWithShiftAtPosition(
+                measureIndex,
+                { action: 'before', noteIndex, voiceIndex },
+                noteData,
+                compositionState,
+                beatsPerMeasure
+              );
+              return;
+            }
+
+            // Treble clef: Original truncate behavior - insert and remove overflow
             // Calculate the beat position where we're inserting
             let insertBeat = 0;
             for (let i = 0; i < noteIndex; i++) {
@@ -2745,13 +3089,29 @@ export class NoteEditor {
       showNoteOverflowDialog({
         overflowBeats,
         noteDuration: this.currentDuration,
+        bassBlockIsolated: staff === 'bass', // Bass clef only gets truncate option (block-isolated)
         onChoice: (choice) => {
           if (choice === null) {
             return;
           }
 
           if (choice === 'truncate') {
-            // Truncate: Insert the note after the selected and remove any notes that overflow
+            console.log('[SHIFT-INSERT-AFTER] Taking TRUNCATE path, staff=', staff);
+            // For bass clef with block isolation, "truncate" means:
+            // Insert the new note and shift existing notes, truncating any that overflow the block boundary
+            if (staff === 'bass') {
+              console.log('[SHIFT-INSERT-AFTER] Bass truncate - using block-isolated shift with truncation');
+              this.insertBassNoteWithShiftAtPosition(
+                measureIndex,
+                { action: 'after', noteIndex, voiceIndex },
+                noteData,
+                compositionState,
+                beatsPerMeasure
+              );
+              return;
+            }
+
+            // Treble clef: Insert the note after the selected and remove any notes that overflow
             // Calculate the beat position after the selected note
             let insertBeat = 0;
             for (let i = 0; i <= noteIndex; i++) {
@@ -3040,23 +3400,34 @@ export class NoteEditor {
       showNoteOverflowDialog({
         overflowBeats: overflow.overflowBeats,
         noteDuration: newDuration,
+        bassBlockIsolated: overflow.staff === 'bass', // Bass clef only gets truncate option (block-isolated)
         onChoice: (choice) => {
           if (choice === null) {
             return;
           }
 
           if (choice === 'truncate') {
-            // Truncate: set duration to max that fits
-            const fitDuration = this.beatsToDuration(overflow.availableBeats);
-            this.applyDurationChange(newDuration, fitDuration.duration, fitDuration.dotted, [overflow.noteId]);
+            if (overflow.staff === 'bass') {
+              // BASS: Apply the new duration and truncate downstream notes within the block
+              this.applyDurationChangeWithTruncateBass(
+                overflow.measureIndex,
+                overflow.noteIndex,
+                overflow.voiceIndex,
+                newDuration,
+                overflow.newDotted,
+                compositionState
+              );
+            } else {
+              // TREBLE: Truncate the note itself to fit available space
+              const fitDuration = this.beatsToDuration(overflow.availableBeats);
+              this.applyDurationChange(newDuration, fitDuration.duration, fitDuration.dotted, [overflow.noteId]);
+            }
           } else if (choice === 'shift') {
-            // Shift: push downstream notes forward to make room
+            // Shift: push downstream notes forward to make room (treble only)
             if (overflow.staff === 'treble') {
               this.applyDurationChangeWithShift(overflow.measureIndex, overflow.noteIndex, newDuration, overflow.newDotted, compositionState);
-            } else {
-              // Bass clef shift support
-              this.applyDurationChangeWithShiftBass(overflow.measureIndex, overflow.noteIndex, overflow.voiceIndex, newDuration, overflow.newDotted, compositionState);
             }
+            // Note: Bass clef never reaches here since bassBlockIsolated hides the shift option
           }
         },
       });
@@ -3343,6 +3714,109 @@ export class NoteEditor {
   }
 
   /**
+   * Apply duration change to a bass note with block-isolated truncation.
+   * Changes the note to the new duration and truncates downstream notes within the same chord block.
+   * @param {number} measureIndex - Measure index
+   * @param {number} noteIndex - Note index within voice
+   * @param {number} voiceIndex - Voice index
+   * @param {string} newDuration - New duration string
+   * @param {boolean} isDotted - Whether dotted
+   * @param {Object} compositionState - Composition state
+   */
+  applyDurationChangeWithTruncateBass(measureIndex, noteIndex, voiceIndex, newDuration, isDotted, compositionState) {
+    const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(compositionState.metadata?.timeSignature);
+
+    // Get the note from the measure
+    const measure = compositionState.measures[measureIndex];
+    if (!measure) {
+      console.warn('[NoteEditor] Could not find measure for bass duration change with truncate');
+      return;
+    }
+
+    const voice = measure.notation?.bass?.voices?.[voiceIndex];
+    if (!voice || !voice.notes || noteIndex >= voice.notes.length) {
+      console.warn('[NoteEditor] Could not find voice/note for bass duration change with truncate');
+      return;
+    }
+
+    const note = voice.notes[noteIndex];
+    const noteBeat = note.beat || 0;
+
+    // Calculate new duration in beats
+    let newBeats = this.durationToBeats(newDuration);
+    if (isDotted) newBeats *= 1.5;
+
+    // Get block info for this note
+    const absoluteBeat = measureIndex * beatsPerMeasure + noteBeat;
+    const blockInfo = this.getBuildingBlockInfo(measureIndex, noteBeat);
+
+    if (!blockInfo) {
+      console.warn('[NoteEditor] Could not find block info for bass duration change');
+      // Fall back to simple duration change
+      this.applyDurationChange(newDuration, newDuration, isDotted, [`${measureIndex}-bass-${voiceIndex}-${noteIndex}`]);
+      return;
+    }
+
+    // Use correct property names from getBuildingBlockInfo return value
+    const blockStartBeat = blockInfo.segmentStartBeat;
+    const blockEndBeat = blockInfo.segmentEndBeat;
+
+    console.log('[DURATION-TRUNCATE-BASS] Block-isolated truncation');
+    console.log(`[DURATION-TRUNCATE-BASS] Block ${blockInfo.chordIndex}, range [${blockStartBeat}, ${blockEndBeat}), note at beat ${absoluteBeat}`);
+
+    // Check if there are any notes after this one in the block that would be affected
+    const currentNoteBeats = this.durationToBeats(note.duration || '4n', note.dotted);
+    const currentNoteEndBeat = absoluteBeat + currentNoteBeats;
+
+    // If the new duration is shorter or equal AND doesn't overlap subsequent notes, just apply directly
+    // But if new duration is LONGER, we need extract→rebuild to handle downstream notes
+    if (newBeats <= currentNoteBeats) {
+      // Shrinking the note - safe to apply directly
+      console.log('[DURATION-TRUNCATE-BASS] Duration is shrinking, applying directly');
+      this.applyDurationChange(newDuration, newDuration, isDotted, [`${measureIndex}-bass-${voiceIndex}-${noteIndex}`]);
+      return;
+    }
+
+    // New duration is larger - need to use extract→rebuild to truncate downstream notes
+    console.log(`[DURATION-TRUNCATE-BASS] Duration expanding from ${currentNoteBeats} to ${newBeats} beats, using extract→rebuild`);
+
+    // Extract notes from this position within the block only
+    const logicalNotes = this._extractLogicalNotesFromBlock(
+      'bass', voiceIndex, compositionState, beatsPerMeasure,
+      blockStartBeat, blockEndBeat, absoluteBeat
+    );
+
+    console.log(`[DURATION-TRUNCATE-BASS] Extracted ${logicalNotes.length} logical notes from block`);
+
+    // Modify the first logical note's duration (this is the note being changed)
+    if (logicalNotes.length > 0) {
+      logicalNotes[0].totalDuration = newBeats;
+    }
+
+    // Rebuild within block boundaries - this will truncate overflow
+    this._rebuildNotesInBlock(
+      'bass', voiceIndex, compositionState, beatsPerMeasure,
+      blockStartBeat, blockEndBeat, absoluteBeat,
+      logicalNotes
+    );
+
+    // Mark bass as edited and sync
+    if (measure.notation?.bass) {
+      measure.notation.bass.autoGenerated = false;
+      compositionState.saveEditedBassNotesForMeasure(measureIndex);
+    }
+
+    // Sync measures back to bass block sequence
+    compositionState.syncMeasuresToBuildingBlocks();
+
+    this.composerIntegration.render(true);
+
+    setTimeout(() => {
+      this.renderOverlay();
+    }, 50);
+  }
+
+  /**
    * Toggle articulation on all selected notes
    * @param {string} articulation - Articulation type ('staccato', 'accent', 'tenuto', 'marcato')
    */
@@ -3504,10 +3978,97 @@ export class NoteEditor {
 
   /**
    * Toggle dotted on all selected notes
+   * When adding a dot (increasing duration by 50%), check for measure overflow
    */
   toggleDottedOnSelected() {
     if (this.selectedNotes.size === 0) return;
 
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) {
+      console.warn('[NoteEditor] No compositionState available');
+      return;
+    }
+
+    // Get time signature for beat calculation
+    const timeSignature = compositionState.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
+    const maxBeats = getBeatsPerMeasureFromTimeSignature(timeSignature);
+
+    // Check for overflow when ADDING a dot (not when removing one)
+    const overflows = [];
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+
+      const measure = compositionState.measures[measureIndex];
+      if (!measure) continue;
+
+      const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+      const voice = measure.notation[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+      if (!voice || !voice.notes[noteIndex]) continue;
+
+      const note = voice.notes[noteIndex];
+      const currentDotted = note.dotted || false;
+
+      // Only check overflow when ADDING a dot (toggling from false to true)
+      if (!currentDotted) {
+        const currentDuration = note.duration || '4n';
+        const currentBeats = this.durationToBeats(currentDuration, false);
+        const newBeats = currentBeats * 1.5; // Adding dot increases by 50%
+
+        // Calculate current measure beats used (excluding this note)
+        let usedBeats = 0;
+        for (let i = 0; i < voice.notes.length; i++) {
+          if (i !== noteIndex) {
+            const dur = voice.notes[i].duration || '4n';
+            let beats = this.durationToBeats(dur, voice.notes[i].dotted || false);
+            usedBeats += beats;
+          }
+        }
+
+        const availableBeats = maxBeats - usedBeats;
+
+        if (newBeats > availableBeats) {
+          overflows.push({
+            noteId,
+            measureIndex,
+            noteIndex,
+            voiceIndex,
+            staff,
+            overflowBeats: newBeats - availableBeats,
+            availableBeats,
+            newBeats,
+            currentNote: note,
+          });
+        }
+      }
+    }
+
+    // If there are overflows when adding dot, show dialog
+    if (overflows.length > 0) {
+      const overflow = overflows[0];
+
+      showNoteOverflowDialog({
+        overflowBeats: overflow.overflowBeats,
+        noteDuration: `dotted ${overflow.currentNote.duration || '4n'}`,
+        bassBlockIsolated: overflow.staff === 'bass',
+        onChoice: (choice) => {
+          if (choice === null) {
+            return; // User cancelled
+          }
+
+          if (choice === 'truncate') {
+            // Apply the dotted change and truncate downstream notes
+            this._applyDottedWithTruncate(overflow, compositionState, maxBeats);
+          } else if (choice === 'shift') {
+            // Apply the dotted change and shift downstream notes
+            this._applyDottedWithShift(overflow, compositionState, maxBeats);
+          }
+        },
+      });
+      return;
+    }
+
+    // No overflow - apply dotted toggle directly
     // Save state for undo before making changes
     if (typeof window.saveStateBeforeChange === 'function') {
       window.saveStateBeforeChange();
@@ -3518,25 +4079,32 @@ export class NoteEditor {
     for (const noteId of this.selectedNotes) {
       const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
 
-      // Update compositionState directly
-      if (window.getCompositionState) {
-        const compositionState = window.getCompositionState();
-        if (compositionState && compositionState.measures[measureIndex]) {
-          const measure = compositionState.measures[measureIndex];
-          const voiceKey = staff === 'treble' ? 'treble' : 'bass';
-          const voice = measure.notation[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
-          if (voice && voice.notes[noteIndex]) {
-            const note = voice.notes[noteIndex];
-            // Toggle dotted state
-            note.dotted = !note.dotted;
-            changedCount++;
-          }
+      const measure = compositionState.measures[measureIndex];
+      if (measure) {
+        const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+        const voice = measure.notation[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+        if (voice && voice.notes[noteIndex]) {
+          const note = voice.notes[noteIndex];
+          // Toggle dotted state
+          note.dotted = !note.dotted;
+          changedCount++;
         }
       }
     }
 
     if (changedCount > 0) {
-      const compositionState = window.getCompositionState?.();
+      // Recalculate beat positions for affected measures
+      for (const noteId of this.selectedNotes) {
+        const [measureIndex, staff, voiceIndex] = this.parseNoteId(noteId);
+        const measure = compositionState.measures[measureIndex];
+        if (measure) {
+          const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+          const voice = measure.notation[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+          if (voice && voice.notes) {
+            this.recalculateBeatPositions(voice.notes);
+          }
+        }
+      }
 
       // Sync treble changes to block sequence (if using treble block sequence)
       if (compositionState?.trebleBlockSequence?.blocks?.length > 0) {
@@ -3546,7 +4114,7 @@ export class NoteEditor {
       // Save bass edits to preserve the entire building block
       for (const noteId of this.selectedNotes) {
         const [measureIndex, staff, voiceIndex] = this.parseNoteId(noteId);
-        if (staff === 'bass' && compositionState) {
+        if (staff === 'bass') {
           const measure = compositionState.measures[measureIndex];
           if (measure && measure.notation?.bass) {
             measure.notation.bass.autoGenerated = false;
@@ -3557,6 +4125,119 @@ export class NoteEditor {
 
       this.composerIntegration.render(true);
     }
+  }
+
+  /**
+   * Apply dotted change with truncation of downstream notes
+   * @private
+   */
+  _applyDottedWithTruncate(overflow, compositionState, maxBeats) {
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const { measureIndex, staff, voiceIndex, noteIndex } = overflow;
+    const measure = compositionState.measures[measureIndex];
+    const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+    const voice = measure.notation[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+
+    if (!voice || !voice.notes[noteIndex]) return;
+
+    // Set dotted
+    voice.notes[noteIndex].dotted = true;
+
+    // Calculate how much space we need
+    const noteBeats = this.durationToBeats(voice.notes[noteIndex].duration || '4n', true);
+
+    // Calculate beat position of this note
+    let noteBeat = 0;
+    for (let i = 0; i < noteIndex; i++) {
+      noteBeat += this.durationToBeats(voice.notes[i].duration || '4n', voice.notes[i].dotted || false);
+    }
+
+    // Remove notes that overflow
+    const noteEndBeat = noteBeat + noteBeats;
+    const notesToKeep = [];
+    let currentBeat = 0;
+
+    for (let i = 0; i < voice.notes.length; i++) {
+      const n = voice.notes[i];
+      const nBeats = this.durationToBeats(n.duration || '4n', n.dotted || false);
+
+      if (i <= noteIndex) {
+        // Keep notes up to and including the dotted note
+        notesToKeep.push(n);
+        currentBeat += nBeats;
+      } else if (currentBeat < maxBeats) {
+        // Keep subsequent notes only if they fit
+        if (currentBeat + nBeats <= maxBeats) {
+          notesToKeep.push(n);
+          currentBeat += nBeats;
+        } else {
+          // Truncate this note or skip it
+          break;
+        }
+      }
+    }
+
+    voice.notes = notesToKeep;
+    this.recalculateBeatPositions(voice.notes);
+
+    // Sync and render
+    if (staff === 'treble' && compositionState?.trebleBlockSequence?.blocks?.length > 0) {
+      compositionState.syncMeasuresToTrebleBlock();
+    }
+    if (staff === 'bass') {
+      measure.notation.bass.autoGenerated = false;
+      compositionState.saveEditedBassNotesForMeasure(measureIndex);
+    }
+
+    this.composerIntegration.render(true);
+  }
+
+  /**
+   * Apply dotted change with shift of downstream notes
+   * @private
+   */
+  _applyDottedWithShift(overflow, compositionState, maxBeats) {
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const { measureIndex, staff, voiceIndex, noteIndex } = overflow;
+    const measure = compositionState.measures[measureIndex];
+    const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+    const voice = measure.notation[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+
+    if (!voice || !voice.notes[noteIndex]) return;
+
+    const note = voice.notes[noteIndex];
+    const oldBeats = this.durationToBeats(note.duration || '4n', false);
+    const newBeats = oldBeats * 1.5;
+    const shiftAmount = newBeats - oldBeats;
+
+    // Set dotted
+    note.dotted = true;
+
+    // Use the extract→rebuild pattern for treble
+    if (staff === 'treble') {
+      // Recalculate beat positions - shift forward
+      this.recalculateBeatPositions(voice.notes);
+
+      // Sync to block sequence
+      if (compositionState?.trebleBlockSequence?.blocks?.length > 0) {
+        compositionState.syncMeasuresToTrebleBlock();
+      }
+    } else {
+      // Bass - recalculate and save
+      this.recalculateBeatPositions(voice.notes);
+      measure.notation.bass.autoGenerated = false;
+      compositionState.saveEditedBassNotesForMeasure(measureIndex);
+    }
+
+    this.composerIntegration.render(true);
   }
 
   /**
@@ -4387,6 +5068,48 @@ export class NoteEditor {
   // ============================================================================
 
   /**
+   * Get selected notes as structured objects
+   * @returns {Array<{noteId: string, staff: string, measureIndex: number, voiceIndex: number, noteIndex: number, beat: number, pitches: string[], isRest: boolean}>}
+   */
+  getSelectedNotes() {
+    const result = [];
+    const compositionState = window.getCompositionState?.();
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+
+      // Get the beat position and pitch from the actual note
+      let beat = 0;
+      let pitches = [];
+      let isRest = false;
+      if (compositionState?.measures?.[measureIndex]) {
+        const measure = compositionState.measures[measureIndex];
+        const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+        const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex];
+        const note = voice?.notes?.[noteIndex];
+        if (note) {
+          beat = note.beat || 0;
+          pitches = note.pitches || [];
+          isRest = note.isRest || false;
+        }
+      }
+
+      result.push({
+        noteId,
+        staff,
+        measureIndex,
+        voiceIndex,
+        noteIndex,
+        beat,
+        pitches,
+        isRest
+      });
+    }
+
+    return result;
+  }
+
+  /**
    * Select a note
    * @param {string} noteId - Note ID
    */
@@ -4396,8 +5119,60 @@ export class NoteEditor {
     this.onNoteSelect(Array.from(this.selectedNotes));
     this.renderOverlay();
 
+    // Update the active staff and bass block based on the selected note
+    this._updateEditingStateFromSelection(noteId);
+
     // Dispatch event for tutorial validation
     dispatchBuilderEvent('notationNoteSelected', { noteId, selectedNotes: Array.from(this.selectedNotes) });
+  }
+
+  /**
+   * Update the editing state (active staff and bass block) based on a selected note
+   * @param {string} noteId - Note ID (e.g., "0-bass-0-1")
+   * @private
+   */
+  _updateEditingStateFromSelection(noteId) {
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    // Parse the note ID to get measure, staff, voice, note indices
+    const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+
+    // Update the active staff in compositionState
+    compositionState.setActiveStaff(staff);
+
+    // Also update the toolbar staff selection mode to match the selected note's staff
+    // This provides intuitive UX: selecting a treble note switches to treble mode, etc.
+    if (this.composerIntegration?.toolbar) {
+      const currentMode = this.composerIntegration.toolbar.getStaffSelectionMode?.();
+      // Only switch if we're in a forced mode (treble/bass) and selected a note from different staff
+      // In auto mode, we don't force a switch
+      if (currentMode !== 'auto' && currentMode !== staff) {
+        this.composerIntegration.toolbar.setStaffSelectionMode(staff);
+      } else {
+        // Still refresh the context to show updated info
+        this.composerIntegration.toolbar.refreshEditingContext?.();
+      }
+    }
+
+    // If it's a bass note, update the active bass block
+    if (staff === 'bass') {
+      // Get the note's beat position to determine which block it belongs to
+      const measure = compositionState.measures?.[measureIndex];
+      const voice = measure?.notation?.bass?.voices?.[voiceIndex];
+      const note = voice?.notes?.[noteIndex];
+
+      if (note !== undefined) {
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(
+          compositionState.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE
+        );
+        const absoluteBeat = measureIndex * beatsPerMeasure + (note.beat || 0);
+        compositionState.updateActiveBassBlockFromBeat(absoluteBeat);
+      }
+    } else {
+      // Treble note selected - clear the active bass block
+      compositionState.setActiveBassBlockIndex(null);
+    }
   }
 
   /**
@@ -4414,6 +5189,15 @@ export class NoteEditor {
     this.onNoteSelect(Array.from(this.selectedNotes));
     this.renderOverlay();
 
+    // Update editing state if we're adding a note
+    if (this.selectedNotes.has(noteId)) {
+      this._updateEditingStateFromSelection(noteId);
+    } else if (this.selectedNotes.size === 0) {
+      // All notes deselected - clear active bass block
+      const compositionState = window.getCompositionState?.();
+      compositionState?.setActiveBassBlockIndex(null);
+    }
+
     // Dispatch event for tutorial validation
     dispatchBuilderEvent('notationNoteSelected', { noteId, selectedNotes: Array.from(this.selectedNotes) });
   }
@@ -4429,6 +5213,10 @@ export class NoteEditor {
     }
     this.onNoteSelect([]);
     this.renderOverlay();
+
+    // Clear the active bass block when selection is cleared
+    const compositionState = window.getCompositionState?.();
+    compositionState?.setActiveBassBlockIndex(null);
   }
 
   /**

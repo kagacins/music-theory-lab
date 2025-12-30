@@ -1658,6 +1658,11 @@ function handleSelectionChange(selection) {
       noteEditor.setChordContext(chord, key);
     }
   }
+
+  // Emit selection changed event for toolbar context update
+  if (notationComposer?.compositionState?.events) {
+    notationComposer.compositionState.events.emit('selectionChanged', selection);
+  }
 }
 
 /**

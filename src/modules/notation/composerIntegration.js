@@ -1024,6 +1024,9 @@ export class NotationComposer {
         cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice !== false,
         // hideCueRests = !cueRestsForSecondaryVoice (checkbox unchecked = hide cue rests)
         hideCueRests: settings.cueRestsForSecondaryVoice === false,
+        // Phase 2 Bass Block Isolation: active block highlighting
+        activeBassBlockIndex: compositionState ? compositionState.getActiveBassBlockIndex() : -1,
+        chordSegments: compositionState ? compositionState.getChordSegments() : [],
       });
     }
 
@@ -1510,6 +1513,7 @@ export class NotationComposer {
       const page = this.pageManager.getPageForMeasure(startMeasure);
 
       // Render this page's measures
+      const compositionState = getCompositionState();
       const renderedPage = renderGrandStaffSystem(page.canvas, pageMeasures, {
         measuresPerLine: this.config.measuresPerLine,
         keySignature: key,
@@ -1533,6 +1537,9 @@ export class NotationComposer {
         cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice !== false,
         // hideCueRests = !cueRestsForSecondaryVoice (checkbox unchecked = hide cue rests)
         hideCueRests: settings.cueRestsForSecondaryVoice === false,
+        // Phase 2 Bass Block Isolation: active block highlighting
+        activeBassBlockIndex: compositionState ? compositionState.getActiveBassBlockIndex() : -1,
+        chordSegments: compositionState ? compositionState.getChordSegments() : [],
       });
 
       // Collect rendered measures (adjust indices back to global)
@@ -1743,6 +1750,9 @@ export class NotationComposer {
       cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice !== false,
       // hideCueRests = !cueRestsForSecondaryVoice (checkbox unchecked = hide cue rests)
       hideCueRests: settings.cueRestsForSecondaryVoice === false,
+      // Phase 2 Bass Block Isolation: active block highlighting
+      activeBassBlockIndex: compositionState ? compositionState.getActiveBassBlockIndex() : -1,
+      chordSegments: compositionState ? compositionState.getChordSegments() : [],
     });
 
     const allRenderedMeasures = [];
@@ -2495,9 +2505,10 @@ export class NotationComposer {
    * Check if a click hit a chord bracket region and handle it
    * @param {number} x - Click X coordinate
    * @param {number} y - Click Y coordinate
+   * @param {MouseEvent} event - The original click event (for modifier keys)
    * @returns {boolean} - True if a bracket was clicked
    */
-  checkChordBracketClick(x, y) {
+  checkChordBracketClick(x, y, event = null) {
     if (!this.chordBracketRegions || this.chordBracketRegions.length === 0) {
       return false;
     }
@@ -2505,7 +2516,7 @@ export class NotationComposer {
     for (const region of this.chordBracketRegions) {
       if (x >= region.x && x <= region.x + region.width &&
           y >= region.y && y <= region.y + region.height) {
-        this.handleChordBracketClick(region);
+        this.handleChordBracketClick(region, event);
         return true;
       }
     }
@@ -2514,34 +2525,53 @@ export class NotationComposer {
 
   /**
    * Handle click on a chord bracket label
-   * Replaces the bass notes in that building block with the foundational chord
+   * Selects the corresponding bass block for editing (Phase 2 enhancement)
+   * Shift+Click replaces bass notes with foundational chord (original behavior)
    * @param {Object} region - Chord bracket region data
+   * @param {MouseEvent} event - The click event (to check for modifier keys)
    */
-  handleChordBracketClick(region) {
+  handleChordBracketClick(region, event = null) {
     const { chordData, chordIndex, startBeat, endBeat, durationBeats } = region;
 
-    if (!chordData || !this.compositionState) {
-      console.warn('[ComposerIntegration] Cannot replace chord - missing data');
+    if (!this.compositionState) {
+      console.warn('[ComposerIntegration] Cannot handle bracket click - missing compositionState');
       return;
     }
 
-    console.log('[ComposerIntegration] Replacing bass with foundational chord:', {
-      chordIndex,
-      chord: chordData,
-      startBeat,
-      endBeat,
-      durationBeats,
-    });
+    // Shift+Click = Replace bass with foundational chord (original behavior)
+    if (event && event.shiftKey && chordData) {
+      console.log('[ComposerIntegration] Replacing bass with foundational chord:', {
+        chordIndex,
+        chord: chordData,
+        startBeat,
+        endBeat,
+        durationBeats,
+      });
 
-    // Call compositionState to replace bass notes with foundational chord
-    this.compositionState.replaceBassWithFoundationalChord(
-      chordIndex,
-      startBeat,
-      durationBeats,
-      chordData
-    );
+      this.compositionState.replaceBassWithFoundationalChord(
+        chordIndex,
+        startBeat,
+        durationBeats,
+        chordData
+      );
 
-    // Re-render to show the changes
+      this.render();
+      return;
+    }
+
+    // Regular click = Select this bass block for editing
+    console.log('[ComposerIntegration] Selecting bass block:', chordIndex);
+
+    // Set the active staff to bass and the active block index
+    this.compositionState.setActiveStaff('bass');
+    this.compositionState.setActiveBassBlockIndex(chordIndex);
+
+    // Also update the toolbar to show bass mode
+    if (this.toolbar) {
+      this.toolbar.setStaffSelectionMode('bass');
+    }
+
+    // Re-render to show the block highlight
     this.render();
   }
 
