@@ -267,8 +267,9 @@
    PROGRESSION CARDS
    ============================================================================ */
 
+/* Removed transition to prevent animation when switching views */
 #progression-visualization > div {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); */
 }
 
 /* Ensure proper spacing between grid items in progression visualization */
@@ -459,14 +460,14 @@ body.progression-tooltips-disabled .chord-card-tooltip {
     transform: scale(0.95);
 }
 
-/* Card slide animations for section switching */
+/* Card slide animations for section switching - DISABLED to remove view switch animation */
 .section-filtered-cards {
-    transition: opacity 0.2s ease-out, transform 0.3s ease-out;
+    /* transition: opacity 0.2s ease-out, transform 0.3s ease-out; */
 }
 
-/* Individual card animations */
+/* Individual card animations - DISABLED to remove view switch animation */
 .section-view-card {
-    animation: slideInFromRight 0.3s ease-out forwards;
+    /* animation: slideInFromRight 0.3s ease-out forwards; */
     /* Cards start visible - animation handles the slide effect */
 }
 

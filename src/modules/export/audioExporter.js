@@ -468,11 +468,11 @@ async function playCompositionForRecording(progressionData, settings, tempo, tot
 function getChordNotesForExport(chord, settings) {
     // Use stored notes if available
     if (chord.notes && chord.notes.length > 0) {
-        // Filter out invalid notes
+        // Filter out invalid notes (allows double sharps ## and double flats bb)
         const validNotes = chord.notes.filter(note => {
             if (!note || typeof note !== 'string') return false;
             if (note.includes('NaN')) return false;
-            return /^[A-G][#b]?\d+$/.test(note);
+            return /^[A-G][#b]*\d+$/.test(note);
         });
 
         // Get bass notes if available

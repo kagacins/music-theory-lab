@@ -4105,7 +4105,10 @@ function showTemplatePreviewBeforeApply(template, content, modal) {
     });
 
     // Finalize - NOW apply the template
-    content.querySelector('#finalize-template-btn')?.addEventListener('click', () => {
+    const finalizeBtn = content.querySelector('#finalize-template-btn');
+    console.log('[SongwritingWizard] Finalize button found:', !!finalizeBtn);
+    finalizeBtn?.addEventListener('click', () => {
+        console.log('[SongwritingWizard] Finalize button clicked!');
         applyTemplateWithCustomOrder(template, reorderedSections, content, modal);
     });
 }
@@ -4114,36 +4117,46 @@ function showTemplatePreviewBeforeApply(template, content, modal) {
  * Apply template with custom section order (called only when Finalize is clicked)
  */
 function applyTemplateWithCustomOrder(template, reorderedSections, content, modal) {
-    const compositionState = getCompositionState();
+    console.log('[SongwritingWizard] Finalize clicked - applying template:', template?.name);
+    console.log('[SongwritingWizard] Sections to create:', reorderedSections);
 
-    // Clear existing sections first
-    const existingSections = compositionState.getSections();
-    existingSections.forEach(s => compositionState.deleteSection(s.id));
+    try {
+        const compositionState = getCompositionState();
+        console.log('[SongwritingWizard] Got compositionState:', !!compositionState);
 
-    // Create sections in the reordered order as placeholders with expected chord counts
-    reorderedSections.forEach(sectionDef => {
-        compositionState.createPlaceholderSection(sectionDef.type, {
-            expectedChordCount: sectionDef.expectedChordCount || 4,
-            label: sectionDef.label
+        // Clear existing sections first
+        const existingSections = compositionState.getSections();
+        console.log('[SongwritingWizard] Existing sections to delete:', existingSections.length);
+        existingSections.forEach(s => compositionState.deleteSection(s.id));
+
+        // Create sections in the reordered order as placeholders with expected chord counts
+        reorderedSections.forEach(sectionDef => {
+            compositionState.createPlaceholderSection(sectionDef.type, {
+                expectedChordCount: sectionDef.expectedChordCount || 4,
+                label: sectionDef.label
+            });
         });
-    });
 
-    // Clear section selection
-    clearSectionSelection();
+        // Clear section selection
+        clearSectionSelection();
 
-    // Re-render progression display
-    renderProgressionDisplay('melody-progression-visualization', true);
+        // Re-render progression display
+        renderProgressionDisplay('melody-progression-visualization', true);
 
-    // Close modal and refresh main view
-    modal.remove();
-    refreshMainViewOnClose();
+        // Close modal and refresh main view
+        modal.remove();
+        refreshMainViewOnClose();
 
-    window.dispatchEvent(new CustomEvent('showNotification', {
-        detail: {
-            message: `Created ${reorderedSections.length} sections from "${template.name}"!`,
-            type: 'success'
-        }
-    }));
+        window.dispatchEvent(new CustomEvent('showNotification', {
+            detail: {
+                message: `Created ${reorderedSections.length} sections from "${template.name}"!`,
+                type: 'success'
+            }
+        }));
+        console.log('[SongwritingWizard] Template applied successfully');
+    } catch (error) {
+        console.error('[SongwritingWizard] Error applying template:', error);
+    }
 }
 
 /**

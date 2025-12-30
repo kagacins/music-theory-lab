@@ -689,7 +689,7 @@
                 <div class="flex items-center gap-2">
                     <!-- Play Button with Dropdown -->
                     <div class="relative group">
-                        <button id="action-play-btn" class="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg shadow transition-colors" title="Play (Space)">
+                        <button id="action-play-btn" onclick="const tab=window.currentTab||'builder'; if(tab==='melody' && window.playAllMelody) window.playAllMelody(); else if(tab==='trainer' && window.handleAutoPlayback) window.handleAutoPlayback(); else if(tab==='builder' && window.playBuilderChordWithDuration) window.playBuilderChordWithDuration();" class="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg shadow transition-colors" title="Play (Space)">
                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
                             <span class="hidden sm:inline">Play</span>
                             <svg id="action-play-dropdown-arrow" class="w-3 h-3 opacity-70" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
@@ -707,25 +707,25 @@
                         </div>
                         <!-- Play Dropdown (Composition Studio) -->
                         <div id="action-play-dropdown" class="melody-only absolute left-0 mt-1 w-48 bg-white rounded-lg shadow-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
-                            <button id="action-play-all" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded-t-lg flex items-center gap-2">
+                            <button id="action-play-all" onclick="if(window.playAllMelody) window.playAllMelody()" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded-t-lg flex items-center gap-2">
                                 <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
                                 Play All
                             </button>
-                            <button id="action-play-progression" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                            <button id="action-play-progression" onclick="if(window.playProgressionOnly) window.playProgressionOnly()" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
                                 <svg class="w-4 h-4 text-teal-600" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"/></svg>
                                 Chords Only
                             </button>
-                            <button id="action-play-from-cursor" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                            <button id="action-play-from-cursor" onclick="if(window.playFromSelectedMeasure) window.playFromSelectedMeasure()" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
                                 <svg class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
                                 Play from Selected
                             </button>
-                            <button id="action-play-measure" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded-b-lg flex items-center gap-2">
+                            <button id="action-play-measure" onclick="if(window.playSelectedMeasure) window.playSelectedMeasure(); else if(window.playMeasure) window.playMeasure(0);" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded-b-lg flex items-center gap-2">
                                 <svg class="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm4.5 2a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm5 0a1.5 1.5 0 100 3 1.5 1.5 0 000-3z"/></svg>
                                 Play Measure
                             </button>
                         </div>
                     </div>
-                    <button id="action-stop-btn" class="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg shadow transition-colors" title="Stop playback">
+                    <button id="action-stop-btn" onclick="if(window.stopPlayAllMelody) window.stopPlayAllMelody(); if(window.stopMelody) window.stopMelody(); if(window.forceStopAllPlayback) window.forceStopAllPlayback(true); if(window.stopNotationPlaybackHighlighting) window.stopNotationPlaybackHighlighting();" class="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg shadow transition-colors" title="Stop playback">
                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd"/></svg>
                         <span class="hidden sm:inline">Stop</span>
                     </button>
@@ -739,11 +739,11 @@
                         </button>
                         <!-- Add Dropdown -->
                         <div class="absolute left-0 mt-1 w-40 bg-white rounded-lg shadow-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
-                            <button id="action-add-chord" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded-t-lg flex items-center gap-2">
+                            <button id="action-add-chord" onclick="if(window.addChordToProgression) window.addChordToProgression(false)" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded-t-lg flex items-center gap-2">
                                 <svg class="w-4 h-4 text-indigo-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
                                 Add Chord
                             </button>
-                            <button id="action-add-go" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded-b-lg flex items-center gap-2">
+                            <button id="action-add-go" onclick="if(window.addChordToProgression) window.addChordToProgression(true)" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded-b-lg flex items-center gap-2">
                                 <svg class="w-4 h-4 text-teal-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"/></svg>
                                 Add & Go
                             </button>
@@ -769,22 +769,22 @@
                         </button>
                         <!-- Edit Dropdown -->
                         <div class="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
-                            <button id="action-undo" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded-t-lg flex items-center gap-2">
+                            <button id="action-undo" onclick="if(window.handleUndo) window.handleUndo()" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded-t-lg flex items-center gap-2">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
                                 Undo
                                 <span class="ml-auto text-xs text-gray-400">Ctrl+Z</span>
                             </button>
-                            <button id="action-redo" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                            <button id="action-redo" onclick="if(window.handleRedo) window.handleRedo()" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"/></svg>
                                 Redo
                                 <span class="ml-auto text-xs text-gray-400">Ctrl+Y</span>
                             </button>
                             <div class="border-t border-gray-100 my-1"></div>
-                            <button id="action-clear-treble" class="melody-only w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                            <button id="action-clear-treble" onclick="if(window.clearAllTrebleNotes) window.clearAllTrebleNotes()" class="melody-only w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
                                 <svg class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                 Clear Treble Clef
                             </button>
-                            <button id="action-clear-progression" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded-b-lg flex items-center gap-2">
+                            <button id="action-clear-progression" onclick="if(window.clearProgression) window.clearProgression()" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded-b-lg flex items-center gap-2">
                                 <svg class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                 Clear Progression
                             </button>
@@ -805,16 +805,16 @@
                                 <span class="text-green-700 font-medium">New Song</span>
                             </button>
                             <div class="border-t border-gray-100 my-1"></div>
-                            <button id="action-save" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                            <button id="action-save" onclick="if(window.saveProjectToFile) window.saveProjectToFile(window.getCompositionState())" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
                                 Save
                                 <span class="ml-auto text-xs text-gray-400">Ctrl+S</span>
                             </button>
-                            <button id="action-load" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                            <button id="action-load" onclick="if(window.loadProjectFromFile) window.loadProjectFromFile()" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                                 Load
                             </button>
-                            <button id="action-version-history" onclick="window.showVersionHistory && window.showVersionHistory()" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2" title="View and restore previous versions">
+                            <button id="action-version-history" onclick="window.showVersionHistoryPanel && window.showVersionHistoryPanel()" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2" title="View and restore previous versions">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                 Version History
                             </button>
@@ -829,23 +829,23 @@
                                 <span>Auto-save on</span>
                             </div>
                             <div class="border-t border-gray-100 my-1"></div>
-                            <button id="action-import-midi" class="trainer-melody-only w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2" title="Import chords from a MIDI file">
+                            <button id="action-import-midi" onclick="if(window.showMIDIImportDialog) window.showMIDIImportDialog()" class="trainer-melody-only w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2" title="Import chords from a MIDI file">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                                 Import MIDI
                             </button>
-                            <button id="action-export-midi" class="trainer-melody-only w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                            <button id="action-export-midi" onclick="if(window.showMIDIExportDialog) window.showMIDIExportDialog()" class="trainer-melody-only w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
                                 Export MIDI
                             </button>
-                            <button id="action-copy-link" class="trainer-melody-only w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
+                            <button id="action-copy-link" onclick="if(window.copyShareableLink) window.copyShareableLink()" class="trainer-melody-only w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                                 Copy Link
                             </button>
-                            <button id="action-export-pdf" class="trainer-melody-only w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2" title="Export lead sheet as PDF">
+                            <button id="action-export-pdf" onclick="if(window.showPDFExportDialog) window.showPDFExportDialog()" class="trainer-melody-only w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2" title="Export lead sheet as PDF">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                                 Export PDF
                             </button>
-                            <button id="action-export-audio" class="trainer-melody-only w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded-b-lg flex items-center gap-2" title="Export as audio file (WAV/MP3)">
+                            <button id="action-export-audio" onclick="if(window.showAudioExportDialog) window.showAudioExportDialog()" class="trainer-melody-only w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 rounded-b-lg flex items-center gap-2" title="Export as audio file (WAV/MP3)">
                                 <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/><circle cx="6" cy="18" r="2" fill="currentColor"/><circle cx="18" cy="16" r="2" fill="currentColor"/></svg>
                                 Export Audio
                             </button>
@@ -2281,7 +2281,7 @@
                         <div class="flex flex-wrap items-center gap-2 mt-3 p-2 bg-emerald-50/50 rounded-lg border border-emerald-300">
                             <!-- Pattern label and selector -->
                             <span class="text-[10px] font-medium text-emerald-700">Bass Pattern</span>
-                            <select id="bass-pattern-select-card" class="w-28 p-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 bg-white">
+                            <select id="bass-pattern-select-card" class="w-28 p-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 bg-white" onchange="window.handleBassPatternChange && window.handleBassPatternChange(this.value, this)">
                                 <optgroup label="Simple">
                                     <option value="whole-note">Whole Note</option>
                                     <option value="root-fifth" selected>Root-Fifth</option>
@@ -2352,7 +2352,7 @@
                             </select>
                             <!-- Octave selector -->
                             <span class="text-[10px] text-gray-500">Octave</span>
-                            <select id="bass-octave-select-card" class="w-16 p-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 bg-white" title="Bass register: Oct 2 = low bass, Oct 3 = mid register">
+                            <select id="bass-octave-select-card" class="w-16 p-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-emerald-500 bg-white" title="Bass register: Oct 2 = low bass, Oct 3 = mid register" onchange="window.handleBassOctaveChange && window.handleBassOctaveChange(this.value, this)">
                                 <option value="auto" selected>Auto</option>
                                 <option value="2">Oct 2</option>
                                 <option value="3">Oct 3</option>
@@ -2360,7 +2360,7 @@
                             <!-- Inversion toggle -->
                             <div class="flex items-center gap-1" title="When ON, bass plays the inversion note (3rd for 1st inv, 5th for 2nd inv)">
                                 <label class="toggle-switch" style="transform: scale(0.7);">
-                                    <input type="checkbox" id="bass-follows-inversion-toggle-card">
+                                    <input type="checkbox" id="bass-follows-inversion-toggle-card" onchange="window.setBassFollowsInversion && window.setBassFollowsInversion(this.checked); const mainToggle = document.getElementById('bass-follows-inversion-toggle'); if (mainToggle) mainToggle.checked = this.checked; window.refreshNotationFromProgression && window.refreshNotationFromProgression();">
                                     <span class="toggle-slider"></span>
                                 </label>
                                 <span class="text-[10px] text-gray-500">Inv</span>
@@ -2814,7 +2814,7 @@
                                         <div class="flex items-center gap-1.5" onclick="event.stopPropagation()" title="Toggle measure highlighting">
                                             <span class="text-[10px] font-medium text-gray-600">Highlight</span>
                                             <label class="relative inline-flex items-center cursor-pointer">
-                                                <input type="checkbox" id="melody-highlight-toggle" class="sr-only" checked onchange="window.toggleMelodyHighlight && window.toggleMelodyHighlight(this.checked)">
+                                                <input type="checkbox" id="melody-highlight-toggle" class="sr-only" checked onchange="window.setHighlightEnabled && window.setHighlightEnabled(this.checked)">
                                                 <div class="toggle-bg w-9 h-5 bg-violet-600 rounded-full border border-violet-700"></div>
                                             </label>
                                         </div>

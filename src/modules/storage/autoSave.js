@@ -46,7 +46,6 @@ export function initAutoSave(compositionState, options = {}) {
         startPeriodicSave();
     }
 
-    console.log('[autoSave] Initialized', { enabled: autoSaveEnabled });
     return true;
 }
 

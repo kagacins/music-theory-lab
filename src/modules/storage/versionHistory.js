@@ -48,7 +48,6 @@ export function initVersionHistory(compositionState) {
     // Load existing versions from storage
     loadVersionsFromStorage();
 
-    console.log('[versionHistory] Initialized with', versions.length, 'versions');
     return true;
 }
 

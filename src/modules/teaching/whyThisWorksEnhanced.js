@@ -81,8 +81,6 @@ export function initWhyThisWorksEnhanced() {
     // Override the standard showWhyThisWorks to use enhanced version
     // This makes all existing "Why?" buttons use the new enhanced panel
     window.showWhyThisWorks = showEnhancedWhyThisWorks;
-
-    console.log('[WhyThisWorksEnhanced] Initialized - Overriding standard Why This Works');
 }
 
 // ============================================================================

@@ -78,4 +78,15 @@
         opacity: 0 !important;
         visibility: hidden !important;
     }
+
+    /* Expanded chord card width constraint */
+    .detailed-card {
+        max-width: 220px;
+        width: fit-content;
+    }
+
+    /* Prevent expanded card wrapper from being too wide */
+    .expanded-card-wrapper {
+        width: fit-content;
+    }
 }

@@ -87,6 +87,10 @@ import {
 } from '../modules/state/compositionState.js';
 
 import {
+    getTrainerState
+} from '../modules/state/trainerState.js';
+
+import {
     invalidateProgressionDataCache
 } from '../modules/state/trainerState.js';
 
@@ -128,6 +132,11 @@ import {
 import {
     initProgressionNotationSync
 } from '../modules/integration/progressionNotationSync.js';
+
+import {
+    initMobileFab
+} from '../modules/ui/floatingActionButton.js';
+
 
 /**
  * Initialize all application modules
@@ -279,7 +288,20 @@ export async function initializeModules() {
                 if (shouldRecover) {
                     const result = loadAutoSave();
                     if (result.success) {
-                        applyProjectToState(result.project);
+                        const trainerState = getTrainerState();
+                        applyProjectToState(result.project, compositionState, trainerState, {
+                            onProgressionLoaded: (progressionData) => {
+                                // Refresh progression display after loading
+                                if (window.renderProgressionDisplay) {
+                                    window.renderProgressionDisplay('melody-progression-visualization', true);
+                                }
+                            },
+                            onNotationRefresh: () => {
+                                if (window.refreshNotationFromProgression) {
+                                    window.refreshNotationFromProgression();
+                                }
+                            }
+                        });
                         alert('Your work has been recovered!');
                     } else {
                         alert('Failed to recover work: ' + result.error);
@@ -323,4 +345,9 @@ export async function initializeModules() {
 
     // Initialize Progression-Notation Sync (no delay needed, sync system is ready)
     initProgressionNotationSync();
+
+    // Initialize Floating Action Button (FAB) - delayed to ensure DOM is ready
+    setTimeout(() => {
+        initMobileFab();
+    }, 100);
 }

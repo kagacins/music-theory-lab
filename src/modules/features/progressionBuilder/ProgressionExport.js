@@ -574,7 +574,6 @@ export function openTemplateBrowser() {
  * @param {string} rhythmPattern - Optional rhythm pattern ID to apply
  */
 function loadTemplateToProgression(template, action = 'load', rhythmPattern = null) {
-
     const keySelect = document.getElementById('trainer-key-select');
     const currentKey = keySelect ? keySelect.value : 'C';
 
@@ -688,7 +687,6 @@ function loadTemplateToProgression(template, action = 'load', rhythmPattern = nu
         const finalQuality = chordQuality || defaultQuality;
 
         // Get chord info from base roman numeral with the correct quality
-        // TODO: Import getProgressionChordNotes from parent module
         const chordInfo = window.getProgressionChordNotes
             ? window.getProgressionChordNotes(currentKey, baseRoman, finalQuality, 0)
             : null;

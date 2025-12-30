@@ -519,8 +519,9 @@ export class NotationComposer {
                 // Keep rests
                 if (note.isRest) return true;
                 // For non-rests, require valid pitch or pitches array
+                // Allows double sharps (##) and double flats (bb) like F##3, Bbb4
                 if (note.pitches && Array.isArray(note.pitches) && note.pitches.length > 0) return true;
-                if (note.pitch && typeof note.pitch === 'string' && note.pitch.match(/^[A-G][#b]?\d+$/)) return true;
+                if (note.pitch && typeof note.pitch === 'string' && note.pitch.match(/^[A-G][#b]*\d+$/)) return true;
                 // Filter out notes with null/undefined pitch
                 return false;
               })

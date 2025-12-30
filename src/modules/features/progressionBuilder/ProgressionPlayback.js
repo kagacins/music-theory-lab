@@ -787,8 +787,9 @@ function playProgressionChordNow(index) {
         if (typeof note !== 'string') return false;
         // Check for 'NaN' string or notes containing 'NaN' in octave position
         if (note === 'NaN' || note.includes('NaN')) return false;
-        // Check if note matches valid format (letter + optional accidental + number)
-        if (!/^[A-G][#b]?\d+$/.test(note)) return false;
+        // Check if note matches valid format (letter + optional accidentals + number)
+        // Allows double sharps (##) and double flats (bb) like F##3, Bbb4
+        if (!/^[A-G][#b]*\d+$/.test(note)) return false;
         return true;
     });
 
@@ -1103,5 +1104,38 @@ export function stopTrainerChord() {
         if (window.highlightTrainer) {
             window.highlightTrainer(trainerState.scaleNotes, null);
         }
+    }
+}
+
+/**
+ * Play a chord once with duration (for preview/test playback)
+ * @param {Array} notes - Array of note names to play
+ */
+export function playTrainerChordOnce(notes) {
+    if (!notes || notes.length === 0) return;
+
+    initAudio();
+    if (!getAudioIsReady()) return;
+
+    // Stop any currently playing notes first
+    stopTrainerChord();
+    if (window.stopBuilderChord) window.stopBuilderChord();
+
+    // Play the notes with a fixed duration
+    const piano = getPiano();
+    if (piano) {
+        piano.triggerAttackRelease(notes, '0.5s');
+    }
+
+    // Highlight the played notes on keyboard
+    const trainerState = getTrainerState();
+    if (window.highlightTrainer) {
+        window.highlightTrainer(trainerState.scaleNotes, notes);
+        // Clear highlights after playback
+        Tone.Draw.schedule(() => {
+            if (window.highlightTrainer) {
+                window.highlightTrainer(trainerState.scaleNotes, null);
+            }
+        }, Tone.now() + 0.5);
     }
 }

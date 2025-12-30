@@ -527,6 +527,32 @@ export function setupApp() {
 // ===========================================
 
 /**
+ * Enter the main app (stays on default tab)
+ */
+export function enterApp() {
+    const landingPage = document.getElementById('landing-page');
+    const mainApp = document.getElementById('main-app');
+
+    if (landingPage && mainApp) {
+        // Fade out landing page
+        landingPage.style.transition = 'opacity 0.3s ease-out';
+        landingPage.style.opacity = '0';
+
+        setTimeout(() => {
+            landingPage.classList.add('hidden');
+            mainApp.classList.remove('hidden');
+
+            // Fade in main app
+            mainApp.style.opacity = '0';
+            mainApp.style.transition = 'opacity 0.3s ease-in';
+            setTimeout(() => {
+                mainApp.style.opacity = '1';
+            }, 50);
+        }, 300);
+    }
+}
+
+/**
  * Enter the main app and switch to a specific tab
  * @param {string} tabName - The tab to switch to after entering
  */

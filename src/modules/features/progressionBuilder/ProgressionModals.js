@@ -130,7 +130,7 @@ function getMoodPresetById(id) {
  * @param {string} key - Musical key (e.g., 'C', 'Dm')
  * @returns {Array<string>} Array of note names in the scale
  */
-function getScaleNotesForKey(key) {
+export function getScaleNotesForKey(key) {
     const scalePattern = [0, 2, 4, 5, 7, 9, 11]; // Major scale intervals
     const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
     const flatNames = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
@@ -651,37 +651,17 @@ function createNewSection(type, containerId) {
         // Check for adjacency - each index should be exactly 1 more than the previous
         for (let i = 1; i < selectedIndices.length; i++) {
             if (selectedIndices[i] !== selectedIndices[i - 1] + 1) {
-                console.log('[Section] Non-adjacent selection detected');
-                // Non-adjacent selection - show warning and only use the first contiguous range
+                console.log('[Section] Non-adjacent selection detected - blocking section creation');
 
-                // Find first contiguous range
-                const contiguousRange = [selectedIndices[0]];
-                for (let j = 1; j < selectedIndices.length; j++) {
-                    if (selectedIndices[j] === contiguousRange[contiguousRange.length - 1] + 1) {
-                        contiguousRange.push(selectedIndices[j]);
-                    } else {
-                        break;
-                    }
-                }
-                console.log('[Section] Using contiguous range:', contiguousRange);
-
-                // Show a toast/notification to the user
-                if (window.showNotification) {
-                    window.showNotification('Only adjacent chords can be grouped. Using first contiguous selection.', 'warning');
+                // Show toast notification explaining the requirement
+                if (window.showToast) {
+                    window.showToast('Sections can only be created from consecutive chords. Please select adjacent chord cards.', { type: 'warning', duration: 4000 });
+                } else if (window.showNotification) {
+                    window.showNotification('Sections can only be created from consecutive chords. Please select adjacent chord cards.', 'warning');
                 }
 
-                // Use only the contiguous range
-                console.log('[Section] Calling compositionState.createSection with contiguous range');
-                compositionState.createSection(type, contiguousRange);
-                clearSelection();
-
-                // Re-render to show the new section
-                renderProgressionDisplay('melody-progression-visualization', true);
-                renderProgressionDisplay('melody-progression-visualization', false);
-
-                // Dispatch event for tutorial validation
-                dispatchBuilderEvent('chordsGrouped', { groupName: type, chordIndices: contiguousRange });
-                console.log('[Section] Section created (non-adjacent case)');
+                // Do NOT create a section - just return
+                console.log('[Section] Section creation blocked due to non-consecutive selection');
                 return;
             }
         }
@@ -691,6 +671,12 @@ function createNewSection(type, containerId) {
     console.log('[Section] All indices adjacent or single - creating section');
     console.log('[Section] Calling compositionState.createSection');
     compositionState.createSection(type, selectedIndices);
+
+    // Switch to Section view when creating a section
+    console.log('[Section] Switching to Section view');
+    if (window.setProgressionViewMode) {
+        window.setProgressionViewMode('section');
+    }
 
     // Clear selection
     console.log('[Section] Clearing selection');

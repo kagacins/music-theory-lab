@@ -923,8 +923,246 @@ export class CompositionState {
         // ====================================================================
         // Sections allow organizing chord cards into named groups like
         // Verse, Chorus, Bridge, etc. for easier song composition.
+        //
+        // NEW MODEL (2024-12): Sections use startIndex + chordCount instead of chordIndices array
+        // - Chords have ONE universal sequence order
+        // - Sections define contiguous ranges within that sequence
+        // - Pseudo-sections automatically fill gaps between defined sections
+        // - Section reordering physically moves chord data and updates startIndex values
         this.sections = [];
         this._nextSectionId = 1;
+    }
+
+    // ========================================================================
+    // SECTION HELPER: Compute chordIndices from startIndex + chordCount
+    // ========================================================================
+
+    /**
+     * Get the chord indices for a section (computed from startIndex + chordCount)
+     * @param {Object} section - Section object with startIndex and chordCount
+     * @returns {Array<number>} Array of chord indices
+     */
+    _getSectionChordIndices(section) {
+        if (!section || section.chordCount <= 0) return [];
+        const indices = [];
+        for (let i = 0; i < section.chordCount; i++) {
+            indices.push(section.startIndex + i);
+        }
+        return indices;
+    }
+
+    /**
+     * Clean up empty sections - removes sections with chordCount === 0
+     * This should be called whenever sections might become empty
+     * @private
+     */
+    _cleanupEmptySections() {
+        // Don't remove placeholder sections - they're intentionally empty
+        // Placeholder sections have isPlaceholder: true or fromTemplate: true
+        const emptySectionIds = this.sections
+            .filter(s => s.chordCount === 0 && !s.isPlaceholder && !s.fromTemplate)
+            .map(s => s.id);
+
+        if (emptySectionIds.length > 0) {
+            console.log('[_cleanupEmptySections] Removing empty sections:', emptySectionIds);
+            this.sections = this.sections.filter(s => s.chordCount > 0 || s.isPlaceholder || s.fromTemplate);
+            emptySectionIds.forEach(id => {
+                this.events.emit('sectionDeleted', { sectionId: id });
+            });
+        }
+    }
+
+    /**
+     * Build a complete section view - all sections are now real (no more pseudo-sections)
+     * This is the core function for consistent section/chord rendering.
+     *
+     * IMPORTANT: This now calls materializeUngroupedSections() first to ensure
+     * all chord gaps are covered by real 'ungrouped' type sections.
+     *
+     * @returns {Array<Object>} Array of section objects in progression order
+     */
+    buildSectionView() {
+        const progressionData = this.exportToProgressionData();
+        const totalChords = progressionData.length;
+        console.log('[buildSectionView] totalChords:', totalChords, 'progression:', progressionData.map(c => `${c.root}${c.type?.charAt(0) || ''}`));
+        console.log('[buildSectionView] this.sections:', this.sections.map(s => ({ id: s.id, type: s.type, startIndex: s.startIndex, chordCount: s.chordCount, isPlaceholder: s.isPlaceholder })));
+
+        // Clean up empty sections first (but preserve placeholders)
+        this._cleanupEmptySections();
+
+        // If there are placeholder sections but no chords, return just the placeholder sections
+        const placeholderSections = this.sections.filter(s => s.isPlaceholder || s.fromTemplate);
+        if (totalChords === 0 && placeholderSections.length > 0) {
+            // Return placeholder sections in order
+            return placeholderSections.map((section, idx) => ({
+                ...section,
+                chordIndices: [],
+                isPseudoSection: false,
+                isPlaceholder: true,
+                order: idx
+            }));
+        }
+
+        if (totalChords === 0) return [];
+
+        // CRITICAL: Materialize any ungrouped chords as real 'ungrouped' sections
+        // This ensures there are no gaps in section coverage
+        this.materializeUngroupedSections();
+
+        // Sort all sections by startIndex - now includes ungrouped sections too
+        const sortedSections = [...this.sections]
+            .filter(s => s.chordCount > 0 || s.isPlaceholder || s.fromTemplate)
+            .sort((a, b) => a.startIndex - b.startIndex);
+
+        // Build result - all sections are now "real" (no pseudo-sections)
+        const result = sortedSections.map(section => ({
+            ...section,
+            chordIndices: this._getSectionChordIndices(section),
+            isPseudoSection: false  // All sections are now real
+        }));
+
+        console.log('[buildSectionView] result:', result.map(s => ({ id: s.id, type: s.type, startIndex: s.startIndex, chordCount: s.chordCount })));
+
+        return result;
+    }
+
+    /**
+     * Materialize ungrouped chords as real 'ungrouped' sections
+     * This converts gaps in section coverage into real sections stored in this.sections,
+     * eliminating the complexity of handling them differently in drag-drop.
+     *
+     * Should be called:
+     * - When loading a progression
+     * - After chords are added/removed
+     * - Before drag-drop operations that might create gaps
+     *
+     * @returns {boolean} True if any sections were created or modified
+     */
+    materializeUngroupedSections() {
+        const progressionData = this.exportToProgressionData();
+        const totalChords = progressionData.length;
+
+        if (totalChords === 0) return false;
+
+        // Clean up empty sections first
+        this._cleanupEmptySections();
+
+        // IMPORTANT: First, remove any ungrouped sections that now have stale boundaries
+        // This prevents duplicate ungrouped sections from accumulating
+        this.sections = this.sections.filter(s => {
+            if (s.type !== 'ungrouped') return true; // Keep non-ungrouped sections
+
+            // Check if this ungrouped section's range is still a gap
+            // (i.e., not covered by any non-ungrouped section)
+            const isStillValid = !this.sections.some(other =>
+                other !== s &&
+                other.type !== 'ungrouped' &&
+                other.chordCount > 0 &&
+                // Check for overlap
+                !(other.startIndex >= s.startIndex + s.chordCount ||
+                  other.startIndex + other.chordCount <= s.startIndex)
+            );
+
+            if (!isStillValid) {
+                console.log(`[materializeUngroupedSections] Removing stale ungrouped section ${s.id}`);
+            }
+            return isStillValid;
+        });
+
+        // Sort non-ungrouped sections by startIndex
+        const nonUngroupedSections = [...this.sections]
+            .filter(s => s.type !== 'ungrouped' && s.chordCount > 0)
+            .sort((a, b) => a.startIndex - b.startIndex);
+
+        let createdAny = false;
+        let currentPos = 0;
+        let ungroupedCounter = 1;
+
+        // Count existing ungrouped sections to continue numbering
+        const existingUngrouped = this.sections.filter(s => s.type === 'ungrouped');
+        if (existingUngrouped.length > 0) {
+            // Extract numbers from labels like "No Group 1", "No Group 2"
+            const numbers = existingUngrouped.map(s => {
+                const match = s.label?.match(/No Group (\d+)/);
+                return match ? parseInt(match[1], 10) : 0;
+            });
+            ungroupedCounter = Math.max(...numbers) + 1;
+        }
+
+        for (const section of nonUngroupedSections) {
+            // Create real section for any gap before this section
+            if (section.startIndex > currentPos) {
+                const gapSize = section.startIndex - currentPos;
+
+                // Check if there's already a real ungrouped section covering this gap
+                const existingCoverage = this.sections.find(s =>
+                    s.type === 'ungrouped' &&
+                    s.startIndex === currentPos &&
+                    s.chordCount === gapSize
+                );
+
+                if (!existingCoverage) {
+                    // Create a real ungrouped section
+                    this.createSection('ungrouped', [], {
+                        startIndex: currentPos,
+                        chordCount: gapSize,
+                        label: `No Group ${ungroupedCounter}`
+                    });
+                    ungroupedCounter++;
+                    createdAny = true;
+                    console.log(`[materializeUngroupedSections] Created ungrouped section at ${currentPos} with ${gapSize} chords`);
+                }
+            }
+
+            currentPos = section.startIndex + section.chordCount;
+        }
+
+        // Create section for any remaining chords after the last section
+        if (currentPos < totalChords) {
+            const remainingCount = totalChords - currentPos;
+
+            // Check if there's already a real ungrouped section covering this
+            const existingCoverage = this.sections.find(s =>
+                s.type === 'ungrouped' &&
+                s.startIndex === currentPos &&
+                s.chordCount === remainingCount
+            );
+
+            if (!existingCoverage) {
+                this.createSection('ungrouped', [], {
+                    startIndex: currentPos,
+                    chordCount: remainingCount,
+                    label: `No Group ${ungroupedCounter}`
+                });
+                createdAny = true;
+                console.log(`[materializeUngroupedSections] Created trailing ungrouped section at ${currentPos} with ${remainingCount} chords`);
+            }
+        }
+
+        // Handle case where there are no non-ungrouped sections at all - all chords are ungrouped
+        if (nonUngroupedSections.length === 0 && totalChords > 0) {
+            const existingCoverage = this.sections.find(s =>
+                s.type === 'ungrouped' &&
+                s.startIndex === 0 &&
+                s.chordCount === totalChords
+            );
+
+            if (!existingCoverage) {
+                this.createSection('ungrouped', [], {
+                    startIndex: 0,
+                    chordCount: totalChords,
+                    label: `No Group ${ungroupedCounter}`
+                });
+                createdAny = true;
+                console.log(`[materializeUngroupedSections] Created single ungrouped section for all ${totalChords} chords`);
+            }
+        }
+
+        if (createdAny) {
+            this.events.emit('sectionsMaterialized');
+        }
+
+        return createdAny;
     }
 
     // ========================================================================
@@ -3410,6 +3648,115 @@ export class CompositionState {
         measure.notation.bass.autoGenerated = false;
     }
 
+    /**
+     * Place chord voicing in bass for a specific chord index
+     * Handles multi-measure chords by splitting with proper ties (like duration changes do)
+     * @param {number} chordIndex - The chord index to update
+     * @returns {boolean} - Success
+     */
+    placeChordVoicingInBassForChord(chordIndex) {
+        // Ensure chord segments are built
+        if (this.chordSegments.length === 0) {
+            this.buildChordSegments();
+        }
+
+        // Find the segment for this chord
+        const segment = this.chordSegments.find(s => s.chordIndex === chordIndex);
+        if (!segment) {
+            console.warn(`placeChordVoicingInBassForChord: No segment found for chordIndex ${chordIndex}`);
+            return false;
+        }
+
+        const { startBeat, durationBeats, chord } = segment;
+        if (!chord || !chord.root) {
+            return false;
+        }
+
+        // Get the chord's notes (the voicing to use)
+        let bassNotes = chord.notes || [];
+        if (bassNotes.length === 0) {
+            const chordNotesObj = getChordNotes(chord.root, chord.type, this.metadata.key);
+            if (chordNotesObj && chordNotesObj.specificNotes) {
+                bassNotes = chordNotesObj.specificNotes;
+            }
+        }
+
+        // Apply omittedNotes filter
+        const omittedNotes = chord.omittedNotes || [];
+        if (omittedNotes.length > 0) {
+            bassNotes = bassNotes.filter(n => !omittedNotes.includes(n));
+        }
+
+        if (bassNotes.length === 0) {
+            return false;
+        }
+
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(
+            this.metadata.timeSignature || DEFAULT_TIME_SIGNATURE
+        );
+
+        // Create a single note spanning the full chord duration
+        // splitBlockBassIntoMeasures will handle splitting with ties
+        const chordVoicingNote = {
+            type: 'note',
+            pitches: bassNotes,
+            duration: '1n', // Will be recalculated by split function
+            beat: 0,
+            durationBeats: durationBeats,
+            chordIndex: chordIndex
+        };
+
+        // Split across measures with proper ties
+        const measureNoteGroups = splitBlockBassIntoMeasures(
+            [chordVoicingNote],
+            startBeat,
+            beatsPerMeasure,
+            chordIndex
+        );
+
+        // Clear bass notes from all measures this chord spans, then place new notes
+        const startMeasure = Math.floor(startBeat / beatsPerMeasure);
+        const endBeat = startBeat + durationBeats;
+        const endMeasure = Math.ceil(endBeat / beatsPerMeasure) - 1;
+
+        // Clear existing bass notes in these measures for this chord
+        for (let i = startMeasure; i <= endMeasure && i < this.measures.length; i++) {
+            const measure = this.measures[i];
+            if (measure && measure.notation.bass.voices[0]) {
+                // Remove notes that belong to this chord
+                measure.notation.bass.voices[0].notes = (measure.notation.bass.voices[0].notes || [])
+                    .filter(n => n.chordIndex !== chordIndex);
+            }
+        }
+
+        // Place the split notes into appropriate measures
+        for (const { measureIndex, notes } of measureNoteGroups) {
+            if (measureIndex >= this.measures.length) continue;
+
+            const measure = this.measures[measureIndex];
+            if (!measure) continue;
+
+            // Mark as NOT auto-generated (user explicitly reverted to chord voicing)
+            const manualNotes = notes.map(note => ({
+                ...note,
+                autoGenerated: false,
+            }));
+
+            // Add to existing notes
+            if (!measure.notation.bass.voices[0].notes) {
+                measure.notation.bass.voices[0].notes = [];
+            }
+            measure.notation.bass.voices[0].notes.push(...manualNotes);
+
+            // Sort by beat position
+            measure.notation.bass.voices[0].notes.sort((a, b) => a.beat - b.beat);
+            measure.notation.bass.autoGenerated = false;
+        }
+
+        this.events.emit('bassUpdated', chordIndex);
+        return true;
+    }
+
     // ========================================================================
     // Voice Management (Multi-Voice Polyphony Support)
     // ========================================================================
@@ -5685,6 +6032,7 @@ export class CompositionState {
         solo: { label: 'Solo', color: '#EC4899' },        // Pink
         breakdown: { label: 'Breakdown', color: '#64748B' }, // Slate
         outro: { label: 'Outro', color: '#F97316' },      // Orange
+        ungrouped: { label: 'No Group', color: '#6b7280' }, // Gray - for ungrouped chords
         custom: { label: 'Custom', color: '#78716C' }     // Stone
     };
 
@@ -5697,20 +6045,28 @@ export class CompositionState {
     }
 
     /**
-     * Get all sections
+     * Get all sections (with computed chordIndices for backward compatibility)
      * @returns {Array} Array of section objects
      */
     getSections() {
-        return [...this.sections];
+        return this.sections.map(s => ({
+            ...s,
+            chordIndices: this._getSectionChordIndices(s)
+        }));
     }
 
     /**
-     * Get a section by ID
+     * Get a section by ID (with computed chordIndices)
      * @param {string} sectionId - Section ID
      * @returns {Object|null} Section object or null
      */
     getSection(sectionId) {
-        return this.sections.find(s => s.id === sectionId) || null;
+        const section = this.sections.find(s => s.id === sectionId);
+        if (!section) return null;
+        return {
+            ...section,
+            chordIndices: this._getSectionChordIndices(section)
+        };
     }
 
     /**
@@ -5719,7 +6075,15 @@ export class CompositionState {
      * @returns {Object|null} Section object or null if chord is ungrouped
      */
     getSectionForChord(chordIndex) {
-        return this.sections.find(s => s.chordIndices.includes(chordIndex)) || null;
+        const section = this.sections.find(s => {
+            if (s.chordCount <= 0) return false;
+            return chordIndex >= s.startIndex && chordIndex < s.startIndex + s.chordCount;
+        });
+        if (!section) return null;
+        return {
+            ...section,
+            chordIndices: this._getSectionChordIndices(section)
+        };
     }
 
     /**
@@ -5733,9 +6097,13 @@ export class CompositionState {
 
         let allChordIndices = [];
         sectionIds.forEach(sectionId => {
+            // All sections are now real (including ungrouped ones)
             const section = this.getSection(sectionId);
-            if (section && section.chordIndices) {
-                allChordIndices.push(...section.chordIndices);
+            if (section) {
+                // Use startIndex + chordCount to get indices
+                for (let i = 0; i < section.chordCount; i++) {
+                    allChordIndices.push(section.startIndex + i);
+                }
             }
         });
 
@@ -5758,23 +6126,49 @@ export class CompositionState {
 
     /**
      * Create a new section
+     * NEW MODEL: Uses startIndex + chordCount instead of chordIndices array
      * @param {string} type - Section type (verse, chorus, etc.)
-     * @param {Array<number>} chordIndices - Indices of chords to include
+     * @param {Array<number>} chordIndices - Indices of chords to include (must be contiguous!)
      * @param {Object} options - Optional settings
      * @param {string} [options.label] - Custom label for the section
      * @param {string} [options.color] - Custom color for the section
+     * @param {number} [options.startIndex] - Direct startIndex (overrides chordIndices)
+     * @param {number} [options.chordCount] - Direct chordCount (overrides chordIndices)
      * @param {number} [options.expectedChordCount] - Expected number of chords (for placeholder sections)
      * @param {number} [options.targetBars] - Target length in bars (for structure-first workflow)
      * @param {boolean} [options.isPlaceholder] - Whether this is an empty placeholder section
-     * @returns {Object} The created section
+     * @returns {Object} The created section (with computed chordIndices for backward compat)
      */
     createSection(type, chordIndices = [], options = {}) {
         const sectionType = CompositionState.SECTION_TYPES[type] || CompositionState.SECTION_TYPES.custom;
 
-        // Remove chords from any existing sections
-        chordIndices.forEach(idx => {
-            this.removeChordFromSection(idx);
-        });
+        // Calculate startIndex and chordCount from options or chordIndices
+        let startIndex, chordCount;
+
+        if (options.startIndex !== undefined && options.chordCount !== undefined) {
+            // Direct specification
+            startIndex = options.startIndex;
+            chordCount = options.chordCount;
+        } else if (chordIndices.length > 0) {
+            // Derive from chordIndices (assume contiguous)
+            const sorted = [...chordIndices].sort((a, b) => a - b);
+            startIndex = sorted[0];
+            chordCount = sorted.length;
+
+            // Validate contiguity
+            const isContiguous = sorted.every((idx, i) => i === 0 || idx === sorted[i-1] + 1);
+            if (!isContiguous) {
+                console.warn('[createSection] Non-contiguous chordIndices provided. Using min/max range:', sorted);
+                chordCount = sorted[sorted.length - 1] - sorted[0] + 1;
+            }
+        } else {
+            // Empty section (placeholder)
+            startIndex = options.startIndex ?? 0;
+            chordCount = 0;
+        }
+
+        // Check for overlaps with existing sections and adjust them
+        this._resolveOverlappingSections(startIndex, chordCount);
 
         // Find the lowest available number for auto-labeling
         const baseLabel = sectionType.label;
@@ -5782,72 +6176,127 @@ export class CompositionState {
 
         let autoLabel;
         if (sameTypeSections.length === 0) {
-            // No sections of this type exist - use base label without number
             autoLabel = baseLabel;
         } else {
-            // Parse existing labels to find used numbers
             const usedNumbers = new Set();
             sameTypeSections.forEach(s => {
-                // Check if label is exactly the base label (counts as 1)
                 if (s.label === baseLabel) {
                     usedNumbers.add(1);
                 } else {
-                    // Try to parse number from label like "Bridge 2", "Verse 3", etc.
                     const match = s.label.match(new RegExp(`^${baseLabel}\\s+(\\d+)$`));
                     if (match) {
                         usedNumbers.add(parseInt(match[1], 10));
                     }
                 }
             });
-
-            // Find lowest available number (starting from 1 for unnumbered base label)
             let lowestAvailable = 1;
             while (usedNumbers.has(lowestAvailable)) {
                 lowestAvailable++;
             }
-
-            // Use base label alone for 1, numbered for 2+
             autoLabel = lowestAvailable === 1 ? baseLabel : `${baseLabel} ${lowestAvailable}`;
         }
 
         // Determine if this is a placeholder section
         const isPlaceholder = options.isPlaceholder !== undefined
             ? options.isPlaceholder
-            : (chordIndices.length === 0 && options.expectedChordCount > 0);
+            : (chordCount === 0 && options.expectedChordCount > 0);
 
         const section = {
             id: this._generateSectionId(),
             type: type,
             label: options.label || autoLabel,
-            chordIndices: [...chordIndices],
+            // NEW MODEL: Use startIndex + chordCount
+            startIndex: startIndex,
+            chordCount: chordCount,
             color: options.color || sectionType.color,
             collapsed: false,
-            // New optional fields for structure-first workflow
-            expectedChordCount: options.expectedChordCount || chordIndices.length || 4,
+            expectedChordCount: options.expectedChordCount || chordCount || 4,
             targetBars: options.targetBars || null,
             isPlaceholder: isPlaceholder,
-            fromTemplate: options.fromTemplate || false  // Sections from templates won't auto-delete when empty
+            fromTemplate: options.fromTemplate || false
         };
 
         this.sections.push(section);
-        this.events.emit('sectionCreated', section);
-        return section;
+
+        // Emit event with computed chordIndices for backward compat
+        this.events.emit('sectionCreated', {
+            ...section,
+            chordIndices: this._getSectionChordIndices(section)
+        });
+
+        return {
+            ...section,
+            chordIndices: this._getSectionChordIndices(section)
+        };
+    }
+
+    /**
+     * Resolve overlapping sections when creating a new section
+     * Removes indices from existing sections that overlap with the new range
+     * @param {number} newStartIndex - Start of new section
+     * @param {number} newChordCount - Size of new section
+     */
+    _resolveOverlappingSections(newStartIndex, newChordCount) {
+        if (newChordCount === 0) return;
+
+        const newEndIndex = newStartIndex + newChordCount - 1;
+        const sectionsToDelete = [];
+
+        this.sections.forEach(section => {
+            if (section.chordCount === 0) return;
+
+            const sectionEndIndex = section.startIndex + section.chordCount - 1;
+
+            // Check for overlap
+            if (!(sectionEndIndex < newStartIndex || section.startIndex > newEndIndex)) {
+                // There's overlap - need to adjust or delete this section
+
+                if (section.startIndex >= newStartIndex && sectionEndIndex <= newEndIndex) {
+                    // Section is fully contained - mark for deletion
+                    if (!section.isPlaceholder && !section.fromTemplate) {
+                        sectionsToDelete.push(section.id);
+                    } else {
+                        // Convert to placeholder
+                        section.chordCount = 0;
+                        section.isPlaceholder = true;
+                    }
+                } else if (section.startIndex < newStartIndex && sectionEndIndex > newEndIndex) {
+                    // New section is inside existing - split existing (keep front part only)
+                    section.chordCount = newStartIndex - section.startIndex;
+                } else if (section.startIndex < newStartIndex) {
+                    // Overlap at end of existing section - truncate it
+                    section.chordCount = newStartIndex - section.startIndex;
+                } else {
+                    // Overlap at start of existing section - move it forward
+                    const overlapAmount = newEndIndex - section.startIndex + 1;
+                    section.startIndex = newEndIndex + 1;
+                    section.chordCount = Math.max(0, section.chordCount - overlapAmount);
+                }
+            }
+        });
+
+        // Delete fully contained sections
+        sectionsToDelete.forEach(id => {
+            const idx = this.sections.findIndex(s => s.id === id);
+            if (idx !== -1) this.sections.splice(idx, 1);
+        });
     }
 
     /**
      * Update a section's properties
+     * NEW MODEL: Supports startIndex + chordCount, with backward compat for chordIndices
      * @param {string} sectionId - Section ID
-     * @param {Object} updates - Properties to update { label, type, color, collapsed, chordIndices, expectedChordCount, targetBars, isPlaceholder }
+     * @param {Object} updates - Properties to update
      * @returns {Object|null} Updated section or null if not found
      */
     updateSection(sectionId, updates) {
-        const section = this.getSection(sectionId);
+        // Find the actual section object (not the computed one from getSection)
+        const section = this.sections.find(s => s.id === sectionId);
         if (!section) return null;
 
         if (updates.label !== undefined) section.label = updates.label;
         if (updates.type !== undefined) {
             section.type = updates.type;
-            // Optionally update color to match new type
             if (!updates.color) {
                 const sectionType = CompositionState.SECTION_TYPES[updates.type];
                 if (sectionType) section.color = sectionType.color;
@@ -5855,14 +6304,35 @@ export class CompositionState {
         }
         if (updates.color !== undefined) section.color = updates.color;
         if (updates.collapsed !== undefined) section.collapsed = updates.collapsed;
-        if (updates.chordIndices !== undefined) section.chordIndices = updates.chordIndices;
-        // New optional fields for structure-first workflow
+
+        // NEW MODEL: Handle startIndex + chordCount directly
+        if (updates.startIndex !== undefined) section.startIndex = updates.startIndex;
+        if (updates.chordCount !== undefined) section.chordCount = updates.chordCount;
+
+        // BACKWARD COMPAT: If chordIndices is provided, convert to startIndex + chordCount
+        if (updates.chordIndices !== undefined && Array.isArray(updates.chordIndices)) {
+            if (updates.chordIndices.length > 0) {
+                const sorted = [...updates.chordIndices].sort((a, b) => a - b);
+                section.startIndex = sorted[0];
+                section.chordCount = sorted.length;
+            } else {
+                section.chordCount = 0;
+            }
+        }
+
         if (updates.expectedChordCount !== undefined) section.expectedChordCount = updates.expectedChordCount;
         if (updates.targetBars !== undefined) section.targetBars = updates.targetBars;
         if (updates.isPlaceholder !== undefined) section.isPlaceholder = updates.isPlaceholder;
 
-        this.events.emit('sectionUpdated', section);
-        return section;
+        this.events.emit('sectionUpdated', {
+            ...section,
+            chordIndices: this._getSectionChordIndices(section)
+        });
+
+        return {
+            ...section,
+            chordIndices: this._getSectionChordIndices(section)
+        };
     }
 
     /**
@@ -5875,35 +6345,50 @@ export class CompositionState {
         if (index === -1) return false;
 
         const section = this.sections[index];
+        const chordIndices = this._getSectionChordIndices(section);
         this.sections.splice(index, 1);
-        this.events.emit('sectionDeleted', { sectionId, chordIndices: section.chordIndices });
+        this.events.emit('sectionDeleted', { sectionId, chordIndices });
         return true;
     }
 
     /**
-     * Add a chord to a section
+     * Add a chord to a section (expand section to include it)
+     * NEW MODEL: Expands section range if chord is adjacent, or moves section to include it
      * @param {number} chordIndex - Chord index
      * @param {string} sectionId - Section ID
-     * @param {number} position - Position within section (default: end)
+     * @param {number} position - Ignored in new model (sections are contiguous)
      * @returns {boolean} True if successful
      */
     addChordToSection(chordIndex, sectionId, position = -1) {
         // Remove from current section first
         this.removeChordFromSection(chordIndex);
 
-        const section = this.getSection(sectionId);
+        const section = this.sections.find(s => s.id === sectionId);
         if (!section) return false;
 
-        if (position < 0 || position >= section.chordIndices.length) {
-            section.chordIndices.push(chordIndex);
+        // If section is empty, set it to just this chord
+        if (section.chordCount === 0) {
+            section.startIndex = chordIndex;
+            section.chordCount = 1;
         } else {
-            section.chordIndices.splice(position, 0, chordIndex);
+            // Expand section to include this chord
+            const currentEnd = section.startIndex + section.chordCount - 1;
+
+            if (chordIndex < section.startIndex) {
+                // Chord is before section - expand backward
+                const expansion = section.startIndex - chordIndex;
+                section.startIndex = chordIndex;
+                section.chordCount += expansion;
+            } else if (chordIndex > currentEnd) {
+                // Chord is after section - expand forward
+                section.chordCount = chordIndex - section.startIndex + 1;
+            }
+            // If chord is already within range, nothing to do
         }
 
-        // If section was a placeholder, mark it's no longer empty but keep fromTemplate flag
-        if (section.isPlaceholder && section.chordIndices.length > 0) {
+        // If section was a placeholder, mark it's no longer empty
+        if (section.isPlaceholder && section.chordCount > 0) {
             section.isPlaceholder = false;
-            // Preserve fromTemplate flag so section isn't auto-deleted if emptied again
         }
 
         this.events.emit('chordAddedToSection', { chordIndex, sectionId });
@@ -5911,26 +6396,41 @@ export class CompositionState {
     }
 
     /**
-     * Remove a chord from its section (becomes ungrouped)
-     * Auto-deletes the section if it becomes empty
+     * Remove a chord from its section (shrinks section or splits it)
+     * NEW MODEL: Sections are contiguous, so removing from middle isn't directly supported
+     * - If chord is at start: increment startIndex, decrement chordCount
+     * - If chord is at end: decrement chordCount
+     * - If chord is in middle: shrink section to exclude it (section ends before this chord)
      * @param {number} chordIndex - Chord index
      * @returns {string|null} ID of section it was removed from, or null
      */
     removeChordFromSection(chordIndex) {
         for (const section of this.sections) {
-            const idx = section.chordIndices.indexOf(chordIndex);
-            if (idx !== -1) {
+            if (section.chordCount === 0) continue;
+
+            const sectionEnd = section.startIndex + section.chordCount - 1;
+
+            // Check if chord is within this section's range
+            if (chordIndex >= section.startIndex && chordIndex <= sectionEnd) {
                 const sectionId = section.id;
-                section.chordIndices.splice(idx, 1);
+
+                if (chordIndex === section.startIndex) {
+                    // Chord is at the start - shrink from front
+                    section.startIndex++;
+                    section.chordCount--;
+                } else if (chordIndex === sectionEnd) {
+                    // Chord is at the end - shrink from back
+                    section.chordCount--;
+                } else {
+                    // Chord is in the middle - shrink to end before this chord
+                    section.chordCount = chordIndex - section.startIndex;
+                }
+
                 this.events.emit('chordRemovedFromSection', { chordIndex, sectionId });
 
-                // Auto-delete section if it becomes empty
-                // BUT don't delete sections from templates (check fromTemplate or isPlaceholder)
-                if (section.chordIndices.length === 0 && !section.isPlaceholder && !section.fromTemplate) {
+                // Auto-delete section if it becomes empty - NO exceptions
+                if (section.chordCount === 0) {
                     this.deleteSection(sectionId);
-                } else if (section.chordIndices.length === 0 && (section.isPlaceholder || section.fromTemplate)) {
-                    // Section came from a template - restore placeholder state
-                    section.isPlaceholder = true;
                 }
 
                 return sectionId;
@@ -5943,7 +6443,7 @@ export class CompositionState {
      * Move a chord to a different position within its section or to another section
      * @param {number} chordIndex - Chord index
      * @param {string} targetSectionId - Target section ID (or null for ungrouped)
-     * @param {number} position - Position within target section
+     * @param {number} position - Position within target section (ignored in new model)
      * @returns {boolean} True if successful
      */
     moveChordToSection(chordIndex, targetSectionId, position = -1) {
@@ -5954,8 +6454,98 @@ export class CompositionState {
     }
 
     /**
-     * Reorder sections
-     * @param {number} fromIndex - Current section index
+     * Reorder sections by physically moving chord data and updating startIndex values
+     * NEW MODEL: This is the core section reordering function
+     * @param {Array<string>} newSectionOrder - Array of section IDs (including pseudo-sections) in new order
+     * @param {Function} getProgressionData - Function to get current progression data
+     * @param {Function} setProgressionData - Function to set new progression data
+     * @returns {boolean} True if successful
+     */
+    reorderSectionsByIds(newSectionOrder, getProgressionData, setProgressionData) {
+        console.log('[reorderSectionsByIds] START - newSectionOrder:', newSectionOrder);
+
+        // CRITICAL: Use storedProgressionData directly, NOT the cached getProgressionData()
+        // The cache might be stale or return a different array than what we need
+        const progressionData = this.storedProgressionData;
+        if (!progressionData || progressionData.length === 0) {
+            console.log('[reorderSectionsByIds] No stored progression data, aborting');
+            return false;
+        }
+
+        console.log('[reorderSectionsByIds] Current progression (from storedProgressionData):', progressionData.map(c => `${c.root}${c.type?.charAt(0) || ''}`));
+
+        // Build the current section view (includes pseudo-sections)
+        const currentView = this.buildSectionView();
+        console.log('[reorderSectionsByIds] Current section view:', currentView.map(s => ({
+            id: s.id,
+            startIndex: s.startIndex,
+            chordCount: s.chordCount,
+            type: s.type
+        })));
+
+        // Map section IDs to their current data
+        const sectionMap = new Map();
+        currentView.forEach(s => sectionMap.set(s.id, s));
+
+        // Build new progression by concatenating chords in the new section order
+        const newProgression = [];
+        const sectionUpdates = []; // Track { sectionId, newStartIndex }
+
+        newSectionOrder.forEach(sectionId => {
+            const section = sectionMap.get(sectionId);
+            if (!section) {
+                console.log(`[reorderSectionsByIds] Section ${sectionId} not found in map!`);
+                return;
+            }
+
+            const newStartIndex = newProgression.length;
+            console.log(`[reorderSectionsByIds] Processing section ${sectionId}: startIndex=${section.startIndex}, count=${section.chordCount}, newStart=${newStartIndex}`);
+
+            // Add this section's chords to new progression
+            for (let i = section.startIndex; i < section.startIndex + section.chordCount; i++) {
+                if (i < progressionData.length) {
+                    const chord = progressionData[i];
+                    console.log(`[reorderSectionsByIds]   Adding chord ${i}: ${chord.root}${chord.type?.charAt(0) || ''}`);
+                    newProgression.push({ ...progressionData[i] }); // Deep copy each chord
+                }
+            }
+
+            // Track update for all sections (all are now real, including ungrouped)
+            sectionUpdates.push({
+                sectionId: section.id,
+                newStartIndex: newStartIndex
+            });
+        });
+
+        console.log('[reorderSectionsByIds] New progression:', newProgression.map(c => `${c.root}${c.type?.charAt(0) || ''}`));
+        console.log('[reorderSectionsByIds] Section updates:', sectionUpdates);
+
+        // CRITICAL: Update storedProgressionData DIRECTLY first, before calling setProgressionData
+        // This ensures the data is updated in compositionState before any sync/cache operations
+        console.log('[reorderSectionsByIds] Updating storedProgressionData directly...');
+        this.storedProgressionData = newProgression;
+
+        // Update section startIndex values
+        sectionUpdates.forEach(update => {
+            const section = this.sections.find(s => s.id === update.sectionId);
+            if (section) {
+                console.log(`[reorderSectionsByIds] Updating section ${update.sectionId}: startIndex ${section.startIndex} -> ${update.newStartIndex}`);
+                section.startIndex = update.newStartIndex;
+            }
+        });
+
+        // Now call the setProgressionData callback to sync with trainerState and trigger re-render
+        console.log('[reorderSectionsByIds] Calling setProgressionData callback...');
+        setProgressionData(newProgression);
+
+        console.log('[reorderSectionsByIds] END - success');
+        this.events.emit('sectionsReorderedByIds', { newSectionOrder });
+        return true;
+    }
+
+    /**
+     * Legacy reorder sections (by array index)
+     * @param {number} fromIndex - Current section index in this.sections array
      * @param {number} toIndex - Target section index
      * @returns {boolean} True if successful
      */
@@ -6304,25 +6894,36 @@ export class CompositionState {
 
     /**
      * Get chords that are not in any section
+     * NEW MODEL: Uses startIndex + chordCount to determine grouped indices
      * @returns {Array<number>} Array of ungrouped chord indices
      */
     getUngroupedChordIndices() {
         const progressionData = this.exportToProgressionData();
-        const allChordIndices = progressionData.map((_, idx) => idx);
+        const totalChords = progressionData.length;
         const groupedIndices = new Set();
 
         this.sections.forEach(section => {
-            section.chordIndices.forEach(idx => groupedIndices.add(idx));
+            if (section.chordCount > 0) {
+                for (let i = 0; i < section.chordCount; i++) {
+                    groupedIndices.add(section.startIndex + i);
+                }
+            }
         });
 
-        return allChordIndices.filter(idx => !groupedIndices.has(idx));
+        const ungrouped = [];
+        for (let i = 0; i < totalChords; i++) {
+            if (!groupedIndices.has(i)) {
+                ungrouped.push(i);
+            }
+        }
+        return ungrouped;
     }
 
     /**
      * Add a chord to a section at a specific position (alias for addChordToSection)
      * @param {number} chordIndex - Chord index
      * @param {string} sectionId - Section ID
-     * @param {number} position - Position within section
+     * @param {number} position - Position within section (ignored in new model)
      * @returns {boolean} True if successful
      */
     addChordToSectionAt(chordIndex, sectionId, position) {
@@ -6331,100 +6932,218 @@ export class CompositionState {
 
     /**
      * Reorder chords within a section
+     * NEW MODEL: In contiguous sections, this requires physically reordering the progression data
+     * This method just validates the request - actual reordering should be done by the caller
      * @param {string} sectionId - Section ID
-     * @param {Array<number>} newIndices - New order of chord indices
-     * @returns {boolean} True if successful
+     * @param {Array<number>} newIndices - New order of chord indices (must match section's current indices)
+     * @returns {boolean} True if the reorder is valid
      */
     reorderChordsInSection(sectionId, newIndices) {
-        const section = this.getSection(sectionId);
+        const section = this.sections.find(s => s.id === sectionId);
         if (!section) return false;
 
-        // Verify all indices belong to this section
-        const currentSet = new Set(section.chordIndices);
+        // Verify the new indices match the section's current range
+        const currentIndices = this._getSectionChordIndices(section);
+        const currentSet = new Set(currentIndices);
         const newSet = new Set(newIndices);
+
         if (currentSet.size !== newSet.size) return false;
         for (const idx of newIndices) {
             if (!currentSet.has(idx)) return false;
         }
 
-        section.chordIndices = [...newIndices];
+        // Note: With the new contiguous model, we don't store chord order within a section
+        // The section just defines a range. Reordering chords within a section means
+        // physically reordering the progression data while keeping the section's range.
+        // This is handled by the drag-drop code that calls this method.
+
         this.events.emit('sectionChordsReordered', { sectionId, newIndices });
         return true;
     }
 
     /**
-     * Update chord indices in sections after a chord is deleted
+     * Update sections after a chord is deleted
+     * NEW MODEL: Adjusts startIndex and chordCount
      * @param {number} deletedIndex - Index of the deleted chord
      */
     updateSectionsAfterChordDelete(deletedIndex) {
+        const sectionsToDelete = [];
+
         this.sections.forEach(section => {
-            // Remove the deleted index
-            section.chordIndices = section.chordIndices.filter(idx => idx !== deletedIndex);
-            // Decrement indices greater than deleted
-            section.chordIndices = section.chordIndices.map(idx =>
-                idx > deletedIndex ? idx - 1 : idx
-            );
+            if (section.chordCount === 0) return;
+
+            const sectionEnd = section.startIndex + section.chordCount - 1;
+
+            if (deletedIndex < section.startIndex) {
+                // Deleted chord is before this section - shift startIndex back
+                section.startIndex--;
+            } else if (deletedIndex >= section.startIndex && deletedIndex <= sectionEnd) {
+                // Deleted chord is within this section - reduce chordCount
+                section.chordCount--;
+
+                // Auto-delete section if it becomes empty
+                if (section.chordCount === 0 && !section.isPlaceholder && !section.fromTemplate) {
+                    sectionsToDelete.push(section.id);
+                }
+            }
+            // If deleted chord is after this section, no change needed
         });
+
+        // Delete empty sections
+        sectionsToDelete.forEach(sectionId => {
+            this.deleteSection(sectionId);
+        });
+
         this.events.emit('sectionsUpdatedAfterDelete', { deletedIndex });
     }
 
     /**
-     * Update chord indices in sections after a chord is inserted
+     * Update sections after a chord is inserted
+     * NEW MODEL: Adjusts startIndex values
      * @param {number} insertedIndex - Index where chord was inserted
      */
     updateSectionsAfterChordInsert(insertedIndex) {
         this.sections.forEach(section => {
-            // Increment indices >= inserted
-            section.chordIndices = section.chordIndices.map(idx =>
-                idx >= insertedIndex ? idx + 1 : idx
-            );
+            if (section.chordCount === 0) return;
+
+            if (insertedIndex <= section.startIndex) {
+                // Inserted before or at section start - shift startIndex forward
+                section.startIndex++;
+            } else if (insertedIndex > section.startIndex && insertedIndex <= section.startIndex + section.chordCount) {
+                // Inserted within section - expand section to include it
+                section.chordCount++;
+            }
+            // If inserted after section, no change needed
         });
         this.events.emit('sectionsUpdatedAfterInsert', { insertedIndex });
     }
 
     /**
-     * Update chord indices in sections after chords are reordered
+     * Update sections after a single chord is moved
+     * NEW MODEL: Recalculates startIndex based on chord movement
      * @param {number} fromIndex - Original chord index
      * @param {number} toIndex - New chord index
+     * @param {boolean} preserveMembership - If true, don't change section membership, only adjust positions
      */
-    updateSectionsAfterChordReorder(fromIndex, toIndex) {
+    updateSectionsAfterChordReorder(fromIndex, toIndex, preserveMembership = false) {
+        if (fromIndex === toIndex) return;
+
+        console.log(`[CompositionState] updateSectionsAfterChordReorder: ${fromIndex} -> ${toIndex}, preserveMembership=${preserveMembership}`);
+
         this.sections.forEach(section => {
-            section.chordIndices = section.chordIndices.map(idx => {
-                if (idx === fromIndex) {
-                    return toIndex;
-                } else if (fromIndex < toIndex) {
-                    // Moving forward: indices between shift back
-                    if (idx > fromIndex && idx <= toIndex) {
-                        return idx - 1;
+            if (section.chordCount === 0) return;
+
+            const sectionEnd = section.startIndex + section.chordCount - 1;
+            const chordWasInSection = fromIndex >= section.startIndex && fromIndex <= sectionEnd;
+
+            if (!preserveMembership) {
+                // Original behavior: update section membership
+                const chordMovedIntoSection = toIndex >= section.startIndex && toIndex <= sectionEnd;
+
+                if (chordWasInSection && !chordMovedIntoSection) {
+                    // Chord left this section - shrink it
+                    section.chordCount--;
+                    if (fromIndex === section.startIndex) {
+                        section.startIndex++;
                     }
-                } else {
-                    // Moving backward: indices between shift forward
-                    if (idx >= toIndex && idx < fromIndex) {
-                        return idx + 1;
+                } else if (!chordWasInSection && chordMovedIntoSection) {
+                    // Chord entered this section - expand it
+                    section.chordCount++;
+                    if (toIndex <= section.startIndex) {
+                        section.startIndex = toIndex;
                     }
                 }
-                return idx;
-            });
+
+                // Adjust startIndex for shifts in chord positions
+                if (fromIndex < section.startIndex && toIndex >= section.startIndex) {
+                    // Chord moved from before to after start - shift start back
+                    section.startIndex--;
+                } else if (fromIndex >= section.startIndex + section.chordCount && toIndex < section.startIndex) {
+                    // Chord moved from after to before start - shift start forward
+                    section.startIndex++;
+                }
+            } else {
+                // Preserve membership: only adjust startIndex positions, don't change chordCount
+                // This is used when moving chords between pseudo-sections
+
+                if (chordWasInSection) {
+                    // Chord is moving OUT of this section - but we want to keep it OUT
+                    // Don't change anything for this section's membership
+                } else {
+                    // Chord is NOT in this section - just adjust startIndex if needed
+                    if (fromIndex < section.startIndex && toIndex >= section.startIndex) {
+                        // Chord moved from before section to at/after section start
+                        // Section effectively shifts back by 1
+                        section.startIndex--;
+                        console.log(`[CompositionState] Section ${section.id}: shifted startIndex to ${section.startIndex} (chord moved from before to after)`);
+                    } else if (fromIndex > sectionEnd && toIndex <= section.startIndex) {
+                        // Chord moved from after section to before/at section start
+                        // Section effectively shifts forward by 1
+                        section.startIndex++;
+                        console.log(`[CompositionState] Section ${section.id}: shifted startIndex to ${section.startIndex} (chord moved from after to before)`);
+                    }
+                }
+            }
         });
         this.events.emit('sectionsUpdatedAfterReorder', { fromIndex, toIndex });
     }
 
     /**
+     * Update sections after a full reorder (e.g., section drag-drop)
+     * NEW MODEL: Maps old positions to new positions and updates startIndex
+     * @param {Array<number>} fullNewOrder - Array where fullNewOrder[newPos] = oldPos
+     */
+    updateSectionsAfterFullReorder(fullNewOrder) {
+        console.log('[CompositionState] updateSectionsAfterFullReorder called with:', fullNewOrder);
+
+        // Create reverse mapping: oldPos -> newPos
+        const oldToNew = new Map();
+        fullNewOrder.forEach((oldPos, newPos) => {
+            oldToNew.set(oldPos, newPos);
+        });
+
+        // Update each section's startIndex based on where its first chord ended up
+        this.sections.forEach(section => {
+            if (section.chordCount === 0) return;
+
+            // Find where this section's chords ended up
+            const oldStart = section.startIndex;
+            const newStart = oldToNew.get(oldStart);
+
+            if (newStart !== undefined) {
+                console.log(`[CompositionState] Section ${section.id}: startIndex ${oldStart} -> ${newStart}`);
+                section.startIndex = newStart;
+            }
+        });
+
+        this.events.emit('sectionsUpdatedAfterFullReorder', { fullNewOrder });
+    }
+
+    /**
      * Export sections data for persistence
-     * @returns {Array} Array of section objects (without internal IDs)
+     * NEW MODEL: Exports startIndex + chordCount (with backward-compat chordIndices)
+     * @returns {Array} Array of section objects
      */
     exportSections() {
         return this.sections.map(section => ({
             type: section.type,
             label: section.label,
-            chordIndices: [...section.chordIndices],
+            startIndex: section.startIndex,
+            chordCount: section.chordCount,
+            // Backward compat: also include computed chordIndices
+            chordIndices: this._getSectionChordIndices(section),
             color: section.color,
-            collapsed: section.collapsed
+            collapsed: section.collapsed,
+            isPlaceholder: section.isPlaceholder,
+            fromTemplate: section.fromTemplate,
+            expectedChordCount: section.expectedChordCount,
+            targetBars: section.targetBars
         }));
     }
 
     /**
      * Import sections data from persistence
+     * NEW MODEL: Supports both old chordIndices format and new startIndex/chordCount format
      * @param {Array} sectionsData - Array of section objects
      */
     importSections(sectionsData) {
@@ -6434,13 +7153,35 @@ export class CompositionState {
         if (!Array.isArray(sectionsData)) return;
 
         sectionsData.forEach(data => {
+            let startIndex, chordCount;
+
+            // Support new format
+            if (data.startIndex !== undefined && data.chordCount !== undefined) {
+                startIndex = data.startIndex;
+                chordCount = data.chordCount;
+            }
+            // Backward compat: convert old chordIndices format
+            else if (Array.isArray(data.chordIndices) && data.chordIndices.length > 0) {
+                const sorted = [...data.chordIndices].sort((a, b) => a - b);
+                startIndex = sorted[0];
+                chordCount = sorted.length;
+            } else {
+                startIndex = 0;
+                chordCount = 0;
+            }
+
             this.sections.push({
                 id: this._generateSectionId(),
                 type: data.type || 'custom',
                 label: data.label || 'Section',
-                chordIndices: Array.isArray(data.chordIndices) ? [...data.chordIndices] : [],
+                startIndex: startIndex,
+                chordCount: chordCount,
                 color: data.color || CompositionState.SECTION_TYPES.custom.color,
-                collapsed: data.collapsed || false
+                collapsed: data.collapsed || false,
+                isPlaceholder: data.isPlaceholder || false,
+                fromTemplate: data.fromTemplate || false,
+                expectedChordCount: data.expectedChordCount || chordCount || 4,
+                targetBars: data.targetBars || null
             });
         });
 

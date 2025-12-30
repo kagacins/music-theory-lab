@@ -41,7 +41,6 @@ export function initCompositionInsights() {
     window.clearCompositionInsights = clearInsightsData;
 
     isInitialized = true;
-    console.log('[CompositionInsights] Initialized');
 }
 
 // ============================================================================

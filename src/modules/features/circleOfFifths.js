@@ -484,6 +484,7 @@ function handleKeyClick(event) {
 
     // If same key or no chords, just apply the change directly
     if (actualKey === currentKey || !progressionData || progressionData.length === 0) {
+        closeCircleOfFifthsPanel();
         applyKeyChange(actualKey, type);
         return;
     }

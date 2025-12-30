@@ -19,12 +19,17 @@
 
 import { CHORD_DEFINITIONS, SHARP_NOTES, FLAT_NOTES, INVERSION_NAMES, ENHARMONIC_MAP } from '../../../data/music-data.js';
 import { HarmonyAnalyzer, COMMON_PROGRESSIONS } from '../../analysis/harmonyAnalyzer.js';
+import { PATTERN_CATEGORIES } from '../../analysis/patternDetection.js';
 import {
     getTrainerState,
     getCurrentKey,
     getProgressionData,
+    setProgressionData,
+    setProgressionRomans,
     setCurrentKey,
-    getSelectedChordIndex
+    getSelectedChordIndex,
+    clearSelection,
+    selectSingle
 } from '../../state/trainerState.js';
 import { getNotationPreference, getCurrentTab } from '../../state/globalState.js';
 import {
@@ -36,13 +41,16 @@ import {
     transposeTrebleWithModeAdjust,
     loadProgression,
     setProgressionViewMode,
+    getProgressionViewMode,
     expandChordCard,
     collapseChordCard,
+    isChordExpanded,
     updateChordType,
     updateChordRoot,
     updateChordInversion,
     updateChordDuration,
     updateRHOctaveShift,
+    updateChordAndRenderPreservingTrebleNotes,
     selectChordCard,
     highlightChordCard,
     unhighlightAllChordCards,
@@ -51,18 +59,31 @@ import {
     toggleProgressionNote,
     toggleProgressionLHNote,
     updateProgressionChord,
-    updateProgressionChordLH
+    updateProgressionChordLH,
+    getSelectedSectionIds,
+    isSectionSelectedInView,
+    selectSectionInView,
+    deselectSectionInView,
+    clearSectionSelection,
+    handleMultiSelectToggle,
+    handleMultiSelectRange,
+    clearMultiSelection,
+    updateMultiSelectVisuals
 } from './ProgressionController.js';
+import { getScaleNotesForKey, showProgressionChordSuggestions } from './ProgressionModals.js';
 import {
     startProgressionChord,
     stopTrainerChord
 } from './ProgressionPlayback.js';
+import { getCompositionState } from '../../state/compositionState.js';
 import { renderEnhancedTensionCurve } from '../../ui/TensionArcUI.js';
 import {
     initializeSimplifiedSortable,
     initializeSectionChipsSortable,
-    initializeSectionCardsAreaSortables
+    initializeSectionCardsAreaSortables,
+    initializeSectionContainerSortable
 } from './ProgressionDragDrop.js';
+import { dispatchBuilderEvent } from '../../ui/lessonGuidedMode.js';
 import { getLHNotes, getInvertedChordNotes, noteToMidi } from '../../utils/noteUtils.js';
 import { initAudio, getAudioIsReady, getPiano } from '../../audio/audioEngine.js';
 import { highlightTrainer } from '../../ui/keyboard.js';
@@ -80,11 +101,8 @@ import { highlightTrainer } from '../../ui/keyboard.js';
  */
 const staffNotationStates = new Map();
 
-/**
- * Set of expanded chord indices
- * Tracks which cards are showing detailed view vs simplified view
- */
-const expandedChords = new Set();
+// Note: expandedChords state is managed in ProgressionController.js
+// Use isChordExpanded(index) to check if a chord is expanded
 
 /**
  * One-time flag to force flat layout (ignore sections)
@@ -92,69 +110,7 @@ const expandedChords = new Set();
  */
 let forceFlatLayoutOnce = false;
 
-/**
- * Current progression view mode
- * Options: 'default' | 'scroll' | 'section'
- */
-let progressionViewMode = 'default';
-
-/**
- * Selected section IDs (for section view mode)
- */
-const selectedSectionIds = new Set();
-
-/**
- * User's preferred section order (for drag-drop reordering)
- */
-let userSectionOrder = [];
-
-/**
- * Pattern categories for enhanced pattern highlighting
- */
-const PATTERN_CATEGORIES = {
-    progressions: {
-        label: 'Progressions',
-        icon: '🎵',
-        color: '#a855f7',
-        priority: 1
-    },
-    cadences: {
-        label: 'Cadences',
-        icon: '🎼',
-        color: '#3b82f6',
-        priority: 2
-    },
-    sequences: {
-        label: 'Sequences',
-        icon: '🔄',
-        color: '#22c55e',
-        priority: 3
-    },
-    modal: {
-        label: 'Modal',
-        icon: '🎹',
-        color: '#f59e0b',
-        priority: 4
-    },
-    borrowed: {
-        label: 'Borrowed',
-        icon: '↔️',
-        color: '#ec4899',
-        priority: 5
-    }
-};
-
-// ============================================================================
-// MODULE STATE GETTERS
-// ============================================================================
-
-/**
- * Get array of currently selected section IDs
- * @returns {Array<string>} Array of section IDs
- */
-export function getSelectedSectionIds() {
-    return [...selectedSectionIds];
-}
+// PATTERN_CATEGORIES is imported from patternDetection.js
 
 // ============================================================================
 // HELPER FUNCTIONS - STAFF NOTATION STATE
@@ -396,8 +352,8 @@ function createViewModeToggle() {
     container.className = 'view-mode-toggle flex items-center gap-1 bg-gray-100 rounded-lg p-0.5';
     container.id = 'view-mode-toggle';
 
-    const isScrollView = progressionViewMode === 'scroll';
-    const isSectionView = progressionViewMode === 'section';
+    const isScrollView = getProgressionViewMode() === 'scroll';
+    const isSectionView = getProgressionViewMode() === 'section';
 
     container.innerHTML = `
         <button class="view-mode-btn px-2 py-1 text-xs font-medium rounded-md transition-all duration-200 flex items-center gap-1
@@ -446,8 +402,9 @@ export function createCompactViewModeToggle() {
     container.className = 'flex items-center gap-1.5';
     container.id = 'compact-view-mode-toggle';
 
-    const isScrollView = progressionViewMode === 'scroll';
-    const isSectionView = progressionViewMode === 'section';
+    const currentMode = getProgressionViewMode();
+    const isScrollView = currentMode === 'scroll';
+    const isSectionView = currentMode === 'section';
 
     container.innerHTML = `
         <span class="text-xs text-white/70 font-medium">View:</span>
@@ -480,7 +437,7 @@ export function createCompactViewModeToggle() {
             }
             // Update toggle button styles
             container.querySelectorAll('.compact-view-btn').forEach(b => {
-                const isActive = b.getAttribute('data-mode') === progressionViewMode;
+                const isActive = b.getAttribute('data-mode') === getProgressionViewMode();
                 b.className = `compact-view-btn px-2 py-1 text-xs font-medium rounded transition-all duration-200
                               ${isActive ? 'bg-white/30 text-white shadow-sm' : 'text-white/60 hover:text-white hover:bg-white/10'}`;
             });
@@ -500,7 +457,7 @@ export function createCompactViewModeToggle() {
  * @param {Array} notes - Array of note strings
  * @returns {Object} Width and height
  */
-function calculateCanvasDimensions(key, notes) {
+export function calculateCanvasDimensions(key, notes) {
     // TODO: Move to HelperFunctions module or keep here as VexFlow-specific
     const keySignature = getKeySignatureAccidentals(key);
     const accidentalCount = keySignature.sharps.size + keySignature.flats.size;
@@ -598,7 +555,7 @@ function getKeySignatureAccidentals(key) {
  * @param {string} key - Current key signature
  * @param {HTMLCanvasElement} canvas - Canvas element
  */
-function renderChordNotation(chord, key, canvas) {
+export function renderChordNotation(chord, key, canvas) {
     try {
         // VexFlow 5.x browser build exposes VexFlow namespace
         if (typeof VexFlow === 'undefined') {
@@ -756,6 +713,26 @@ function renderStaffNotation(chordIndex, canvas) {
     // It should stay in ProgressionRenderer.js as it's VexFlow-specific rendering
     // Implementation continues from line 1981-2510 of progressionBuilder.js
     // For brevity, marking as TODO to copy full implementation
+}
+
+/**
+ * Refresh only the chord notation canvas in a detailed card (without rebuilding HTML)
+ * @param {number} index - Chord index
+ * @param {object} chord - Chord data
+ */
+export function refreshChordNotationCanvas(index, chord) {
+    const trainerState = getTrainerState();
+    const key = trainerState.currentKey || 'C';
+
+    // Find the canvas in the detailed card for this chord
+    const wrapper = document.querySelector(`.chord-card-wrapper[data-chord-index="${index}"]`);
+    if (!wrapper) return;
+
+    const canvas = wrapper.querySelector('.chord-notation-canvas');
+    if (canvas) {
+        // Re-render the chord notation with updated data
+        renderChordNotation(chord, key, canvas);
+    }
 }
 
 /**
@@ -1076,12 +1053,245 @@ const harmonyAnalyzer = new HarmonyAnalyzer();
  * @param {string} key - Current key
  */
 function renderPatternHighlights(container, progressionData, key) {
-    // TODO: Implementation from lines 2726-2966
-    // This is a complex function that:
-    // 1. Analyzes progression for patterns
-    // 2. Creates collapsible master container
-    // 3. Organizes patterns by category
-    // 4. Creates interactive badges
+    if (!progressionData || progressionData.length === 0) return;
+
+    // Remove old pattern highlights if they exist
+    const oldHighlights = document.querySelector('#pattern-highlights-container');
+    if (oldHighlights) {
+        oldHighlights.remove();
+    }
+
+    // Analyze progression for patterns
+    const analysis = harmonyAnalyzer.analyzeProgression(progressionData, key);
+
+    // Use enhanced patterns if available, fallback to legacy patterns
+    const enhancedPatterns = analysis.enhancedPatterns || {
+        progressions: analysis.patterns || [],
+        cadences: [],
+        sequences: [],
+        modal: [],
+        borrowed: []
+    };
+
+    // Check if we have any patterns to display
+    const hasAnyPatterns = Object.values(enhancedPatterns).some(arr => arr && arr.length > 0);
+    if (!hasAnyPatterns) return;
+
+    // Create master collapsible pattern container
+    const patternContainer = document.createElement('div');
+    patternContainer.className = 'mb-2 px-4';
+    patternContainer.id = 'pattern-highlights-container';
+
+    // Add CSS for compact horizontal layout
+    const style = document.createElement('style');
+    style.textContent = `
+        .pattern-master-container {
+            background: rgba(20, 20, 30, 0.8);
+            border: 1px solid rgba(100, 100, 120, 0.3);
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        .pattern-master-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.375rem 0.75rem;
+            background: rgba(30, 30, 40, 0.6);
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 1px solid rgba(100, 100, 120, 0.2);
+        }
+        .pattern-master-header:hover {
+            background: rgba(40, 40, 50, 0.8);
+        }
+        .pattern-master-header.collapsed {
+            border-bottom: none;
+        }
+        .pattern-master-title {
+            flex: 1;
+            font-weight: 600;
+            color: #e5e7eb;
+            font-size: 0.7rem;
+        }
+        .pattern-master-expand {
+            font-size: 0.625rem;
+            transition: transform 0.2s;
+            color: #9ca3af;
+        }
+        .pattern-master-header:not(.collapsed) .pattern-master-expand {
+            transform: rotate(180deg);
+        }
+        .pattern-master-content {
+            padding: 0.5rem;
+            max-height: 300px;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+        }
+        .pattern-master-content.collapsed {
+            max-height: 0;
+            padding: 0 0.5rem;
+        }
+        .pattern-category-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            margin-bottom: 0.375rem;
+        }
+        .pattern-category-row:last-child {
+            margin-bottom: 0;
+        }
+        .pattern-category-label {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            background: rgba(50, 50, 60, 0.6);
+            border-radius: 0.375rem;
+            font-size: 0.5rem;
+            font-weight: 600;
+            color: #d1d5db;
+            white-space: nowrap;
+            min-width: 70px;
+        }
+        .pattern-category-label-icon {
+            font-size: 0.625rem;
+        }
+        .pattern-badges-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.375rem;
+            flex: 1;
+        }
+        .enhanced-pattern-badge {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.125rem;
+            padding: 0.375rem 0.5rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        .enhanced-pattern-badge:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+        }
+        .enhanced-pattern-badge.progressions {
+            background: linear-gradient(135deg, #a855f7, #8b5cf6);
+            color: white;
+        }
+        .enhanced-pattern-badge.cadences {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+        }
+        .enhanced-pattern-badge.sequences {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: white;
+        }
+        .enhanced-pattern-badge.modal {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+        }
+        .enhanced-pattern-badge.borrowed {
+            background: linear-gradient(135deg, #ec4899, #db2777);
+            color: white;
+        }
+        .pattern-badge-chords {
+            font-size: 0.5rem;
+            font-weight: 700;
+            opacity: 0.95;
+            letter-spacing: -0.02em;
+        }
+        .pattern-badge-name {
+            font-size: 0.5rem;
+            font-weight: 500;
+            opacity: 0.9;
+        }
+        .pattern-badge-count {
+            font-size: 0.45rem;
+            opacity: 0.8;
+            background: rgba(255, 255, 255, 0.25);
+            padding: 0.0625rem 0.25rem;
+            border-radius: 0.25rem;
+            margin-left: 0.25rem;
+        }
+        .pattern-highlight {
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.6) !important;
+            border-color: #a855f7 !important;
+        }
+    `;
+    patternContainer.appendChild(style);
+
+    // Create master container
+    const masterContainer = document.createElement('div');
+    masterContainer.className = 'pattern-master-container';
+
+    // Count total patterns
+    const totalPatterns = Object.values(enhancedPatterns).reduce((sum, arr) => sum + (arr?.length || 0), 0);
+
+    // Create master header (collapsed by default)
+    const masterHeader = document.createElement('button');
+    masterHeader.className = 'pattern-master-header collapsed';
+    masterHeader.innerHTML = `
+        <span class="pattern-master-title">Detected Patterns (${totalPatterns})</span>
+        <span class="pattern-master-expand">▼</span>
+    `;
+
+    // Create master content (collapsed by default)
+    const masterContent = document.createElement('div');
+    masterContent.className = 'pattern-master-content collapsed';
+
+    // Sort categories by priority
+    const sortedCategories = Object.entries(PATTERN_CATEGORIES)
+        .sort((a, b) => a[1].priority - b[1].priority);
+
+    for (const [categoryKey, categoryInfo] of sortedCategories) {
+        const patterns = enhancedPatterns[categoryKey];
+
+        // Skip empty categories
+        if (!patterns || patterns.length === 0) continue;
+
+        // Create horizontal category row
+        const categoryRow = document.createElement('div');
+        categoryRow.className = 'pattern-category-row';
+
+        // Category label
+        const categoryLabel = document.createElement('div');
+        categoryLabel.className = 'pattern-category-label';
+        categoryLabel.style.borderLeft = `2px solid ${categoryInfo.color}`;
+        categoryLabel.innerHTML = `
+            <span class="pattern-category-label-icon">${categoryInfo.icon}</span>
+            <span>${categoryInfo.label}</span>
+        `;
+
+        // Badges container
+        const badgesRow = document.createElement('div');
+        badgesRow.className = 'pattern-badges-row';
+
+        // Add badges for each pattern
+        patterns.forEach(pattern => {
+            const badge = createEnhancedPatternBadge(pattern, categoryKey);
+            badgesRow.appendChild(badge);
+        });
+
+        categoryRow.appendChild(categoryLabel);
+        categoryRow.appendChild(badgesRow);
+        masterContent.appendChild(categoryRow);
+    }
+
+    // Toggle expand/collapse
+    masterHeader.addEventListener('click', () => {
+        masterHeader.classList.toggle('collapsed');
+        masterContent.classList.toggle('collapsed');
+    });
+
+    masterContainer.appendChild(masterHeader);
+    masterContainer.appendChild(masterContent);
+    patternContainer.appendChild(masterContainer);
+
+    // Insert at the top of the container
+    container.insertBefore(patternContainer, container.firstChild);
 }
 
 /**
@@ -1091,7 +1301,83 @@ function renderPatternHighlights(container, progressionData, key) {
  * @returns {HTMLElement} Badge element
  */
 function createEnhancedPatternBadge(pattern, category) {
-    // TODO: Implementation from lines 2974-3052
+    const badge = document.createElement('button');
+    badge.className = `enhanced-pattern-badge ${category}`;
+
+    // Get display name and count
+    const name = pattern.name || pattern.shortName || pattern.type;
+    const count = pattern.matches?.length || pattern.count || 1;
+
+    // Get chord symbols if available and <= 6 chords
+    const chordSymbols = pattern.pattern && pattern.pattern.length <= 6
+        ? pattern.pattern.join('-')
+        : (pattern.chords && pattern.chords.length <= 6 ? pattern.chords.join('-') : '');
+
+    // Build tooltip
+    let tooltip = pattern.description || pattern.fullName || name;
+    if (pattern.positions) {
+        tooltip += `\nPositions: ${pattern.positions.map(p => p + 1).join(', ')}`;
+    } else if (pattern.matches) {
+        tooltip += `\nFound at: ${pattern.matches.map(m => `measure ${m + 1}`).join(', ')}`;
+    }
+    tooltip += '\n\nClick to highlight';
+
+    badge.title = tooltip;
+
+    // Badge content with two rows: chords on top (if short), name below
+    let content = '';
+    if (chordSymbols) {
+        content += `<div class="pattern-badge-chords">${chordSymbols}</div>`;
+    }
+    content += `<div class="pattern-badge-name">${name}`;
+    if (count > 1) {
+        content += `<span class="pattern-badge-count">${count}×</span>`;
+    }
+    content += `</div>`;
+
+    badge.innerHTML = content;
+
+    // Click handler to highlight chords
+    badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+
+        // Clear any existing highlights first
+        clearPatternHighlights();
+
+        // Remove active state from all badges
+        document.querySelectorAll('.enhanced-pattern-badge').forEach(b => {
+            b.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.3)';
+        });
+
+        // Check if this badge is already active
+        const isActive = badge.dataset.active === 'true';
+
+        if (!isActive) {
+            // Activate this badge
+            badge.dataset.active = 'true';
+            badge.style.boxShadow = `0 4px 12px ${PATTERN_CATEGORIES[category]?.color || '#a855f7'}88`;
+
+            // Calculate positions to highlight
+            let positions = [];
+            if (pattern.positions && Array.isArray(pattern.positions)) {
+                positions = pattern.positions;
+            } else if (pattern.matches) {
+                // For progressions, expand matches to full pattern length
+                const patternLen = pattern.pattern?.length || 1;
+                positions = pattern.matches.flatMap(m =>
+                    Array.from({ length: patternLen }, (_, i) => m + i)
+                );
+            }
+
+            highlightPatternChordsByPositions(positions);
+        } else {
+            // Deactivate this badge
+            badge.dataset.active = 'false';
+            badge.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.3)';
+        }
+    });
+
+    return badge;
 }
 
 /**
@@ -1099,7 +1385,33 @@ function createEnhancedPatternBadge(pattern, category) {
  * @param {Array} positions - Array of chord positions
  */
 function highlightPatternChordsByPositions(positions) {
-    // TODO: Implementation from lines 3058-3091
+    // Clear existing highlights
+    clearPatternHighlights();
+
+    if (!positions || positions.length === 0) return;
+
+    positions.forEach(pos => {
+        // Find card by data-chord-index attribute
+        const card = document.querySelector(`.chord-card-wrapper[data-chord-index="${pos}"]`);
+
+        if (card) {
+            card.classList.add('pattern-highlight');
+            // Apply styles directly to ensure they work
+            card.style.setProperty('box-shadow', '0 0 15px rgba(168, 85, 247, 0.6)', 'important');
+            card.style.setProperty('border-color', '#a855f7', 'important');
+            card.style.setProperty('border-width', '2px', 'important');
+        }
+    });
+
+    // Auto-clear after 3 seconds
+    setTimeout(() => {
+        clearPatternHighlights();
+        // Also reset badge active states
+        document.querySelectorAll('.enhanced-pattern-badge').forEach(b => {
+            b.dataset.active = 'false';
+            b.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.3)';
+        });
+    }, 3000);
 }
 
 // ============================================================================
@@ -1139,7 +1451,60 @@ export function updateSingleCard(index) {
  * @param {string} key - Current key
  */
 function updateSingleCardWrapper(wrapper, chord, index, key) {
-    // TODO: Implementation from lines 7704-7759
+    if (!wrapper || !chord) return;
+
+    // Check if this card is currently expanded
+    const isExpanded = isChordExpanded(index);
+
+    // Completely disable ALL transitions and animations using CSS class
+    // This overrides the global .chord-card-wrapper transition and animation rules
+    wrapper.classList.add('no-animation');
+
+    // Replace the card's HTML with updated version
+    if (isExpanded) {
+        wrapper.innerHTML = createDetailedCardHTML(chord, index, key);
+        // Ensure expanded class is present
+        wrapper.classList.add('expanded-card-wrapper');
+
+        // Render chord notation on the canvas (after DOM is ready)
+        requestAnimationFrame(() => {
+            const canvas = wrapper.querySelector('.chord-notation-canvas');
+            if (canvas) {
+                renderChordNotation(chord, key, canvas);
+
+                // Adjust card dimensions based on canvas size
+                const dimensions = calculateCanvasDimensions(key, chord.notes);
+                const detailedCard = wrapper.querySelector('.detailed-card');
+                if (detailedCard) {
+                    detailedCard.style.minWidth = `${dimensions.width + 20}px`;
+                }
+                // Don't set wrapper minWidth - CSS handles it via fit-content
+            }
+        });
+    } else {
+        wrapper.innerHTML = '';
+        const simplifiedStructure = createSimplifiedCardStructure(chord, index, key);
+        wrapper.appendChild(simplifiedStructure);
+        // Ensure expanded class is removed
+        wrapper.classList.remove('expanded-card-wrapper');
+    }
+
+    // Re-attach event listeners
+    attachCardEventListeners(wrapper, index);
+
+    // Keep no-animation class permanently to prevent any flash
+    // The CSS rule ensures all children also have transitions/animations disabled
+
+    // Restore selection (purple ring) if this card was selected
+    const selectedIndex = getSelectedChordIndex();
+    if (selectedIndex === index) {
+        const card = wrapper.querySelector('.simplified-card, .detailed-card');
+        if (card) {
+            card.classList.add('ring-4', 'ring-purple-500', 'ring-offset-2');
+            card.setAttribute('data-selected', 'true');
+        }
+    }
+    // No longer need transforms - flexbox/grid handles layout automatically
 }
 
 // ============================================================================
@@ -1343,7 +1708,7 @@ function toggleStaffNotation(chordIndex, sourceContainerId = null) {
  */
 function updateNotationForSelectedSections() {
 
-    if (progressionViewMode !== 'section') {
+    if (getProgressionViewMode() !== 'section') {
         return;
     }
 
@@ -1507,15 +1872,13 @@ function getMaxInversionForLhType(lhType) {
  * @param {boolean} syncBothTabs - Whether to sync both tabs
  */
 export function renderProgressionDisplay(containerId = 'progression-visualization', syncBothTabs = true) {
-    // DEBUGGING: Uncomment to trace when render is called
-    console.log('[renderProgressionDisplay] Rendering', containerId);
+    // Render progression cards to the specified container
 
     // Capture staff notation states before clearing DOM (always capture from both tabs)
     captureStaffNotationStates();
 
     const container = document.getElementById(containerId);
     if (!container) {
-        console.log('[renderProgressionDisplay] Container not found:', containerId);
         return;
     }
 
@@ -1557,19 +1920,12 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
     container.innerHTML = '';
 
     const trainerState = getTrainerState();
-    console.log('[renderProgressionDisplay] Progression data length:', trainerState.progressionData?.length);
-    console.log('[renderProgressionDisplay] Condition check:', {
-        containerId,
-        match: containerId === 'progression-visualization',
-        hasData: trainerState.progressionData.length > 0
-    });
 
     // DEPRECATED: This block handles the old "Progression Workshop" tab which has been removed.
     // The container 'progression-visualization' no longer exists in the UI.
     // This code is kept for reference but will never execute.
     // TODO: Remove this entire block in a future cleanup pass.
     if (containerId === 'progression-visualization' && trainerState.progressionData.length > 0) {
-        console.log('[renderProgressionDisplay] RENDERING CARDS for progression-visualization');
         // Get parent panel to render pattern badges and tension curve outside the grid
         const panel = container.parentElement;
 
@@ -1650,11 +2006,11 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         gridContainer.id = `${containerId}-cards-grid`;
 
         // Branch based on view mode
-        if (progressionViewMode === 'section' && sections.length > 0) {
+        if (getProgressionViewMode() === 'section' && sections.length > 0) {
             // Section View Mode: show section picker and filtered cards
             gridContainer.className = 'flex flex-col gap-2';
             renderSectionViewMode(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', sections);
-        } else if (progressionViewMode === 'scroll') {
+        } else if (getProgressionViewMode() === 'scroll') {
             // Scroll View Mode: horizontal scrolling
             renderScrollViewMode(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
                 showActionButtons: true
@@ -1722,16 +2078,18 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         container.innerHTML = '';
         container.className = 'flex flex-col gap-2 p-2 bg-white rounded-lg border border-gray-200';
 
-        // Populate header toggle if we have sections (toggle is in the Chord Progression header)
+        // Populate header toggle (toggle is in the Chord Progression header)
         const headerToggle = document.getElementById('header-section-view-toggle');
         if (headerToggle) {
-            if (sections.length > 0) {
+            if (hasSections) {
                 headerToggle.innerHTML = '';
                 headerToggle.className = 'flex items-center gap-1 ml-2';
                 headerToggle.appendChild(createCompactViewModeToggle());
             } else {
+                // No sections - hide toggle and default to scroll view
                 headerToggle.innerHTML = '';
-                headerToggle.className = 'hidden ml-2';
+                headerToggle.className = 'hidden';
+                setProgressionViewMode('scroll');
             }
         }
 
@@ -1740,11 +2098,11 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
         gridContainer.id = `${containerId}-cards-grid`;
 
         // Branch based on view mode - pass showActionButtons: false since toolbar is above
-        if (progressionViewMode === 'section' && sections.length > 0) {
+        if (getProgressionViewMode() === 'section' && sections.length > 0) {
             // Section View Mode: show section picker and filtered cards
             gridContainer.className = 'flex flex-col gap-2';
             renderSectionViewMode(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', sections);
-        } else if (progressionViewMode === 'scroll') {
+        } else if (getProgressionViewMode() === 'scroll') {
             // Scroll View Mode: horizontal scrolling
             renderScrollViewMode(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
                 showActionButtons: false
@@ -1778,7 +2136,7 @@ export function renderProgressionDisplay(containerId = 'progression-visualizatio
                     window.syncProgressionToMelodyComposer();
                 }
                 // Then refresh notation - but respect section view filtering!
-                if (progressionViewMode === 'section' && selectedSectionIds.size > 0) {
+                if (getProgressionViewMode() === 'section' && getSelectedSectionIds().length > 0) {
                     // In section view with a selection - use filtered rendering
                     // Add a small delay to ensure sync has completed
                     setTimeout(() => {
@@ -3062,8 +3420,10 @@ export function renderProgressionDisplayForBuilder(container, progressionData, k
             headerToggle.className = 'flex items-center gap-1 ml-2';
             headerToggle.appendChild(createCompactBuilderViewModeToggle());
         } else {
+            // No sections - hide toggle and default to scroll view
             headerToggle.innerHTML = '';
             headerToggle.className = 'hidden ml-2';
+            setProgressionViewMode('scroll');
         }
     }
 
@@ -3072,11 +3432,11 @@ export function renderProgressionDisplayForBuilder(container, progressionData, k
     gridContainer.id = `${container.id || 'builder-progression-visualization'}-cards-grid`;
 
     // Branch based on view mode (same pattern as Composition Studio)
-    if (progressionViewMode === 'section' && hasSections) {
+    if (getProgressionViewMode() === 'section' && hasSections) {
         // Section View Mode: show section picker and filtered cards
         gridContainer.className = 'flex flex-col gap-2';
         renderSectionViewModeForBuilder(gridContainer, progressionData, key, sections, showActionButtons);
-    } else if (progressionViewMode === 'scroll') {
+    } else if (getProgressionViewMode() === 'scroll') {
         // Scroll View Mode: horizontal scrolling
         renderScrollViewMode(gridContainer, progressionData, key, {
             showActionButtons: showActionButtons,
@@ -3116,8 +3476,8 @@ function createCompactBuilderViewModeToggle() {
     container.className = 'flex items-center gap-1.5';
     container.id = 'compact-builder-view-mode-toggle';
 
-    const isScrollView = progressionViewMode === 'scroll';
-    const isSectionView = progressionViewMode === 'section';
+    const isScrollView = getProgressionViewMode() === 'scroll';
+    const isSectionView = getProgressionViewMode() === 'section';
 
     container.innerHTML = `
         <span class="text-xs text-white/70 font-medium">View:</span>
@@ -3151,7 +3511,7 @@ function createCompactBuilderViewModeToggle() {
 
             // Update toggle button styles
             container.querySelectorAll('.compact-builder-view-btn').forEach(b => {
-                const isActive = b.getAttribute('data-mode') === progressionViewMode;
+                const isActive = b.getAttribute('data-mode') === getProgressionViewMode();
                 b.className = `compact-builder-view-btn px-2 py-1 text-xs font-medium rounded transition-all duration-200
                               ${isActive ? 'bg-white/30 text-white shadow-sm' : 'text-white/60 hover:text-white hover:bg-white/10'}`;
             });
@@ -3190,46 +3550,47 @@ function renderSectionViewModeForBuilder(gridContainer, progressionData, key, se
     cardsWrapper.style.cssText = 'scroll-behavior: smooth; -webkit-overflow-scrolling: touch; padding-bottom: 8px;';
 
     const cardsContainer = document.createElement('div');
-    cardsContainer.className = 'section-filtered-cards flex flex-nowrap items-start gap-2 transition-all duration-300';
+    cardsContainer.className = 'section-filtered-cards flex flex-nowrap items-start gap-2';
     cardsContainer.id = `${gridContainer.id}-cards-grid`;
 
     // Collect visible chord indices based on selected sections
     let visibleChordIndices = new Set();
     const selectedIds = getSelectedSectionIds();
 
-    // Build the combined sections list (including pseudo-sections for ungrouped chords)
-    const allSectionsWithPseudo = buildSectionChipsWithUngrouped(sections);
+    // Build the combined sections list (all sections are now real, including ungrouped)
+    const allSections = buildSectionChipsWithUngrouped(sections);
 
     if (selectedIds.length === 0) {
         // No section selected - show all cards
         progressionData.forEach((_, idx) => visibleChordIndices.add(idx));
     } else {
-        // Show only cards from selected sections (including pseudo-sections)
+        // Show only cards from selected sections (including ungrouped sections)
         selectedIds.forEach(sectionId => {
-            const section = allSectionsWithPseudo.find(s => s.id === sectionId);
+            const section = allSections.find(s => s.id === sectionId);
             if (section && section.chordIndices) {
                 section.chordIndices.forEach(idx => visibleChordIndices.add(idx));
             }
         });
     }
 
-    // Render each section (including pseudo-sections for ungrouped chords)
-    allSectionsWithPseudo.forEach(sectionData => {
+    // Render each section (all are now real sections, including ungrouped)
+    allSections.forEach(sectionData => {
         // Check if any of this section's chords are visible
         const visibleInSection = (sectionData.chordIndices || []).filter(idx => visibleChordIndices.has(idx));
 
-        // Skip if no visible chords
-        if (visibleInSection.length === 0) return;
+        // Skip if no visible chords UNLESS it's a placeholder section
+        const isPlaceholderSection = sectionData.isPlaceholder || sectionData.fromTemplate;
+        if (visibleInSection.length === 0 && !isPlaceholderSection) return;
 
         // Create section container with outline and label
         const sectionContainer = document.createElement('div');
         sectionContainer.className = 'section-unified-container inline-flex flex-col flex-shrink-0 rounded-lg overflow-visible section-view-card';
         sectionContainer.setAttribute('data-section-id', sectionData.id);
 
-        const isPseudoSection = sectionData.isPseudoSection;
+        const isUngrouped = sectionData.type === 'ungrouped';
 
-        if (isPseudoSection) {
-            sectionContainer.setAttribute('data-pseudo-section', 'true');
+        if (isUngrouped) {
+            sectionContainer.setAttribute('data-ungrouped-section', 'true');
         }
 
         // Banner header with section label
@@ -3244,15 +3605,13 @@ function renderSectionViewModeForBuilder(gridContainer, progressionData, key, se
             </svg>
             <span class="text-white text-xs font-semibold flex-grow">${sectionData.label || 'Section'}</span>
             <span class="text-white/70 text-xs">${visibleInSection.length}</span>
-            ${!isPseudoSection ? `
-                <button class="section-menu-btn p-0.5 rounded hover:bg-white/20 transition"
-                        onclick="event.stopPropagation(); window.showSectionMenu && window.showSectionMenu(event, '${sectionData.id}')"
-                        title="Section options">
-                    <svg class="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
-                    </svg>
-                </button>
-            ` : ''}
+            <button class="section-menu-btn p-0.5 rounded hover:bg-white/20 transition"
+                    onclick="event.stopPropagation(); window.showSectionMenu && window.showSectionMenu(event, '${sectionData.id}')"
+                    title="Section options">
+                <svg class="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
+                </svg>
+            </button>
         `;
         sectionContainer.appendChild(banner);
 
@@ -3271,14 +3630,44 @@ function renderSectionViewModeForBuilder(gridContainer, progressionData, key, se
         cardsArea.setAttribute('data-section-id', sectionData.id);
 
         // Render cards in this section
-        visibleInSection.forEach(chordIdx => {
-            if (chordIdx < progressionData.length) {
-                const chord = progressionData[chordIdx];
-                const wrapper = createChordCardWrapper(chord, chordIdx, key);
-                wrapper.setAttribute('data-in-section', sectionData.id);
-                cardsArea.appendChild(wrapper);
+        if (visibleInSection.length > 0) {
+            visibleInSection.forEach(chordIdx => {
+                if (chordIdx < progressionData.length) {
+                    const chord = progressionData[chordIdx];
+                    const wrapper = createChordCardWrapper(chord, chordIdx, key);
+                    wrapper.setAttribute('data-in-section', sectionData.id);
+                    cardsArea.appendChild(wrapper);
+                }
+            });
+        } else if (isPlaceholderSection) {
+            // This is a placeholder section - show "Add Chord" placeholders
+            const expectedCount = sectionData.expectedChordCount || 4;
+            for (let i = 0; i < expectedCount; i++) {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'chord-placeholder flex flex-col justify-center items-center p-3 rounded-lg flex-shrink-0';
+                placeholder.style.cssText = `
+                    min-width: 80px;
+                    min-height: 100px;
+                    border: 2px dashed ${sectionData.color || '#9ca3af'};
+                    background-color: ${(sectionData.color || '#9ca3af')}10;
+                    cursor: pointer;
+                `;
+                placeholder.innerHTML = `
+                    <svg class="w-6 h-6 mb-1" style="color: ${sectionData.color || '#9ca3af'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    <span class="text-xs font-medium" style="color: ${sectionData.color || '#9ca3af'}">Add</span>
+                `;
+                placeholder.onclick = () => {
+                    if (window.addChordToSection) {
+                        window.addChordToSection(sectionData.id);
+                    } else if (window.toggleQuickAddChord) {
+                        window.toggleQuickAddChord();
+                    }
+                };
+                cardsArea.appendChild(placeholder);
             }
-        });
+        }
 
         sectionContainer.appendChild(cardsArea);
         cardsContainer.appendChild(sectionContainer);
@@ -3287,8 +3676,11 @@ function renderSectionViewModeForBuilder(gridContainer, progressionData, key, se
     cardsWrapper.appendChild(cardsContainer);
     gridContainer.appendChild(cardsWrapper);
 
-    // Initialize sortable on section cards areas
+    // Initialize sortable on section cards areas (for dragging cards between sections)
     initializeSectionCardsAreaSortables(cardsContainer);
+
+    // Initialize sortable for dragging entire section containers
+    initializeSectionContainerSortable(cardsContainer);
 }
 
 /**
@@ -3402,7 +3794,6 @@ export function renderProgressionControls() {
     // Use setKeyDropdownValue to properly handle flat keys that may need dropdown repopulation
     setKeyDropdownValue(selectedKey, false); // false = don't trigger loadProgression yet
     progressionSelect.selectedIndex = selectedProgIndex;
-    console.log(`Loaded random progression: ${selectedProgName} in ${selectedKey}`);
 
     // Add event listeners
     keySelect.onchange = () => {
@@ -3429,7 +3820,6 @@ export function renderProgressionControls() {
 
         console.log('[KeyChange] Showing dialog for key change with', progressionData.length, 'chords');
 
-        // TODO: Import showKeyChangeDialog when modals module is extracted
         const showKeyChangeDialog = window.showKeyChangeDialog;
 
         // Check if dialog function is available
@@ -3480,17 +3870,14 @@ export function renderProgressionControls() {
 
                 // Update key and re-render
                 setCurrentKey(newKey);
-                // TODO: Import renderProgressionCards when extracted
                 if (window.renderProgressionCards) {
                     window.renderProgressionCards(document.getElementById('chord-cards-container'), false);
                 }
-                // TODO: Import renderProgressionDisplay when extracted
                 if (window.renderProgressionDisplay) {
                     window.renderProgressionDisplay('melody-progression-visualization', false);
                 }
                 if (window.updateKeyboardLabels) window.updateKeyboardLabels();
                 if (window.updateKeySignatureDisplay) window.updateKeySignatureDisplay(newKey);
-                // TODO: Import updateCurrentKeyDisplay when extracted
                 if (window.updateCurrentKeyDisplay) window.updateCurrentKeyDisplay();
 
                 // Sync to composition state
@@ -3503,7 +3890,6 @@ export function renderProgressionControls() {
     progressionSelect.onchange = () => loadProgression();
 
     // Update "Current Key" display text on initial render
-    // TODO: Import updateCurrentKeyDisplay when extracted
     if (window.updateCurrentKeyDisplay) window.updateCurrentKeyDisplay();
 
     // Add event listener for speed selector - restart playback if currently playing
@@ -3532,7 +3918,6 @@ export function renderProgressionControls() {
         loadProgression();
     } else {
         // Render progression display
-        // TODO: Import renderProgressionDisplay when extracted
         if (window.renderProgressionDisplay) {
             window.renderProgressionDisplay('melody-progression-visualization', true);
             window.renderProgressionDisplay('melody-progression-visualization', false);
@@ -3557,23 +3942,183 @@ function renderSectionViewMode(container, progressionData, key, sections) {
 }
 
 /**
- * Create section picker bar
- * @param {Array} sections - Array of section objects
- * @returns {HTMLElement} Section picker bar
+ * Handle section chip click
+ * @param {string} sectionId - Section ID that was clicked
+ * @param {boolean} isShiftClick - Whether shift key was held
+ * @param {boolean} isCtrlClick - Whether ctrl/cmd key was held
  */
-function createSectionPickerBar(sections) {
-    // TODO: Implementation from lines 3774-3833
+function handleSectionChipClick(sectionId, isShiftClick, isCtrlClick = false) {
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    const realSections = compositionState ? compositionState.getSections() : [];
+    // Use combined list including ungrouped sections for proper range selection
+    const allSections = buildSectionChipsWithUngrouped(realSections);
+    const selectedIds = getSelectedSectionIds();
+
+    if (isShiftClick) {
+        // Shift+click: select range of adjacent sections
+        selectSectionRange(sectionId, allSections);
+    } else if (isCtrlClick) {
+        // Ctrl+click: toggle this section in the selection
+        if (isSectionSelectedInView(sectionId)) {
+            deselectSectionInView(sectionId);
+        } else {
+            selectSectionInView(sectionId, true);
+        }
+    } else {
+        // Normal click: toggle selection or select single
+        if (isSectionSelectedInView(sectionId) && selectedIds.length === 1) {
+            // Clicking the only selected section - deselect it
+            deselectSectionInView(sectionId);
+        } else {
+            // Select only this section
+            selectSectionInView(sectionId, false);
+        }
+    }
+
+    // Re-render with new selection
+    rerenderActiveProgressionDisplay();
+
+    // Update notation to show only selected section measures
+    if (window.updateNotationForSelectedSections) {
+        window.updateNotationForSelectedSections();
+    }
 }
 
 /**
- * Create section chip element
+ * Create section picker bar for section view mode
+ * Includes "All" button at left, plus all sections (including ungrouped ones)
+ * @param {Array} sections - Array of section objects
+ * @returns {HTMLElement} Section picker bar element
+ */
+function createSectionPickerBar(sections) {
+    const bar = document.createElement('div');
+    bar.className = 'section-picker-bar flex items-center gap-2 p-2 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg mb-2 border border-gray-200';
+    bar.id = 'section-picker-bar';
+
+    // Previous section button
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'section-nav-btn p-1.5 rounded-full bg-white border border-gray-200 hover:bg-gray-100 hover:border-gray-300 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0';
+    prevBtn.innerHTML = `<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+    </svg>`;
+    prevBtn.title = 'Previous section (←)';
+    prevBtn.onclick = () => {
+        if (window.navigateToPreviousSection) {
+            window.navigateToPreviousSection();
+        }
+    };
+    bar.appendChild(prevBtn);
+
+    // "All" button - moved to left side, right after prev button
+    const selectedIds = getSelectedSectionIds();
+    const allBtn = document.createElement('button');
+    allBtn.className = `px-2.5 py-1.5 text-xs font-semibold rounded-full transition-all duration-200 flex-shrink-0
+                        ${selectedIds.length === 0 ? 'bg-indigo-500 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'}`;
+    allBtn.textContent = 'All';
+    allBtn.title = 'Show all chords';
+    allBtn.setAttribute('data-section-id', 'all');
+    allBtn.onclick = () => {
+        clearSectionSelection();
+        rerenderActiveProgressionDisplay();
+        if (window.updateNotationForSelectedSections) {
+            window.updateNotationForSelectedSections();
+        }
+    };
+    bar.appendChild(allBtn);
+
+    // Section chips container
+    const chipsContainer = document.createElement('div');
+    chipsContainer.className = 'section-chips-container flex items-center gap-1.5 flex-1 overflow-x-auto py-1 px-1';
+    chipsContainer.id = 'section-chips-container';
+    chipsContainer.style.scrollbarWidth = 'none'; // Hide scrollbar
+
+    // Build combined list of all sections (including ungrouped ones)
+    const allChips = buildSectionChipsWithUngrouped(sections);
+
+    allChips.forEach(chipData => {
+        const isSelected = isSectionSelectedInView(chipData.id);
+        const chip = createSectionChip(chipData, isSelected, handleSectionChipClick);
+        chipsContainer.appendChild(chip);
+    });
+
+    bar.appendChild(chipsContainer);
+
+    // Note: Sortable initialization is done AFTER this bar is appended to the document
+    // See renderSectionViewMode where initializeSectionChipsSortable is called
+
+    // Next section button
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'section-nav-btn p-1.5 rounded-full bg-white border border-gray-200 hover:bg-gray-100 hover:border-gray-300 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0';
+    nextBtn.innerHTML = `<svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+    </svg>`;
+    nextBtn.title = 'Next section (→)';
+    nextBtn.onclick = () => {
+        if (window.navigateToNextSection) {
+            window.navigateToNextSection();
+        }
+    };
+    bar.appendChild(nextBtn);
+
+    return bar;
+}
+
+/**
+ * Create section chip element for section picker bar
  * @param {Object} section - Section object
- * @param {boolean} isSelected - Whether selected
- * @param {Function} onClick - Click handler
- * @returns {HTMLElement} Section chip
+ * @param {boolean} isSelected - Whether section is selected
+ * @param {Function} onClick - Click handler that receives (sectionId, shiftKey, ctrlKey)
+ * @returns {HTMLElement} Section chip element
  */
 function createSectionChip(section, isSelected, onClick) {
-    // TODO: Implementation from lines 3726-3766
+    const chip = document.createElement('button');
+    const chordCount = section.chordIndices?.length || section.chordCount || 0;
+    const sectionColor = section.color || '#c084fc';
+    const isUngrouped = section.type === 'ungrouped';
+
+    // Much stronger visual difference for selected state
+    // Dragging is via the handle, so keep cursor-pointer for the chip itself
+    chip.className = `section-chip flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold
+                      transition-all duration-200 flex-shrink-0 cursor-pointer
+                      ${isSelected ? 'ring-2 ring-offset-2 shadow-lg transform scale-105' : 'hover:scale-102'}`;
+    chip.style.cssText = `
+        background: ${isSelected ? hexToRgba(sectionColor, 0.35) : hexToRgba(sectionColor, 0.08)};
+        border: 2px solid ${isSelected ? sectionColor : hexToRgba(sectionColor, 0.25)};
+        color: ${isSelected ? '#1f2937' : '#6b7280'};
+        ${isSelected ? `--tw-ring-color: ${sectionColor}; box-shadow: 0 4px 12px ${hexToRgba(sectionColor, 0.4)};` : ''}
+    `;
+
+    // Add drag grip icon for all sections (including ungrouped for reordering)
+    const dragGrip = `<span class="section-pill-drag-handle cursor-grab active:cursor-grabbing"><svg class="w-3 h-3 opacity-40 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
+        <path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm0 6a2 2 0 10.001 4.001A2 2 0 007 14zm6-8a2 2 0 10.001-4.001A2 2 0 0013 6zm0 2a2 2 0 10.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10.001 4.001A2 2 0 0013 14z"/>
+    </svg></span>`;
+
+    chip.innerHTML = `
+        ${dragGrip}
+        <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background: ${sectionColor}; ${isSelected ? 'box-shadow: 0 0 8px ' + sectionColor + ';' : ''}"></span>
+        <span class="truncate max-w-[100px]">${section.label || 'Section'}</span>
+        <span class="text-[10px] ${isSelected ? 'font-bold' : 'opacity-70'}">(${chordCount})</span>
+        ${isSelected ? '<svg class="w-3 h-3 ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>' : ''}
+    `;
+
+    chip.setAttribute('data-section-id', section.id);
+
+    // Add click handler AFTER setting innerHTML (innerHTML can clear event listeners)
+    chip.addEventListener('click', (e) => {
+        // Don't trigger if clicking on drag handle
+        if (e.target.closest('.section-pill-drag-handle')) {
+            return;
+        }
+        onClick(section.id, e.shiftKey, e.ctrlKey || e.metaKey);
+    });
+
+    // Mark ungrouped sections and store their chord indices for reference
+    if (isUngrouped) {
+        chip.setAttribute('data-ungrouped-section', 'true');
+        chip.setAttribute('data-chord-indices', JSON.stringify(section.chordIndices || []));
+    }
+
+    return chip;
 }
 
 // ============================================================================
@@ -3588,8 +4133,27 @@ function createSectionChip(section, isSelected, onClick) {
  * @param {Object} options - Rendering options
  */
 function renderScrollViewMode(gridContainer, progressionData, key, options = {}) {
-    // Delegate to flat cards scroll implementation
-    renderFlatCardsScroll(gridContainer, progressionData, key, options);
+    // Apply scroll view container styles
+    gridContainer.className = 'scroll-view-container flex flex-nowrap items-start gap-2 overflow-x-auto pb-2';
+    gridContainer.style.cssText = `
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 transparent;
+    `;
+
+    // Check if there are sections - if so, use section-aware rendering
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+    const sections = compositionState ? compositionState.getSections() : [];
+    const hasSections = sections && sections.length > 0;
+
+    if (hasSections) {
+        // Render with section containers/banners in scroll mode
+        renderSectionAwareCardsScroll(gridContainer, progressionData, key, options);
+    } else {
+        // Flat cards without sections
+        renderFlatCardsScroll(gridContainer, progressionData, key, options);
+    }
 }
 
 // ============================================================================
@@ -3711,12 +4275,50 @@ function createEmptyProgressionState(containerId) {
 }
 
 /**
- * Build section chips including ungrouped chords as pseudo-sections
- * Groups consecutive ungrouped chords together and creates pseudo-sections for them
- * @param {Array} sections - Array of section objects
- * @returns {Array} Combined array of real sections and pseudo-sections
+ * Build section chips for all sections including ungrouped ones
+ * Delegates to compositionState.buildSectionView() which now materializes
+ * ungrouped chords as real 'ungrouped' type sections
+ * @param {Array} sections - Sections from getSections (not directly used - kept for API compat)
+ * @returns {Array} Array of all sections (all are now real, no pseudo-sections)
  */
-function buildSectionChipsWithUngrouped(sections) {
+export function buildSectionChipsWithUngrouped(sections) {
+    // Use the centralized buildSectionView from compositionState
+    // This now returns all real sections, including 'ungrouped' type sections
+    const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+
+    if (compositionState && typeof compositionState.buildSectionView === 'function') {
+        // Use the authoritative section view (all sections are now real)
+        const sectionView = compositionState.buildSectionView();
+
+        // Check if user has a custom order preference
+        const userOrder = getUserSectionOrder();
+
+        if (userOrder && userOrder.length > 0) {
+            // Sort by user's preferred order, with fallback to startIndex
+            sectionView.sort((a, b) => {
+                const aIndex = userOrder.indexOf(a.id);
+                const bIndex = userOrder.indexOf(b.id);
+
+                // If both are in userOrder, use that order
+                if (aIndex !== -1 && bIndex !== -1) {
+                    return aIndex - bIndex;
+                }
+
+                // If both are NOT in userOrder, sort by startIndex
+                if (aIndex === -1 && bIndex === -1) {
+                    return (a.startIndex || 0) - (b.startIndex || 0);
+                }
+
+                // Mixed: use startIndex comparison
+                return (a.startIndex || 0) - (b.startIndex || 0);
+            });
+        }
+        // If no user order, buildSectionView already returns in startIndex order
+
+        return sectionView;
+    }
+
+    // FALLBACK: Old logic for backward compatibility
     const trainerState = getTrainerState();
     const progressionLength = trainerState.progressionData?.length || 0;
 
@@ -3750,63 +4352,43 @@ function buildSectionChipsWithUngrouped(sections) {
     let currentGroup = [ungroupedIndices[0]];
 
     for (let i = 1; i < ungroupedIndices.length; i++) {
-        // Check if this index is consecutive OR if there's a section in between
         const prevIdx = ungroupedIndices[i - 1];
         const currIdx = ungroupedIndices[i];
 
-        // Check if there's a section starting between prevIdx and currIdx
         const sectionInBetween = sections.some(s => {
             const sectionStart = Math.min(...(s.chordIndices || [Infinity]));
             return sectionStart > prevIdx && sectionStart < currIdx;
         });
 
         if (currIdx === prevIdx + 1 && !sectionInBetween) {
-            // Consecutive ungrouped chord, add to current group
             currentGroup.push(currIdx);
         } else {
-            // Gap or section in between - start new group
             ungroupedGroups.push([...currentGroup]);
             currentGroup = [currIdx];
         }
     }
-    // Don't forget the last group
     if (currentGroup.length > 0) {
         ungroupedGroups.push(currentGroup);
     }
 
-    // Create pseudo-section objects for each ungrouped group
+    // Create pseudo-section objects
     const pseudoSections = ungroupedGroups.map((indices, groupIndex) => ({
         id: `no-group-${groupIndex + 1}`,
         label: `No Group ${groupIndex + 1}`,
-        color: '#9ca3af', // Gray color for ungrouped
+        color: '#9ca3af',
         chordIndices: indices,
+        startIndex: indices[0],
+        chordCount: indices.length,
         isPseudoSection: true
     }));
 
-    // Combine real sections and pseudo-sections
+    // Combine and sort
     const allSections = [...sections, ...pseudoSections];
-
-    // If user has set a preferred order, use it
-    if (userSectionOrder && userSectionOrder.length > 0) {
-        // Sort by user's preferred order
-        allSections.sort((a, b) => {
-            const aIndex = userSectionOrder.indexOf(a.id);
-            const bIndex = userSectionOrder.indexOf(b.id);
-            // Items not in userSectionOrder go to the end
-            if (aIndex === -1 && bIndex === -1) return 0;
-            if (aIndex === -1) return 1;
-            if (bIndex === -1) return -1;
-            return aIndex - bIndex;
-        });
-    } else {
-        // Default: Sort all sections (real and pseudo) by their first chord index position
-        // This ensures appended chords appear at the end, not the beginning
-        allSections.sort((a, b) => {
-            const aMin = Math.min(...(a.chordIndices || [Infinity]));
-            const bMin = Math.min(...(b.chordIndices || [Infinity]));
-            return aMin - bMin;
-        });
-    }
+    allSections.sort((a, b) => {
+        const aMin = a.startIndex !== undefined ? a.startIndex : Math.min(...(a.chordIndices || [Infinity]));
+        const bMin = b.startIndex !== undefined ? b.startIndex : Math.min(...(b.chordIndices || [Infinity]));
+        return aMin - bMin;
+    });
 
     return allSections;
 }
@@ -4225,7 +4807,7 @@ function hideTensionTooltip() {
  * Highlight tension curve point during playback (blue)
  * @param {number} index - Chord index to highlight
  */
-function highlightTensionPoint(index) {
+export function highlightTensionPoint(index) {
     const container = document.getElementById('tension-curve-container');
     if (!container) return;
 
@@ -4245,7 +4827,7 @@ function highlightTensionPoint(index) {
  * This is different from playback highlighting (blue)
  * @param {number} index - Chord index to highlight
  */
-function highlightTensionPointForSelection(index) {
+export function highlightTensionPointForSelection(index) {
     const container = document.getElementById('tension-curve-container');
     if (!container) return;
 
@@ -4264,7 +4846,7 @@ function highlightTensionPointForSelection(index) {
  * Unhighlight all tension curve points
  * Removes both playback (blue) and selection (purple) highlighting
  */
-function unhighlightAllTensionPoints() {
+export function unhighlightAllTensionPoints() {
     const container = document.getElementById('tension-curve-container');
     if (!container) return;
 
@@ -4283,7 +4865,7 @@ function unhighlightAllTensionPoints() {
  * Toggle notation view on simplified chord cards
  * Switches between chord info view and VexFlow notation view
  */
-function toggleSimplifiedCardNotation(wrapper, index) {
+export function toggleSimplifiedCardNotation(wrapper, index) {
     const card = wrapper.querySelector('.simplified-card');
     const chordInfoView = wrapper.querySelector('.chord-info-view');
     const notationView = wrapper.querySelector('.notation-view');
@@ -4367,7 +4949,7 @@ function toggleSimplifiedCardNotation(wrapper, index) {
  * Accumulates shifts when multiple cards are expanded
  * Uses transform instead of margin to preserve card width
  */
-function updateCardShifts() {
+export function updateCardShifts() {
     // Update shifts for all three containers (Progression Builder, Composition Studio, Chord Builder)
     const containers = [
         document.getElementById('progression-visualization'),
@@ -4418,7 +5000,7 @@ function updateContainerShifts(container) {
 
             for (const wrapper of allWrappers) {
                 const chordIndex = parseInt(wrapper.getAttribute('data-chord-index'));
-                const isExpanded = expandedChords.has(chordIndex);
+                const isExpanded = isChordExpanded(chordIndex);
                 const notationView = wrapper.querySelector('.notation-view');
                 const notationShowing = notationView && !notationView.classList.contains('hidden');
 
@@ -4569,48 +5151,37 @@ function renderSectionAwareCardsScroll(gridContainer, progressionData, key, opti
         gridContainer.appendChild(buttonContainer);
     }
 
-    // Track which sections have already been rendered (to avoid duplicates)
-    const renderedSections = new Set();
+    // Use buildSectionView to get the proper section order
+    // All sections are now real (including ungrouped ones)
+    const sectionView = compositionState ? compositionState.buildSectionView() : [];
 
-    // Render cards in positional order - maintaining original chord sequence
-    // Ungrouped chords stay in their positions, sections are rendered when we hit their first chord
-    let i = 0;
-    while (i < progressionData.length) {
-        const section = chordToSection.get(i);
-
-        if (section && !renderedSections.has(section.id)) {
-            // This chord is in a section we haven't rendered yet - render entire section
-            // Call createUnifiedSectionContainer via window (it's in the old module)
+    if (sectionView.length > 0) {
+        // Render each section using unified container
+        sectionView.forEach(section => {
             const sectionContainer = createUnifiedSectionContainer(section, progressionData, key);
             if (sectionContainer) {
                 sectionContainer.style.scrollSnapAlign = 'start';
                 sectionContainer.style.flexShrink = '0';
                 gridContainer.appendChild(sectionContainer);
             }
-            renderedSections.add(section.id);
-
-            // Skip all cards in this section (by finding max index in section)
-            const maxIndex = Math.max(...section.chordIndices);
-            i = maxIndex + 1;
-        } else if (section && renderedSections.has(section.id)) {
-            // This chord is in a section we already rendered (non-contiguous indices)
-            // Skip it - it was already rendered with its section
-            i++;
-        } else {
-            // Ungrouped card - render directly in grid at its position
+        });
+    } else {
+        // Fallback: No sections at all - render all cards as ungrouped
+        // This shouldn't happen if buildSectionView works correctly, but just in case
+        for (let i = 0; i < progressionData.length; i++) {
             const chord = progressionData[i];
-            // Call createChordCardWrapper (now migrated to this module)
             const wrapper = createChordCardWrapper(chord, i, key);
             if (wrapper) {
                 wrapper.style.scrollSnapAlign = 'start';
                 wrapper.style.flexShrink = '0';
-                // Mark as ungrouped for drag/drop handling
                 wrapper.setAttribute('data-ungrouped', 'true');
                 gridContainer.appendChild(wrapper);
             }
-            i++;
         }
     }
+
+    // Initialize Sortable for dragging entire section containers
+    initializeSectionContainerSortable(gridContainer);
 }
 
 /**
@@ -4692,7 +5263,7 @@ function renderFlatCardsScroll(gridContainer, progressionData, key, options = {}
 function createChordCardWrapper(chord, index, key) {
     const wrapper = document.createElement('div');
     // Use class for grid layout - Add no-animation class to prevent all transitions/animations
-    const isExpanded = expandedChords.has(index);
+    const isExpanded = isChordExpanded(index);
     wrapper.className = isExpanded
         ? 'chord-card-wrapper expanded-card-wrapper no-animation'
         : 'chord-card-wrapper no-animation'; // All cards take 1 grid cell
@@ -4744,7 +5315,7 @@ function createChordCardWrapper(chord, index, key) {
  * @param {string} key - Current key
  * @returns {DocumentFragment} Fragment containing control bar and card
  */
-function createSimplifiedCardStructure(chord, index, key) {
+export function createSimplifiedCardStructure(chord, index, key) {
     const fragment = document.createDocumentFragment();
 
     // Create control bar
@@ -4874,6 +5445,104 @@ function createTooltipElement(chord, index, key) {
  * Create unified section container (renders section with cards)
  * Used in section-aware rendering modes
  */
+/**
+ * Create a pseudo-section container for ungrouped chords
+ * This wraps ungrouped chords in a container so they can participate in section reordering
+ * @param {Object} section - Pseudo-section object from buildSectionView
+ * @param {Array} progressionData - Full progression data
+ * @param {string} key - Current key
+ * @returns {HTMLElement} Pseudo-section container
+ */
+function createPseudoSectionContainer(section, progressionData, key) {
+    const container = document.createElement('div');
+    container.className = 'section-unified-container inline-flex flex-col rounded-lg overflow-visible';
+    container.setAttribute('data-section-id', section.id);
+    container.setAttribute('data-pseudo-section', 'true');
+    container.style.setProperty('--section-color', section.color || '#6b7280');
+
+    // Subtle banner for ungrouped chords - less prominent than real sections
+    const banner = document.createElement('div');
+    banner.className = 'section-banner flex items-center gap-2 px-2 py-1 rounded-t-lg cursor-grab active:cursor-grabbing';
+    banner.style.backgroundColor = section.color || '#6b7280';
+    banner.style.opacity = '0.7';
+    banner.setAttribute('data-section-id', section.id);
+
+    banner.innerHTML = `
+        <svg class="section-drag-handle w-3 h-3 text-white/70 flex-shrink-0 cursor-grab active:cursor-grabbing" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
+        </svg>
+        <span class="text-white text-xs font-medium flex-grow italic">${section.label || 'Ungrouped'}</span>
+    `;
+
+    container.appendChild(banner);
+
+    // Cards container
+    const cardsArea = document.createElement('div');
+    cardsArea.className = 'section-cards-area items-start gap-2 p-2 rounded-b-lg';
+    cardsArea.style.display = 'flex';
+    cardsArea.style.flexDirection = 'row';
+    cardsArea.style.flexWrap = 'nowrap';
+    cardsArea.style.overflowX = 'auto';
+    cardsArea.style.overflowY = 'visible';
+    cardsArea.style.backgroundColor = (section.color || '#6b7280') + '20'; // 20% opacity - same as real sections
+    cardsArea.style.borderLeft = `3px solid ${section.color || '#6b7280'}`;
+    cardsArea.style.borderRight = `3px solid ${section.color || '#6b7280'}`;
+    cardsArea.style.borderBottom = `3px solid ${section.color || '#6b7280'}`;
+    cardsArea.setAttribute('data-section-id', section.id);
+
+    // Render cards using chordIndices from section view
+    const indices = section.chordIndices || [];
+    indices.forEach(chordIdx => {
+        if (chordIdx < progressionData.length) {
+            const chord = progressionData[chordIdx];
+            const wrapper = createChordCardWrapper(chord, chordIdx, key);
+            wrapper.setAttribute('data-ungrouped', 'true');
+            cardsArea.appendChild(wrapper);
+        }
+    });
+
+    container.appendChild(cardsArea);
+
+    // Initialize Sortable on the cards area (same as real sections)
+    if (typeof Sortable !== 'undefined') {
+        cardsArea.sortableInstance = new Sortable(cardsArea, {
+            group: {
+                name: 'progression-cards',
+                pull: true,
+                put: function(to, from, dragEl) {
+                    return dragEl.classList.contains('chord-card-wrapper') &&
+                           dragEl.hasAttribute('data-chord-index');
+                }
+            },
+            animation: 200,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            dragClass: 'sortable-drag',
+            handle: '.drag-handle',
+            filter: 'button, select, input, .play-btn, .delete-btn, .expand-btn, .info-tooltip-btn, .no-drag',
+            preventOnFilter: false,
+            draggable: '.chord-card-wrapper[data-chord-index]',
+            swapThreshold: 0.65,
+            delay: 150,
+            delayOnTouchOnly: true,
+            touchStartThreshold: 5,
+            onAdd: function(evt) {
+                // Card added from another section/pseudo-section
+                handleCardDragWithinSection(evt, evt.from.getAttribute('data-section-id'));
+            },
+            onEnd: function(evt) {
+                // Only handle reorders within this pseudo-section
+                if (evt.from !== evt.to) {
+                    return;
+                }
+                handleCardDragWithinSection(evt, section.id);
+            }
+        });
+    }
+
+    return container;
+}
+
 function createUnifiedSectionContainer(section, progressionData, key) {
     const container = document.createElement('div');
     container.className = 'section-unified-container inline-flex flex-col rounded-lg overflow-visible';
@@ -4918,14 +5587,44 @@ function createUnifiedSectionContainer(section, progressionData, key) {
     cardsArea.setAttribute('data-section-id', section.id);
 
     // Render cards in this section
-    section.chordIndices.forEach(chordIdx => {
-        if (chordIdx < progressionData.length) {
-            const chord = progressionData[chordIdx];
-            const wrapper = createChordCardWrapper(chord, chordIdx, key); // Already migrated - use locally
-            wrapper.setAttribute('data-in-section', section.id);
-            cardsArea.appendChild(wrapper);
+    if (section.chordIndices && section.chordIndices.length > 0) {
+        section.chordIndices.forEach(chordIdx => {
+            if (chordIdx < progressionData.length) {
+                const chord = progressionData[chordIdx];
+                const wrapper = createChordCardWrapper(chord, chordIdx, key); // Already migrated - use locally
+                wrapper.setAttribute('data-in-section', section.id);
+                cardsArea.appendChild(wrapper);
+            }
+        });
+    } else if (section.isPlaceholder || section.fromTemplate) {
+        // This is a placeholder section - show "Add Chord" placeholders
+        const expectedCount = section.expectedChordCount || 4;
+        for (let i = 0; i < expectedCount; i++) {
+            const placeholder = document.createElement('div');
+            placeholder.className = 'chord-placeholder flex flex-col justify-center items-center p-3 rounded-lg flex-shrink-0';
+            placeholder.style.cssText = `
+                min-width: 80px;
+                min-height: 100px;
+                border: 2px dashed ${section.color || '#9ca3af'};
+                background-color: ${(section.color || '#9ca3af')}10;
+                cursor: pointer;
+            `;
+            placeholder.innerHTML = `
+                <svg class="w-6 h-6 mb-1" style="color: ${section.color || '#9ca3af'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                <span class="text-xs font-medium" style="color: ${section.color || '#9ca3af'}">Add</span>
+            `;
+            placeholder.onclick = () => {
+                if (window.addChordToSection) {
+                    window.addChordToSection(section.id);
+                } else if (window.toggleQuickAddChord) {
+                    window.toggleQuickAddChord();
+                }
+            };
+            cardsArea.appendChild(placeholder);
         }
-    });
+    }
 
     container.appendChild(cardsArea);
 
@@ -5150,7 +5849,7 @@ function getRootNoteOptions(currentRoot) {
  * @param {string} key - Current key signature
  * @returns {string} HTML string for detailed card
  */
-function createDetailedCardHTML(chord, index, key) {
+export function createDetailedCardHTML(chord, index, key) {
     const roman = chord.roman || harmonyAnalyzer.getRomanNumeral(chord, key);
     const colors = getFunctionColors(roman);
     const isInterval = chord.selectionMode === 'interval';
@@ -5373,11 +6072,11 @@ function handleCardDragWithinSection(evt, originalSectionId) {
     // Update section membership if changed
     if (fromSectionId !== toSectionId) {
         // Remove from old section
-        if (fromSectionId) {
-            compositionState.removeChordFromSection(oldChordIndex, fromSectionId);
+        if (fromSectionId && !fromSectionId.startsWith('no-group')) {
+            compositionState.removeChordFromSection(oldChordIndex);
         }
-        // Add to new section (if dropping into a section, not to main container)
-        if (toSectionId) {
+        // Add to new section (if dropping into a real section, not a pseudo-section)
+        if (toSectionId && !toSectionId.startsWith('no-group')) {
             const section = compositionState.getSection(toSectionId);
             if (section) {
                 // Find position within the new section
@@ -5386,15 +6085,25 @@ function handleCardDragWithinSection(evt, originalSectionId) {
                 compositionState.addChordToSection(oldChordIndex, toSectionId, positionInSection);
             }
         }
+
+        // Re-render to reflect section membership changes (including deleted empty sections)
+        renderProgressionDisplay('progression-visualization', false);
+        renderProgressionDisplay('melody-progression-visualization', true);
+
+        if (window.refreshNotationFromProgression) {
+            window.refreshNotationFromProgression();
+        }
+
+        return; // Exit - section membership change handled
     }
 
     // If dragging within the same section (or both ungrouped), reorder the actual chord data
     if (fromSectionId === toSectionId) {
-        // Try to get real section - returns null for pseudo-sections like "No Group"
+        // Get the section - all sections are now real, including ungrouped ones
         const section = fromSectionId ? compositionState.getSection(toSectionId) : null;
 
-        // Check if this is a pseudo-section (ungrouped chords) - ID starts with "no-group"
-        const isPseudoSection = fromSectionId && fromSectionId.startsWith('no-group');
+        // Check if this is an ungrouped section
+        const isUngroupedSection = section && section.type === 'ungrouped';
 
         if (section) {
             // Get the new order of chord indices within this section from the DOM
@@ -5446,15 +6155,15 @@ function handleCardDragWithinSection(evt, originalSectionId) {
                     sectionId: toSectionId
                 });
             }
-        } else if (!fromSectionId || isPseudoSection) {
-            // Ungrouped chords being reordered within a pseudo-section
-            // For pseudo-sections, we reorder the actual progression data
+        } else if (!fromSectionId || isUngroupedSection) {
+            // Ungrouped chords being reordered within an ungrouped section
+            // For ungrouped sections, we reorder the actual progression data
             const ungroupedCards = Array.from(toContainer.querySelectorAll('.chord-card-wrapper[data-chord-index]'));
             const newVisualOrder = ungroupedCards.map(card =>
                 parseInt(card.getAttribute('data-chord-index'), 10)
             );
 
-            // Get the indices that are in this pseudo-section (sorted for position mapping)
+            // Get the indices that are in this section (sorted for position mapping)
             const indicesInSection = [...newVisualOrder].sort((a, b) => a - b);
 
             // Check if visual order differs from sorted order (i.e., user reordered)
@@ -5583,7 +6292,7 @@ function handleCardDragWithinSection(evt, originalSectionId) {
 /**
  * Helper: Update tension curve if visible
  */
-function updateTensionCurveIfVisible() {
+export function updateTensionCurveIfVisible() {
     // Check for either old or new tension container
     const tensionContainer = document.getElementById('tension-arc-container') || document.getElementById('tension-curve-container');
     if (tensionContainer && tensionContainer.style.display !== 'none') {
@@ -5622,7 +6331,7 @@ function updateTensionCurveIfVisible() {
  * - Duration selectors
  * - Multi-select click handlers
  */
-function attachCardEventListeners(wrapper, index) {
+export function attachCardEventListeners(wrapper, index) {
     const expandBtn = wrapper.querySelector('.expand-btn');
     const collapseBtns = wrapper.querySelectorAll('.collapse-btn'); // Get ALL collapse buttons
     const playBtn = wrapper.querySelector('.play-btn');
@@ -5636,6 +6345,20 @@ function attachCardEventListeners(wrapper, index) {
     const notationToggleBtn = wrapper.querySelector('.notation-toggle-btn');
     const suggestionsLightbulbBtn = wrapper.querySelector('.suggestions-lightbulb-btn');
 
+    // Helper function to update inversion button highlighting in expanded card
+    const updateInversionButtonHighlight = (selectedInversion) => {
+        inversionBtns.forEach(btn => {
+            const btnInversion = parseInt(btn.getAttribute('data-inversion'));
+            if (btnInversion === selectedInversion) {
+                btn.classList.add('bg-indigo-600', 'text-white');
+                btn.classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+            } else {
+                btn.classList.remove('bg-indigo-600', 'text-white');
+                btn.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+            }
+        });
+    };
+
     // Notation toggle button (simplified cards - in control bar above card)
     if (notationToggleBtn) {
         notationToggleBtn.addEventListener('click', (e) => {
@@ -5648,9 +6371,7 @@ function attachCardEventListeners(wrapper, index) {
     if (suggestionsLightbulbBtn) {
         suggestionsLightbulbBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (window.showProgressionChordSuggestions) {
-                window.showProgressionChordSuggestions(index);
-            }
+            showProgressionChordSuggestions(index);
         });
     }
 
@@ -5677,7 +6398,6 @@ function attachCardEventListeners(wrapper, index) {
         expandBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             expandChordCard(index);
-            // No longer need to preserve transforms - flexbox/grid handles layout
         });
     }
 
@@ -5695,23 +6415,19 @@ function attachCardEventListeners(wrapper, index) {
             // Select this card (persistent purple ring)
             selectChordCard(index);
 
-            if (window.startProgressionChord) {
-                window.startProgressionChord(index);
-                // Highlight corresponding tension curve point and chord card
-                highlightTensionPoint(index);
-                highlightChordCard(index);
-            } else {
-                console.warn(`[Play Button] window.startProgressionChord is not defined!`);
-            }
+            startProgressionChord(index);
+            // Highlight corresponding tension curve point and chord card
+            highlightTensionPoint(index);
+            highlightChordCard(index);
         });
         playBtn.addEventListener('mouseup', () => {
-            if (window.stopTrainerChord) window.stopTrainerChord();
+            stopTrainerChord();
             // Remove playback highlighting but keep selection (purple ring persists)
             unhighlightAllTensionPoints();
             unhighlightAllChordCards();
         });
         playBtn.addEventListener('mouseleave', () => {
-            if (window.stopTrainerChord) window.stopTrainerChord();
+            stopTrainerChord();
             // Remove playback highlighting but keep selection (purple ring persists)
             unhighlightAllTensionPoints();
             unhighlightAllChordCards();
@@ -5723,16 +6439,14 @@ function attachCardEventListeners(wrapper, index) {
             // Select this card (persistent purple ring)
             selectChordCard(index);
 
-            if (window.startProgressionChord) {
-                window.startProgressionChord(index);
-                highlightTensionPoint(index);
-                highlightChordCard(index);
-            }
+            startProgressionChord(index);
+            highlightTensionPoint(index);
+            highlightChordCard(index);
         }, { passive: false });
 
         playBtn.addEventListener('touchend', (e) => {
             e.preventDefault();
-            if (window.stopTrainerChord) window.stopTrainerChord();
+            stopTrainerChord();
             // Remove playback highlighting but keep selection (purple ring persists)
             unhighlightAllTensionPoints();
             unhighlightAllChordCards();
@@ -5742,9 +6456,7 @@ function attachCardEventListeners(wrapper, index) {
     // Delete button
     if (deleteBtn) {
         deleteBtn.addEventListener('click', () => {
-            if (window.removeChordFromProgression) {
-                window.removeChordFromProgression(index);
-            }
+            removeChordFromProgression(index);
         });
     }
 
@@ -5763,18 +6475,18 @@ function attachCardEventListeners(wrapper, index) {
 
             if (isCtrlOrCmd) {
                 // Ctrl/Cmd+click: Toggle this card in multi-selection
-                if (window.handleMultiSelectToggle) window.handleMultiSelectToggle(index);
+                handleMultiSelectToggle(index);
             } else if (isShift) {
                 // Shift+click: Range select from last selected
-                if (window.handleMultiSelectRange) window.handleMultiSelectRange(index);
+                handleMultiSelectRange(index);
             } else {
                 // Normal click: Clear multi-selection and select single card
-                if (window.clearSelection) window.clearSelection();
+                clearSelection();
                 selectChordCard(index);
                 // Also add to multi-select state for consistency
-                if (window.selectSingle) window.selectSingle(index);
+                selectSingle(index);
                 // Update bass selection UI for single selection
-                if (window.updateMultiSelectVisuals) window.updateMultiSelectVisuals();
+                updateMultiSelectVisuals();
             }
             // No longer need to preserve transforms - flexbox/grid handles layout
         });
@@ -5810,37 +6522,32 @@ function attachCardEventListeners(wrapper, index) {
             // Update WITHOUT syncing notation (to prevent flash)
             updateChordInversion(index, inversion, true, false);
 
+            // Update button highlighting immediately
+            updateInversionButtonHighlight(inversion);
+
             // Start playing the chord with the new inversion
-            if (window.startProgressionChord) {
-                window.startProgressionChord(index);
-            }
+            startProgressionChord(index);
         });
 
         // Stop playing on mouseup and sync notation immediately
         btn.addEventListener('mouseup', (e) => {
             e.stopPropagation();
             e.preventDefault();
-            if (window.stopTrainerChord) {
-                window.stopTrainerChord();
-            }
+            stopTrainerChord();
 
             // Update notation preserving treble notes
-            if (window.updateChordAndRenderPreservingTrebleNotes) {
-                window.updateChordAndRenderPreservingTrebleNotes(index);
-            }
+            updateChordAndRenderPreservingTrebleNotes(index);
 
             wasPressed = false;
         });
 
         // Also stop if mouse leaves button and sync if was pressed
         btn.addEventListener('mouseleave', (e) => {
-            if (window.stopTrainerChord) {
-                window.stopTrainerChord();
-            }
+            stopTrainerChord();
 
             // Sync notation if button was pressed
-            if (wasPressed && window.updateChordAndRenderPreservingTrebleNotes) {
-                window.updateChordAndRenderPreservingTrebleNotes(index);
+            if (wasPressed) {
+                updateChordAndRenderPreservingTrebleNotes(index);
             }
 
             wasPressed = false;
@@ -5852,9 +6559,7 @@ function attachCardEventListeners(wrapper, index) {
         checkbox.addEventListener('change', (e) => {
             e.stopPropagation();
             const note = checkbox.value;
-            if (window.toggleProgressionNote) {
-                window.toggleProgressionNote(index, note);
-            }
+            toggleProgressionNote(index, note);
         });
     });
 
@@ -5864,7 +6569,7 @@ function attachCardEventListeners(wrapper, index) {
             e.stopPropagation();
 
             // Get compositionState directly - the single source of truth
-            const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+            const compositionState = getCompositionState();
             if (!compositionState) {
                 return;
             }
@@ -5880,15 +6585,11 @@ function attachCardEventListeners(wrapper, index) {
                 noteCheckboxes.forEach(cb => cb.checked = true);
 
                 // Sync progressionData changes to notation display
-                if (window.updateChordAndRenderPreservingTrebleNotes) {
-                    window.updateChordAndRenderPreservingTrebleNotes(index);
-                }
+                updateChordAndRenderPreservingTrebleNotes(index);
 
                 // Play the chord
-                if (window.startProgressionChord && window.stopTrainerChord) {
-                    window.startProgressionChord(index);
-                    setTimeout(() => window.stopTrainerChord(), 500);
-                }
+                startProgressionChord(index);
+                setTimeout(() => stopTrainerChord(), 500);
             }
         });
     }
@@ -5898,7 +6599,7 @@ function attachCardEventListeners(wrapper, index) {
             e.stopPropagation();
 
             // Get compositionState directly - the single source of truth
-            const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+            const compositionState = getCompositionState();
             if (!compositionState) {
                 return;
             }
@@ -5914,9 +6615,7 @@ function attachCardEventListeners(wrapper, index) {
                 noteCheckboxes.forEach(cb => cb.checked = false);
 
                 // Sync progressionData changes to notation display
-                if (window.updateChordAndRenderPreservingTrebleNotes) {
-                    window.updateChordAndRenderPreservingTrebleNotes(index);
-                }
+                updateChordAndRenderPreservingTrebleNotes(index);
             }
         });
     }
@@ -5939,9 +6638,7 @@ function attachCardEventListeners(wrapper, index) {
         suggestionsBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             // Open the chord suggestions modal
-            if (window.showProgressionChordSuggestions) {
-                window.showProgressionChordSuggestions(index);
-            }
+            showProgressionChordSuggestions(index);
         });
     }
 
@@ -6340,6 +7037,22 @@ function attachCardEventListeners(wrapper, index) {
     }
 }
 
+/**
+ * Re-render the active progression display (whichever tab is currently visible)
+ * This is a helper function for operations that need to refresh the UI after state changes
+ */
+export function rerenderActiveProgressionDisplay() {
+    const currentTab = getCurrentTab();
+
+    if (currentTab === 'progression-builder' || currentTab === 'trainer') {
+        renderProgressionDisplay('progression-visualization', false);
+    } else if (currentTab === 'melody-composer' || currentTab === 'melody') {
+        renderProgressionDisplay('melody-progression-visualization', false);
+    } else if (currentTab === 'chord-builder' || currentTab === 'builder') {
+        renderProgressionDisplay('builder-progression-visualization', false);
+    }
+}
+
 // Main rendering functions (already exported above with 'export' keyword)
 // - renderProgressionDisplay
 // - renderProgressionDisplayForBuilder
@@ -6347,6 +7060,7 @@ function attachCardEventListeners(wrapper, index) {
 // - renderChordStaffNotation
 // - toggleAllStaffNotation
 // - createCompactViewModeToggle
+// - rerenderActiveProgressionDisplay
 
 // Internal functions that may need to be exposed to window for HTML event handlers
 // will be handled in the main progressionBuilder.js file

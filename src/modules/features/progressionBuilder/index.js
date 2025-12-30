@@ -68,7 +68,20 @@ import {
     renderProgressionControls,
     renderChordStaffNotation,
     toggleAllStaffNotation,
-    createCompactViewModeToggle
+    createCompactViewModeToggle,
+    rerenderActiveProgressionDisplay,
+    createDetailedCardHTML,
+    attachCardEventListeners,
+    createSimplifiedCardStructure,
+    highlightTensionPoint,
+    highlightTensionPointForSelection,
+    unhighlightAllTensionPoints,
+    toggleSimplifiedCardNotation,
+    refreshChordNotationCanvas,
+    renderChordNotation,
+    calculateCanvasDimensions,
+    updateCardShifts,
+    buildSectionChipsWithUngrouped
 } from './ProgressionRenderer.js';
 
 // Drag-Drop Functions
@@ -92,6 +105,8 @@ import {
     selectSectionInView,
     deselectSectionInView,
     clearSectionSelection,
+    setUserSectionOrder,
+    getUserSectionOrder,
     selectSectionRange,
     navigateToPreviousSection,
     navigateToNextSection,
@@ -101,12 +116,14 @@ import {
     highlightChordCard,
     unhighlightAllChordCards,
     expandChordCard,
+    collapseChordCard,
     collapseAllChordCards,
 
     // Multi-Select
     clearMultiSelection,
     handleMultiSelectToggle,
     handleMultiSelectRange,
+    updateMultiSelectVisuals,
     updateBassSelectionUI,
     updateCustomBassPatternInfo,
     copySelectedChords,
@@ -121,6 +138,13 @@ import {
     toggleProgressionNote,
     toggleProgressionLHNote,
     clearProgression,
+
+    // Chord Update Functions
+    updateChordType,
+    updateChordRoot,
+    updateChordInversion,
+    updateRHOctaveShift,
+    updateChordAndRenderPreservingTrebleNotes,
 
     // Data & State
     loadProgression,
@@ -222,7 +246,17 @@ export {
     renderProgressionControls,
     renderChordStaffNotation,
     toggleAllStaffNotation,
-    createCompactViewModeToggle
+    createCompactViewModeToggle,
+    rerenderActiveProgressionDisplay,
+    highlightTensionPoint,
+    highlightTensionPointForSelection,
+    unhighlightAllTensionPoints,
+    toggleSimplifiedCardNotation,
+    refreshChordNotationCanvas,
+    renderChordNotation,
+    calculateCanvasDimensions,
+    updateCardShifts,
+    buildSectionChipsWithUngrouped
 };
 
 // Drag-Drop
@@ -242,6 +276,8 @@ export {
     selectSectionInView,
     deselectSectionInView,
     clearSectionSelection,
+    setUserSectionOrder,
+    getUserSectionOrder,
     selectSectionRange,
     navigateToPreviousSection,
     navigateToNextSection
@@ -253,11 +289,13 @@ export {
     highlightChordCard,
     unhighlightAllChordCards,
     expandChordCard,
+    collapseChordCard,
     collapseAllChordCards,
     clearMultiSelection,
     clearSelection,
     handleMultiSelectToggle,
     handleMultiSelectRange,
+    updateMultiSelectVisuals,
     updateBassSelectionUI,
     updateCustomBassPatternInfo,
     copySelectedChords,
@@ -274,6 +312,15 @@ export {
     toggleProgressionNote,
     toggleProgressionLHNote,
     clearProgression
+};
+
+// Controller - Chord Updates
+export {
+    updateChordType,
+    updateChordRoot,
+    updateChordInversion,
+    updateRHOctaveShift,
+    updateChordAndRenderPreservingTrebleNotes
 };
 
 // Controller - Data
@@ -366,6 +413,14 @@ if (typeof window !== 'undefined') {
     window.renderProgressionDisplay = renderProgressionDisplay;
     window.toggleAllStaffNotation = toggleAllStaffNotation;
     window.createCompactViewModeToggle = createCompactViewModeToggle;
+    window.createDetailedCardHTML = createDetailedCardHTML;
+    window.attachCardEventListeners = attachCardEventListeners;
+    window.createSimplifiedCardStructure = createSimplifiedCardStructure;
+    window.refreshChordNotationCanvas = refreshChordNotationCanvas;
+    window.renderChordNotation = renderChordNotation;
+    window.calculateCanvasDimensions = calculateCanvasDimensions;
+    window.updateCardShifts = updateCardShifts;
+    window.buildSectionChipsWithUngrouped = buildSectionChipsWithUngrouped;
 
     // View Mode
     window.setProgressionViewMode = setProgressionViewMode;
@@ -373,12 +428,15 @@ if (typeof window !== 'undefined') {
     window.navigateToPreviousSection = navigateToPreviousSection;
     window.navigateToNextSection = navigateToNextSection;
     window.clearSectionSelection = clearSectionSelection;
+    window.setUserSectionOrder = setUserSectionOrder;
+    window.getUserSectionOrder = getUserSectionOrder;
 
     // Selection
     window.clearMultiSelection = clearMultiSelection;
     window.clearSelection = clearSelection;
     window.handleMultiSelectToggle = handleMultiSelectToggle;
     window.handleMultiSelectRange = handleMultiSelectRange;
+    window.updateMultiSelectVisuals = updateMultiSelectVisuals;
     window.updateBassSelectionUI = updateBassSelectionUI;
     window.updateCustomBassPatternInfo = updateCustomBassPatternInfo;
     window.copySelectedChords = copySelectedChords;
@@ -402,4 +460,22 @@ if (typeof window !== 'undefined') {
 
     // UI Updates
     window.updateProgressionControlsUI = updateProgressionControlsUI;
+
+    // Chord Update Functions (used by expanded card controls)
+    window.updateChordType = updateChordType;
+    window.updateChordRoot = updateChordRoot;
+    window.updateChordInversion = updateChordInversion;
+    window.updateRHOctaveShift = updateRHOctaveShift;
+    window.updateChordAndRenderPreservingTrebleNotes = updateChordAndRenderPreservingTrebleNotes;
+    window.collapseChordCard = collapseChordCard;
+
+    // Tension Point Functions
+    window.highlightTensionPoint = highlightTensionPoint;
+    window.highlightTensionPointForSelection = highlightTensionPointForSelection;
+    window.unhighlightAllTensionPoints = unhighlightAllTensionPoints;
+    window.toggleSimplifiedCardNotation = toggleSimplifiedCardNotation;
+
+    // Toggle Note Functions
+    window.toggleProgressionNote = toggleProgressionNote;
+    window.removeChordFromProgression = removeChordFromProgression;
 }

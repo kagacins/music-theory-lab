@@ -56,8 +56,6 @@ export function initTheoryOverlay() {
             refreshOverlay();
         }
     }, 500);
-
-    console.log('[TheoryOverlay] Initialized');
 }
 
 // ============================================================================

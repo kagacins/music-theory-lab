@@ -174,14 +174,21 @@ export function highlightTrainer(scaleNotes, chordNotes) {
     const currentTab = window.currentTab;
 
     clearHighlights();
-    if (currentTab !== 'trainer' || !scaleNotes) return;
 
-    scaleNotes.forEach(note => {
-        const keyId = getNoteKeyId(note);
-        const keyElement = document.getElementById(keyId);
-        if (keyElement) keyElement.classList.add('active-scale');
-    });
+    // Check if keyboard is visible (exists in DOM)
+    const keyboardEl = document.getElementById('piano-keyboard');
+    if (!keyboardEl) return;
 
+    // Highlight scale notes if on trainer tab and scaleNotes provided
+    if (currentTab === 'trainer' && scaleNotes) {
+        scaleNotes.forEach(note => {
+            const keyId = getNoteKeyId(note);
+            const keyElement = document.getElementById(keyId);
+            if (keyElement) keyElement.classList.add('active-scale');
+        });
+    }
+
+    // Always highlight chord notes when playing (regardless of tab)
     if (chordNotes) {
          chordNotes.forEach(note => {
             const keyId = getNoteKeyId(note);

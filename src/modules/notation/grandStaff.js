@@ -4142,9 +4142,9 @@ export function convertToGrandStaffFormat(composerData) {
         .filter(note => {
           // Keep rests
           if (note.isRest) return true;
-          // For non-rests, require valid pitch
+          // For non-rests, require valid pitch (allows double sharps ## and double flats bb)
           const pitch = note.pitch || note;
-          if (pitch && typeof pitch === 'string' && pitch.match(/^[A-G][#b]?\d+$/)) return true;
+          if (pitch && typeof pitch === 'string' && pitch.match(/^[A-G][#b]*\d+$/)) return true;
           // Filter out notes with null/undefined pitch
           return false;
         })
@@ -4164,9 +4164,9 @@ export function convertToGrandStaffFormat(composerData) {
           .filter(note => {
             // Keep rests
             if (note.isRest) return true;
-            // For non-rests, require valid pitch
+            // For non-rests, require valid pitch (allows double sharps ## and double flats bb)
             const pitch = note.pitch || note;
-            if (pitch && typeof pitch === 'string' && pitch.match(/^[A-G][#b]?\d+$/)) return true;
+            if (pitch && typeof pitch === 'string' && pitch.match(/^[A-G][#b]*\d+$/)) return true;
             // Filter out notes with null/undefined pitch
             return false;
           })
@@ -4177,9 +4177,9 @@ export function convertToGrandStaffFormat(composerData) {
             tuplet: note.tuplet || null,
           }));
       } else {
-        // Single bass note - validate before adding
+        // Single bass note - validate before adding (allows double sharps ## and double flats bb)
         const pitch = bassNotes[i];
-        if (pitch && typeof pitch === 'string' && pitch.match(/^[A-G][#b]?\d+$/)) {
+        if (pitch && typeof pitch === 'string' && pitch.match(/^[A-G][#b]*\d+$/)) {
           measureData.bassNotes = [{
             pitch: bassNotes[i],
             duration: '1n',

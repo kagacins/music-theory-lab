@@ -115,19 +115,36 @@ let cachedMeasuresLength = 0;
 let cachedMeasuresHash = null;
 
 /**
- * Generate a hash of measures to detect changes
- * @param {Array} measures - Array of measures
+ * Generate a hash of measures AND storedProgressionData to detect changes
+ * CRITICAL: Must check BOTH because chord reordering changes storedProgressionData
+ * but may not change measures structure in the same way
+ * @param {Object} compositionState - CompositionState instance
  * @returns {string} Hash string
  */
-function generateMeasuresHash(measures) {
-    if (!measures || measures.length === 0) return '0';
-    // Create a hash based on ALL chords to detect any chord change
-    // Previous version only checked first/last which missed middle chord changes
-    const chordParts = measures.map((m, i) => {
-        const chord = m?.chord;
-        return `${i}:${chord?.root || ''}${chord?.type || ''}${chord?.inversion || 0}`;
-    });
-    return `${measures.length}-${chordParts.join('|')}`;
+function generateStateHash(compositionState) {
+    const measures = compositionState?.measures;
+    const storedProg = compositionState?.storedProgressionData;
+
+    // Hash from measures
+    let measuresHash = '0';
+    if (measures && measures.length > 0) {
+        const chordParts = measures.map((m, i) => {
+            const chord = m?.chord;
+            return `${i}:${chord?.root || ''}${chord?.type || ''}${chord?.inversion || 0}`;
+        });
+        measuresHash = `${measures.length}-${chordParts.join('|')}`;
+    }
+
+    // CRITICAL: Also hash storedProgressionData to catch reordering
+    let storedHash = '0';
+    if (storedProg && storedProg.length > 0) {
+        const storedParts = storedProg.map((c, i) =>
+            `${i}:${c?.root || ''}${c?.type || ''}${c?.inversion || 0}`
+        );
+        storedHash = `${storedProg.length}-${storedParts.join('|')}`;
+    }
+
+    return `M:${measuresHash}|S:${storedHash}`;
 }
 
 /**
@@ -152,19 +169,21 @@ export function getProgressionData() {
         const compositionState = window.getCompositionState();
         if (!compositionState) return [];
 
-        // Check if measures have changed by comparing length and a simple hash
+        // Check if state has changed by comparing length and a hash
+        // CRITICAL: Hash now includes BOTH measures AND storedProgressionData
+        // This catches chord reordering which changes storedProgressionData order
         const currentMeasuresLength = compositionState.measures?.length || 0;
-        const currentMeasuresHash = generateMeasuresHash(compositionState.measures);
+        const currentStateHash = generateStateHash(compositionState);
 
-        // Only re-export if measures have changed OR cache is invalidated
+        // Only re-export if state has changed OR cache is invalidated
         // DEBUGGING: If cards show stale data, add console.log here to check cache hit/miss
-        // console.log('[getProgressionData] cache check:', { cached: cachedProgressionData !== null, hashMatch: cachedMeasuresHash === currentMeasuresHash });
+        // console.log('[getProgressionData] cache check:', { cached: cachedProgressionData !== null, hashMatch: cachedMeasuresHash === currentStateHash });
         if (cachedProgressionData === null ||
             cachedMeasuresLength !== currentMeasuresLength ||
-            cachedMeasuresHash !== currentMeasuresHash) {
+            cachedMeasuresHash !== currentStateHash) {
             cachedProgressionData = compositionState.exportToProgressionData();
             cachedMeasuresLength = currentMeasuresLength;
-            cachedMeasuresHash = currentMeasuresHash;
+            cachedMeasuresHash = currentStateHash;
         }
 
         return cachedProgressionData;

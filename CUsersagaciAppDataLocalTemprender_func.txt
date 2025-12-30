@@ -1,0 +1,1108 @@
+export function renderProgressionDisplay(containerId = 'progression-visualization', syncBothTabs = true) {
+    // DEBUGGING: Uncomment to trace when render is called
+    // console.log('[renderProgressionDisplay] Rendering', containerId);
+
+    // Capture staff notation states before clearing DOM (always capture from both tabs)
+    captureStaffNotationStates();
+
+    const container = document.getElementById(containerId);
+    if (!container) {
+        return;
+    }
+
+    // Save scroll positions of all scrollable containers before re-rendering
+    const scrollPositions = new Map();
+    const scrollableSelectors = [
+        '.scroll-view-container',
+        '.section-filtered-cards',
+        '.section-cards-wrapper',
+        '.section-chips-container',
+        '[class*="overflow-x-auto"]'
+    ];
+    scrollableSelectors.forEach(selector => {
+        container.querySelectorAll(selector).forEach(el => {
+            if (el.scrollLeft > 0) {
+                // Use a unique key based on class or id
+                const key = el.id || el.className;
+                scrollPositions.set(key, el.scrollLeft);
+            }
+        });
+    });
+    // Also check if container itself is scrollable
+    if (container.scrollLeft > 0) {
+        scrollPositions.set('container', container.scrollLeft);
+    }
+    
+    // IMPORTANT: Destroy Sortable BEFORE clearing innerHTML
+    // because innerHTML = '' destroys all DOM elements Sortable is tracking
+    // Destroy Sortable for both progression builder and melody tab
+    if ((containerId === 'progression-visualization' || containerId === 'melody-progression-visualization') && container.sortableInstance) {
+        try {
+            container.sortableInstance.destroy();
+            container.sortableInstance = null;
+        } catch (e) {
+            container.sortableInstance = null;
+        }
+    }
+    
+    container.innerHTML = '';
+
+    const trainerState = getTrainerState();
+
+    // DEPRECATED: This block handles the old "Progression Workshop" tab which has been removed.
+    // The container 'progression-visualization' no longer exists in the UI.
+    // This code is kept for reference but will never execute.
+    // TODO: Remove this entire block in a future cleanup pass.
+    if (containerId === 'progression-visualization' && trainerState.progressionData.length > 0) {
+        // Get parent panel to render pattern badges and tension curve outside the grid
+        const panel = container.parentElement;
+
+        // Remove old pattern badges and tension curve if they exist
+        const oldPatterns = panel?.querySelector('#pattern-highlights-container');
+        const oldTension = panel?.querySelector('#tension-curve-container');
+        const oldTensionArc = panel?.querySelector('#tension-arc-container');
+        if (oldPatterns) oldPatterns.remove();
+        if (oldTension) oldTension.remove();
+        if (oldTensionArc) oldTensionArc.remove();
+
+        // Clear any existing pattern highlights from chord cards
+        clearPatternHighlights();
+
+        // 1. Pattern highlighting badges at top of panel (before grid)
+        if (panel) {
+            renderPatternHighlights(panel, trainerState.progressionData, trainerState.currentKey || 'C');
+            // Move it before the grid container
+            const badges = panel.querySelector('#pattern-highlights-container');
+            if (badges) {
+                panel.insertBefore(badges, container);
+            }
+        }
+
+        // 2. Simplified chord cards with Add Chord/Clear All buttons as first grid item
+        // Check if we have any sections defined - if so, use section-aware rendering,
+        // unless a one-time flat layout has been requested.
+        const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+        let hasSections = compositionState && compositionState.getSections().length > 0;
+
+        // One-time override: when forceFlatLayoutOnce is true, ignore sections
+        // for this render of the main progression view. This avoids rare stacking
+        // issues when inserting chords via suggestions in heavily-sectioned songs.
+        if (containerId === 'progression-visualization' && forceFlatLayoutOnce) {
+            hasSections = false;
+            forceFlatLayoutOnce = false;
+        }
+
+        // Both section-aware and flat rendering use the same approach:
+        // 1. Clear container and remove grid classes
+        // 2. Add toolbar at top (full width) with view mode toggle
+        // 3. Add grid container with cards below
+
+        // Clear and restructure container
+        container.innerHTML = '';
+        // Save original classes and temporarily make it a flex column
+        const originalClasses = container.className;
+        container.className = 'flex flex-col gap-2 p-2 bg-white rounded-lg border border-gray-200';
+
+        // Add view mode toggle toolbar if we have sections
+        const sections = compositionState ? compositionState.getSections() : [];
+        if (sections.length > 0) {
+            const toolbar = document.createElement('div');
+            toolbar.className = 'flex items-center justify-between px-3 py-2 bg-indigo-50 rounded-lg border-2 border-indigo-200 mb-3';
+            toolbar.id = 'view-mode-toolbar';
+            toolbar.style.cssText = 'min-height: 40px;'; // Ensure visibility
+
+            // Label on left
+            const label = document.createElement('span');
+            label.className = 'text-sm font-semibold text-indigo-700';
+            label.textContent = 'Card View:';
+            toolbar.appendChild(label);
+
+            // Toggle on right
+            toolbar.appendChild(createViewModeToggle());
+            container.appendChild(toolbar);
+
+
+            // Debug: verify it's actually in the DOM
+            setTimeout(() => {
+                const toolbarCheck = document.getElementById('view-mode-toolbar');
+            }, 100);
+        } else {
+        }
+
+        // Create container for cards
+        const gridContainer = document.createElement('div');
+        gridContainer.id = `${containerId}-cards-grid`;
+
+        // Branch based on view mode
+        if (progressionViewMode === 'section' && sections.length > 0) {
+            // Section View Mode: show section picker and filtered cards
+            gridContainer.className = 'flex flex-col gap-2';
+            renderSectionViewMode(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', sections);
+        } else if (progressionViewMode === 'scroll') {
+            // Scroll View Mode: horizontal scrolling
+            renderScrollViewMode(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
+                showActionButtons: true
+            });
+            // Initialize sortable on the grid container
+            initializeSimplifiedSortable(gridContainer);
+        } else {
+            // Default: Use flexbox with horizontal scroll (no wrapping)
+            gridContainer.className = 'scroll-view-container flex flex-nowrap items-start gap-2 overflow-x-auto pb-2';
+            if (hasSections) {
+                renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
+                    showActionButtons: true
+                });
+            } else {
+                renderFlatCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
+                    showActionButtons: true
+                });
+            }
+            // Initialize sortable on the grid container
+            initializeSimplifiedSortable(gridContainer);
+        }
+
+        container.appendChild(gridContainer);
+
+        // 3. Tension curve visualization (after grid, at bottom of panel) - Phase 3 Enhanced
+        if (panel) {
+            const compositionStateForTension = window.getCompositionState ? window.getCompositionState() : null;
+            const sectionsForTension = compositionStateForTension ? compositionStateForTension.getSections() : [];
+            renderEnhancedTensionCurve(panel, trainerState.progressionData, trainerState.currentKey || 'C', sectionsForTension);
+        }
+
+        // 4. Move Quick Analysis Bar above tension curve
+        const quickAnalysisBar = panel?.querySelector('#quick-analysis-bar-container');
+        const tensionCurve = panel?.querySelector('#tension-arc-container') || panel?.querySelector('#tension-curve-container');
+        if (quickAnalysisBar && tensionCurve) {
+            // Remove from current position and insert before tension curve
+            quickAnalysisBar.remove();
+            panel.insertBefore(quickAnalysisBar, tensionCurve);
+        }
+
+        // Don't render old-style detailed cards below - they expand inline from simplified
+        // (Sortable is already initialized in renderSimplifiedChordSequence)
+
+        // Update Chord Builder panel (three-way sync)
+        if (window.updateBuilderProgressionPanel) {
+            window.updateBuilderProgressionPanel();
+        }
+
+        return;
+    }
+
+    // COMPOSITION STUDIO: Use simplified/detailed card style with Add/Clear buttons
+    // Also render when we have wireframe sections (even if no chords yet) so users can see placeholders
+    const compositionStateForCheck = window.getCompositionState ? window.getCompositionState() : null;
+    const sectionsForCheck = compositionStateForCheck ? compositionStateForCheck.getSections() : [];
+    const hasWireframeSections = sectionsForCheck.length > 0;
+
+    if (containerId === 'melody-progression-visualization' && (trainerState.progressionData.length > 0 || hasWireframeSections)) {
+        // Check if we have any sections defined - if so, use section-aware rendering
+        const compositionState = compositionStateForCheck;
+        const sections = sectionsForCheck;
+        const hasSections = sections.length > 0;
+
+        // Same restructured layout as Progression Builder
+        container.innerHTML = '';
+        container.className = 'flex flex-col gap-2 p-2 bg-white rounded-lg border border-gray-200';
+
+        // Populate header toggle if we have sections (toggle is in the Chord Progression header)
+        const headerToggle = document.getElementById('header-section-view-toggle');
+        if (headerToggle) {
+            if (sections.length > 0) {
+                headerToggle.innerHTML = '';
+                headerToggle.className = 'flex items-center gap-1 ml-2';
+                headerToggle.appendChild(createCompactViewModeToggle());
+            } else {
+                headerToggle.innerHTML = '';
+                headerToggle.className = 'hidden ml-2';
+            }
+        }
+
+        // Create container for cards
+        const gridContainer = document.createElement('div');
+        gridContainer.id = `${containerId}-cards-grid`;
+
+        // Branch based on view mode - pass showActionButtons: false since toolbar is above
+        if (progressionViewMode === 'section' && sections.length > 0) {
+            // Section View Mode: show section picker and filtered cards
+            gridContainer.className = 'flex flex-col gap-2';
+            renderSectionViewMode(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', sections);
+        } else if (progressionViewMode === 'scroll') {
+            // Scroll View Mode: horizontal scrolling
+            renderScrollViewMode(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
+                showActionButtons: false
+            });
+            // Initialize sortable on the grid container
+            initializeSimplifiedSortable(gridContainer);
+        } else {
+            // Default: Use flexbox with horizontal scroll (no wrapping)
+            gridContainer.className = 'scroll-view-container flex flex-nowrap items-start gap-2 overflow-x-auto pb-2';
+            if (hasSections) {
+                renderSectionAwareCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
+                    showActionButtons: false
+                });
+            } else {
+                renderFlatCards(gridContainer, trainerState.progressionData, trainerState.currentKey || 'C', {
+                    showActionButtons: false
+                });
+            }
+            // Initialize sortable on the grid container
+            initializeSimplifiedSortable(gridContainer);
+        }
+
+        container.appendChild(gridContainer);
+
+        // Also update the Composition Studio's notation
+        if (window.refreshNotationFromProgression) {
+            // Use requestAnimationFrame to ensure system is ready
+            requestAnimationFrame(() => {
+                // Sync progression to compositionState first
+                if (window.syncProgressionToMelodyComposer && window.getCompositionState) {
+                    window.syncProgressionToMelodyComposer();
+                }
+                // Then refresh notation - but respect section view filtering!
+                if (progressionViewMode === 'section' && selectedSectionIds.size > 0) {
+                    // In section view with a selection - use filtered rendering
+                    // Add a small delay to ensure sync has completed
+                    setTimeout(() => {
+                        updateNotationForSelectedSections();
+                    }, 50);
+                } else {
+                    // Normal full rendering
+                    window.refreshNotationFromProgression();
+                }
+            });
+        }
+
+        return;
+    }
+
+    // For other views, render traditional detailed cards
+    trainerState.progressionData.forEach((chordData, index) => {
+        // Create wrapper container for controls above and card below
+        const wrapper = document.createElement('div');
+        wrapper.className = 'flex flex-col items-center w-full max-w-[170px] relative';
+        // Make wrapper draggable for Sortable
+        wrapper.setAttribute('data-index', index);
+        
+        // Controls container above the card (centered)
+        // Position relative with z-index to appear on top of expanded cards
+        const topControls = document.createElement('div');
+        topControls.className = 'flex items-center justify-center gap-1 mb-0.5 relative z-10';
+        
+        const playBtn = document.createElement('button');
+        playBtn.innerHTML = '<svg class="w-2.5 h-2.5 inline mr-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.841z"></path></svg>Play';
+        playBtn.className = 'px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 active:bg-indigo-300 transition no-drag';
+        playBtn.setAttribute('data-chord-index', index);
+        playBtn.onmousedown = (e) => {
+            e.stopPropagation();
+            // Don't preventDefault - audio needs the event to work properly
+            // Get current index from wrapper's data attribute (handles drag-and-drop)
+            const wrapper = e.target.closest(`#${containerId} > div`);
+            const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+            startProgressionChord(currentIndex);
+        };
+        playBtn.onmouseup = (e) => {
+            e.stopPropagation();
+            stopTrainerChord();
+        };
+        playBtn.onmouseleave = (e) => {
+            e.stopPropagation();
+            stopTrainerChord();
+        };
+        // Touch events for mobile/tablet
+        playBtn.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            // Get current index from wrapper's data attribute (handles drag-and-drop)
+            const wrapper = e.target.closest(`#${containerId} > div`);
+            const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+            startProgressionChord(currentIndex);
+        }, { passive: false });
+        playBtn.addEventListener('touchend', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            stopTrainerChord();
+        }, { passive: false });
+        playBtn.addEventListener('touchcancel', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            stopTrainerChord();
+        }, { passive: false });
+        topControls.appendChild(playBtn);
+
+        // Add Staff Notation Toggle button (icon only, next to Play)
+        const staffToggleBtn = document.createElement('button');
+        staffToggleBtn.innerHTML = '<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"></path></svg>';
+        staffToggleBtn.className = 'p-0.5 text-teal-600 rounded-full hover:bg-teal-100 transition';
+        staffToggleBtn.title = 'Toggle staff notation view';
+        staffToggleBtn.setAttribute('data-chord-index', index);
+        staffToggleBtn.onclick = (e) => {
+            e.stopPropagation();
+            // Get current index from wrapper's data attribute (handles drag-and-drop)
+            const wrapper = e.target.closest(`#${containerId} > div`);
+            const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+            // Pass the container ID so we can sync both tabs
+            toggleStaffNotation(currentIndex, containerId);
+        };
+        topControls.appendChild(staffToggleBtn);
+
+        // Add Chord Suggestion button (lightbulb icon, next to staff toggle)
+        const suggestionBtn = document.createElement('button');
+        suggestionBtn.innerHTML = '💡';
+        suggestionBtn.className = 'text-sm p-0.5 text-yellow-600 rounded-full hover:bg-yellow-100 transition';
+        suggestionBtn.title = 'Get chord suggestions';
+        suggestionBtn.setAttribute('data-chord-index', index);
+        suggestionBtn.onclick = (e) => {
+            e.stopPropagation();
+            // Get current index from wrapper's data attribute (handles drag-and-drop)
+            const wrapper = e.target.closest(`#${containerId} > div`);
+            const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+            if (window.showProgressionChordSuggestions) {
+                window.showProgressionChordSuggestions(currentIndex);
+            }
+        };
+        topControls.appendChild(suggestionBtn);
+        
+        wrapper.appendChild(topControls);
+        
+        // Create the card itself
+        const card = document.createElement('div');
+        card.className = 'p-1 bg-indigo-50 rounded-lg shadow border border-indigo-200 flex flex-col gap-0.5 progression-chord-item w-full';
+        // Prevent text selection during drag
+        card.style.userSelect = 'none';
+        card.style.webkitUserSelect = 'none';
+        card.style.msUserSelect = 'none';
+
+        // Add click handler for theory tools selection
+        card.onclick = (e) => {
+            // Don't trigger if clicking on buttons inside the card
+            if (e.target.closest('button')) return;
+            if (window.setSelectedChordIndex) {
+                // Get current index from wrapper's data attribute (handles drag-and-drop)
+                const currentIndex = parseInt(wrapper.getAttribute('data-index')) || index;
+                window.setSelectedChordIndex(currentIndex);
+            }
+        };
+
+        const header = document.createElement('div');
+        header.className = 'flex justify-between items-start';
+
+        const nameContainer = document.createElement('div');
+        nameContainer.className = 'flex flex-col text-left';
+
+        // PHASE 3.3: Color-coded roman numerals by harmonic function
+        const colors = getFunctionColors(chordData.roman);
+
+        const romanEl = document.createElement('span');
+        romanEl.className = `font-mono font-bold text-sm ${colors.romanColor} leading-tight`;
+        romanEl.textContent = chordData.roman;
+        nameContainer.appendChild(romanEl);
+
+        const simpleNameEl = document.createElement('span');
+        simpleNameEl.className = 'px-0.5 font-sans text-[10px] text-gray-500 leading-tight';
+        simpleNameEl.textContent = chordData.simpleName || '';
+        nameContainer.appendChild(simpleNameEl);
+
+        // Add chord function label (Tonic, Dominant, Subdominant, etc.)
+        const functionLabel = getChordFunction(chordData.roman);
+        if (functionLabel) {
+            const functionEl = document.createElement('span');
+            functionEl.className = `px-0.5 font-sans text-[10px] ${colors.functionColor} font-medium leading-tight`;
+            functionEl.textContent = functionLabel;
+            nameContainer.appendChild(functionEl);
+        }
+        
+        // Add scale notes indicator (shows which scale notes work over this chord)
+        const scaleNotesEl = document.createElement('span');
+        scaleNotesEl.className = 'px-0.5 font-sans text-[9px] text-purple-500 leading-tight cursor-help whitespace-nowrap overflow-hidden text-ellipsis block';
+        const trainerState = getTrainerState();
+        const scaleNotes = trainerState.scaleNotes || [];
+        const chordNotes = chordData.notes || [];
+        const scaleNotesInChord = scaleNotes.filter(sn => {
+            const snBase = sn.replace(/[0-9]/g, '');
+            return chordNotes.some(cn => cn.replace(/[0-9]/g, '') === snBase);
+        });
+        if (scaleNotesInChord.length > 0) {
+            const scaleText = `Scale: ${scaleNotesInChord.map(n => n.replace(/[0-9]/g, '')).slice(0, 3).join(', ')}${scaleNotesInChord.length > 3 ? '...' : ''}`;
+            scaleNotesEl.textContent = scaleText;
+            scaleNotesEl.title = `Scale notes that work over this chord: ${scaleNotesInChord.map(n => n.replace(/[0-9]/g, '')).join(', ')}`;
+            nameContainer.appendChild(scaleNotesEl);
+        }
+
+        header.appendChild(nameContainer);
+
+        // Delete button in header (right side)
+        const deleteBtn = document.createElement('button');
+        deleteBtn.innerHTML = '<svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>';
+        deleteBtn.className = 'p-0.5 text-gray-400 rounded-full hover:bg-gray-200 hover:text-gray-600 transition flex-shrink-0';
+        deleteBtn.title = 'Remove Chord';
+        deleteBtn.onmousedown = (e) => {
+            e.stopPropagation();
+        };
+        deleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            // Get current index from wrapper's data attribute (handles drag-and-drop)
+            const currentIndex = parseInt(wrapper.getAttribute('data-index')) || index;
+            removeChordFromProgression(currentIndex);
+        };
+        header.appendChild(deleteBtn);
+        
+        header.id = `chord-header-${index}`;
+
+        card.title = `Drag to reorder ${chordData.simpleName}`;
+        card.style.cursor = 'grab';
+
+        card.appendChild(header);
+        
+        // Staff Notation Container (hidden by default)
+        // This will be shown when toggled, replacing all other card content
+        const staffContainer = document.createElement('div');
+        staffContainer.id = `staff-notation-${index}`;
+        staffContainer.className = 'hidden p-1 bg-white rounded w-full overflow-hidden';
+        const staffCanvas = document.createElement('canvas');
+        staffCanvas.id = `staff-canvas-${index}`;
+        // Render at 220px to give VexFlow room to space notes far from clef
+        staffCanvas.width = 220;
+        staffCanvas.height = 150;
+        // Display at 100% of card width
+        staffCanvas.style.width = '100%';
+        staffCanvas.style.maxWidth = '100%';
+        staffCanvas.style.height = 'auto';
+        staffCanvas.style.display = 'block';
+        staffContainer.appendChild(staffCanvas);
+        card.appendChild(staffContainer);
+
+        // Chord Type Selector with Quality Indicator
+        const typeSelectContainer = document.createElement('div');
+        typeSelectContainer.className = 'relative mt-0';
+        
+        const typeSelect = document.createElement('select');
+        typeSelect.className = 'w-full p-0.5 pr-5 text-[10px] border border-gray-300 rounded';
+        Object.keys(CHORD_DEFINITIONS).forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = getNotationPreference() === 'symbol' ? (CHORD_DEFINITIONS[type].symbol || type) : type;
+            if (type === chordData.type) option.selected = true;
+            typeSelect.appendChild(option);
+        });
+        typeSelect.onchange = (e) => {
+            const wrapper = e.target.closest(`#${containerId} > div`);
+            const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+            updateProgressionChord(currentIndex, 'type', e.target.value);
+        };
+        typeSelect.onmousedown = (e) => e.stopPropagation();
+        typeSelect.style.cursor = 'default';
+        typeSelectContainer.appendChild(typeSelect);
+        card.appendChild(typeSelectContainer);
+
+        // Voicing editor for RH chord
+        const editor = document.createElement('div');
+        editor.className = 'flex flex-wrap gap-x-1 gap-y-0.5 items-center p-0.5 mt-0.5 rounded bg-gray-50 border';
+
+        const voicingLabelContainer = document.createElement('div');
+        voicingLabelContainer.className = 'w-full flex items-center justify-between mb-0';
+        
+        const voicingLabel = document.createElement('h4');
+        voicingLabel.className = 'text-[10px] font-semibold text-indigo-600';
+        voicingLabel.textContent = 'Voicing';
+        voicingLabelContainer.appendChild(voicingLabel);
+
+        // Add "All" and "None" buttons for RH voicing
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'flex gap-0.5';
+        
+        const allButton = document.createElement('button');
+        allButton.textContent = 'All';
+        allButton.className = 'px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-500 hover:bg-indigo-600 text-white rounded transition-colors';
+        allButton.onmousedown = (e) => e.stopPropagation();
+        allButton.onclick = (e) => {
+            const wrapper = e.target.closest('#progression-visualization > div');
+            const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+            const trainerState = getTrainerState();
+            const chord = trainerState.progressionData[currentIndex];
+            if (!chord) return;
+
+            // Save state before changing voicing
+            saveStateBeforeChange();
+
+            // Ensure omittedNotes array exists
+            if (!chord.omittedNotes) {
+                chord.omittedNotes = [];
+            }
+
+            // Select all: clear all omitted notes
+            chord.omittedNotes = [];
+            
+            // Update checkboxes directly without re-rendering
+            const cardWrapper = e.target.closest('#progression-visualization > div');
+            if (cardWrapper) {
+                const checkboxes = cardWrapper.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach(cb => {
+                    if (chord.notes && chord.notes.includes(cb.value)) {
+                        cb.checked = true;
+                    }
+                });
+            }
+            
+            // Play chord with duration
+            const lhNotes = getLHNotes(
+                chord.root,
+                chord.lhType,
+                chord.lhInversion,
+                trainerState.currentKey,
+                chord.lhOctaveShift,
+                chord.type,
+                getKeyBasedEnharmonic()
+            ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
+            const voicedNotes = chord.notes.filter(n => !chord.omittedNotes.includes(n));
+            const allNotes = voicedNotes.concat(lhNotes);
+            if (allNotes.length > 0) {
+                playTrainerChordOnce(allNotes);
+            }
+        };
+        allButton.title = 'Select all notes';
+        
+        const noneButton = document.createElement('button');
+        noneButton.textContent = 'None';
+        noneButton.className = 'px-1.5 py-0.5 text-[10px] font-semibold bg-gray-500 hover:bg-gray-600 text-white rounded transition-colors';
+        noneButton.onmousedown = (e) => e.stopPropagation();
+        noneButton.onclick = (e) => {
+            const wrapper = e.target.closest('#progression-visualization > div');
+            const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+            const trainerState = getTrainerState();
+            const chord = trainerState.progressionData[currentIndex];
+            if (!chord) return;
+
+            // Save state before changing voicing
+            saveStateBeforeChange();
+
+            // Ensure omittedNotes array exists
+            if (!chord.omittedNotes) {
+                chord.omittedNotes = [];
+            }
+
+            // Select none: omit all notes
+            const notesToOmit = [...(chord.notes || [])];
+            chord.omittedNotes = notesToOmit;
+            
+            // Update checkboxes directly without re-rendering
+            const cardWrapper = e.target.closest(`#${containerId} > div`);
+            if (cardWrapper) {
+                const checkboxes = cardWrapper.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach(cb => {
+                    if (chord.notes && chord.notes.includes(cb.value)) {
+                        cb.checked = false;
+                    }
+                });
+            }
+            
+            // Play chord with duration (should be empty if all notes omitted)
+            const lhNotes = getLHNotes(
+                chord.root,
+                chord.lhType,
+                chord.lhInversion,
+                trainerState.currentKey,
+                chord.lhOctaveShift,
+                chord.type,
+                getKeyBasedEnharmonic()
+            ).filter(n => !(chord.lhOmittedNotes || []).includes(n));
+            const voicedNotes = chord.notes.filter(n => !chord.omittedNotes.includes(n));
+            const allNotes = voicedNotes.concat(lhNotes);
+            // Play even if empty (will just play LH notes if any)
+            playTrainerChordOnce(allNotes);
+        };
+        noneButton.title = 'Deselect all notes';
+        
+        buttonContainer.appendChild(allButton);
+        buttonContainer.appendChild(noneButton);
+        voicingLabelContainer.appendChild(buttonContainer);
+        editor.appendChild(voicingLabelContainer);
+
+        const checkboxContainer = document.createElement('div');
+        checkboxContainer.className = 'w-full flex flex-wrap gap-x-2 gap-y-0.5 mb-1';
+
+        const notesForVoicing = chordData.notes || [];
+        notesForVoicing.forEach(note => {
+            const wrapper = document.createElement('label');
+            wrapper.className = 'flex items-center gap-0.5 cursor-pointer text-gray-700 text-[10px]';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = note;
+            checkbox.checked = !(chordData.omittedNotes || []).includes(note);
+            checkbox.className = 'w-2.5 h-2.5 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500';
+        checkbox.onmousedown = (e) => e.stopPropagation();
+            checkbox.onchange = (e) => {
+                const cardWrapper = e.target.closest(`#${containerId} > div`);
+                const currentIndex = cardWrapper ? parseInt(cardWrapper.getAttribute('data-index')) || index : index;
+                toggleProgressionNote(currentIndex, note);
+            };
+            wrapper.appendChild(checkbox);
+            wrapper.append(note);
+            checkboxContainer.appendChild(wrapper);
+        });
+        editor.appendChild(checkboxContainer);
+
+        // Inversion Selector with Suggestions
+        const invContainer = document.createElement('div');
+        invContainer.className = 'mt-0.5';
+        
+        const invLabelContainer = document.createElement('div');
+        invLabelContainer.className = 'flex items-center justify-between mb-0.5';
+        
+        const invLabel = document.createElement('label');
+        invLabel.className = 'block text-[10px] font-medium text-gray-600';
+        invLabel.textContent = 'Inversion:';
+        invLabelContainer.appendChild(invLabel);
+        
+        // Add suggestion button with tooltip
+        const inversionSuggestionBtn = document.createElement('button');
+        inversionSuggestionBtn.type = 'button';
+        inversionSuggestionBtn.textContent = '💡';
+        inversionSuggestionBtn.title = 'Hover to see inversion suggestion';
+        inversionSuggestionBtn.onmousedown = (e) => e.stopPropagation();
+        
+        // Check if there's a suggestion and set button color accordingly
+        const checkSuggestion = () => {
+            const suggestion = suggestInversion(index);
+            if (suggestion) {
+                // Green-tinted when there is a suggestion
+                inversionSuggestionBtn.className = 'px-1 py-0.5 text-[10px] bg-green-100 hover:bg-green-200 text-green-700 rounded transition-colors relative';
+            } else {
+                // Red-tinted when there is no suggestion
+                inversionSuggestionBtn.className = 'px-1 py-0.5 text-[10px] bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors relative';
+            }
+        };
+        
+        // Set initial button color
+        checkSuggestion();
+        
+        // Create tooltip container - append to body to avoid z-index issues
+        const tooltipContainer = document.createElement('div');
+        tooltipContainer.id = `inversion-tooltip-${index}`;
+        tooltipContainer.className = 'fixed bg-white border border-gray-300 rounded-lg shadow-xl z-[9999] p-2';
+        tooltipContainer.style.display = 'none';
+        tooltipContainer.style.width = '240px';
+        document.body.appendChild(tooltipContainer);
+        
+        // Show tooltip on hover
+        let tooltipTimeout;
+        inversionSuggestionBtn.addEventListener('mouseenter', () => {
+            clearTimeout(tooltipTimeout);
+            // Update button color on hover (in case suggestion status changed)
+            checkSuggestion();
+            const suggestion = suggestInversion(index);
+            
+            // Position tooltip near the button
+            const rect = inversionSuggestionBtn.getBoundingClientRect();
+            tooltipContainer.style.left = `${rect.left + (rect.width / 2)}px`;
+            tooltipContainer.style.top = `${rect.top - 10}px`;
+            tooltipContainer.style.transform = 'translate(-50%, -100%)';
+            
+            if (suggestion) {
+                tooltipContainer.innerHTML = `
+                    <div class="text-[10px] font-semibold text-indigo-700 mb-0.5">Suggested: ${suggestion.inversionName}</div>
+                    <div class="text-[10px] text-gray-600 mb-1.5">${suggestion.reason}</div>
+                    <button class="w-full px-2 py-0.5 text-[10px] font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded transition-colors">
+                        Accept
+                    </button>
+                `;
+                
+                // Add click handler to Accept button
+                const acceptBtn = tooltipContainer.querySelector('button');
+                acceptBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    // Get current index from wrapper's data attribute (handles drag-and-drop)
+                    const wrapper = inversionSuggestionBtn.closest(`#${containerId} > div`);
+                    const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+                    updateProgressionChord(currentIndex, 'inversion', suggestion.inversion);
+                    tooltipContainer.style.display = 'none';
+                    // Update button color after accepting suggestion
+                    setTimeout(() => checkSuggestion(), 50);
+                };
+                
+                tooltipContainer.style.display = 'block';
+            } else {
+                tooltipContainer.innerHTML = `
+                    <div class="text-[10px] text-gray-600">No suggestion available. Current inversion is already optimal or no previous chord to compare.</div>
+                `;
+                tooltipContainer.style.display = 'block';
+            }
+        });
+        
+        inversionSuggestionBtn.addEventListener('mouseleave', () => {
+            tooltipTimeout = setTimeout(() => {
+                tooltipContainer.style.display = 'none';
+            }, 100); // Small delay to allow moving to tooltip
+        });
+        
+        // Keep tooltip visible when hovering over it
+        tooltipContainer.addEventListener('mouseenter', () => {
+            clearTimeout(tooltipTimeout);
+        });
+        
+        tooltipContainer.addEventListener('mouseleave', () => {
+            tooltipContainer.style.display = 'none';
+        });
+        invLabelContainer.appendChild(inversionSuggestionBtn);
+        invContainer.appendChild(invLabelContainer);
+        
+        // Inversion button switches
+        const invButtonContainer = document.createElement('div');
+        invButtonContainer.className = 'flex gap-0.5';
+        
+        const def = CHORD_DEFINITIONS[chordData.type];
+        const maxInversion = def ? def.intervals.length - 1 : 0;
+        const currentInversion = chordData.inversion || 0;
+        
+        // Create buttons for all available inversions (up to maxInversion)
+        const invButtons = [];
+        for (let invIndex = 0; invIndex <= maxInversion; invIndex++) {
+            const invButton = document.createElement('button');
+            invButton.type = 'button';
+            // Use INVERSION_NAMES for display, or fallback to 'R' for root, number for others
+            const invName = INVERSION_NAMES[invIndex] || (invIndex === 0 ? 'R' : invIndex.toString());
+            invButton.textContent = invIndex === 0 ? 'R' : invName.replace('st', '').replace('nd', '').replace('rd', '').replace('th', '');
+            invButton.setAttribute('data-inversion', invIndex);
+            invButton.className = `flex-1 px-1 py-0.5 text-[10px] font-semibold rounded transition-colors ${
+                invIndex === currentInversion
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`;
+            
+            let isPlaying = false;
+            let heldNotes = null;
+            
+            // Helper function to update button highlighting
+            const updateButtonHighlighting = () => {
+                invButtonContainer.querySelectorAll('button').forEach((btn) => {
+                    const btnInversion = parseInt(btn.getAttribute('data-inversion'));
+                    if (btnInversion === invIndex) {
+                        btn.className = 'flex-1 px-1 py-0.5 text-[10px] font-semibold rounded transition-colors bg-indigo-600 text-white';
+                    } else {
+                        btn.className = 'flex-1 px-1 py-0.5 text-[10px] font-semibold rounded transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300';
+                    }
+                });
+            };
+            
+            const startPlayback = (e) => {
+                if (e) e.stopPropagation();
+                // Update highlighting immediately
+                updateButtonHighlighting();
+                
+                if (!isPlaying) {
+                    isPlaying = true;
+                    // Get chord notes for direct playback
+                    const key = getCurrentKey ? getCurrentKey() : 'C';
+                    const res = getInvertedChordNotes(
+                        chordData.root,
+                        chordData.type,
+                        invIndex,
+                        key,
+                        0, // octave shift
+                        'sharp', // enharmonic preference
+                        'full' // notation preference
+                    );
+                    heldNotes = res.specificNotes || [];
+                    const instrument = window.getInstrument && window.getInstrument();
+                    if (instrument && heldNotes.length > 0) {
+                        const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                        const baseTime = Tone.now() + 0.01;
+                        if (isGuitar) {
+                            heldNotes.forEach((n, idx) => instrument.triggerAttack(n, baseTime + idx * 0.0001));
+                        } else {
+                            instrument.triggerAttack(heldNotes, Tone.now());
+                        }
+                    }
+                }
+            };
+            
+            const stopPlayback = (e) => {
+                if (e) e.stopPropagation();
+                if (isPlaying) {
+                    isPlaying = false;
+                    // Stop playback
+                    const instrument = window.getInstrument && window.getInstrument();
+                    if (instrument && heldNotes && heldNotes.length > 0) {
+                        const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                        if (isGuitar) {
+                            heldNotes.forEach(n => {
+                                try { instrument.triggerRelease(n, Tone.now()); } catch (_) {}
+                            });
+                        } else {
+                            instrument.triggerRelease(heldNotes, Tone.now());
+                        }
+                        heldNotes = null;
+                    }
+                }
+            };
+            
+            // Hold-to-play with immediate highlighting
+            invButton.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                startPlayback(e);
+            });
+            
+            invButton.addEventListener('mouseup', (e) => {
+                e.stopPropagation();
+                stopPlayback(e);
+                // Update state silently (without playing chord again)
+                const wrapper = e.target.closest(`#${containerId} > div`);
+                const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+                const selectedInversion = invIndex;
+                
+                const trainerState = getTrainerState();
+                if (trainerState.progressionData[currentIndex]) {
+                    trainerState.progressionData[currentIndex].inversion = selectedInversion;
+                    saveStateBeforeChange();
+                }
+                setTimeout(() => checkSuggestion(), 50);
+            });
+            
+            invButton.addEventListener('mouseleave', (e) => {
+                e.stopPropagation();
+                stopPlayback(e);
+            });
+            
+            // Touch events for mobile/tablet
+            invButton.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                startPlayback(e);
+            }, { passive: false });
+            
+            invButton.addEventListener('touchend', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                stopPlayback(e);
+                // Update state silently (without playing chord again)
+                const wrapper = e.target.closest(`#${containerId} > div`);
+                const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+                const selectedInversion = invIndex;
+                
+                const trainerState = getTrainerState();
+                if (trainerState.progressionData[currentIndex]) {
+                    trainerState.progressionData[currentIndex].inversion = selectedInversion;
+                    saveStateBeforeChange();
+                }
+                setTimeout(() => checkSuggestion(), 50);
+            }, { passive: false });
+            
+            invButton.addEventListener('touchcancel', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                stopPlayback(e);
+            }, { passive: false });
+            
+            invButtonContainer.appendChild(invButton);
+            invButtons.push(invButton);
+        }
+        
+        invContainer.appendChild(invButtonContainer);
+        
+        editor.appendChild(invContainer);
+
+        // Octave Shift Selector
+        const octContainer = document.createElement('div');
+        octContainer.className = 'mt-0.5';
+        
+        const octLabel = document.createElement('label');
+        octLabel.className = 'block text-[10px] font-medium text-gray-600 mb-0.5';
+        octLabel.textContent = 'Octave Adj.:';
+        octContainer.appendChild(octLabel);
+
+        const octSelect = document.createElement('select');
+        octSelect.className = 'w-full p-0.5 text-[10px] border border-gray-300 rounded';
+        // Reverse order: +3 at top, -3 at bottom
+        for (let i = 3; i >= -3; i--) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `${i > 0 ? '+' : ''}${i}`;
+            if (i === (chordData.octaveShift || 0)) option.selected = true;
+            octSelect.appendChild(option);
+        }
+        octSelect.onchange = (e) => {
+            const wrapper = e.target.closest(`#${containerId} > div`);
+            const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+            updateProgressionChord(currentIndex, 'octaveShift', parseInt(e.target.value));
+        };
+        octSelect.onmousedown = (e) => e.stopPropagation();
+        octSelect.style.cursor = 'default';
+        octContainer.appendChild(octSelect);
+        editor.appendChild(octContainer);
+
+        card.appendChild(editor);
+
+        // Left Hand Controls
+        const lhLabel = document.createElement('div');
+        lhLabel.className = 'text-[10px] text-gray-500 font-medium mt-0.5';
+        lhLabel.textContent = 'Left Hand:';
+        card.appendChild(lhLabel);
+
+        const lhContainer = document.createElement('div');
+        lhContainer.className = 'p-0.5 mt-0 rounded bg-gray-50 border';
+
+        const lhControlGrid = document.createElement('div');
+        lhControlGrid.className = 'grid grid-cols-2 gap-x-0.5 gap-y-0.5 items-end';
+
+        // LH Type Dropdown
+        const lhTypeWrapper = document.createElement('div');
+        lhTypeWrapper.className = 'col-span-2';
+        const lhTypeLabel = document.createElement('label');
+        lhTypeLabel.className = 'block text-[10px] font-medium text-gray-600';
+        lhTypeLabel.textContent = 'Type';
+        const lhTypeSelect = document.createElement('select');
+        lhTypeSelect.className = 'w-full p-0.5 text-[10px] border border-gray-300 rounded';
+        
+        // Copy options from source select, preserving text and title attributes
+        const sourceSelect = document.getElementById('builder-lh-type-select');
+        if (sourceSelect) {
+            Array.from(sourceSelect.options).forEach(sourceOption => {
+                const newOption = document.createElement('option');
+                newOption.value = sourceOption.value;
+                newOption.textContent = sourceOption.textContent; // Only copy text content, not innerHTML
+                if (sourceOption.title) {
+                    newOption.title = sourceOption.title; // Copy title attribute for tooltip
+                }
+                lhTypeSelect.appendChild(newOption);
+            });
+        }
+        
+        lhTypeSelect.value = chordData.lhType || 'off';
+        lhTypeSelect.onchange = (e) => {
+            const wrapper = e.target.closest(`#${containerId} > div`);
+            const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+            updateProgressionChordLH(currentIndex, 'lhType', e.target.value);
+        };
+        lhTypeSelect.onmousedown = (e) => e.stopPropagation();
+        lhTypeWrapper.appendChild(lhTypeLabel);
+        lhTypeWrapper.appendChild(lhTypeSelect);
+        lhControlGrid.appendChild(lhTypeWrapper);
+
+        // LH Inversion Buttons (similar to RH inversion buttons)
+        const lhInvWrapper = document.createElement('div');
+        lhInvWrapper.className = 'col-span-2';
+        const lhInvLabel = document.createElement('label');
+        lhInvLabel.className = 'block text-[10px] font-medium text-gray-600 mb-0.5';
+        lhInvLabel.textContent = 'Inversion:';
+        lhInvWrapper.appendChild(lhInvLabel);
+        
+        const lhInvButtonContainer = document.createElement('div');
+        lhInvButtonContainer.className = 'flex gap-0.5';
+        
+        const maxLhInversion = getMaxInversionForLhType(chordData.lhType);
+        const currentLhInversion = chordData.lhInversion || 0;
+        
+        // Only show inversion buttons if LH type is not 'off' and has inversions available
+        if (chordData.lhType && chordData.lhType !== 'off' && maxLhInversion > 0) {
+            // Create buttons for R, 1, 2, 3 (up to maxLhInversion)
+            for (let invIndex = 0; invIndex <= Math.min(maxLhInversion, 3); invIndex++) {
+                const lhInvButton = document.createElement('button');
+                lhInvButton.type = 'button';
+                lhInvButton.textContent = invIndex === 0 ? 'R' : invIndex.toString();
+                lhInvButton.setAttribute('data-lh-inversion', invIndex);
+                lhInvButton.className = `flex-1 px-1 py-0.5 text-[10px] font-semibold rounded transition-colors ${
+                    invIndex === currentLhInversion
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`;
+                
+                let isPlaying = false;
+                let heldNotes = null;
+                
+                // Helper function to update button highlighting
+                const updateLhButtonHighlighting = () => {
+                    lhInvButtonContainer.querySelectorAll('button').forEach((btn) => {
+                        const btnInversion = parseInt(btn.getAttribute('data-lh-inversion'));
+                        if (btnInversion === invIndex) {
+                            btn.className = 'flex-1 px-1 py-0.5 text-[10px] font-semibold rounded transition-colors bg-indigo-600 text-white';
+                        } else {
+                            btn.className = 'flex-1 px-1 py-0.5 text-[10px] font-semibold rounded transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300';
+                        }
+                    });
+                };
+                
+                const startLhPlayback = (e) => {
+                    if (e) e.stopPropagation();
+                    // Update highlighting immediately
+                    updateLhButtonHighlighting();
+                    
+                    if (!isPlaying) {
+                        isPlaying = true;
+                        // Get LH chord notes for direct playback
+                        const key = getCurrentKey ? getCurrentKey() : 'C';
+                        const lhOctaveShift = chordData.lhOctaveShift || 0;
+                        heldNotes = getLHNotes(
+                            chordData.root,
+                            chordData.lhType,
+                            invIndex,
+                            key,
+                            lhOctaveShift,
+                            chordData.type,
+                            'sharp' // enharmonic preference
+                        ) || [];
+                        const instrument = window.getInstrument && window.getInstrument();
+                        if (instrument && heldNotes.length > 0) {
+                            const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                            const baseTime = Tone.now() + 0.01;
+                            if (isGuitar) {
+                                heldNotes.forEach((n, idx) => instrument.triggerAttack(n, baseTime + idx * 0.0001));
+                            } else {
+                                instrument.triggerAttack(heldNotes, Tone.now());
+                            }
+                        }
+                    }
+                };
+                
+                const stopLhPlayback = (e) => {
+                    if (e) e.stopPropagation();
+                    if (isPlaying) {
+                        isPlaying = false;
+                        // Stop playback
+                        const instrument = window.getInstrument && window.getInstrument();
+                        if (instrument && heldNotes && heldNotes.length > 0) {
+                            const isGuitar = window.getIsFretboardModeOn && window.getIsFretboardModeOn();
+                            if (isGuitar) {
+                                heldNotes.forEach(n => {
+                                    try { instrument.triggerRelease(n, Tone.now()); } catch (_) {}
+                                });
+                            } else {
+                                instrument.triggerRelease(heldNotes, Tone.now());
+                            }
+                            heldNotes = null;
+                        }
+                    }
+                };
+                
+                // Hold-to-play with immediate highlighting
+                lhInvButton.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                    startLhPlayback(e);
+                });
+                
+                lhInvButton.addEventListener('mouseup', (e) => {
+                    e.stopPropagation();
+                    stopLhPlayback(e);
+                    // Update state silently (without playing chord again)
+                    const wrapper = e.target.closest(`#${containerId} > div`);
+                    const currentIndex = wrapper ? parseInt(wrapper.getAttribute('data-index')) || index : index;
+                    const selectedLhInversion = invIndex;
+                    
+                    const trainerState = getTrainerState();
+                    if (trainerState.progressionData[currentIndex]) {
+                        trainerState.progressionData[currentIndex].lhInversion = selectedLhInversion;
+                        saveStateBeforeChange();
+                    }
+                });
+                
+                lhInvButton.addEventListener('mouseleave', (e) => {
+                    e.stopPropagation();
+                    stopLhPlayback(e);
+                });
+                
+                // Touch events for mobile/tablet
+                lhInvButton.addEventListener('touchstart', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    startLhPlayback(e);
