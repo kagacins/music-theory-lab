@@ -1456,6 +1456,30 @@ export function initEnhancedNotation(options = {}) {
       }
     };
 
+    notationComposer.toolbar.onDynamicChange = (dynamic) => {
+      // Always set dynamic for new notes
+      noteEditor.setDynamic(dynamic);
+
+      if (noteEditor.selectedNotes.size > 0) {
+        // Also toggle dynamic on selected notes
+        noteEditor.toggleDynamicOnSelected(dynamic);
+      }
+    };
+
+    // Handle hairpin application (crescendo/decrescendo)
+    notationComposer.toolbar.onHairpinApply = (hairpinType) => {
+      if (noteEditor.selectedNotes.size >= 2) {
+        noteEditor.applyHairpinToSelected(hairpinType);
+      }
+    };
+
+    // Handle hairpin removal
+    notationComposer.toolbar.onHairpinRemove = () => {
+      if (noteEditor.selectedNotes.size >= 1) {
+        noteEditor.removeHairpinFromSelected();
+      }
+    };
+
     // Handle chord symbol application
     notationComposer.toolbar.onChordSymbolApply = (chordSymbol) => {
       // Find the target chord based on selection priority:

@@ -942,6 +942,24 @@ export class CompositionState {
         // - Section reordering physically moves chord data and updates startIndex values
         this.sections = [];
         this._nextSectionId = 1;
+
+        // ====================================================================
+        // HAIRPINS - Crescendo/Decrescendo spans
+        // ====================================================================
+        // Hairpins span from a start note to an end note within the same clef.
+        // Each hairpin is stored as:
+        // {
+        //   id: 'hp_1',              // Unique ID
+        //   type: 'crescendo',       // 'crescendo' | 'decrescendo'
+        //   clef: 'treble',          // 'treble' | 'bass'
+        //   voiceIndex: 0,           // Voice index within the clef
+        //   startMeasure: 0,         // Measure index of start note
+        //   startBeat: 0,            // Beat position of start note
+        //   endMeasure: 1,           // Measure index of end note (can span measures)
+        //   endBeat: 2               // Beat position of end note
+        // }
+        this.hairpins = [];
+        this._nextHairpinId = 1;
     }
 
     // ========================================================================
@@ -7824,6 +7842,97 @@ export class CompositionState {
         });
 
         this.events.emit('sectionsImported', this.sections);
+    }
+
+    // ========================================================================
+    // HAIRPIN METHODS - Crescendo/Decrescendo spans
+    // ========================================================================
+
+    /**
+     * Add a hairpin (crescendo or decrescendo) spanning from start to end note
+     * @param {Object} options - Hairpin options
+     * @param {string} options.type - 'crescendo' or 'decrescendo'
+     * @param {string} options.clef - 'treble' or 'bass'
+     * @param {number} options.voiceIndex - Voice index within the clef
+     * @param {number} options.startMeasure - Start measure index
+     * @param {number} options.startBeat - Start beat position
+     * @param {number} options.endMeasure - End measure index
+     * @param {number} options.endBeat - End beat position
+     * @returns {Object} The created hairpin object
+     */
+    addHairpin({ type, clef, voiceIndex, startMeasure, startBeat, endMeasure, endBeat }) {
+        const hairpin = {
+            id: `hp_${this._nextHairpinId++}`,
+            type,
+            clef,
+            voiceIndex: voiceIndex || 0,
+            startMeasure,
+            startBeat,
+            endMeasure,
+            endBeat
+        };
+
+        // Remove any overlapping hairpins on the same clef/voice
+        this.hairpins = this.hairpins.filter(h => {
+            if (h.clef !== clef || h.voiceIndex !== voiceIndex) return true;
+            // Check for overlap
+            const newStart = startMeasure * 1000 + startBeat;
+            const newEnd = endMeasure * 1000 + endBeat;
+            const existingStart = h.startMeasure * 1000 + h.startBeat;
+            const existingEnd = h.endMeasure * 1000 + h.endBeat;
+            // Overlapping if ranges intersect
+            return newEnd <= existingStart || newStart >= existingEnd;
+        });
+
+        this.hairpins.push(hairpin);
+        this.events.emit('hairpinAdded', hairpin);
+        return hairpin;
+    }
+
+    /**
+     * Remove a hairpin by ID
+     * @param {string} hairpinId - Hairpin ID to remove
+     * @returns {boolean} True if removed
+     */
+    removeHairpin(hairpinId) {
+        const index = this.hairpins.findIndex(h => h.id === hairpinId);
+        if (index >= 0) {
+            const removed = this.hairpins.splice(index, 1)[0];
+            this.events.emit('hairpinRemoved', removed);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Get all hairpins for a specific clef
+     * @param {string} clef - 'treble' or 'bass'
+     * @returns {Array} Array of hairpins for the clef
+     */
+    getHairpinsForClef(clef) {
+        return this.hairpins.filter(h => h.clef === clef);
+    }
+
+    /**
+     * Get hairpins that span a specific measure
+     * @param {number} measureIndex - Measure index
+     * @param {string} clef - Optional clef filter
+     * @returns {Array} Array of hairpins affecting this measure
+     */
+    getHairpinsForMeasure(measureIndex, clef = null) {
+        return this.hairpins.filter(h => {
+            if (clef && h.clef !== clef) return false;
+            return h.startMeasure <= measureIndex && h.endMeasure >= measureIndex;
+        });
+    }
+
+    /**
+     * Clear all hairpins
+     */
+    clearHairpins() {
+        this.hairpins = [];
+        this._nextHairpinId = 1;
+        this.events.emit('hairpinsCleared');
     }
 }
 

@@ -1475,6 +1475,339 @@ function drawPartialTieCurve(ctx, startX, startY, endX, endY, direction = 'below
 }
 
 // ============================================================================
+// ============================================================================
+// HAIRPIN RENDERING
+// ============================================================================
+
+/**
+ * Draw hairpins (crescendo/decrescendo) for a system
+ * @param {Object} context - VexFlow context
+ * @param {Array} renderedMeasures - Array of rendered measure objects containing VexFlow notes
+ * @param {Array} hairpins - Array of hairpin objects from compositionState
+ * @param {Array} measures - Original measure data (for beat positions)
+ */
+function drawHairpins(context, renderedMeasures, hairpins, measures) {
+  if (!renderedMeasures || renderedMeasures.length === 0 || !hairpins || hairpins.length === 0) {
+    return;
+  }
+
+  // Get raw canvas context (same as drawManualTies)
+  let ctx = null;
+  if (context.vexFlowCanvasContext && typeof context.vexFlowCanvasContext.beginPath === 'function') {
+    ctx = context.vexFlowCanvasContext;
+  } else if (context.context && typeof context.context.beginPath === 'function') {
+    ctx = context.context;
+  } else if (context.canvas && context.canvas.getContext) {
+    ctx = context.canvas.getContext('2d');
+  } else if (typeof context.beginPath === 'function') {
+    ctx = context;
+  } else if (context.getCanvasContext && typeof context.getCanvasContext === 'function') {
+    ctx = context.getCanvasContext();
+  }
+  if (!ctx) {
+    try {
+      if (context.backend && context.backend.ctx) {
+        ctx = context.backend.ctx;
+      }
+    } catch (e) { /* ignore */ }
+  }
+  if (!ctx || typeof ctx.beginPath !== 'function') {
+    return;
+  }
+
+  // Helper to check if two measures are on the same row (same Y position)
+  function areMeasuresOnSameRow(measure1, measure2) {
+    if (!measure1 || !measure2) return false;
+    const y1 = measure1.actualBounds?.bassY || measure1.bounds?.y || 0;
+    const y2 = measure2.actualBounds?.bassY || measure2.bounds?.y || 0;
+    return Math.abs(y1 - y2) < 50;
+  }
+
+  // Helper to get Y position (midpoint between staves)
+  function getHairpinY(measureData) {
+    const trebleStave = measureData.trebleStave;
+    const bassStave = measureData.bassStave;
+    if (trebleStave && bassStave) {
+      const trebleBottom = trebleStave.getYForLine(5);
+      const bassTop = bassStave.getYForLine(0);
+      return (trebleBottom + bassTop) / 2;
+    }
+    return null;
+  }
+
+  // Helper to draw a hairpin segment
+  // openStart/openEnd indicate "continuation" points (mid-hairpin, cut off)
+  // For a complete hairpin: openStart=false, openEnd=false
+  // For "start to nowhere": openStart=false, openEnd=true
+  // For "from nowhere to end": openStart=true, openEnd=false
+  // For "continuation" (middle row): openStart=true, openEnd=true
+  function drawHairpinSegment(startX, endX, staffY, type, openStart, openEnd) {
+    const hairpinHeight = 8;
+    const halfHeight = hairpinHeight / 2;
+    // Intermediate height for "cut off" points (slightly open, showing continuation)
+    const midHeight = hairpinHeight / 4;
+
+    ctx.save();
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+
+    let startHeight, endHeight;
+
+    if (type === 'crescendo') {
+      // Crescendo: starts at a point (0) and opens up to full height
+      // Complete: 0 -> halfHeight
+      // Start to nowhere: 0 -> midHeight (partial opening)
+      // From nowhere to end: midHeight -> halfHeight (finish opening)
+      // Continuation: midHeight -> midHeight (parallel at mid-height)
+      if (!openStart && !openEnd) {
+        // Complete hairpin
+        startHeight = 0;
+        endHeight = halfHeight;
+      } else if (!openStart && openEnd) {
+        // Start to nowhere: starts at point, ends partially open
+        startHeight = 0;
+        endHeight = midHeight;
+      } else if (openStart && !openEnd) {
+        // From nowhere to end: starts partially open, ends fully open
+        startHeight = midHeight;
+        endHeight = halfHeight;
+      } else {
+        // Continuation: parallel lines at mid-height
+        startHeight = midHeight;
+        endHeight = midHeight;
+      }
+    } else {
+      // Decrescendo: starts wide (full height) and closes to a point (0)
+      // Complete: halfHeight -> 0
+      // Start to nowhere: halfHeight -> midHeight (partial closing)
+      // From nowhere to end: midHeight -> 0 (finish closing)
+      // Continuation: midHeight -> midHeight (parallel at mid-height)
+      if (!openStart && !openEnd) {
+        // Complete hairpin
+        startHeight = halfHeight;
+        endHeight = 0;
+      } else if (!openStart && openEnd) {
+        // Start to nowhere: starts wide, ends partially narrowed
+        startHeight = halfHeight;
+        endHeight = midHeight;
+      } else if (openStart && !openEnd) {
+        // From nowhere to end: starts partially narrowed, ends at point
+        startHeight = midHeight;
+        endHeight = 0;
+      } else {
+        // Continuation: parallel lines at mid-height
+        startHeight = midHeight;
+        endHeight = midHeight;
+      }
+    }
+
+    // Draw top line
+    ctx.moveTo(startX, staffY - startHeight);
+    ctx.lineTo(endX, staffY - endHeight);
+    // Draw bottom line
+    ctx.moveTo(startX, staffY + startHeight);
+    ctx.lineTo(endX, staffY + endHeight);
+
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  for (const hairpin of hairpins) {
+    try {
+      // Find the start and end rendered measures
+      const startMeasureData = renderedMeasures.find(m => m.index === hairpin.startMeasure);
+      const endMeasureData = renderedMeasures.find(m => m.index === hairpin.endMeasure);
+
+      // Handle different cases for cross-row/cross-page hairpins
+      const hasStart = !!startMeasureData;
+      const hasEnd = !!endMeasureData;
+
+      if (!hasStart && !hasEnd) {
+        // Neither start nor end is on this page - check if hairpin passes through
+        // Find any measures that fall within the hairpin range
+        const middleMeasures = renderedMeasures.filter(m =>
+          m.index > hairpin.startMeasure && m.index < hairpin.endMeasure
+        );
+
+        if (middleMeasures.length > 0) {
+          // Draw continuation segments for each row
+          let currentRowStart = null;
+          let currentRowEnd = null;
+          let currentY = null;
+
+          for (const measure of middleMeasures) {
+            const measureY = getHairpinY(measure);
+            if (measureY === null) continue;
+
+            if (currentY === null || !areMeasuresOnSameRow({ actualBounds: { bassY: currentY } }, measure)) {
+              // New row - draw previous row's segment if exists
+              if (currentRowStart !== null && currentRowEnd !== null) {
+                drawHairpinSegment(currentRowStart, currentRowEnd, currentY, hairpin.type, true, true);
+              }
+              // Start new row
+              currentRowStart = measure.actualBounds?.x || measure.bounds?.x || 0;
+              currentY = measureY;
+            }
+            // Extend to this measure's end
+            currentRowEnd = (measure.actualBounds?.x || measure.bounds?.x || 0) +
+                           (measure.actualBounds?.width || measure.bounds?.width || 200);
+          }
+          // Draw final row
+          if (currentRowStart !== null && currentRowEnd !== null) {
+            drawHairpinSegment(currentRowStart, currentRowEnd, currentY, hairpin.type, true, true);
+          }
+        }
+        continue;
+      }
+
+      // Get note data for positioning
+      const clefKey = hairpin.clef === 'treble' ? 'trebleNotes' : 'bassNotes';
+
+      if (hasStart && hasEnd && areMeasuresOnSameRow(startMeasureData, endMeasureData)) {
+        // Simple case: start and end on same row - draw complete hairpin
+        const startNotes = hairpin.clef === 'treble' ? startMeasureData.trebleNotes : startMeasureData.bassNotes;
+        const endNotes = hairpin.clef === 'treble' ? endMeasureData.trebleNotes : endMeasureData.bassNotes;
+
+        if (!startNotes?.length || !endNotes?.length) continue;
+
+        const startMeasureNotesData = measures[hairpin.startMeasure];
+        const endMeasureNotesData = measures[hairpin.endMeasure];
+        if (!startMeasureNotesData || !endMeasureNotesData) continue;
+
+        const startNoteData = startMeasureNotesData[clefKey] || [];
+        const endNoteData = endMeasureNotesData[clefKey] || [];
+
+        // Find start note index
+        let startNoteIndex = 0;
+        for (let i = 0; i < startNoteData.length; i++) {
+          if (Math.abs((startNoteData[i]?.beat || 0) - hairpin.startBeat) < 0.01) {
+            startNoteIndex = i;
+            break;
+          }
+        }
+
+        // Find end note index
+        let endNoteIndex = 0;
+        for (let i = 0; i < endNoteData.length; i++) {
+          if (Math.abs((endNoteData[i]?.beat || 0) - hairpin.endBeat) < 0.01) {
+            endNoteIndex = i;
+            break;
+          }
+        }
+
+        const startVexNote = startNotes[startNoteIndex];
+        const endVexNote = endNotes[endNoteIndex];
+        if (!startVexNote || !endVexNote) continue;
+
+        const startX = startVexNote.getAbsoluteX();
+        const endX = endVexNote.getAbsoluteX() + (endVexNote.getBoundingBox()?.getW() || 20);
+        const staffY = getHairpinY(startMeasureData);
+        if (staffY === null) continue;
+
+        drawHairpinSegment(startX, endX, staffY, hairpin.type, false, false);
+
+      } else {
+        // Cross-row or cross-page: draw partial hairpins
+
+        // Draw "start to nowhere" if start is on this page
+        if (hasStart) {
+          const startNotes = hairpin.clef === 'treble' ? startMeasureData.trebleNotes : startMeasureData.bassNotes;
+          if (startNotes?.length) {
+            const startMeasureNotesData = measures[hairpin.startMeasure];
+            const startNoteData = startMeasureNotesData?.[clefKey] || [];
+
+            let startNoteIndex = 0;
+            for (let i = 0; i < startNoteData.length; i++) {
+              if (Math.abs((startNoteData[i]?.beat || 0) - hairpin.startBeat) < 0.01) {
+                startNoteIndex = i;
+                break;
+              }
+            }
+
+            const startVexNote = startNotes[startNoteIndex];
+            if (startVexNote) {
+              const startX = startVexNote.getAbsoluteX();
+              // Extend to the right edge of the row (find last measure on same row)
+              let rowEndX = startX + 100; // Default extension
+              for (const measure of renderedMeasures) {
+                if (areMeasuresOnSameRow(startMeasureData, measure)) {
+                  const measureEnd = (measure.actualBounds?.x || measure.bounds?.x || 0) +
+                                    (measure.actualBounds?.width || measure.bounds?.width || 200);
+                  if (measureEnd > rowEndX) rowEndX = measureEnd;
+                }
+              }
+              const staffY = getHairpinY(startMeasureData);
+              if (staffY !== null) {
+                // openStart=false (has start note), openEnd=true (goes to nowhere)
+                drawHairpinSegment(startX, rowEndX - 10, staffY, hairpin.type, false, true);
+              }
+            }
+          }
+        }
+
+        // Draw "from nowhere to end" if end is on this page
+        if (hasEnd) {
+          const endNotes = hairpin.clef === 'treble' ? endMeasureData.trebleNotes : endMeasureData.bassNotes;
+          if (endNotes?.length) {
+            const endMeasureNotesData = measures[hairpin.endMeasure];
+            const endNoteData = endMeasureNotesData?.[clefKey] || [];
+
+            let endNoteIndex = 0;
+            for (let i = 0; i < endNoteData.length; i++) {
+              if (Math.abs((endNoteData[i]?.beat || 0) - hairpin.endBeat) < 0.01) {
+                endNoteIndex = i;
+                break;
+              }
+            }
+
+            const endVexNote = endNotes[endNoteIndex];
+            if (endVexNote) {
+              const endX = endVexNote.getAbsoluteX() + (endVexNote.getBoundingBox()?.getW() || 20);
+              // Extend from the left edge of the row (find first measure on same row)
+              let rowStartX = endX - 100; // Default extension
+              for (const measure of renderedMeasures) {
+                if (areMeasuresOnSameRow(endMeasureData, measure)) {
+                  const measureStart = measure.actualBounds?.x || measure.bounds?.x || 0;
+                  if (measureStart < rowStartX || rowStartX === endX - 100) rowStartX = measureStart;
+                }
+              }
+              const staffY = getHairpinY(endMeasureData);
+              if (staffY !== null) {
+                // openStart=true (comes from nowhere), openEnd=false (has end note)
+                drawHairpinSegment(rowStartX + 10, endX, staffY, hairpin.type, true, false);
+              }
+            }
+          }
+        }
+
+        // Draw continuation segments for measures between start and end (on different rows)
+        if (hasStart && hasEnd) {
+          // Find measures between start and end that are on different rows from both
+          for (const measure of renderedMeasures) {
+            if (measure.index <= hairpin.startMeasure || measure.index >= hairpin.endMeasure) continue;
+            if (areMeasuresOnSameRow(startMeasureData, measure)) continue;
+            if (areMeasuresOnSameRow(endMeasureData, measure)) continue;
+
+            // This measure is on a different row - draw full-width continuation
+            const measureStart = measure.actualBounds?.x || measure.bounds?.x || 0;
+            const measureEnd = measureStart + (measure.actualBounds?.width || measure.bounds?.width || 200);
+            const staffY = getHairpinY(measure);
+            if (staffY !== null) {
+              drawHairpinSegment(measureStart + 10, measureEnd - 10, staffY, hairpin.type, true, true);
+            }
+          }
+        }
+      }
+
+    } catch (e) {
+      // Silently continue on error
+    }
+  }
+}
+
+// ============================================================================
 // NOTE COLORING
 // ============================================================================
 
@@ -2766,7 +3099,7 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature, options =
         accidentalTracker.getAccidentalForNote(pitch, keySignature)
       );
       // Use computed measure-aware accidentals (overrides any provided accidentals for correct notation)
-      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false, note.articulation || null, measureAccidentals, stemDirection);
+      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false, note.articulation || null, measureAccidentals, stemDirection, note.dynamic || null);
       if (!chordNote) {
         console.warn('[createNotesForStaff] createChordNote returned null for note:', JSON.stringify(note), 'adjustedPitches:', adjustedPitches);
         continue;
@@ -2947,6 +3280,8 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     // Phase 2 Bass Block Isolation: active block highlighting
     activeBassBlockIndex = -1,   // Index of the active bass block for highlighting (-1 = none)
     chordSegments = [],          // Array of chord segments for block boundary visualization
+    // Hairpins (crescendo/decrescendo)
+    hairpins = [],               // Array of hairpin objects from compositionState
   } = options;
 
   // Calculate dimensions
@@ -4275,6 +4610,14 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
   // This works for cross-measure ties within the same system
 
   drawManualTies(context, renderedMeasures, measures);
+
+  // ==========================================================================
+  // HAIRPIN RENDERING (Crescendo/Decrescendo)
+  // ==========================================================================
+  // Draw hairpins between staves using VexFlow's StaveHairpin
+  if (hairpins && hairpins.length > 0) {
+    drawHairpins(context, renderedMeasures, hairpins, measures);
+  }
 
   // Collect all note regions and add chord tone analysis
   const allNoteRegions = [];

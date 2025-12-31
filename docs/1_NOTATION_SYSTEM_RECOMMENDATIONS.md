@@ -240,27 +240,69 @@ if (hasMultipleVoices) {
 
 ## Notation Toolbar Enhancement Plan
 
-### Current Capabilities
+### Implementation Status (Updated December 30, 2025)
 
-| Category | Features |
-|----------|----------|
-| **Durations** | Whole, half, quarter, eighth, sixteenth, thirty-second |
-| **Modifiers** | Dotted notes, rests |
-| **Tuplets** | Triplets, quintuplets, septuplets |
-| **Accidentals** | Natural, sharp, flat, double-sharp, double-flat |
-| **Articulations** | Staccato, accent, tenuto, marcato, fermata |
-| **Voice Control** | Voice 1, Voice 2 selection |
-| **Time Signature** | Configurable |
-| **Layout** | Measures per line |
+#### ✅ COMPLETED Features
 
-### Tier 1 Enhancements (High Priority)
+| Category | Features | Status |
+|----------|----------|--------|
+| **Progressive Disclosure** | Tier 1 (essential) + Tier 2 (expanded) with `▼ More` / `▲ Less` toggle | ✅ Done |
+| **Floating Palette** | Draggable, customizable, tab-aware (Composition Studio only) | ✅ Done |
+| **Palette Customization** | Settings panel with 7 toggles (durations, dot/rest, accidentals, staff select, mode toggle, tuplets, articulations) | ✅ Done |
+| **Entry/Select Mode** | Toggle between note entry and selection modes, leftmost in Tier 1 | ✅ Done |
+| **Durations** | Whole, half, quarter, eighth, sixteenth, thirty-second | ✅ Done |
+| **Modifiers** | Dotted notes, rests | ✅ Done |
+| **Tuplets** | Triplets, quintuplets, sextuplets (in Tier 2) | ✅ Done |
+| **Accidentals** | Natural, sharp, flat (double sharp/flat via keyboard) | ✅ Done |
+| **Articulations** | Staccato, accent, tenuto, marcato (in Tier 2) | ✅ Done |
+| **Voice Control** | Voice 1, Voice 2 selection | ✅ Done |
+| **Time Signature** | Configurable dropdown | ✅ Done |
+| **Layout** | Measures per line, sticky toolbar | ✅ Done |
+| **Staff Selection** | Auto/Treble/Bass selector with context indicator | ✅ Done |
+| **Transpose Tools** | Octave and semitone transposition (shown when notes selected) | ✅ Done |
+| **V2 Rest Display** | Clean/Explicit mode for multi-voice rest visibility | ✅ Done |
+| **Metronome Toggle** | In View section | ✅ Done |
+
+#### Current Toolbar Layout
+
+```
+TIER 1 (Always Visible):
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│ [✏][⎀] │ [Selection: ✓ n] [⬇8][+][-][⬆8] │ [𝅝][𝅗𝅥][♩][♪][𝅘𝅥𝅯] │ [•][𝄽] │ [♯][♭][♮] │
+│ Mode   │ (shown when selected)            │ Durations          │ Mod   │ Accid     │
+├────────────────────────────────────────────────────────────────────────────────────┤
+│ [🎯 Auto ▼] [📍 Ready] │ [☐ Palette] │ [▼ More]                                    │
+│ Staff Select           │ Toggle      │ Expand                                      │
+└────────────────────────────────────────────────────────────────────────────────────┘
+
+TIER 2 (Click "More" to expand):
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│ Tuplet: [3][5][6] │ Artic: [.][>][—][^] │ Tie: [⁀] │ Voice: [V1▼]                  │
+├────────────────────────────────────────────────────────────────────────────────────┤
+│ Edit: [↩][↪][🗑] │ Clip: [📋][📥][📦] │ View: [Time▼][Meas▼][🔔]                  │
+├────────────────────────────────────────────────────────────────────────────────────┤
+│ V2 Rests: [Clean][All] │ Chord: [____][✓]                                         │
+└────────────────────────────────────────────────────────────────────────────────────┘
+
+FLOATING PALETTE (Optional, customizable):
+┌──────────────────────────┐
+│ Quick Tools        [⚙][×]│
+├──────────────────────────┤
+│ [𝅝][𝅗𝅥][♩][♪][𝅘𝅥𝅯] │ [•][𝄽]│
+│ [♯][♭][♮] │ [Auto ▼]    │
+└──────────────────────────┘
+```
+
+### Remaining Tier 1 Enhancements (High Priority)
 
 #### 1. Dynamics
 **Symbols**: pp, p, mp, mf, f, ff, sfz, fp
+**Status**: ❌ Not started
 **Implementation**:
 - Add `dynamics` property to Unit class
 - Render below staff using VexFlow's `Annotation` or `TextDynamics`
 - Store in note data structure
+- Add dynamics button group to Tier 2
 
 #### 2. Slurs and Phrase Marks
 **Status**: 🔧 DATA STRUCTURE EXISTS, UI MISSING
@@ -273,72 +315,72 @@ this.slur = options.slur || null;
 - `_computeSlurForPart()` method handles slurs in split notes (lines 1047-1060)
 - Slur data flows through measure rendering
 **Remaining Work**:
-- Create UI for slur creation (click-drag between notes)
+- Create UI for slur creation (click-drag between notes or button to slur selected notes)
 - Implement VexFlow `Curve` rendering based on slur data
-- Add slur visibility in notation
+- Add slur button to Tier 2 near Tie button
 
 #### 3. Crescendo/Decrescendo (Hairpins)
+**Status**: ❌ Not started
 **Implementation**:
-- Store start/end positions
+- Store start/end positions in compositionState
 - Use VexFlow's `StaveHairpin`
-- UI: Button to mark crescendo/decrescendo regions
+- UI: Add hairpin buttons after dynamics in Tier 2
 
-### Tier 2 Enhancements (Medium Priority)
+### Remaining Tier 2 Enhancements (Medium Priority)
 
 #### 4. Repeat Signs and Endings
 **Types**: Start repeat, end repeat, first/second endings
+**Status**: ❌ Not started
 **Implementation**:
 - Measure-level attributes
 - Use VexFlow's `Barline` types and `Volta`
 
 #### 5. Tempo Markings
 **Types**: BPM, Italian terms (Allegro, Andante, etc.)
+**Status**: ❌ Not started
 **Implementation**:
 - Store in composition metadata or measure
 - Render using VexFlow's `StaveText`
 
 #### 6. Grace Notes
+**Status**: ❌ Not started
 **Implementation**:
 - Use VexFlow's `GraceNoteGroup`
 - Add `graceNotes` array property to main notes
 
 #### 7. Ornaments
 **Types**: Trill, mordent, turn, tremolo
+**Status**: ❌ Not started
 **Implementation**:
 - Use VexFlow's `Ornament` modifier
-- Add to articulation options
+- Add to articulation options in Tier 2
 
-### Tier 3 Enhancements (Lower Priority)
+### Remaining Tier 3 Enhancements (Lower Priority)
 
 #### 8. Custom Beam Groups
 Allow users to control beam groupings manually.
+**Status**: ❌ Not started
 
 #### 9. Lyrics/Text Annotations
 Add text below notes for lyrics or analysis.
+**Status**: ❌ Not started
 
-#### 10. Chord Symbols
+#### 10. Chord Symbols Above Staff
 Display chord names above the staff.
+**Status**: ⚠️ Input exists (Tier 2), rendering above staff not implemented
 
 #### 11. Pedal Markings
 Piano-specific sustain pedal notation.
+**Status**: ⚠️ Data structure exists (`Unit.pedal`), no UI
 
-### Proposed Toolbar Redesign
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ [Duration] [Rest] [Dot] │ [Tuplet ▼] │ [Accidental ▼] │ [Voice ▼] │
-├─────────────────────────────────────────────────────────────────────┤
-│ [Articulation ▼] │ [Dynamics ▼] │ [Slur] [Tie] │ [More ▼]         │
-├─────────────────────────────────────────────────────────────────────┤
-│ [Measure Edit Mode] │ [Time Sig] │ [Key Sig] │ [Tempo]            │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-**Design Principles**:
-- Group related controls
-- Use dropdowns for less common options
-- Keep frequently used controls always visible
-- Add keyboard shortcuts for power users
+### Design Principles (Implemented)
+- ✅ Group related controls
+- ✅ Use progressive disclosure (Tier 1/Tier 2)
+- ✅ Keep frequently used controls always visible (Tier 1)
+- ✅ Keyboard shortcuts for power users
+- ✅ Floating palette for quick access
+- ✅ Tab-aware UI (palette only on Composition Studio)
+- ✅ Customizable palette content
 
 ---
 
@@ -498,43 +540,61 @@ function validateMeasure(measure, timeSignature) {
 
 ## Implementation Priority Matrix
 
-### Phase 1: Critical Fixes (Immediate)
+### Phase 1: Critical Fixes - Status (Updated December 30, 2025)
 
-| Item | Effort | Impact | Priority |
-|------|--------|--------|----------|
-| Fix articulation leaking on shift-insert | Low | High | P0 |
-| Complete bass clef tie rendering | Medium | High | P0 |
-| Fix tied note merging tolerance | Low | Medium | P1 |
-| Implement bass clef shift operations | High | High | P1 |
+| Item | Effort | Impact | Priority | Status |
+|------|--------|--------|----------|--------|
+| Fix articulation leaking on shift-insert | Low | High | P0 | ✅ Resolved (intentional behavior) |
+| Complete bass clef tie rendering | Medium | High | P0 | ⚠️ Needs verification |
+| Fix tied note merging tolerance | Low | Medium | P1 | ✅ Resolved via refactoring |
+| Implement bass clef shift operations | High | High | P1 | ✅ Done (`insertBassNoteWithShiftAtPosition`) |
 
-### Phase 2: Stability Improvements (Short-term)
+### Phase 2: Stability Improvements - Status
 
-| Item | Effort | Impact | Priority |
-|------|--------|--------|----------|
-| Unified shift operation API | High | High | P1 |
-| Block/Measure sync improvements | Medium | High | P1 |
-| parentIndex chain protection | Medium | Medium | P2 |
-| Multi-voice rest optimization | Low | Low | P2 |
+| Item | Effort | Impact | Priority | Status |
+|------|--------|--------|----------|--------|
+| Unified shift operation API | High | High | P1 | ⚠️ Deferred (intentional architectural difference documented) |
+| Block/Measure sync improvements | Medium | High | P1 | ✅ Done (documented limitation for multi-voice) |
+| parentIndex chain protection | Medium | Medium | P2 | ✅ Fixed in `setNote()` |
+| Multi-voice rest optimization | Low | Low | P2 | ✅ Done (configurable display modes) |
 
-### Phase 3: Feature Enhancements (Medium-term)
+### Phase 3: Feature Enhancements - Status
 
-| Item | Effort | Impact | Priority |
-|------|--------|--------|----------|
-| Dynamics support | Medium | High | P1 |
-| Slurs and phrase marks | High | High | P1 |
-| Measure Isolation Editing | High | Very High | P1 |
-| Crescendo/decrescendo | Medium | Medium | P2 |
-| Toolbar redesign | Medium | Medium | P2 |
+| Item | Effort | Impact | Priority | Status |
+|------|--------|--------|----------|--------|
+| Dynamics support | Medium | High | P1 | ❌ Not started |
+| Slurs and phrase marks | High | High | P1 | ⚠️ Data structure ready, UI missing |
+| Measure Isolation Editing | High | Very High | P1 | ❌ Not started |
+| Crescendo/decrescendo | Medium | Medium | P2 | ❌ Not started |
+| Toolbar redesign | Medium | Medium | P2 | ✅ DONE (progressive disclosure, floating palette) |
 
-### Phase 4: Advanced Features (Long-term)
+### Phase 4: Advanced Features - Status
 
-| Item | Effort | Impact | Priority |
-|------|--------|--------|----------|
-| Repeat signs and endings | Medium | Medium | P2 |
-| Grace notes | Medium | Medium | P3 |
-| Ornaments | Low | Low | P3 |
-| Custom beam groups | High | Low | P3 |
-| Lyrics support | Medium | Medium | P3 |
+| Item | Effort | Impact | Priority | Status |
+|------|--------|--------|----------|--------|
+| Repeat signs and endings | Medium | Medium | P2 | ❌ Not started |
+| Grace notes | Medium | Medium | P3 | ❌ Not started |
+| Ornaments | Low | Low | P3 | ❌ Not started |
+| Custom beam groups | High | Low | P3 | ❌ Not started |
+| Lyrics support | Medium | Medium | P3 | ❌ Not started |
+
+### Revised Priority for Next Steps
+
+Based on completed work, the recommended implementation order is:
+
+**Immediate (P1):**
+1. **Dynamics support** - Medium effort, high impact for expressive notation
+2. **Slurs UI** - Data structure ready, just need click-drag UI and VexFlow rendering
+3. **Verify bass clef ties** - May already work, needs testing
+
+**Short-term (P2):**
+1. **Crescendo/decrescendo** - Complements dynamics
+2. **Measure Isolation Editing** - High-value UX improvement
+
+**Medium-term (P3):**
+1. **Grace notes**
+2. **Ornaments** - Low effort addition to articulation system
+3. **Repeat signs**
 
 ---
 
@@ -648,14 +708,30 @@ export const NotationDebugger = {
 
 ## Conclusion
 
-The Music Theory Lab notation system has a solid foundation with the unit-based subdivision system and VexFlow integration. The key areas for improvement are:
+The Music Theory Lab notation system has a solid foundation with the unit-based subdivision system and VexFlow integration.
 
-1. **Stability**: Fix cross-measure tie handling, implement bass clef shift operations, and protect parentIndex chains
-2. **Features**: Add dynamics, slurs, and the Measure Isolation Editing feature
-3. **Architecture**: Create unified APIs for note operations and improve event-driven updates
-4. **User Experience**: Redesign the toolbar and add keyboard shortcuts
+### Completed Improvements (as of December 30, 2025)
 
-The **Measure Isolation Editing** feature represents a significant opportunity to improve user confidence when editing compositions. By allowing users to edit measures in isolation with validation before committing, we can eliminate the fear of unintended consequences that currently makes notation editing feel fragile.
+1. **Stability**:
+   - ✅ Bass clef shift operations implemented (`insertBassNoteWithShiftAtPosition`)
+   - ✅ parentIndex chain protection added to `setNote()`
+   - ✅ Multi-voice rest handling with configurable display modes
+   - ⚠️ Cross-measure tie handling documented, needs verification
+
+2. **User Experience**:
+   - ✅ Toolbar redesigned with progressive disclosure (Tier 1/Tier 2)
+   - ✅ Floating palette with customization and tab-awareness
+   - ✅ Entry/Select mode toggle for intuitive workflow
+   - ✅ Staff selection with Auto/Treble/Bass modes
+   - ✅ Keyboard shortcuts implemented
+
+### Remaining Work
+
+1. **Features**: Add dynamics, slurs UI, and the Measure Isolation Editing feature
+2. **Architecture**: Consider unified APIs for note operations (optional - current split approach is intentional)
+3. **Expressive Notation**: Crescendo/decrescendo, grace notes, ornaments
+
+The **Measure Isolation Editing** feature remains a significant opportunity to improve user confidence when editing compositions. By allowing users to edit measures in isolation with validation before committing, we can eliminate the fear of unintended consequences that currently makes notation editing feel fragile.
 
 ---
 
@@ -668,11 +744,11 @@ The **Measure Isolation Editing** feature represents a significant opportunity t
 | `compositionState.js` | ~7200 | `insertTrebleNoteWithShift()`, `deleteTrebleNoteWithShift()`, `renderTrebleBlocksToMeasures()`, `renderBassBlocksToMeasures()` |
 | `vexFlowRenderer.js` | ~1400 | `parseNote()`, `getRequiredAccidental()`, `createStaveNote()` |
 | `grandStaff.js` | ~4300 | `fillGapsWithRests()`, voice separation logic, `drawTieCurve()`, `drawPartialTieCurve()` |
-| `notationToolbar.js` | ~1850 | UI state management, toolbar rendering |
+| `notationToolbar.js` | ~2200 | Progressive disclosure UI, floating palette, customization settings |
 | `trainerState.js` | ~650 | `setCurrentKey()`, global training state |
 
 ---
 
 *Document generated: December 26, 2025*
-*Last Updated: December 29, 2025*
-*Version: 1.1*
+*Last Updated: December 30, 2025*
+*Version: 1.2*

@@ -756,6 +756,7 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
     dotted = false,  // Is this dotted?
     accidental = null, // Explicit accidental override
     articulation = null, // Articulation: 'staccato', 'accent', 'tenuto', 'marcato'
+    dynamic = null,  // Dynamic marking: 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'sfz', 'fp'
     stemDirection = null, // Optional stem direction: 1 (up), -1 (down), null (auto)
   } = noteData;
 
@@ -845,6 +846,24 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
     }
   }
 
+  // Add dynamic marking if specified
+  // Using Annotation modifier for dynamics text
+  // For treble clef: position below (BOTTOM) so dynamics appear between staves
+  // For bass clef: position above (TOP) so dynamics appear between staves
+  if (!isRest && dynamic) {
+    try {
+      const verticalJustify = clef === 'bass'
+        ? VF.Annotation.VerticalJustify.TOP
+        : VF.Annotation.VerticalJustify.BOTTOM;
+      const annotation = new VF.Annotation(dynamic)
+        .setFont('Times', 12, 'bold italic')
+        .setVerticalJustification(verticalJustify);
+      staveNote.addModifier(annotation, 0);
+    } catch (error) {
+      console.warn('[VexFlowRenderer] Error adding dynamic annotation:', error.message);
+    }
+  }
+
   return staveNote;
 }
 
@@ -857,9 +876,11 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
  * @param {boolean} dotted - Is the chord dotted
  * @param {string} articulation - Articulation for the chord
  * @param {string|Array|null} accidental - Explicit accidental override (string for all pitches, array for per-pitch)
+ * @param {number|null} stemDirection - Optional stem direction
+ * @param {string|null} dynamic - Dynamic marking: 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'sfz', 'fp'
  * @returns {Object} - VexFlow StaveNote with multiple keys
  */
-export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble', dotted = false, articulation = null, accidental = null, stemDirection = null) {
+export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble', dotted = false, articulation = null, accidental = null, stemDirection = null, dynamic = null) {
   const VF = getVF();
   if (!VF || !pitches || pitches.length === 0) return null;
 
@@ -945,6 +966,23 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
     if (vexArticulation) {
       // For chords, apply articulation to the top note (last index)
       staveNote.addModifier(new VF.Articulation(vexArticulation), pitches.length - 1);
+    }
+  }
+
+  // Add dynamic marking if specified (applied to the chord)
+  // Using Annotation modifier for dynamics text
+  // Position: BOTTOM for treble (below staff), TOP for bass (above staff, between staves)
+  if (dynamic) {
+    try {
+      const verticalJustify = clef === 'bass'
+        ? VF.Annotation.VerticalJustify.TOP
+        : VF.Annotation.VerticalJustify.BOTTOM;
+      const annotation = new VF.Annotation(dynamic)
+        .setFont('Times', 12, 'bold italic')
+        .setVerticalJustification(verticalJustify);
+      staveNote.addModifier(annotation, 0);
+    } catch (error) {
+      console.warn('[VexFlowRenderer] Error adding dynamic annotation to chord:', error.message);
     }
   }
 

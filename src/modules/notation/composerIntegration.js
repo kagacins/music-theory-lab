@@ -917,6 +917,7 @@ export class NotationComposer {
               tied: note.tied,  // CRITICAL: For same-measure ties
               isTied: note.isTied,  // CRITICAL: For cross-measure ties (continuation notes)
               articulation: note.articulation || null,  // CRITICAL: Articulations (staccato, accent, etc.)
+              dynamic: note.dynamic || null,  // CRITICAL: Dynamics (pp, p, mp, mf, f, ff, sfz, fp)
               velocity: note.velocity,
               isChordTone: note.isChordTone,
               isRest: note.isRest || note.type === 'rest',  // CRITICAL: Include rests
@@ -938,6 +939,7 @@ export class NotationComposer {
               tied: note.tied,  // CRITICAL: For same-measure ties
               isTied: note.isTied,  // CRITICAL: For cross-measure ties
               articulation: note.articulation || null,  // CRITICAL: Articulations
+              dynamic: note.dynamic || null,  // CRITICAL: Dynamics (pp, p, mp, mf, f, ff, sfz, fp)
               velocity: note.velocity,
               isChordTone: note.isChordTone,
               isRest: note.isRest || note.type === 'rest',  // CRITICAL: Include rests
@@ -1027,6 +1029,8 @@ export class NotationComposer {
         // Phase 2 Bass Block Isolation: active block highlighting
         activeBassBlockIndex: compositionState ? compositionState.getActiveBassBlockIndex() : -1,
         chordSegments: compositionState ? compositionState.getChordSegments() : [],
+        // Hairpins (crescendo/decrescendo)
+        hairpins: compositionState ? compositionState.hairpins : [],
       });
     }
 
@@ -1246,6 +1250,7 @@ export class NotationComposer {
           tied: note.tied,
           isTied: note.isTied,
           articulation: note.articulation || null,
+          dynamic: note.dynamic || null,  // Dynamics (pp, p, mp, mf, f, ff, sfz, fp)
           velocity: note.velocity,
           isChordTone: note.isChordTone,
           isRest: note.isRest || note.type === 'rest',
@@ -1266,6 +1271,7 @@ export class NotationComposer {
           tied: note.tied,
           isTied: note.isTied,
           articulation: note.articulation || null,
+          dynamic: note.dynamic || null,  // Dynamics (pp, p, mp, mf, f, ff, sfz, fp)
           velocity: note.velocity,
           isChordTone: note.isChordTone,
           isRest: note.isRest || note.type === 'rest',
@@ -1333,6 +1339,8 @@ export class NotationComposer {
       playbackCursor: this.playbackCursor,
       enableHarmonicColoring: this.config.enableHarmonicColoring,
       enableChordSpans: this.config.enableChordSpans,
+      // Hairpins (crescendo/decrescendo)
+      hairpins: this.compositionState ? this.compositionState.hairpins : [],
     };
 
     // Use multi-page or single canvas rendering
@@ -1540,6 +1548,8 @@ export class NotationComposer {
         // Phase 2 Bass Block Isolation: active block highlighting
         activeBassBlockIndex: compositionState ? compositionState.getActiveBassBlockIndex() : -1,
         chordSegments: compositionState ? compositionState.getChordSegments() : [],
+        // Hairpins (crescendo/decrescendo)
+        hairpins: compositionState ? compositionState.hairpins : [],
       });
 
       // Collect rendered measures (adjust indices back to global)
@@ -1753,6 +1763,8 @@ export class NotationComposer {
       // Phase 2 Bass Block Isolation: active block highlighting
       activeBassBlockIndex: compositionState ? compositionState.getActiveBassBlockIndex() : -1,
       chordSegments: compositionState ? compositionState.getChordSegments() : [],
+      // Hairpins (crescendo/decrescendo)
+      hairpins: compositionState ? compositionState.hairpins : [],
     });
 
     const allRenderedMeasures = [];
