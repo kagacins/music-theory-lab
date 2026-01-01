@@ -347,15 +347,25 @@ export class NoteEditor {
     }
 
     // Check interaction mode from toolbar
-    // In 'noteEntry' mode with Alt held (or on touch devices), skip note selection and go directly to note addition
+    // Alt-based mode switching (matching Measure Isolation Modal pattern):
+    // - When interactionMode = 'select' (default): Normal = Select, Alt = Entry
+    // - When interactionMode = 'noteEntry' (sticky): Normal = Entry, Alt = Select (inverted)
     const interactionMode = this.composerIntegration?.toolbar?.getInteractionMode?.() || 'select';
-    // Touch devices: allow tap-to-add in noteEntry mode without requiring Alt key
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    const isNoteEntryMode = interactionMode === 'noteEntry' && (e.altKey || isTouchDevice);
 
-    // Check if clicking on an existing note FIRST (before checking Alt key)
-    // Skip this check in noteEntry mode when Alt is held - prioritize adding notes
-    const clickedNote = isNoteEntryMode ? null : this.findNoteAtPosition(position.x, position.y);
+    // Determine if we're in note entry mode based on toggle and Alt state
+    // When toggle is OFF ('select'): Alt = entry mode, normal = select mode
+    // When toggle is ON ('noteEntry'): Normal = entry mode, Alt = select mode (inverted)
+    const inNoteEntryMode = interactionMode === 'noteEntry'
+      ? !e.altKey   // Sticky mode ON: normal click is entry, Alt inverts to select
+      : e.altKey;   // Sticky mode OFF: Alt enables entry, normal click is select
+
+    // DEBUG: Log mode state
+    console.log(`[NoteEditor] interactionMode=${interactionMode}, altKey=${e.altKey}, inNoteEntryMode=${inNoteEntryMode}`);
+
+    // Check if clicking on an existing note (for selection)
+    // Only try to select notes when NOT in entry mode
+    const clickedNote = inNoteEntryMode ? null : this.findNoteAtPosition(position.x, position.y);
+    console.log(`[NoteEditor] clickedNote=${clickedNote ? 'found' : 'null'}`);
 
     if (clickedNote) {
       // Clicking on a note - handle selection (works with or without Alt in select mode)
@@ -405,14 +415,13 @@ export class NoteEditor {
       return;
     }
 
-    // Not clicking on a note - check if we're in note addition mode (Alt held or touch + noteEntry)
-    const canAddNote = e.altKey || (isTouchDevice && interactionMode === 'noteEntry');
-    if (!canAddNote) {
-      // Not in note addition mode = let event bubble to measure selection/playback
+    // Not clicking on a note - check if we're in entry mode to add notes
+    if (!inNoteEntryMode) {
+      // Not in entry mode = let event bubble to measure selection/playback
       return;
     }
 
-    // In note addition mode (Alt held, or touch device in noteEntry mode)
+    // In note entry mode
     // Only proceed if clicking on a valid staff position
     if (!staffPosition || !staffPosition.staff) {
       return;
@@ -556,8 +565,16 @@ export class NoteEditor {
 
     // REMOVED: Hover toolbar logic - now using contextual top toolbar
 
-    // Only show ghost note if Alt key is held (note editing mode)
-    if (!e.altKey) {
+    // Determine if we're in note entry mode (matching handleMouseDown logic)
+    // When toggle is OFF ('select'): Alt = entry mode
+    // When toggle is ON ('noteEntry'): Normal = entry mode, Alt = select mode
+    const interactionMode = this.composerIntegration?.toolbar?.getInteractionMode?.() || 'select';
+    const inNoteEntryMode = interactionMode === 'noteEntry'
+      ? !e.altKey  // Sticky mode: normal is entry, Alt inverts to select
+      : e.altKey;  // Default: Alt enables entry
+
+    // Only show ghost note in entry mode
+    if (!inNoteEntryMode) {
       this.hoveredPosition = null;
       this.ghostNote = null;
       this.renderOverlay();
@@ -1332,6 +1349,10 @@ export class NoteEditor {
 
     return 0;
   }
+
+  // ============================================================================
+  // NOTE INSERTION
+  // ============================================================================
 
   /**
    * Add a note at a staff position
@@ -2417,6 +2438,10 @@ export class NoteEditor {
     }
   }
 
+  // ============================================================================
+  // NOTE MODIFICATION (Move, Delete, Transpose)
+  // ============================================================================
+
   /**
    * Move selected notes by a number of steps
    * @param {number} steps - Number of steps (positive = up, negative = down)
@@ -2784,6 +2809,10 @@ export class NoteEditor {
       currentTime += durationSeconds;
     });
   }
+
+  // ============================================================================
+  // SHIFT INSERT/DELETE OPERATIONS
+  // ============================================================================
 
   /**
    * Insert a note before the first selected note
@@ -3310,6 +3339,10 @@ export class NoteEditor {
     });
   }
 
+  // ============================================================================
+  // DURATION CHANGES
+  // ============================================================================
+
   /**
    * Change duration of all selected notes
    * @param {string} newDuration - New Tone.js duration
@@ -3822,6 +3855,10 @@ export class NoteEditor {
       this.renderOverlay();
     }, 50);
   }
+
+  // ============================================================================
+  // ARTICULATIONS, DYNAMICS, ORNAMENTS
+  // ============================================================================
 
   /**
    * Toggle articulation on all selected notes
@@ -4663,6 +4700,10 @@ export class NoteEditor {
     this.composerIntegration.render(true);
   }
 
+  // ============================================================================
+  // TIES, DOTTED, RESTS
+  // ============================================================================
+
   /**
    * Toggle tie on all selected notes
    * When multiple notes are selected, only toggle tie on the FIRST note of each pair,
@@ -5201,6 +5242,10 @@ export class NoteEditor {
     }
   }
 
+  // ============================================================================
+  // TUPLETS
+  // ============================================================================
+
   /**
    * Create a tuplet from selected notes
    * @param {string} tupletType - 'triplet', 'quintuplet', or 'sextuplet'
@@ -5675,6 +5720,10 @@ export class NoteEditor {
     return true;
   }
 
+  // ============================================================================
+  // ACCIDENTALS
+  // ============================================================================
+
   /**
    * Change accidental on all selected notes (supports per-pitch accidentals in chords)
    * @param {string} accidental - Accidental ('#', 'b', 'n', or null)
@@ -5754,11 +5803,10 @@ export class NoteEditor {
     }
   }
 
-  /**
-   * Parse note ID to get location
-   * @param {string} noteId - Note ID like "0-treble-1" or "0-treble-1-2" for pitch index
-   * @returns {Array} - [measureIndex, staff, noteIndex, pitchIndex] (pitchIndex is null for whole notes)
-   */
+  // ============================================================================
+  // NOTE ID UTILITIES
+  // ============================================================================
+
   /**
    * Parse note ID into components (instance method returning array)
    * Format: measureIndex-staff-voiceIndex-noteIndex[-pitchIndex]

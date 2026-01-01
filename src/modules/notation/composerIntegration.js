@@ -255,8 +255,6 @@ export class NotationComposer {
           if (this.compositionState) {
             this.compositionState.updateSettings({
               restDisplayMode: settings.restDisplayMode,
-              cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice,
-              hideCueRests: settings.hideCueRests,
             });
           }
           // Re-render to apply new rest display mode
@@ -279,8 +277,6 @@ export class NotationComposer {
         const initialRestSettings = this.toolbar.getRestDisplaySettings();
         this.compositionState.updateSettings({
           restDisplayMode: initialRestSettings.restDisplayMode,
-          cueRestsForSecondaryVoice: initialRestSettings.cueRestsForSecondaryVoice,
-          hideCueRests: initialRestSettings.hideCueRests,
         });
 
         // Sync toolbar's time signature to match compositionState
@@ -1033,9 +1029,6 @@ export class NotationComposer {
         showChordSpans: showChordSpans,
         // Multi-voice rest display settings
         restDisplayMode: settings.restDisplayMode || 'clean',
-        cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice !== false,
-        // hideCueRests = !cueRestsForSecondaryVoice (checkbox unchecked = hide cue rests)
-        hideCueRests: settings.cueRestsForSecondaryVoice === false,
         // Phase 2 Bass Block Isolation: active block highlighting
         activeBassBlockIndex: compositionState ? compositionState.getActiveBassBlockIndex() : -1,
         chordSegments: compositionState ? compositionState.getChordSegments() : [],
@@ -1572,9 +1565,6 @@ export class NotationComposer {
         showChordSpans: settings.showChordSpans !== false, // Default to true
         // Multi-voice rest display settings
         restDisplayMode: settings.restDisplayMode || 'clean',
-        cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice !== false,
-        // hideCueRests = !cueRestsForSecondaryVoice (checkbox unchecked = hide cue rests)
-        hideCueRests: settings.cueRestsForSecondaryVoice === false,
         // Phase 2 Bass Block Isolation: active block highlighting
         activeBassBlockIndex: compositionState ? compositionState.getActiveBassBlockIndex() : -1,
         chordSegments: compositionState ? compositionState.getChordSegments() : [],
@@ -1793,9 +1783,6 @@ export class NotationComposer {
       showChordSpans: settings.showChordSpans !== false, // Default to true
       // Multi-voice rest display settings
       restDisplayMode: settings.restDisplayMode || 'clean',
-      cueRestsForSecondaryVoice: settings.cueRestsForSecondaryVoice !== false,
-      // hideCueRests = !cueRestsForSecondaryVoice (checkbox unchecked = hide cue rests)
-      hideCueRests: settings.cueRestsForSecondaryVoice === false,
       // Phase 2 Bass Block Isolation: active block highlighting
       activeBassBlockIndex: compositionState ? compositionState.getActiveBassBlockIndex() : -1,
       chordSegments: compositionState ? compositionState.getChordSegments() : [],

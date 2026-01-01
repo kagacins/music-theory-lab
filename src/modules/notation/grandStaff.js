@@ -301,35 +301,34 @@ export function fillGapsWithRests(notes, timeSignature = '4/4', clef = 'treble',
 
 /**
  * Analyze two voices and determine rest visibility for clean notation.
- * In clean notation mode, rests in one voice that coincide with notes in
- * another voice on the same beat can be hidden (the beat structure is clear).
- * However, rests that are REQUIRED for rhythmic clarity (before a re-entry)
- * are always shown.
+ *
+ * REST RULES FOR TWO-VOICE NOTATION:
+ * 1. V1 (primary voice) rests: Always full-size regular rests
+ * 2. V2 (secondary voice) rests: Hidden in clean mode when V1 has content at same beat
+ *    - When V1 has a note or rest, V2's filler rest is redundant
+ * 3. In "explicit" mode ("All"): Show all V2 rests as cue rests (small and gray)
  *
  * @param {Array} primaryVoiceNotes - Notes from voice 1 (typically stems up)
  * @param {Array} secondaryVoiceNotes - Notes from voice 2 (typically stems down)
  * @param {Object} options - Display options
  * @param {string} options.restDisplayMode - 'clean' (smart omission) or 'explicit' (show all)
- * @param {boolean} options.cueRestsForSecondaryVoice - Use smaller rests for voice 2
  * @returns {Object} - { primaryRestVisibility: Map, secondaryRestVisibility: Map }
  *                     Each map: beat -> { hidden: boolean, isCue: boolean }
  */
 export function analyzeRestVisibility(primaryVoiceNotes, secondaryVoiceNotes, options = {}) {
   const {
     restDisplayMode = 'clean',
-    cueRestsForSecondaryVoice = true,
   } = options;
 
   // Maps: beat number -> { hidden: boolean, isCue: boolean }
   const primaryRestVisibility = new Map();
   const secondaryRestVisibility = new Map();
 
-  // "explicit" mode ("All"): show all rests, but still apply cue styling when appropriate
-  // The difference from "clean" mode is that we never hide rests in explicit mode
+  // "explicit" mode ("All"): show all rests
+  // "clean" mode: hide redundant V2 rests
   const isExplicitMode = restDisplayMode === 'explicit';
 
-  // Build beat maps for each voice
-  // Format: beat -> { isRest: boolean, hasNote: boolean, isLastBeforeNote: boolean }
+  // Build beat maps for each voice - track what's at each beat
   const buildBeatMap = (notes) => {
     const beatMap = new Map();
     notes.forEach((note, idx) => {
@@ -344,69 +343,28 @@ export function analyzeRestVisibility(primaryVoiceNotes, secondaryVoiceNotes, op
   };
 
   const primaryBeatMap = buildBeatMap(primaryVoiceNotes);
-  const secondaryBeatMap = buildBeatMap(secondaryVoiceNotes);
 
-  // Analyze primary voice rests
-  // Primary voice gets cue treatment when secondary voice has a note at same beat
-  primaryVoiceNotes.forEach((note, idx) => {
-    if (note.isRest || note.type === 'rest') {
-      const beat = note.beat ?? 0;
-      const secondaryAtBeat = secondaryBeatMap.get(beat);
+  // Primary voice rests: always regular (no cue styling needed)
+  // No entries needed - they render as normal full-size rests
 
-      // Check if secondary voice has a note at this beat
-      const secondaryHasNote = secondaryAtBeat?.hasNote;
-
-      // Apply cue logic when secondary voice has a note at this beat
-      if (secondaryHasNote) {
-        if (cueRestsForSecondaryVoice) {
-          // Cue mode enabled (Show Cue Rests checked): show as cue-sized rest
-          // In explicit mode ("All"), always show cue rest (never hide)
-          // In clean mode, show cue rest (hidden: false) so user can see and interact with it
-          primaryRestVisibility.set(beat, { hidden: false, isCue: true });
-        } else {
-          // Cue mode disabled (Show Cue Rests unchecked): hide rests where other voice has note
-          // In explicit mode ("All"), show as full-size rest
-          // In clean mode, hide completely (use GhostNote)
-          if (isExplicitMode) {
-            // Show full-size rest in explicit mode
-            // No entry needed - renders as normal rest
-          } else {
-            // Hide in clean mode
-            primaryRestVisibility.set(beat, { hidden: true, isCue: false });
-          }
-        }
-      }
-    }
-  });
-
-  // Analyze secondary voice rests
-  secondaryVoiceNotes.forEach((note, idx) => {
+  // Secondary voice rests visibility:
+  // - Clean mode: HIDE when V1 has anything (note or rest) at that beat
+  // - Explicit mode: Show as cue rests (small and gray)
+  secondaryVoiceNotes.forEach((note) => {
     if (note.isRest || note.type === 'rest') {
       const beat = note.beat ?? 0;
       const primaryAtBeat = primaryBeatMap.get(beat);
 
-      // Check if primary voice has a note at this beat
-      const primaryHasNote = primaryAtBeat?.hasNote;
+      // V1 has content at this beat if there's any entry (note or rest)
+      const primaryHasContent = primaryAtBeat !== undefined;
 
-      // Voice 2 rests visibility depends on cueRestsForSecondaryVoice setting
-      if (primaryHasNote) {
-        if (cueRestsForSecondaryVoice) {
-          // Cue mode enabled (Show Cue Rests checked): show as cue-sized rest
-          // In explicit mode ("All"), always show cue rest (never hide)
-          // In clean mode, show cue rest (hidden: false) so user can see and interact with it
-          secondaryRestVisibility.set(beat, { hidden: false, isCue: true });
-        } else {
-          // Cue mode disabled (Show Cue Rests unchecked): hide rests where other voice has note
-          // In explicit mode ("All"), show as full-size rest
-          // In clean mode, hide completely (use GhostNote)
-          if (isExplicitMode) {
-            // Show full-size rest in explicit mode
-            // No entry needed - renders as normal rest
-          } else {
-            // Hide in clean mode
-            secondaryRestVisibility.set(beat, { hidden: true, isCue: false });
-          }
-        }
+      if (!isExplicitMode && primaryHasContent) {
+        // Clean mode: hide V2 rest when V1 has anything at same position
+        // The rhythmic structure is already established by V1
+        secondaryRestVisibility.set(beat, { hidden: true, isCue: true });
+      } else {
+        // Explicit mode: show V2 rests as cue rests (small and gray)
+        secondaryRestVisibility.set(beat, { hidden: false, isCue: true });
       }
     }
   });
@@ -425,9 +383,8 @@ export function analyzeRestVisibility(primaryVoiceNotes, secondaryVoiceNotes, op
  *
  * @param {Array} notes - Array of note data
  * @param {Map} restVisibilityMap - Map of beat -> { hidden, isCue }
- * @param {boolean} hideCueRests - If true, cue rests become hidden (GhostNotes)
  */
-export function applyRestVisibility(notes, restVisibilityMap, hideCueRests = false) {
+export function applyRestVisibility(notes, restVisibilityMap) {
   if (!restVisibilityMap || restVisibilityMap.size === 0) return;
 
   notes.forEach(note => {
@@ -435,12 +392,7 @@ export function applyRestVisibility(notes, restVisibilityMap, hideCueRests = fal
       const beat = note.beat ?? 0;
       const visibility = restVisibilityMap.get(beat);
       if (visibility) {
-        // When hideCueRests is enabled, convert cue rests to hidden (GhostNotes)
-        if (hideCueRests && visibility.isCue && !visibility.hidden) {
-          note._restDisplay = { hidden: true, isCue: false };
-        } else {
-          note._restDisplay = visibility;
-        }
+        note._restDisplay = visibility;
       }
     }
   });
@@ -2385,8 +2337,6 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     chordBeatOffset = 0,    // Beat offset within measure where chord starts (for mid-measure chord positioning)
     // Multi-voice rest display options
     restDisplayMode = 'clean',      // 'clean' (smart omission) or 'explicit' (show all)
-    cueRestsForSecondaryVoice = true, // Use smaller rests for voice 2
-    hideCueRests = false,           // If true, cue rests become GhostNotes (invisible)
     // Repeat signs
     repeatSign = null,              // 'repeatStart', 'repeatEnd', 'repeatBoth', or null
   } = options;
@@ -2517,10 +2467,10 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     const { primaryRestVisibility, secondaryRestVisibility } = analyzeRestVisibility(
       primaryTrebleVoiceNotes,
       secondaryTrebleVoiceNotes,
-      { restDisplayMode, cueRestsForSecondaryVoice }
+      { restDisplayMode }
     );
-    applyRestVisibility(primaryTrebleVoiceNotes, primaryRestVisibility, hideCueRests);
-    applyRestVisibility(secondaryTrebleVoiceNotes, secondaryRestVisibility, hideCueRests);
+    applyRestVisibility(primaryTrebleVoiceNotes, primaryRestVisibility);
+    applyRestVisibility(secondaryTrebleVoiceNotes, secondaryRestVisibility);
   }
 
   // Create notes for voice 0 (primary voice)
@@ -2579,10 +2529,10 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     const { primaryRestVisibility, secondaryRestVisibility } = analyzeRestVisibility(
       primaryBassVoiceNotes,
       secondaryBassVoiceNotes,
-      { restDisplayMode, cueRestsForSecondaryVoice }
+      { restDisplayMode }
     );
-    applyRestVisibility(primaryBassVoiceNotes, primaryRestVisibility, hideCueRests);
-    applyRestVisibility(secondaryBassVoiceNotes, secondaryRestVisibility, hideCueRests);
+    applyRestVisibility(primaryBassVoiceNotes, primaryRestVisibility);
+    applyRestVisibility(secondaryBassVoiceNotes, secondaryRestVisibility);
   }
 
   // Create notes for bass voice 0 (primary voice)
@@ -3628,8 +3578,6 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     showChordSpans = true,       // Show chord span shading and brackets
     // Multi-voice rest display options
     restDisplayMode = 'clean',      // 'clean' (smart omission) or 'explicit' (show all)
-    cueRestsForSecondaryVoice = true, // Use smaller rests for secondary voice
-    hideCueRests = false,           // If true, cue rests become GhostNotes (invisible)
     // Multi-page support: offset for global measure index (0-based)
     globalMeasureOffset = 0,     // First measure's global index (for page 2, this would be 8)
     // Phase 2 Bass Block Isolation: active block highlighting
@@ -4562,8 +4510,6 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       chordBeatOffset: chordStartInfo?.beatOffset || 0,
       // Multi-voice rest display options
       restDisplayMode,
-      cueRestsForSecondaryVoice,
-      hideCueRests,
       // Repeat sign for this measure
       repeatSign: measureRepeatSign?.type || null,
     });

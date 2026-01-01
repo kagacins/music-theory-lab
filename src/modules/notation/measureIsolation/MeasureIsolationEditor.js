@@ -15,12 +15,13 @@
 
 import { SlotGrid, SLOT_TYPES, SLOTS_PER_BEAT, durationToSlots, slotsToDuration } from './SlotGrid.js';
 import { getBeatsPerMeasureFromTimeSignature } from '../../state/compositionState.js';
-import { durationToBeats } from '../durationUtils.js';
+import { durationToBeats, beatsToDuration } from '../durationUtils.js';
 import { pitchToLine } from '../staffLayouter.js';
 import { KEY_SIGNATURES, noteToMidi } from '../vexFlowRenderer.js';
 import { getPiano, getAudioIsReady, initAudio } from '../../audio/audioEngine.js';
 import { getCurrentTempo } from '../../audio/melodyGenerator.js';
 import { analyzeChordTone, CHORD_TONE_COLORS, NOTE_RELATIONSHIPS } from '../../analysis/chordToneAnalyzer.js';
+import { showToast } from '../../ui/toastNotifications.js';
 
 // VexFlow globals (loaded via CDN)
 const VF = typeof Vex !== 'undefined' ? Vex.Flow : null;
@@ -78,11 +79,24 @@ export class MeasureIsolationEditor {
         this.currentAccidental = null;  // null = use key signature, 'n' = explicit natural, '#', 'b'
         this.currentVoice = 0;  // 0 or 1
 
+        // Mode state: Alt-based switching with optional sticky toggle
+        // When noteEntryModeSticky is OFF (default):
+        //   - Normal click = Select mode
+        //   - Alt+Click = Note Entry mode
+        // When noteEntryModeSticky is ON:
+        //   - Normal click = Note Entry mode
+        //   - Alt+Click = Select mode (inverted)
+        this.noteEntryModeSticky = false;  // The toggle state
+        this.isAltPressed = false;         // Tracks Alt key state for ghost note
+
         // Selection state (for click-to-select, then delete)
         this.selectedNote = null;  // { clef, voice, slotIndex }
 
-        // Ghost note state (for preview on hover)
+        // Ghost note state (for preview on hover - only shown in entry mode)
         this.ghostNote = null;  // { clef, slotIndex, pitch, x, y }
+
+        // Track last mouse position for each clef (to restore ghost note when Alt is pressed)
+        this.lastMousePosition = { treble: null, bass: null };  // { x, y, slotIndex, pitch }
 
         // Ottava state
         this.trebleOttava = 0;  // 0 = none, 1 = 8va, -1 = 8vb
@@ -193,13 +207,27 @@ export class MeasureIsolationEditor {
                         <button class="mie-ottava-btn px-2 py-1 border rounded text-sm bg-gray-100" data-clef="bass" data-ottava="0" title="None">—</button>
                         <button class="mie-ottava-btn px-2 py-1 border rounded text-sm hover:bg-blue-100" data-clef="bass" data-ottava="1" title="8va - One octave up">8va</button>
                     </div>
+                    <!-- Sticky Entry Mode Toggle -->
+                    <div class="flex items-center gap-2 ml-auto">
+                        <span class="text-xs text-gray-500" title="When ON, default is Entry mode. When OFF, hold Alt for Entry mode.">Entry Mode:</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="mie-sticky-toggle" class="sr-only peer">
+                            <div class="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer
+                                        peer-checked:after:translate-x-full peer-checked:after:border-white
+                                        after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                                        after:bg-white after:border-gray-300 after:border after:rounded-full
+                                        after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
+                        </label>
+                        <span id="mie-sticky-status" class="text-xs text-gray-500">Hold Alt</span>
+                    </div>
                 </div>
 
                 <!-- Instructions -->
                 <div class="px-4 py-2 bg-blue-50 text-sm text-blue-800 border-b">
-                    <strong>Click</strong> to add note, <strong>click note</strong> to select then <kbd class="px-1 bg-white rounded">1-6</kbd> duration, <kbd class="px-1 bg-white rounded">Del</kbd> delete.
-                    <kbd class="px-1 bg-white rounded">.</kbd> dotted, <kbd class="px-1 bg-white rounded">R</kbd> rest, <kbd class="px-1 bg-white rounded">S/F/N/K</kbd> accidentals, <kbd class="px-1 bg-white rounded">Space</kbd> play.
-                    <kbd class="px-1 bg-white rounded">Alt+Click</kbd> force insert (skip selection).
+                    <strong>Select Mode</strong> (default): click notes to select.
+                    <strong>Hold <kbd class="px-1 bg-white rounded">Alt</kbd></strong> for Entry Mode (click to add notes).
+                    When selected: <kbd class="px-1 bg-white rounded">←→</kbd> move, <kbd class="px-1 bg-white rounded">↑↓</kbd> transpose, <kbd class="px-1 bg-white rounded">1-6</kbd> duration, <kbd class="px-1 bg-white rounded">S/F/N/K</kbd> accidentals, <kbd class="px-1 bg-white rounded">R</kbd> rest, <kbd class="px-1 bg-white rounded">Del</kbd> delete.
+                    <kbd class="px-1 bg-white rounded">.</kbd> dotted, <kbd class="px-1 bg-white rounded">Space</kbd> play.
                 </div>
 
                 <!-- Main Content: The two staves -->
@@ -311,13 +339,30 @@ export class MeasureIsolationEditor {
                 // 'key' means use key signature (null), otherwise use the explicit accidental
                 this.currentAccidental = accidental === 'key' ? null : accidental;
                 this._updateAccidentalButtons();
+
+                // If a note is selected, apply the accidental to it
+                if (this.selectedNote) {
+                    if (accidental === 'key') {
+                        this._applyKeySignatureAccidentalToSelectedNote();
+                    } else if (accidental === 'n') {
+                        this._applyAccidentalToSelectedNote('');  // Natural = no accidental
+                    } else {
+                        this._applyAccidentalToSelectedNote(accidental);
+                    }
+                }
             });
         });
 
         // Rest button
         this.modal.querySelector('#mie-rest-btn')?.addEventListener('click', () => {
-            this.isRestMode = !this.isRestMode;
-            this._updateModeButtons();
+            // If a note or rest is selected, toggle between note/rest
+            if (this.selectedNote) {
+                this._toggleSelectedNoteRest();
+            } else {
+                // Toggle rest mode for new entries
+                this.isRestMode = !this.isRestMode;
+                this._updateModeButtons();
+            }
         });
 
         // Delete button (deletes selected note)
@@ -348,15 +393,41 @@ export class MeasureIsolationEditor {
             });
         });
 
+        // Sticky entry mode toggle
+        this.modal.querySelector('#mie-sticky-toggle')?.addEventListener('change', (e) => {
+            this.noteEntryModeSticky = e.target.checked;
+            this._updateStickyToggleStatus();
+            this._updateModeStatus();
+            // Clear ghost note if leaving entry mode
+            if (!this._isInNoteEntryMode() && this.ghostNote) {
+                this.ghostNote = null;
+            }
+            this._renderStaves();
+        });
+
         // Keyboard shortcuts - use document level handler since canvas clicks don't maintain focus
         // Store the bound handler so we can remove it later
+        // Use capture phase (true) to intercept events BEFORE they reach other handlers
         this._boundKeydownHandler = (e) => {
             // Only handle if modal is visible
             if (!this.modal.classList.contains('hidden')) {
                 this._handleKeydown(e);
+                // Stop propagation to prevent noteEditor from also handling this event
+                e.stopPropagation();
+                e.stopImmediatePropagation();
             }
         };
-        document.addEventListener('keydown', this._boundKeydownHandler);
+        document.addEventListener('keydown', this._boundKeydownHandler, true);  // capture phase
+
+        // Track Alt key release for mode switching
+        this._boundKeyupHandler = (e) => {
+            if (!this.modal.classList.contains('hidden')) {
+                this._handleKeyup(e);
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+            }
+        };
+        document.addEventListener('keyup', this._boundKeyupHandler, true);  // capture phase
 
         // Click outside to close
         this.modal.addEventListener('click', (e) => {
@@ -370,6 +441,42 @@ export class MeasureIsolationEditor {
      * Handle keyboard shortcuts
      */
     _handleKeydown(e) {
+        // Track Alt key state for mode switching
+        if (e.key === 'Alt') {
+            if (!this.isAltPressed) {
+                this.isAltPressed = true;
+                this._updateModeStatus();
+
+                // Restore ghost note from last mouse position if entering entry mode
+                // and not in rest mode
+                if (this._isInNoteEntryMode() && !this.isRestMode) {
+                    // Try to restore ghost from whichever clef has a saved position
+                    const treblePos = this.lastMousePosition.treble;
+                    const bassPos = this.lastMousePosition.bass;
+                    if (treblePos) {
+                        this.ghostNote = {
+                            clef: 'treble',
+                            slotIndex: treblePos.slotIndex,
+                            pitch: treblePos.pitch,
+                            x: treblePos.x,
+                            y: treblePos.y
+                        };
+                    } else if (bassPos) {
+                        this.ghostNote = {
+                            clef: 'bass',
+                            slotIndex: bassPos.slotIndex,
+                            pitch: bassPos.pitch,
+                            x: bassPos.x,
+                            y: bassPos.y
+                        };
+                    }
+                }
+
+                this._renderStaves();
+            }
+            return;
+        }
+
         if (e.key === 'Escape') {
             e.preventDefault();
             // If note is selected, deselect it; otherwise cancel modal
@@ -392,8 +499,14 @@ export class MeasureIsolationEditor {
             this._deleteSelectedNote();
         } else if (e.key === 'r' || e.key === 'R') {
             e.preventDefault();
-            this.isRestMode = !this.isRestMode;
-            this._updateModeButtons();
+            // If a note or rest is selected, toggle between note/rest
+            if (this.selectedNote) {
+                this._toggleSelectedNoteRest();
+            } else {
+                // Toggle rest mode for new entries
+                this.isRestMode = !this.isRestMode;
+                this._updateModeButtons();
+            }
         } else if (e.key >= '1' && e.key <= '6') {
             e.preventDefault();
             const durations = ['1n', '2n', '4n', '8n', '16n', '32n'];
@@ -416,22 +529,111 @@ export class MeasureIsolationEditor {
             e.preventDefault();
             this.currentAccidental = '#';
             this._updateAccidentalButtons();
+            // If a note is selected, apply sharp to it
+            if (this.selectedNote) {
+                this._applyAccidentalToSelectedNote('#');
+            }
         } else if (e.key === 'f' || e.key === 'F') {
             e.preventDefault();
             this.currentAccidental = 'b';
             this._updateAccidentalButtons();
+            // If a note is selected, apply flat to it
+            if (this.selectedNote) {
+                this._applyAccidentalToSelectedNote('b');
+            }
         } else if (e.key === 'n' || e.key === 'N') {
             e.preventDefault();
             this.currentAccidental = 'n';  // Explicit natural (override key signature)
             this._updateAccidentalButtons();
+            // If a note is selected, remove accidental (natural)
+            if (this.selectedNote) {
+                this._applyAccidentalToSelectedNote('');
+            }
         } else if (e.key === 'k' || e.key === 'K') {
             e.preventDefault();
             this.currentAccidental = null;  // Use key signature
             this._updateAccidentalButtons();
+            // If a note is selected, apply key signature accidental
+            if (this.selectedNote) {
+                this._applyKeySignatureAccidentalToSelectedNote();
+            }
         } else if (e.key === 'v' || e.key === 'V') {
             e.preventDefault();
             this.currentVoice = this.currentVoice === 0 ? 1 : 0;
             this._updateVoiceButtons();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();  // Prevent background scrolling
+            if (this.selectedNote) {
+                // Throttle key repeats to prevent freezing
+                if (!this._lastTransposeTime || Date.now() - this._lastTransposeTime > 50) {
+                    this._transposeSelectedNote(1);  // Up one half step
+                    this._lastTransposeTime = Date.now();
+                }
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();  // Prevent background scrolling
+            if (this.selectedNote) {
+                // Throttle key repeats to prevent freezing
+                if (!this._lastTransposeTime || Date.now() - this._lastTransposeTime > 50) {
+                    this._transposeSelectedNote(-1);  // Down one half step
+                    this._lastTransposeTime = Date.now();
+                }
+            }
+        } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            if (this.selectedNote) {
+                this._moveSelectedNoteHorizontally(-1);  // Move left one slot
+            }
+        } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            if (this.selectedNote) {
+                this._moveSelectedNoteHorizontally(1);  // Move right one slot
+            }
+        }
+    }
+
+    /**
+     * Handle key up events (for Alt key tracking)
+     */
+    _handleKeyup(e) {
+        if (e.key === 'Alt') {
+            this.isAltPressed = false;
+            this._updateModeStatus();
+            // Clear ghost note when leaving entry mode (if not in sticky mode)
+            if (!this.noteEntryModeSticky) {
+                this.ghostNote = null;
+            }
+            this._renderStaves();
+        }
+    }
+
+    /**
+     * Determine if currently in note entry mode
+     * When noteEntryModeSticky is OFF: Alt = Entry, No Alt = Select
+     * When noteEntryModeSticky is ON: No Alt = Entry, Alt = Select (inverted)
+     */
+    _isInNoteEntryMode() {
+        if (this.noteEntryModeSticky) {
+            // Sticky mode: normal is entry, Alt inverts to select
+            return !this.isAltPressed;
+        } else {
+            // Default: normal is select, Alt enables entry
+            return this.isAltPressed;
+        }
+    }
+
+    /**
+     * Update the status bar to show current mode
+     */
+    _updateModeStatus() {
+        const inEntryMode = this._isInNoteEntryMode();
+        const modeText = inEntryMode ? 'Note Entry' : 'Select';
+        const altHint = this.noteEntryModeSticky
+            ? (this.isAltPressed ? ' (Alt held)' : '')
+            : (this.isAltPressed ? ' (Alt held)' : ' (hold Alt to enter)');
+
+        if (!this.selectedNote) {
+            this._updateStatus(`${modeText} Mode${altHint} - Click on staff`);
         }
     }
 
@@ -623,12 +825,12 @@ export class MeasureIsolationEditor {
 
         const slot = this.slotGrid.getSlot(clef, voice, slotIndex);
         if (slot.type === SLOT_TYPES.REST) {
-            this._updateStatus(`Selected rest - Press Del to delete`);
+            this._updateStatus(`Selected rest - ←→ move, R to note, 1-6 duration, Del delete`);
         } else if (pitch && slot.pitches?.length > 1) {
-            this._updateStatus(`Selected ${pitch} in chord (${slot.pitches.length} notes) - Press Del to delete this note`);
+            this._updateStatus(`Selected ${pitch} in chord - ←→ move, ↑↓ transpose, S/F/N/K accidentals, R rest, Del`);
         } else {
             const pitchInfo = pitch || slot.pitches?.join(', ') || 'note';
-            this._updateStatus(`Selected ${pitchInfo} - Press Del to delete`);
+            this._updateStatus(`Selected ${pitchInfo} - ←→ move, ↑↓ transpose, S/F/N/K accidentals, R rest, Del`);
         }
     }
 
@@ -680,6 +882,329 @@ export class MeasureIsolationEditor {
             this._updateStatus(`Changed rest to ${durationName}`);
         }
 
+        this._renderStaves();
+        this._updateFillStats();
+    }
+
+    /**
+     * Toggle selected item between note and rest
+     * - If note selected: convert to rest
+     * - If rest selected: convert to note (using default pitch for clef)
+     */
+    _toggleSelectedNoteRest() {
+        if (!this.selectedNote) return;
+
+        const { clef, voice, slotIndex } = this.selectedNote;
+        const slot = this.slotGrid.getSlot(clef, voice, slotIndex);
+
+        if (slot.type === SLOT_TYPES.NOTE_START) {
+            // Convert note to rest (preserve duration)
+            this.slotGrid.setRest(clef, voice, slotIndex, {
+                duration: slot.duration,
+                dotted: slot.dotted
+            });
+            this._updateStatus(`Converted to rest`);
+            // Update selection - it's now a rest
+            this._selectNoteAtSlot(clef, voice, slotIndex, null);
+        } else if (slot.type === SLOT_TYPES.REST) {
+            // Convert rest to note - use a sensible default pitch for the clef
+            const defaultPitch = clef === 'treble' ? 'B4' : 'D3';
+            this.slotGrid.setNote(clef, voice, slotIndex, {
+                pitches: [defaultPitch],
+                duration: slot.duration,
+                dotted: slot.dotted
+            });
+            this._updateStatus(`Converted to note (${defaultPitch})`);
+            // Update selection - it's now a note
+            this._selectNoteAtSlot(clef, voice, slotIndex, defaultPitch);
+        } else {
+            this._updateStatus('Select a note or rest first');
+            return;
+        }
+
+        this._renderStaves();
+        this._updateFillStats();
+    }
+
+    /**
+     * Apply an accidental to the selected note
+     * @param {string} accidental - '#', 'b', or '' (natural)
+     */
+    _applyAccidentalToSelectedNote(accidental) {
+        if (!this.selectedNote) return;
+
+        const { clef, voice, slotIndex, pitch } = this.selectedNote;
+        const slot = this.slotGrid.getSlot(clef, voice, slotIndex);
+
+        if (slot.type !== SLOT_TYPES.NOTE_START || !slot.pitches?.length) {
+            this._updateStatus('No note selected');
+            return;
+        }
+
+        // If a specific pitch is selected (in a chord), only modify that pitch
+        // Otherwise modify all pitches in the slot
+        const pitchesToModify = pitch ? [pitch] : slot.pitches;
+        const newPitches = slot.pitches.map(p => {
+            if (!pitchesToModify.includes(p)) return p;
+
+            // Parse the pitch (e.g., "C#4" -> { note: "C", acc: "#", octave: "4" })
+            const match = p.match(/^([A-G])([#b]?)(\d+)$/);
+            if (!match) return p;
+
+            const noteLetter = match[1];
+            const octave = match[3];
+
+            // Create new pitch with the specified accidental
+            return noteLetter + accidental + octave;
+        });
+
+        // Update the slot with new pitches
+        this.slotGrid.setNote(clef, voice, slotIndex, {
+            pitches: newPitches,
+            duration: slot.duration,
+            dotted: slot.dotted,
+            stemDirection: slot.stemDirection,
+            articulation: slot.articulation,
+            dynamic: slot.dynamic
+        });
+
+        // Update selection to point to new pitch
+        if (pitch) {
+            const match = pitch.match(/^([A-G])([#b]?)(\d+)$/);
+            if (match) {
+                const newPitch = match[1] + accidental + match[3];
+                this.selectedNote.pitch = newPitch;
+            }
+        }
+
+        const accName = accidental === '#' ? 'sharp' : accidental === 'b' ? 'flat' : 'natural';
+        this._updateStatus(`Applied ${accName}`);
+        this._renderStaves();
+    }
+
+    /**
+     * Apply the key signature accidental to the selected note
+     */
+    _applyKeySignatureAccidentalToSelectedNote() {
+        if (!this.selectedNote) return;
+
+        const { clef, voice, slotIndex, pitch } = this.selectedNote;
+        const slot = this.slotGrid.getSlot(clef, voice, slotIndex);
+
+        if (slot.type !== SLOT_TYPES.NOTE_START || !slot.pitches?.length) {
+            this._updateStatus('No note selected');
+            return;
+        }
+
+        // If a specific pitch is selected (in a chord), only modify that pitch
+        // Otherwise modify all pitches in the slot
+        const pitchesToModify = pitch ? [pitch] : slot.pitches;
+        const newPitches = slot.pitches.map(p => {
+            if (!pitchesToModify.includes(p)) return p;
+
+            // Parse the pitch
+            const match = p.match(/^([A-G])([#b]?)(\d+)$/);
+            if (!match) return p;
+
+            const noteLetter = match[1];
+            const octave = match[3];
+
+            // Get the accidental from key signature for this note letter
+            const keyAcc = this._getKeySignatureAccidentalForNote(noteLetter);
+
+            return noteLetter + keyAcc + octave;
+        });
+
+        // Update the slot
+        this.slotGrid.setNote(clef, voice, slotIndex, {
+            pitches: newPitches,
+            duration: slot.duration,
+            dotted: slot.dotted,
+            stemDirection: slot.stemDirection,
+            articulation: slot.articulation,
+            dynamic: slot.dynamic
+        });
+
+        // Update selection
+        if (pitch) {
+            const match = pitch.match(/^([A-G])([#b]?)(\d+)$/);
+            if (match) {
+                const keyAcc = this._getKeySignatureAccidentalForNote(match[1]);
+                this.selectedNote.pitch = match[1] + keyAcc + match[3];
+            }
+        }
+
+        this._updateStatus(`Applied key signature (${this.currentKey})`);
+        this._renderStaves();
+    }
+
+    /**
+     * Transpose the selected note by a number of half steps
+     * Uses the key signature's enharmonic preference (sharps vs flats)
+     * @param {number} semitones - Number of half steps (positive = up, negative = down)
+     */
+    _transposeSelectedNote(semitones) {
+        if (!this.selectedNote) return;
+
+        const { clef, voice, slotIndex, pitch } = this.selectedNote;
+        const slot = this.slotGrid.getSlot(clef, voice, slotIndex);
+
+        if (slot.type !== SLOT_TYPES.NOTE_START || !slot.pitches?.length) {
+            this._updateStatus('No note selected');
+            return;
+        }
+
+        // Chromatic scales for transposition
+        const CHROMATIC_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const CHROMATIC_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+        // Determine enharmonic preference from key signature accidentals
+        // If key has flats (Bb, Eb, etc.), use flat spelling; otherwise use sharps
+        const useFlats = this.keyAccidentals && this.keyAccidentals.length > 0 &&
+            this.keyAccidentals[0]?.includes('b');
+        const chromatic = useFlats ? CHROMATIC_FLAT : CHROMATIC_SHARP;
+
+        // If a specific pitch is selected (in a chord), only transpose that pitch
+        // Otherwise transpose all pitches
+        const pitchesToModify = pitch ? [pitch] : slot.pitches;
+        const newPitches = slot.pitches.map(p => {
+            if (!pitchesToModify.includes(p)) return p;
+
+            // Parse the pitch
+            const match = p.match(/^([A-G])([#b]?)(\d+)$/);
+            if (!match) return p;
+
+            const noteName = match[1] + match[2];  // e.g., "C#"
+            let octave = parseInt(match[3]);
+
+            // Find current position in chromatic scale
+            // Normalize enharmonic equivalents
+            let noteIndex = chromatic.indexOf(noteName);
+            if (noteIndex === -1) {
+                // Try the other spelling
+                const altChromatic = useFlats ? CHROMATIC_SHARP : CHROMATIC_FLAT;
+                noteIndex = altChromatic.indexOf(noteName);
+                if (noteIndex === -1) {
+                    // Handle edge cases like Cb, E#, etc.
+                    const enharmonicMap = {
+                        'Cb': 11, 'B#': 0, 'Fb': 4, 'E#': 5
+                    };
+                    noteIndex = enharmonicMap[noteName];
+                    if (noteIndex === undefined) return p;  // Can't transpose
+                }
+            }
+
+            // Apply transposition
+            let newIndex = noteIndex + semitones;
+
+            // Handle octave changes
+            while (newIndex < 0) {
+                newIndex += 12;
+                octave--;
+            }
+            while (newIndex >= 12) {
+                newIndex -= 12;
+                octave++;
+            }
+
+            // Get the new note name from chromatic scale
+            const newNoteName = chromatic[newIndex];
+
+            return newNoteName + octave;
+        });
+
+        // Update the slot
+        this.slotGrid.setNote(clef, voice, slotIndex, {
+            pitches: newPitches,
+            duration: slot.duration,
+            dotted: slot.dotted,
+            stemDirection: slot.stemDirection,
+            articulation: slot.articulation,
+            dynamic: slot.dynamic
+        });
+
+        // Update selection to point to new pitch
+        if (pitch) {
+            const pitchIndex = slot.pitches.indexOf(pitch);
+            if (pitchIndex >= 0 && pitchIndex < newPitches.length) {
+                this.selectedNote.pitch = newPitches[pitchIndex];
+            }
+        }
+
+        const direction = semitones > 0 ? '↑' : '↓';
+        const newPitch = pitch ? this.selectedNote.pitch : newPitches.join(', ');
+        this._updateStatus(`Transposed ${direction} to ${newPitch}`);
+        this._renderStaves();
+    }
+
+    /**
+     * Move the selected note horizontally to an adjacent slot
+     * @param {number} direction - -1 for left, +1 for right
+     */
+    _moveSelectedNoteHorizontally(direction) {
+        if (!this.selectedNote) return;
+
+        const { clef, voice, slotIndex } = this.selectedNote;
+        const slot = this.slotGrid.getSlot(clef, voice, slotIndex);
+
+        if (slot.type !== SLOT_TYPES.NOTE_START && slot.type !== SLOT_TYPES.REST) {
+            this._updateStatus('No note or rest selected');
+            return;
+        }
+
+        const newSlotIndex = slotIndex + direction;
+
+        // Check bounds
+        if (newSlotIndex < 0) {
+            this._updateStatus('⚠️ Already at start of measure');
+            return;
+        }
+
+        // Check if the note would overflow the measure at the new position
+        const durationSlots = slot.durationSlots || 1;
+        if (newSlotIndex + durationSlots > this.slotGrid.totalSlots) {
+            this._updateStatus(`⚠️ Note would overflow measure at this position`);
+            return;
+        }
+
+        // Check if destination slot is occupied (and not by the current note's continuation)
+        const destSlot = this.slotGrid.getSlot(clef, voice, newSlotIndex);
+        if (destSlot.type === SLOT_TYPES.NOTE_START || destSlot.type === SLOT_TYPES.REST) {
+            this._updateStatus('⚠️ Destination slot is occupied');
+            return;
+        }
+        // If moving left, also check we're not moving into a continuation of another note
+        if (direction < 0 && destSlot.type === SLOT_TYPES.CONTINUATION) {
+            this._updateStatus('⚠️ Destination slot is part of another note');
+            return;
+        }
+
+        // Clear the old slot
+        this.slotGrid.clearSlot(clef, voice, slotIndex);
+
+        // Place at new position
+        if (slot.type === SLOT_TYPES.NOTE_START) {
+            this.slotGrid.setNote(clef, voice, newSlotIndex, {
+                pitches: slot.pitches,
+                duration: slot.duration,
+                dotted: slot.dotted,
+                stemDirection: slot.stemDirection,
+                articulation: slot.articulation,
+                dynamic: slot.dynamic
+            });
+        } else if (slot.type === SLOT_TYPES.REST) {
+            this.slotGrid.setRest(clef, voice, newSlotIndex, {
+                duration: slot.duration,
+                dotted: slot.dotted
+            });
+        }
+
+        // Update selection to new position
+        this.selectedNote.slotIndex = newSlotIndex;
+
+        const dirArrow = direction > 0 ? '→' : '←';
+        const beat = newSlotIndex / SLOTS_PER_BEAT;
+        this._updateStatus(`Moved ${dirArrow} to beat ${beat.toFixed(2)}`);
         this._renderStaves();
         this._updateFillStats();
     }
@@ -833,6 +1358,16 @@ export class MeasureIsolationEditor {
     }
 
     /**
+     * Update sticky toggle status text
+     */
+    _updateStickyToggleStatus() {
+        const statusEl = this.modal.querySelector('#mie-sticky-status');
+        if (statusEl) {
+            statusEl.textContent = this.noteEntryModeSticky ? 'Always On' : 'Hold Alt';
+        }
+    }
+
+    /**
      * Open the editor for a specific measure
      */
     open(measureIndex) {
@@ -846,6 +1381,8 @@ export class MeasureIsolationEditor {
         this.bassOttava = 0;
         this.ghostNote = null;  // Clear ghost note
         this.selectedNote = null;  // Clear any selection
+        this.isAltPressed = false;  // Reset Alt key state
+        // Note: noteEntryModeSticky is NOT reset - it persists across modal opens
 
         const measure = this.compositionState.getMeasure(measureIndex);
         if (!measure) {
@@ -898,6 +1435,14 @@ export class MeasureIsolationEditor {
         this._updateOttavaButtons();
         this._updateDeleteButton();
         this.modal.querySelector('#mie-dotted').checked = false;
+
+        // Sync sticky toggle checkbox with state (persists across modal opens)
+        const stickyToggle = this.modal.querySelector('#mie-sticky-toggle');
+        if (stickyToggle) {
+            stickyToggle.checked = this.noteEntryModeSticky;
+        }
+        this._updateStickyToggleStatus();
+        this._updateModeStatus();
 
         // Show modal
         this.modal.classList.remove('hidden');
@@ -960,27 +1505,35 @@ export class MeasureIsolationEditor {
             return;
         }
 
-        // Check if clicking on an existing note (for selection)
-        // Alt+click skips selection and forces insert mode
-        const forceInsert = event.altKey;
+        // Mode-based click handling:
+        // - In Select mode: clicking on notes selects them, clicking empty space does nothing
+        // - In Entry mode: always add/place notes (skip selection)
+        const inEntryMode = this._isInNoteEntryMode();
         const clickedNote = this._findNoteAtClick(clef, slotIndex, y);
-        if (clickedNote && !forceInsert) {
-            // If clicking same note that's already selected, deselect it
-            // For chords, also check if clicking the same pitch
-            if (this.selectedNote &&
-                this.selectedNote.clef === clef &&
-                this.selectedNote.voice === clickedNote.voice &&
-                this.selectedNote.slotIndex === clickedNote.slotIndex &&
-                this.selectedNote.pitch === clickedNote.pitch) {
-                this._clearSelection();
+
+        // In Select mode, only allow note selection (no adding notes)
+        if (!inEntryMode) {
+            if (clickedNote) {
+                // If clicking same note that's already selected, deselect it
+                // For chords, also check if clicking the same pitch
+                if (this.selectedNote &&
+                    this.selectedNote.clef === clef &&
+                    this.selectedNote.voice === clickedNote.voice &&
+                    this.selectedNote.slotIndex === clickedNote.slotIndex &&
+                    this.selectedNote.pitch === clickedNote.pitch) {
+                    this._clearSelection();
+                } else {
+                    // Select this note (with specific pitch for chord notes)
+                    this._selectNoteAtSlot(clef, clickedNote.voice, clickedNote.slotIndex, clickedNote.pitch);
+                }
             } else {
-                // Select this note (with specific pitch for chord notes)
-                this._selectNoteAtSlot(clef, clickedNote.voice, clickedNote.slotIndex, clickedNote.pitch);
+                // Clicking empty space in Select mode - show hint
+                this._updateStatus('Hold Alt to enter notes');
             }
             return;
         }
 
-        // Clear any existing selection when adding new notes
+        // In Entry mode: Clear any existing selection when adding new notes
         if (this.selectedNote) {
             this._clearSelection();
         }
@@ -1019,15 +1572,6 @@ export class MeasureIsolationEditor {
      * Handle canvas mouse move - update ghost note preview
      */
     _handleCanvasMouseMove(event, clef) {
-        // Don't show ghost in rest mode
-        if (this.isRestMode) {
-            if (this.ghostNote) {
-                this.ghostNote = null;
-                this._renderStaves();
-            }
-            return;
-        }
-
         const canvas = clef === 'treble' ? this.trebleCanvas : this.bassCanvas;
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
@@ -1039,7 +1583,8 @@ export class MeasureIsolationEditor {
         // Calculate slot index
         const slotX = x - this.START_X;
         if (slotX < 0) {
-            if (this.ghostNote) {
+            this.lastMousePosition[clef] = null;
+            if (this.ghostNote && this.ghostNote.clef === clef) {
                 this.ghostNote = null;
                 this._renderStaves();
             }
@@ -1048,7 +1593,8 @@ export class MeasureIsolationEditor {
 
         const slotIndex = Math.floor(slotX / this.SLOT_WIDTH);
         if (slotIndex < 0 || slotIndex >= this.slotGrid.totalSlots) {
-            if (this.ghostNote) {
+            this.lastMousePosition[clef] = null;
+            if (this.ghostNote && this.ghostNote.clef === clef) {
                 this.ghostNote = null;
                 this._renderStaves();
             }
@@ -1058,7 +1604,8 @@ export class MeasureIsolationEditor {
         // Get pitch from Y position
         const pitchInfo = this._getPitchFromY(y, clef);
         if (!pitchInfo) {
-            if (this.ghostNote) {
+            this.lastMousePosition[clef] = null;
+            if (this.ghostNote && this.ghostNote.clef === clef) {
                 this.ghostNote = null;
                 this._renderStaves();
             }
@@ -1079,6 +1626,19 @@ export class MeasureIsolationEditor {
         const noteX = this.START_X + (slotIndex * this.SLOT_WIDTH) + (this.SLOT_WIDTH / 2);
         const noteY = this._getYFromPitch(fullPitch, clef);
 
+        // Always store last mouse position for this clef (so we can restore ghost on Alt press)
+        this.lastMousePosition[clef] = { x: noteX, y: noteY, slotIndex, pitch: fullPitch };
+
+        // Only show ghost note in entry mode (not in select mode)
+        // Also don't show ghost in rest mode
+        if (!this._isInNoteEntryMode() || this.isRestMode) {
+            if (this.ghostNote && this.ghostNote.clef === clef) {
+                this.ghostNote = null;
+                this._renderStaves();
+            }
+            return;
+        }
+
         // Update ghost note if changed
         const newGhost = { clef, slotIndex, pitch: fullPitch, x: noteX, y: noteY };
         const ghostChanged = !this.ghostNote ||
@@ -1093,9 +1653,10 @@ export class MeasureIsolationEditor {
     }
 
     /**
-     * Handle canvas mouse leave - clear ghost note
+     * Handle canvas mouse leave - clear ghost note and last mouse position
      */
     _handleCanvasMouseLeave(clef) {
+        this.lastMousePosition[clef] = null;
         if (this.ghostNote && this.ghostNote.clef === clef) {
             this.ghostNote = null;
             this._renderStaves();
@@ -1248,6 +1809,57 @@ export class MeasureIsolationEditor {
     }
 
     /**
+     * Generate optimal note/rest durations to fill a given number of slots
+     * Uses the minimum number of tied notes to fill the space exactly
+     * @param {number} slots - Number of slots to fill
+     * @returns {Array<{duration: string, dotted: boolean, slots: number}>} Array of durations
+     * @private
+     */
+    _generateOptimalDurations(slots) {
+        if (slots <= 0) return [];
+
+        const results = [];
+
+        // Standard durations in descending order of slots (8 slots per beat)
+        // Dotted whole = 48 slots, Whole = 32 slots, Dotted half = 24 slots, etc.
+        const standardDurations = [
+            { duration: '1n', dotted: true, slots: 48 },   // dotted whole (6 beats)
+            { duration: '1n', dotted: false, slots: 32 },  // whole (4 beats)
+            { duration: '2n', dotted: true, slots: 24 },   // dotted half (3 beats)
+            { duration: '2n', dotted: false, slots: 16 },  // half (2 beats)
+            { duration: '4n', dotted: true, slots: 12 },   // dotted quarter (1.5 beats)
+            { duration: '4n', dotted: false, slots: 8 },   // quarter (1 beat)
+            { duration: '8n', dotted: true, slots: 6 },    // dotted eighth (0.75 beats)
+            { duration: '8n', dotted: false, slots: 4 },   // eighth (0.5 beats)
+            { duration: '16n', dotted: true, slots: 3 },   // dotted sixteenth (0.375 beats)
+            { duration: '16n', dotted: false, slots: 2 },  // sixteenth (0.25 beats)
+            { duration: '32n', dotted: false, slots: 1 },  // thirty-second (0.125 beats)
+        ];
+
+        let remainingSlots = slots;
+
+        // Greedy algorithm: use largest duration that fits
+        while (remainingSlots > 0) {
+            let found = false;
+            for (const dur of standardDurations) {
+                if (dur.slots <= remainingSlots) {
+                    results.push({ ...dur });
+                    remainingSlots -= dur.slots;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                // Shouldn't happen with 32nd notes as minimum, but safety fallback
+                console.warn(`[MeasureIsolationEditor] Could not fill remaining ${remainingSlots} slots`);
+                break;
+            }
+        }
+
+        return results;
+    }
+
+    /**
      * Place a note at the given position
      */
     _placeNote(clef, slotIndex, pitch) {
@@ -1283,11 +1895,10 @@ export class MeasureIsolationEditor {
 
         // Only reach here if placing new note (not adding to chord)
         if (existingSlot.type !== SLOT_TYPES.NOTE_START) {
-            // Check if note would be truncated
+            // Check if note would overflow the measure
             const durationBeats = durationToBeats(this.currentDuration, this.isDotted);
             const durationSlots = Math.round(durationBeats * SLOTS_PER_BEAT);
             const availableSlots = this.slotGrid.totalSlots - slotIndex;
-            const willTruncate = durationSlots > availableSlots;
 
             // Determine stem direction:
             // Only force V1 up / V2 down when BOTH voices are active in this clef
@@ -1306,21 +1917,60 @@ export class MeasureIsolationEditor {
                 stemDirection = this.currentVoice === 0 ? 1 : -1;
             }
 
-            this.slotGrid.setNote(clef, this.currentVoice, slotIndex, {
-                pitches: [pitch],
-                duration: this.currentDuration,
-                dotted: this.isDotted,
-                stemDirection: stemDirection
-            });
+            if (durationSlots > availableSlots) {
+                // Note would overflow - truncate and use ties to fill available space
+                const availableBeats = availableSlots / SLOTS_PER_BEAT;
+                const requestedBeats = durationBeats;
 
-            // Status message
-            let status = `Added ${pitch} (${this._getDurationName(this.currentDuration)}${this.isDotted ? ' dotted' : ''})`;
-            if (willTruncate) {
-                const truncatedSlots = availableSlots;
-                const truncatedBeats = truncatedSlots / SLOTS_PER_BEAT;
-                status += ` ⚠️ Truncated to ${truncatedBeats.toFixed(2)} beats`;
+                // Show toast notification about truncation
+                showToast(
+                    `Note truncated: ${requestedBeats} beats → ${availableBeats} beats`,
+                    { type: 'warning', duration: 3000 }
+                );
+
+                // Generate optimal durations to fill available space with ties
+                const optimalDurations = this._generateOptimalDurations(availableSlots);
+
+                if (optimalDurations.length === 0) {
+                    this._updateStatus(`⚠️ No space available at this position`);
+                    return;
+                }
+
+                // Place notes with ties
+                let currentSlot = slotIndex;
+                optimalDurations.forEach((dur, index) => {
+                    const isFirst = index === 0;
+                    const isLast = index === optimalDurations.length - 1;
+                    const needsTie = optimalDurations.length > 1 && !isLast;
+
+                    this.slotGrid.setNote(clef, this.currentVoice, currentSlot, {
+                        pitches: [pitch],
+                        duration: dur.duration,
+                        dotted: dur.dotted,
+                        stemDirection: stemDirection,
+                        tied: needsTie,  // This note ties to the next
+                        isTied: !isFirst  // This note is tied from the previous
+                    });
+
+                    currentSlot += dur.slots;
+                });
+
+                // Status message
+                const tiedCount = optimalDurations.length;
+                const tiedMsg = tiedCount > 1 ? ` (${tiedCount} tied notes)` : '';
+                this._updateStatus(`Added ${pitch} truncated to ${availableBeats} beats${tiedMsg}`);
+            } else {
+                // Normal placement - note fits
+                this.slotGrid.setNote(clef, this.currentVoice, slotIndex, {
+                    pitches: [pitch],
+                    duration: this.currentDuration,
+                    dotted: this.isDotted,
+                    stemDirection: stemDirection
+                });
+
+                // Status message
+                this._updateStatus(`Added ${pitch} (${this._getDurationName(this.currentDuration)}${this.isDotted ? ' dotted' : ''})`);
             }
-            this._updateStatus(status);
         }
 
         this._renderStaves();
@@ -1338,12 +1988,53 @@ export class MeasureIsolationEditor {
             return;
         }
 
-        this.slotGrid.setRest(clef, this.currentVoice, slotIndex, {
-            duration: this.currentDuration,
-            dotted: this.isDotted
-        });
+        // Check if rest would overflow the measure
+        const durationBeats = durationToBeats(this.currentDuration, this.isDotted);
+        const durationSlots = Math.round(durationBeats * SLOTS_PER_BEAT);
+        const availableSlots = this.slotGrid.totalSlots - slotIndex;
 
-        this._updateStatus(`Added rest (${this._getDurationName(this.currentDuration)})`);
+        if (durationSlots > availableSlots) {
+            // Rest would overflow - truncate to fill available space
+            const availableBeats = availableSlots / SLOTS_PER_BEAT;
+
+            // Show toast notification about truncation
+            showToast(
+                `Rest truncated: ${durationBeats} beats → ${availableBeats} beats`,
+                { type: 'warning', duration: 3000 }
+            );
+
+            // Generate optimal durations to fill available space
+            const optimalDurations = this._generateOptimalDurations(availableSlots);
+
+            if (optimalDurations.length === 0) {
+                this._updateStatus(`⚠️ No space available at this position`);
+                return;
+            }
+
+            // Place rests (rests don't tie, just place multiple)
+            let currentSlot = slotIndex;
+            optimalDurations.forEach((dur) => {
+                this.slotGrid.setRest(clef, this.currentVoice, currentSlot, {
+                    duration: dur.duration,
+                    dotted: dur.dotted
+                });
+                currentSlot += dur.slots;
+            });
+
+            // Status message
+            const restCount = optimalDurations.length;
+            const restMsg = restCount > 1 ? ` (${restCount} rests)` : '';
+            this._updateStatus(`Added rest truncated to ${availableBeats} beats${restMsg}`);
+        } else {
+            // Normal placement - rest fits
+            this.slotGrid.setRest(clef, this.currentVoice, slotIndex, {
+                duration: this.currentDuration,
+                dotted: this.isDotted
+            });
+
+            this._updateStatus(`Added rest (${this._getDurationName(this.currentDuration)})`);
+        }
+
         this._renderStaves();
         this._updateFillStats();
     }

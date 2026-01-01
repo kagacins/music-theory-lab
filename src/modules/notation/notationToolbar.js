@@ -208,7 +208,6 @@ export class NotationToolbar {
 
     // Multi-voice rest display settings
     this.restDisplayMode = localStorage.getItem('notation-rest-display-mode') || 'clean'; // 'clean' or 'explicit'
-    this.cueRestsForSecondaryVoice = localStorage.getItem('notation-cue-rests') !== 'false'; // default true
     this.onRestDisplayModeChange = options.onRestDisplayModeChange || (() => {});
 
     // Voice leading visualization
@@ -452,12 +451,14 @@ export class NotationToolbar {
       <div class="notation-toolbar notation-toolbar-banner ${stickyClass}">
         <!-- TIER 1: ESSENTIAL (Always Visible) -->
         <div class="toolbar-tier toolbar-tier-1">
-          <!-- Mode Toggle (Leftmost - most important for workflow) -->
-          <div class="toolbar-section mode-section">
-            <div class="button-group">
-              <button class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'noteEntry' ? 'active' : ''}" data-interaction-mode="noteEntry" title="Note Entry Mode (click adds notes)">✏</button>
-              <button class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'select' ? 'active' : ''}" data-interaction-mode="select" title="Select Mode (click selects notes)">⎀</button>
+          <!-- Mode Toggle (Leftmost - Alt-based mode switching with sticky toggle) -->
+          <div class="toolbar-section mode-section" style="display: flex; align-items: center; gap: 4px;">
+            <span class="text-xs text-gray-600" style="white-space: nowrap;">Entry:</span>
+            <div class="button-group" style="display: flex; gap: 2px;">
+              <button class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'noteEntry' ? 'active' : ''}" data-interaction-mode="noteEntry" title="Entry Mode ON - click adds notes (hold Alt to select)" style="min-width: 32px; padding: 4px 8px;">ON</button>
+              <button class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'select' ? 'active' : ''}" data-interaction-mode="select" title="Entry Mode OFF - click selects notes (hold Alt to add)" style="min-width: 32px; padding: 4px 8px;">OFF</button>
             </div>
+            <span class="mode-hint text-xs text-gray-500" style="white-space: nowrap;">${this.interactionMode === 'noteEntry' ? '(Alt=Sel)' : '(Alt=Add)'}</span>
           </div>
 
           <!-- Selection Indicator (shown when notes selected) -->
@@ -692,10 +693,6 @@ export class NotationToolbar {
             <div class="toolbar-group-content">
               <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'clean' ? 'active' : ''}" data-rest-mode="clean" title="Clean mode - hide redundant rests">Clean</button>
               <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'explicit' ? 'active' : ''}" data-rest-mode="explicit" title="Show all rests explicitly">All</button>
-              <label class="cue-rest-toggle ${this.restDisplayMode === 'clean' ? '' : 'disabled'}" title="Show small cue rests for secondary voice">
-                <input type="checkbox" class="cue-rests-checkbox" ${this.cueRestsForSecondaryVoice ? 'checked' : ''} ${this.restDisplayMode === 'clean' ? '' : 'disabled'}>
-                <span>Cue</span>
-              </label>
             </div>
           </div>
 
@@ -1386,44 +1383,6 @@ export class NotationToolbar {
         min-width: 28px;
       }
 
-      .cue-rest-toggle {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        cursor: pointer;
-        padding: 4px 8px;
-        border-radius: 4px;
-        background: var(--bg-tertiary, #333);
-        font-size: 11px;
-        color: var(--text-primary, #fff);
-        transition: background 0.15s ease;
-        height: 32px;
-      }
-
-      .cue-rest-toggle:hover:not(.disabled) {
-        background: var(--bg-hover, #444);
-      }
-
-      .cue-rest-toggle.disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-
-      .cue-rest-checkbox {
-        width: 12px;
-        height: 14px;
-        cursor: pointer;
-      }
-
-      .cue-rest-checkbox:disabled {
-        cursor: not-allowed;
-      }
-
-      .cue-rest-label {
-        font-size: 11px;
-        color: var(--text-muted, #888);
-      }
-
       /* Ensure tooltips aren't clipped */
       .notation-toolbar,
       .toolbar-group,
@@ -1835,11 +1794,6 @@ export class NotationToolbar {
           this.setRestDisplayMode(mode);
         }
       });
-    });
-
-    // Cue rest checkbox
-    this.container.querySelector('.cue-rest-checkbox')?.addEventListener('change', (e) => {
-      this.setCueRestsEnabled(e.target.checked);
     });
 
     // Voice leading toggle button
@@ -2297,6 +2251,12 @@ export class NotationToolbar {
       const isActive = btn.dataset.interactionMode === this.interactionMode;
       btn.classList.toggle('active', isActive);
     });
+
+    // Update mode hint text if present
+    const modeHint = this.container.querySelector('.mode-hint');
+    if (modeHint) {
+      modeHint.textContent = this.interactionMode === 'noteEntry' ? '(Alt=Sel)' : '(Alt=Add)';
+    }
   }
 
   /**
@@ -2310,24 +2270,6 @@ export class NotationToolbar {
     this.updateRestDisplayButtons();
     this.onRestDisplayModeChange({
       restDisplayMode: this.restDisplayMode,
-      cueRestsForSecondaryVoice: this.cueRestsForSecondaryVoice,
-      hideCueRests: !this.cueRestsForSecondaryVoice,
-    });
-  }
-
-  /**
-   * Set cue rests enabled for secondary voice
-   * When enabled (checkbox checked): Show small gray cue rests
-   * When disabled (checkbox unchecked): Hide cue rests using GhostNotes
-   * @param {boolean} enabled - Whether to show cue-sized rests (true) or hide them (false)
-   */
-  setCueRestsEnabled(enabled) {
-    this.cueRestsForSecondaryVoice = enabled;
-    localStorage.setItem('notation-cue-rests', enabled ? 'true' : 'false');
-    this.onRestDisplayModeChange({
-      restDisplayMode: this.restDisplayMode,
-      cueRestsForSecondaryVoice: this.cueRestsForSecondaryVoice,
-      hideCueRests: !this.cueRestsForSecondaryVoice,
     });
   }
 
@@ -2356,19 +2298,16 @@ export class NotationToolbar {
 
   /**
    * Get current rest display settings
-   * @returns {Object} - { restDisplayMode, cueRestsForSecondaryVoice, hideCueRests }
+   * @returns {Object} - { restDisplayMode }
    */
   getRestDisplaySettings() {
     return {
       restDisplayMode: this.restDisplayMode,
-      cueRestsForSecondaryVoice: this.cueRestsForSecondaryVoice,
-      // hideCueRests is the inverse: when cue checkbox is checked (show cue), hide is false
-      hideCueRests: !this.cueRestsForSecondaryVoice,
     };
   }
 
   /**
-   * Update rest display mode button states and cue checkbox disabled state
+   * Update rest display mode button states
    */
   updateRestDisplayButtons() {
     if (!this.container) return;
@@ -2376,15 +2315,6 @@ export class NotationToolbar {
       const isActive = btn.dataset.restMode === this.restDisplayMode;
       btn.classList.toggle('active', isActive);
     });
-
-    // Disable cue checkbox when in "All" (explicit) mode
-    const cueToggle = this.container.querySelector('.cue-rest-toggle');
-    const cueCheckbox = this.container.querySelector('.cue-rest-checkbox');
-    if (cueToggle && cueCheckbox) {
-      const isExplicit = this.restDisplayMode === 'explicit';
-      cueToggle.classList.toggle('disabled', isExplicit);
-      cueCheckbox.disabled = isExplicit;
-    }
   }
 
   /**
@@ -3133,12 +3063,12 @@ export class NotationToolbar {
       `;
     }
 
-    // Row 3: Mode toggle (if enabled)
+    // Row 3: Mode toggle (if enabled) - Alt-based switching with sticky
     let row3Content = '';
     if (ps.showModeToggle) {
       row3Content += `
-        <button class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'noteEntry' ? 'active' : ''}" data-interaction-mode="noteEntry" title="Note Entry Mode">✏</button>
-        <button class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'select' ? 'active' : ''}" data-interaction-mode="select" title="Select Mode">⎀</button>
+        <button class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'noteEntry' ? 'active' : ''}" data-interaction-mode="noteEntry" title="Entry Mode ON (Alt = select)" style="min-width: 32px;">ON</button>
+        <button class="toolbar-btn interaction-mode-btn ${this.interactionMode === 'select' ? 'active' : ''}" data-interaction-mode="select" title="Entry Mode OFF (Alt = add)" style="min-width: 32px;">OFF</button>
       `;
     }
 

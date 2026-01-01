@@ -2,7 +2,7 @@
 
 **Purpose:** Quick lookup for key function signatures without reading full files.
 
-**Last Updated:** 2025-12-26
+**Last Updated:** 2026-01-01 (Updated for Phase 1-3 refactoring + Measure Isolation + durationUtils)
 
 ---
 
@@ -87,11 +87,39 @@ truncateSegmentBassNotes(chordIndex, newDurationBeats) → {truncatedNotes, adju
 // Truncate bass notes when chord duration shrinks
 ```
 
+### Section Management (NEW)
+
+```javascript
+getSections() → Section[]
+// Get all sections (verse, chorus, etc.)
+
+getSection(sectionId) → Section | null
+// Get section by ID
+
+addSection(section) → string
+// Add new section, returns section ID
+
+updateSection(sectionId, updates) → void
+// Update section properties
+
+removeSection(sectionId) → boolean
+// Remove section by ID
+
+reorderSections(newOrder) → void
+// Reorder sections by ID array
+
+getChordsInSection(sectionId) → Chord[]
+// Get all chords belonging to a section
+```
+
 ### Measure Methods
 
 ```javascript
 getMeasure(index) → Measure | null
 // Get measure at index
+
+getMeasures() → Measure[]
+// Get all measures
 
 getMeasureCount() → number
 // Total number of measures
@@ -213,6 +241,258 @@ TS_PPQ = 480  // Ticks per quarter note
 
 ---
 
+## ⏱️ DURATION UTILITIES - Centralized Duration Handling
+**File:** [src/modules/notation/durationUtils.js](../src/modules/notation/durationUtils.js)
+
+**CRITICAL:** All duration operations should use these utilities to ensure consistent canonical format (separate `duration` and `dotted` properties).
+
+### Constants
+
+```javascript
+DURATION_TO_BEATS = {
+  '1n': 4, '2n': 2, '4n': 1, '8n': 0.5, '16n': 0.25, '32n': 0.125
+}
+
+BEATS_TO_DURATION = {
+  4: '1n', 2: '2n', 1: '4n', 0.5: '8n', 0.25: '16n', 0.125: '32n'
+}
+
+DOTTED_BEATS = {
+  '1n': 6, '2n': 3, '4n': 1.5, '8n': 0.75, '16n': 0.375, '32n': 0.1875
+}
+```
+
+### Core Functions
+
+```javascript
+normalizeDottedState(note) → Note
+// Ensure note has canonical format (dotted as separate boolean, not in duration string)
+// Example: {duration: '2n.', dotted: undefined} → {duration: '2n', dotted: true}
+
+isDotted(note) → boolean
+// Check if note is dotted (handles both formats)
+
+getBaseDuration(duration) → string
+// Strip '.' from duration string if present
+// Example: '2n.' → '2n'
+
+beatsToDuration(beats) → { duration: string, dotted: boolean }
+// Convert beats to canonical duration format
+// Example: 3 beats → { duration: '2n', dotted: true }
+
+beatsToDurationString(beats) → string
+// Convert beats to Tone.js duration string (includes dot if needed)
+// Example: 3 beats → '2n.'
+
+durationToBeats(duration, dotted = false) → number
+// Convert duration to beats
+// Example: ('2n', true) → 3 beats
+
+getNoteDurationInBeats(note) → number
+// Get total beats for a note object (handles dotted correctly)
+
+toVexFlowDuration(duration, dotted = false) → string
+// Convert to VexFlow format ('h', 'q', 'hd', 'qd', etc.)
+// Example: ('2n', true) → 'hd'
+
+fromVexFlowDuration(vexDuration) → { duration: string, dotted: boolean }
+// Convert VexFlow format to canonical format
+// Example: 'hd' → { duration: '2n', dotted: true }
+
+createNote({ pitches, beats, duration, dotted, beat, ...rest }) → Note
+// Create properly formatted note with canonical duration format
+
+validateDottedState(note) → { isValid: boolean, issues: string[] }
+// Check if note has consistent dotted state
+```
+
+---
+
+## 🎹 MEASURE ISOLATION EDITOR - Slot-Based Editing
+**File:** [src/modules/notation/measureIsolation/](../src/modules/notation/measureIsolation/)
+
+### SlotGrid Constants & Types
+
+```javascript
+UNITS_PER_SLOT = 6          // 32nd note = smallest slot
+SLOTS_PER_BEAT = 8          // 48 units/beat ÷ 6 units/slot = 8 slots/beat
+
+SLOT_TYPES = {
+  EMPTY: 'empty',           // Available for notes
+  NOTE_START: 'note',       // Note/chord starts here
+  CONTINUATION: 'continuation',  // Previous note continues
+  REST: 'rest'              // Explicit rest
+}
+```
+
+### SlotGrid Functions
+
+```javascript
+durationToSlots(duration, dotted = false) → number
+// Convert duration to number of slots
+// Example: ('4n', false) → 8 slots
+
+slotsToDuration(slots) → { duration: string, dotted: boolean }
+// Convert slots to canonical duration format
+// Example: 12 slots → { duration: '4n', dotted: true }
+```
+
+### SlotGrid Class
+
+```javascript
+class SlotGrid {
+  constructor(timeSignature, voiceCount = 2)
+  // Create grid for measure with given time signature
+
+  fromMeasure(measureNotation) → this
+  // Load notation data into grid
+
+  toNotation() → { treble: {...}, bass: {...} }
+  // Export grid to notation format
+
+  setNote(clef, voice, slotIndex, pitches, durationSlots, options?) → boolean
+  // Place a note at slot
+
+  setRest(clef, voice, slotIndex, durationSlots) → boolean
+  // Place a rest at slot
+
+  clearSlots(clef, voice, startSlot, count) → void
+  // Clear range of slots
+
+  getSlot(clef, voice, slotIndex) → Slot
+  // Get slot at position
+
+  voiceHasContent(clef, voiceIndex) → boolean
+  // Check if voice has any notes/rests
+
+  getSlotBeatInfo(slotIndex) → { beat, isDownbeat, isHalfBeat }
+  // Get beat position info for slot
+}
+```
+
+### MeasureIsolationEditor
+
+```javascript
+getMeasureIsolationEditor(options?) → MeasureIsolationEditor
+// Get or create singleton editor instance
+
+openMeasureIsolationEditor(measureIndex, options?) → void
+// Open editor for specific measure
+
+class MeasureIsolationEditor {
+  constructor(options?)
+
+  open(measureIndex) → void
+  // Open editor for measure
+
+  close() → void
+  // Close editor
+
+  save() → void
+  // Save changes to compositionState
+
+  // Internal methods handle:
+  // - Click-to-place notes
+  // - Duration/pitch selection
+  // - Voice switching (V1/V2)
+  // - Clef switching (treble/bass)
+  // - Real-time preview
+}
+```
+
+---
+
+## 🎵 PROGRESSION CONTROLLER - State & CRUD Operations
+**File:** [src/modules/features/progressionBuilder/ProgressionController.js](../src/modules/features/progressionBuilder/ProgressionController.js)
+
+### View & Selection State
+
+```javascript
+getProgressionViewMode() → 'all' | 'sections'
+// Get current view mode
+
+setProgressionViewMode(mode) → void
+// Set view mode
+
+getSelectedSectionIds() → string[]
+// Get currently selected section IDs
+
+selectSectionInView(sectionId, additive = false) → void
+// Select section (additive adds to selection)
+
+deselectSectionInView(sectionId) → void
+// Deselect section
+
+clearSectionSelection() → void
+// Clear all section selections
+
+selectSectionRange(targetSectionId, sections) → void
+// Select range of sections (shift-click)
+
+navigateToPreviousSection() / navigateToNextSection() → void
+// Section navigation
+```
+
+### Chord CRUD Operations
+
+```javascript
+addChordToProgressionByParams(chordType, root, inversion = 0, octaveShift = 0) → void
+// Add chord with parameters
+
+addToProgressionData(chordData, options?) → void
+// Add chord data object to progression
+
+removeChordFromProgression(index) → void
+// Remove chord at index
+
+deleteSelectedChords(indices) → void
+// Delete multiple selected chords
+
+updateChordType(index, newType) → void
+// Update chord type (e.g., 'Major' → 'Minor 7th')
+
+updateChordRoot(index, newRoot) → void
+// Update chord root (e.g., 'C' → 'D')
+
+updateChordInversion(index, newInversion, shouldUpdateUI?, shouldSyncNotation?) → void
+// Update chord inversion
+
+updateChordDuration(index, sourceElement) → void
+// Update chord duration (interactive, from dropdown)
+
+finalizeDurationChange(index, totalBeats) → void
+// Finalize duration change programmatically
+
+updateChordVoicing(index, newVoicing) → void
+// Update chord voicing
+
+updateChordAndRenderPreservingTrebleNotes(index, options?) → void
+// Update chord while preserving user's treble notes
+```
+
+### Transposition
+
+```javascript
+transposeTreble(oldKey, newKey) → void
+// Transpose all treble notes from old key to new key
+
+transposeTrebleWithModeAdjust(oldKey, newKey) → void
+// Transpose with mode adjustment (major↔minor)
+
+getKeyBasedEnharmonic() → 'sharp' | 'flat'
+// Get enharmonic preference based on current key
+```
+
+### Undo/Redo
+
+```javascript
+saveStateBeforeChange() → void
+// Save current state for undo (call BEFORE making changes)
+// Integrates with versionHistory.js
+```
+
+---
+
 ## 🔄 PROGRESSION NOTATION SYNC
 **File:** [src/modules/integration/progressionNotationSync.js](../src/modules/integration/progressionNotationSync.js)
 
@@ -246,9 +526,6 @@ removeMeasureFromProgression(measureIndex) → void
 
 syncProgressionToNotation() → void
 // Sync entire progression → notation
-
-syncNotationToProgression() → void
-// DISABLED - Would sync notation → progression
 
 highlightChordTonesInMelody(measureIndex) → boolean[]
 // Highlight melody notes that are chord tones
@@ -331,22 +608,6 @@ regenerateAllBass() → void
 // Regenerate all bass notes
 ```
 
-### Settings
-
-```javascript
-getBassPatternOptions() → {value, label, description}[]
-// Get available bass pattern options
-
-getBridgeSettings() → object
-// Get current bridge settings
-
-setUseCompositionState(enabled) → void
-// Enable/disable compositionState usage
-
-isUsingCompositionState() → boolean
-// Check if using compositionState
-```
-
 ---
 
 ## 🎼 NOTATION INIT
@@ -413,20 +674,6 @@ clearPlaybackHighlights() → void
 // Clear all playback highlights
 ```
 
-### Shortcuts
-
-```javascript
-showNotationShortcuts() → void
-// Show keyboard shortcuts modal
-```
-
-### Cleanup
-
-```javascript
-destroyEnhancedNotation() → void
-// Destroy notation system
-```
-
 ---
 
 ## 🔊 AUDIO ENGINE
@@ -462,9 +709,6 @@ getGuitar() → Tone.Sampler | Tone.PluckSynth | null
 
 getInstrument() → Tone.Sampler | Tone.PluckSynth | null
 // Get current active instrument (usually piano)
-
-getCameraShutter() → Tone.Player | null
-// Get camera shutter sound effect
 ```
 
 ### Audio State
@@ -479,16 +723,6 @@ getAudioIsReady() → boolean
 whenAudioReady(callback) → void
 // Execute callback when audio ready
 
-setAudioIsLoading(value) → void
-// Set loading state
-
-setAudioIsReady(value) → void
-// Set ready state
-```
-
-### Playback
-
-```javascript
 forceStopAllPlayback(andClearHighlights?) → void
 // Force stop all playing sounds
 ```
@@ -496,9 +730,6 @@ forceStopAllPlayback(andClearHighlights?) → void
 ### Metronome
 
 ```javascript
-getMetronomeSynth() → {downbeat, beat}
-// Get metronome synth instances
-
 getMetronomeEnabled() → boolean
 // Check if metronome is enabled
 
@@ -513,9 +744,6 @@ startMetronome(beatsPerMeasure?, totalMeasures?) → void
 
 stopMetronome() → void
 // Stop metronome
-
-scheduleMetronomeClick(time, isDownbeat?) → void
-// Schedule single metronome click
 ```
 
 ---
@@ -570,22 +798,6 @@ getLHNotes(rootNote, lhType, lhInversion?, key, lhOctaveShift, rhChordType?, enh
 // lhType: 'root', 'fifth', 'octave', 'chord', 'off'
 ```
 
-### Note Analysis
-
-```javascript
-getNotePitches(note) → string[]
-// Get all pitches from note object (handles chords)
-
-hasPitch(note) → boolean
-// Check if note has pitch data (not a rest)
-
-getPrimaryPitch(note) → string
-// Get primary pitch (first pitch if chord)
-
-isPolyphonic(note) → boolean
-// Check if note is polyphonic (multiple pitches)
-```
-
 ---
 
 ## 📊 MUSIC DATA CONSTANTS
@@ -603,62 +815,18 @@ SHARP_NOTES
 FLAT_NOTES
 // Chromatic with flats: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']
 
-MAJOR_SCALE_STEPS
-// [0, 2, 4, 5, 7, 9, 11]
-
-ROMAN_MAP_BASE
-// Roman numeral to chord quality mapping
-
-COMMON_PROGRESSIONS
-// Array of {name, chords, category, description}
-
 CHORD_DEFINITIONS
 // CRITICAL: All chord types with intervals/symbols
 // Format: { 'Major': {symbol: '', intervals: [0, 4, 7], ...}, 'Minor': {...}, ... }
 // ALWAYS check this for valid chord.type values!
 
-INVERSION_NAMES
-// ['Root Position', '1st Inversion', '2nd Inversion', '3rd Inversion', ...]
-
-INTERVAL_DEFINITIONS
-// All interval definitions
-
-CHORD_GROUPS
-// Grouped chord types for UI
-
-INTERVAL_GROUPS
-// Grouped intervals for UI
-
-SCALE_DEFINITIONS
-// All scales with categories
-
-ENHARMONIC_MAP
-// Enharmonic equivalents: {'C#': 'Db', 'Db': 'C#', ...}
-
-KEY_SIGNATURE_TEXT
-// Text representations of key signatures
-
-KEY_SIGNATURE_IMAGES
-// Image paths for key signature images
-
-RELATIVE_MINOR_MAP
-// Major to relative minor: {'C': 'A', 'G': 'E', ...}
-
-DIATONIC_CHORD_GROUPS
-// Chords grouped by key
+COMMON_PROGRESSIONS
+// Array of {name, chords, category, description}
 
 TIME_SIGNATURES
 // Available time signatures
 
 DEFAULT_TIME_SIGNATURE = {num: 4, denom: 4}
-```
-
-### Exported Functions
-
-```javascript
-generateDiatonicChords(key) → string[]
-// Generate diatonic chord roots for key
-// Example: generateDiatonicChords('C') → ['C', 'Dm', 'Em', 'F', 'G', 'Am', 'Bdim']
 ```
 
 ---
@@ -679,25 +847,24 @@ generateDiatonicChords(key) → string[]
   lhType: string,            // 'off' | 'root' | 'fifth' | 'octave' | 'chord'
   lhOctaveShift: number,     // Octave shift for left hand
   roman: string,             // 'I', 'ii', 'V', etc. (optional)
-  name: string               // Display name (optional)
+  sectionId: string          // Section this chord belongs to (optional)
 }
 ```
 
-### Note Object
+### Note Object (Canonical Format)
 
 ```javascript
 {
   type: 'note' | 'rest',
   pitch: string,             // 'C4' (for single note)
   pitches: string[],         // ['C4', 'E4', 'G4'] (for chord)
-  duration: string,          // '4n', '8n', '2n', '16n', etc. (Tone.js format)
+  duration: string,          // '4n', '8n', '2n', '16n', etc. (NO dot suffix!)
+  dotted: boolean,           // Separate dotted flag (ALWAYS use this format)
   beat: number,              // Position in measure (0-based)
-  dotted: boolean,           // Dotted note
   isRest: boolean,           // Is this a rest
   accidental: string | null, // '#', 'b', 'n', null
   articulation: string | null, // Articulation type
-  tuplet: {type, num, val} | null, // Tuplet info
-  tie: 'start' | 'continue' | 'end' | undefined, // Tie state
+  voice: number,             // 0 or 1 for V1/V2
   chordIndex: number         // Index of owning chord
 }
 ```
@@ -710,7 +877,8 @@ generateDiatonicChords(key) → string[]
   notation: {
     treble: {
       voices: [
-        { notes: Note[] }    // Voice 1 notes
+        { notes: Note[] },   // Voice 1 notes
+        { notes: Note[] }    // Voice 2 notes (optional)
       ]
     },
     bass: {
@@ -723,26 +891,31 @@ generateDiatonicChords(key) → string[]
 }
 ```
 
-### ChordSegment Object
+### Section Object
 
 ```javascript
 {
-  chordIndex: number,        // Index of chord
-  startBeat: number,         // Absolute start position
-  durationBeats: number,     // Duration in beats
-  chord: Chord,              // Chord object reference
-  bassNotes: Note[],         // Bass notes for this segment
-  isEdited: boolean,         // User manually edited bass
-  originalBassNotes: Note[]  // Original auto-generated bass (for restore)
+  id: string,                // Unique section ID
+  name: string,              // Display name ('Verse', 'Chorus', etc.)
+  type: string,              // Section type
+  color: string,             // Display color
+  chordIndices: number[]     // Indices of chords in this section
 }
 ```
 
-### CollectedNote Object
+### Slot Object (Measure Isolation)
 
 ```javascript
 {
-  note: Note,                // Note object
-  absoluteBeat: number       // Absolute position in composition
+  type: SLOT_TYPES,          // 'empty', 'note', 'continuation', 'rest'
+  pitches: string[],         // For notes: ['C4', 'E4']
+  duration: string,          // Original duration
+  dotted: boolean,           // Dotted flag
+  durationSlots: number,     // Duration in slots
+  articulation: string,      // Optional articulation
+  dynamic: string,           // Optional dynamic marking
+  tied: boolean,             // Tie to next note
+  isTied: boolean            // Tied from previous note
 }
 ```
 
@@ -785,6 +958,23 @@ This ensures:
 - `"Suspended 4th"`, `"Suspended 2nd"`
 - `"Dim"`, `"Aug"`, `"m7b5"`
 
+### Canonical Duration Format
+
+**ALWAYS use separate `dotted` property:**
+
+```javascript
+// ✅ CORRECT - Canonical format
+{
+  duration: '2n',
+  dotted: true
+}
+
+// ❌ WRONG - Dot in duration string
+{
+  duration: '2n.'
+}
+```
+
 ### Chord Playback
 
 **ALWAYS use `chord.notes` array instead of regenerating:**
@@ -811,24 +1001,6 @@ const chordData = {
   inversion: chord.inversion || 0,
   notes: chord.notes
 };
-
-// ❌ WRONG - Missing inversion
-const chordData = {
-  root: chord.root,
-  type: chord.type
-};
-```
-
-### Enharmonic Spelling
-
-**ALWAYS use `spellNoteInKey()` for display:**
-
-```javascript
-// ✅ CORRECT - Bb in key of Bb
-const displayRoot = spellNoteInKey(chord.root, currentKey);
-
-// ❌ WRONG - May show A# instead of Bb
-const displayRoot = chord.root;
 ```
 
 ---

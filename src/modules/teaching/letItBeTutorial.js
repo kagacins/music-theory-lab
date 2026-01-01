@@ -1435,7 +1435,7 @@ function launchLetItBeMelodyTutorialSteps() {
 
     // Define the melody tutorial steps
     // "Let It Be" chorus melody: "Let it be, let it be..."
-    // This tutorial teaches Note Entry Mode vs Select Mode, durations, ties, and rests
+    // This tutorial teaches Alt-based mode switching (Entry Mode On/Off), durations, ties, and rests
     const letItBeMelodySteps = [
         // ========== PART 1: INTRODUCTION ==========
         {
@@ -1467,38 +1467,38 @@ function launchLetItBeMelodyTutorialSteps() {
         // ========== PART 2: TWO MODES EXPLAINED ==========
         {
             instruction: 'There are TWO ways to work with notation. Let\'s learn both!',
-            callout: '✏ NOTE ENTRY MODE: Click anywhere on the staff to ADD a note at that pitch.\n⎀ SELECT MODE: Click to SELECT existing notes, then edit them.',
+            callout: '✏ On: Entry Mode is ON - click to ADD notes.\n✏ Off: Entry Mode is OFF - click to SELECT notes, hold Alt to add.',
             validation: null,
             successMessage: null,
             onEnter: expandStaffNotationPanel
         },
         {
-            instruction: 'NOTE ENTRY MODE (✏) is for adding new notes. You click on the staff where you want the note, and it appears!',
+            instruction: 'ENTRY MODE ON (✏ On) is for adding new notes. Click on the staff and notes appear!',
             spotlight: '[data-interaction-mode="noteEntry"]',
             targetElement: '[data-interaction-mode="noteEntry"]',
-            callout: 'In Note Entry Mode:\n• Click on staff = add note at that pitch\n• The duration button you\'ve selected determines the note length\n• Notes are added in sequence',
+            callout: 'With Entry Mode ON:\n• Click on staff = add note at that pitch\n• The duration button you\'ve selected determines the note length\n• Notes are added in sequence\n• Hold Alt to temporarily switch to Select mode',
             validation: null,
             successMessage: null,
             onEnter: expandStaffNotationPanel
         },
         {
-            instruction: 'SELECT MODE (⎀) is for editing. Click to select notes, then transpose, delete, or modify them.',
+            instruction: 'ENTRY MODE OFF (✏ Off) is for selecting and editing. Hold Alt to add notes!',
             spotlight: '[data-interaction-mode="select"]',
             targetElement: '[data-interaction-mode="select"]',
-            callout: 'In Select Mode:\n• Click a note = select it\n• Shift+Click = select multiple notes\n• Alt+Click = add a note (without switching modes!)\n• Alt+Click on selected note = add polyphony (stack another note)\n• Esc = unselect note\n• Use toolbar to transpose or delete',
+            callout: 'With Entry Mode OFF:\n• Click a note = select it\n• Shift+Click = select multiple notes\n• Hold Alt + Click = add a note\n• Alt+Click on selected note = add polyphony (stack another note)\n• Esc = unselect note\n• Use toolbar to transpose or delete',
             validation: null,
             successMessage: null,
             onEnter: expandStaffNotationPanel
         },
         // ========== PART 3: ADDING NOTES ==========
         {
-            instruction: 'Let\'s start adding the melody! First, click the Note Entry Mode button (✏).',
+            instruction: 'Let\'s start adding the melody! Click the Entry Mode ON button (✏ On).',
             spotlight: '[data-interaction-mode="noteEntry"]',
             targetElement: '[data-interaction-mode="noteEntry"]',
-            callout: 'This mode lets you click anywhere on the treble staff to add notes.',
+            callout: 'With Entry Mode ON, you can click anywhere on the treble staff to add notes.',
             isActionStep: true,
             validation: { type: 'interaction_mode_set', value: 'noteEntry' },
-            successMessage: 'Note Entry Mode activated!',
+            successMessage: 'Entry Mode ON!',
             quickAdvance: true,
             onEnter: expandStaffNotationPanel
         },
@@ -1517,10 +1517,10 @@ function launchLetItBeMelodyTutorialSteps() {
             }
         },
         {
-            instruction: 'Click in MEASURE 1 (first measure) at the E5 position to add the first note. While moving your mouse, you can hold the Alt key to see where the note will be placed.',
+            instruction: 'Click in MEASURE 1 (first measure) at the E5 position to add the first note.',
             spotlight: '#notation-pages-container',
             targetElement: '#notation-pages-container',
-            callout: 'E5 is in the 1st SPACE from the top in the treble clef (just below the top line).\n\n💡 Your mouse pointer\'s horizontal position within a measure doesn\'t matter - notes are added after the last note in that measure!\n\n💡 Hold Alt to see a "ghost note" preview showing exactly where your note will be placed!',
+            callout: 'E5 is in the 1st SPACE from the top in the treble clef (just below the top line).\n\n💡 Your mouse pointer\'s horizontal position within a measure doesn\'t matter - notes are added after the last note in that measure!\n\n💡 With Entry Mode ON, you\'ll see a "ghost note" preview showing exactly where your note will be placed!',
             isActionStep: true,
             validation: { type: 'note_added_to_treble' },
             expectedNote: 'E5',
@@ -1624,13 +1624,13 @@ function launchLetItBeMelodyTutorialSteps() {
             }
         },
         {
-            instruction: 'Now switch to SELECT MODE (⎀) so we can select the notes to tie them.',
+            instruction: 'Turn Entry Mode OFF (✏ Off) so we can select the notes to tie them.',
             spotlight: '[data-interaction-mode="select"]',
             targetElement: '[data-interaction-mode="select"]',
-            callout: 'Select Mode lets us click on existing notes to select them.\nRemember: Alt+Click adds notes, Esc unselects.',
+            callout: 'With Entry Mode OFF, you can click to select existing notes.\nRemember: Hold Alt to add notes, Esc unselects.',
             isActionStep: true,
             validation: { type: 'interaction_mode_set', value: 'select' },
-            successMessage: 'Select Mode activated!',
+            successMessage: 'Entry Mode OFF!',
             quickAdvance: true,
             onEnter: () => {
                 expandStaffNotationPanel();
@@ -1686,13 +1686,13 @@ function launchLetItBeMelodyTutorialSteps() {
         },
         // ========== PART 5: CONTINUING THE MELODY ==========
         {
-            instruction: 'Now let\'s continue the melody! Make sure you\'re in Note Entry Mode (✏).',
+            instruction: 'Now let\'s continue the melody! Turn Entry Mode ON (✏ On).',
             spotlight: '[data-interaction-mode="noteEntry"]',
             targetElement: '[data-interaction-mode="noteEntry"]',
             callout: 'We\'ll add: E5-G5-A5, rest, G5-G5-E5-D5-C5, A4-G4, tied E5s, and more!',
             isActionStep: true,
             validation: { type: 'interaction_mode_set', value: 'noteEntry' },
-            successMessage: 'Note Entry Mode activated!',
+            successMessage: 'Entry Mode ON!',
             quickAdvance: false,
             onEnter: () => {
                 expandStaffNotationPanel();
@@ -2063,13 +2063,13 @@ function launchLetItBeMelodyTutorialSteps() {
             }
         },
         {
-            instruction: 'Switch to Select Mode (⎀) to tie them.',
+            instruction: 'Turn Entry Mode OFF (✏ Off) to select and tie them.',
             spotlight: '[data-interaction-mode="select"]',
             targetElement: '[data-interaction-mode="select"]',
             callout: 'We need to select both notes to tie them.',
             isActionStep: true,
             validation: { type: 'interaction_mode_set', value: 'select' },
-            successMessage: 'Select Mode!',
+            successMessage: 'Entry Mode OFF!',
             quickAdvance: false,
             onEnter: () => {
                 expandStaffNotationPanel();
@@ -2128,13 +2128,13 @@ function launchLetItBeMelodyTutorialSteps() {
         },
         // ========== RESTS ==========
         {
-            instruction: 'Add a quarter rest. Switch to Note Entry Mode.',
+            instruction: 'Add a quarter rest. Turn Entry Mode ON (✏ On).',
             spotlight: '[data-interaction-mode="noteEntry"]',
             targetElement: '[data-interaction-mode="noteEntry"]',
-            callout: 'Back to Note Entry for the rest.',
+            callout: 'Back to Entry Mode for the rest.',
             isActionStep: true,
             validation: { type: 'interaction_mode_set', value: 'noteEntry' },
-            successMessage: 'Note Entry Mode!',
+            successMessage: 'Entry Mode ON!',
             quickAdvance: false,
             onEnter: () => {
                 expandStaffNotationPanel();
@@ -2477,14 +2477,14 @@ function launchLetItBeMelodyTutorialSteps() {
         // ========== SUMMARY ==========
         {
             instruction: '🎉 Congratulations! You\'ve entered the complete "Let It Be" chorus melody!',
-            callout: 'You\'ve mastered:\n• Note Entry Mode & Select Mode\n• Duration selection\n• Adding rests\n• Creating ties\n• Staff positions (lines vs spaces)',
+            callout: 'You\'ve mastered:\n• Entry Mode toggle (✏ On/Off)\n• Alt-based mode switching\n• Duration selection\n• Adding rests\n• Creating ties\n• Staff positions (lines vs spaces)',
             validation: null,
             successMessage: null,
             onEnter: expandStaffNotationPanel
         },
         {
             instruction: 'You\'re ready to create your own melodies!',
-            callout: 'KEYBOARD SHORTCUTS:\n• Shift+1-6: Duration (1=whole, 6=32nd)\n• R: Toggle rest mode\n• T: Create tie\n• Delete: Delete selected\n• Ctrl+Z: Undo\n• Alt: Show ghost note preview',
+            callout: 'KEYBOARD SHORTCUTS:\n• Shift+1-6: Duration (1=whole, 6=32nd)\n• R: Toggle rest mode\n• T: Create tie\n• Delete: Delete selected\n• Ctrl+Z: Undo\n\nMODE TIP: Entry Mode OFF = hold Alt to add notes. Entry Mode ON = click to add!',
             validation: null,
             successMessage: 'You\'ve mastered melody notation entry!',
             allowFreeExplore: true,

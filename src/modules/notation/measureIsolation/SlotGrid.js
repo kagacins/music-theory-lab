@@ -13,7 +13,7 @@
 
 import { UNITS_PER_BEAT, DURATION_UNITS, unitsToDuration, durationToUnits } from '../../state/buildingBlock.js';
 import { getBeatsPerMeasureFromTimeSignature } from '../../state/compositionState.js';
-import { durationToBeats } from '../durationUtils.js';
+import { durationToBeats, beatsToDuration } from '../durationUtils.js';
 import { noteToMidi } from '../vexFlowRenderer.js';
 
 // Constants
@@ -29,6 +29,28 @@ export const SLOT_TYPES = {
     CONTINUATION: 'continuation',  // Previous note continues through this slot
     REST: 'rest'              // Explicit rest
 };
+
+/**
+ * Convert duration (with dotted flag) to number of slots
+ * @param {string} duration - Duration string (e.g., '4n', '2n')
+ * @param {boolean} [dotted=false] - Whether the note is dotted
+ * @returns {number} Number of slots
+ */
+export function durationToSlots(duration, dotted = false) {
+    const beats = durationToBeats(duration, dotted);
+    return Math.round(beats * SLOTS_PER_BEAT);
+}
+
+/**
+ * Convert number of slots to duration object
+ * Uses the canonical format: { duration, dotted }
+ * @param {number} slots - Number of slots
+ * @returns {{ duration: string, dotted: boolean }} Duration object
+ */
+export function slotsToDuration(slots) {
+    const beats = slots / SLOTS_PER_BEAT;
+    return beatsToDuration(beats);
+}
 
 /**
  * SlotGrid - Manages the slot-based representation of a measure
@@ -110,13 +132,10 @@ export class SlotGrid {
      * @private
      */
     _loadVoicesToSlots(clef, voices) {
-        console.log(`[SlotGrid] Loading ${clef} clef, ${voices.length} voices`);
-
         voices.forEach((voice, voiceIndex) => {
             if (voiceIndex >= this.voiceCount) return;
 
             const notes = voice.notes || [];
-            console.log(`[SlotGrid] ${clef} Voice ${voiceIndex}: ${notes.length} notes`);
             let currentBeat = 0;
 
             notes.forEach(note => {
@@ -145,14 +164,11 @@ export class SlotGrid {
                         // Compare by MIDI values for robust matching (handles enharmonic equivalents)
                         if (voiceIndex === 1) {
                             const v0Slot = this.slots[clef][0][slotIndex];
-                            console.log(`[SlotGrid] Voice 1 at slot ${slotIndex}: checking for duplicate. V0 slot type: ${v0Slot?.type}`);
                             if (v0Slot && v0Slot.type === SLOT_TYPES.NOTE_START) {
                                 const v0Midi = (v0Slot.pitches || []).map(p => noteToMidi(p)).sort((a, b) => a - b).join(',');
                                 const thisMidi = pitches.map(p => noteToMidi(p)).sort((a, b) => a - b).join(',');
-                                console.log(`[SlotGrid] V0 MIDI: ${v0Midi}, V1 MIDI: ${thisMidi}, match: ${v0Midi === thisMidi}`);
                                 if (v0Midi === thisMidi) {
                                     // Skip duplicate - Voice 0 already has this content (same MIDI values)
-                                    console.log(`[SlotGrid] SKIPPING duplicate at slot ${slotIndex}`);
                                     currentBeat = noteBeat + durationBeats;
                                     return;
                                 }
@@ -394,26 +410,38 @@ export class SlotGrid {
     /**
      * Convert voice slots to notation format
      * Empty slots are filled with optimal rests (fewest rests possible)
+     *
+     * REST RULES FOR TWO-VOICE NOTATION:
+     * 1. V1 always needs complete rhythmic representation (regular rests)
+     * 2. V2 is invisible when it has no content (no rests generated)
+     * 3. V2 filler rests are ALWAYS cue rests when V2 has content
+     * 4. Overlapping rests: if V1 has a rest at same position, V2 rest can be hidden
+     *
      * @private
      */
     _voiceSlotsToNotation(clef) {
         const voices = [];
 
-        // Check if both voices have content in this clef (for cue rest logic)
+        // Check if each voice has actual note content (not just rests)
         const v0HasContent = this.voiceHasContent(clef, 0);
         const v1HasContent = this.voiceHasContent(clef, 1);
-        const bothVoicesActive = v0HasContent && v1HasContent;
 
         for (let v = 0; v < this.voiceCount; v++) {
             const voiceSlots = this.slots[clef][v];
+            const otherVoiceSlots = this.slots[clef][v === 0 ? 1 : 0];
             const notes = [];
 
-            // A rest should be a cue rest if:
-            // 1. Both voices are active in this clef
-            // 2. This voice has content (so it needs filling rests)
-            // 3. The rest is in a slot where the other voice has content
-            const thisVoiceHasContent = v === 0 ? v0HasContent : v1HasContent;
-            const otherVoiceIndex = v === 0 ? 1 : 0;
+            // Voice 2 (index 1) should be completely invisible if it has no content
+            // This matches Composition Studio behavior
+            if (v === 1 && !v1HasContent) {
+                voices.push({ notes: [] });
+                continue;
+            }
+
+            // Determine rest styling rules:
+            // - V1 rests are always regular (V1 is the primary voice)
+            // - V2 filler rests are ALWAYS cue rests when V2 has content
+            const isSecondaryVoice = v === 1;
 
             let i = 0;
             while (i < this.totalSlots) {
@@ -430,11 +458,23 @@ export class SlotGrid {
                     // Fill with optimal rests
                     const rests = this._generateOptimalRests(i, emptyCount);
                     rests.forEach(rest => {
-                        // Determine if this rest should be a cue rest:
-                        // - Both voices must be active in the clef
-                        // - This voice must have content somewhere
-                        // - We mark all filler rests as cue rests in multi-voice mode
-                        const shouldBeCueRest = bothVoicesActive && thisVoiceHasContent;
+                        const restSlotIndex = Math.round(rest.beat * SLOTS_PER_BEAT);
+
+                        // Check if the other voice has a rest at this same position
+                        // If so, we can potentially hide this rest (overlapping rest optimization)
+                        const otherSlot = otherVoiceSlots[restSlotIndex];
+                        const otherHasRestHere = otherSlot &&
+                            (otherSlot.type === SLOT_TYPES.REST ||
+                             (otherSlot.type === SLOT_TYPES.EMPTY && v === 1 && v0HasContent));
+
+                        // V2 filler rests are always cue rests
+                        // V1 filler rests are regular rests
+                        const shouldBeCueRest = isSecondaryVoice;
+
+                        // Hide V2 rest if V1 already has a rest covering this position
+                        // (V1's rest provides the rhythmic information)
+                        const shouldHide = isSecondaryVoice && otherHasRestHere &&
+                            otherSlot.type === SLOT_TYPES.REST;
 
                         notes.push({
                             pitches: [],
@@ -444,8 +484,10 @@ export class SlotGrid {
                             isRest: true,
                             type: 'rest',
                             voice: v,
-                            // Mark as cue rest for multi-voice notation styling
-                            _restDisplay: shouldBeCueRest ? { hidden: false, isCue: true } : undefined
+                            // Mark as cue rest for V2, or hidden if overlapping with V1 rest
+                            _restDisplay: shouldHide
+                                ? { hidden: true, isCue: true }
+                                : (shouldBeCueRest ? { hidden: false, isCue: true } : undefined)
                         });
                     });
 
@@ -457,12 +499,18 @@ export class SlotGrid {
                     // Convert note to notation format
                     const beat = i / SLOTS_PER_BEAT;
                     const notePitches = slot.pitches || [];
+
+                    // IMPORTANT: Recalculate duration from actual durationSlots
+                    // This ensures truncated notes get the correct shorter duration
+                    const actualSlots = slot.durationSlots || 1;
+                    const { duration: actualDuration, dotted: actualDotted } = slotsToDuration(actualSlots);
+
                     notes.push({
                         pitches: notePitches,
                         // Also set 'pitch' for legacy playback compatibility (first pitch if any)
                         pitch: notePitches.length > 0 ? notePitches[0] : undefined,
-                        duration: slot.duration,
-                        dotted: slot.dotted || false,
+                        duration: actualDuration,
+                        dotted: actualDotted,
                         beat: beat,
                         type: 'note',  // Required for playback to work
                         isRest: false,
@@ -479,23 +527,39 @@ export class SlotGrid {
                         voice: v
                     });
                     // Skip the duration of this note
-                    i += slot.durationSlots || 1;
+                    i += actualSlots;
                 } else if (slot.type === SLOT_TYPES.REST) {
-                    // User-placed rest - use as-is but apply cue styling if multi-voice
+                    // User-placed rest
                     const beat = i / SLOTS_PER_BEAT;
-                    const shouldBeCueRest = bothVoicesActive && thisVoiceHasContent;
+
+                    // IMPORTANT: Recalculate duration from actual durationSlots
+                    const actualSlots = slot.durationSlots || 1;
+                    const { duration: actualDuration, dotted: actualDotted } = slotsToDuration(actualSlots);
+
+                    // Check if other voice has a rest at same position (for hiding logic)
+                    const otherSlot = otherVoiceSlots[i];
+                    const otherHasRestHere = otherSlot && otherSlot.type === SLOT_TYPES.REST;
+
+                    // V2 user-placed rests are cue rests, V1 rests are regular
+                    const shouldBeCueRest = isSecondaryVoice;
+
+                    // Hide V2 rest if V1 has rest at same position
+                    const shouldHide = isSecondaryVoice && otherHasRestHere;
+
                     notes.push({
                         pitches: [],
-                        duration: slot.duration,
-                        dotted: slot.dotted || false,
+                        duration: actualDuration,
+                        dotted: actualDotted,
                         beat: beat,
                         isRest: true,
                         type: 'rest',
                         voice: v,
-                        // Mark as cue rest for multi-voice notation styling
-                        _restDisplay: shouldBeCueRest ? { hidden: false, isCue: true } : undefined
+                        // Mark as cue rest for V2, or hidden if overlapping
+                        _restDisplay: shouldHide
+                            ? { hidden: true, isCue: true }
+                            : (shouldBeCueRest ? { hidden: false, isCue: true } : undefined)
                     });
-                    i += slot.durationSlots || 1;
+                    i += actualSlots;
                 } else {
                     i++;
                 }
@@ -682,39 +746,4 @@ export class SlotGrid {
             slot.type === SLOT_TYPES.REST
         );
     }
-}
-
-/**
- * Calculate the number of slots for a given duration
- * @param {string} duration - Duration string like '4n', '8n'
- * @param {boolean} dotted - Whether the note is dotted
- * @returns {number} Number of slots
- */
-export function durationToSlots(duration, dotted = false) {
-    const beats = durationToBeats(duration, dotted);
-    return Math.round(beats * SLOTS_PER_BEAT);
-}
-
-/**
- * Calculate the duration string from a number of slots
- * @param {number} slots - Number of slots
- * @returns {{ duration: string, dotted: boolean }}
- */
-export function slotsToDuration(slots) {
-    const units = slots * UNITS_PER_SLOT;
-    const duration = unitsToDuration(units);
-
-    // Check if it's a dotted duration
-    const baseUnits = DURATION_UNITS[duration] || 48;
-    const expectedUnits = baseUnits;
-    const dottedUnits = baseUnits * 1.5;
-
-    // If units matches dotted version better, return dotted
-    if (Math.abs(units - dottedUnits) < Math.abs(units - expectedUnits)) {
-        // Find the base duration that when dotted gives us this
-        const baseDuration = unitsToDuration(Math.round(units / 1.5));
-        return { duration: baseDuration, dotted: true };
-    }
-
-    return { duration, dotted: false };
 }

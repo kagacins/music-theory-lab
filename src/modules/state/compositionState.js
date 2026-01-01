@@ -850,8 +850,6 @@ export class CompositionState {
             showChordSpans: true,          // Show chord span shading and brackets (default ON)
             // Multi-voice rest display settings
             restDisplayMode: 'clean',      // 'clean' = smart omission, 'explicit' = show all rests
-            cueRestsForSecondaryVoice: true, // Use smaller (cue-sized) rests for secondary voices
-            hideCueRests: false,           // When true, cue rests become GhostNotes (invisible)
         };
 
         // Current editing state
