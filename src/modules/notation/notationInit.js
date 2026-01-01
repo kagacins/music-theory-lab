@@ -1480,6 +1480,65 @@ export function initEnhancedNotation(options = {}) {
       }
     };
 
+    // Handle slur application
+    notationComposer.toolbar.onSlur = () => {
+      if (noteEditor.selectedNotes.size >= 2) {
+        noteEditor.applySlurToSelected();
+      }
+    };
+
+    // Handle slur removal
+    notationComposer.toolbar.onSlurRemove = () => {
+      if (noteEditor.selectedNotes.size >= 1) {
+        noteEditor.removeSlurFromSelected();
+      }
+    };
+
+    // Handle ornament application
+    notationComposer.toolbar.onOrnamentApply = (ornamentType) => {
+      if (noteEditor.selectedNotes.size >= 1) {
+        noteEditor.applyOrnamentToSelected(ornamentType);
+      }
+    };
+
+    // Handle ornament removal
+    notationComposer.toolbar.onOrnamentRemove = () => {
+      if (noteEditor.selectedNotes.size >= 1) {
+        noteEditor.removeOrnamentFromSelected();
+      }
+    };
+
+    // Handle grace note addition
+    notationComposer.toolbar.onGraceNoteAdd = (graceType) => {
+      if (noteEditor.selectedNotes.size >= 1) {
+        noteEditor.addGraceNoteToSelected(graceType);
+      }
+    };
+
+    // Handle grace note removal
+    notationComposer.toolbar.onGraceNoteRemove = () => {
+      if (noteEditor.selectedNotes.size >= 1) {
+        noteEditor.removeGraceNotesFromSelected();
+      }
+    };
+
+    // Handle grace note transpose
+    notationComposer.toolbar.onGraceNoteTranspose = (halfSteps) => {
+      if (noteEditor.selectedNotes.size >= 1) {
+        noteEditor.transposeGraceNotesOnSelected(halfSteps);
+      }
+    };
+
+    // Handle tempo marking application
+    notationComposer.toolbar.onTempoMarkingApply = (tempoMarking) => {
+      noteEditor.applyTempoMarking(tempoMarking);
+    };
+
+    // Handle repeat sign application
+    notationComposer.toolbar.onRepeatSignApply = (repeatType) => {
+      noteEditor.applyRepeatSign(repeatType);
+    };
+
     // Handle chord symbol application
     notationComposer.toolbar.onChordSymbolApply = (chordSymbol) => {
       // Find the target chord based on selection priority:
@@ -1570,6 +1629,25 @@ export function initEnhancedNotation(options = {}) {
 
     notationComposer.toolbar.onOctaveShift = (direction) => {
       noteEditor.shiftSelectedNotesOctave(direction);
+    };
+
+    // Measure Isolation Editor - open for selected measure
+    notationComposer.toolbar.onMeasureEdit = () => {
+      // Get the measure index from noteEditor's current selection or context
+      let measureIndex = 0;
+      if (noteEditor.selectedNotes && noteEditor.selectedNotes.size > 0) {
+        // Use the first selected note's measure
+        const firstSelected = noteEditor.selectedNotes.values().next().value;
+        if (firstSelected && firstSelected.measureIndex !== undefined) {
+          measureIndex = firstSelected.measureIndex;
+        }
+      } else if (noteEditor.lastClickMeasure !== undefined) {
+        measureIndex = noteEditor.lastClickMeasure;
+      }
+      // Open the measure isolation editor
+      if (window.openMeasureIsolationEditor) {
+        window.openMeasureIsolationEditor(measureIndex);
+      }
     };
 
     // Set initial chord context for harmonic coloring

@@ -924,6 +924,11 @@ export class NotationComposer {
               tuplet: note.tuplet || null,  // CRITICAL: Preserve tuplet grouping for rendering
               voiceIndex: voiceIndex,  // CRITICAL: Track which voice this note belongs to
               _restDisplay: note._restDisplay,  // CRITICAL: Preserve cue/hidden rest styling for multi-voice
+              graceNotes: note.graceNotes || null,  // Grace notes (acciaccatura, appoggiatura)
+              ornament: note.ornament || null,  // Ornaments (trill, mordent, turn, etc.)
+              slur: note.slur || null,  // Slur information { start: slurId, end: slurId }
+              fermata: note.fermata || null,  // Fermata markings ('normal', 'short', 'long')
+              stemDirection: note.stemDirection || null,  // Stem direction override
             }))
           ),
           // MULTI-VOICE: Gather bass notes from ALL voices, not just voice 0
@@ -946,6 +951,11 @@ export class NotationComposer {
               tuplet: note.tuplet || null,  // CRITICAL: Preserve tuplet grouping
               voiceIndex: voiceIndex,  // CRITICAL: Track which voice this note belongs to
               _restDisplay: note._restDisplay,  // CRITICAL: Preserve cue/hidden rest styling for multi-voice
+              graceNotes: note.graceNotes || null,  // Grace notes (acciaccatura, appoggiatura)
+              ornament: note.ornament || null,  // Ornaments (trill, mordent, turn, etc.)
+              slur: note.slur || null,  // Slur information { start: slurId, end: slurId }
+              fermata: note.fermata || null,  // Fermata markings ('normal', 'short', 'long')
+              stemDirection: note.stemDirection || null,  // Stem direction override
             }))
           ),
           keySignature: m.keySignature || this.compositionState.metadata.key,
@@ -1031,6 +1041,12 @@ export class NotationComposer {
         chordSegments: compositionState ? compositionState.getChordSegments() : [],
         // Hairpins (crescendo/decrescendo)
         hairpins: compositionState ? compositionState.hairpins : [],
+        // Slurs (phrase marks)
+        slurs: compositionState ? compositionState.slurs : [],
+        // Tempo markings
+        tempoMarkings: compositionState ? compositionState.tempoMarkings : [],
+        // Repeat signs
+        repeatSigns: compositionState ? compositionState.repeatSigns : [],
       });
     }
 
@@ -1257,6 +1273,11 @@ export class NotationComposer {
           tuplet: note.tuplet || null,
           voiceIndex: voiceIndex,
           _restDisplay: note._restDisplay,
+          graceNotes: note.graceNotes || null,  // Grace notes (acciaccatura, appoggiatura)
+          ornament: note.ornament || null,  // Ornaments (trill, mordent, turn, etc.)
+          slur: note.slur || null,  // Slur information { start: slurId, end: slurId }
+          fermata: note.fermata || null,  // Fermata markings ('normal', 'short', 'long')
+          stemDirection: note.stemDirection || null,  // Stem direction override
         }))
       ),
       bassNotes: (m.notation.bass.voices || []).flatMap((voice, voiceIndex) =>
@@ -1278,6 +1299,11 @@ export class NotationComposer {
           tuplet: note.tuplet || null,
           voiceIndex: voiceIndex,
           _restDisplay: note._restDisplay,
+          graceNotes: note.graceNotes || null,  // Grace notes (acciaccatura, appoggiatura)
+          ornament: note.ornament || null,  // Ornaments (trill, mordent, turn, etc.)
+          slur: note.slur || null,  // Slur information { start: slurId, end: slurId }
+          fermata: note.fermata || null,  // Fermata markings ('normal', 'short', 'long')
+          stemDirection: note.stemDirection || null,  // Stem direction override
         }))
       ),
       keySignature: m.keySignature || this.compositionState.metadata.key,
@@ -1341,6 +1367,10 @@ export class NotationComposer {
       enableChordSpans: this.config.enableChordSpans,
       // Hairpins (crescendo/decrescendo)
       hairpins: this.compositionState ? this.compositionState.hairpins : [],
+      // Slurs (phrase marks)
+      slurs: this.compositionState ? this.compositionState.slurs : [],
+      // Tempo markings
+      tempoMarkings: this.compositionState ? this.compositionState.tempoMarkings : [],
     };
 
     // Use multi-page or single canvas rendering
@@ -1550,6 +1580,12 @@ export class NotationComposer {
         chordSegments: compositionState ? compositionState.getChordSegments() : [],
         // Hairpins (crescendo/decrescendo)
         hairpins: compositionState ? compositionState.hairpins : [],
+        // Slurs (phrase marks)
+        slurs: compositionState ? compositionState.slurs : [],
+        // Tempo markings
+        tempoMarkings: compositionState ? compositionState.tempoMarkings : [],
+        // Repeat signs
+        repeatSigns: compositionState ? compositionState.repeatSigns : [],
       });
 
       // Collect rendered measures (adjust indices back to global)
@@ -1765,6 +1801,12 @@ export class NotationComposer {
       chordSegments: compositionState ? compositionState.getChordSegments() : [],
       // Hairpins (crescendo/decrescendo)
       hairpins: compositionState ? compositionState.hairpins : [],
+      // Slurs (phrase marks)
+      slurs: compositionState ? compositionState.slurs : [],
+      // Tempo markings
+      tempoMarkings: compositionState ? compositionState.tempoMarkings : [],
+      // Repeat signs
+      repeatSigns: compositionState ? compositionState.repeatSigns : [],
     });
 
     const allRenderedMeasures = [];
@@ -1879,6 +1921,9 @@ export class NotationComposer {
     // Mouseup handler - for click vs hold detection
     container.addEventListener('mouseup', (e) => this.handleCanvasMouseUp(e));
 
+    // Double-click handler - for measure isolation editor
+    container.addEventListener('dblclick', (e) => this.handleCanvasDblClick(e));
+
     // Mouse move for hover effects
     container.addEventListener('mousemove', (e) => this.handleMouseMove(e));
 
@@ -1908,6 +1953,7 @@ export class NotationComposer {
       // Attach listeners
       page.canvas.addEventListener('mousedown', (e) => this.handleCanvasMouseDown(e));
       page.canvas.addEventListener('mouseup', (e) => this.handleCanvasMouseUp(e));
+      page.canvas.addEventListener('dblclick', (e) => this.handleCanvasDblClick(e));
       page.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
       page.canvas.addEventListener('mouseleave', () => this.handleCanvasMouseLeave());
 
@@ -2038,6 +2084,30 @@ export class NotationComposer {
         staff: this.selectedStaff,
         pitch: staffPosition.pitch,
       });
+    }
+  }
+
+  /**
+   * Handle double-click on canvas - open Measure Isolation Editor
+   * @param {MouseEvent} e - Mouse event
+   */
+  handleCanvasDblClick(e) {
+    // Get position - works for both single and multi-page mode
+    const position = this.getPositionFromEvent(e);
+    if (!position) return;
+
+    // Find what was clicked
+    const staffPosition = this.layoutManager.getStaffPositionAtPoint(position.x, position.y);
+
+    if (staffPosition && staffPosition.measure) {
+      // SECTION VIEW FIX: Apply filter offset to convert local index to global
+      const filterOffset = this.getMeasureFilterOffset();
+      const globalMeasureIndex = staffPosition.measure.index + filterOffset;
+
+      // Open the Measure Isolation Editor for this measure
+      if (window.openMeasureIsolationEditor) {
+        window.openMeasureIsolationEditor(globalMeasureIndex);
+      }
     }
   }
 

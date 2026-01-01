@@ -82,6 +82,47 @@ export const HAIRPINS = [
 ];
 
 /**
+ * Ornament types for note embellishment
+ */
+export const ORNAMENTS = [
+  { id: 'trill', label: 'Trill', symbol: 'tr' },
+  { id: 'mordent', label: 'Mordent', symbol: '𝆰' },
+  { id: 'invertedMordent', label: 'Inverted Mordent', symbol: '𝆱' },
+  { id: 'turn', label: 'Turn', symbol: '𝆗' },
+  { id: 'invertedTurn', label: 'Inverted Turn', symbol: '⤻' },
+];
+
+/**
+ * Grace note types
+ */
+export const GRACE_NOTES = [
+  { id: 'acciaccatura', label: 'Acciaccatura (crushed)', symbol: '♪/' },  // Slashed grace note (fast)
+  { id: 'appoggiatura', label: 'Appoggiatura (leaning)', symbol: '♪' },  // No slash (longer)
+];
+
+/**
+ * Common tempo markings with BPM ranges
+ */
+export const TEMPO_MARKINGS = [
+  { id: 'largo', label: 'Largo (Very slow)', symbol: 'Largo', bpm: '40-60' },
+  { id: 'adagio', label: 'Adagio (Slow)', symbol: 'Adagio', bpm: '66-76' },
+  { id: 'andante', label: 'Andante (Walking pace)', symbol: 'Andante', bpm: '76-108' },
+  { id: 'moderato', label: 'Moderato (Moderate)', symbol: 'Moderato', bpm: '108-120' },
+  { id: 'allegro', label: 'Allegro (Fast)', symbol: 'Allegro', bpm: '120-156' },
+  { id: 'vivace', label: 'Vivace (Lively)', symbol: 'Vivace', bpm: '156-176' },
+  { id: 'presto', label: 'Presto (Very fast)', symbol: 'Presto', bpm: '168-200' },
+];
+
+/**
+ * Repeat sign types
+ */
+export const REPEAT_SIGNS = [
+  { id: 'repeatStart', label: 'Repeat Start |:', symbol: '|:' },
+  { id: 'repeatEnd', label: 'Repeat End :|', symbol: ':|' },
+  { id: 'repeatBoth', label: 'Repeat Both :|:', symbol: ':|:' },
+];
+
+/**
  * Zoom levels
  */
 export const ZOOM_LEVELS = [50, 75, 100, 125, 150, 175, 200];
@@ -137,7 +178,17 @@ export class NotationToolbar {
     this.onUndo = options.onUndo || (() => {});
     this.onRedo = options.onRedo || (() => {});
     this.onDelete = options.onDelete || (() => {});
+    this.onMeasureEdit = options.onMeasureEdit || (() => {});  // Open Measure Isolation Editor
     this.onTie = options.onTie || (() => {});
+    this.onSlur = options.onSlur || (() => {});  // Slur: create slur between selected notes
+    this.onSlurRemove = options.onSlurRemove || (() => {});  // Remove slur from selected notes
+    this.onOrnamentApply = options.onOrnamentApply || (() => {});  // Apply ornament to selected notes
+    this.onOrnamentRemove = options.onOrnamentRemove || (() => {});  // Remove ornament from selected notes
+    this.onGraceNoteAdd = options.onGraceNoteAdd || (() => {});  // Add grace note to selected note
+    this.onGraceNoteRemove = options.onGraceNoteRemove || (() => {});  // Remove grace notes from selected note
+    this.onGraceNoteTranspose = options.onGraceNoteTranspose || (() => {});  // Transpose grace notes by half steps
+    this.onTempoMarkingApply = options.onTempoMarkingApply || (() => {});  // Apply tempo marking at selected position
+    this.onRepeatSignApply = options.onRepeatSignApply || (() => {});  // Apply repeat sign at selected measure
     this.onChordSymbolApply = options.onChordSymbolApply || (() => {});
     this.onCopy = options.onCopy || (() => {});
     this.onPaste = options.onPaste || (() => {});
@@ -529,6 +580,62 @@ export class NotationToolbar {
             </div>
           </div>
 
+          <!-- Slur Button -->
+          <div class="toolbar-group tier2-group">
+            <span class="group-label">Slur</span>
+            <div class="toolbar-group-content">
+              <button class="toolbar-btn slur-btn" data-action="slur" title="Slur (select 2+ notes)">⌢</button>
+              <button class="toolbar-btn slur-remove-btn" data-action="remove-slur" title="Remove slur">✕</button>
+            </div>
+          </div>
+
+          <!-- Ornaments -->
+          <div class="toolbar-group tier2-group">
+            <span class="group-label">Ornament</span>
+            <div class="toolbar-group-content ornament-buttons">
+              ${ORNAMENTS.map(o => `
+                <button class="toolbar-btn ornament-btn" data-ornament="${o.id}" title="${o.label}">${o.symbol}</button>
+              `).join('')}
+              <button class="toolbar-btn ornament-remove-btn" data-action="remove-ornament" title="Remove ornament">✕</button>
+            </div>
+          </div>
+
+          <!-- Grace Notes -->
+          <div class="toolbar-group tier2-group">
+            <span class="group-label">Grace</span>
+            <div class="toolbar-group-content grace-note-buttons">
+              ${GRACE_NOTES.map(g => `
+                <button class="toolbar-btn grace-note-btn" data-grace="${g.id}" title="${g.label}">${g.symbol}</button>
+              `).join('')}
+              <button class="toolbar-btn grace-transpose-btn" data-grace-transpose="-1" title="Transpose grace note down">-</button>
+              <button class="toolbar-btn grace-transpose-btn" data-grace-transpose="1" title="Transpose grace note up">+</button>
+              <button class="toolbar-btn grace-remove-btn" data-action="remove-grace" title="Remove grace notes">✕</button>
+            </div>
+          </div>
+
+          <!-- Tempo Markings -->
+          <div class="toolbar-group tier2-group">
+            <span class="group-label">Tempo</span>
+            <div class="toolbar-group-content tempo-buttons">
+              <select class="tempo-select" title="Select tempo marking">
+                <option value="">-</option>
+                ${TEMPO_MARKINGS.map(t => `
+                  <option value="${t.id}" title="${t.bpm} BPM">${t.symbol}</option>
+                `).join('')}
+              </select>
+            </div>
+          </div>
+
+          <!-- Repeat Signs -->
+          <div class="toolbar-group tier2-group">
+            <span class="group-label">Repeat</span>
+            <div class="toolbar-group-content repeat-buttons">
+              ${REPEAT_SIGNS.map(r => `
+                <button class="toolbar-btn repeat-btn" data-repeat="${r.id}" title="${r.label}">${r.symbol}</button>
+              `).join('')}
+            </div>
+          </div>
+
           <!-- Voice Selection -->
           <div class="toolbar-group tier2-group">
             <span class="group-label">Voice</span>
@@ -547,6 +654,7 @@ export class NotationToolbar {
               <button class="toolbar-btn undo-btn" data-action="undo" title="Undo (Ctrl+Z)">↩</button>
               <button class="toolbar-btn redo-btn" data-action="redo" title="Redo (Ctrl+Y)">↪</button>
               <button class="toolbar-btn delete-btn" data-action="delete" title="Delete">🗑</button>
+              <button class="toolbar-btn measure-edit-btn" data-action="measureEdit" title="Measure Isolation Editor">🔲</button>
             </div>
           </div>
 
@@ -579,11 +687,15 @@ export class NotationToolbar {
           </div>
 
           <!-- Voice 2 Rest Display -->
-          <div class="toolbar-group tier2-group">
+          <div class="toolbar-group tier2-group rest-display-section">
             <span class="group-label">V2 Rests</span>
             <div class="toolbar-group-content">
-              <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'clean' ? 'active' : ''}" data-rest-mode="clean" title="Clean mode">Clean</button>
-              <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'explicit' ? 'active' : ''}" data-rest-mode="explicit" title="Show all">All</button>
+              <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'clean' ? 'active' : ''}" data-rest-mode="clean" title="Clean mode - hide redundant rests">Clean</button>
+              <button class="toolbar-btn rest-display-btn ${this.restDisplayMode === 'explicit' ? 'active' : ''}" data-rest-mode="explicit" title="Show all rests explicitly">All</button>
+              <label class="cue-rest-toggle ${this.restDisplayMode === 'clean' ? '' : 'disabled'}" title="Show small cue rests for secondary voice">
+                <input type="checkbox" class="cue-rests-checkbox" ${this.cueRestsForSecondaryVoice ? 'checked' : ''} ${this.restDisplayMode === 'clean' ? '' : 'disabled'}>
+                <span>Cue</span>
+              </label>
             </div>
           </div>
 
@@ -1263,12 +1375,15 @@ export class NotationToolbar {
         display: none;
       }
 
+      /* Override .toolbar-btn font-size for rest display buttons */
+      .notation-toolbar .rest-display-btn,
       .rest-display-btn {
-        width: auto;
-        padding: 0 8px;
-        font-size: 11px;
+        width: auto !important;
+        padding: 0 6px !important;
+        font-size: 9px !important;
         font-weight: 500;
-        height: 32px;
+        height: 24px !important;
+        min-width: 28px;
       }
 
       .cue-rest-toggle {
@@ -1440,6 +1555,95 @@ export class NotationToolbar {
       this.onTie();
     });
 
+    // Slur button - create slur between selected notes
+    this.container.querySelector('.slur-btn')?.addEventListener('click', () => {
+      if (this.selectedNotesCount >= 2) {
+        this.onSlur();
+      } else {
+        console.log('Select 2+ notes to create a slur');
+      }
+    });
+
+    // Slur remove button
+    this.container.querySelector('.slur-remove-btn')?.addEventListener('click', () => {
+      if (this.selectedNotesCount >= 1) {
+        this.onSlurRemove();
+      } else {
+        console.log('Select a note within a slur to remove it');
+      }
+    });
+
+    // Ornament buttons - apply ornament to selected notes
+    this.container.querySelectorAll('.ornament-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const ornamentType = e.currentTarget.dataset.ornament;
+        if (ornamentType && this.selectedNotesCount >= 1) {
+          this.onOrnamentApply(ornamentType);
+        } else if (this.selectedNotesCount < 1) {
+          console.log('Select at least 1 note to apply an ornament');
+        }
+      });
+    });
+
+    // Ornament remove button
+    this.container.querySelector('.ornament-remove-btn')?.addEventListener('click', () => {
+      if (this.selectedNotesCount >= 1) {
+        this.onOrnamentRemove();
+      } else {
+        console.log('Select a note to remove its ornament');
+      }
+    });
+
+    // Grace note buttons - add grace note to selected note
+    this.container.querySelectorAll('.grace-note-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const graceType = e.currentTarget.dataset.grace;
+        if (graceType) {
+          // Always call the callback - let noteEditor check selection
+          this.onGraceNoteAdd(graceType);
+        }
+      });
+    });
+
+    // Grace note remove button
+    this.container.querySelector('.grace-remove-btn')?.addEventListener('click', () => {
+      // Always call the callback - let noteEditor check selection
+      this.onGraceNoteRemove();
+    });
+
+    // Grace note transpose buttons
+    this.container.querySelectorAll('.grace-transpose-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const halfSteps = parseInt(e.currentTarget.dataset.graceTranspose);
+        if (!isNaN(halfSteps)) {
+          this.onGraceNoteTranspose(halfSteps);
+        }
+      });
+    });
+
+    // Tempo marking select
+    this.container.querySelector('.tempo-select')?.addEventListener('change', (e) => {
+      const tempoId = e.target.value;
+      if (tempoId) {
+        const tempoMarking = TEMPO_MARKINGS.find(t => t.id === tempoId);
+        if (tempoMarking) {
+          this.onTempoMarkingApply(tempoMarking);
+        }
+        // Reset the select after applying
+        e.target.value = '';
+      }
+    });
+
+    // Repeat sign buttons
+    this.container.querySelectorAll('.repeat-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const repeatType = e.currentTarget.dataset.repeat;
+        if (repeatType) {
+          this.onRepeatSignApply(repeatType);
+        }
+      });
+    });
+
     // Accidental buttons - use currentTarget to ensure we get the button element
     this.container.querySelectorAll('.accidental-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -1542,6 +1746,11 @@ export class NotationToolbar {
 
     this.container.querySelector('[data-action="delete"]')?.addEventListener('click', () => {
       this.onDelete();
+    });
+
+    // Measure Isolation Editor button
+    this.container.querySelector('[data-action="measureEdit"]')?.addEventListener('click', () => {
+      this.onMeasureEdit();
     });
 
     // Copy/Paste buttons

@@ -1808,6 +1808,346 @@ function drawHairpins(context, renderedMeasures, hairpins, measures) {
 }
 
 // ============================================================================
+// SLUR RENDERING
+// ============================================================================
+
+/**
+ * Draw slurs (curved phrasing marks) between notes
+ * Slurs connect multiple notes indicating they should be played smoothly (legato)
+ * Unlike ties, slurs can connect notes of different pitches
+ *
+ * @param {Object} context - VexFlow rendering context
+ * @param {Array} renderedMeasures - Array of rendered measure data
+ * @param {Array} slurs - Array of slur objects from compositionState
+ * @param {Array} measures - Array of measure note data
+ */
+function drawSlurs(context, renderedMeasures, slurs, measures) {
+  if (!renderedMeasures || renderedMeasures.length === 0 || !slurs || slurs.length === 0) {
+    return;
+  }
+
+  // Get raw canvas context (same pattern as drawHairpins)
+  let ctx = null;
+  if (context.vexFlowCanvasContext && typeof context.vexFlowCanvasContext.beginPath === 'function') {
+    ctx = context.vexFlowCanvasContext;
+  } else if (context.context && typeof context.context.beginPath === 'function') {
+    ctx = context.context;
+  } else if (context.canvas && context.canvas.getContext) {
+    ctx = context.canvas.getContext('2d');
+  } else if (typeof context.beginPath === 'function') {
+    ctx = context;
+  } else if (context.getCanvasContext && typeof context.getCanvasContext === 'function') {
+    ctx = context.getCanvasContext();
+  }
+  if (!ctx) {
+    try {
+      if (context.backend && context.backend.ctx) {
+        ctx = context.backend.ctx;
+      }
+    } catch (e) { /* ignore */ }
+  }
+  if (!ctx || typeof ctx.beginPath !== 'function') {
+    return;
+  }
+
+  // Helper to check if two measures are on the same row
+  function areMeasuresOnSameRow(measure1, measure2) {
+    if (!measure1 || !measure2) return false;
+    const y1 = measure1.actualBounds?.bassY || measure1.bounds?.y || 0;
+    const y2 = measure2.actualBounds?.bassY || measure2.bounds?.y || 0;
+    return Math.abs(y1 - y2) < 50;
+  }
+
+  // Helper to get note Y position based on clef and stem direction
+  // Slurs curve AWAY from stems: stem up → slur below, stem down → slur above
+  function getSlurDirection(vexNote, clef) {
+    if (!vexNote) return clef === 'treble' ? 'above' : 'below';
+
+    try {
+      const stemDir = vexNote.getStemDirection ? vexNote.getStemDirection() : null;
+      if (stemDir === 1) {
+        // Stem up = slur goes BELOW (away from stem)
+        return 'below';
+      } else if (stemDir === -1) {
+        // Stem down = slur goes ABOVE (away from stem)
+        return 'above';
+      }
+    } catch (e) { /* ignore */ }
+
+    // Default based on clef
+    return clef === 'treble' ? 'above' : 'below';
+  }
+
+  // Helper to get note position for slur endpoint
+  function getNoteSlurPosition(vexNote, direction) {
+    if (!vexNote) return { x: 0, y: 0 };
+
+    try {
+      const bbox = vexNote.getBoundingBox();
+      const x = vexNote.getAbsoluteX() + (bbox?.getW() || 0) / 2;
+
+      // Get Y based on direction
+      if (direction === 'above') {
+        // Position above the note head
+        const topY = bbox?.getY() || 0;
+        return { x, y: topY - 8 };
+      } else {
+        // Position below the note head
+        const bottomY = (bbox?.getY() || 0) + (bbox?.getH() || 0);
+        return { x, y: bottomY + 8 };
+      }
+    } catch (e) {
+      return { x: vexNote.getAbsoluteX(), y: 100 };
+    }
+  }
+
+  // Helper to draw a complete slur curve
+  function drawSlurCurve(startX, startY, endX, endY, direction) {
+    const controlPointOffset = direction === 'below' ? 20 : -20;
+
+    // Control point at midpoint, offset for curve
+    const controlX = (startX + endX) / 2;
+    const controlY = (direction === 'below' ?
+      Math.max(startY, endY) : Math.min(startY, endY)) + controlPointOffset;
+
+    ctx.save();
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+
+    // Draw slur as a stroked curve (thinner than ties)
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.quadraticCurveTo(controlX, controlY, endX, endY);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // Helper to draw a partial slur (for cross-row slurs)
+  function drawPartialSlur(startX, startY, endX, endY, direction, openEnd) {
+    const controlPointOffset = direction === 'below' ? 15 : -15;
+
+    const controlX = (startX + endX) / 2;
+    const controlY = (direction === 'below' ?
+      Math.max(startY, endY) : Math.min(startY, endY)) + controlPointOffset;
+
+    ctx.save();
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.quadraticCurveTo(controlX, controlY, endX, endY);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  for (const slur of slurs) {
+    try {
+      // Find the start and end rendered measures
+      const startMeasureData = renderedMeasures.find(m => m.index === slur.startMeasure);
+      const endMeasureData = renderedMeasures.find(m => m.index === slur.endMeasure);
+
+      const hasStart = !!startMeasureData;
+      const hasEnd = !!endMeasureData;
+
+      if (!hasStart && !hasEnd) {
+        // Neither start nor end visible - skip for now
+        continue;
+      }
+
+      const clefKey = slur.clef === 'treble' ? 'trebleNotes' : 'bassNotes';
+      const notesKey = slur.clef === 'treble' ? 'trebleNotes' : 'bassNotes';
+
+      if (hasStart && hasEnd && areMeasuresOnSameRow(startMeasureData, endMeasureData)) {
+        // Same row - draw complete slur
+        const startNotes = startMeasureData[notesKey];
+        const endNotes = endMeasureData[notesKey];
+        if (!startNotes?.length || !endNotes?.length) continue;
+
+        // Find the note at the start beat
+        const startMeasureNotesData = measures[slur.startMeasure];
+        const endMeasureNotesData = measures[slur.endMeasure];
+        const startNoteData = startMeasureNotesData?.[clefKey] || [];
+        const endNoteData = endMeasureNotesData?.[clefKey] || [];
+
+        // Find start note index by beat
+        let startNoteIndex = 0;
+        for (let i = 0; i < startNoteData.length; i++) {
+          if (Math.abs((startNoteData[i]?.beat || 0) - slur.startBeat) < 0.01) {
+            startNoteIndex = i;
+            break;
+          }
+        }
+
+        // Find end note index by beat
+        let endNoteIndex = 0;
+        for (let i = 0; i < endNoteData.length; i++) {
+          if (Math.abs((endNoteData[i]?.beat || 0) - slur.endBeat) < 0.01) {
+            endNoteIndex = i;
+            break;
+          }
+        }
+
+        const startVexNote = startNotes[startNoteIndex];
+        const endVexNote = endNotes[endNoteIndex];
+        if (!startVexNote || !endVexNote) continue;
+
+        // Determine slur direction based on stem direction
+        const direction = getSlurDirection(startVexNote, slur.clef);
+
+        const startPos = getNoteSlurPosition(startVexNote, direction);
+        const endPos = getNoteSlurPosition(endVexNote, direction);
+
+        drawSlurCurve(startPos.x, startPos.y, endPos.x, endPos.y, direction);
+
+      } else {
+        // Cross-row slur - draw partial segments
+
+        if (hasStart) {
+          const startNotes = startMeasureData[notesKey];
+          if (startNotes?.length) {
+            const startMeasureNotesData = measures[slur.startMeasure];
+            const startNoteData = startMeasureNotesData?.[clefKey] || [];
+
+            let startNoteIndex = 0;
+            for (let i = 0; i < startNoteData.length; i++) {
+              if (Math.abs((startNoteData[i]?.beat || 0) - slur.startBeat) < 0.01) {
+                startNoteIndex = i;
+                break;
+              }
+            }
+
+            const startVexNote = startNotes[startNoteIndex];
+            if (startVexNote) {
+              const direction = getSlurDirection(startVexNote, slur.clef);
+              const startPos = getNoteSlurPosition(startVexNote, direction);
+
+              // Find right edge of current row
+              let rowEndX = startPos.x + 100;
+              for (const measure of renderedMeasures) {
+                if (areMeasuresOnSameRow(startMeasureData, measure)) {
+                  const measureEnd = (measure.actualBounds?.x || measure.bounds?.x || 0) +
+                                    (measure.actualBounds?.width || measure.bounds?.width || 200);
+                  if (measureEnd > rowEndX) rowEndX = measureEnd;
+                }
+              }
+
+              drawPartialSlur(startPos.x, startPos.y, rowEndX - 10, startPos.y, direction, 'end');
+            }
+          }
+        }
+
+        if (hasEnd) {
+          const endNotes = endMeasureData[notesKey];
+          if (endNotes?.length) {
+            const endMeasureNotesData = measures[slur.endMeasure];
+            const endNoteData = endMeasureNotesData?.[clefKey] || [];
+
+            let endNoteIndex = 0;
+            for (let i = 0; i < endNoteData.length; i++) {
+              if (Math.abs((endNoteData[i]?.beat || 0) - slur.endBeat) < 0.01) {
+                endNoteIndex = i;
+                break;
+              }
+            }
+
+            const endVexNote = endNotes[endNoteIndex];
+            if (endVexNote) {
+              const direction = getSlurDirection(endVexNote, slur.clef);
+              const endPos = getNoteSlurPosition(endVexNote, direction);
+
+              // Find left edge of current row
+              let rowStartX = endPos.x - 100;
+              for (const measure of renderedMeasures) {
+                if (areMeasuresOnSameRow(endMeasureData, measure)) {
+                  const measureStart = measure.actualBounds?.x || measure.bounds?.x || 0;
+                  if (measureStart < rowStartX || rowStartX === endPos.x - 100) {
+                    rowStartX = measureStart;
+                  }
+                }
+              }
+
+              drawPartialSlur(rowStartX + 10, endPos.y, endPos.x, endPos.y, direction, 'start');
+            }
+          }
+        }
+      }
+
+    } catch (e) {
+      // Silently continue on error
+    }
+  }
+}
+
+// ============================================================================
+// TEMPO MARKING RENDERING
+// ============================================================================
+
+/**
+ * Draw tempo markings above the staff at their designated measures
+ * @param {Object} context - VexFlow rendering context
+ * @param {Array} renderedMeasures - Array of rendered measure data
+ * @param {Array} tempoMarkings - Array of tempo marking objects
+ */
+function drawTempoMarkings(context, renderedMeasures, tempoMarkings) {
+  if (!renderedMeasures || renderedMeasures.length === 0 || !tempoMarkings || tempoMarkings.length === 0) {
+    return;
+  }
+
+  // Get raw canvas context
+  let ctx = null;
+  if (context.vexFlowCanvasContext && typeof context.vexFlowCanvasContext.fillText === 'function') {
+    ctx = context.vexFlowCanvasContext;
+  } else if (context.context && typeof context.context.fillText === 'function') {
+    ctx = context.context;
+  } else if (context.canvas && context.canvas.getContext) {
+    ctx = context.canvas.getContext('2d');
+  } else if (typeof context.fillText === 'function') {
+    ctx = context;
+  } else if (context.getCanvasContext && typeof context.getCanvasContext === 'function') {
+    ctx = context.getCanvasContext();
+  }
+  if (!ctx) {
+    try {
+      if (context.backend && context.backend.ctx) {
+        ctx = context.backend.ctx;
+      }
+    } catch (e) { /* ignore */ }
+  }
+  if (!ctx || typeof ctx.fillText !== 'function') {
+    return;
+  }
+
+  for (const tempo of tempoMarkings) {
+    try {
+      // Find the rendered measure for this tempo marking
+      const measureData = renderedMeasures.find(m => m.index === tempo.measureIndex);
+      if (!measureData) continue;
+
+      // Get position above the treble staff
+      const trebleStave = measureData.trebleStave;
+      if (!trebleStave) continue;
+
+      const x = measureData.actualBounds?.x || measureData.bounds?.x || trebleStave.getX();
+      const y = trebleStave.getYForLine(0) - 20; // Above the top of the staff
+
+      ctx.save();
+      ctx.font = 'bold italic 14px Times, serif';
+      ctx.fillStyle = '#000000';
+      ctx.fillText(tempo.symbol, x + 10, y);
+      ctx.restore();
+
+    } catch (e) {
+      // Silently continue on error
+    }
+  }
+}
+
+// ============================================================================
 // NOTE COLORING
 // ============================================================================
 
@@ -2047,6 +2387,8 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     restDisplayMode = 'clean',      // 'clean' (smart omission) or 'explicit' (show all)
     cueRestsForSecondaryVoice = true, // Use smaller rests for voice 2
     hideCueRests = false,           // If true, cue rests become GhostNotes (invisible)
+    // Repeat signs
+    repeatSign = null,              // 'repeatStart', 'repeatEnd', 'repeatBoth', or null
   } = options;
 
   const {
@@ -2084,9 +2426,22 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
     showTimeSignature: isFirstInSystem && showTimeSignature,
   });
 
-  // Set barlines
+  // Set barlines (including repeat signs)
   if (showBarlines) {
-    if (isLastInSystem) {
+    // Handle repeat signs at beginning of measure
+    if (repeatSign === 'repeatStart' || repeatSign === 'repeatBoth') {
+      trebleStave.setBegBarType(VF.Barline.type.REPEAT_BEGIN);
+      bassStave.setBegBarType(VF.Barline.type.REPEAT_BEGIN);
+    }
+
+    // Handle repeat signs at end of measure or regular barlines
+    if (repeatSign === 'repeatEnd') {
+      trebleStave.setEndBarType(VF.Barline.type.REPEAT_END);
+      bassStave.setEndBarType(VF.Barline.type.REPEAT_END);
+    } else if (repeatSign === 'repeatBoth') {
+      trebleStave.setEndBarType(VF.Barline.type.REPEAT_END);
+      bassStave.setEndBarType(VF.Barline.type.REPEAT_END);
+    } else if (isLastInSystem) {
       trebleStave.setEndBarType(VF.Barline.type.END);
       bassStave.setEndBarType(VF.Barline.type.END);
     } else {
@@ -3099,7 +3454,7 @@ function createNotesForStaff(notes, keySignature, clef, timeSignature, options =
         accidentalTracker.getAccidentalForNote(pitch, keySignature)
       );
       // Use computed measure-aware accidentals (overrides any provided accidentals for correct notation)
-      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false, note.articulation || null, measureAccidentals, stemDirection, note.dynamic || null);
+      const chordNote = createChordNote(adjustedPitches, note.duration || '4n', keySignature, clef, note.dotted || false, note.articulation || null, measureAccidentals, stemDirection, note.dynamic || null, note.ornament || null, note.graceNotes || null);
       if (!chordNote) {
         console.warn('[createNotesForStaff] createChordNote returned null for note:', JSON.stringify(note), 'adjustedPitches:', adjustedPitches);
         continue;
@@ -3282,6 +3637,12 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     chordSegments = [],          // Array of chord segments for block boundary visualization
     // Hairpins (crescendo/decrescendo)
     hairpins = [],               // Array of hairpin objects from compositionState
+    // Slurs (curved lines for phrasing)
+    slurs = [],                  // Array of slur objects from compositionState
+    // Tempo markings
+    tempoMarkings = [],          // Array of tempo marking objects from compositionState
+    // Repeat signs
+    repeatSigns = [],            // Array of repeat sign objects from compositionState
   } = options;
 
   // Calculate dimensions
@@ -4175,6 +4536,10 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
     // Get chord start info for this measure (if chord starts mid-measure)
     const chordStartInfo = chordStartBeatInMeasure.get(i);
 
+    // Look up repeat sign for this measure (using global measure index)
+    const globalMeasureIndex = globalMeasureOffset + i;
+    const measureRepeatSign = repeatSigns.find(rs => rs.measureIndex === globalMeasureIndex);
+
     // Render the measure
     const result = renderGrandStaffMeasure(context, measures[i], {
       x,
@@ -4199,6 +4564,8 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       restDisplayMode,
       cueRestsForSecondaryVoice,
       hideCueRests,
+      // Repeat sign for this measure
+      repeatSign: measureRepeatSign?.type || null,
     });
 
     if (result) {
@@ -4617,6 +4984,22 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
   // Draw hairpins between staves using VexFlow's StaveHairpin
   if (hairpins && hairpins.length > 0) {
     drawHairpins(context, renderedMeasures, hairpins, measures);
+  }
+
+  // ==========================================================================
+  // SLUR RENDERING (Phrase marks / legato)
+  // ==========================================================================
+  // Draw slurs as curved lines connecting notes
+  if (slurs && slurs.length > 0) {
+    drawSlurs(context, renderedMeasures, slurs, measures);
+  }
+
+  // ==========================================================================
+  // TEMPO MARKING RENDERING
+  // ==========================================================================
+  // Draw tempo markings (Allegro, Andante, etc.) above the staff
+  if (tempoMarkings && tempoMarkings.length > 0) {
+    drawTempoMarkings(context, renderedMeasures, tempoMarkings);
   }
 
   // Collect all note regions and add chord tone analysis

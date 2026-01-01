@@ -758,6 +758,8 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
     articulation = null, // Articulation: 'staccato', 'accent', 'tenuto', 'marcato'
     dynamic = null,  // Dynamic marking: 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'sfz', 'fp'
     stemDirection = null, // Optional stem direction: 1 (up), -1 (down), null (auto)
+    ornament = null, // Ornament: 'trill', 'mordent', 'invertedMordent', 'turn', 'invertedTurn'
+    graceNotes = null, // Array of grace notes: { pitch, duration, slash }
   } = noteData;
 
   // Convert duration if needed
@@ -846,6 +848,50 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
     }
   }
 
+  // Add ornament if specified
+  if (!isRest && ornament) {
+    // VexFlow ornament codes
+    const ornamentMap = {
+      'trill': 'tr',
+      'mordent': 'mordent',
+      'invertedMordent': 'mordent_inverted',
+      'turn': 'turn',
+      'invertedTurn': 'turn_inverted',
+    };
+
+    const vexOrnament = ornamentMap[ornament];
+    if (vexOrnament) {
+      try {
+        const ornamentObj = new VF.Ornament(vexOrnament);
+        staveNote.addModifier(ornamentObj, 0);
+      } catch (error) {
+        console.warn('[VexFlowRenderer] Error adding ornament:', error.message);
+      }
+    }
+  }
+
+  // Add grace notes if specified
+  if (!isRest && graceNotes && Array.isArray(graceNotes) && graceNotes.length > 0) {
+    try {
+      const vexGraceNotes = graceNotes.map(gn => {
+        const graceKey = noteToVexKey(gn.pitch);
+        const graceDuration = DURATION_MAP[gn.duration] || '8';
+        const graceNote = new VF.GraceNote({
+          keys: [graceKey],
+          duration: graceDuration,
+          slash: gn.slash || false,
+        });
+        return graceNote;
+      });
+
+      // Create a GraceNoteGroup and attach to the main note
+      const graceGroup = new VF.GraceNoteGroup(vexGraceNotes);
+      staveNote.addModifier(graceGroup, 0);
+    } catch (error) {
+      console.warn('[VexFlowRenderer] Error adding grace notes:', error.message);
+    }
+  }
+
   // Add dynamic marking if specified
   // Using Annotation modifier for dynamics text
   // For treble clef: position below (BOTTOM) so dynamics appear between staves
@@ -878,9 +924,11 @@ export function createStaveNote(noteData, key = 'C', clef = 'treble') {
  * @param {string|Array|null} accidental - Explicit accidental override (string for all pitches, array for per-pitch)
  * @param {number|null} stemDirection - Optional stem direction
  * @param {string|null} dynamic - Dynamic marking: 'pp', 'p', 'mp', 'mf', 'f', 'ff', 'sfz', 'fp'
+ * @param {string|null} ornament - Ornament: 'trill', 'mordent', 'invertedMordent', 'turn', 'invertedTurn'
+ * @param {Array|null} graceNotes - Array of grace notes: { pitch, duration, slash }
  * @returns {Object} - VexFlow StaveNote with multiple keys
  */
-export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble', dotted = false, articulation = null, accidental = null, stemDirection = null, dynamic = null) {
+export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'treble', dotted = false, articulation = null, accidental = null, stemDirection = null, dynamic = null, ornament = null, graceNotes = null) {
   const VF = getVF();
   if (!VF || !pitches || pitches.length === 0) return null;
 
@@ -966,6 +1014,49 @@ export function createChordNote(pitches, duration = '4n', key = 'C', clef = 'tre
     if (vexArticulation) {
       // For chords, apply articulation to the top note (last index)
       staveNote.addModifier(new VF.Articulation(vexArticulation), pitches.length - 1);
+    }
+  }
+
+  // Add ornament if specified (applied to the top note of the chord)
+  if (ornament) {
+    const ornamentMap = {
+      'trill': 'tr',
+      'mordent': 'mordent',
+      'invertedMordent': 'mordent_inverted',
+      'turn': 'turn',
+      'invertedTurn': 'turn_inverted',
+    };
+
+    const vexOrnament = ornamentMap[ornament];
+    if (vexOrnament) {
+      try {
+        const ornamentObj = new VF.Ornament(vexOrnament);
+        staveNote.addModifier(ornamentObj, pitches.length - 1);
+      } catch (error) {
+        console.warn('[VexFlowRenderer] Error adding ornament to chord:', error.message);
+      }
+    }
+  }
+
+  // Add grace notes if specified (applied to the chord)
+  if (graceNotes && Array.isArray(graceNotes) && graceNotes.length > 0) {
+    try {
+      const vexGraceNotes = graceNotes.map(gn => {
+        const graceKey = noteToVexKey(gn.pitch);
+        const graceDuration = DURATION_MAP[gn.duration] || '8';
+        const graceNote = new VF.GraceNote({
+          keys: [graceKey],
+          duration: graceDuration,
+          slash: gn.slash || false,
+        });
+        return graceNote;
+      });
+
+      // Create a GraceNoteGroup and attach to the chord
+      const graceGroup = new VF.GraceNoteGroup(vexGraceNotes);
+      staveNote.addModifier(graceGroup, 0);
+    } catch (error) {
+      console.warn('[VexFlowRenderer] Error adding grace notes to chord:', error.message);
     }
   }
 

@@ -141,7 +141,16 @@ export function createProjectData(compositionState) {
 
         // Full measures data (preserves multi-voice notation - Voice 1 & Voice 2)
         // This is needed because BuildingBlockSequence cannot represent simultaneous voices
-        measures: compositionState.measures ? JSON.parse(JSON.stringify(compositionState.measures)) : []
+        measures: compositionState.measures ? JSON.parse(JSON.stringify(compositionState.measures)) : [],
+
+        // Tempo markings (stored separately from measures)
+        tempoMarkings: compositionState.tempoMarkings ? [...compositionState.tempoMarkings] : [],
+
+        // Repeat signs (stored separately from measures)
+        repeatSigns: compositionState.repeatSigns ? [...compositionState.repeatSigns] : [],
+
+        // Hairpins - crescendo/decrescendo (stored separately from measures)
+        hairpins: compositionState.hairpins ? [...compositionState.hairpins] : []
     };
 }
 
@@ -437,12 +446,30 @@ export function applyProjectToState(projectData, compositionState, trainerState,
             }
         }
 
-        // 8. Trigger notation refresh
+        // 8. Restore tempo markings
+        if (projectData.tempoMarkings && Array.isArray(projectData.tempoMarkings)) {
+            console.log('[projectManager] Restoring tempo markings:', projectData.tempoMarkings.length);
+            compositionState.tempoMarkings = [...projectData.tempoMarkings];
+        }
+
+        // 9. Restore repeat signs
+        if (projectData.repeatSigns && Array.isArray(projectData.repeatSigns)) {
+            console.log('[projectManager] Restoring repeat signs:', projectData.repeatSigns.length);
+            compositionState.repeatSigns = [...projectData.repeatSigns];
+        }
+
+        // 10. Restore hairpins (crescendo/decrescendo)
+        if (projectData.hairpins && Array.isArray(projectData.hairpins)) {
+            console.log('[projectManager] Restoring hairpins:', projectData.hairpins.length);
+            compositionState.hairpins = [...projectData.hairpins];
+        }
+
+        // 11. Trigger notation refresh
         if (callbacks.onNotationRefresh) {
             callbacks.onNotationRefresh();
         }
 
-        // 9. Update UI elements (tempo, key display, etc.)
+        // 11. Update UI elements (tempo, key display, etc.)
         if (callbacks.onMetadataUpdated) {
             callbacks.onMetadataUpdated(projectData.metadata);
         }

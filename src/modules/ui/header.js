@@ -131,64 +131,9 @@ export function toggleDisplayPanel() {
     console.warn('toggleDisplayPanel not yet implemented');
 }
 
-/**
- * Setup responsive title
- * Previously abbreviated to "IMTL" when wrapping - now always shows full title
- */
-export function setupResponsiveTitle() {
-    const titleElement = document.getElementById('main-title');
-    if (!titleElement) return;
-
-    const fullText = "Interactive Music Theory Lab";
-
-    // Function to ensure title is set correctly
-    function updateTitle() {
-        // Check if title has HTML content (tab title format) or just text (base title)
-        const hasHTML = titleElement.children.length > 0;
-
-        if (hasHTML) {
-            // Tab title format - preserve any tab-specific span
-            const tabTitleSpan = titleElement.querySelector('span');
-            if (tabTitleSpan) {
-                const spanClasses = tabTitleSpan.className;
-                const spanText = tabTitleSpan.textContent;
-                titleElement.innerHTML = `${fullText}:<br><span class="${spanClasses}">${spanText}</span>`;
-            }
-        } else {
-            // Base title format: just text - always use full text
-            titleElement.textContent = fullText;
-        }
-    }
-    
-    // Expose update function globally so tabs.js can call it after updating title
-    window.updateResponsiveTitle = updateTitle;
-    
-    // Initial check
-    updateTitle();
-    
-    // Use ResizeObserver to watch for size changes
-    if (window.ResizeObserver) {
-        const resizeObserver = new ResizeObserver(() => {
-            updateTitle();
-        });
-        
-        // Observe the title element and its parent container
-        resizeObserver.observe(titleElement);
-        if (titleElement.parentElement) {
-            resizeObserver.observe(titleElement.parentElement);
-        }
-        
-        // Also observe the header to catch layout changes
-        const header = document.getElementById('main-header');
-        if (header) {
-            resizeObserver.observe(header);
-        }
-    } else {
-        // Fallback: use window resize event
-        window.addEventListener('resize', updateTitle);
-    }
-    
-    // Also check after a short delay to catch any layout changes
-    setTimeout(updateTitle, 100);
-    setTimeout(updateTitle, 500);
-}
+// NOTE: setupResponsiveTitle has been consolidated into src/init/appSetup.js
+// to avoid duplicate competing implementations. The appSetup.js version handles
+// responsive title changes based on viewport width:
+// - Mobile (<640px): "MTL"
+// - Small screens (640-768px): "Music Theory Lab"
+// - Desktop (≥768px): "Interactive Music Theory Lab"

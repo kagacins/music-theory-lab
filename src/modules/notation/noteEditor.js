@@ -4097,6 +4097,573 @@ export class NoteEditor {
   }
 
   /**
+   * Apply a slur to the selected note range
+   * Requires at least 2 notes selected in the same clef
+   */
+  applySlurToSelected() {
+    if (this.selectedNotes.size < 2) {
+      console.log('[applySlurToSelected] Need at least 2 notes selected');
+      return;
+    }
+
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    // Save state for undo before making changes
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    // Parse all selected notes and group by clef
+    const notesByClef = { treble: [], bass: [] };
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+      const measure = compositionState.measures[measureIndex];
+      if (!measure) continue;
+
+      const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+      const voice = measure.notation[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+      if (!voice || !voice.notes[noteIndex]) continue;
+
+      const note = voice.notes[noteIndex];
+      const clef = staff === 'treble' ? 'treble' : 'bass';
+
+      notesByClef[clef].push({
+        measureIndex,
+        beat: note.beat || 0,
+        voiceIndex: voiceIndex || 0,
+        noteIndex
+      });
+    }
+
+    // Determine which clef has the selection (prefer the one with more notes)
+    let targetClef = 'treble';
+    if (notesByClef.bass.length > notesByClef.treble.length) {
+      targetClef = 'bass';
+    } else if (notesByClef.treble.length === 0 && notesByClef.bass.length > 0) {
+      targetClef = 'bass';
+    }
+
+    const notes = notesByClef[targetClef];
+    if (notes.length < 2) {
+      console.log('[applySlurToSelected] Need at least 2 notes in the same clef');
+      return;
+    }
+
+    // Sort notes by position (measure, then beat)
+    notes.sort((a, b) => {
+      if (a.measureIndex !== b.measureIndex) {
+        return a.measureIndex - b.measureIndex;
+      }
+      return a.beat - b.beat;
+    });
+
+    // Get first and last note as slur start/end
+    const startNote = notes[0];
+    const endNote = notes[notes.length - 1];
+
+    // Add slur to compositionState
+    const slur = compositionState.addSlur({
+      clef: targetClef,
+      voiceIndex: startNote.voiceIndex,
+      startMeasure: startNote.measureIndex,
+      startBeat: startNote.beat,
+      endMeasure: endNote.measureIndex,
+      endBeat: endNote.beat
+    });
+
+    console.log(`[applySlurToSelected] Created slur:`, slur);
+
+    // Re-render to show the slur
+    this.composerIntegration.render(true);
+  }
+
+  /**
+   * Remove slurs that overlap with the selected notes
+   * If any selected note is part of a slur, that slur is removed
+   */
+  removeSlurFromSelected() {
+    if (this.selectedNotes.size === 0) return;
+
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState || !compositionState.slurs || compositionState.slurs.length === 0) {
+      return;
+    }
+
+    // Save state for undo before making changes
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    // Parse all selected notes to find their positions
+    const selectedPositions = [];
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+      const measure = compositionState.measures[measureIndex];
+      if (!measure) continue;
+
+      const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+      const voice = measure.notation[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+      if (!voice || !voice.notes[noteIndex]) continue;
+
+      const note = voice.notes[noteIndex];
+      const clef = staff === 'treble' ? 'treble' : 'bass';
+
+      selectedPositions.push({
+        clef,
+        measureIndex,
+        beat: note.beat || 0
+      });
+    }
+
+    if (selectedPositions.length === 0) return;
+
+    // Find slurs that contain any of the selected notes
+    const slursToRemove = [];
+    for (const slur of compositionState.slurs) {
+      for (const pos of selectedPositions) {
+        if (pos.clef !== slur.clef) continue;
+
+        // Check if this position is within the slur's range
+        const posValue = pos.measureIndex * 1000 + pos.beat;
+        const slurStart = slur.startMeasure * 1000 + slur.startBeat;
+        const slurEnd = slur.endMeasure * 1000 + slur.endBeat;
+
+        if (posValue >= slurStart && posValue <= slurEnd) {
+          slursToRemove.push(slur.id);
+          break; // Don't need to check more positions for this slur
+        }
+      }
+    }
+
+    // Remove the slurs
+    let removedCount = 0;
+    for (const slurId of slursToRemove) {
+      if (compositionState.removeSlur(slurId)) {
+        removedCount++;
+      }
+    }
+
+    if (removedCount > 0) {
+      console.log(`[removeSlurFromSelected] Removed ${removedCount} slur(s)`);
+      this.composerIntegration.render(true);
+    }
+  }
+
+  /**
+   * Apply an ornament to all selected notes
+   * @param {string} ornamentType - The ornament type: 'trill', 'mordent', 'invertedMordent', 'turn', 'invertedTurn'
+   */
+  applyOrnamentToSelected(ornamentType) {
+    if (this.selectedNotes.size === 0) {
+      console.log('[applyOrnamentToSelected] No notes selected');
+      return;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    let changedCount = 0;
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+      const measure = compositionState.measures[measureIndex];
+      if (!measure) continue;
+
+      const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+      const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+      if (!voice || !voice.notes || !voice.notes[noteIndex]) continue;
+
+      const note = voice.notes[noteIndex];
+
+      // Skip rests
+      if (note.isRest) continue;
+
+      // Toggle ornament: if same ornament already applied, remove it
+      if (note.ornament === ornamentType) {
+        note.ornament = null;
+      } else {
+        note.ornament = ornamentType;
+      }
+      changedCount++;
+    }
+
+    if (changedCount > 0) {
+      console.log(`[applyOrnamentToSelected] Applied/toggled '${ornamentType}' on ${changedCount} note(s)`);
+      this.composerIntegration.render(true);
+    }
+  }
+
+  /**
+   * Remove ornaments from all selected notes
+   */
+  removeOrnamentFromSelected() {
+    if (this.selectedNotes.size === 0) {
+      console.log('[removeOrnamentFromSelected] No notes selected');
+      return;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    let removedCount = 0;
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+      const measure = compositionState.measures[measureIndex];
+      if (!measure) continue;
+
+      const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+      const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+      if (!voice || !voice.notes || !voice.notes[noteIndex]) continue;
+
+      const note = voice.notes[noteIndex];
+
+      if (note.ornament) {
+        note.ornament = null;
+        removedCount++;
+      }
+    }
+
+    if (removedCount > 0) {
+      console.log(`[removeOrnamentFromSelected] Removed ornaments from ${removedCount} note(s)`);
+      this.composerIntegration.render(true);
+    }
+  }
+
+  /**
+   * Add a grace note to selected notes
+   * Grace notes are small notes preceding the main note
+   * @param {string} graceType - 'acciaccatura' (slashed/crushed) or 'appoggiatura' (leaning)
+   */
+  addGraceNoteToSelected(graceType) {
+    if (this.selectedNotes.size === 0) {
+      console.log('[addGraceNoteToSelected] No notes selected');
+      return;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    let changedCount = 0;
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+      const measure = compositionState.measures[measureIndex];
+      if (!measure) continue;
+
+      const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+      const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+      if (!voice || !voice.notes || !voice.notes[noteIndex]) continue;
+
+      const note = voice.notes[noteIndex];
+
+      // Skip rests
+      if (note.isRest) continue;
+
+      // Get the pitch of the target note to calculate grace note pitch
+      const targetPitch = note.pitches ? note.pitches[0] : note.pitch;
+      if (!targetPitch) continue;
+
+      // Calculate a grace note pitch (one scale step below by default)
+      // For simplicity, we'll go one semitone below
+      const gracePitch = this.transposeHalfStep(targetPitch, -1);
+
+      // Create grace note object
+      const graceNote = {
+        pitch: gracePitch,
+        duration: '8n',  // Eighth note is standard for grace notes
+        slash: graceType === 'acciaccatura',  // Acciaccatura has a slash through it
+      };
+
+      // Add to existing grace notes or create new array
+      if (!note.graceNotes) {
+        note.graceNotes = [graceNote];
+      } else {
+        note.graceNotes.push(graceNote);
+      }
+      changedCount++;
+    }
+
+    if (changedCount > 0) {
+      console.log(`[addGraceNoteToSelected] Added ${graceType} to ${changedCount} note(s)`);
+      this.composerIntegration.render(true);
+    }
+  }
+
+  /**
+   * Remove all grace notes from selected notes
+   */
+  removeGraceNotesFromSelected() {
+    if (this.selectedNotes.size === 0) {
+      console.log('[removeGraceNotesFromSelected] No notes selected');
+      return;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    let removedCount = 0;
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+      const measure = compositionState.measures[measureIndex];
+      if (!measure) continue;
+
+      const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+      const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+      if (!voice || !voice.notes || !voice.notes[noteIndex]) continue;
+
+      const note = voice.notes[noteIndex];
+
+      if (note.graceNotes && note.graceNotes.length > 0) {
+        note.graceNotes = null;
+        removedCount++;
+      }
+    }
+
+    if (removedCount > 0) {
+      console.log(`[removeGraceNotesFromSelected] Removed grace notes from ${removedCount} note(s)`);
+      this.composerIntegration.render(true);
+    }
+  }
+
+  /**
+   * Transpose grace notes on selected notes by a number of half steps
+   * @param {number} halfSteps - positive = up, negative = down
+   */
+  transposeGraceNotesOnSelected(halfSteps) {
+    if (this.selectedNotes.size === 0) {
+      console.log('[transposeGraceNotesOnSelected] No notes selected');
+      return;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    let transposedCount = 0;
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+      const measure = compositionState.measures[measureIndex];
+      if (!measure) continue;
+
+      const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+      const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+      if (!voice || !voice.notes || !voice.notes[noteIndex]) continue;
+
+      const note = voice.notes[noteIndex];
+
+      // Check if note has grace notes
+      if (note.graceNotes && note.graceNotes.length > 0) {
+        // Transpose each grace note
+        note.graceNotes = note.graceNotes.map(gn => ({
+          ...gn,
+          pitch: this.transposeHalfStep(gn.pitch, halfSteps)
+        }));
+        transposedCount++;
+      }
+    }
+
+    if (transposedCount > 0) {
+      console.log(`[transposeGraceNotesOnSelected] Transposed grace notes on ${transposedCount} note(s) by ${halfSteps} half steps`);
+      this.composerIntegration.render(true);
+    }
+  }
+
+  /**
+   * Set the pitch of grace notes on selected notes directly
+   * @param {string} pitch - The new pitch for all grace notes (e.g., "C4", "F#5")
+   */
+  setGraceNotePitchOnSelected(pitch) {
+    if (this.selectedNotes.size === 0) {
+      console.log('[setGraceNotePitchOnSelected] No notes selected');
+      return;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    let changedCount = 0;
+
+    for (const noteId of this.selectedNotes) {
+      const [measureIndex, staff, voiceIndex, noteIndex] = this.parseNoteId(noteId);
+      const measure = compositionState.measures[measureIndex];
+      if (!measure) continue;
+
+      const voiceKey = staff === 'treble' ? 'treble' : 'bass';
+      const voice = measure.notation?.[voiceKey]?.voices?.[voiceIndex] || this.getVoice(measure, staff);
+      if (!voice || !voice.notes || !voice.notes[noteIndex]) continue;
+
+      const note = voice.notes[noteIndex];
+
+      // Check if note has grace notes
+      if (note.graceNotes && note.graceNotes.length > 0) {
+        // Set pitch for all grace notes
+        note.graceNotes = note.graceNotes.map(gn => ({
+          ...gn,
+          pitch: pitch
+        }));
+        changedCount++;
+      }
+    }
+
+    if (changedCount > 0) {
+      console.log(`[setGraceNotePitchOnSelected] Set grace note pitch to ${pitch} on ${changedCount} note(s)`);
+      this.composerIntegration.render(true);
+    }
+  }
+
+  /**
+   * Transpose a pitch by a number of half steps
+   * @param {string} pitch - e.g., "C4", "F#5"
+   * @param {number} halfSteps - positive = up, negative = down
+   * @returns {string} - transposed pitch
+   */
+  transposeHalfStep(pitch, halfSteps) {
+    const noteOrder = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const flatToSharp = { 'Db': 'C#', 'Eb': 'D#', 'Fb': 'E', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#', 'Cb': 'B' };
+
+    // Parse the pitch
+    const match = pitch.match(/^([A-G][#b]?)(\d+)$/);
+    if (!match) return pitch;
+
+    let [, noteName, octaveStr] = match;
+    let octave = parseInt(octaveStr);
+
+    // Normalize flats to sharps for calculation
+    if (flatToSharp[noteName]) {
+      noteName = flatToSharp[noteName];
+    }
+
+    // Find current index
+    let noteIndex = noteOrder.indexOf(noteName);
+    if (noteIndex === -1) {
+      // Handle natural notes that might have been written with 'b' (like 'E' for 'Fb')
+      noteIndex = noteOrder.indexOf(noteName.charAt(0));
+    }
+    if (noteIndex === -1) return pitch;
+
+    // Calculate new index
+    let newIndex = noteIndex + halfSteps;
+
+    // Handle octave changes
+    while (newIndex < 0) {
+      newIndex += 12;
+      octave--;
+    }
+    while (newIndex >= 12) {
+      newIndex -= 12;
+      octave++;
+    }
+
+    return noteOrder[newIndex] + octave;
+  }
+
+  /**
+   * Apply a tempo marking at the selected note's measure position
+   * @param {Object} tempoMarking - { symbol, bpm } tempo marking info
+   */
+  applyTempoMarking(tempoMarking) {
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    // Get the measure index from: 1) selected notes, 2) selected measure, 3) default to 0
+    let measureIndex = 0;
+    if (this.selectedNotes.size > 0) {
+      const firstNoteId = [...this.selectedNotes][0];
+      const [measIdx] = this.parseNoteId(firstNoteId);
+      measureIndex = measIdx;
+    } else if (this.composerIntegration?.selectedMeasure != null) {
+      measureIndex = this.composerIntegration.selectedMeasure;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    compositionState.addTempoMarking({
+      measureIndex,
+      symbol: tempoMarking.symbol,
+      bpm: tempoMarking.bpm,
+    });
+
+    console.log(`[applyTempoMarking] Added ${tempoMarking.symbol} at measure ${measureIndex}`);
+    this.composerIntegration.render(true);
+  }
+
+  /**
+   * Apply a repeat sign at the current selected measure
+   * @param {string} repeatType - 'repeatStart', 'repeatEnd', 'repeatBoth', or 'none' to remove
+   */
+  applyRepeatSign(repeatType) {
+    const compositionState = window.getCompositionState?.();
+    if (!compositionState) return;
+
+    // Get the measure index from: 1) selected notes, 2) selected measure, 3) default to 0
+    let measureIndex = 0;
+    if (this.selectedNotes.size > 0) {
+      const firstNoteId = [...this.selectedNotes][0];
+      const [measIdx] = this.parseNoteId(firstNoteId);
+      measureIndex = measIdx;
+    } else if (this.composerIntegration?.selectedMeasure != null) {
+      measureIndex = this.composerIntegration.selectedMeasure;
+    }
+
+    // Save state for undo
+    if (typeof window.saveStateBeforeChange === 'function') {
+      window.saveStateBeforeChange();
+    }
+
+    if (repeatType === 'none') {
+      // Remove repeat sign from this measure
+      compositionState.removeRepeatSign(measureIndex);
+      console.log(`[applyRepeatSign] Removed repeat sign from measure ${measureIndex}`);
+    } else {
+      // Add or update repeat sign
+      compositionState.addRepeatSign({
+        measureIndex,
+        type: repeatType, // 'repeatStart', 'repeatEnd', 'repeatBoth'
+      });
+      console.log(`[applyRepeatSign] Added ${repeatType} at measure ${measureIndex}`);
+    }
+
+    this.composerIntegration.render(true);
+  }
+
+  /**
    * Toggle tie on all selected notes
    * When multiple notes are selected, only toggle tie on the FIRST note of each pair,
    * to prevent unwanted cascading ties.

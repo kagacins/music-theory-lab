@@ -111,7 +111,7 @@ function setupResponsiveTitle() {
             titleElement.textContent = 'Music Theory Lab';
         } else {
             // Desktop: full title
-            titleElement.textContent = 'Music Theory Lab';
+            titleElement.textContent = 'Interactive Music Theory Lab';
         }
     };
 

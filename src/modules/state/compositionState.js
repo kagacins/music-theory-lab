@@ -960,6 +960,29 @@ export class CompositionState {
         // }
         this.hairpins = [];
         this._nextHairpinId = 1;
+
+        // Slurs - curved lines indicating phrasing/legato
+        // Structure: {
+        //   id: 'sl_1',
+        //   clef: 'treble' | 'bass',
+        //   voiceIndex: 0,
+        //   startMeasure: 0,
+        //   startBeat: 0,
+        //   endMeasure: 1,
+        //   endBeat: 2
+        // }
+        this.slurs = [];
+        this._nextSlurId = 1;
+
+        // Tempo markings - stored at specific measure positions
+        // Array of { id, measureIndex, symbol, bpm }
+        this.tempoMarkings = [];
+        this._nextTempoId = 1;
+
+        // Repeat signs - stored at specific measure positions
+        // Array of { id, measureIndex, type } where type is 'repeatStart', 'repeatEnd', 'repeatBoth'
+        this.repeatSigns = [];
+        this._nextRepeatId = 1;
     }
 
     // ========================================================================
@@ -7933,6 +7956,233 @@ export class CompositionState {
         this.hairpins = [];
         this._nextHairpinId = 1;
         this.events.emit('hairpinsCleared');
+    }
+
+    // ========================================================================
+    // SLUR MANAGEMENT
+    // ========================================================================
+
+    /**
+     * Add a slur between two notes
+     * @param {Object} options - Slur options
+     * @param {string} options.clef - 'treble' or 'bass'
+     * @param {number} options.voiceIndex - Voice index
+     * @param {number} options.startMeasure - Start measure index
+     * @param {number} options.startBeat - Start beat position
+     * @param {number} options.endMeasure - End measure index
+     * @param {number} options.endBeat - End beat position
+     * @returns {Object} The created slur object
+     */
+    addSlur({ clef, voiceIndex, startMeasure, startBeat, endMeasure, endBeat }) {
+        const slur = {
+            id: `sl_${this._nextSlurId++}`,
+            clef,
+            voiceIndex: voiceIndex || 0,
+            startMeasure,
+            startBeat,
+            endMeasure,
+            endBeat
+        };
+
+        // Note: Unlike hairpins, we allow overlapping slurs (nested slurs are valid in music)
+        this.slurs.push(slur);
+        this.events.emit('slurAdded', slur);
+        return slur;
+    }
+
+    /**
+     * Remove a slur by ID
+     * @param {string} slurId - Slur ID to remove
+     * @returns {boolean} True if removed
+     */
+    removeSlur(slurId) {
+        const index = this.slurs.findIndex(s => s.id === slurId);
+        if (index >= 0) {
+            const removed = this.slurs.splice(index, 1)[0];
+            this.events.emit('slurRemoved', removed);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Get all slurs for a specific clef
+     * @param {string} clef - 'treble' or 'bass'
+     * @returns {Array} Array of slurs for the clef
+     */
+    getSlursForClef(clef) {
+        return this.slurs.filter(s => s.clef === clef);
+    }
+
+    /**
+     * Get slurs that span a specific measure
+     * @param {number} measureIndex - Measure index
+     * @param {string} clef - Optional clef filter
+     * @returns {Array} Array of slurs affecting this measure
+     */
+    getSlursForMeasure(measureIndex, clef = null) {
+        return this.slurs.filter(s => {
+            if (clef && s.clef !== clef) return false;
+            return s.startMeasure <= measureIndex && s.endMeasure >= measureIndex;
+        });
+    }
+
+    /**
+     * Clear all slurs
+     */
+    clearSlurs() {
+        this.slurs = [];
+        this._nextSlurId = 1;
+        this.events.emit('slursCleared');
+    }
+
+    // ========================================================================
+    // TEMPO MARKING MANAGEMENT
+    // ========================================================================
+
+    /**
+     * Add a tempo marking at a specific measure
+     * @param {Object} params - Tempo marking parameters
+     * @param {number} params.measureIndex - Measure index for the tempo marking
+     * @param {string} params.symbol - Display symbol (e.g., 'Allegro', 'Andante')
+     * @param {string} params.bpm - BPM range string (e.g., '120-156')
+     * @returns {Object} The created tempo marking
+     */
+    addTempoMarking({ measureIndex, symbol, bpm }) {
+        // Remove any existing tempo marking at this measure
+        this.tempoMarkings = this.tempoMarkings.filter(t => t.measureIndex !== measureIndex);
+
+        const tempo = {
+            id: `tempo_${this._nextTempoId++}`,
+            measureIndex,
+            symbol,
+            bpm,
+        };
+        this.tempoMarkings.push(tempo);
+        this.tempoMarkings.sort((a, b) => a.measureIndex - b.measureIndex);
+        this.events.emit('tempoMarkingAdded', tempo);
+        return tempo;
+    }
+
+    /**
+     * Remove a tempo marking by ID
+     * @param {string} tempoId - Tempo marking ID
+     * @returns {boolean} True if removed
+     */
+    removeTempoMarking(tempoId) {
+        const index = this.tempoMarkings.findIndex(t => t.id === tempoId);
+        if (index >= 0) {
+            const removed = this.tempoMarkings.splice(index, 1)[0];
+            this.events.emit('tempoMarkingRemoved', removed);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Get tempo marking for a specific measure
+     * @param {number} measureIndex - Measure index
+     * @returns {Object|null} Tempo marking or null
+     */
+    getTempoMarkingForMeasure(measureIndex) {
+        return this.tempoMarkings.find(t => t.measureIndex === measureIndex) || null;
+    }
+
+    /**
+     * Get all tempo markings
+     * @returns {Array} Array of tempo markings
+     */
+    getAllTempoMarkings() {
+        return [...this.tempoMarkings];
+    }
+
+    /**
+     * Clear all tempo markings
+     */
+    clearTempoMarkings() {
+        this.tempoMarkings = [];
+        this._nextTempoId = 1;
+        this.events.emit('tempoMarkingsCleared');
+    }
+
+    // ========================================================================
+    // REPEAT SIGN MANAGEMENT
+    // ========================================================================
+
+    /**
+     * Add or toggle a repeat sign at a specific measure
+     * @param {Object} params - Repeat sign parameters
+     * @param {number} params.measureIndex - Measure index for the repeat sign
+     * @param {string} params.type - Repeat type: 'repeatStart', 'repeatEnd', 'repeatBoth'
+     * @returns {Object|null} The created repeat sign, or null if removed
+     */
+    addRepeatSign({ measureIndex, type }) {
+        // Check if a repeat sign already exists at this measure
+        const existingIndex = this.repeatSigns.findIndex(r => r.measureIndex === measureIndex);
+
+        if (existingIndex >= 0) {
+            const existing = this.repeatSigns[existingIndex];
+            if (existing.type === type) {
+                // Same type - remove it (toggle off)
+                this.repeatSigns.splice(existingIndex, 1);
+                this.events.emit('repeatSignRemoved', existing);
+                return null;
+            } else {
+                // Different type - replace it
+                this.repeatSigns.splice(existingIndex, 1);
+            }
+        }
+
+        const repeat = {
+            id: `repeat_${this._nextRepeatId++}`,
+            measureIndex,
+            type,
+        };
+        this.repeatSigns.push(repeat);
+        this.repeatSigns.sort((a, b) => a.measureIndex - b.measureIndex);
+        this.events.emit('repeatSignAdded', repeat);
+        return repeat;
+    }
+
+    /**
+     * Remove a repeat sign by ID
+     * @param {string} repeatId - Repeat sign ID
+     * @returns {boolean} True if removed
+     */
+    removeRepeatSign(repeatId) {
+        const index = this.repeatSigns.findIndex(r => r.id === repeatId);
+        if (index >= 0) {
+            const removed = this.repeatSigns.splice(index, 1)[0];
+            this.events.emit('repeatSignRemoved', removed);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Get repeat sign for a specific measure
+     * @param {number} measureIndex - Measure index
+     * @returns {Object|null} Repeat sign or null
+     */
+    getRepeatSignForMeasure(measureIndex) {
+        return this.repeatSigns.find(r => r.measureIndex === measureIndex) || null;
+    }
+
+    /**
+     * Get all repeat signs
+     * @returns {Array} Array of repeat signs
+     */
+    getAllRepeatSigns() {
+        return [...this.repeatSigns];
+    }
+
+    /**
+     * Clear all repeat signs
+     */
+    clearRepeatSigns() {
+        this.repeatSigns = [];
+        this._nextRepeatId = 1;
+        this.events.emit('repeatSignsCleared');
     }
 }
 

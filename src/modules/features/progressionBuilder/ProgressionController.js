@@ -4005,6 +4005,16 @@ export function captureProgressionState() {
         if (compositionState.metadata) {
             state.metadata = JSON.parse(JSON.stringify(compositionState.metadata));
         }
+        // Capture tempo markings, repeat signs, and hairpins (stored separately from measures)
+        if (compositionState.tempoMarkings) {
+            state.tempoMarkings = [...compositionState.tempoMarkings];
+        }
+        if (compositionState.repeatSigns) {
+            state.repeatSigns = [...compositionState.repeatSigns];
+        }
+        if (compositionState.hairpins) {
+            state.hairpins = [...compositionState.hairpins];
+        }
     }
 
     return state;
@@ -4080,6 +4090,16 @@ function restoreProgressionState(state) {
         }
         if (state.chordSegments) {
             compositionState.chordSegments = JSON.parse(JSON.stringify(state.chordSegments));
+        }
+        // Restore tempo markings and repeat signs
+        if (state.tempoMarkings) {
+            compositionState.tempoMarkings = [...state.tempoMarkings];
+        }
+        if (state.repeatSigns) {
+            compositionState.repeatSigns = [...state.repeatSigns];
+        }
+        if (state.hairpins) {
+            compositionState.hairpins = [...state.hairpins];
         }
         compositionState.events.emit('loaded', { measures: compositionState.measures });
     }

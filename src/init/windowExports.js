@@ -15,7 +15,7 @@ import { initAllSectionDragDrop } from '../modules/ui/sectionDragDrop.js';
 import { initAllSectionSidebars, triggerSectionSidebarUpdate } from '../modules/ui/sectionSidebar.js';
 import { showModal, hideModal, showModalHTML, showAboutModal, hideAboutModal } from '../modules/ui/modals.js';
 import { renderKeyboard, updateKeyboardLabels, updateKeyNames, clearHighlights, g_KeyboardKeys } from '../modules/ui/keyboard.js';
-import { updateKeySignatureDisplay, setupResponsiveTitle } from '../modules/ui/header.js';
+import { updateKeySignatureDisplay } from '../modules/ui/header.js';
 import { toggleSidebar, toggleSettingsGroup, restoreSettingsGroupStates, toggleHeaderDisplays, restoreHeaderDisplaysState } from '../modules/ui/sidebar.js';
 import { showSettingsModal, showChordWeightsModal, showMelodyWeightsModal } from '../modules/ui/settingsModal.js';
 import { initPresetUI, togglePresetPanel, openPresetPanel, closePresetPanel } from '../modules/ui/presetUI.js';
@@ -412,6 +412,12 @@ import {
 import {
     togglePanel
 } from '../modules/ui/floatingSuggestionsPanel.js';
+
+// Measure Isolation Editor
+import {
+    openMeasureIsolationEditor,
+    getMeasureIsolationEditor
+} from '../modules/notation/measureIsolation/index.js';
 
 import {
     ENHARMONIC_MAP,
@@ -2123,4 +2129,32 @@ export function setupWindowExports() {
 
     // Floating Suggestions Panel functions
     window.togglePanel = togglePanel;
+
+    // Measure Isolation Editor
+    window.openMeasureIsolationEditor = (measureIndex) => {
+        const compositionState = window.getCompositionState ? window.getCompositionState() : null;
+        if (!compositionState) {
+            console.error('[MeasureIsolationEditor] No compositionState available');
+            return;
+        }
+
+        // Save state for undo before opening editor
+        if (window.saveStateBeforeChange) {
+            window.saveStateBeforeChange();
+        }
+
+        openMeasureIsolationEditor(measureIndex, {
+            compositionState,
+            onApply: () => {
+                // Refresh displays after changes applied
+                if (window.refreshNotationFromProgression) {
+                    window.refreshNotationFromProgression();
+                }
+            },
+            onCancel: () => {
+                // Nothing special needed
+            }
+        });
+    };
+    window.getMeasureIsolationEditor = getMeasureIsolationEditor;
 }

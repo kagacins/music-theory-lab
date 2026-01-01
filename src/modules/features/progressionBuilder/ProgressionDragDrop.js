@@ -36,12 +36,8 @@ import {
 // Guided mode integration
 import { dispatchBuilderEvent } from '../../ui/lessonGuidedMode.js';
 
-// Note: The following dependencies will be imported from other modules once refactoring is complete:
-// - UI: renderProgressionDisplay (from ProgressionRenderer.js)
-// - UI: createUnifiedSectionContainer (from ProgressionRenderer.js)
-// - UI: createPseudoSectionContainer (from ProgressionRenderer.js)
-// - UI: createChordCardWrapper (from ProgressionRenderer.js)
-// - Undo: saveStateBeforeChange (from ProgressionController.js)
+// Undo support
+import { saveStateBeforeChange } from './ProgressionController.js';
 
 // ============================================================================
 // SORTABLE INITIALIZATION FUNCTIONS
@@ -79,6 +75,9 @@ export function initializeSectionContainerSortable(container) {
         sort: true,
         onEnd: function(evt) {
             console.log('[SectionContainer] Drag ended - using NEW section model');
+
+            // Save state for undo BEFORE making changes
+            saveStateBeforeChange();
 
             const compositionState = window.getCompositionState ? window.getCompositionState() : null;
             const trainerState = window.getTrainerState ? window.getTrainerState() : null;
@@ -195,6 +194,8 @@ export function initializeSectionCardsAreaSortables(container) {
             onEnd: function(evt) {
                 // onEnd fires on source container - only handle same-section reordering here
                 if (evt.from === evt.to) {
+                    // Save state for undo BEFORE making changes
+                    saveStateBeforeChange();
                     handleCardDragWithinSection(evt, sectionId);
                 }
                 // Cross-section moves are handled by onAdd on the destination
@@ -202,6 +203,8 @@ export function initializeSectionCardsAreaSortables(container) {
             onAdd: function(evt) {
                 // Card was added from another section - handle cross-section move
                 // evt.to is this container (destination), evt.from is source
+                // Save state for undo BEFORE making changes
+                saveStateBeforeChange();
                 handleCardDragWithinSection(evt, evt.from.getAttribute('data-section-id'));
             }
         });
@@ -242,6 +245,9 @@ export function initializeSectionChipsSortable(chipsContainer) {
         touchStartThreshold: 3,
         onEnd: function(evt) {
             console.log('[SectionChips] Drag ended - using NEW section model');
+
+            // Save state for undo BEFORE making changes
+            saveStateBeforeChange();
 
             const compositionState = window.getCompositionState ? window.getCompositionState() : null;
             const trainerState = window.getTrainerState ? window.getTrainerState() : null;
@@ -389,6 +395,8 @@ export function initializeSimplifiedSortable(container) {
         },
         // Handle cards added FROM sections TO the main container (ungrouped)
         onAdd: function(evt) {
+            // Save state for undo BEFORE making changes
+            saveStateBeforeChange();
             // Use the unified handler which handles cross-container moves
             handleCardDragWithinSection(evt, evt.from.getAttribute('data-section-id'));
         },
@@ -398,6 +406,9 @@ export function initializeSimplifiedSortable(container) {
 
             // Cross-container moves are handled by onAdd
             if (evt.from !== evt.to) return;
+
+            // Save state for undo BEFORE making changes
+            saveStateBeforeChange();
 
             const draggedItem = evt.item;
 
@@ -542,8 +553,9 @@ export function initializeSectionSortables(container) {
 
                     if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
 
+                    // Save state for undo BEFORE making changes
+                    saveStateBeforeChange();
                     // Use reorderSectionsWithChords for consistent behavior with pill reordering
-                    // saveStateBeforeChange();
                     reorderSectionsWithChords(currentSections, oldIndex, newIndex);
 
                     // Re-render
@@ -599,6 +611,8 @@ export function initializeSectionSortables(container) {
             },
             // Handle cards added FROM outside INTO this container
             onAdd: function(evt) {
+                // Save state for undo BEFORE making changes
+                saveStateBeforeChange();
                 handleChordMoveToSection(evt);
             },
             onEnd: function(evt) {
@@ -606,6 +620,8 @@ export function initializeSectionSortables(container) {
                 if (evt.from !== evt.to) {
                     return;
                 }
+                // Save state for undo BEFORE making changes
+                saveStateBeforeChange();
                 handleChordMoveToSection(evt);
             }
         });

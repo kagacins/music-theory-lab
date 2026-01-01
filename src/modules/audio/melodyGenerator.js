@@ -139,6 +139,139 @@ function getDurationInSeconds(duration, tempo, tuplet = null, dotted = false) {
     }
 }
 
+// ============================================================================
+// REPEAT SIGN PLAYBACK SUPPORT
+// ============================================================================
+
+/**
+ * Build playback measure order considering repeat signs.
+ * Returns an array of { measureIndex, playbackPosition } that represents
+ * the order in which measures should be played.
+ *
+ * Repeat signs work as follows:
+ * - repeatStart (|:) marks the start of a section to repeat
+ * - repeatEnd (:|) marks the end and causes playback to jump back to the most recent repeatStart
+ * - repeatBoth (:|:) ends the previous repeat section AND starts a new one
+ *
+ * Each repeat section is played exactly once (play through, then repeat once).
+ *
+ * @param {Object} compositionState - The composition state
+ * @returns {Array} Array of { measureIndex, playbackPosition } objects
+ */
+function buildPlaybackMeasureOrder(compositionState) {
+    const measureCount = compositionState.getMeasureCount();
+    if (measureCount === 0) {
+        return [];
+    }
+
+    const repeatSigns = compositionState.getAllRepeatSigns();
+
+    // If no repeat signs, just play measures in order
+    if (!repeatSigns || repeatSigns.length === 0) {
+        return Array.from({ length: measureCount }, (_, i) => ({
+            measureIndex: i,
+            playbackPosition: i
+        }));
+    }
+
+    // Build a map of repeat signs by measure index for quick lookup
+    const repeatSignMap = new Map();
+    repeatSigns.forEach(sign => {
+        repeatSignMap.set(sign.measureIndex, sign.type);
+    });
+
+    // Build the playback order
+    const playbackOrder = [];
+    let playbackPosition = 0;
+    let currentRepeatStartMeasure = 0; // Where to jump back to on repeat
+    let repeatUsed = new Set(); // Track which repeat sections have been used
+
+    // Check if there's a repeatEnd without a preceding repeatStart
+    // In this case, treat measure 0 as an implicit repeat start
+    const firstRepeatEnd = repeatSigns.find(s => s.type === 'repeatEnd' || s.type === 'repeatBoth');
+    const firstRepeatStart = repeatSigns.find(s => s.type === 'repeatStart' || s.type === 'repeatBoth');
+
+    // If there's a repeat end before any repeat start, we're implicitly in a repeat section from measure 0
+    let inRepeatSection = firstRepeatEnd && (!firstRepeatStart || firstRepeatEnd.measureIndex <= firstRepeatStart.measureIndex);
+
+    let measureIndex = 0;
+
+    while (measureIndex < measureCount) {
+        const repeatType = repeatSignMap.get(measureIndex);
+
+        // Determine if this measure acts as a repeat START
+        const isRepeatStart = repeatType === 'repeatStart' || repeatType === 'repeatBoth';
+        // Determine if this measure acts as a repeat END
+        const isRepeatEnd = repeatType === 'repeatEnd' || repeatType === 'repeatBoth';
+
+        // Handle repeat start markers FIRST (before adding measure)
+        if (isRepeatStart) {
+            // If we're already in a repeat section and hit a repeatBoth,
+            // we need to handle the END part first before starting a new section
+            if (repeatType === 'repeatBoth' && inRepeatSection && currentRepeatStartMeasure !== measureIndex) {
+                const repeatKey = `${currentRepeatStartMeasure}-${measureIndex}`;
+
+                if (!repeatUsed.has(repeatKey)) {
+                    // Add this measure first (it's part of the ending section)
+                    playbackOrder.push({
+                        measureIndex,
+                        playbackPosition: playbackPosition++
+                    });
+
+                    // Mark this repeat as used
+                    repeatUsed.add(repeatKey);
+
+                    // Jump back to repeat start
+                    measureIndex = currentRepeatStartMeasure;
+                    continue;
+                }
+            }
+
+            // Now set this as the start of a (new) repeat section
+            currentRepeatStartMeasure = measureIndex;
+            inRepeatSection = true;
+        }
+
+        // Add current measure to playback order
+        playbackOrder.push({
+            measureIndex,
+            playbackPosition: playbackPosition++
+        });
+
+        // Handle repeat end markers AFTER adding the measure
+        if (isRepeatEnd) {
+            const repeatKey = `${currentRepeatStartMeasure}-${measureIndex}`;
+
+            if (inRepeatSection && !repeatUsed.has(repeatKey)) {
+                // Mark this repeat as used
+                repeatUsed.add(repeatKey);
+
+                // Jump back to repeat start
+                measureIndex = currentRepeatStartMeasure;
+
+                // For repeatBoth, stay in repeat section (it starts a new one after the jump back)
+                // For repeatEnd, exit repeat section
+                if (repeatType === 'repeatEnd') {
+                    inRepeatSection = false;
+                }
+                continue;
+            } else {
+                // Repeat already used or not in a section
+                if (repeatType === 'repeatEnd') {
+                    inRepeatSection = false;
+                }
+            }
+        }
+
+        measureIndex++;
+    }
+
+    console.log('[buildPlaybackMeasureOrder] Repeat signs:', repeatSigns);
+    console.log('[buildPlaybackMeasureOrder] Playback order:', playbackOrder);
+
+    return playbackOrder;
+}
+
 /**
  * Get notes available for melody based on chord and style
  */
@@ -4104,10 +4237,49 @@ export function playAllMelody() {
             return;
         }
 
+        // Handle grace notes - play them just before the principal note
+        // Grace notes "steal" time from either before the beat (acciaccatura) or from the principal note (appoggiatura)
+        let principalNoteTime = time;
+        const graceNotes = noteData.graceNotes;
+
+        if (graceNotes && Array.isArray(graceNotes) && graceNotes.length > 0) {
+            // Grace note duration: acciaccatura is very short (~0.05s), appoggiatura is longer (~0.1s)
+            // For multiple grace notes, distribute them evenly in the grace note time window
+            const graceNoteDuration = 0.06; // Duration of each grace note in seconds
+            const totalGraceTime = graceNotes.length * graceNoteDuration;
+
+            // For acciaccatura (slashed), steal time from before the beat
+            // For appoggiatura (not slashed), steal time from the principal note
+            const hasSlash = graceNotes.some(gn => gn.slash);
+
+            if (hasSlash) {
+                // Acciaccatura: grace notes play before the beat, principal note on time
+                // Play grace notes starting before the beat
+                graceNotes.forEach((gn, index) => {
+                    const graceTime = time - totalGraceTime + (index * graceNoteDuration);
+                    if (graceTime >= 0 && gn.pitch) {
+                        synth.triggerAttackRelease(gn.pitch, graceNoteDuration * 0.9, graceTime);
+                    }
+                });
+                // Principal note plays at original time
+            } else {
+                // Appoggiatura: grace notes steal time from principal note
+                // Grace notes play starting at the beat
+                graceNotes.forEach((gn, index) => {
+                    const graceTime = time + (index * graceNoteDuration);
+                    if (gn.pitch) {
+                        synth.triggerAttackRelease(gn.pitch, graceNoteDuration * 0.9, graceTime);
+                    }
+                });
+                // Principal note is delayed
+                principalNoteTime = time + totalGraceTime;
+            }
+        }
+
         // Use the passed-in time parameter directly (Tone.js handles timing)
         // Play all pitches in the chord
         notesToPlay.forEach(pitch => {
-            synth.triggerAttackRelease(pitch, noteData.duration, time);
+            synth.triggerAttackRelease(pitch, noteData.duration, principalNoteTime);
         });
 
         // Create note identifier: "measure-beat-pitch" for each pitch in the chord
@@ -4177,10 +4349,12 @@ export function playAllMelody() {
             }, removeTime);
         }
     }, (() => {
-        // Get melody notes from compositionState
+        // Get melody notes from compositionState, respecting repeat signs
         if (window.getCompositionState) {
             const compositionState = window.getCompositionState();
-            const melodyNotes = compositionState.getAllMelodyNotes();
+
+            // Build playback order considering repeat signs
+            const playbackOrder = buildPlaybackMeasureOrder(compositionState);
 
             // Helper to compare pitches (handles both single notes and chords)
             const samePitches = (a, b) => {
@@ -4198,45 +4372,79 @@ export function playAllMelody() {
             const events = [];
             let exportedIndex = 0;
 
-            for (let i = 0; i < melodyNotes.length; i++) {
-                const note = melodyNotes[i];
+            // Build all melody notes in playback order
+            const allMelodyNotes = [];
+            playbackOrder.forEach(({ measureIndex, playbackPosition }) => {
+                const measureData = compositionState.getMeasure(measureIndex);
+                const trebleVoices = measureData?.notation?.treble?.voices || [];
+
+                trebleVoices.forEach((voice, voiceIndex) => {
+                    if (!voice || !voice.notes) return;
+
+                    voice.notes.forEach(note => {
+                        // Add note with playback position metadata
+                        allMelodyNotes.push({
+                            ...note,
+                            measure: measureIndex, // Original measure for highlighting
+                            playbackPosition, // Used for timing
+                        });
+                    });
+                });
+            });
+
+            // Sort notes by playback position and beat
+            allMelodyNotes.sort((a, b) => {
+                if (a.playbackPosition !== b.playbackPosition) {
+                    return a.playbackPosition - b.playbackPosition;
+                }
+                return (a.beat || 0) - (b.beat || 0);
+            });
+
+            for (let i = 0; i < allMelodyNotes.length; i++) {
+                const note = allMelodyNotes[i];
 
                 // Only schedule playable notes (skip rests)
                 if (note.type !== 'note' || (!note.pitch && !note.pitches)) {
                     continue;
                 }
 
-                const prev = i > 0 ? melodyNotes[i - 1] : null;
+                const prev = i > 0 ? allMelodyNotes[i - 1] : null;
 
                 // Determine if this note is a continuation of a tie group
+                // (Only within the same playback position to handle repeats correctly)
                 const isContinuation =
-                    // New-style ties: this note is marked as a continuation or end
-                    ((note.tie === 'continue' || note.tie === 'end') && prev && samePitches(note, prev)) ||
-                    // Legacy ties: previous note has tied=true and same pitch
-                    (prev && prev.tied && samePitches(note, prev)) ||
-                    // isTied flag: this note is a continuation from a previous tied note
-                    // (used by time signature redistribution)
-                    (note.isTied && prev && samePitches(note, prev));
+                    prev &&
+                    prev.playbackPosition === note.playbackPosition &&
+                    (
+                        // New-style ties: this note is marked as a continuation or end
+                        ((note.tie === 'continue' || note.tie === 'end') && samePitches(note, prev)) ||
+                        // Legacy ties: previous note has tied=true and same pitch
+                        (prev.tied && samePitches(note, prev)) ||
+                        // isTied flag: this note is a continuation from a previous tied note
+                        (note.isTied && samePitches(note, prev))
+                    );
 
                 // Skip pure continuation notes – their duration will be merged into the start note
                 if (isContinuation) {
                     continue;
                 }
 
-                // Base time for this note
-                const baseTime = (note.measure * measureDuration) + (note.beat * beatDuration);
+                // Base time for this note using playbackPosition (not original measure)
+                const baseTime = (note.playbackPosition * measureDuration) + ((note.beat || 0) * beatDuration);
                 const safeTime = Math.max(0, baseTime);
 
                 // Start with this note's duration - use tuplet-aware AND dotted-aware calculation
                 let totalDurationSeconds = getDurationInSeconds(note.duration, tempo, note.tuplet, note.dotted);
 
                 // Look ahead to merge durations of tied continuation notes
+                // (Only within the same playback position)
                 let j = i + 1;
-                while (j < melodyNotes.length) {
-                    const next = melodyNotes[j];
+                while (j < allMelodyNotes.length) {
+                    const next = allMelodyNotes[j];
                     if (!next || next.type !== 'note') break;
+                    if (next.playbackPosition !== note.playbackPosition) break; // Don't merge across repeats
 
-                    const prevInChain = melodyNotes[j - 1];
+                    const prevInChain = allMelodyNotes[j - 1];
 
                     const nextIsContinuation =
                         // New-style ties: continue/end and same pitch
@@ -4244,14 +4452,13 @@ export function playAllMelody() {
                         // Legacy ties: previous note in chain has tied=true and same pitch
                         (prevInChain && prevInChain.tied && samePitches(next, prevInChain)) ||
                         // isTied flag: this note is a continuation from a previous tied note
-                        // (used by time signature redistribution)
                         (next.isTied && samePitches(next, prevInChain));
 
                     if (!nextIsContinuation) {
                         break;
                     }
 
-                    // Merge this continuation note's duration into the total (use tuplet-aware AND dotted-aware calculation)
+                    // Merge this continuation note's duration into the total
                     totalDurationSeconds += getDurationInSeconds(next.duration, tempo, next.tuplet, next.dotted);
 
                     // Advance chain
@@ -4263,9 +4470,10 @@ export function playAllMelody() {
                     pitch: note.pitch,          // Single note (may be undefined for chords)
                     pitches: note.pitches,      // Chord pitches (may be undefined for single notes)
                     duration: totalDurationSeconds, // Use merged duration in seconds
-                    measure: note.measure,
-                    beat: note.beat,
+                    measure: note.measure,      // Original measure for highlighting
+                    beat: note.beat || 0,
                     dynamic: note.dynamic,      // Include stored dynamic (may be null if inherited)
+                    graceNotes: note.graceNotes, // Grace notes to play before principal note
                     noteIndex: exportedIndex    // Index into this filtered/merged list
                 });
 
@@ -4457,13 +4665,16 @@ export function playAllMelody() {
             const events = [];
             const measureCount = compositionState.getMeasureCount();
 
-            // Iterate through all measures and schedule each bass note individually
-            for (let measureIndex = 0; measureIndex < measureCount; measureIndex++) {
+            // Build playback order considering repeat signs
+            const playbackOrder = buildPlaybackMeasureOrder(compositionState);
+
+            // Iterate through playback order (respects repeats)
+            playbackOrder.forEach(({ measureIndex, playbackPosition }) => {
                 const measureData = compositionState.getMeasure(measureIndex);
                 const bassVoices = measureData?.notation?.bass?.voices || [];
 
                 if (bassVoices.length === 0) {
-                    continue;
+                    return;
                 }
 
                 // Get the chord for this measure (for chord release tracking)
@@ -4487,8 +4698,9 @@ export function playAllMelody() {
                             return;
                         }
 
-                        // Calculate absolute time for this note
-                        const measureStartBeat = measureIndex * beatsPerMeasure;
+                        // Calculate absolute time for this note using playbackPosition (not measureIndex)
+                        // This ensures repeated sections play at the correct time
+                        const measureStartBeat = playbackPosition * beatsPerMeasure;
                         const noteBeat = note.beat || 0;
                         const absoluteBeat = measureStartBeat + noteBeat;
                         const noteTime = absoluteBeat * beatDuration;
@@ -4504,12 +4716,12 @@ export function playAllMelody() {
                         events.push({
                             time: safeTime,
                             chord,
-                            measureIndex,
+                            measureIndex, // Keep original for highlighting
                             specificNote
                         });
                     });
                 });
-            }
+            });
 
             // Sort events by time to ensure correct playback order
             events.sort((a, b) => a.time - b.time);
@@ -4609,20 +4821,21 @@ export function playAllMelody() {
             }
         }, time);
     }, (() => {
-        // Generate events for each measure start
+        // Generate events for each measure start, respecting repeat signs
         const events = [];
         if (window.getCompositionState) {
             const compositionState = window.getCompositionState();
-            const measureCount = compositionState.getMeasureCount();
-            for (let i = 0; i < measureCount; i++) {
-                const measure = compositionState.getMeasure(i);
+            // Use playback order to honor repeat signs
+            const playbackOrder = buildPlaybackMeasureOrder(compositionState);
+            playbackOrder.forEach(({ measureIndex, playbackPosition }) => {
+                const measure = compositionState.getMeasure(measureIndex);
                 const chordIndex = measure?.chord?.chordIndex;
                 events.push({
-                    time: i * measureDuration,
-                    measureIndex: i,
+                    time: playbackPosition * measureDuration,
+                    measureIndex: measureIndex,
                     chordIndex: chordIndex
                 });
-            }
+            });
         }
         return events;
     })());
@@ -4658,24 +4871,16 @@ export function playAllMelody() {
         key: getCurrentKey()
     });
 
-    // Calculate total duration - use actual measure count from compositionState
-    let maxMeasure = progressionData.length - 1; // Fallback
+    // Calculate total duration - use playback order which accounts for repeats
+    let totalPlaybackMeasures = progressionData.length; // Fallback
     if (window.getCompositionState) {
         const compositionState = window.getCompositionState();
-        maxMeasure = compositionState.getMeasureCount() - 1;
-
-        // If there are melody notes, ensure we play long enough for them too
-        if (hasMelodyNotes) {
-            const allMelodyNotes = compositionState.getAllMelodyNotes();
-            if (allMelodyNotes.length > 0) {
-                const maxMelodyMeasure = Math.max(...allMelodyNotes.map(n => n.measure));
-                maxMeasure = Math.max(maxMeasure, maxMelodyMeasure);
-            }
-        }
+        const playbackOrder = buildPlaybackMeasureOrder(compositionState);
+        totalPlaybackMeasures = playbackOrder.length;
     }
     // Add small buffer to ensure last chord finishes (reverb will decay naturally)
     // No need for large buffer since we're releasing notes at exact measure boundaries
-    const totalDuration = (maxMeasure + 1) * measureDuration + 0.5;
+    const totalDuration = totalPlaybackMeasures * measureDuration + 0.5;
     
     // Stop after all notes have played
     Tone.Transport.scheduleOnce(() => {
@@ -4890,20 +5095,22 @@ export function playProgressionOnly() {
             });
         }
     }, (() => {
-        // Schedule ALL bass notes from compositionState
+        // Schedule ALL bass notes from compositionState, respecting repeat signs
         if (window.getCompositionState) {
             const compositionState = window.getCompositionState();
             const timeSignature = compositionState.metadata?.timeSignature || DEFAULT_TIME_SIGNATURE;
             const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
 
             const events = [];
-            const measureCount = compositionState.getMeasureCount();
 
-            for (let measureIndex = 0; measureIndex < measureCount; measureIndex++) {
+            // Build playback order considering repeat signs
+            const playbackOrder = buildPlaybackMeasureOrder(compositionState);
+
+            playbackOrder.forEach(({ measureIndex, playbackPosition }) => {
                 const measureData = compositionState.getMeasure(measureIndex);
                 const bassVoices = measureData?.notation?.bass?.voices || [];
 
-                if (bassVoices.length === 0) continue;
+                if (bassVoices.length === 0) return;
 
                 const chord = measureData.chord || {};
 
@@ -4913,7 +5120,8 @@ export function playProgressionOnly() {
                     bassVoice.notes.forEach((note) => {
                         if (note.type === 'rest' || note.isRest || note.isTied) return;
 
-                        const measureStartBeat = measureIndex * beatsPerMeasure;
+                        // Use playbackPosition for timing (not measureIndex)
+                        const measureStartBeat = playbackPosition * beatsPerMeasure;
                         const noteBeat = note.beat || 0;
                         const absoluteBeat = measureStartBeat + noteBeat;
                         const noteTime = absoluteBeat * beatDuration;
@@ -4928,12 +5136,12 @@ export function playProgressionOnly() {
                         events.push({
                             time: safeTime,
                             chord,
-                            measureIndex,
+                            measureIndex, // Keep original for highlighting
                             specificNote
                         });
                     });
                 });
-            }
+            });
 
             events.sort((a, b) => a.time - b.time);
             return events;
@@ -4995,7 +5203,7 @@ export function playProgressionOnly() {
     // Clear any previously tracked chord notes
     currentlyPlayingChordNotes = [];
 
-    // Schedule chord card highlighting at measure boundaries
+    // Schedule chord card highlighting at measure boundaries (respecting repeats)
     const measureHighlightPart = new Tone.Part((time, data) => {
         Tone.Draw.schedule(() => {
             if (window.highlightChordCard && data.chordIndex !== undefined) {
@@ -5009,16 +5217,18 @@ export function playProgressionOnly() {
         const events = [];
         if (window.getCompositionState) {
             const compositionState = window.getCompositionState();
-            const measureCount = compositionState.getMeasureCount();
-            for (let i = 0; i < measureCount; i++) {
-                const measure = compositionState.getMeasure(i);
+            // Build playback order considering repeat signs
+            const playbackOrder = buildPlaybackMeasureOrder(compositionState);
+
+            playbackOrder.forEach(({ measureIndex, playbackPosition }) => {
+                const measure = compositionState.getMeasure(measureIndex);
                 const chordIndex = measure?.chord?.chordIndex;
                 events.push({
-                    time: i * measureDuration,
-                    measureIndex: i,
+                    time: playbackPosition * measureDuration,
+                    measureIndex: measureIndex, // Original measure for highlighting
                     chordIndex: chordIndex
                 });
-            }
+            });
         }
         return events;
     })());
@@ -5029,11 +5239,12 @@ export function playProgressionOnly() {
     chordPart.start(0);
     measureHighlightPart.start(0);
 
-    // Calculate total measures for metronome
+    // Calculate total measures for metronome - use playback order for repeat support
     let totalMeasuresForMetronome = progressionData.length;
     if (window.getCompositionState) {
         const compositionState = window.getCompositionState();
-        totalMeasuresForMetronome = compositionState.getMeasureCount();
+        const playbackOrder = buildPlaybackMeasureOrder(compositionState);
+        totalMeasuresForMetronome = playbackOrder.length;
     }
 
     // Start metronome if enabled
@@ -5049,13 +5260,8 @@ export function playProgressionOnly() {
         key: getCurrentKey()
     });
 
-    // Calculate total duration
-    let maxMeasure = progressionData.length - 1;
-    if (window.getCompositionState) {
-        const compositionState = window.getCompositionState();
-        maxMeasure = compositionState.getMeasureCount() - 1;
-    }
-    const totalDuration = (maxMeasure + 1) * measureDuration + 0.5;
+    // Calculate total duration - use playback order for repeat support
+    const totalDuration = totalMeasuresForMetronome * measureDuration + 0.5;
 
     // Stop after all notes have played
     Tone.Transport.scheduleOnce(() => {
