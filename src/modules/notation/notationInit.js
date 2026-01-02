@@ -39,8 +39,8 @@ function transposePitchBySteps(pitch, steps, staff, keySignature = 'C') {
   // Use appropriate scale based on key
   const notes = useFlats ? flatNotes : sharpNotes;
 
-  // Parse pitch - handle both sharps and flats in input
-  const match = pitch.match(/^([A-G][#b]?)(\d+)$/);
+  // Parse pitch - handle both sharps and flats in input (including negative octaves)
+  const match = pitch.match(/^([A-G][#b]?)(-?\d+)$/);
   if (!match) return pitch;
 
   const [, noteName, octave] = match;
@@ -71,6 +71,17 @@ function transposePitchBySteps(pitch, steps, staff, keySignature = 'C') {
   while (newIndex >= 12) {
     newIndex -= 12;
     newOctave++;
+  }
+
+  // Clamp octave to valid range (0-9 covers standard piano range and beyond)
+  // Octave 0 = C0 (MIDI 12), Octave 9 = C9 (MIDI 120)
+  // This prevents notes from becoming unresponsive at extreme ranges
+  if (newOctave < 0) {
+    newOctave = 0;
+    newIndex = 0; // Clamp to C0
+  } else if (newOctave > 9) {
+    newOctave = 9;
+    newIndex = 11; // Clamp to B9
   }
 
   return notes[newIndex] + newOctave;

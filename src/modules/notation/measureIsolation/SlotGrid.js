@@ -53,21 +53,27 @@ export function slotsToDuration(slots) {
 }
 
 /**
- * SlotGrid - Manages the slot-based representation of a measure
+ * SlotGrid - Manages the slot-based representation of one or more measures
+ *
+ * For multi-measure editing, uses a single extended grid spanning all measures.
+ * This allows notes to straddle measure boundaries with ties.
  */
 export class SlotGrid {
     /**
      * @param {Object} timeSignature - { num, denom } time signature
      * @param {number} voiceCount - Number of voices per clef (default 2)
+     * @param {number} measureCount - Number of measures to span (default 1)
      */
-    constructor(timeSignature, voiceCount = 2) {
+    constructor(timeSignature, voiceCount = 2, measureCount = 1) {
         this.timeSignature = timeSignature || { num: 4, denom: 4 };
         this.voiceCount = voiceCount;
+        this.measureCount = measureCount;
 
         // Calculate slots based on time signature
         const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(this.timeSignature);
         this.beatsPerMeasure = beatsPerMeasure;
-        this.totalSlots = Math.round(beatsPerMeasure * SLOTS_PER_BEAT);
+        this.slotsPerMeasure = Math.round(beatsPerMeasure * SLOTS_PER_BEAT);
+        this.totalSlots = this.slotsPerMeasure * measureCount;
 
         // Initialize slot arrays for both clefs, both voices
         // Structure: { treble: [[v0 slots], [v1 slots]], bass: [[v0 slots], [v1 slots]] }
@@ -76,8 +82,37 @@ export class SlotGrid {
             bass: this._createEmptyVoiceSlots()
         };
 
-        // Track the original measure data for comparison
+        // Track the original measure data for comparison (array for multi-measure)
         this.originalMeasure = null;
+        this.originalMeasures = [];
+    }
+
+    /**
+     * Get the measure index (within the visible range) for a given slot
+     * @param {number} slotIndex - Global slot index within the grid
+     * @returns {number} Measure index (0-based, relative to visible measures)
+     */
+    getMeasureIndexForSlot(slotIndex) {
+        return Math.floor(slotIndex / this.slotsPerMeasure);
+    }
+
+    /**
+     * Get the local slot index within a measure
+     * @param {number} slotIndex - Global slot index within the grid
+     * @returns {number} Local slot index (0 to slotsPerMeasure-1)
+     */
+    getLocalSlotIndex(slotIndex) {
+        return slotIndex % this.slotsPerMeasure;
+    }
+
+    /**
+     * Convert local measure slot to global slot
+     * @param {number} measureOffset - Which measure (0-based within visible range)
+     * @param {number} localSlot - Slot within that measure
+     * @returns {number} Global slot index
+     */
+    getGlobalSlotIndex(measureOffset, localSlot) {
+        return measureOffset * this.slotsPerMeasure + localSlot;
     }
 
     /**
@@ -103,7 +138,7 @@ export class SlotGrid {
     }
 
     /**
-     * Load existing measure data into the slot grid
+     * Load existing measure data into the slot grid (single measure)
      * @param {Object} measure - Measure object from compositionState
      */
     loadFromMeasure(measure) {
@@ -111,6 +146,7 @@ export class SlotGrid {
 
         // Store original for later comparison
         this.originalMeasure = JSON.parse(JSON.stringify(measure));
+        this.originalMeasures = [JSON.parse(JSON.stringify(measure))];
 
         // Clear existing slots
         this.slots.treble = this._createEmptyVoiceSlots();
@@ -118,20 +154,56 @@ export class SlotGrid {
 
         // Load treble clef
         if (measure.notation?.treble?.voices) {
-            this._loadVoicesToSlots('treble', measure.notation.treble.voices);
+            this._loadVoicesToSlots('treble', measure.notation.treble.voices, 0);
         }
 
         // Load bass clef
         if (measure.notation?.bass?.voices) {
-            this._loadVoicesToSlots('bass', measure.notation.bass.voices);
+            this._loadVoicesToSlots('bass', measure.notation.bass.voices, 0);
         }
+    }
+
+    /**
+     * Load multiple measures into the slot grid
+     * Each measure's content is loaded at the appropriate slot offset
+     * @param {Array<Object>} measures - Array of measure objects from compositionState
+     */
+    loadFromMeasures(measures) {
+        if (!measures || measures.length === 0) return;
+
+        // Store originals for later comparison
+        this.originalMeasures = measures.map(m => JSON.parse(JSON.stringify(m)));
+        this.originalMeasure = this.originalMeasures[0]; // For backward compatibility
+
+        // Clear existing slots
+        this.slots.treble = this._createEmptyVoiceSlots();
+        this.slots.bass = this._createEmptyVoiceSlots();
+
+        // Load each measure at its offset
+        measures.forEach((measure, measureIndex) => {
+            if (!measure) return;
+            const slotOffset = measureIndex * this.slotsPerMeasure;
+
+            // Load treble clef
+            if (measure.notation?.treble?.voices) {
+                this._loadVoicesToSlots('treble', measure.notation.treble.voices, slotOffset);
+            }
+
+            // Load bass clef
+            if (measure.notation?.bass?.voices) {
+                this._loadVoicesToSlots('bass', measure.notation.bass.voices, slotOffset);
+            }
+        });
     }
 
     /**
      * Load voices from notation format into slots
      * @private
+     * @param {string} clef - 'treble' or 'bass'
+     * @param {Array} voices - Voice array from measure notation
+     * @param {number} slotOffset - Offset for multi-measure loading (default 0)
      */
-    _loadVoicesToSlots(clef, voices) {
+    _loadVoicesToSlots(clef, voices, slotOffset = 0) {
         voices.forEach((voice, voiceIndex) => {
             if (voiceIndex >= this.voiceCount) return;
 
@@ -141,7 +213,10 @@ export class SlotGrid {
             notes.forEach(note => {
                 // Get beat position - use note.beat if available, otherwise use running total
                 const noteBeat = note.beat !== undefined ? note.beat : currentBeat;
-                const slotIndex = Math.round(noteBeat * SLOTS_PER_BEAT);
+                // Local slot index within the measure
+                const localSlotIndex = Math.round(noteBeat * SLOTS_PER_BEAT);
+                // Global slot index including offset for multi-measure
+                const slotIndex = slotOffset + localSlotIndex;
 
                 // Get duration in beats, then convert to slots
                 const durationBeats = durationToBeats(note.duration, note.dotted);
@@ -398,6 +473,8 @@ export class SlotGrid {
 
     /**
      * Convert the slot grid back to measure notation format
+     * For single-measure grids, returns notation for that measure
+     * For multi-measure grids, returns notation for all measures combined (legacy behavior)
      * @returns {Object} { treble: { voices: [...] }, bass: { voices: [...] } }
      */
     toMeasureNotation() {
@@ -405,6 +482,38 @@ export class SlotGrid {
             treble: { voices: this._voiceSlotsToNotation('treble') },
             bass: { voices: this._voiceSlotsToNotation('bass') }
         };
+    }
+
+    /**
+     * Extract notation for a specific measure from the multi-measure grid
+     * @param {number} measureOffset - Which measure to extract (0-based within visible range)
+     * @returns {Object} { treble: { voices: [...] }, bass: { voices: [...] } }
+     */
+    extractMeasureNotation(measureOffset) {
+        if (measureOffset < 0 || measureOffset >= this.measureCount) {
+            console.error(`[SlotGrid] Invalid measure offset: ${measureOffset} (measureCount: ${this.measureCount})`);
+            return { treble: { voices: [] }, bass: { voices: [] } };
+        }
+
+        const startSlot = measureOffset * this.slotsPerMeasure;
+        const endSlot = startSlot + this.slotsPerMeasure;
+
+        return {
+            treble: { voices: this._voiceSlotsToNotationRange('treble', startSlot, endSlot) },
+            bass: { voices: this._voiceSlotsToNotationRange('bass', startSlot, endSlot) }
+        };
+    }
+
+    /**
+     * Extract notation for all measures as an array
+     * @returns {Array<Object>} Array of measure notations
+     */
+    toMeasureNotationArray() {
+        const result = [];
+        for (let m = 0; m < this.measureCount; m++) {
+            result.push(this.extractMeasureNotation(m));
+        }
+        return result;
     }
 
     /**
@@ -569,6 +678,202 @@ export class SlotGrid {
         }
 
         return voices;
+    }
+
+    /**
+     * Convert voice slots to notation format for a specific slot range
+     * Used for extracting individual measures from multi-measure grid
+     * @private
+     * @param {string} clef - 'treble' or 'bass'
+     * @param {number} startSlot - Start slot (inclusive)
+     * @param {number} endSlot - End slot (exclusive)
+     */
+    _voiceSlotsToNotationRange(clef, startSlot, endSlot) {
+        const voices = [];
+
+        // Check if each voice has content in this range
+        const v0HasContent = this._voiceHasContentInRange(clef, 0, startSlot, endSlot);
+        const v1HasContent = this._voiceHasContentInRange(clef, 1, startSlot, endSlot);
+
+        for (let v = 0; v < this.voiceCount; v++) {
+            const voiceSlots = this.slots[clef][v];
+            const otherVoiceSlots = this.slots[clef][v === 0 ? 1 : 0];
+            const notes = [];
+
+            // Voice 2 (index 1) should be completely invisible if it has no content
+            if (v === 1 && !v1HasContent) {
+                voices.push({ notes: [] });
+                continue;
+            }
+
+            const isSecondaryVoice = v === 1;
+            let i = startSlot;
+
+            while (i < endSlot) {
+                const slot = voiceSlots[i];
+
+                if (slot.type === SLOT_TYPES.EMPTY) {
+                    // Count consecutive empty slots (within this range)
+                    let emptyCount = 0;
+                    while (i + emptyCount < endSlot &&
+                           voiceSlots[i + emptyCount].type === SLOT_TYPES.EMPTY) {
+                        emptyCount++;
+                    }
+
+                    // Fill with optimal rests - use local beat position (relative to measure start)
+                    const localStartSlot = i - startSlot;
+                    const rests = this._generateOptimalRests(localStartSlot, emptyCount);
+                    rests.forEach(rest => {
+                        const restSlotIndex = Math.round(rest.beat * SLOTS_PER_BEAT) + startSlot;
+
+                        const otherSlot = otherVoiceSlots[restSlotIndex];
+                        const otherHasRestHere = otherSlot &&
+                            (otherSlot.type === SLOT_TYPES.REST ||
+                             (otherSlot.type === SLOT_TYPES.EMPTY && v === 1 && v0HasContent));
+
+                        const shouldBeCueRest = isSecondaryVoice;
+                        const shouldHide = isSecondaryVoice && otherHasRestHere &&
+                            otherSlot.type === SLOT_TYPES.REST;
+
+                        notes.push({
+                            pitches: [],
+                            duration: rest.duration,
+                            dotted: rest.dotted || false,
+                            beat: rest.beat,  // Already local from _generateOptimalRests
+                            isRest: true,
+                            type: 'rest',
+                            voice: v,
+                            _restDisplay: shouldHide
+                                ? { hidden: true, isCue: true }
+                                : (shouldBeCueRest ? { hidden: false, isCue: true } : undefined)
+                        });
+                    });
+
+                    i += emptyCount;
+                } else if (slot.type === SLOT_TYPES.CONTINUATION) {
+                    // Handle continuation at start of measure (note starts in previous measure)
+                    // This note is tied FROM the previous measure
+                    if (i === startSlot && slot.sourceSlot < startSlot) {
+                        // This is a continuation of a note from the previous measure
+                        // Find the source slot to get pitch info
+                        const sourceSlot = voiceSlots[slot.sourceSlot];
+                        if (sourceSlot && sourceSlot.type === SLOT_TYPES.NOTE_START) {
+                            // Calculate how much of this note extends into this measure
+                            const noteEndSlot = slot.sourceSlot + (sourceSlot.durationSlots || 1);
+                            const slotsInThisMeasure = Math.min(noteEndSlot, endSlot) - startSlot;
+
+                            if (slotsInThisMeasure > 0) {
+                                const { duration, dotted } = slotsToDuration(slotsInThisMeasure);
+                                const notePitches = sourceSlot.pitches || [];
+
+                                notes.push({
+                                    pitches: notePitches,
+                                    pitch: notePitches.length > 0 ? notePitches[0] : undefined,
+                                    duration: duration,
+                                    dotted: dotted,
+                                    beat: 0,  // Starts at beginning of measure
+                                    type: 'note',
+                                    isRest: false,
+                                    isTied: true,  // This note is tied FROM previous measure
+                                    tied: noteEndSlot > endSlot,  // Ties to next measure if extends beyond
+                                    articulation: sourceSlot.articulation,
+                                    dynamic: sourceSlot.dynamic,
+                                    voice: v
+                                });
+
+                                // Skip past this continuation
+                                i = Math.min(noteEndSlot, endSlot);
+                                continue;
+                            }
+                        }
+                    }
+                    i++;
+                } else if (slot.type === SLOT_TYPES.NOTE_START) {
+                    // Convert note to notation format with local beat
+                    const localBeat = (i - startSlot) / SLOTS_PER_BEAT;
+                    const notePitches = slot.pitches || [];
+
+                    // Calculate actual slots (may be truncated at measure boundary)
+                    const noteEndSlot = i + (slot.durationSlots || 1);
+                    const slotsInThisMeasure = Math.min(noteEndSlot, endSlot) - i;
+                    const { duration: actualDuration, dotted: actualDotted } = slotsToDuration(slotsInThisMeasure);
+
+                    // Determine tie status
+                    const originallyTied = slot.tied;
+                    const extendsToNextMeasure = noteEndSlot > endSlot;
+
+                    notes.push({
+                        pitches: notePitches,
+                        pitch: notePitches.length > 0 ? notePitches[0] : undefined,
+                        duration: actualDuration,
+                        dotted: actualDotted,
+                        beat: localBeat,
+                        type: 'note',
+                        isRest: false,
+                        articulation: slot.articulation,
+                        dynamic: slot.dynamic,
+                        tied: originallyTied || extendsToNextMeasure,  // Tie if originally tied OR crosses boundary
+                        isTied: slot.isTied,
+                        graceNotes: slot.graceNotes,
+                        ornament: slot.ornament,
+                        fermata: slot.fermata,
+                        slur: slot.slur,
+                        stemDirection: slot.stemDirection,
+                        voice: v
+                    });
+                    i += slotsInThisMeasure;
+                } else if (slot.type === SLOT_TYPES.REST) {
+                    // User-placed rest
+                    const localBeat = (i - startSlot) / SLOTS_PER_BEAT;
+
+                    const actualSlots = slot.durationSlots || 1;
+                    const slotsInThisMeasure = Math.min(actualSlots, endSlot - i);
+                    const { duration: actualDuration, dotted: actualDotted } = slotsToDuration(slotsInThisMeasure);
+
+                    const otherSlot = otherVoiceSlots[i];
+                    const otherHasRestHere = otherSlot && otherSlot.type === SLOT_TYPES.REST;
+                    const shouldBeCueRest = isSecondaryVoice;
+                    const shouldHide = isSecondaryVoice && otherHasRestHere;
+
+                    notes.push({
+                        pitches: [],
+                        duration: actualDuration,
+                        dotted: actualDotted,
+                        beat: localBeat,
+                        isRest: true,
+                        type: 'rest',
+                        voice: v,
+                        _restDisplay: shouldHide
+                            ? { hidden: true, isCue: true }
+                            : (shouldBeCueRest ? { hidden: false, isCue: true } : undefined)
+                    });
+                    i += slotsInThisMeasure;
+                } else {
+                    i++;
+                }
+            }
+
+            voices.push({ notes });
+        }
+
+        return voices;
+    }
+
+    /**
+     * Check if a voice has content in a specific slot range
+     * @private
+     */
+    _voiceHasContentInRange(clef, voiceIndex, startSlot, endSlot) {
+        const voiceSlots = this.slots[clef]?.[voiceIndex];
+        if (!voiceSlots) return false;
+
+        for (let i = startSlot; i < endSlot; i++) {
+            const slot = voiceSlots[i];
+            if (slot && (slot.type === SLOT_TYPES.NOTE_START || slot.type === SLOT_TYPES.REST)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

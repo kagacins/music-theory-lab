@@ -1057,6 +1057,128 @@ window.syncProgressionToMelodyComposer();
 
 ---
 
+## CRITICAL: Ottava Bracket Positioning (8va/8vb/15ma/15mb)
+
+**File:** `src/modules/notation/grandStaff.js` (functions `drawBassBracket` and `drawTrebleBracket`)
+
+**WARNING:** TOP position (8va/15ma) and BOTTOM position (8vb/15mb) brackets behave DIFFERENTLY with `setLine()`. Do NOT assume they work the same way.
+
+### VexFlow Line Number Convention (IMPORTANT!)
+
+VexFlow line numbers work like this:
+- **LARGER/positive line numbers** = higher on staff = **higher pitch**
+- **SMALLER/negative line numbers** = lower on staff = **lower pitch**
+
+Example: A note at line 5 is HIGHER than a note at line -1.
+
+Helper functions in grandStaff.js:
+- `getHighestPitchLine(note)` → returns LARGEST line number (highest pitch)
+- `getLowestPitchLine(note)` → returns SMALLEST line number (lowest pitch, can be negative)
+
+### Tracking Variables Initialization
+
+When tracking highest/lowest pitch across multiple notes in a bracket:
+```javascript
+// For finding the HIGHEST pitch (largest line number) - use MAX
+let highestPitchLine = -Infinity;  // Will find maximum via > comparison
+
+// For finding the LOWEST pitch (smallest line number) - use MIN
+let lowestPitchLine = Infinity;    // Will find minimum via < comparison
+```
+
+### TREBLE CLEF 8va/15ma/22ma (TOP Position) - Bracket ABOVE Notes
+
+For treble clef brackets that appear ABOVE the notes:
+
+```javascript
+// highestLine is the LARGEST line number (most positive = highest pitch)
+// Use highestLine directly, subtract offset to position above
+// For TOP: LARGER NEGATIVE offset = bracket moves DOWN (closer to notes)
+lineOffset = highestLine - OFFSET;
+```
+
+**Current OFFSET value:** `4.5`
+
+**How it works:**
+- When `highestLine = 5` (high note): `lineOffset = 5 - 4.5 = 0.5` (bracket just above)
+- When `highestLine = 2` (lower note): `lineOffset = 2 - 4.5 = -2.5` (bracket lower on page)
+
+**Adjustments:**
+- **To move label DOWN (closer to notes):** Increase OFFSET (e.g., `4.5` → `5.5`)
+- **To move label UP (farther from notes):** Decrease OFFSET (e.g., `4.5` → `3.5`)
+
+### TREBLE CLEF 8vb/15mb (BOTTOM Position) - Bracket BELOW Notes
+
+For treble clef brackets that appear BELOW the notes:
+
+```javascript
+// lowestLine is the SMALLEST line number (most negative = lowest pitch)
+// Negate lowestLine so lower notes produce larger offsets (pushing bracket down)
+lineOffset = -lowestLine + OFFSET;
+```
+
+**Current OFFSET value:** `3.0`
+
+**How it works:**
+- When `lowestLine = -1` (low note): `lineOffset = -(-1) + 3.0 = 4.0` (bracket pushed down)
+- When `lowestLine = 0.5` (higher note): `lineOffset = -(0.5) + 3.0 = 2.5` (bracket closer)
+
+**Adjustments:**
+- **To move label DOWN (farther below notes):** Increase OFFSET (e.g., `+3.0` → `+4.0`)
+- **To move label UP (closer to notes):** Decrease OFFSET (e.g., `+3.0` → `+2.0`)
+
+### BASS CLEF 8va/15ma/22ma (TOP Position) - Bracket ABOVE Notes
+
+For bass clef brackets that appear ABOVE the notes:
+
+```javascript
+// highestLine is the LARGEST line number (most positive = highest pitch)
+// Use highestLine directly, subtract offset to position above
+// For TOP: LARGER NEGATIVE offset = bracket moves DOWN (closer to notes)
+// Uses SAME formula and offset as treble clef
+lineOffset = highestLine - OFFSET;
+```
+
+**Current OFFSET value:** `4.5` (same as treble clef)
+
+**Adjustments:**
+- **To move label DOWN (closer to notes):** Increase OFFSET (e.g., `4.5` → `5.5`)
+- **To move label UP (farther from notes):** Decrease OFFSET (e.g., `4.5` → `3.5`)
+
+### BASS CLEF 8vb/15mb/22mb (BOTTOM Position) - Bracket BELOW Notes
+
+For bass clef brackets that appear BELOW the notes:
+
+```javascript
+// lowestLine is the SMALLEST line number (most negative = lowest pitch)
+// Negate lowestLine so lower notes produce larger offsets
+// Bass clef ALSO uses ADDITION (same as treble clef for 8vb/15mb)
+lineOffset = -lowestLine + OFFSET;
+```
+
+**Current OFFSET value:** `2.0`
+
+**How it works:**
+- When `lowestLine = -1` (low note): `lineOffset = -(-1) + 2.0 = 1 + 2 = 3.0` (bracket pushed down)
+- When `lowestLine = 0.5` (higher note): `lineOffset = -(0.5) + 2.0 = -0.5 + 2 = 1.5` (bracket closer)
+
+**Adjustments:**
+- **To move label DOWN (farther below notes):** Increase OFFSET (e.g., `+2.0` → `+3.0`)
+- **To move label UP (closer to notes):** Decrease OFFSET (e.g., `+2.0` → `+1.0`)
+
+### Summary: All Ottava Formulas
+
+| Clef | Position | Labels | Formula | OFFSET |
+|------|----------|--------|---------|--------|
+| Treble | TOP (above) | 8va/15ma/22ma | `highestLine - OFFSET` | 4.5 |
+| Treble | BOTTOM (below) | 8vb/15mb/22mb | `-lowestLine + OFFSET` | 3.0 |
+| Bass | TOP (above) | 8va/15ma/22ma | `highestLine - OFFSET` | 4.5 |
+| Bass | BOTTOM (below) | 8vb/15mb/22mb | `-lowestLine + OFFSET` | 2.0 |
+
+**Key insight:** TOP and BOTTOM positions use completely different formula patterns. TOP subtracts, BOTTOM negates then adds.
+
+---
+
 ## 📚 Additional Resources
 
 - [docs/MODULE_INDEX.md](docs/MODULE_INDEX.md) - Find modules by functionality

@@ -17,7 +17,7 @@ import { SlotGrid, SLOT_TYPES, SLOTS_PER_BEAT, durationToSlots, slotsToDuration 
 import { getBeatsPerMeasureFromTimeSignature } from '../../state/compositionState.js';
 import { durationToBeats, beatsToDuration } from '../durationUtils.js';
 import { pitchToLine } from '../staffLayouter.js';
-import { KEY_SIGNATURES, noteToMidi } from '../vexFlowRenderer.js';
+import { KEY_SIGNATURES, noteToMidi, CLEF_RANGES } from '../vexFlowRenderer.js';
 import { getPiano, getAudioIsReady, initAudio } from '../../audio/audioEngine.js';
 import { getCurrentTempo } from '../../audio/melodyGenerator.js';
 import { analyzeChordTone, CHORD_TONE_COLORS, NOTE_RELATIONSHIPS } from '../../analysis/chordToneAnalyzer.js';
@@ -60,6 +60,74 @@ function lineToPitch(line, staff) {
 }
 
 /**
+ * Determine if a pitch needs ottava adjustment and return adjustment info
+ * Supports up to 3-octave shifts (22ma/22mb)
+ * @param {string} pitch - Pitch like "C4" or "E#6"
+ * @param {string} clef - 'treble' or 'bass'
+ * @returns {{ needsOttava: boolean, ottavaType: string|null, displayPitch: string, shift: number }}
+ */
+function getOttavaAdjustment(pitch, clef) {
+    const midi = noteToMidi(pitch);
+    if (midi === null) {
+        return { needsOttava: false, ottavaType: null, displayPitch: pitch, shift: 0 };
+    }
+
+    const range = CLEF_RANGES[clef];
+    if (!range) {
+        return { needsOttava: false, ottavaType: null, displayPitch: pitch, shift: 0 };
+    }
+
+    // Check if note is out of range - support up to 3 octave shifts
+    if (midi > range.max + 24) {
+        // Note is extremely high - needs 22ma (display three octaves lower)
+        const adjustedPitch = adjustPitchByOctave(pitch, -3);
+        return { needsOttava: true, ottavaType: '22ma', displayPitch: adjustedPitch, shift: -3 };
+    } else if (midi > range.max + 12) {
+        // Note is very high - needs 15ma (display two octaves lower)
+        const adjustedPitch = adjustPitchByOctave(pitch, -2);
+        return { needsOttava: true, ottavaType: '15ma', displayPitch: adjustedPitch, shift: -2 };
+    } else if (midi > range.max) {
+        // Note is too high - needs 8va (display one octave lower)
+        const adjustedPitch = adjustPitchByOctave(pitch, -1);
+        return { needsOttava: true, ottavaType: '8va', displayPitch: adjustedPitch, shift: -1 };
+    } else if (midi < range.min - 24) {
+        // Note is extremely low - needs 22mb (display three octaves higher)
+        const adjustedPitch = adjustPitchByOctave(pitch, 3);
+        return { needsOttava: true, ottavaType: '22mb', displayPitch: adjustedPitch, shift: 3 };
+    } else if (midi < range.min - 12) {
+        // Note is very low - needs 15mb (display two octaves higher)
+        const adjustedPitch = adjustPitchByOctave(pitch, 2);
+        return { needsOttava: true, ottavaType: '15mb', displayPitch: adjustedPitch, shift: 2 };
+    } else if (midi < range.min) {
+        // Note is too low - needs 8vb (display one octave higher)
+        const adjustedPitch = adjustPitchByOctave(pitch, 1);
+        return { needsOttava: true, ottavaType: '8vb', displayPitch: adjustedPitch, shift: 1 };
+    }
+
+    return { needsOttava: false, ottavaType: null, displayPitch: pitch, shift: 0 };
+}
+
+/**
+ * Adjust a pitch by a number of octaves
+ * @param {string} pitch - Pitch like "C4" or "E#6" (supports negative octaves like "C-1")
+ * @param {number} octaveShift - Number of octaves to shift (positive = up, negative = down)
+ * @returns {string} Adjusted pitch
+ */
+function adjustPitchByOctave(pitch, octaveShift) {
+    const match = pitch.match(/^([A-G][#b]?)(-?\d+)$/);
+    if (!match) return pitch;
+
+    const noteName = match[1];
+    let octave = parseInt(match[2]) + octaveShift;
+
+    // Clamp to valid range (0-9)
+    if (octave < 0) octave = 0;
+    if (octave > 9) octave = 9;
+
+    return `${noteName}${octave}`;
+}
+
+/**
  * MeasureIsolationEditor - VexFlow-based direct editing
  */
 export class MeasureIsolationEditor {
@@ -68,7 +136,15 @@ export class MeasureIsolationEditor {
         this.onApplyCallback = options.onApply || (() => {});
         this.onCancelCallback = options.onCancel || (() => {});
 
+        // Multi-measure support
+        this.centerMeasureIndex = null;     // The originally selected measure
+        this.showPrevious = false;          // Toggle for previous measure
+        this.showNext = false;              // Toggle for next measure
+        this.measureCount = 1;              // Number of measures currently shown
+
+        // Legacy alias (for backward compatibility during refactor)
         this.measureIndex = null;
+
         this.slotGrid = null;
         this.modal = null;
 
@@ -89,8 +165,11 @@ export class MeasureIsolationEditor {
         this.noteEntryModeSticky = false;  // The toggle state
         this.isAltPressed = false;         // Tracks Alt key state for ghost note
 
-        // Selection state (for click-to-select, then delete)
-        this.selectedNote = null;  // { clef, voice, slotIndex }
+        // Multi-selection state (replaces single selectedNote for multi-measure)
+        this.selectedNotes = new Set();     // IDs: "{measureOffset}-{clef}-{voice}-{slotIndex}"
+        this.lastSelectedNote = null;       // For shift-click range selection
+        // Legacy alias for single selection (backward compatibility)
+        this.selectedNote = null;           // { clef, voice, slotIndex }
 
         // Ghost note state (for preview on hover - only shown in entry mode)
         this.ghostNote = null;  // { clef, slotIndex, pitch, x, y }
@@ -98,17 +177,16 @@ export class MeasureIsolationEditor {
         // Track last mouse position for each clef (to restore ghost note when Alt is pressed)
         this.lastMousePosition = { treble: null, bass: null };  // { x, y, slotIndex, pitch }
 
-        // Ottava state
-        this.trebleOttava = 0;  // 0 = none, 1 = 8va, -1 = 8vb
-        this.bassOttava = 0;
-
         // Canvas and rendering
         this.trebleCanvas = null;
         this.bassCanvas = null;
 
         // Layout constants matching VexFlow
-        this.STAFF_WIDTH = 1000;
-        this.CANVAS_HEIGHT = 280;      // Increased for more ledger line space
+        this.BASE_MEASURE_WIDTH = 900; // Width per measure (excluding clef/key sig area)
+        this.STAFF_WIDTH = 1000;       // Total canvas width (dynamically updated for multi-measure)
+        this.TREBLE_CANVAS_HEIGHT = 110; // Treble: room above for ledger lines, less below
+        this.BASS_CANVAS_HEIGHT = 140;   // Bass: less above, more room below for low notes
+        this.CANVAS_HEIGHT = 140;      // Legacy fallback
         this.SLOT_WIDTH = null;        // Calculated based on time signature
         this.CLEF_WIDTH = 70;
         this.START_X = 100;            // Where notes begin (after clef)
@@ -116,7 +194,9 @@ export class MeasureIsolationEditor {
         // VexFlow-compatible staff layout
         this.LINE_SPACING = 10;        // 10px between staff lines (standard VexFlow)
         this.STAFF_HEIGHT = 40;        // 5 lines = 4 gaps × 10px = 40px
-        this.STAFF_TOP_Y = 100;        // More room above for ledger lines and 8va
+        this.TREBLE_STAFF_TOP_Y = 55;  // Treble: extra space for ottava brackets (8va/15ma/22ma)
+        this.BASS_STAFF_TOP_Y = 30;    // Bass: less above, more room below
+        this.STAFF_TOP_Y = 35;         // Legacy fallback
         this.PIXELS_PER_STEP = 5;      // 5px per diatonic step (half line spacing)
 
         this._createModal();
@@ -126,15 +206,52 @@ export class MeasureIsolationEditor {
      * Create the modal DOM structure
      */
     _createModal() {
-        this.modal = document.getElementById('measure-isolation-modal');
-        if (this.modal) {
-            return;
+        // Always remove existing modal to ensure we have latest HTML structure
+        const existingModal = document.getElementById('measure-isolation-modal');
+        if (existingModal) {
+            existingModal.remove();
         }
 
         this.modal = document.createElement('div');
         this.modal.id = 'measure-isolation-modal';
         this.modal.className = 'fixed inset-0 bg-black bg-opacity-50 hidden z-[9999] flex items-center justify-center p-4';
         this.modal.innerHTML = `
+            <!-- Scrollbar styles - force native scrollbar visibility -->
+            <style>
+                .mie-scrollable-staves {
+                    overflow-x: scroll !important;
+                    overflow-y: hidden !important;
+                    max-width: 100%;
+                    padding-bottom: 4px;
+                }
+                /* Force scrollbar to always show (not overlay) */
+                .mie-scrollable-staves {
+                    scrollbar-width: auto;
+                    scrollbar-color: #6366f1 #e5e7eb;
+                }
+                /* Webkit/Chrome scrollbar - force visibility */
+                .mie-scrollable-staves::-webkit-scrollbar {
+                    -webkit-appearance: scrollbar !important;
+                    height: 14px !important;
+                    background: #e5e7eb;
+                }
+                .mie-scrollable-staves::-webkit-scrollbar-track {
+                    background: #e5e7eb;
+                    border-radius: 0;
+                }
+                .mie-scrollable-staves::-webkit-scrollbar-thumb {
+                    background: #6366f1;
+                    border-radius: 7px;
+                    border: 3px solid #e5e7eb;
+                    min-width: 40px;
+                }
+                .mie-scrollable-staves::-webkit-scrollbar-thumb:hover {
+                    background: #4f46e5;
+                }
+                .mie-scrollable-staves::-webkit-scrollbar-button {
+                    display: none;
+                }
+            </style>
             <div class="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden flex flex-col">
                 <!-- Header -->
                 <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 flex items-center justify-between">
@@ -193,20 +310,8 @@ export class MeasureIsolationEditor {
                     <button id="mie-delete-btn" class="px-3 py-1.5 border rounded hover:bg-red-100 text-red-600 opacity-50" title="Delete Selected (Del/Backspace)" disabled>🗑 Delete</button>
                 </div>
 
-                <!-- Ottava Toolbar -->
+                <!-- Mode & View Toolbar -->
                 <div class="px-4 py-2 bg-gray-50 border-b flex items-center gap-6">
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs text-gray-500">Treble Ottava:</span>
-                        <button class="mie-ottava-btn px-2 py-1 border rounded text-sm hover:bg-blue-100" data-clef="treble" data-ottava="-1" title="8vb - One octave down">8vb</button>
-                        <button class="mie-ottava-btn px-2 py-1 border rounded text-sm bg-gray-100" data-clef="treble" data-ottava="0" title="None">—</button>
-                        <button class="mie-ottava-btn px-2 py-1 border rounded text-sm hover:bg-blue-100" data-clef="treble" data-ottava="1" title="8va - One octave up">8va</button>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs text-gray-500">Bass Ottava:</span>
-                        <button class="mie-ottava-btn px-2 py-1 border rounded text-sm hover:bg-blue-100" data-clef="bass" data-ottava="-1" title="8vb - One octave down">8vb</button>
-                        <button class="mie-ottava-btn px-2 py-1 border rounded text-sm bg-gray-100" data-clef="bass" data-ottava="0" title="None">—</button>
-                        <button class="mie-ottava-btn px-2 py-1 border rounded text-sm hover:bg-blue-100" data-clef="bass" data-ottava="1" title="8va - One octave up">8va</button>
-                    </div>
                     <!-- Sticky Entry Mode Toggle -->
                     <div class="flex items-center gap-2 ml-auto">
                         <span class="text-xs text-gray-500" title="When ON, default is Entry mode. When OFF, hold Alt for Entry mode.">Entry Mode:</span>
@@ -220,6 +325,18 @@ export class MeasureIsolationEditor {
                         </label>
                         <span id="mie-sticky-status" class="text-xs text-gray-500">Hold Alt</span>
                     </div>
+                    <!-- Previous/Next Measure Toggles -->
+                    <div class="flex items-center gap-2 ml-4 pl-4 border-l border-gray-300">
+                        <span class="text-xs text-gray-500">View:</span>
+                        <label id="mie-prev-label" class="flex items-center gap-1 cursor-pointer">
+                            <input type="checkbox" id="mie-show-prev" class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-sm text-gray-700">Prev</span>
+                        </label>
+                        <label id="mie-next-label" class="flex items-center gap-1 cursor-pointer">
+                            <input type="checkbox" id="mie-show-next" class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-sm text-gray-700">Next</span>
+                        </label>
+                    </div>
                 </div>
 
                 <!-- Instructions -->
@@ -231,26 +348,33 @@ export class MeasureIsolationEditor {
                 </div>
 
                 <!-- Main Content: The two staves -->
-                <div class="flex-1 overflow-auto p-4 bg-gray-50">
-                    <!-- Treble Staff -->
-                    <div class="mb-4">
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="text-sm font-medium text-gray-600">Treble Clef</span>
-                            <span id="mie-treble-ottava-label" class="text-xs text-blue-600 font-medium hidden"></span>
-                        </div>
-                        <div id="mie-treble-container" class="bg-white border rounded-lg overflow-hidden cursor-crosshair">
-                            <canvas id="mie-treble-canvas"></canvas>
-                        </div>
-                    </div>
+                <div class="flex-1 overflow-y-auto p-4 bg-gray-50">
+                    <!-- Scrollable container for staves (horizontal scroll for multi-measure) -->
+                    <div id="mie-staves-scroll-container" class="mie-scrollable-staves">
+                        <!-- Inner wrapper to ensure canvases don't shrink -->
+                        <div id="mie-staves-inner" style="display: inline-block; min-width: max-content;">
+                            <!-- Measure Numbers Row -->
+                            <div id="mie-measure-numbers" class="flex mb-2" style="min-height: 28px;"></div>
 
-                    <!-- Bass Staff -->
-                    <div>
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="text-sm font-medium text-gray-600">Bass Clef</span>
-                            <span id="mie-bass-ottava-label" class="text-xs text-blue-600 font-medium hidden"></span>
-                        </div>
-                        <div id="mie-bass-container" class="bg-white border rounded-lg overflow-hidden cursor-crosshair">
-                            <canvas id="mie-bass-canvas"></canvas>
+                            <!-- Treble Staff -->
+                            <div class="mb-2">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-sm font-medium text-gray-600 w-20">Treble</span>
+                                </div>
+                                <div id="mie-treble-container" class="bg-white border rounded overflow-hidden cursor-crosshair">
+                                    <canvas id="mie-treble-canvas"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Bass Staff -->
+                            <div>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-sm font-medium text-gray-600 w-20">Bass</span>
+                                </div>
+                                <div id="mie-bass-container" class="bg-white border rounded overflow-hidden cursor-crosshair">
+                                    <canvas id="mie-bass-canvas"></canvas>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -378,21 +502,6 @@ export class MeasureIsolationEditor {
             });
         });
 
-        // Ottava buttons
-        this.modal.querySelectorAll('.mie-ottava-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const clef = e.currentTarget.dataset.clef;
-                const ottava = parseInt(e.currentTarget.dataset.ottava);
-                if (clef === 'treble') {
-                    this.trebleOttava = ottava;
-                } else {
-                    this.bassOttava = ottava;
-                }
-                this._updateOttavaButtons();
-                this._renderStaves();
-            });
-        });
-
         // Sticky entry mode toggle
         this.modal.querySelector('#mie-sticky-toggle')?.addEventListener('change', (e) => {
             this.noteEntryModeSticky = e.target.checked;
@@ -403,6 +512,16 @@ export class MeasureIsolationEditor {
                 this.ghostNote = null;
             }
             this._renderStaves();
+        });
+
+        // Previous/Next measure toggles
+        this.modal.querySelector('#mie-show-prev')?.addEventListener('change', (e) => {
+            this.showPrevious = e.target.checked;
+            this._reloadMeasures();
+        });
+        this.modal.querySelector('#mie-show-next')?.addEventListener('change', (e) => {
+            this.showNext = e.target.checked;
+            this._reloadMeasures();
         });
 
         // Keyboard shortcuts - use document level handler since canvas clicks don't maintain focus
@@ -589,6 +708,10 @@ export class MeasureIsolationEditor {
             if (this.selectedNote) {
                 this._moveSelectedNoteHorizontally(1);  // Move right one slot
             }
+        } else if (e.key === 't' || e.key === 'T') {
+            e.preventDefault();
+            // Toggle tie on selected notes (works with multi-selection)
+            this._toggleTieOnSelected();
         }
     }
 
@@ -757,6 +880,8 @@ export class MeasureIsolationEditor {
      */
     _clearSelection() {
         this.selectedNote = null;
+        this.selectedNotes.clear();
+        this.lastSelectedNote = null;
         this._updateDeleteButton();
         this._renderStaves();
         this._updateStatus('Click on staff to add notes');
@@ -818,7 +943,15 @@ export class MeasureIsolationEditor {
      * @param {string|null} pitch - Specific pitch (for chord note selection) or null for rest
      */
     _selectNoteAtSlot(clef, voice, slotIndex, pitch = null) {
+        // Clear any existing multi-selection and set single selection
+        this.selectedNotes.clear();
+        const noteId = this._makeNoteId(clef, voice, slotIndex, pitch);
+        this.selectedNotes.add(noteId);
+
+        // Also set legacy selectedNote for backward compatibility
         this.selectedNote = { clef, voice, slotIndex, pitch };
+        this.lastSelectedNote = { clef, voice, slotIndex, pitch };
+
         this._updateDeleteButton();
         this._updateToolbarForSelection();
         this._renderStaves();
@@ -831,6 +964,121 @@ export class MeasureIsolationEditor {
         } else {
             const pitchInfo = pitch || slot.pitches?.join(', ') || 'note';
             this._updateStatus(`Selected ${pitchInfo} - ←→ move, ↑↓ transpose, S/F/N/K accidentals, R rest, Del`);
+        }
+    }
+
+    /**
+     * Create a unique note ID for multi-selection tracking
+     * @param {string} clef - 'treble' or 'bass'
+     * @param {number} voice - Voice index (0 or 1)
+     * @param {number} slotIndex - Global slot index
+     * @param {string|null} pitch - Specific pitch in chord (optional)
+     * @returns {string} Unique note identifier
+     */
+    _makeNoteId(clef, voice, slotIndex, pitch = null) {
+        const measureOffset = this.slotGrid?.getMeasureIndexForSlot(slotIndex) || 0;
+        // Include pitch in ID for chord note differentiation
+        return `${measureOffset}-${clef}-${voice}-${slotIndex}${pitch ? '-' + pitch : ''}`;
+    }
+
+    /**
+     * Parse a note ID back into its components
+     * @param {string} noteId - Note identifier
+     * @returns {Object} { measureOffset, clef, voice, slotIndex, pitch }
+     */
+    _parseNoteId(noteId) {
+        const parts = noteId.split('-');
+        return {
+            measureOffset: parseInt(parts[0], 10),
+            clef: parts[1],
+            voice: parseInt(parts[2], 10),
+            slotIndex: parseInt(parts[3], 10),
+            pitch: parts[4] || null
+        };
+    }
+
+    /**
+     * Toggle tie on selected notes
+     * Ties connect notes of the same pitch across slots/measures
+     */
+    _toggleTieOnSelected() {
+        if (this.selectedNotes.size === 0) {
+            this._updateStatus('No notes selected to tie');
+            return;
+        }
+
+        // Parse all selected note IDs and toggle their tied state
+        let toggledCount = 0;
+        for (const noteId of this.selectedNotes) {
+            const parsed = this._parseNoteId(noteId);
+            const slot = this.slotGrid.getSlot(parsed.clef, parsed.voice, parsed.slotIndex);
+
+            if (slot.type === SLOT_TYPES.NOTE_START) {
+                // Toggle the tied property
+                slot.tied = !slot.tied;
+                toggledCount++;
+            }
+        }
+
+        if (toggledCount > 0) {
+            this._renderStaves();
+            this._updateFillStats();
+            const tieState = toggledCount === 1 ?
+                (this.slotGrid.getSlot(
+                    this._parseNoteId([...this.selectedNotes][0]).clef,
+                    this._parseNoteId([...this.selectedNotes][0]).voice,
+                    this._parseNoteId([...this.selectedNotes][0]).slotIndex
+                ).tied ? 'added' : 'removed') :
+                'toggled';
+            this._updateStatus(`Tie ${tieState} on ${toggledCount} note${toggledCount > 1 ? 's' : ''}`);
+        } else {
+            this._updateStatus('No notes to tie (only notes can have ties)');
+        }
+    }
+
+    /**
+     * Toggle a note in the multi-selection (for Shift+Click)
+     */
+    _toggleNoteInSelection(clef, voice, slotIndex, pitch = null) {
+        const noteId = this._makeNoteId(clef, voice, slotIndex, pitch);
+
+        if (this.selectedNotes.has(noteId)) {
+            // Remove from selection
+            this.selectedNotes.delete(noteId);
+        } else {
+            // Add to selection
+            this.selectedNotes.add(noteId);
+        }
+
+        // Update lastSelectedNote and legacy selectedNote
+        if (this.selectedNotes.size === 1) {
+            // If only one note selected, update legacy selectedNote
+            const [singleId] = this.selectedNotes;
+            const parsed = this._parseNoteId(singleId);
+            this.selectedNote = { clef: parsed.clef, voice: parsed.voice, slotIndex: parsed.slotIndex, pitch: parsed.pitch };
+        } else if (this.selectedNotes.size === 0) {
+            this.selectedNote = null;
+        } else {
+            // Multiple notes selected - selectedNote stays as last clicked
+            this.selectedNote = null;  // Or keep it for operations that need a "primary" note
+        }
+
+        this.lastSelectedNote = { clef, voice, slotIndex, pitch };
+
+        this._updateDeleteButton();
+        this._updateToolbarForSelection();
+        this._renderStaves();
+
+        // Update status message
+        const count = this.selectedNotes.size;
+        if (count === 0) {
+            this._updateStatus('No notes selected');
+        } else if (count === 1) {
+            const slot = this.slotGrid.getSlot(clef, voice, slotIndex);
+            const pitchInfo = pitch || slot.pitches?.join(', ') || 'note';
+            this._updateStatus(`Selected ${pitchInfo} - ←→ move, ↑↓ transpose, T toggle tie`);
+        } else {
+            this._updateStatus(`${count} notes selected - T to toggle ties, Del to delete`);
         }
     }
 
@@ -1228,7 +1476,7 @@ export class MeasureIsolationEditor {
         const bpm = getCurrentTempo();
         const secondsPerBeat = 60 / bpm;
 
-        // Collect all notes from the slot grid
+        // Collect all notes from the slot grid with slot info for highlighting
         const allNotes = [];
 
         ['treble', 'bass'].forEach(clef => {
@@ -1238,10 +1486,15 @@ export class MeasureIsolationEditor {
                     if (slot.type === SLOT_TYPES.NOTE_START && slot.pitches?.length > 0) {
                         const beat = s / SLOTS_PER_BEAT;
                         const durationBeats = durationToBeats(slot.duration, slot.dotted);
+                        const durationSlots = Math.round(durationBeats * SLOTS_PER_BEAT);
                         allNotes.push({
                             pitches: slot.pitches,
                             startTime: beat * secondsPerBeat,
-                            duration: durationBeats * secondsPerBeat
+                            duration: durationBeats * secondsPerBeat,
+                            clef: clef,
+                            voice: v,
+                            slotIndex: s,
+                            durationSlots: durationSlots
                         });
                     }
                 }
@@ -1262,13 +1515,27 @@ export class MeasureIsolationEditor {
         // Store timeout IDs so we can cancel
         this._playbackTimeouts = [];
 
-        // Schedule all notes
-        const now = Tone.now();
+        // Initialize playback highlighting state
+        this._playingNotes = new Set();  // Set of "clef-voice-slot" keys
+
+        // Schedule all notes with highlighting
         allNotes.forEach(note => {
-            const timeoutId = setTimeout(() => {
+            const noteKey = `${note.clef}-${note.voice}-${note.slotIndex}`;
+
+            // Start note - highlight and play
+            const startTimeout = setTimeout(() => {
+                this._playingNotes.add(noteKey);
+                this._renderStaves();
                 piano.triggerAttackRelease(note.pitches, note.duration, Tone.now());
             }, note.startTime * 1000);
-            this._playbackTimeouts.push(timeoutId);
+            this._playbackTimeouts.push(startTimeout);
+
+            // End note - remove highlight
+            const endTimeout = setTimeout(() => {
+                this._playingNotes.delete(noteKey);
+                this._renderStaves();
+            }, (note.startTime + note.duration) * 1000);
+            this._playbackTimeouts.push(endTimeout);
         });
 
         // Calculate total duration
@@ -1294,6 +1561,12 @@ export class MeasureIsolationEditor {
             this._playbackTimeouts = [];
         }
 
+        // Clear highlighting
+        if (this._playingNotes) {
+            this._playingNotes.clear();
+            this._renderStaves();
+        }
+
         // Show play button, hide stop button
         const playBtn = this.modal.querySelector('#mie-play-btn');
         const stopBtn = this.modal.querySelector('#mie-stop-btn');
@@ -1314,48 +1587,6 @@ export class MeasureIsolationEditor {
         });
     }
 
-    /**
-     * Update ottava button states
-     */
-    _updateOttavaButtons() {
-        this.modal.querySelectorAll('.mie-ottava-btn').forEach(btn => {
-            const clef = btn.dataset.clef;
-            const ottava = parseInt(btn.dataset.ottava);
-            const currentOttava = clef === 'treble' ? this.trebleOttava : this.bassOttava;
-            const isActive = ottava === currentOttava;
-            btn.classList.toggle('bg-blue-100', isActive);
-            btn.classList.toggle('border-blue-400', isActive);
-            btn.classList.toggle('bg-gray-100', !isActive && ottava === 0);
-        });
-
-        // Update labels
-        const trebleLabel = this.modal.querySelector('#mie-treble-ottava-label');
-        const bassLabel = this.modal.querySelector('#mie-bass-ottava-label');
-
-        if (trebleLabel) {
-            if (this.trebleOttava === 1) {
-                trebleLabel.textContent = '(8va - notes sound one octave higher)';
-                trebleLabel.classList.remove('hidden');
-            } else if (this.trebleOttava === -1) {
-                trebleLabel.textContent = '(8vb - notes sound one octave lower)';
-                trebleLabel.classList.remove('hidden');
-            } else {
-                trebleLabel.classList.add('hidden');
-            }
-        }
-
-        if (bassLabel) {
-            if (this.bassOttava === 1) {
-                bassLabel.textContent = '(8va - notes sound one octave higher)';
-                bassLabel.classList.remove('hidden');
-            } else if (this.bassOttava === -1) {
-                bassLabel.textContent = '(8vb - notes sound one octave lower)';
-                bassLabel.classList.remove('hidden');
-            } else {
-                bassLabel.classList.add('hidden');
-            }
-        }
-    }
 
     /**
      * Update sticky toggle status text
@@ -1372,15 +1603,19 @@ export class MeasureIsolationEditor {
      */
     open(measureIndex) {
         this.measureIndex = measureIndex;
+        this.centerMeasureIndex = measureIndex;  // Multi-measure: track the originally selected measure
+        this.showPrevious = false;  // Reset to single measure view
+        this.showNext = false;
+        this.measureCount = 1;
         this.currentDuration = '4n';
         this.isDotted = false;
         this.isRestMode = false;
         this.currentAccidental = null;  // null = use key signature
         this.currentVoice = 0;
-        this.trebleOttava = 0;
-        this.bassOttava = 0;
         this.ghostNote = null;  // Clear ghost note
         this.selectedNote = null;  // Clear any selection
+        this.selectedNotes.clear();  // Clear multi-selection
+        this.lastSelectedNote = null;
         this.isAltPressed = false;  // Reset Alt key state
         // Note: noteEntryModeSticky is NOT reset - it persists across modal opens
 
@@ -1417,9 +1652,12 @@ export class MeasureIsolationEditor {
         const totalSlots = Math.round(beatsPerMeasure * SLOTS_PER_BEAT);
         this.SLOT_WIDTH = (this.STAFF_WIDTH - this.START_X - 30) / totalSlots;
 
-        // Create slot grid
-        this.slotGrid = new SlotGrid(timeSignature);
+        // Create slot grid (single measure initially)
+        this.slotGrid = new SlotGrid(timeSignature, 2, 1);
         this.slotGrid.loadFromMeasure(measure);
+
+        // Store visible measure indices (just the center measure initially)
+        this.visibleMeasureIndices = [measureIndex];
 
         // Update title
         const titleEl = this.modal.querySelector('#mie-title');
@@ -1432,7 +1670,6 @@ export class MeasureIsolationEditor {
         this._updateAccidentalButtons();
         this._updateModeButtons();
         this._updateVoiceButtons();
-        this._updateOttavaButtons();
         this._updateDeleteButton();
         this.modal.querySelector('#mie-dotted').checked = false;
 
@@ -1444,12 +1681,20 @@ export class MeasureIsolationEditor {
         this._updateStickyToggleStatus();
         this._updateModeStatus();
 
+        // Reset Previous/Next checkboxes and update their enabled state
+        const prevCheckbox = this.modal.querySelector('#mie-show-prev');
+        const nextCheckbox = this.modal.querySelector('#mie-show-next');
+        if (prevCheckbox) prevCheckbox.checked = false;
+        if (nextCheckbox) nextCheckbox.checked = false;
+        this._updatePrevNextToggles();
+
         // Show modal
         this.modal.classList.remove('hidden');
 
         // Initialize canvases and render
         setTimeout(() => {
             this._initCanvases();
+            this._updateMeasureNumbers();
             this._renderStaves();
             this._updateFillStats();
         }, 50);
@@ -1459,21 +1704,21 @@ export class MeasureIsolationEditor {
      * Initialize the canvases
      */
     _initCanvases() {
-        // Treble canvas
+        // Treble canvas - less height below staff (notes go up)
         this.trebleCanvas = this.modal.querySelector('#mie-treble-canvas');
         if (this.trebleCanvas) {
             this.trebleCanvas.width = this.STAFF_WIDTH;
-            this.trebleCanvas.height = this.CANVAS_HEIGHT;
+            this.trebleCanvas.height = this.TREBLE_CANVAS_HEIGHT;
             this.trebleCanvas.onclick = (e) => this._handleCanvasClick(e, 'treble');
             this.trebleCanvas.onmousemove = (e) => this._handleCanvasMouseMove(e, 'treble');
             this.trebleCanvas.onmouseleave = () => this._handleCanvasMouseLeave('treble');
         }
 
-        // Bass canvas
+        // Bass canvas - more height below staff (notes go down)
         this.bassCanvas = this.modal.querySelector('#mie-bass-canvas');
         if (this.bassCanvas) {
             this.bassCanvas.width = this.STAFF_WIDTH;
-            this.bassCanvas.height = this.CANVAS_HEIGHT;
+            this.bassCanvas.height = this.BASS_CANVAS_HEIGHT;
             this.bassCanvas.onclick = (e) => this._handleCanvasClick(e, 'bass');
             this.bassCanvas.onmousemove = (e) => this._handleCanvasMouseMove(e, 'bass');
             this.bassCanvas.onmouseleave = () => this._handleCanvasMouseLeave('bass');
@@ -1484,6 +1729,9 @@ export class MeasureIsolationEditor {
      * Handle canvas click - determine slot and pitch from position
      */
     _handleCanvasClick(event, clef) {
+        // Set clef-specific STAFF_TOP_Y for pitch calculations
+        this.STAFF_TOP_Y = clef === 'treble' ? this.TREBLE_STAFF_TOP_Y : this.BASS_STAFF_TOP_Y;
+
         const canvas = clef === 'treble' ? this.trebleCanvas : this.bassCanvas;
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
@@ -1501,7 +1749,7 @@ export class MeasureIsolationEditor {
 
         const slotIndex = Math.floor(slotX / this.SLOT_WIDTH);
         if (slotIndex < 0 || slotIndex >= this.slotGrid.totalSlots) {
-            this._updateStatus('Click within the measure bounds');
+            this._updateStatus(this.measureCount > 1 ? 'Click within the measure bounds' : 'Click within the measure');
             return;
         }
 
@@ -1514,21 +1762,31 @@ export class MeasureIsolationEditor {
         // In Select mode, only allow note selection (no adding notes)
         if (!inEntryMode) {
             if (clickedNote) {
-                // If clicking same note that's already selected, deselect it
-                // For chords, also check if clicking the same pitch
-                if (this.selectedNote &&
-                    this.selectedNote.clef === clef &&
-                    this.selectedNote.voice === clickedNote.voice &&
-                    this.selectedNote.slotIndex === clickedNote.slotIndex &&
-                    this.selectedNote.pitch === clickedNote.pitch) {
-                    this._clearSelection();
+                const noteId = this._makeNoteId(clef, clickedNote.voice, slotIndex, clickedNote.pitch);
+
+                if (event.shiftKey) {
+                    // Shift+Click: Toggle note in multi-selection
+                    this._toggleNoteInSelection(clef, clickedNote.voice, slotIndex, clickedNote.pitch);
                 } else {
-                    // Select this note (with specific pitch for chord notes)
-                    this._selectNoteAtSlot(clef, clickedNote.voice, clickedNote.slotIndex, clickedNote.pitch);
+                    // Normal click: Replace selection
+                    // If clicking same note that's already selected (and no multi-selection), deselect it
+                    if (this.selectedNotes.size === 1 && this.selectedNotes.has(noteId)) {
+                        this._clearSelection();
+                    } else {
+                        // Select just this note (clears any multi-selection)
+                        this._selectNoteAtSlot(clef, clickedNote.voice, slotIndex, clickedNote.pitch);
+                    }
                 }
             } else {
-                // Clicking empty space in Select mode - show hint
-                this._updateStatus('Hold Alt to enter notes');
+                // Clicking empty space in Select mode
+                if (!event.shiftKey) {
+                    // Clear selection when clicking empty space (unless shift is held)
+                    if (this.selectedNotes.size > 0) {
+                        this._clearSelection();
+                    } else {
+                        this._updateStatus('Hold Alt to enter notes');
+                    }
+                }
             }
             return;
         }
@@ -1572,6 +1830,9 @@ export class MeasureIsolationEditor {
      * Handle canvas mouse move - update ghost note preview
      */
     _handleCanvasMouseMove(event, clef) {
+        // Set clef-specific STAFF_TOP_Y for pitch calculations
+        this.STAFF_TOP_Y = clef === 'treble' ? this.TREBLE_STAFF_TOP_Y : this.BASS_STAFF_TOP_Y;
+
         const canvas = clef === 'treble' ? this.trebleCanvas : this.bassCanvas;
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
@@ -1676,8 +1937,12 @@ export class MeasureIsolationEditor {
             // Check for note start or continuation (continuation should select the parent note)
             if (slot.type === SLOT_TYPES.NOTE_START) {
                 // Check if click is near any of the note's pitches
+                // Must account for ottava shift when comparing Y positions
                 for (const pitch of slot.pitches || []) {
-                    const noteY = this._getYFromPitch(pitch, clef);
+                    // Get ottava adjustment for this pitch (same logic as _drawNotes)
+                    const ottavaInfo = getOttavaAdjustment(pitch, clef);
+                    const ottavaShift = ottavaInfo.shift;
+                    const noteY = this._getYFromPitch(pitch, clef, ottavaShift);
                     if (Math.abs(clickY - noteY) < 15) {  // 15px hit zone
                         return { voice: v, slotIndex, pitch };  // Include specific pitch
                     }
@@ -1688,7 +1953,10 @@ export class MeasureIsolationEditor {
                 if (parentIndex !== null) {
                     const parentSlot = this.slotGrid.getSlot(clef, v, parentIndex);
                     for (const pitch of parentSlot.pitches || []) {
-                        const noteY = this._getYFromPitch(pitch, clef);
+                        // Get ottava adjustment for this pitch
+                        const ottavaInfo = getOttavaAdjustment(pitch, clef);
+                        const ottavaShift = ottavaInfo.shift;
+                        const noteY = this._getYFromPitch(pitch, clef, ottavaShift);
                         if (Math.abs(clickY - noteY) < 15) {
                             return { voice: v, slotIndex: parentIndex, pitch };  // Include specific pitch
                         }
@@ -1723,10 +1991,10 @@ export class MeasureIsolationEditor {
 
     /**
      * Get pitch from Y coordinate using VexFlow-compatible calculation
+     * Note: With automatic ottava detection, this returns the raw pitch from the visual position.
+     * Notes that would require ottava treatment will be automatically displayed with brackets.
      */
     _getPitchFromY(y, clef) {
-        const ottava = clef === 'treble' ? this.trebleOttava : this.bassOttava;
-
         // Calculate relative Y from staff top
         const relativeY = y - this.STAFF_TOP_Y;
 
@@ -1738,15 +2006,6 @@ export class MeasureIsolationEditor {
 
         // Convert line to pitch
         const basePitch = lineToPitch(line, clef);
-
-        // Apply ottava adjustment
-        if (ottava !== 0) {
-            const match = basePitch.match(/^([A-G])(\d+)$/);
-            if (match) {
-                const adjustedOctave = parseInt(match[2]) + ottava;
-                return { note: match[1], octave: adjustedOctave };
-            }
-        }
 
         const match = basePitch.match(/^([A-G])(\d+)$/);
         if (match) {
@@ -1780,19 +2039,20 @@ export class MeasureIsolationEditor {
 
     /**
      * Get Y position from pitch (inverse of _getPitchFromY)
+     * @param {string} pitch - Pitch like "C4"
+     * @param {string} clef - 'treble' or 'bass'
+     * @param {number} [ottavaShift=0] - Octave shift for display (from automatic ottava detection)
      */
-    _getYFromPitch(pitch, clef) {
-        const ottava = clef === 'treble' ? this.trebleOttava : this.bassOttava;
-
+    _getYFromPitch(pitch, clef, ottavaShift = 0) {
         // Parse pitch
         const match = pitch.match(/^([A-G])([#b]?)(\d+)$/);
         if (!match) return this.STAFF_TOP_Y + 20; // Default to middle
 
         let octave = parseInt(match[3]);
 
-        // Reverse ottava adjustment for display
-        if (ottava !== 0) {
-            octave -= ottava;
+        // Apply ottava shift for display (ottavaShift is already negative for 8va, positive for 8vb)
+        if (ottavaShift !== 0) {
+            octave += ottavaShift;
         }
 
         const adjustedPitch = match[1] + match[2] + octave;
@@ -1968,8 +2228,19 @@ export class MeasureIsolationEditor {
                     stemDirection: stemDirection
                 });
 
-                // Status message
-                this._updateStatus(`Added ${pitch} (${this._getDurationName(this.currentDuration)}${this.isDotted ? ' dotted' : ''})`);
+                // Check if note spans measures (for informative status message)
+                if (this.measureCount > 1) {
+                    const startMeasure = this.slotGrid.getMeasureIndexForSlot(slotIndex);
+                    const endMeasure = this.slotGrid.getMeasureIndexForSlot(slotIndex + durationSlots - 1);
+                    if (endMeasure > startMeasure) {
+                        const measuresCrossed = endMeasure - startMeasure;
+                        this._updateStatus(`Added ${pitch} spanning ${measuresCrossed + 1} measures (tied)`);
+                    } else {
+                        this._updateStatus(`Added ${pitch} (${this._getDurationName(this.currentDuration)}${this.isDotted ? ' dotted' : ''})`);
+                    }
+                } else {
+                    this._updateStatus(`Added ${pitch} (${this._getDurationName(this.currentDuration)}${this.isDotted ? ' dotted' : ''})`);
+                }
             }
         }
 
@@ -2062,6 +2333,11 @@ export class MeasureIsolationEditor {
     _renderStaves() {
         this._renderStaff('treble');
         this._renderStaff('bass');
+
+        // Draw measure bar lines on top
+        if (this.measureCount > 1) {
+            this._drawMeasureBarLines();
+        }
     }
 
     /**
@@ -2071,8 +2347,27 @@ export class MeasureIsolationEditor {
         const canvas = clef === 'treble' ? this.trebleCanvas : this.bassCanvas;
         if (!canvas) return;
 
+        // Set clef-specific STAFF_TOP_Y for all rendering methods
+        this.STAFF_TOP_Y = clef === 'treble' ? this.TREBLE_STAFF_TOP_Y : this.BASS_STAFF_TOP_Y;
+
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw measure background shading (prev/next measures get subtle gray)
+        if (this.measureCount > 1 && this.visibleMeasureIndices) {
+            const slotsPerMeasure = this.slotGrid?.slotsPerMeasure || 32;
+            this.visibleMeasureIndices.forEach((measureIndex, viewOffset) => {
+                if (measureIndex !== this.centerMeasureIndex) {
+                    // Non-center measures get gray background
+                    const startSlot = viewOffset * slotsPerMeasure;
+                    const x = this.START_X + (startSlot * this.SLOT_WIDTH);
+                    const width = slotsPerMeasure * this.SLOT_WIDTH;
+
+                    ctx.fillStyle = 'rgba(156, 163, 175, 0.15)';  // Gray-400 at 15% opacity
+                    ctx.fillRect(x, 0, width, canvas.height);
+                }
+            });
+        }
 
         // Draw slot fill shading first (very background)
         this._drawSlotFillShading(ctx, clef);
@@ -2089,10 +2384,7 @@ export class MeasureIsolationEditor {
         // Draw key signature after clef
         this._drawKeySignature(ctx, clef);
 
-        // Draw ottava bracket if active
-        this._drawOttavaBracket(ctx, clef);
-
-        // Draw notes from slot grid
+        // Draw notes from slot grid (includes automatic ottava detection and brackets)
         this._drawNotes(ctx, clef);
 
         // Draw ghost note preview (if hovering on this clef)
@@ -2183,20 +2475,28 @@ export class MeasureIsolationEditor {
                 ctx.lineWidth = 0.5;
             }
 
-            // Draw from top of canvas to below staff
-            const gridTop = this.STAFF_TOP_Y - 60;
-            const gridBottom = this.STAFF_TOP_Y + this.STAFF_HEIGHT + 60;
+            // Draw grid lines from above staff to below
+            const gridTop = this.STAFF_TOP_Y - 30;  // Room for ledger lines
+            const gridBottom = this.STAFF_TOP_Y + this.STAFF_HEIGHT + 30;
 
             ctx.beginPath();
             ctx.moveTo(x, gridTop);
             ctx.lineTo(x, gridBottom);
             ctx.stroke();
 
-            // Beat numbers on downbeats
+            // Beat numbers on downbeats - draw above the grid lines
+            // For multi-measure, restart beat numbering at 1 for each measure
             if (beatInfo.isDownbeat && s < totalSlots) {
-                ctx.fillStyle = '#374151';
-                ctx.font = 'bold 11px Arial';
-                ctx.fillText(beatInfo.beat.toString(), x + 2, gridTop - 5);
+                ctx.fillStyle = '#1f2937';  // Dark gray
+                ctx.font = 'bold 12px Arial';
+
+                // Calculate beat number relative to measure (restart at 1 for each measure)
+                const slotsPerMeasure = this.slotGrid.slotsPerMeasure;
+                const localSlot = s % slotsPerMeasure;
+                const localBeat = Math.floor(localSlot / SLOTS_PER_BEAT) + 1;
+
+                // Offset to the right to avoid overlap with bar lines
+                ctx.fillText(localBeat.toString(), x + 8, 18);
             }
         }
     }
@@ -2231,6 +2531,37 @@ export class MeasureIsolationEditor {
     }
 
     /**
+     * Draw bar lines between measures for multi-measure view
+     * This draws on both canvases simultaneously
+     */
+    _drawMeasureBarLines() {
+        if (this.measureCount <= 1) return;
+
+        const slotsPerMeasure = this.slotGrid?.slotsPerMeasure || 32;
+
+        // Draw bar lines on both canvases
+        [this.trebleCanvas, this.bassCanvas].forEach(canvas => {
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            // Draw prominent bar lines at each measure boundary
+            ctx.strokeStyle = '#1f2937';  // Gray-800 - darker for visibility
+            ctx.lineWidth = 3;
+
+            for (let m = 1; m < this.measureCount; m++) {
+                const slotOffset = m * slotsPerMeasure;
+                const x = this.START_X + (slotOffset * this.SLOT_WIDTH);
+
+                // Draw thicker, more prominent bar line - full canvas height like slot grid lines
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+        });
+    }
+
+    /**
      * Draw clef symbol
      */
     _drawClef(ctx, clef) {
@@ -2257,9 +2588,7 @@ export class MeasureIsolationEditor {
      * We use the same _getYFromPitch() function to get consistent positioning
      */
     _drawKeySignature(ctx, clef) {
-        console.log('[MIE] _drawKeySignature called for', clef, 'key:', this.currentKey, 'accidentals:', this.keyAccidentals);
         if (!this.keyAccidentals || this.keyAccidentals.length === 0) {
-            console.log('[MIE] No key accidentals to draw');
             return;
         }
 
@@ -2286,16 +2615,11 @@ export class MeasureIsolationEditor {
             const pitchTable = isSharp ? sharpPitches : flatPitches;
             const pitch = pitchTable[clef]?.[noteName];
 
-            console.log('[MIE] Drawing accidental:', acc, 'noteName:', noteName, 'pitch:', pitch, 'at x:', x);
-
             if (pitch) {
                 const y = this._getYFromPitch(pitch, clef);
                 const symbol = isSharp ? '♯' : '♭';
-                console.log('[MIE] Drawing symbol:', symbol, 'at y:', y);
                 ctx.fillText(symbol, x, y + 5);
                 x += 12;  // Space between accidentals
-            } else {
-                console.warn('[MIE] Could not find pitch for noteName:', noteName, 'in', clef);
             }
         });
     }
@@ -2374,88 +2698,213 @@ export class MeasureIsolationEditor {
     }
 
     /**
-     * Draw ottava bracket if active
+     * Draw ottava brackets for groups of notes that need them
+     * Supports 8va/15ma/22ma (above) and 8vb/15mb/22mb (below)
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {string} clef - 'treble' or 'bass'
+     * @param {Array} brackets - Array of bracket info: { type, startX, endX, startSlot, endSlot }
      */
-    _drawOttavaBracket(ctx, clef) {
-        const ottava = clef === 'treble' ? this.trebleOttava : this.bassOttava;
-        if (ottava === 0) return;
+    _drawOttavaBrackets(ctx, clef, brackets) {
+        if (!brackets || brackets.length === 0) return;
 
-        const label = ottava === 1 ? '8va' : '8vb';
-        const bracketY = ottava === 1 ? this.STAFF_TOP_Y - 40 : this.STAFF_TOP_Y + this.STAFF_HEIGHT + 30;
-        const bracketWidth = this.STAFF_WIDTH - this.START_X - 40;
+        for (const bracket of brackets) {
+            // Determine if bracket goes above (8va/15ma/22ma) or below (8vb/15mb/22mb)
+            const isAbove = bracket.type === '8va' || bracket.type === '15ma' || bracket.type === '22ma';
+            const label = bracket.type;
 
-        ctx.save();
-        ctx.strokeStyle = '#3b82f6';
-        ctx.fillStyle = '#3b82f6';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 2]);
+            // Position bracket relative to the actual note positions:
+            // - Above brackets (8va/15ma/22ma): above the notes (above minNoteY)
+            // - Below brackets (8vb/15mb/22mb): below the notes (below maxNoteY)
+            // Fall back to staff position if note Y wasn't tracked or is invalid
+            let bracketY;
+            if (isAbove) {
+                // Above: position above the highest note in the bracket
+                // Check for valid Y (not Infinity from empty pitch array)
+                const hasValidMinY = bracket.minNoteY !== undefined &&
+                                     bracket.minNoteY !== Infinity &&
+                                     bracket.minNoteY > 0;
+                const noteTopY = hasValidMinY ? bracket.minNoteY : this.STAFF_TOP_Y;
+                bracketY = noteTopY - 20;  // 20px above the highest note
+            } else {
+                // Below: position below the lowest note in the bracket
+                // Check for valid Y (not -Infinity from empty pitch array)
+                const hasValidMaxY = bracket.maxNoteY !== undefined &&
+                                     bracket.maxNoteY !== -Infinity &&
+                                     bracket.maxNoteY > 0;
+                const noteBottomY = hasValidMaxY ? bracket.maxNoteY : (this.STAFF_TOP_Y + this.STAFF_HEIGHT);
+                bracketY = noteBottomY + 25;  // 25px below the lowest note
+            }
 
-        // Draw bracket line
-        ctx.beginPath();
-        ctx.moveTo(this.START_X, bracketY);
-        ctx.lineTo(this.START_X + bracketWidth, bracketY);
-        ctx.stroke();
+            // Extend bracket slightly beyond note positions
+            const startX = bracket.startX - 10;
+            const endX = bracket.endX + 15;
 
-        // Draw vertical hooks
-        const hookHeight = ottava === 1 ? 8 : -8;
-        ctx.beginPath();
-        ctx.moveTo(this.START_X, bracketY);
-        ctx.lineTo(this.START_X, bracketY + hookHeight);
-        ctx.stroke();
+            ctx.save();
+            ctx.strokeStyle = '#3b82f6';  // Blue
+            ctx.fillStyle = '#3b82f6';
+            ctx.lineWidth = 1.5;
 
-        ctx.beginPath();
-        ctx.moveTo(this.START_X + bracketWidth, bracketY);
-        ctx.lineTo(this.START_X + bracketWidth, bracketY + hookHeight);
-        ctx.stroke();
+            // Draw label
+            ctx.font = 'italic 12px serif';
+            const labelWidth = ctx.measureText(label).width;
+            // For above brackets, label goes above the line; for below brackets, label goes below the line
+            ctx.fillText(label, startX, bracketY + (isAbove ? -3 : 12));
 
-        // Draw label
-        ctx.setLineDash([]);
-        ctx.font = 'italic 12px serif';
-        ctx.fillText(label, this.START_X + 5, bracketY - 3);
+            // Draw dashed line from after label to end
+            ctx.setLineDash([4, 2]);
+            const lineStartX = startX + labelWidth + 5;
 
-        ctx.restore();
+            if (lineStartX < endX) {
+                ctx.beginPath();
+                ctx.moveTo(lineStartX, bracketY);
+                ctx.lineTo(endX, bracketY);
+                ctx.stroke();
+            }
+
+            // Draw end hook pointing toward the notes:
+            // - Above brackets (8va/15ma/22ma): hook goes DOWN (toward notes below the bracket)
+            // - Below brackets (8vb/15mb/22mb): hook goes UP (toward notes above the bracket)
+            const hookHeight = isAbove ? 8 : -8;
+            ctx.beginPath();
+            ctx.moveTo(endX, bracketY);
+            ctx.lineTo(endX, bracketY + hookHeight);
+            ctx.stroke();
+
+            ctx.restore();
+        }
     }
 
     /**
-     * Draw notes from the slot grid
+     * Draw notes from the slot grid with automatic ottava detection and bracketing
      */
     _drawNotes(ctx, clef) {
-        console.log(`[MIE] Drawing notes for ${clef} clef`);
+        // Collect ottava bracket info as we draw notes
+        // Structure: { type: '8va'|'8vb', startX, endX, startSlot, endSlot }
+        const ottavaBrackets = [];
+        let currentBracket = null;
+
         for (let v = 0; v < this.slotGrid.voiceCount; v++) {
+            // Reset bracket tracking for each voice
+            currentBracket = null;
+
             for (let s = 0; s < this.slotGrid.totalSlots; s++) {
                 const slot = this.slotGrid.getSlot(clef, v, s);
                 const x = this.START_X + (s * this.SLOT_WIDTH) + (this.SLOT_WIDTH / 2);
 
                 if (slot.type === SLOT_TYPES.NOTE_START) {
-                    console.log(`[MIE] ${clef} V${v} slot ${s}: NOTE_START pitches=${JSON.stringify(slot.pitches)}`);
                     // For Voice 1, check if Voice 0 has identical pitches at same slot
-                    // Compare by MIDI values for more robust matching (handles enharmonic equivalents)
                     if (v === 1) {
                         const v0Slot = this.slotGrid.getSlot(clef, 0, s);
                         if (v0Slot.type === SLOT_TYPES.NOTE_START) {
                             const v0Midi = (v0Slot.pitches || []).map(p => noteToMidi(p)).sort((a, b) => a - b).join(',');
                             const v1Midi = (slot.pitches || []).map(p => noteToMidi(p)).sort((a, b) => a - b).join(',');
-                            console.log(`[MIE] Duplicate check: V0=${v0Midi}, V1=${v1Midi}, skip=${v0Midi === v1Midi}`);
                             if (v0Midi === v1Midi) {
-                                // Identical content (by MIDI value) - skip rendering Voice 1's duplicate
                                 continue;
                             }
                         }
                     }
-                    this._drawNoteHead(ctx, x, slot, v, clef, s);
+
+                    // Determine ottava adjustment for this note (check all pitches)
+                    const pitches = slot.pitches || [];
+                    let noteOttavaType = null;
+                    let noteOttavaShift = 0;
+
+                    // Only check for ottava if note has pitches
+                    if (pitches.length > 0) {
+                        for (const pitch of pitches) {
+                            const ottavaInfo = getOttavaAdjustment(pitch, clef);
+                            if (ottavaInfo.needsOttava) {
+                                // If any pitch in a chord needs ottava, apply to all
+                                noteOttavaType = ottavaInfo.ottavaType;
+                                noteOttavaShift = ottavaInfo.shift;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Track ottava brackets (only for voice 0 to avoid duplicate brackets)
+                    if (v === 0) {
+                        if (noteOttavaType) {
+                            // Calculate the displayed Y position of this note (with ottava shift)
+                            // Need to find the min (highest on screen) and max (lowest on screen) Y for bracket positioning
+                            let noteMinY = Infinity;
+                            let noteMaxY = -Infinity;
+                            for (const pitch of pitches) {
+                                const noteY = this._getYFromPitch(pitch, clef, noteOttavaShift);
+                                noteMinY = Math.min(noteMinY, noteY);
+                                noteMaxY = Math.max(noteMaxY, noteY);
+                            }
+
+                            if (!currentBracket || currentBracket.type !== noteOttavaType) {
+                                // Close previous bracket if different type
+                                if (currentBracket) {
+                                    ottavaBrackets.push(currentBracket);
+                                }
+                                // Start new bracket - track min/max Y of notes for positioning
+                                currentBracket = {
+                                    type: noteOttavaType,
+                                    startX: x,
+                                    endX: x,
+                                    startSlot: s,
+                                    endSlot: s,
+                                    minNoteY: noteMinY,  // Highest note (smallest Y)
+                                    maxNoteY: noteMaxY   // Lowest note (largest Y)
+                                };
+                            } else {
+                                // Extend current bracket and update min/max Y
+                                currentBracket.endX = x;
+                                currentBracket.endSlot = s;
+                                currentBracket.minNoteY = Math.min(currentBracket.minNoteY, noteMinY);
+                                currentBracket.maxNoteY = Math.max(currentBracket.maxNoteY, noteMaxY);
+                            }
+                        } else {
+                            // No ottava needed - close any open bracket
+                            if (currentBracket) {
+                                ottavaBrackets.push(currentBracket);
+                                currentBracket = null;
+                            }
+                        }
+                    }
+
+                    // Draw the note with ottava adjustment
+                    this._drawNoteHead(ctx, x, slot, v, clef, s, noteOttavaShift);
+
                 } else if (slot.type === SLOT_TYPES.REST) {
+                    // Rests terminate any active ottava bracket
+                    if (v === 0 && currentBracket) {
+                        ottavaBrackets.push(currentBracket);
+                        currentBracket = null;
+                    }
                     this._drawRest(ctx, x, slot, v, clef, s);
+
                 } else if (slot.type === SLOT_TYPES.CONTINUATION) {
+                    // Continuation extends the previous note's ottava
                     this._drawContinuation(ctx, x);
+                } else if (slot.type === SLOT_TYPES.EMPTY) {
+                    // Empty slots terminate any active ottava bracket
+                    if (v === 0 && currentBracket) {
+                        ottavaBrackets.push(currentBracket);
+                        currentBracket = null;
+                    }
                 }
             }
+
+            // Close any remaining bracket at end of voice
+            if (v === 0 && currentBracket) {
+                ottavaBrackets.push(currentBracket);
+                currentBracket = null;
+            }
         }
+
+        // Draw ottava brackets after all notes
+        this._drawOttavaBrackets(ctx, clef, ottavaBrackets);
     }
 
     /**
      * Draw a note head at position with proper duration representation
+     * @param {number} ottavaShift - Octave shift for display (from automatic ottava detection)
      */
-    _drawNoteHead(ctx, x, slot, voiceIndex, clef, slotIndex) {
+    _drawNoteHead(ctx, x, slot, voiceIndex, clef, slotIndex, ottavaShift = 0) {
         const pitches = slot.pitches || [];
         const duration = slot.duration || '4n';
         const isDotted = slot.dotted || false;
@@ -2470,19 +2919,23 @@ export class MeasureIsolationEditor {
         // Default voice colors (used for bass and when harmonic coloring not available)
         const defaultColor = voiceIndex === 0 ? '#1e40af' : '#7c3aed';
 
-        // Check if this slot is selected
-        const isSlotSelected = this.selectedNote &&
+        // Check if this slot is selected (check both legacy selectedNote and multi-selection Set)
+        const legacySlotSelected = this.selectedNote &&
             this.selectedNote.clef === clef &&
             this.selectedNote.voice === voiceIndex &&
             this.selectedNote.slotIndex === slotIndex;
 
         for (const pitch of pitches) {
-            const y = this._getYFromPitch(pitch, clef);
+            // Apply ottava shift for display position
+            const y = this._getYFromPitch(pitch, clef, ottavaShift);
 
             // Check if this specific pitch is selected (for chords)
-            // If no specific pitch in selection, all pitches in the slot are selected
-            const isPitchSelected = isSlotSelected &&
-                (!this.selectedNote.pitch || this.selectedNote.pitch === pitch);
+            // Check both legacy selection and multi-selection Set
+            const noteIdWithPitch = this._makeNoteId(clef, voiceIndex, slotIndex, pitch);
+            const noteIdWithoutPitch = this._makeNoteId(clef, voiceIndex, slotIndex, null);
+            const isInMultiSelection = this.selectedNotes.has(noteIdWithPitch) || this.selectedNotes.has(noteIdWithoutPitch);
+            const isPitchSelected = isInMultiSelection || (legacySlotSelected &&
+                (!this.selectedNote.pitch || this.selectedNote.pitch === pitch));
 
             // Draw selection ring first (behind note) - only for selected pitch
             if (isPitchSelected) {
@@ -2515,10 +2968,20 @@ export class MeasureIsolationEditor {
                 }
             }
 
-            // Determine color - use harmonic coloring for treble, default for bass
-            const harmonicColors = this._getHarmonicColor(pitch, clef);
-            const color = harmonicColors ? harmonicColors.fill : defaultColor;
-            const strokeColor = harmonicColors ? harmonicColors.stroke : defaultColor;
+            // Check if this note is currently playing
+            const noteKey = `${clef}-${voiceIndex}-${slotIndex}`;
+            const isPlaying = this._playingNotes?.has(noteKey);
+
+            // Determine color - red if playing, otherwise harmonic coloring for treble, default for bass
+            let color, strokeColor;
+            if (isPlaying) {
+                color = '#dc2626';      // Red-600 for playing notes
+                strokeColor = '#dc2626';
+            } else {
+                const harmonicColors = this._getHarmonicColor(pitch, clef);
+                color = harmonicColors ? harmonicColors.fill : defaultColor;
+                strokeColor = harmonicColors ? harmonicColors.stroke : defaultColor;
+            }
 
             // Draw note head
             ctx.save();
@@ -2975,6 +3438,208 @@ export class MeasureIsolationEditor {
         }
     }
 
+    // ========================================================================
+    // MULTI-MEASURE HELPERS
+    // ========================================================================
+
+    /**
+     * Get the list of visible measure indices based on toggle states
+     * @returns {number[]} Array of measure indices to display
+     */
+    _getVisibleMeasureIndices() {
+        if (this.centerMeasureIndex === null) return [];
+
+        const totalMeasures = this.compositionState?.measures?.length || 0;
+        const indices = [];
+
+        // Add previous measure if toggle is on and it exists
+        if (this.showPrevious && this.centerMeasureIndex > 0) {
+            indices.push(this.centerMeasureIndex - 1);
+        }
+
+        // Always add the center measure
+        indices.push(this.centerMeasureIndex);
+
+        // Add next measure if toggle is on and it exists
+        if (this.showNext && this.centerMeasureIndex < totalMeasures - 1) {
+            indices.push(this.centerMeasureIndex + 1);
+        }
+
+        return indices;
+    }
+
+    /**
+     * Reload measures when Previous/Next toggles change
+     * Re-creates the SlotGrid and re-renders
+     */
+    _reloadMeasures() {
+        const measureIndices = this._getVisibleMeasureIndices();
+        this.measureCount = measureIndices.length;
+
+        if (measureIndices.length === 0) {
+            console.warn('[MeasureIsolationEditor] No measures to display');
+            return;
+        }
+
+        // Update title
+        const titleEl = this.modal.querySelector('#mie-title');
+        if (titleEl) {
+            const measureList = measureIndices.map(i => i + 1).join(', ');
+            titleEl.textContent = `Measure Editor - Measure${this.measureCount > 1 ? 's' : ''} ${measureList}`;
+        }
+
+        // Calculate new staff width based on measure count
+        // BASE_MEASURE_WIDTH per measure, plus space for clef/key signature
+        this.STAFF_WIDTH = this.START_X + (this.BASE_MEASURE_WIDTH * this.measureCount) + 30;
+
+        // Get time signature for slot calculations
+        const timeSignature = this.compositionState.getTimeSignature();
+        const beatsPerMeasure = getBeatsPerMeasureFromTimeSignature(timeSignature);
+        const slotsPerMeasure = Math.round(beatsPerMeasure * SLOTS_PER_BEAT);
+
+        // Update slot width - slots stay consistent size across all measures
+        this.SLOT_WIDTH = this.BASE_MEASURE_WIDTH / slotsPerMeasure;
+
+        // Create multi-measure SlotGrid
+        this.slotGrid = new SlotGrid(timeSignature, 2, this.measureCount);
+
+        // Load all visible measures
+        const measures = measureIndices.map(idx => this.compositionState.getMeasure(idx));
+        this.slotGrid.loadFromMeasures(measures);
+
+        // Store measure indices for later use (e.g., saving)
+        this.visibleMeasureIndices = measureIndices;
+
+        // Re-initialize canvases with new width, then update measure numbers and render
+        this._initCanvases();
+        this._updateMeasureNumbers();
+        this._renderStaves();
+        this._updateFillStats();
+
+        console.log('[MeasureIsolationEditor] Reloaded measures:', measureIndices, 'width:', this.STAFF_WIDTH);
+    }
+
+    /**
+     * Update the measure numbers display above the staves
+     * Shows measure numbers with visual distinction for selected vs prev/next
+     */
+    _updateMeasureNumbers() {
+        const container = this.modal?.querySelector('#mie-measure-numbers');
+        if (!container) {
+            console.warn('[MIE] Measure numbers container not found');
+            return;
+        }
+
+        const measureIndices = this.visibleMeasureIndices || [this.centerMeasureIndex];
+        if (!measureIndices || measureIndices.length === 0) {
+            console.warn('[MIE] No measure indices available');
+            return;
+        }
+
+        // Calculate the actual measure width based on canvas and slot dimensions
+        const slotsPerMeasure = this.slotGrid?.slotsPerMeasure || 32;
+
+        // Get measure width from SLOT_WIDTH if available, otherwise use canvas width
+        let measureWidth;
+        if (this.SLOT_WIDTH && this.SLOT_WIDTH > 0) {
+            measureWidth = this.SLOT_WIDTH * slotsPerMeasure;
+        } else if (this.trebleCanvas) {
+            // Fallback: calculate from canvas width
+            measureWidth = (this.trebleCanvas.width - this.START_X - 30) / measureIndices.length;
+        } else {
+            // Last resort fallback
+            measureWidth = 800;
+        }
+
+        // Update the container's left margin to match START_X
+        const startX = this.START_X || 100;
+        container.style.marginLeft = `${startX}px`;
+
+        console.log('[MIE] Updating measure numbers:', {
+            measureIndices,
+            measureWidth,
+            SLOT_WIDTH: this.SLOT_WIDTH,
+            START_X: startX,
+            centerMeasureIndex: this.centerMeasureIndex
+        });
+
+        // Build measure number labels
+        let html = '';
+        measureIndices.forEach((measureIndex, viewOffset) => {
+            const isCenter = measureIndex === this.centerMeasureIndex;
+            const measureNum = measureIndex + 1;  // 1-indexed for display
+
+            // Determine styling based on whether this is the selected (center) measure
+            const bgClass = isCenter
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-300 text-gray-700';
+            const label = isCenter
+                ? `Measure ${measureNum}`
+                : (measureIndex < this.centerMeasureIndex ? `← M${measureNum}` : `M${measureNum} →`);
+
+            html += `
+                <div class="flex-shrink-0 text-center" style="width: ${measureWidth}px;">
+                    <span class="inline-block px-4 py-1.5 rounded-full text-sm font-bold ${bgClass} shadow-sm">
+                        ${label}
+                    </span>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+        console.log('[MIE] Measure numbers HTML set:', html.substring(0, 200) + '...');
+    }
+
+    /**
+     * Update the Previous/Next toggle states (disable if at edges)
+     */
+    _updatePrevNextToggles() {
+        const totalMeasures = this.compositionState?.measures?.length || 0;
+
+        const prevCheckbox = this.modal.querySelector('#mie-show-prev');
+        const nextCheckbox = this.modal.querySelector('#mie-show-next');
+        const prevLabel = this.modal.querySelector('#mie-prev-label');
+        const nextLabel = this.modal.querySelector('#mie-next-label');
+
+        if (prevCheckbox) {
+            // Disable if center is first measure
+            const prevDisabled = this.centerMeasureIndex <= 0;
+            prevCheckbox.disabled = prevDisabled;
+            if (prevDisabled) {
+                prevCheckbox.checked = false;
+                this.showPrevious = false;
+            }
+            // Style label text lighter when disabled
+            if (prevLabel) {
+                const labelSpan = prevLabel.querySelector('span');
+                if (labelSpan) {
+                    labelSpan.className = prevDisabled ? 'text-sm text-gray-300' : 'text-sm text-gray-700';
+                }
+                prevLabel.classList.toggle('cursor-not-allowed', prevDisabled);
+                prevLabel.classList.toggle('cursor-pointer', !prevDisabled);
+            }
+        }
+
+        if (nextCheckbox) {
+            // Disable if center is last measure
+            const nextDisabled = this.centerMeasureIndex >= totalMeasures - 1;
+            nextCheckbox.disabled = nextDisabled;
+            if (nextDisabled) {
+                nextCheckbox.checked = false;
+                this.showNext = false;
+            }
+            // Style label text lighter when disabled
+            if (nextLabel) {
+                const labelSpan = nextLabel.querySelector('span');
+                if (labelSpan) {
+                    labelSpan.className = nextDisabled ? 'text-sm text-gray-300' : 'text-sm text-gray-700';
+                }
+                nextLabel.classList.toggle('cursor-not-allowed', nextDisabled);
+                nextLabel.classList.toggle('cursor-pointer', !nextDisabled);
+            }
+        }
+    }
+
     /**
      * Cancel and close
      */
@@ -2988,28 +3653,36 @@ export class MeasureIsolationEditor {
      * Apply changes and close
      */
     apply() {
-        if (!this.slotGrid || this.measureIndex === null) {
+        if (!this.slotGrid || this.centerMeasureIndex === null) {
             this.cancel();
             return;
         }
 
-        // Get edited notation
-        const editedNotation = this.slotGrid.toMeasureNotation();
+        // Get the list of visible measure indices
+        const measureIndices = this.visibleMeasureIndices || [this.centerMeasureIndex];
 
-        // Apply to composition state
-        const measure = this.compositionState.getMeasure(this.measureIndex);
-        if (measure) {
-            // Ensure notation structure exists
-            if (!measure.notation) {
-                measure.notation = { treble: { voices: [] }, bass: { voices: [] } };
+        // Apply edits to each visible measure
+        measureIndices.forEach((measureIndex, viewOffset) => {
+            // Extract notation for this specific measure from the multi-measure grid
+            const editedNotation = this.slotGrid.extractMeasureNotation(viewOffset);
+
+            // Apply to composition state
+            const measure = this.compositionState.getMeasure(measureIndex);
+            if (measure) {
+                // Ensure notation structure exists
+                if (!measure.notation) {
+                    measure.notation = { treble: { voices: [] }, bass: { voices: [] } };
+                }
+
+                // Update notation
+                measure.notation.treble = editedNotation.treble;
+                measure.notation.bass = editedNotation.bass;
+
+                console.log('[MeasureIsolationEditor] Applied changes to measure', measureIndex);
             }
+        });
 
-            // Update notation
-            measure.notation.treble = editedNotation.treble;
-            measure.notation.bass = editedNotation.bass;
-
-            console.log('[MeasureIsolationEditor] Applied changes to measure', this.measureIndex);
-        }
+        console.log('[MeasureIsolationEditor] Applied changes to measures:', measureIndices);
 
         // Close modal
         this.modal.classList.add('hidden');

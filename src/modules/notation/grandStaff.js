@@ -3269,7 +3269,8 @@ export function renderGrandStaffMeasure(context, measureData, options = {}) {
 
 /**
  * Apply ottava adjustment to notes for comfortable display in clef
- * Notes too high get 8va (shift down for display), notes too low get 8vb (shift up for display)
+ * Notes too high get 8va/15ma (shift down for display), notes too low get 8vb/15mb (shift up for display)
+ * Supports up to 2-octave shifts (15ma/15mb)
  * @param {Array} pitches - Array of pitch strings
  * @param {string} clef - 'treble' or 'bass'
  * @returns {Object} - { adjustedPitches, ottavaLabel, ottavaShift }
@@ -3281,38 +3282,83 @@ function applyOttavaAdjustment(pitches, clef) {
 
   const range = CLEF_RANGES[clef];
 
-  // Check if any notes need adjustment
-  let needsShiftDown = false;  // 8va - notes too high
-  let needsShiftUp = false;    // 8vb - notes too low
+  // Find the most extreme note to determine shift needed
+  let maxMidi = -Infinity;
+  let minMidi = Infinity;
 
   for (const pitch of pitches) {
     const midi = noteToMidi(pitch);
-    if (midi > range.max) {
-      needsShiftDown = true;
-    } else if (midi < range.min) {
-      needsShiftUp = true;
+    if (midi !== null) {
+      maxMidi = Math.max(maxMidi, midi);
+      minMidi = Math.min(minMidi, midi);
     }
   }
 
-  // If conflicting needs, prioritize based on average pitch
-  if (needsShiftDown && needsShiftUp) {
-    const avgMidi = pitches.reduce((sum, p) => sum + noteToMidi(p), 0) / pitches.length;
+  // Determine shift needed based on how far out of range
+  // Supports up to 3-octave shifts (22ma/22mb)
+  let shiftAmount = 0;
+  let ottavaLabel = null;
+
+  if (maxMidi > range.max + 24) {
+    // Need 22ma (3 octaves down for display)
+    shiftAmount = -3;
+    ottavaLabel = '22ma';
+  } else if (maxMidi > range.max + 12) {
+    // Need 15ma (2 octaves down for display)
+    shiftAmount = -2;
+    ottavaLabel = '15ma';
+  } else if (maxMidi > range.max) {
+    // Need 8va (1 octave down for display)
+    shiftAmount = -1;
+    ottavaLabel = '8va';
+  } else if (minMidi < range.min - 24) {
+    // Need 22mb (3 octaves up for display)
+    shiftAmount = 3;
+    ottavaLabel = '22mb';
+  } else if (minMidi < range.min - 12) {
+    // Need 15mb (2 octaves up for display)
+    shiftAmount = 2;
+    ottavaLabel = '15mb';
+  } else if (minMidi < range.min) {
+    // Need 8vb (1 octave up for display)
+    shiftAmount = 1;
+    ottavaLabel = '8vb';
+  }
+
+  // If conflicting needs (some notes high, some low), prioritize based on average
+  if ((maxMidi > range.max) && (minMidi < range.min)) {
+    const avgMidi = pitches.reduce((sum, p) => sum + (noteToMidi(p) || 0), 0) / pitches.length;
     const midRange = (range.min + range.max) / 2;
     if (avgMidi > midRange) {
-      needsShiftUp = false;  // More notes are high
+      // Prioritize shifting down (8va/15ma/22ma)
+      if (maxMidi > range.max + 24) {
+        shiftAmount = -3;
+        ottavaLabel = '22ma';
+      } else if (maxMidi > range.max + 12) {
+        shiftAmount = -2;
+        ottavaLabel = '15ma';
+      } else {
+        shiftAmount = -1;
+        ottavaLabel = '8va';
+      }
     } else {
-      needsShiftDown = false;  // More notes are low
+      // Prioritize shifting up (8vb/15mb/22mb)
+      if (minMidi < range.min - 24) {
+        shiftAmount = 3;
+        ottavaLabel = '22mb';
+      } else if (minMidi < range.min - 12) {
+        shiftAmount = 2;
+        ottavaLabel = '15mb';
+      } else {
+        shiftAmount = 1;
+        ottavaLabel = '8vb';
+      }
     }
   }
 
-  if (needsShiftDown) {
-    // Shift all notes down one octave for display, mark with 8va
-    const adjustedPitches = pitches.map(pitch => applyOctaveShift(pitch, -1));
-    return { adjustedPitches, ottavaLabel: '8va', ottavaShift: -1 };
-  } else if (needsShiftUp) {
-    // Shift all notes up one octave for display, mark with 8vb
-    const adjustedPitches = pitches.map(pitch => applyOctaveShift(pitch, 1));
-    return { adjustedPitches, ottavaLabel: '8vb', ottavaShift: 1 };
+  if (shiftAmount !== 0) {
+    const adjustedPitches = pitches.map(pitch => applyOctaveShift(pitch, shiftAmount));
+    return { adjustedPitches, ottavaLabel, ottavaShift: shiftAmount };
   }
 
   return { adjustedPitches: pitches, ottavaLabel: null, ottavaShift: 0 };
@@ -4573,12 +4619,13 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       return 2; // Default to middle of staff
     }
 
-    // Helper to get the highest pitched note's line (largest line number for 8va bass notes)
+    // VexFlow line numbers: LARGER/positive = higher on staff = higher pitch
+    // So "highest pitch" means LARGEST line number (most positive)
     function getHighestPitchLine(note) {
       try {
         const keyProps = note.getKeyProps();
         if (keyProps && keyProps.length > 0) {
-          // For bass clef 8va notes, highest pitch = largest line number
+          // Highest pitch = largest line number (higher on staff)
           let maxLine = -Infinity;
           for (const prop of keyProps) {
             if (prop.line > maxLine) {
@@ -4593,12 +4640,13 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       return 2;
     }
 
-    // Helper to get the lowest pitched note's line (smallest line number for 8vb bass notes)
+    // VexFlow line numbers: SMALLER/negative = lower on staff = lower pitch
+    // So "lowest pitch" means SMALLEST line number (most negative)
     function getLowestPitchLine(note) {
       try {
         const keyProps = note.getKeyProps();
         if (keyProps && keyProps.length > 0) {
-          // For bass clef 8vb notes, lowest pitch = smallest line number
+          // Lowest pitch = smallest line number (lower on staff)
           let minLine = Infinity;
           for (const prop of keyProps) {
             if (prop.line < minLine) {
@@ -4613,269 +4661,327 @@ export function renderGrandStaffSystem(container, measures, options = {}) {
       return 2;
     }
 
-    // Process bass clef brackets (where chord progressions are)
+    // Process bass clef brackets with cross-measure support
+    // VexFlow line numbers: LARGER = higher pitch, SMALLER/negative = lower pitch
+    //
+    // Strategy: Track active bracket across measures. A bracket continues if
+    // the next measure starts with the same ottava label. Close bracket when
+    // ottava label changes or measure has no ottava.
     let currentBassOttava = null;
     let bassOttavaStart = null;
     let bassOttavaEnd = null;
-    let bassHighestPitchLine = -Infinity; // Track highest pitched note (largest line number for 8va)
-    let bassLowestPitchLine = Infinity; // Track lowest pitched note (smallest line number for 8vb)
+    // For 8va: want MAX of highest lines (largest = highest pitch)
+    // For 8vb: want MIN of lowest lines (smallest = lowest pitch)
+    let bassHighestPitchLine = -Infinity;  // Will find MAX via > comparison
+    let bassLowestPitchLine = Infinity;    // Will find MIN via < comparison
+    let bassNoteCount = 0;
 
     for (let i = 0; i < renderedMeasures.length; i++) {
       const measure = renderedMeasures[i];
       const bassNotes = measure.bassNotes;
       const brackets = measure.bassOttavaBrackets;
 
-      // Check if this measure has ottava (for chord progressions, may have multiple notes per measure)
-      const hasOttava = brackets && brackets.length > 0;
-      // Get the first bracket's label and indices (for measures with multiple notes)
-      const firstBracket = hasOttava ? brackets[0] : null;
-      const lastBracket = hasOttava ? brackets[brackets.length - 1] : null;
-      const ottavaLabel = firstBracket ? firstBracket.label : null;
-      const bracketStartIndex = firstBracket ? firstBracket.startIndex : 0;
-      const bracketEndIndex = lastBracket ? lastBracket.endIndex : 0;
-
-      if (ottavaLabel) {
-        // Get the actual notes at the bracket indices
-        const startNote = bassNotes[bracketStartIndex] || bassNotes[0];
-        const endNote = bassNotes[bracketEndIndex] || bassNotes[bassNotes.length - 1];
-
-        if (currentBassOttava === ottavaLabel) {
-          // Continue the bracket - use the end note index from this measure's bracket
-          bassOttavaEnd = { measure: i, noteIndex: bracketEndIndex, note: endNote };
-          // Update extreme note positions for all notes in the bracket
-          for (let ni = bracketStartIndex; ni <= bracketEndIndex && ni < bassNotes.length; ni++) {
-            const highPitchLine = getHighestPitchLine(bassNotes[ni]);
-            const lowPitchLine = getLowestPitchLine(bassNotes[ni]);
-            if (highPitchLine > bassHighestPitchLine) bassHighestPitchLine = highPitchLine;
-            if (lowPitchLine < bassLowestPitchLine) bassLowestPitchLine = lowPitchLine;
-          }
-        } else {
-          // Draw previous bracket if exists
-          if (currentBassOttava && bassOttavaStart && bassOttavaEnd) {
-            try {
-              const is8va = currentBassOttava === '8va';
-              // Use TOP position for 8va (above notes), BOTTOM position for 8vb (below notes)
-              const position = is8va ? TOP_POSITION : BOTTOM_POSITION;
-              const textBracket = new VF.TextBracket({
-                start: bassOttavaStart.note,
-                stop: bassOttavaEnd.note,
-                text: currentBassOttava,
-                superscript: '',
-                position: position,
-              });
-              // Position based on extreme note: for 8va, above highest; for 8vb, below lowest
-              // For 8va (TOP): larger line number = higher pitch = more positive offset to push up
-              // For 8vb (BOTTOM): smaller line number = lower pitch = more positive offset to push down
-              // Bass clef: large positive line = high pitch, small/negative line = low pitch
-              const lineOffset = is8va ? (bassHighestPitchLine - 5.0) : (3.5 - bassLowestPitchLine);
-              textBracket.setLine(lineOffset);
-              textBracket.setContext(context).draw();
-            } catch (e) {
-              console.warn('Error drawing ottava bracket:', e);
-            }
-          }
-          // Start new bracket using the correct start index from this measure
-          currentBassOttava = ottavaLabel;
-          bassOttavaStart = { measure: i, noteIndex: bracketStartIndex, note: startNote };
-          bassOttavaEnd = { measure: i, noteIndex: bracketEndIndex, note: endNote };
-          // Calculate extreme positions for all notes in this bracket
-          bassHighestPitchLine = -Infinity;
-          bassLowestPitchLine = Infinity;
-          for (let ni = bracketStartIndex; ni <= bracketEndIndex && ni < bassNotes.length; ni++) {
-            const highPitchLine = getHighestPitchLine(bassNotes[ni]);
-            const lowPitchLine = getLowestPitchLine(bassNotes[ni]);
-            if (highPitchLine > bassHighestPitchLine) bassHighestPitchLine = highPitchLine;
-            if (lowPitchLine < bassLowestPitchLine) bassLowestPitchLine = lowPitchLine;
-          }
-        }
-      } else {
-        // No ottava in this measure - draw any pending bracket
+      if (!bassNotes || bassNotes.length === 0) {
+        // No notes - close any pending bracket
         if (currentBassOttava && bassOttavaStart && bassOttavaEnd) {
-          try {
-            const is8va = currentBassOttava === '8va';
-            // Use TOP position for 8va (above notes), BOTTOM position for 8vb (below notes)
-            const position = is8va ? TOP_POSITION : BOTTOM_POSITION;
-            const textBracket = new VF.TextBracket({
-              start: bassOttavaStart.note,
-              stop: bassOttavaEnd.note,
-              text: currentBassOttava,
-              superscript: '',
-              position: position,
-            });
-            // For 8va (TOP): larger line number = higher pitch = more positive offset to push up
-            // For 8vb (BOTTOM): smaller line number = lower pitch = more positive offset to push down
-            const lineOffset = is8va ? (bassHighestPitchLine - 5.0) : (3.5 - bassLowestPitchLine);
-            textBracket.setLine(lineOffset);
-            textBracket.setContext(context).draw();
-          } catch (e) {
-            console.warn('Error drawing ottava bracket:', e);
-          }
+          drawBassBracket(currentBassOttava, bassOttavaStart, bassOttavaEnd, bassHighestPitchLine, bassLowestPitchLine, bassNoteCount);
         }
         currentBassOttava = null;
         bassOttavaStart = null;
         bassOttavaEnd = null;
-        bassHighestPitchLine = -Infinity;
-        bassLowestPitchLine = Infinity;
+        bassHighestPitchLine = -Infinity;  // Reset for MAX finding
+        bassLowestPitchLine = Infinity;    // Reset for MIN finding
+        bassNoteCount = 0;
+        continue;
+      }
+
+      if (!brackets || brackets.length === 0) {
+        // No ottava in this measure - close any pending bracket
+        if (currentBassOttava && bassOttavaStart && bassOttavaEnd) {
+          drawBassBracket(currentBassOttava, bassOttavaStart, bassOttavaEnd, bassHighestPitchLine, bassLowestPitchLine, bassNoteCount);
+        }
+        currentBassOttava = null;
+        bassOttavaStart = null;
+        bassOttavaEnd = null;
+        bassHighestPitchLine = -Infinity;  // Reset for MAX finding
+        bassLowestPitchLine = Infinity;    // Reset for MIN finding
+        bassNoteCount = 0;
+        continue;
+      }
+
+      // Process each bracket in this measure
+      for (let bIdx = 0; bIdx < brackets.length; bIdx++) {
+        const bracket = brackets[bIdx];
+        const startIdx = bracket.startIndex ?? 0;
+        const endIdx = bracket.endIndex ?? 0;
+        const ottavaLabel = bracket.label;
+
+        // Check if this is a continuation of the current bracket
+        if (currentBassOttava === ottavaLabel && bIdx === 0 && startIdx === 0) {
+          // Continue the bracket - first bracket starts at note 0, same label
+          bassOttavaEnd = bassNotes[endIdx];
+          const bracketNoteCount = endIdx - startIdx + 1;
+          bassNoteCount += bracketNoteCount;
+          // Update line positions for notes in this bracket
+          // VexFlow: larger line = higher pitch, smaller line = lower pitch
+          for (let j = startIdx; j <= endIdx && j < bassNotes.length; j++) {
+            const noteHighestLine = getHighestPitchLine(bassNotes[j]); // largest line = highest pitch
+            const noteLowestLine = getLowestPitchLine(bassNotes[j]);   // smallest line = lowest pitch
+            // Track max highest (for 8va) and min lowest (for 8vb)
+            if (noteHighestLine > bassHighestPitchLine) bassHighestPitchLine = noteHighestLine;
+            if (noteLowestLine < bassLowestPitchLine) bassLowestPitchLine = noteLowestLine;
+          }
+        } else {
+          // Different label or gap - draw previous bracket if exists
+          if (currentBassOttava && bassOttavaStart && bassOttavaEnd) {
+            drawBassBracket(currentBassOttava, bassOttavaStart, bassOttavaEnd, bassHighestPitchLine, bassLowestPitchLine, bassNoteCount);
+          }
+
+          // Start new bracket
+          currentBassOttava = ottavaLabel;
+          bassOttavaStart = bassNotes[startIdx];
+          bassOttavaEnd = bassNotes[endIdx];
+          const bracketNoteCount = endIdx - startIdx + 1;
+          // VexFlow: larger line = higher pitch, smaller line = lower pitch
+          // For 8va: want MAX of highest lines (largest = highest pitch)
+          // For 8vb: want MIN of lowest lines (smallest = lowest pitch)
+          bassHighestPitchLine = -Infinity;  // Will find MAX
+          bassLowestPitchLine = Infinity;    // Will find MIN
+          bassNoteCount = bracketNoteCount;
+
+          // Calculate line positions for notes in this bracket
+          for (let j = startIdx; j <= endIdx && j < bassNotes.length; j++) {
+            const noteHighestLine = getHighestPitchLine(bassNotes[j]); // largest line = highest pitch
+            const noteLowestLine = getLowestPitchLine(bassNotes[j]);   // smallest line = lowest pitch
+            // Track max highest (for 8va) and min lowest (for 8vb)
+            if (noteHighestLine > bassHighestPitchLine) bassHighestPitchLine = noteHighestLine;
+            if (noteLowestLine < bassLowestPitchLine) bassLowestPitchLine = noteLowestLine;
+          }
+        }
+
+        // If this bracket doesn't end at the last note, or there are more brackets,
+        // we need to close this one before moving to the next
+        const isLastBracket = bIdx === brackets.length - 1;
+        const endsAtLastNote = endIdx === bassNotes.length - 1;
+
+        if (!isLastBracket || !endsAtLastNote) {
+          // Draw this bracket and prepare for next
+          if (currentBassOttava && bassOttavaStart && bassOttavaEnd) {
+            drawBassBracket(currentBassOttava, bassOttavaStart, bassOttavaEnd, bassHighestPitchLine, bassLowestPitchLine, bassNoteCount);
+          }
+          currentBassOttava = null;
+          bassOttavaStart = null;
+          bassOttavaEnd = null;
+          bassHighestPitchLine = -Infinity;  // Reset for MAX finding
+          bassLowestPitchLine = Infinity;    // Reset for MIN finding
+          bassNoteCount = 0;
+        }
       }
     }
 
-    // Draw final bracket if exists
+    // Draw final bass bracket if exists
     if (currentBassOttava && bassOttavaStart && bassOttavaEnd) {
+      drawBassBracket(currentBassOttava, bassOttavaStart, bassOttavaEnd, bassHighestPitchLine, bassLowestPitchLine, bassNoteCount);
+    }
+
+    // Helper function to draw a bass bracket with correct positioning
+    function drawBassBracket(label, startNote, endNote, highestLine, lowestLine, noteCount = 1) {
+      if (!startNote || !endNote) return;
       try {
-        const is8va = currentBassOttava === '8va';
-        // Use TOP position for 8va (above notes), BOTTOM position for 8vb (below notes)
-        const position = is8va ? TOP_POSITION : BOTTOM_POSITION;
+        // 8va/15ma/22ma: bracket above notes (TOP position)
+        // 8vb/15mb/22mb: bracket below notes (BOTTOM position)
+        const isAbove = label === '8va' || label === '15ma' || label === '22ma';
+        const position = isAbove ? TOP_POSITION : BOTTOM_POSITION;
+
         const textBracket = new VF.TextBracket({
-          start: bassOttavaStart.note,
-          stop: bassOttavaEnd.note,
-          text: currentBassOttava,
+          start: startNote,
+          stop: endNote,
+          text: label,
           superscript: '',
           position: position,
         });
-        // For 8va (TOP): larger line number = higher pitch = more positive offset to push up
-        // For 8vb (BOTTOM): smaller line number = lower pitch = more positive offset to push down
-        const lineOffset = is8va ? (bassHighestPitchLine - 5.0) : (3.5 - bassLowestPitchLine);
+
+        // VexFlow line numbers: LARGER = higher pitch, SMALLER/negative = lower pitch
+        // highestLine = largest line number (highest pitch)
+        // lowestLine = smallest line number (lowest pitch, can be negative)
+        let lineOffset;
+        if (isAbove) {
+          // 8va/15ma/22ma: BASS CLEF TOP position bracket above the highest note
+          // For TOP: LARGER NEGATIVE = bracket moves DOWN (closer to notes)
+          // Using same offset as treble clef
+          lineOffset = highestLine - 4.5;
+        } else {
+          // 8vb/15mb: BASS CLEF BOTTOM position
+          // Lower notes have smaller (more negative) line numbers
+          // For BASS BOTTOM: LARGER POSITIVE = DOWN
+          lineOffset = -lowestLine + 2.0;
+        }
+
         textBracket.setLine(lineOffset);
         textBracket.setContext(context).draw();
       } catch (e) {
-        console.warn('Error drawing ottava bracket:', e);
+        console.warn('Error drawing bass ottava bracket:', e);
       }
     }
 
-    // Process treble clef brackets with dynamic positioning
-    // Note: In treble clef, line numbers work opposite to bass clef:
+    // Process treble clef brackets with cross-measure support
+    // In treble clef, line numbers work opposite to bass clef:
     // - Small/negative line numbers = high pitch (above staff)
     // - Large positive line numbers = low pitch (below staff)
+    //
+    // Strategy: Track active bracket across measures. A bracket continues if
+    // the next measure starts with the same ottava label. Close bracket when
+    // ottava label changes or measure has no ottava.
     let currentTrebleOttava = null;
     let trebleOttavaStart = null;
     let trebleOttavaEnd = null;
-    let trebleHighestPitchLine = Infinity; // Track highest pitched note (smallest line number for 8va)
-    let trebleLowestPitchLine = -Infinity; // Track lowest pitched note (largest line number for 8vb)
+    let trebleHighestPitchLine = -Infinity;  // Will find MAX (largest = highest pitch)
+    let trebleLowestPitchLine = Infinity;   // Will find MIN (smallest = lowest pitch)
+    let trebleNoteCount = 0;
 
     for (let i = 0; i < renderedMeasures.length; i++) {
       const measure = renderedMeasures[i];
       const trebleNotes = measure.trebleNotes;
       const brackets = measure.trebleOttavaBrackets;
 
-      const hasOttava = brackets && brackets.length > 0;
-      const ottavaLabel = hasOttava ? brackets[0].label : null;
-
-      // Find first and last note with this ottava label in the measure
-      // The brackets array tracks startIndex/endIndex within the measure
-      let firstOttavaNote = trebleNotes[0];
-      let lastOttavaNote = trebleNotes[0];
-      if (hasOttava && brackets[0]) {
-        const bracket = brackets[0];
-        if (bracket.startIndex !== undefined && trebleNotes[bracket.startIndex]) {
-          firstOttavaNote = trebleNotes[bracket.startIndex];
-        }
-        if (bracket.endIndex !== undefined && trebleNotes[bracket.endIndex]) {
-          lastOttavaNote = trebleNotes[bracket.endIndex];
-        }
-      }
-
-      if (ottavaLabel) {
-        if (currentTrebleOttava === ottavaLabel) {
-          // Continue the bracket - use last note with ottava in this measure
-          trebleOttavaEnd = { measure: i, noteIndex: brackets[0]?.endIndex || 0, note: lastOttavaNote };
-          // Update extreme note positions for all notes in this measure's bracket
-          for (let j = (brackets[0]?.startIndex || 0); j <= (brackets[0]?.endIndex || 0) && j < trebleNotes.length; j++) {
-            const highPitchLine = getLowestPitchLine(trebleNotes[j]); // MIN = highest pitch in treble
-            const lowPitchLine = getHighestPitchLine(trebleNotes[j]); // MAX = lowest pitch in treble
-            if (highPitchLine < trebleHighestPitchLine) trebleHighestPitchLine = highPitchLine;
-            if (lowPitchLine > trebleLowestPitchLine) trebleLowestPitchLine = lowPitchLine;
-          }
-        } else {
-          // Draw previous bracket if exists
-          if (currentTrebleOttava && trebleOttavaStart && trebleOttavaEnd) {
-            try {
-              const is8va = currentTrebleOttava === '8va';
-              // Use TOP position for 8va (above notes), BOTTOM position for 8vb (below notes)
-              const position = is8va ? TOP_POSITION : BOTTOM_POSITION;
-              const textBracket = new VF.TextBracket({
-                start: trebleOttavaStart.note,
-                stop: trebleOttavaEnd.note,
-                text: currentTrebleOttava,
-                superscript: '',
-                position: position,
-              });
-              // For treble clef: smaller line = higher pitch, larger line = lower pitch
-              // 8va (TOP): smaller line needs larger positive offset to push bracket higher
-              // 8vb (BOTTOM): larger line needs positive offset to push bracket lower
-              const lineOffset = is8va ? (8.0 - trebleHighestPitchLine) : (trebleLowestPitchLine - 3.5);
-              textBracket.setLine(lineOffset);
-              textBracket.setContext(context).draw();
-            } catch (e) {
-              console.warn('Error drawing ottava bracket:', e);
-            }
-          }
-          // Start new bracket - use first note with ottava in this measure
-          currentTrebleOttava = ottavaLabel;
-          trebleOttavaStart = { measure: i, noteIndex: brackets[0]?.startIndex || 0, note: firstOttavaNote };
-          trebleOttavaEnd = { measure: i, noteIndex: brackets[0]?.endIndex || 0, note: lastOttavaNote };
-          // Update extreme positions for all notes in the bracket
-          trebleHighestPitchLine = Infinity;
-          trebleLowestPitchLine = -Infinity;
-          for (let j = (brackets[0]?.startIndex || 0); j <= (brackets[0]?.endIndex || 0) && j < trebleNotes.length; j++) {
-            const highPitchLine = getLowestPitchLine(trebleNotes[j]); // MIN = highest pitch in treble
-            const lowPitchLine = getHighestPitchLine(trebleNotes[j]); // MAX = lowest pitch in treble
-            if (highPitchLine < trebleHighestPitchLine) trebleHighestPitchLine = highPitchLine;
-            if (lowPitchLine > trebleLowestPitchLine) trebleLowestPitchLine = lowPitchLine;
-          }
-        }
-      } else {
-        // No ottava in this measure - draw any pending bracket
+      if (!trebleNotes || trebleNotes.length === 0) {
+        // No notes - close any pending bracket
         if (currentTrebleOttava && trebleOttavaStart && trebleOttavaEnd) {
-          try {
-            const is8va = currentTrebleOttava === '8va';
-            // Use TOP position for 8va (above notes), BOTTOM position for 8vb (below notes)
-            const position = is8va ? TOP_POSITION : BOTTOM_POSITION;
-            const textBracket = new VF.TextBracket({
-              start: trebleOttavaStart.note,
-              stop: trebleOttavaEnd.note,
-              text: currentTrebleOttava,
-              superscript: '',
-              position: position,
-            });
-            // For treble clef: smaller line = higher pitch, larger line = lower pitch
-            // 8va (TOP): smaller line needs larger positive offset to push bracket higher
-            // 8vb (BOTTOM): larger line needs positive offset to push bracket lower
-            const lineOffset = is8va ? (8.0 - trebleHighestPitchLine) : (trebleLowestPitchLine - 3.5);
-            textBracket.setLine(lineOffset);
-            textBracket.setContext(context).draw();
-          } catch (e) {
-            console.warn('Error drawing ottava bracket:', e);
-          }
+          drawTrebleBracket(currentTrebleOttava, trebleOttavaStart, trebleOttavaEnd, trebleHighestPitchLine, trebleLowestPitchLine, trebleNoteCount);
         }
         currentTrebleOttava = null;
         trebleOttavaStart = null;
         trebleOttavaEnd = null;
         trebleHighestPitchLine = Infinity;
         trebleLowestPitchLine = -Infinity;
+        trebleNoteCount = 0;
+        continue;
+      }
+
+      if (!brackets || brackets.length === 0) {
+        // No ottava in this measure - close any pending bracket
+        if (currentTrebleOttava && trebleOttavaStart && trebleOttavaEnd) {
+          drawTrebleBracket(currentTrebleOttava, trebleOttavaStart, trebleOttavaEnd, trebleHighestPitchLine, trebleLowestPitchLine, trebleNoteCount);
+        }
+        currentTrebleOttava = null;
+        trebleOttavaStart = null;
+        trebleOttavaEnd = null;
+        trebleNoteCount = 0;
+        trebleHighestPitchLine = Infinity;
+        trebleLowestPitchLine = -Infinity;
+        continue;
+      }
+
+      // Process each bracket in this measure
+      for (let bIdx = 0; bIdx < brackets.length; bIdx++) {
+        const bracket = brackets[bIdx];
+        const startIdx = bracket.startIndex ?? 0;
+        const endIdx = bracket.endIndex ?? 0;
+        const ottavaLabel = bracket.label;
+        const bracketNoteCount = endIdx - startIdx + 1;
+
+        // Check if this is a continuation of the current bracket
+        if (currentTrebleOttava === ottavaLabel && bIdx === 0 && startIdx === 0) {
+          // Continue the bracket - first bracket starts at note 0, same label
+          trebleOttavaEnd = trebleNotes[endIdx];
+          trebleNoteCount += bracketNoteCount;
+          // Update line positions for notes in this bracket
+          // In treble: smaller line = higher pitch, larger line = lower pitch
+          for (let j = startIdx; j <= endIdx && j < trebleNotes.length; j++) {
+            const noteHighestLine = getHighestPitchLine(trebleNotes[j]); // smallest line number = highest pitch
+            const noteLowestLine = getLowestPitchLine(trebleNotes[j]);   // largest line number = lowest pitch
+            if (noteHighestLine < trebleHighestPitchLine) trebleHighestPitchLine = noteHighestLine;
+            if (noteLowestLine > trebleLowestPitchLine) trebleLowestPitchLine = noteLowestLine;
+          }
+        } else {
+          // Different label or gap - draw previous bracket if exists
+          if (currentTrebleOttava && trebleOttavaStart && trebleOttavaEnd) {
+            drawTrebleBracket(currentTrebleOttava, trebleOttavaStart, trebleOttavaEnd, trebleHighestPitchLine, trebleLowestPitchLine, trebleNoteCount);
+          }
+
+          // Start new bracket
+          currentTrebleOttava = ottavaLabel;
+          trebleOttavaStart = trebleNotes[startIdx];
+          trebleOttavaEnd = trebleNotes[endIdx];
+          // VexFlow: larger line = higher pitch, smaller line = lower pitch
+          // For 8va: want MAX of highest lines (largest = highest note)
+          // For 8vb: want MIN of lowest lines (smallest = lowest note)
+          trebleHighestPitchLine = -Infinity;  // Will find MAX
+          trebleLowestPitchLine = Infinity;    // Will find MIN
+          trebleNoteCount = bracketNoteCount;
+
+          // Calculate line positions for notes in this bracket
+          for (let j = startIdx; j <= endIdx && j < trebleNotes.length; j++) {
+            const noteHighestLine = getHighestPitchLine(trebleNotes[j]); // largest line = highest pitch
+            const noteLowestLine = getLowestPitchLine(trebleNotes[j]);   // smallest line = lowest pitch
+            // Track max highest (for 8va) and min lowest (for 8vb)
+            if (noteHighestLine > trebleHighestPitchLine) trebleHighestPitchLine = noteHighestLine;
+            if (noteLowestLine < trebleLowestPitchLine) trebleLowestPitchLine = noteLowestLine;
+          }
+        }
+
+        // If this bracket doesn't end at the last note, or there are more brackets,
+        // we need to close this one before moving to the next
+        const isLastBracket = bIdx === brackets.length - 1;
+        const endsAtLastNote = endIdx === trebleNotes.length - 1;
+
+        if (!isLastBracket || !endsAtLastNote) {
+          // Draw this bracket and prepare for next
+          if (currentTrebleOttava && trebleOttavaStart && trebleOttavaEnd) {
+            drawTrebleBracket(currentTrebleOttava, trebleOttavaStart, trebleOttavaEnd, trebleHighestPitchLine, trebleLowestPitchLine, trebleNoteCount);
+          }
+          currentTrebleOttava = null;
+          trebleOttavaStart = null;
+          trebleOttavaEnd = null;
+          trebleHighestPitchLine = -Infinity;  // Reset for MAX finding
+          trebleLowestPitchLine = Infinity;    // Reset for MIN finding
+          trebleNoteCount = 0;
+        }
       }
     }
 
     // Draw final treble bracket if exists
     if (currentTrebleOttava && trebleOttavaStart && trebleOttavaEnd) {
+      drawTrebleBracket(currentTrebleOttava, trebleOttavaStart, trebleOttavaEnd, trebleHighestPitchLine, trebleLowestPitchLine, trebleNoteCount);
+    }
+
+    // Helper function to draw a treble bracket with correct positioning
+    function drawTrebleBracket(label, startNote, endNote, highestLine, lowestLine, noteCount = 1) {
+      if (!startNote || !endNote) return;
       try {
-        const is8va = currentTrebleOttava === '8va';
-        // Use TOP position for 8va (above notes), BOTTOM position for 8vb (below notes)
-        const position = is8va ? TOP_POSITION : BOTTOM_POSITION;
+        // 8va/15ma/22ma: bracket above notes (TOP position)
+        // 8vb/15mb/22mb: bracket below notes (BOTTOM position)
+        const isAbove = label === '8va' || label === '15ma' || label === '22ma';
+        const position = isAbove ? TOP_POSITION : BOTTOM_POSITION;
+
         const textBracket = new VF.TextBracket({
-          start: trebleOttavaStart.note,
-          stop: trebleOttavaEnd.note,
-          text: currentTrebleOttava,
+          start: startNote,
+          stop: endNote,
+          text: label,
           superscript: '',
           position: position,
         });
-        // For treble clef: smaller line = higher pitch, larger line = lower pitch
-        // 8va (TOP): smaller line needs larger positive offset to push bracket higher
-        // 8vb (BOTTOM): larger line needs positive offset to push bracket lower
-        const lineOffset = is8va ? (8.0 - trebleHighestPitchLine) : (trebleLowestPitchLine - 3.5);
+
+        // VexFlow line numbers: LARGER = higher pitch (higher on staff)
+        // highestLine = largest line number (highest pitch)
+        // lowestLine = smallest line number (lowest pitch, can be negative)
+        let lineOffset;
+        if (isAbove) {
+          // 8va/15ma/22ma: TOP position bracket above the highest note
+          // Higher notes have larger line numbers, so use highestLine directly
+          // For TOP: LARGER NEGATIVE = bracket moves DOWN (closer to notes)
+          lineOffset = highestLine - 4.5;
+        } else {
+          // 8vb/15mb: TREBLE CLEF BOTTOM position
+          // Lower notes have smaller (more negative) line numbers
+          // Negate lowestLine so lower notes push bracket further down
+          lineOffset = -lowestLine + 3.0;
+        }
+
         textBracket.setLine(lineOffset);
         textBracket.setContext(context).draw();
       } catch (e) {
-        console.warn('Error drawing ottava bracket:', e);
+        console.warn('Error drawing treble ottava bracket:', e);
       }
     }
   }
